@@ -61,7 +61,8 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 80,
+    paddingBottom: 100,
     gap: 10,
   },
   bubble: {

@@ -72,6 +72,12 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+## 5. Respect the UI design
+
+- Do not change the UI design. 
+- Do not add new components or modify existing ones unless explicitly asked.
+- Keep the UI design as close as possible to the original design.
+- When you need to add a new component, make sure it matches the existing design.
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.

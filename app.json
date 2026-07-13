@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "opera",
+    "name": "Opera",
     "slug": "opera",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -12,7 +12,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E53935",
+        "backgroundColor": "#FF1A1A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -29,7 +29,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FFF5EC",
+          "backgroundColor": "#FF1A1A",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }

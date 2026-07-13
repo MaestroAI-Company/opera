@@ -33,9 +33,9 @@ export default function ChatView({ messages }: ChatViewProps) {
             {item.content}
           </Text>
         ) : (
-          <Text style={styles.aiText}>
+          <View style={styles.aiContainer}>
             {renderMarkdown(item.content)}
-          </Text>
+          </View>
         )}
       </View>
     );
@@ -85,9 +85,7 @@ const styles = StyleSheet.create({
   userText: {
     color: "#fff",
   },
-  aiText: {
-    fontSize: 18,
-    lineHeight: 26,
-    color: "#000",
+  aiContainer: {
+    gap: 2,
   },
 });

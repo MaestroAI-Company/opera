@@ -1,7 +1,8 @@
 import React from "react";
-import { StyleSheet, Text } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 const s = StyleSheet.create({
+  base: { fontSize: 18, lineHeight: 26, color: "#000" },
   bold: { fontWeight: "bold" },
   italic: { fontStyle: "italic" },
   code: {
@@ -22,9 +23,11 @@ const s = StyleSheet.create({
     lineHeight: 18,
     marginVertical: 4,
   },
-  h1: { fontSize: 22, fontWeight: "bold", marginTop: 8, marginBottom: 4 },
-  h2: { fontSize: 19, fontWeight: "bold", marginTop: 7, marginBottom: 3 },
-  h3: { fontSize: 17, fontWeight: "bold", marginTop: 6, marginBottom: 3 },
+  h1: { fontSize: 22, fontWeight: "bold", marginTop: 8, marginBottom: 4, color: "#000" },
+  h2: { fontSize: 19, fontWeight: "bold", marginTop: 7, marginBottom: 3, color: "#000" },
+  h3: { fontSize: 17, fontWeight: "bold", marginTop: 6, marginBottom: 3, color: "#000" },
+  paragraph: { marginVertical: 2 },
+  spacing: { height: 8 },
 });
 
 type Token =
@@ -116,7 +119,7 @@ export function renderMarkdown(md: string): React.ReactNode[] {
       }
       i++; // skip closing ```
       elements.push(
-        <Text key={`code-${i}`} style={s.codeBlock}>
+        <Text key={`code-${i}`} style={[s.base, s.codeBlock]}>
           {codeLines.join("\n")}
         </Text>
       );
@@ -129,7 +132,7 @@ export function renderMarkdown(md: string): React.ReactNode[] {
       const level = headingMatch[1].length;
       const style = level === 1 ? s.h1 : level === 2 ? s.h2 : s.h3;
       elements.push(
-        <Text key={`h-${i}`} style={style}>
+        <Text key={`h-${i}`} style={[s.base, style]}>
           {renderTokens(parseInline(headingMatch[2]), i)}
         </Text>
       );
@@ -141,7 +144,7 @@ export function renderMarkdown(md: string): React.ReactNode[] {
     const bulletMatch = line.match(/^[\s]*[-*]\s+(.*)/);
     if (bulletMatch) {
       elements.push(
-        <Text key={`li-${i}`} style={{ marginVertical: 2 }}>
+        <Text key={`li-${i}`} style={[s.base, s.paragraph]}>
           {"• "}{renderTokens(parseInline(bulletMatch[1]), i)}
         </Text>
       );
@@ -153,7 +156,7 @@ export function renderMarkdown(md: string): React.ReactNode[] {
     const olMatch = line.match(/^[\s]*(\d+)\.\s+(.*)/);
     if (olMatch) {
       elements.push(
-        <Text key={`oli-${i}`} style={{ marginVertical: 2 }}>
+        <Text key={`oli-${i}`} style={[s.base, s.paragraph]}>
           {`${olMatch[1]}. `}{renderTokens(parseInline(olMatch[2]), i)}
         </Text>
       );
@@ -165,7 +168,7 @@ export function renderMarkdown(md: string): React.ReactNode[] {
     if (line.trimStart().startsWith("> ")) {
       const quoteText = line.replace(/^[\s]*>\s?/, "");
       elements.push(
-        <Text key={`quote-${i}`} style={{ borderLeftColor: "#FF1A1A", borderLeftWidth: 3, paddingLeft: 10, marginVertical: 4 }}>
+        <Text key={`quote-${i}`} style={[s.base, { borderLeftColor: "#FF1A1A", borderLeftWidth: 3, paddingLeft: 10, marginVertical: 4 }]}>
           {renderTokens(parseInline(quoteText), i)}
         </Text>
       );
@@ -175,6 +178,7 @@ export function renderMarkdown(md: string): React.ReactNode[] {
 
     // empty line = spacing
     if (line.trim() === "") {
+      elements.push(<View key={`sp-${i}`} style={s.spacing} />);
       i++;
       continue;
     }
@@ -187,8 +191,8 @@ export function renderMarkdown(md: string): React.ReactNode[] {
     }
     if (paraLines.length > 0) {
       elements.push(
-        <Text key={`p-${i}`} style={{ marginVertical: 2 }}>
-          {renderTokens(parseInline(paraLines.join(" ")), i)}
+        <Text key={`p-${i}`} style={[s.base, s.paragraph]}>
+          {renderTokens(parseInline(paraLines.join("\n")), i)}
         </Text>
       );
     }

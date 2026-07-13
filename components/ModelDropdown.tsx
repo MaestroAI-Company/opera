@@ -71,6 +71,7 @@ export default function ModelDropdown({
   return (
     <View style={styles.container}>
       <View ref={triggerRef} style={styles.shadowLayer}>
+        <View style={styles.shadowBlock} />
         <Pressable onPress={handleOpen} style={styles.trigger}>
           <Image source={arrowDownIcon} style={styles.icon} />
           <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
@@ -154,26 +155,39 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  shadowLayer: {},
+  shadowLayer: {
+    position: "relative",
+  },
+  shadowBlock: {
+    position: "absolute",
+    top: 4,
+    left: -4,
+    right: 4,
+    height: 44,
+    backgroundColor: "#00000013",
+    borderRadius: 5,
+  },
   trigger: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 2,
     borderColor: "#00000017",
     paddingHorizontal: 12,
-    height: 36,
+    height: 44,
     backgroundColor: "#fff",
     gap: 8,
     borderRadius: 5,
     maxWidth: 180,
     overflow: "hidden",
+    position: "relative",
+    zIndex: 1,
   },
   icon: {
-    width: 16,
-    height: 16,
+    width: 18,
+    height: 18,
   },
   label: {
-    fontSize: 16,
+    fontSize: 15,
     color: "#000",
     fontFamily: "monospace",
     flexShrink: 1,
@@ -197,16 +211,19 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 12,
     color: "#888",
     marginBottom: 8,
     marginTop: 4,
+    fontFamily: "monospace",
+    textTransform: "uppercase",
+    letterSpacing: 1,
   },
   separator: {
     height: 16,
   },
   modelStatus: {
-    fontSize: 14,
+    fontSize: 12,
     color: "#888",
     fontStyle: "italic",
     paddingHorizontal: 12,
@@ -222,7 +239,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FF1A1A",
   },
   optionText: {
-    fontSize: 18,
+    fontSize: 15,
     color: "#000",
     fontFamily: "monospace",
   },

@@ -15,9 +15,9 @@ import ChatView from "../../components/ChatView";
 import DrawerMenu from "../../components/DrawerMenu";
 import ModelDropdown from "../../components/ModelDropdown";
 import TopBar from "../../components/TopBar";
+import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { AIModule } from "../services/ai/AIModule";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
-import { SYSTEM_PROMPTS } from "../../constants/prompts";
 
 const butterflyImage = require("../../assets/images/butterfly2.png");
 const texture2 = require("../../assets/images/texture2.png");
@@ -195,9 +195,12 @@ export default function Index() {
             onModelChange={setSelectedModel}
             onReflectionChange={setSelectedReflection}
             rightElement={
-              <Pressable style={styles.settingsButton}>
-                <Image source={settingsIcon} style={styles.settingsIcon} />
-              </Pressable>
+              <View style={styles.settingsShadowLayer}>
+                <View style={styles.settingsShadowBlock} />
+                <Pressable style={styles.settingsButton}>
+                  <Image source={settingsIcon} style={styles.settingsIcon} />
+                </Pressable>
+              </View>
             }
           />
         </TopBar>
@@ -262,19 +265,33 @@ const styles = StyleSheet.create({
     color: "#333",
     letterSpacing: 1,
   },
+  settingsShadowLayer: {
+    position: "relative",
+    marginLeft: 6,
+  },
+  settingsShadowBlock: {
+    position: "absolute",
+    top: 4,
+    left: -4,
+    right: 4,
+    height: 44,
+    backgroundColor: "#00000013",
+    borderRadius: 5,
+  },
   settingsButton: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 6,
     backgroundColor: "#fff",
     borderWidth: 2,
     borderColor: "#00000017",
     borderRadius: 5,
+    position: "relative",
+    zIndex: 1,
   },
   settingsIcon: {
-    width: 22,
-    height: 22,
+    width: 18,
+    height: 18,
   },
 });

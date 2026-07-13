@@ -4,7 +4,7 @@ import { Image, Pressable, StyleSheet, TextInput, View } from "react-native";
 //icons
 const nextWhiteIcon = require("../assets/icons/arrow.png");
 const micIcon = require("../assets/icons/micrphone-white.png");
-const addIcon = require("../assets/icons/add-white.png");
+const addIcon = require("../assets/icons/add.png");
 
 type ChatInputBarProps = {
   onSend?: (message: string) => void;
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderWidth: 2,
     borderColor: "#00000017",
-    height: 52,
+    height: 56,
     shadowColor: "#FF1A1A",
     shadowOffset: { width: 2, height: 6 },
     shadowOpacity: 1,
@@ -77,27 +77,27 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   plusButton: {
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
     justifyContent: "center",
     alignItems: "center",
   },
   micButton: {
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 4,
+    marginLeft: 6,
   },
   micIcon: {
-    width: 16,
-    height: 16,
+    width: 18,
+    height: 18,
     tintColor: "#fff",
     resizeMode: "contain",
   },
   plusIcon: {
-    width: 16,
-    height: 16,
+    width: 18,
+    height: 18,
     tintColor: "#fff",
     resizeMode: "contain",
   },
@@ -109,14 +109,14 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   sendButton: {
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
     justifyContent: "center",
     alignItems: "center",
   },
   sendIcon: {
-    width: 16,
-    height: 16,
+    width: 18,
+    height: 18,
     tintColor: "#fff",
   },
 });

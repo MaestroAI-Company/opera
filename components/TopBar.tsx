@@ -1,4 +1,7 @@
-import { View, Pressable, Text, StyleSheet } from "react-native";
+import { Image, Pressable, StyleSheet, View } from "react-native";
+
+const moreIcon = require("../assets/icons/More.png");
+const addIcon = require("../assets/icons/add.png");
 
 type TopBarProps = {
   onMenuPress: () => void;
@@ -12,12 +15,12 @@ export default function TopBar({ onMenuPress, onNewPress, children }: TopBarProp
       <View style={styles.leftButtons}>
         <View style={styles.shadowLayer}>
           <View style={styles.shadowBlock} />
-          <View style={styles.buttonsRow}>
-            <Pressable onPress={onMenuPress} style={styles.squareButton}>
-              <Text style={styles.buttonLabel}>☰</Text>
+          <View style={styles.buttonsContainer}>
+            <Pressable onPress={onMenuPress} style={styles.button}>
+              <Image source={moreIcon} style={styles.buttonIcon} />
             </Pressable>
-            <Pressable onPress={onNewPress} style={styles.squareButton}>
-              <Text style={styles.buttonLabel}>＋</Text>
+            <Pressable onPress={onNewPress} style={styles.button}>
+              <Image source={addIcon} style={styles.buttonIcon} />
             </Pressable>
           </View>
         </View>
@@ -44,29 +47,32 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 4,
     left: -4,
-    width: 68,
-    height: 36,
+    right: 4,
+    height: 44,
     backgroundColor: "#00000013",
     borderRadius: 5,
   },
-  buttonsRow: {
+  buttonsContainer: {
     flexDirection: "row",
-    position: "relative",
-    zIndex: 1,
-    marginLeft: 0,
-  },
-  squareButton: {
-    width: 36,
-    height: 36,
+    alignItems: "center",
+    backgroundColor: "#fff",
     borderWidth: 2,
     borderColor: "#00000017",
     borderRadius: 5,
+    position: "relative",
+    zIndex: 1,
+    overflow: "hidden",
+  },
+  button: {
+    width: 40,
+    height: 40,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
   },
-  buttonLabel: {
-    fontSize: 18,
-    color: "#333",
+  buttonIcon: {
+    width: 18,
+    height: 18,
+    resizeMode: "contain",
+    tintColor: "#333333",
   },
 });

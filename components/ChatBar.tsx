@@ -1,8 +1,10 @@
-import { View, TextInput, Pressable, Image, StyleSheet } from "react-native";
 import { useState } from "react";
+import { Image, Pressable, StyleSheet, TextInput, View } from "react-native";
 
 //icons
-const nextWhiteIcon = require("../assets/icons/next-white.png");
+const nextWhiteIcon = require("../assets/icons/arrow.png");
+const micIcon = require("../assets/icons/micrphone-white.png");
+const addIcon = require("../assets/icons/add-white.png");
 
 type ChatInputBarProps = {
   onSend?: (message: string) => void;
@@ -28,10 +30,12 @@ export default function ChatBar({
     <View style={styles.container}>
       {/* + button */}
       <Pressable onPress={onPlusPress} style={styles.plusButton}>
-        <View style={styles.plusIcon}>
-          <View style={styles.plusH} />
-          <View style={styles.plusV} />
-        </View>
+        <Image source={addIcon} style={styles.plusIcon} />
+      </Pressable>
+
+      {/* mic button */}
+      <Pressable style={styles.micButton}>
+        <Image source={micIcon} style={styles.micIcon} />
       </Pressable>
 
       {/* text input */}
@@ -66,32 +70,36 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#00000017",
     height: 52,
+    shadowColor: "#FF1A1A",
+    shadowOffset: { width: 2, height: 6 },
+    shadowOpacity: 1,
+    shadowRadius: 15,
+    elevation: 6,
   },
   plusButton: {
-    width: 28,
-    height: 28,
+    width: 24,
+    height: 24,
     justifyContent: "center",
     alignItems: "center",
+  },
+  micButton: {
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 4,
+  },
+  micIcon: {
+    width: 16,
+    height: 16,
+    tintColor: "#fff",
+    resizeMode: "contain",
   },
   plusIcon: {
-    width: 18,
-    height: 18,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  plusH: {
-    position: "absolute",
     width: 16,
-    height: 2,
-    backgroundColor: "#fff",
-    borderRadius: 1,
-  },
-  plusV: {
-    position: "absolute",
-    width: 2,
     height: 16,
-    backgroundColor: "#fff",
-    borderRadius: 1,
+    tintColor: "#fff",
+    resizeMode: "contain",
   },
   input: {
     flex: 1,
@@ -101,14 +109,14 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   sendButton: {
-    width: 32,
-    height: 32,
+    width: 24,
+    height: 24,
     justifyContent: "center",
     alignItems: "center",
   },
   sendIcon: {
-    width: 20,
-    height: 20,
+    width: 16,
+    height: 16,
     tintColor: "#fff",
   },
 });

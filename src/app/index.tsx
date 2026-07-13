@@ -182,30 +182,10 @@ export default function Index() {
     >
       <ImageBackground
         source={texture2}
-        style={[styles.container, { paddingTop: insets.top }]}
+        style={[styles.container]}
         imageStyle={styles.backgroundTexture}
       >
-        <TopBar
-          onMenuPress={() => setDrawerVisible(true)}
-          onNewPress={startNewConversation}
-        >
-          <ModelDropdown
-            selectedModel={selectedModel}
-            selectedReflection={selectedReflection}
-            onModelChange={setSelectedModel}
-            onReflectionChange={setSelectedReflection}
-            rightElement={
-              <View style={styles.settingsShadowLayer}>
-                <View style={styles.settingsShadowBlock} />
-                <Pressable style={styles.settingsButton}>
-                  <Image source={settingsIcon} style={styles.settingsIcon} />
-                </Pressable>
-              </View>
-            }
-          />
-        </TopBar>
-
-        {/* welcome screen when no active conversation */}
+        {/* content fills full screen, behind bars */}
         {!activeConversation ? (
           <View style={styles.centerContent}>
             <Image
@@ -216,11 +196,34 @@ export default function Index() {
             <Text style={styles.welcomeText}>Welcome</Text>
           </View>
         ) : (
-          //chat view over the welcome screen
           <ChatView messages={messages} />
         )}
 
-        <View style={{ paddingBottom: insets.bottom }}>
+        {/* top bar overlay */}
+        <View style={[styles.topBarOverlay, { paddingTop: insets.top }]}>
+          <TopBar
+            onMenuPress={() => setDrawerVisible(true)}
+            onNewPress={startNewConversation}
+          >
+            <ModelDropdown
+              selectedModel={selectedModel}
+              selectedReflection={selectedReflection}
+              onModelChange={setSelectedModel}
+              onReflectionChange={setSelectedReflection}
+              rightElement={
+                <View style={styles.settingsShadowLayer}>
+                  <View style={styles.settingsShadowBlock} />
+                  <Pressable style={styles.settingsButton}>
+                    <Image source={settingsIcon} style={styles.settingsIcon} />
+                  </Pressable>
+                </View>
+              }
+            />
+          </TopBar>
+        </View>
+
+        {/* bottom bar overlay */}
+        <View style={[styles.bottomBarOverlay, { paddingBottom: insets.bottom }]}>
           <ChatBar
             onSend={handleSend}
             onPlusPress={() => console.log("plus pressed")}
@@ -248,6 +251,18 @@ const styles = StyleSheet.create({
   backgroundTexture: {
     opacity: 0.01,
     resizeMode: "cover",
+  },
+  topBarOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+  bottomBarOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   centerContent: {
     flex: 1,

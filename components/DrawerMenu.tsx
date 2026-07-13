@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Dimensions, Image, Pressable, ScrollView, Text, View, StyleSheet } from "react-native";
+import { Animated, Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Conversation } from "../src/services/db/DatabaseService";
 
 const operaLogo = require("../assets/icons/opera.png");
+const searchIcon = require("../assets/icons/search.png");
+const newIcon = require("../assets/icons/add.png");
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.82;
@@ -76,7 +78,7 @@ export default function DrawerMenu({
           source={operaLogo}
           style={styles.logo}
           resizeMode="contain"
-          tintColor="#E53935"
+          tintColor="#FF1A1A"
         />
 
         <View style={styles.quickActionsShadowLayer}>
@@ -89,21 +91,21 @@ export default function DrawerMenu({
               }}
               style={styles.quickActionItem}
             >
-              <Text style={styles.quickActionIcon}>＋</Text>
+              <Image source={newIcon} style={styles.quickActionIcon} />
               <Text style={styles.quickActionLabel}>New discussion</Text>
             </Pressable>
             <Pressable onPress={onClose} style={styles.quickActionItem}>
-              <Text style={styles.quickActionIcon}>⌕</Text>
+              <Image source={searchIcon} style={styles.quickActionIcon} />
               <Text style={styles.quickActionLabel}>Search</Text>
             </Pressable>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Récents</Text>
+        <Text style={styles.sectionTitle}>Last discussions</Text>
 
         <ScrollView showsVerticalScrollIndicator={false}>
           {conversations.length === 0 && (
-            <Text style={styles.emptyText}>Aucune conversation</Text>
+            <Text style={styles.emptyText}>No conversation</Text>
           )}
           {conversations.map((conv) => {
             const isSelected = conv.id === selectedConversationId;
@@ -121,9 +123,6 @@ export default function DrawerMenu({
                   numberOfLines={1}
                 >
                   {conv.name}
-                </Text>
-                <Text style={styles.discussionDate}>
-                  {new Date(conv.updatedAt).toLocaleDateString("fr-FR")}
                 </Text>
               </Pressable>
             );
@@ -188,8 +187,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   quickActionIcon: {
-    fontSize: 18,
-    color: "#333",
+    width: 18,
+    height: 18,
   },
   quickActionLabel: {
     fontSize: 15,
@@ -218,15 +217,15 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   discussionRowSelected: {
-    backgroundColor: "#FFF0F0",
+    backgroundColor: "#FF1A1A",
   },
   discussionText: {
     fontSize: 15,
-    color: "#222",
+    color: "#000000ff",
     fontFamily: "monospace",
   },
   discussionTextSelected: {
-    color: "#E53935",
+    color: "#ffffffff",
     fontWeight: "600",
   },
   discussionDate: {

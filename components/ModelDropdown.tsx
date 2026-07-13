@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Image, Modal, Pressable, Text, View, StyleSheet, LayoutRectangle } from "react-native";
+import { Image, LayoutRectangle, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { AIModule } from "../src/services/ai/AIModule";
 
-const arrowDownIcon = require("../assets/icons/swipe_down.png");
+const arrowDownIcon = require("../assets/icons/down_arrow.png");
 
 const REFLECTIONS = [
   { id: "quick", label: "Quick" },

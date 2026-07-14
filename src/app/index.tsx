@@ -211,17 +211,13 @@ export default function Index() {
   );
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
+    <View style={styles.container}>
       <ImageBackground
         source={texture2}
-        style={[styles.container]}
+        style={StyleSheet.absoluteFill}
         imageStyle={styles.backgroundTexture}
       >
-        {/* content fills full screen, behind bars */}
-        {!activeConversation ? (
+        {!activeConversation && (
           <View style={styles.centerContent}>
             <Image
               source={incognitoMode ? butterflyGrey : butterflyImage}
@@ -262,57 +258,66 @@ export default function Index() {
               Welcome to incognito mode. You can ask quick questions without leaving a trace. Once you close the window, your conversation disappears forever and won't be used to train our AI.
             </Text>
           </View>
-        ) : (
-          <ChatView
-            messages={messages}
-            conversation={activeConversation}
-            contentTopPadding={insets.top + 72}
-            contentBottomPadding={88 + insets.bottom}
-          />
         )}
-
-        {/* top bar overlay */}
-        <View style={[styles.topBarOverlay, { paddingTop: insets.top }]}>
-          <TopBar
-            onMenuPress={() => setDrawerVisible(true)}
-            onNewPress={startNewConversation}
-          >
-            <ModelDropdown
-              selectedModel={selectedModel}
-              selectedReflection={selectedReflection}
-              onModelChange={setSelectedModel}
-              onReflectionChange={setSelectedReflection}
-              rightElement={
-                <View style={styles.settingsShadowLayer}>
-                  <View style={styles.settingsShadowBlock} />
-                  <Pressable style={styles.settingsButton}>
-                    <Image source={settingsIcon} style={styles.settingsIcon} />
-                  </Pressable>
-                </View>
-              }
-            />
-          </TopBar>
-        </View>
-
-        {/* bottom bar overlay */}
-        <View style={[styles.bottomBarOverlay, { paddingBottom: insets.bottom }]}>
-          <ChatBar
-            onSend={handleSend}
-            onPlusPress={() => console.log("plus pressed")}
-            incognito={incognitoMode}
-          />
-        </View>
-
-        <DrawerMenu
-          visible={drawerVisible}
-          onClose={() => setDrawerVisible(false)}
-          conversations={conversations}
-          selectedConversationId={activeConversation?.id ?? null}
-          onSelectConversation={selectConversation}
-          onNewConversation={startNewConversation}
-        />
       </ImageBackground>
-    </KeyboardAvoidingView>
+
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <View style={{ flex: 1, backgroundColor: "transparent" }}>
+          {activeConversation && (
+            <ChatView
+              messages={messages}
+              conversation={activeConversation}
+              contentTopPadding={insets.top + 72}
+              contentBottomPadding={88 + insets.bottom}
+            />
+          )}
+
+          {/* top bar overlay */}
+          <View style={[styles.topBarOverlay, { paddingTop: insets.top }]}>
+            <TopBar
+              onMenuPress={() => setDrawerVisible(true)}
+              onNewPress={startNewConversation}
+            >
+              <ModelDropdown
+                selectedModel={selectedModel}
+                selectedReflection={selectedReflection}
+                onModelChange={setSelectedModel}
+                onReflectionChange={setSelectedReflection}
+                rightElement={
+                  <View style={styles.settingsShadowLayer}>
+                    <View style={styles.settingsShadowBlock} />
+                    <Pressable style={styles.settingsButton}>
+                      <Image source={settingsIcon} style={styles.settingsIcon} />
+                    </Pressable>
+                  </View>
+                }
+              />
+            </TopBar>
+          </View>
+
+          {/* bottom bar overlay */}
+          <View style={[styles.bottomBarOverlay, { paddingBottom: insets.bottom }]}>
+            <ChatBar
+              onSend={handleSend}
+              onPlusPress={() => console.log("plus pressed")}
+              incognito={incognitoMode}
+            />
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+
+      <DrawerMenu
+        visible={drawerVisible}
+        onClose={() => setDrawerVisible(false)}
+        conversations={conversations}
+        selectedConversationId={activeConversation?.id ?? null}
+        onSelectConversation={selectConversation}
+        onNewConversation={startNewConversation}
+      />
+    </View>
   );
 }
 

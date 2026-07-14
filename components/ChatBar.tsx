@@ -10,12 +10,14 @@ type ChatInputBarProps = {
   onSend?: (message: string) => void;
   onPlusPress?: () => void;
   placeholder?: string;
+  incognito?: boolean;
 };
 
 export default function ChatBar({
   onSend,
   onPlusPress,
   placeholder = "Ask",
+  incognito = false,
 }: ChatInputBarProps) {
   const [text, setText] = useState("");
 
@@ -27,7 +29,7 @@ export default function ChatBar({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, incognito && styles.containerIncognito]}>
       {/* + button */}
       <Pressable onPress={onPlusPress} style={styles.plusButton}>
         <Image source={addIcon} style={styles.plusIcon} />
@@ -75,6 +77,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 15,
     elevation: 6,
+  },
+  containerIncognito: {
+    backgroundColor: "#747474",
+    shadowColor: "#747474",
   },
   plusButton: {
     width: 28,

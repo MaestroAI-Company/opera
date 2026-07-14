@@ -20,6 +20,7 @@ import { AIModule } from "../services/ai/AIModule";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
 
 const butterflyImage = require("../../assets/images/butterfly2.png");
+const butterflyGrey = require("../../assets/images/butterfly2_grey.png");
 const texture2 = require("../../assets/images/texture2.png");
 const settingsIcon = require("../../assets/icons/settings.png");
 
@@ -29,6 +30,7 @@ export default function Index() {
   const [selectedReflection, setSelectedReflection] = useState("quick");
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [dbReady, setDbReady] = useState(false);
+  const [incognitoMode, setIncognitoMode] = useState(false);
 
   //conversation state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -100,7 +102,7 @@ export default function Index() {
   //send a message — creates conversation on first send
   const handleSend = useCallback(
     async (text: string) => {
-      if (!dbReady) return;
+      if (!dbReady && !incognitoMode) return;
 
       let conv = activeConversation;
       let isFirstMessage = false;
@@ -108,11 +110,20 @@ export default function Index() {
       //create conversation if this is the first message
       if (!conv) {
         isFirstMessage = true;
-        //use first 30 chars of message as placeholder name
         const name = text.length > 30 ? text.slice(0, 30) + "…" : text;
-        conv = await DB.createConversation(selectedModel || "unknown", name);
+        if (incognitoMode) {
+          conv = {
+            id: "incognito_" + Date.now(),
+            name,
+            model: selectedModel || "unknown",
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+        } else {
+          conv = await DB.createConversation(selectedModel || "unknown", name);
+          setConversations((prev) => [conv!, ...prev]);
+        }
         setActiveConversation(conv);
-        setConversations((prev) => [conv!, ...prev]);
       }
 
       //build history before updating state to avoid double-sending
@@ -121,11 +132,33 @@ export default function Index() {
         .map((m) => ({ role: m.role, content: m.content }));
 
       //save user message
-      const userMsg = await DB.addMessage(conv.id, "user", text);
+      let userMsg: Message;
+      if (incognitoMode) {
+        userMsg = {
+          id: "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+          conversationId: conv.id,
+          role: "user",
+          content: text,
+          createdAt: Date.now(),
+        };
+      } else {
+        userMsg = await DB.addMessage(conv.id, "user", text);
+      }
       setMessages((prev) => [...prev, userMsg]);
 
       //create empty assistant message for streaming
-      const assistantMsg = await DB.addMessage(conv.id, "assistant", "…");
+      let assistantMsg: Message;
+      if (incognitoMode) {
+        assistantMsg = {
+          id: "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+          conversationId: conv.id,
+          role: "assistant",
+          content: "…",
+          createdAt: Date.now(),
+        };
+      } else {
+        assistantMsg = await DB.addMessage(conv.id, "assistant", "…");
+      }
       streamingMsgIdRef.current = assistantMsg.id;
       streamingContentRef.current = "";
       setMessages((prev) => [...prev, assistantMsg]);
@@ -162,17 +195,19 @@ export default function Index() {
         );
       }
 
-      //save final assistant message content to db
-      await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
-      //refresh conversation list (updatedAt changed)
-      await loadConversations();
+      if (!incognitoMode) {
+        //save final assistant message content to db
+        await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
+        //refresh conversation list (updatedAt changed)
+        await loadConversations();
+      }
 
       //generate AI title for new conversations
-      if (isFirstMessage && conv) {
+      if (isFirstMessage && conv && !incognitoMode) {
         generateTitle(conv.id, text);
       }
     },
-    [dbReady, activeConversation, selectedModel, selectedReflection, generateTitle]
+    [dbReady, incognitoMode, activeConversation, selectedModel, selectedReflection, generateTitle]
   );
 
   return (
@@ -189,11 +224,43 @@ export default function Index() {
         {!activeConversation ? (
           <View style={styles.centerContent}>
             <Image
-              source={butterflyImage}
+              source={incognitoMode ? butterflyGrey : butterflyImage}
               style={styles.butterfly}
               resizeMode="contain"
             />
             <Text style={styles.welcomeText}>Welcome</Text>
+            <Pressable
+              onPress={() => setIncognitoMode((prev) => !prev)}
+            >
+              <View style={styles.incognitoShadowLayer}>
+                <View style={styles.incognitoShadowBlock} />
+                <View
+                  style={[
+                    styles.incognitoBox,
+                    incognitoMode && styles.incognitoBoxActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.incognitoButtonText,
+                      incognitoMode && styles.incognitoButtonTextActive,
+                    ]}
+                  >
+                    {incognitoMode
+                      ? "Disable incognito mode"
+                      : "Enable incognito mode"}
+                  </Text>
+                </View>
+              </View>
+            </Pressable>
+            <Text
+              style={[
+                styles.incognitoDescription,
+                { opacity: incognitoMode ? 1 : 0 },
+              ]}
+            >
+              Welcome to incognito mode. You can ask quick questions without leaving a trace. Once you close the window, your conversation disappears forever and won't be used to train our AI.
+            </Text>
           </View>
         ) : (
           <ChatView messages={messages} />
@@ -227,6 +294,7 @@ export default function Index() {
           <ChatBar
             onSend={handleSend}
             onPlusPress={() => console.log("plus pressed")}
+            incognito={incognitoMode}
           />
         </View>
 
@@ -308,5 +376,51 @@ const styles = StyleSheet.create({
   settingsIcon: {
     width: 18,
     height: 18,
+  },
+  incognitoShadowLayer: {
+    position: "relative",
+    marginTop: 20,
+  },
+  incognitoShadowBlock: {
+    position: "absolute",
+    top: 6,
+    left: -6,
+    right: 6,
+    bottom: -6,
+    backgroundColor: "#00000013",
+    borderRadius: 5,
+  },
+  incognitoBox: {
+    position: "relative",
+    borderWidth: 2,
+    borderColor: "#00000017",
+    borderRadius: 5,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: "#fff",
+    zIndex: 1,
+  },
+  incognitoBoxActive: {
+    backgroundColor: "#FF1A1A",
+    borderColor: "#FF1A1A",
+  },
+  incognitoButtonText: {
+    fontSize: 14,
+    color: "#222",
+    fontFamily: "monospace",
+    textAlign: "center",
+  },
+  incognitoButtonTextActive: {
+    color: "#fff",
+  },
+  incognitoDescription: {
+    marginTop: 14,
+    fontSize: 12,
+    color: "#999",
+    fontFamily: "monospace",
+    textAlign: "center",
+    lineHeight: 18,
+    maxWidth: 300,
+    alignSelf: "center",
   },
 });

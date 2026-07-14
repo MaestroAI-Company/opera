@@ -1,3 +1,4 @@
+import { AudioModule, useAudioStream } from "expo-audio";
 import { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -8,7 +9,6 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useAudioStream, AudioModule } from "expo-audio";
 import { Whisper } from "../src/services/whisper/WhisperService";
 
 //icons
@@ -43,7 +43,7 @@ function buildWavBuffer(pcmFloat32Chunks: ArrayBuffer[], sampleRate: number): Ar
   const fmt = enc.encode("fmt ");
   const data = enc.encode("data");
 
-  [riff, wave, fmt, data].forEach(() => {}); //keep refs
+  [riff, wave, fmt, data].forEach(() => { }); //keep refs
   view.setUint8(0, riff[0]); view.setUint8(1, riff[1]);
   view.setUint8(2, riff[2]); view.setUint8(3, riff[3]);
   view.setUint32(4, 36 + dataBytes, true);     //file size - 8
@@ -85,25 +85,25 @@ function VoiceIndicator() {
     let isMounted = true;
     const animate = () => {
       if (!isMounted) return;
-      
+
       // increase multiplier to react more
-      const vol = Math.min(1, currentAudioVolume * 50); 
-      
+      const vol = Math.min(1, currentAudioVolume * 50);
+
       const animations = anims.map((anim, i) => {
         // scaley min = 1
         const targetScale = 1 + vol * (2 + Math.sin(Date.now() / 100 + i)) + (Math.random() * vol * 1.5);
         return Animated.timing(anim, {
-          toValue: Math.max(1, Math.min(targetScale, 5)), 
+          toValue: Math.max(1, Math.min(targetScale, 5)),
           duration: 60, // faster = more reactive
           useNativeDriver: true,
         });
       });
-      
+
       Animated.parallel(animations).start(() => {
         if (isMounted) requestAnimationFrame(animate);
       });
     };
-    
+
     animate();
 
     return () => {
@@ -155,7 +155,7 @@ export default function ChatBar({
       if (isRecordingRef.current) {
         pcmChunksRef.current.push(buffer.data);
         sampleRateRef.current = buffer.sampleRate;
-        
+
         const f32 = new Float32Array(buffer.data);
         let sum = 0;
         for (let i = 0; i < f32.length; i++) {
@@ -171,7 +171,7 @@ export default function ChatBar({
 
   //init whisper on mount and request mic permission early
   useEffect(() => {
-    AudioModule.requestRecordingPermissionsAsync().catch(() => {});
+    AudioModule.requestRecordingPermissionsAsync().catch(() => { });
     Whisper.init().then((ok) => setWhisperAvailable(ok));
   }, []);
 
@@ -340,8 +340,8 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   containerIncognito: {
-    backgroundColor: "#747474",
-    shadowColor: "#747474",
+    backgroundColor: "#565A75",
+    shadowColor: "#565A75",
   },
   plusButton: {
     width: 28,

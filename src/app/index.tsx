@@ -19,7 +19,7 @@ import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { AIModule } from "../services/ai/AIModule";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
 
-const butterflyImage = require("../../assets/images/butterfly2.png");
+const butterflyImage = require("../../assets/images/butterfly5.png");
 const butterflyGrey = require("../../assets/images/butterfly2_grey.png");
 const texture2 = require("../../assets/images/texture2.png");
 const settingsIcon = require("../../assets/icons/settings.png");
@@ -190,10 +190,10 @@ export default function Index() {
           { think: selectedReflection === "think" }
         );
       } catch (e: any) {
-        const isAborted = e.name === "AbortError" || 
-                          e.message?.toLowerCase().includes("aborted") || 
-                          e.message?.toLowerCase().includes("cancel");
-        
+        const isAborted = e.name === "AbortError" ||
+          e.message?.toLowerCase().includes("aborted") ||
+          e.message?.toLowerCase().includes("cancel");
+
         if (isAborted) {
           console.log("Generation aborted by user");
           streamingContentRef.current += "\n\n_The user interrupted the response_";
@@ -201,7 +201,7 @@ export default function Index() {
           console.error(e);
           streamingContentRef.current = "Erreur lors de la réponse.";
         }
-        
+
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsg.id
@@ -247,26 +247,25 @@ export default function Index() {
             <Pressable
               onPress={() => setIncognitoMode((prev) => !prev)}
             >
-              <View style={styles.incognitoShadowLayer}>
-                <View style={styles.incognitoShadowBlock} />
-                <View
+
+              <View
+                style={[
+                  styles.incognitoBox,
+                  incognitoMode && styles.incognitoBoxActive,
+                ]}
+              >
+                <Text
                   style={[
-                    styles.incognitoBox,
-                    incognitoMode && styles.incognitoBoxActive,
+                    styles.incognitoButtonText,
+                    incognitoMode && styles.incognitoButtonTextActive,
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.incognitoButtonText,
-                      incognitoMode && styles.incognitoButtonTextActive,
-                    ]}
-                  >
-                    {incognitoMode
-                      ? "Disable incognito mode"
-                      : "Enable incognito mode"}
-                  </Text>
-                </View>
+                  {incognitoMode
+                    ? "Disable incognito mode"
+                    : "Enable incognito mode"}
+                </Text>
               </View>
+
             </Pressable>
             <Text
               style={[
@@ -274,7 +273,7 @@ export default function Index() {
                 { opacity: incognitoMode ? 1 : 0 },
               ]}
             >
-              Welcome to incognito mode. You can ask quick questions without leaving a trace. Once you close the window, your conversation disappears forever and won't be used to train our AI.
+              Welcome to incognito mode. You can ask quick questions without leaving a trace. Once you close the window, your conversation disappears forever.
             </Text>
           </View>
         )}
@@ -369,8 +368,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   butterfly: {
-    width: 180,
-    height: 160,
+    width: 250,
+    height: 250,
     marginBottom: 16,
   },
   welcomeText: {
@@ -408,19 +407,6 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
   },
-  incognitoShadowLayer: {
-    position: "relative",
-    marginTop: 20,
-  },
-  incognitoShadowBlock: {
-    position: "absolute",
-    top: 6,
-    left: -6,
-    right: 6,
-    bottom: -6,
-    backgroundColor: "#00000013",
-    borderRadius: 5,
-  },
   incognitoBox: {
     position: "relative",
     borderWidth: 2,
@@ -430,10 +416,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     backgroundColor: "#fff",
     zIndex: 1,
+    marginTop: 20,
   },
   incognitoBoxActive: {
-    backgroundColor: "#747474",
-    borderColor: "#747474",
+    backgroundColor: "#565A75",
+    borderColor: "#565A75",
   },
   incognitoButtonText: {
     fontSize: 14,

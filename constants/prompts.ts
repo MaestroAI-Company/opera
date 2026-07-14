@@ -1,7 +1,7 @@
 export const SYSTEM_PROMPTS = {
   DEFAULT: `# Identité
 
-Tu es Maestro, un agent conversationnel local, open-source et respectueux de la vie privée.
+Tu es Maestro, un agent conversationnel local, open-source et respectueux de la vie privée. Tu es fabriqué par la Startup "Maestroai.Company"
 
 # Sécurité et vie privée — IMPORTANT
 

@@ -4,6 +4,8 @@ import {
   Animated,
   Easing,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   TextInput,
@@ -11,11 +13,9 @@ import {
 } from "react-native";
 import { Whisper } from "../src/services/whisper/WhisperService";
 
-//icons
 const nextWhiteIcon = require("../assets/icons/arrow.png");
 const micIcon = require("../assets/icons/microphone.png");
 const addIcon = require("../assets/icons/add.png");
-
 const stopIcon = require("../assets/icons/stop.png");
 
 type ChatInputBarProps = {
@@ -27,42 +27,35 @@ type ChatInputBarProps = {
   isGenerating?: boolean;
 };
 
-// build a wav file header + float32 pcm data for whisper.rn transcribedata
+// ... (Fonctions buildWavBuffer et VoiceIndicator inchangées)
 function buildWavBuffer(pcmFloat32Chunks: ArrayBuffer[], sampleRate: number): ArrayBuffer {
-  //concat all float32 chunks
   const totalSamples = pcmFloat32Chunks.reduce((n, b) => n + b.byteLength / 4, 0);
-  const dataBytes = totalSamples * 2; //16-bit output
-
+  const dataBytes = totalSamples * 2;
   const buffer = new ArrayBuffer(44 + dataBytes);
   const view = new DataView(buffer);
-
-  //riff header
   const enc = new TextEncoder();
   const riff = enc.encode("RIFF");
   const wave = enc.encode("WAVE");
   const fmt = enc.encode("fmt ");
   const data = enc.encode("data");
-
-  [riff, wave, fmt, data].forEach(() => { }); //keep refs
+  [riff, wave, fmt, data].forEach(() => { });
   view.setUint8(0, riff[0]); view.setUint8(1, riff[1]);
   view.setUint8(2, riff[2]); view.setUint8(3, riff[3]);
-  view.setUint32(4, 36 + dataBytes, true);     //file size - 8
+  view.setUint32(4, 36 + dataBytes, true);
   view.setUint8(8, wave[0]); view.setUint8(9, wave[1]);
   view.setUint8(10, wave[2]); view.setUint8(11, wave[3]);
   view.setUint8(12, fmt[0]); view.setUint8(13, fmt[1]);
   view.setUint8(14, fmt[2]); view.setUint8(15, fmt[3]);
-  view.setUint32(16, 16, true);                //subchunk1 size
-  view.setUint16(20, 1, true);                 //pcm format
-  view.setUint16(22, 1, true);                 //mono
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
   view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);    //byte rate
-  view.setUint16(32, 2, true);                 //block align
-  view.setUint16(34, 16, true);                //bits per sample
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
   view.setUint8(36, data[0]); view.setUint8(37, data[1]);
   view.setUint8(38, data[2]); view.setUint8(39, data[3]);
   view.setUint32(40, dataBytes, true);
-
-  //write 16-bit pcm samples
   let offset = 44;
   for (const chunk of pcmFloat32Chunks) {
     const f32 = new Float32Array(chunk);
@@ -72,7 +65,6 @@ function buildWavBuffer(pcmFloat32Chunks: ArrayBuffer[], sampleRate: number): Ar
       offset += 2;
     }
   }
-
   return buffer;
 }
 
@@ -80,50 +72,33 @@ let currentAudioVolume = 0;
 
 function VoiceIndicator() {
   const anims = useRef(Array.from({ length: 7 }).map(() => new Animated.Value(1))).current;
-
   useEffect(() => {
     let isMounted = true;
     const animate = () => {
       if (!isMounted) return;
-
-      // increase multiplier to react more
       const vol = Math.min(1, currentAudioVolume * 50);
-
       const animations = anims.map((anim, i) => {
-        // scaley min = 1
         const targetScale = 1 + vol * (2 + Math.sin(Date.now() / 100 + i)) + (Math.random() * vol * 1.5);
         return Animated.timing(anim, {
           toValue: Math.max(1, Math.min(targetScale, 5)),
-          duration: 60, // faster = more reactive
+          duration: 60,
           useNativeDriver: true,
         });
       });
-
       Animated.parallel(animations).start(() => {
         if (isMounted) requestAnimationFrame(animate);
       });
     };
-
     animate();
-
     return () => {
       isMounted = false;
       anims.forEach(a => a.stopAnimation());
     };
   }, [anims]);
-
   return (
     <View style={styles.voiceIndicatorContainer}>
       {anims.map((anim, i) => (
-        <Animated.View
-          key={i}
-          style={[
-            styles.voiceSquare,
-            {
-              transform: [{ scaleY: anim }],
-            },
-          ]}
-        />
+        <Animated.View key={i} style={[styles.voiceSquare, { transform: [{ scaleY: anim }] }]} />
       ))}
     </View>
   );
@@ -145,8 +120,8 @@ export default function ChatBar({
   const pcmChunksRef = useRef<ArrayBuffer[]>([]);
   const sampleRateRef = useRef<number>(16000);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pressAnim = useRef(new Animated.Value(0)).current;
 
-  // audio stream 16kHz float32 mono for whisper
   const { stream } = useAudioStream({
     sampleRate: 16000,
     channels: 1,
@@ -155,7 +130,6 @@ export default function ChatBar({
       if (isRecordingRef.current) {
         pcmChunksRef.current.push(buffer.data);
         sampleRateRef.current = buffer.sampleRate;
-
         const f32 = new Float32Array(buffer.data);
         let sum = 0;
         for (let i = 0; i < f32.length; i++) {
@@ -166,16 +140,13 @@ export default function ChatBar({
     },
   });
 
-  //ref to avoid stale closure in onBuffer callback
   const isRecordingRef = useRef(false);
 
-  //init whisper on mount and request mic permission early
   useEffect(() => {
     AudioModule.requestRecordingPermissionsAsync().catch(() => { });
     Whisper.init().then((ok) => setWhisperAvailable(ok));
   }, []);
 
-  //pulse animation when recording
   useEffect(() => {
     isRecordingRef.current = isRecording;
     if (isRecording) {
@@ -202,7 +173,20 @@ export default function ChatBar({
     }
   }, [isRecording]);
 
-  //start audio streaming
+  const handlePressIn = () => {
+    Animated.timing(pressAnim, { toValue: 1, duration: 150, useNativeDriver: false }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.timing(pressAnim, { toValue: 0, duration: 150, useNativeDriver: false }).start();
+  };
+
+  const scale = pressAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] });
+  const backgroundColor = pressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: incognito ? ["#565A75", "#70748E"] : ["#FF1A1A", "#FF4D4D"],
+  });
+
   const startRecording = async () => {
     try {
       pcmChunksRef.current = [];
@@ -214,23 +198,16 @@ export default function ChatBar({
     }
   };
 
-  //stop streaming and transcribe accumulated pcm
   const stopAndTranscribe = async (): Promise<string | null> => {
     try {
       stream.stop();
       setIsRecording(false);
-
       const chunks = pcmChunksRef.current;
       pcmChunksRef.current = [];
-
       if (chunks.length === 0) return null;
-
       setIsTranscribing(true);
       const wavBuffer = buildWavBuffer(chunks, sampleRateRef.current);
-      console.log(`[Whisper] Start transcribing ${chunks.length} chunks (approx ${Math.round((chunks.length * 1024) / sampleRateRef.current)}s)...`);
-      const startTime = Date.now();
       const transcribed = await Whisper.transcribeData(wavBuffer);
-      console.log(`[Whisper] Transcription completed in ${Date.now() - startTime}ms: "${transcribed}"`);
       setIsTranscribing(false);
       return transcribed;
     } catch (e) {
@@ -240,10 +217,8 @@ export default function ChatBar({
     }
   };
 
-  //handle mic press — toggle recording
   const handleMicPress = () => {
     if (isRecording) {
-      //cancel recording without sending
       stream.stop();
       setIsRecording(false);
       pcmChunksRef.current = [];
@@ -252,16 +227,12 @@ export default function ChatBar({
     }
   };
 
-  //handle send — if recording, stop + transcribe + fill text input
   const handleSend = async () => {
     if (isRecording) {
       const transcribed = await stopAndTranscribe();
-      if (transcribed && transcribed.length > 0) {
-        setText(transcribed);
-      }
+      if (transcribed && transcribed.length > 0) setText(transcribed);
       return;
     }
-
     if (text.trim() && onSend) {
       onSend(text.trim());
       setText("");
@@ -269,64 +240,73 @@ export default function ChatBar({
   };
 
   return (
-    <View style={[styles.container, incognito && styles.containerIncognito]}>
-      {/* + button */}
-      <Pressable onPress={onPlusPress} style={styles.plusButton}>
-        <Image source={addIcon} style={styles.plusIcon} />
-      </Pressable>
+    // Le composant magique natif qui règle le problème sans calculs manuels
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    // On peut ajouter un petit offset si ta navbar ou statusbar décale le tout :
+    // keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0} 
+    >
+      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.pressableWrapper}>
+        <Animated.View
+          style={[
+            styles.container,
+            incognito && styles.containerIncognito,
+            { transform: [{ scale }], backgroundColor: backgroundColor }
+          ]}
+        >
+          <Pressable onPress={onPlusPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.plusButton}>
+            <Image source={addIcon} style={styles.plusIcon} />
+          </Pressable>
 
-      {/* mic button */}
-      {whisperAvailable && !isGenerating && (
-        <Pressable onPress={handleMicPress} style={styles.micButton}>
-          <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
-            <Image
-              source={micIcon}
-              style={[
-                styles.micIcon,
-                isRecording && styles.micIconRecording,
-              ]}
+          {whisperAvailable && !isGenerating && (
+            <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.micButton}>
+              <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
+                <Image source={micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} />
+              </Animated.View>
+            </Pressable>
+          )}
+
+          {isRecording ? (
+            <VoiceIndicator />
+          ) : (
+            <TextInput
+              style={[styles.input, { maxHeight: 100 }]}
+              value={isTranscribing ? "Transcribing..." : text}
+              onChangeText={isTranscribing ? undefined : setText}
+              placeholder={placeholder}
+              placeholderTextColor="rgba(255,255,255,0.6)"
+              multiline={true}
+              editable={!isTranscribing}
+              onTouchStart={handlePressIn}
+              onTouchEnd={handlePressOut}
             />
-          </Animated.View>
-        </Pressable>
-      )}
+          )}
 
-      {/* text input or voice indicator */}
-      {isRecording ? (
-        <VoiceIndicator />
-      ) : (
-        <TextInput
-          style={[styles.input, { maxHeight: 100 }]}
-          value={isTranscribing ? "Transcribing..." : text}
-          onChangeText={isTranscribing ? undefined : setText}
-          placeholder={placeholder}
-          placeholderTextColor="rgba(255,255,255,0.6)"
-          multiline={true}
-          editable={!isTranscribing}
-        />
-      )}
-
-      {/* send or stop button */}
-      {isGenerating ? (
-        <Pressable onPress={onStop} style={styles.sendButton}>
-          <Image source={stopIcon} style={styles.sendIcon} />
-        </Pressable>
-      ) : (
-        <Pressable onPress={handleSend} style={styles.sendButton}>
-          <Image source={nextWhiteIcon} style={styles.sendIcon} />
-        </Pressable>
-      )}
-    </View>
+          {isGenerating ? (
+            <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.sendButton}>
+              <Image source={stopIcon} style={styles.sendIcon} />
+            </Pressable>
+          ) : (
+            <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.sendButton}>
+              <Image source={nextWhiteIcon} style={styles.sendIcon} />
+            </Pressable>
+          )}
+        </Animated.View>
+      </Pressable>
+    </KeyboardAvoidingView>
   );
 }
 
+// ... (Styles conservés à l'identique)
 const styles = StyleSheet.create({
+  pressableWrapper: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
   container: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FF1A1A",
     borderRadius: 10,
-    marginHorizontal: 16,
-    marginBottom: 16,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: 2,
@@ -340,7 +320,6 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   containerIncognito: {
-    backgroundColor: "#565A75",
     shadowColor: "#565A75",
   },
   plusButton: {

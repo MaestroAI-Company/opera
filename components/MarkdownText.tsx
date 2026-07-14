@@ -176,6 +176,17 @@ export function renderMarkdown(md: string): React.ReactNode[] {
       continue;
     }
 
+    // custom interrupted line
+    if (line.trim() === "_The user interrupted the response_") {
+      elements.push(
+        <Text key={`interrupted-${i}`} style={[s.base, s.italic, { color: "gray", marginTop: 4 }]}>
+          The user interrupted the response
+        </Text>
+      );
+      i++;
+      continue;
+    }
+
     // empty line = spacing
     if (line.trim() === "") {
       elements.push(<View key={`sp-${i}`} style={s.spacing} />);

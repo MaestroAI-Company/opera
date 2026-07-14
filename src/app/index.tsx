@@ -41,6 +41,9 @@ export default function Index() {
   const streamingMsgIdRef = useRef<string | null>(null);
   const streamingContentRef = useRef<string>("");
 
+  const [isGenerating, setIsGenerating] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   //keep a ref to the latest messages so handleSend always sees fresh data
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
@@ -163,6 +166,9 @@ export default function Index() {
       streamingContentRef.current = "";
       setMessages((prev) => [...prev, assistantMsg]);
 
+      setIsGenerating(true);
+      abortControllerRef.current = new AbortController();
+
       //send to AI and stream chunks
       try {
         await AIModule.sendMessage(
@@ -180,12 +186,22 @@ export default function Index() {
               )
             );
           },
-          undefined,
+          abortControllerRef.current.signal,
           { think: selectedReflection === "think" }
         );
-      } catch (e) {
-        console.error(e);
-        streamingContentRef.current = "Erreur lors de la réponse.";
+      } catch (e: any) {
+        const isAborted = e.name === "AbortError" || 
+                          e.message?.toLowerCase().includes("aborted") || 
+                          e.message?.toLowerCase().includes("cancel");
+        
+        if (isAborted) {
+          console.log("Generation aborted by user");
+          streamingContentRef.current += "\n\n_The user interrupted the response_";
+        } else {
+          console.error(e);
+          streamingContentRef.current = "Erreur lors de la réponse.";
+        }
+        
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsg.id
@@ -193,6 +209,9 @@ export default function Index() {
               : m
           )
         );
+      } finally {
+        setIsGenerating(false);
+        abortControllerRef.current = null;
       }
 
       if (!incognitoMode) {
@@ -304,6 +323,8 @@ export default function Index() {
               onSend={handleSend}
               onPlusPress={() => console.log("plus pressed")}
               incognito={incognitoMode}
+              isGenerating={isGenerating}
+              onStop={() => abortControllerRef.current?.abort()}
             />
           </View>
         </View>

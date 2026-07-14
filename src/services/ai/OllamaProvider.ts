@@ -146,8 +146,14 @@ export class OllamaProvider implements IAIProvider {
           }
         }
       }
-    } catch (error) {
-      console.error('Error during Ollama streaming:', error);
+    } catch (error: any) {
+      const isAborted = error.name === 'AbortError' || 
+                        error.message?.toLowerCase().includes('cancel') ||
+                        error.message?.toLowerCase().includes('aborted');
+      
+      if (!isAborted) {
+        console.error('Error during Ollama streaming:', error);
+      }
       throw error;
     }
   }

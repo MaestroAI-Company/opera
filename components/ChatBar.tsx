@@ -16,11 +16,15 @@ const nextWhiteIcon = require("../assets/icons/arrow.png");
 const micIcon = require("../assets/icons/microphone.png");
 const addIcon = require("../assets/icons/add.png");
 
+const stopIcon = require("../assets/icons/stop.png");
+
 type ChatInputBarProps = {
   onSend?: (message: string) => void;
   onPlusPress?: () => void;
+  onStop?: () => void;
   placeholder?: string;
   incognito?: boolean;
+  isGenerating?: boolean;
 };
 
 // build a wav file header + float32 pcm data for whisper.rn transcribedata
@@ -128,8 +132,10 @@ function VoiceIndicator() {
 export default function ChatBar({
   onSend,
   onPlusPress,
+  onStop,
   placeholder = "Ask",
   incognito = false,
+  isGenerating = false,
 }: ChatInputBarProps) {
   const [text, setText] = useState("");
   const [whisperAvailable, setWhisperAvailable] = useState(false);
@@ -270,7 +276,7 @@ export default function ChatBar({
       </Pressable>
 
       {/* mic button */}
-      {whisperAvailable && (
+      {whisperAvailable && !isGenerating && (
         <Pressable onPress={handleMicPress} style={styles.micButton}>
           <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
             <Image
@@ -289,21 +295,26 @@ export default function ChatBar({
         <VoiceIndicator />
       ) : (
         <TextInput
-          style={styles.input}
+          style={[styles.input, { maxHeight: 100 }]}
           value={isTranscribing ? "Transcribing..." : text}
           onChangeText={isTranscribing ? undefined : setText}
           placeholder={placeholder}
           placeholderTextColor="rgba(255,255,255,0.6)"
-          onSubmitEditing={handleSend}
-          returnKeyType="send"
+          multiline={true}
           editable={!isTranscribing}
         />
       )}
 
-      {/* send button */}
-      <Pressable onPress={handleSend} style={styles.sendButton}>
-        <Image source={nextWhiteIcon} style={styles.sendIcon} />
-      </Pressable>
+      {/* send or stop button */}
+      {isGenerating ? (
+        <Pressable onPress={onStop} style={styles.sendButton}>
+          <Image source={stopIcon} style={styles.sendIcon} />
+        </Pressable>
+      ) : (
+        <Pressable onPress={handleSend} style={styles.sendButton}>
+          <Image source={nextWhiteIcon} style={styles.sendIcon} />
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -320,7 +331,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderWidth: 2,
     borderColor: "#00000017",
-    height: 56,
+    minHeight: 56,
+    maxHeight: 120,
     shadowColor: "#FF1A1A",
     shadowOffset: { width: 2, height: 6 },
     shadowOpacity: 1,

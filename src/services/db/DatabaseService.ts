@@ -21,24 +21,31 @@ class DatabaseService {
 
   //open db and create tables if needed
   async init(): Promise<void> {
-    this.db = await SQLite.openDatabaseAsync('opera.db');
-    await this.db.execAsync(`
-      CREATE TABLE IF NOT EXISTS conversations (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        model TEXT NOT NULL,
-        createdAt INTEGER NOT NULL,
-        updatedAt INTEGER NOT NULL
+    try {
+      this.db = await SQLite.openDatabaseAsync('opera.db');
+      await this.db.runAsync(
+        `CREATE TABLE IF NOT EXISTS conversations (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          model TEXT NOT NULL,
+          createdAt INTEGER NOT NULL,
+          updatedAt INTEGER NOT NULL
+        )`
       );
-      CREATE TABLE IF NOT EXISTS messages (
-        id TEXT PRIMARY KEY,
-        conversationId TEXT NOT NULL,
-        role TEXT NOT NULL,
-        content TEXT NOT NULL,
-        createdAt INTEGER NOT NULL,
-        FOREIGN KEY (conversationId) REFERENCES conversations(id)
+      await this.db.runAsync(
+        `CREATE TABLE IF NOT EXISTS messages (
+          id TEXT PRIMARY KEY,
+          conversationId TEXT NOT NULL,
+          role TEXT NOT NULL,
+          content TEXT NOT NULL,
+          createdAt INTEGER NOT NULL,
+          FOREIGN KEY (conversationId) REFERENCES conversations(id)
+        )`
       );
-    `);
+    } catch (e) {
+      console.error('Database init failed:', e);
+      this.db = null;
+    }
   }
 
   private getDb(): SQLite.SQLiteDatabase {

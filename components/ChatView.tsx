@@ -1,28 +1,56 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   FlatList,
+  Image,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { renderMarkdown } from "./MarkdownText";
-import { Message } from "../src/services/db/DatabaseService";
+import { Conversation, Message } from "../src/services/db/DatabaseService";
+
+const butterflyImage = require("../assets/images/butterfly2.png");
 
 type ChatViewProps = {
   messages: Message[];
+  conversation: Conversation | null;
+  contentTopPadding: number;
+  contentBottomPadding: number;
 };
 
-export default function ChatView({ messages }: ChatViewProps) {
-  const listRef = useRef<FlatList>(null);
+function formatDate(timestamp: number): string {
+  return new Intl.DateTimeFormat(undefined, {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(timestamp));
+}
 
-  //scroll to bottom when new messages arrive
+export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding }: ChatViewProps) {
+  const listRef = useRef<FlatList>(null);
+  const [showTopGradient, setShowTopGradient] = useState(false);
+  const [showBottomGradient, setShowBottomGradient] = useState(false);
+  const [headerHeight, setHeaderHeight] = useState(0);
+
+  //scroll past the header so first message is at the top
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length > 0 && headerHeight > 0) {
       setTimeout(() => {
-        listRef.current?.scrollToEnd({ animated: true });
+        listRef.current?.scrollToOffset({ offset: headerHeight, animated: false });
       }, 50);
     }
-  }, [messages.length]);
+  }, [messages.length, headerHeight]);
+
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const atTop = contentOffset.y <= headerHeight + 10;
+    const atBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 10;
+    setShowTopGradient(!atTop);
+    setShowBottomGradient(!atBottom);
+  };
 
   const renderItem = ({ item }: { item: Message }) => {
     const isUser = item.role === "user";
@@ -48,9 +76,45 @@ export default function ChatView({ messages }: ChatViewProps) {
         data={messages}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
+        ListHeaderComponent={
+          conversation ? (
+            <View
+              style={styles.conversationHeader}
+              onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
+            >
+              <Image
+                source={butterflyImage}
+                style={styles.headerButterfly}
+                resizeMode="contain"
+              />
+              <Text style={styles.headerTitle} numberOfLines={2}>
+                {conversation.name}
+              </Text>
+              <Text style={styles.headerDate}>
+                {formatDate(conversation.createdAt)}
+              </Text>
+            </View>
+          ) : null
+        }
+        contentContainerStyle={[styles.list, { paddingTop: contentTopPadding, paddingBottom: contentBottomPadding }]}
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       />
+      {showTopGradient && (
+        <LinearGradient
+          colors={["#FFF5EC", "rgba(255,245,236,0.9)", "rgba(255,245,236,0)"]}
+          style={styles.gradientTop}
+          pointerEvents="none"
+        />
+      )}
+      {showBottomGradient && (
+        <LinearGradient
+          colors={["rgba(255,245,236,0)", "rgba(255,245,236,0.9)", "#FFF5EC"]}
+          style={styles.gradientBottom}
+          pointerEvents="none"
+        />
+      )}
     </View>
   );
 }
@@ -61,8 +125,6 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingHorizontal: 16,
-    paddingTop: 80,
-    paddingBottom: 100,
     gap: 10,
   },
   bubble: {
@@ -88,5 +150,42 @@ const styles = StyleSheet.create({
   },
   aiContainer: {
     gap: 2,
+  },
+  conversationHeader: {
+    alignItems: "center",
+    paddingVertical: 20,
+    marginBottom: 10,
+  },
+  headerButterfly: {
+    width: 100,
+    height: 90,
+    marginBottom: 12,
+  },
+  headerTitle: {
+    fontSize: 26,
+    fontWeight: "300",
+    color: "#333",
+    textAlign: "center",
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  headerDate: {
+    fontSize: 13,
+    color: "#999",
+    fontFamily: "monospace",
+  },
+  gradientTop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+  },
+  gradientBottom: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
   },
 });

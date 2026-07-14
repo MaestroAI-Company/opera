@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   FlatList,
   Image,
@@ -29,44 +29,59 @@ function formatDate(timestamp: number): string {
   }).format(new Date(timestamp));
 }
 
+const MessageItem = React.memo(({ item }: { item: Message }) => {
+  const isUser = item.role === "user";
+  return (
+    <View style={[styles.bubble, isUser ? styles.userBubble : styles.aiBubble]}>
+      {isUser ? (
+        <Text style={[styles.bubbleText, styles.userText]}>
+          {item.content}
+        </Text>
+      ) : (
+        <View style={styles.aiContainer}>
+          {renderMarkdown(item.content)}
+        </View>
+      )}
+    </View>
+  );
+}, (prev, next) => prev.item.content === next.item.content);
+
 export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding }: ChatViewProps) {
   const listRef = useRef<FlatList>(null);
   const [showTopGradient, setShowTopGradient] = useState(false);
   const [showBottomGradient, setShowBottomGradient] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
+  const isAtBottomRef = useRef(true);
+  const initialScrollDone = useRef(false);
 
-  //scroll past the header so first message is at the top
+  //scroll past the header so first message is at the top on initial load
   useEffect(() => {
-    if (messages.length > 0 && headerHeight > 0) {
+    if (!initialScrollDone.current && messages.length > 0 && headerHeight > 0) {
       setTimeout(() => {
         listRef.current?.scrollToOffset({ offset: headerHeight, animated: false });
+        initialScrollDone.current = true;
       }, 50);
     }
   }, [messages.length, headerHeight]);
 
+  const isAutoScrolling = useRef(false);
+  const autoScrollTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
+
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
     const atTop = contentOffset.y <= headerHeight + 10;
-    const atBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 10;
+    //threshold for bottom detection
+    const atBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 100;
+    
+    if (!isAutoScrolling.current) {
+      isAtBottomRef.current = atBottom;
+    }
     setShowTopGradient(!atTop);
     setShowBottomGradient(!atBottom);
   };
 
   const renderItem = ({ item }: { item: Message }) => {
-    const isUser = item.role === "user";
-    return (
-      <View style={[styles.bubble, isUser ? styles.userBubble : styles.aiBubble]}>
-        {isUser ? (
-          <Text style={[styles.bubbleText, styles.userText]}>
-            {item.content}
-          </Text>
-        ) : (
-          <View style={styles.aiContainer}>
-            {renderMarkdown(item.content)}
-          </View>
-        )}
-      </View>
-    );
+    return <MessageItem item={item} />;
   };
 
   return (
@@ -100,6 +115,22 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
+        onScrollBeginDrag={() => {
+          isAutoScrolling.current = false;
+          if (autoScrollTimeout.current) clearTimeout(autoScrollTimeout.current);
+        }}
+        onContentSizeChange={(w, h) => {
+          if (isAtBottomRef.current) {
+            isAutoScrolling.current = true;
+            if (autoScrollTimeout.current) clearTimeout(autoScrollTimeout.current);
+            autoScrollTimeout.current = setTimeout(() => {
+              isAutoScrolling.current = false;
+            }, 500);
+            
+            //scrollToOffset to avoid android jump
+            listRef.current?.scrollToOffset({ offset: h + 1000, animated: true });
+          }
+        }}
       />
       {showTopGradient && (
         <LinearGradient

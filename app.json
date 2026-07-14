@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icons/opera.png",
     "scheme": "opera",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/icons/opera.png"
     },
@@ -37,7 +37,8 @@
       [
         "expo-status-bar",
         {
-          "style": "auto"
+          "style": "dark",
+          "backgroundColor": "transparent"
         }
       ],
       "expo-sqlite"

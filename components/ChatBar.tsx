@@ -3,7 +3,7 @@ import { Image, Pressable, StyleSheet, TextInput, View } from "react-native";
 
 //icons
 const nextWhiteIcon = require("../assets/icons/arrow.png");
-const micIcon = require("../assets/icons/micrphone-white.png");
+const micIcon = require("../assets/icons/microphone.png");
 const addIcon = require("../assets/icons/add.png");
 
 type ChatInputBarProps = {

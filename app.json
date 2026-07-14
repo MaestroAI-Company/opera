@@ -41,7 +41,13 @@
           "backgroundColor": "transparent"
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Opera needs access to your microphone for voice-to-text."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

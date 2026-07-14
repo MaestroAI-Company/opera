@@ -73,7 +73,7 @@ function parseInline(text: string): Token[] {
         continue;
       }
     }
-    // plain text — collect until next special char
+    // plain text collect until next special char
     let j = i + 1;
     while (j < text.length && text[j] !== "*" && text[j] !== "_" && text[j] !== "`") j++;
     tokens.push({ type: "text", content: text.slice(i, j) });
@@ -185,16 +185,29 @@ export function renderMarkdown(md: string): React.ReactNode[] {
 
     // regular paragraph
     const paraLines: string[] = [];
-    while (i < lines.length && lines[i].trim() !== "" && !lines[i].trimStart().startsWith("#") && !lines[i].trimStart().startsWith("```") && !lines[i].trimStart().match(/^[-*]\s/) && !lines[i].trimStart().match(/^\d+\.\s/) && !lines[i].trimStart().startsWith("> ")) {
+    while (
+      i < lines.length &&
+      lines[i].trim() !== "" &&
+      !lines[i].trimStart().startsWith("```") &&
+      !lines[i].trimStart().match(/^(#{1,3})\s/) &&
+      !lines[i].trimStart().match(/^[-*]\s/) &&
+      !lines[i].trimStart().match(/^\d+\.\s/) &&
+      !lines[i].trimStart().startsWith("> ")
+    ) {
       paraLines.push(lines[i]);
       i++;
     }
+    
     if (paraLines.length > 0) {
       elements.push(
         <Text key={`p-${i}`} style={[s.base, s.paragraph]}>
           {renderTokens(parseInline(paraLines.join("\n")), i)}
         </Text>
       );
+    } else {
+      // safety fallback prevent infinite loops in case no condition matched
+      // the paragraph loop also didn't consume anything
+      i++;
     }
   }
 

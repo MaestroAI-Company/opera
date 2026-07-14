@@ -263,7 +263,12 @@ export default function Index() {
             </Text>
           </View>
         ) : (
-          <ChatView messages={messages} />
+          <ChatView
+            messages={messages}
+            conversation={activeConversation}
+            contentTopPadding={insets.top + 72}
+            contentBottomPadding={88 + insets.bottom}
+          />
         )}
 
         {/* top bar overlay */}

@@ -6,7 +6,7 @@ Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-s
 
 # Code commenting format
 
-Do simple lowcase english comment. exemple : //load model and detect objects
+Do simple lowercase simple english comment no sentence. exemple : //load model and detect objects
 
 # Use updated code
 You can get updated docs with the context7 mcp

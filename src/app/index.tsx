@@ -432,8 +432,8 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   incognitoBoxActive: {
-    backgroundColor: "#FF1A1A",
-    borderColor: "#FF1A1A",
+    backgroundColor: "#747474",
+    borderColor: "#747474",
   },
   incognitoButtonText: {
     fontSize: 14,

@@ -43,5 +43,3 @@ example
 /ios
 /android
 
-# whisper models (large binaries)
-assets/models/*.bin

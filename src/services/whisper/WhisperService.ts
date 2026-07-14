@@ -1,7 +1,7 @@
 import { initWhisper, WhisperContext } from "whisper.rn";
 
 //bundled model asset
-const MODEL_ASSET = require("../../../assets/models/ggml-tiny.bin");
+const MODEL_ASSET = require("../../../assets/models/ggml-base.bin");
 
 class WhisperService {
   private context: WhisperContext | null = null;

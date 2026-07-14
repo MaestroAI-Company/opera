@@ -1,7 +1,7 @@
 import { initWhisper, WhisperContext } from "whisper.rn";
 
 //bundled model asset
-const MODEL_ASSET = require("../../../assets/models/ggml-base.bin");
+const MODEL_ASSET = require("../../../assets/models/ggml-tiny.bin");
 
 class WhisperService {
   private context: WhisperContext | null = null;
@@ -45,28 +45,30 @@ class WhisperService {
     }
 
     console.log(`[Whisper] Transcribing file ${audioPath}...`);
+    const startTime = Date.now();
     const { promise } = this.context.transcribe(audioPath, {
       language: "auto",
     });
 
     const { result } = await promise;
-    console.log(`[Whisper] File transcription result: "${result.trim()}"`);
+    console.log(`[Whisper] File transcription completed in ${Date.now() - startTime}ms: "${result.trim()}"`);
     return result.trim();
   }
 
-  //transcribe raw float32 pcm data (arraybuffer) — avoids wav file format issues
+  //transcribe raw float32 pcm data (arraybuffer)/avoids wav file format issues
   async transcribeData(buffer: ArrayBuffer): Promise<string> {
     if (!this.context) {
       throw new Error("whisper not initialized");
     }
 
     console.log(`[Whisper] Transcribing buffer of ${buffer.byteLength} bytes...`);
+    const startTime = Date.now();
     const { promise } = this.context.transcribeData(buffer, {
       language: "auto",
     });
 
     const { result } = await promise;
-    console.log(`[Whisper] Buffer transcription result: "${result.trim()}"`);
+    console.log(`[Whisper] Buffer transcription completed in ${Date.now() - startTime}ms: "${result.trim()}"`);
     return result.trim();
   }
 

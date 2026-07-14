@@ -252,12 +252,12 @@ export default function ChatBar({
     }
   };
 
-  //handle send — if recording, stop + transcribe + send
+  //handle send — if recording, stop + transcribe + fill text input
   const handleSend = async () => {
     if (isRecording) {
       const transcribed = await stopAndTranscribe();
-      if (transcribed && transcribed.length > 0 && onSend) {
-        onSend(transcribed);
+      if (transcribed && transcribed.length > 0) {
+        setText(transcribed);
       }
       return;
     }

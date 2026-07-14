@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF5EC",
   },
   backgroundTexture: {
-    opacity: 0.01,
+    opacity: 0.02,
     resizeMode: "cover",
   },
   topBarOverlay: {

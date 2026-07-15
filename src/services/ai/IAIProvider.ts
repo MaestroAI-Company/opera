@@ -8,11 +8,14 @@ export interface IAIProvider {
   //preload model
   preloadModel(modelName: string): Promise<void>;
 
+  //get model capabilities (e.g. vision)
+  getModelCapabilities?(modelName: string): Promise<string[]>;
+
   //send message and stream response
   sendMessage(
     modelName: string,
     systemPrompt: string,
-    messages: { role: string; content: string }[],
+    messages: { role: string; content: string; images?: string[] }[],
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
     options?: { think?: boolean }

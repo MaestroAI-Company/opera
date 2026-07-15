@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 import { IAIProvider } from './IAIProvider';
 import { OllamaProvider } from './OllamaProvider';
 
@@ -52,16 +53,49 @@ class CentralAIModule {
     throw new Error('Download service not supported by active provider');
   }
 
+  async getModelCapabilities(modelName: string): Promise<string[]> {
+    const provider = this.getActiveProvider();
+    if (provider.getModelCapabilities) {
+      return provider.getModelCapabilities(modelName);
+    }
+    return [];
+  }
+
   async sendMessage(
     modelName: string,
     systemPrompt: string,
-    messages: { role: string; content: string }[],
+    messages: { role: string; content: string; images?: string[] }[],
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
     options?: { think?: boolean }
   ): Promise<void> {
     const provider = this.getActiveProvider();
-    return provider.sendMessage(modelName, systemPrompt, messages, onChunk, signal, options);
+    
+    //convert local uris to base64
+    const processedMessages = await Promise.all(
+      messages.map(async (msg) => {
+        if (!msg.images || msg.images.length === 0) return msg;
+        
+        const base64Images = await Promise.all(
+          msg.images.map(async (uri) => {
+            try {
+              //return base64 if already formatted
+              if (uri.startsWith('data:')) return uri.split(',')[1];
+              //read local file as base64 without query params
+              const fileUri = uri.split('?name=')[0];
+              return await FileSystem.readAsStringAsync(fileUri, { encoding: FileSystem.EncodingType.Base64 });
+            } catch (e) {
+              console.error('Failed to read image as base64:', e);
+              return uri; //fallback to raw string on error
+            }
+          })
+        );
+        
+        return { ...msg, images: base64Images };
+      })
+    );
+
+    return provider.sendMessage(modelName, systemPrompt, processedMessages, onChunk, signal, options);
   }
 }
 

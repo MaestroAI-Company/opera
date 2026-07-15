@@ -39,6 +39,8 @@ export default function Index() {
   const [aiService, setAiService] = useState("ollama");
   const [ollamaUrl, setOllamaUrl] = useState("");
   const [speakerEnabled, setSpeakerEnabled] = useState(false);
+  const [modelCapabilities, setModelCapabilities] = useState<string[]>([]);
+  const [alwaysWhisper, setAlwaysWhisper] = useState(false);
 
   //conversation state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -101,6 +103,7 @@ export default function Index() {
         setAiService(s.aiService);
         setOllamaUrl(s.ollamaUrl);
         setSpeakerEnabled(s.speaker);
+        setAlwaysWhisper(s.alwaysWhisper);
         AIModule.configure(s.ollamaUrl);
         Whisper.setLanguage(s.whisperLanguage);
       } catch (e) {
@@ -111,6 +114,19 @@ export default function Index() {
     };
     init();
   }, []);
+
+  //fetch model capabilities when selectedModel changes
+  useEffect(() => {
+    const fetchCapabilities = async () => {
+      if (selectedModel && aiService === "ollama") {
+        const caps = await AIModule.getModelCapabilities(selectedModel);
+        setModelCapabilities(caps);
+      } else {
+        setModelCapabilities([]);
+      }
+    };
+    fetchCapabilities();
+  }, [selectedModel, aiService, ollamaUrl]);
 
   const loadConversations = async () => {
     const convs = await DB.getConversations();
@@ -186,7 +202,7 @@ export default function Index() {
 
   //send a message — creates conversation on first send
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, images?: string[]) => {
       if (!dbReady && !incognitoMode) return;
 
       let conv = activeConversation;
@@ -223,7 +239,12 @@ export default function Index() {
           createdAt: Date.now(),
         };
       } else {
-        userMsg = await DB.addMessage(conv.id, "user", text);
+        userMsg = await DB.addMessage(conv.id, "user", text, images);
+      }
+      
+      //attach images to incognito message as well if needed
+      if (images && images.length > 0) {
+        userMsg.images = images;
       }
       
       if (isFirstMessage || activeConversationRef.current?.id === conv.id) {
@@ -233,8 +254,8 @@ export default function Index() {
       //build history for this task
       const taskHistory = messagesRef.current
         .filter((m) => m.content !== "…")
-        .map((m) => ({ role: m.role, content: m.content }));
-      taskHistory.push({ role: "user", content: text });
+        .map((m) => ({ role: m.role, content: m.content, images: m.images }));
+      taskHistory.push({ role: "user", content: text, images });
 
       const taskSelectedModel = selectedModel;
       const taskOllamaUrl = ollamaUrl;
@@ -359,6 +380,51 @@ export default function Index() {
     [dbReady, incognitoMode, activeConversation, selectedModel, selectedReflection, generateTitle, userInstruction, aiService, ollamaUrl]
   );
 
+  //encode arraybuffer to base64 without btoa (hermes safe)
+  const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+    const bytes = new Uint8Array(buffer);
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const parts: string[] = [];
+    const len = bytes.length;
+    for (let i = 0; i < len; i += 3) {
+      const a = bytes[i];
+      const b = i + 1 < len ? bytes[i + 1] : 0;
+      const c = i + 2 < len ? bytes[i + 2] : 0;
+      parts.push(
+        chars[a >> 2] + chars[((a & 3) << 4) | (b >> 4)] +
+        (i + 1 < len ? chars[((b & 15) << 2) | (c >> 6)] : '=') +
+        (i + 2 < len ? chars[c & 63] : '=')
+      );
+    }
+    return parts.join('');
+  };
+
+  //transcribe audio: use remote model if it supports audio and user hasnt forced whisper
+  const handleTranscribe = useCallback(async (wavBuffer: ArrayBuffer): Promise<string | null> => {
+    const useRemote = !alwaysWhisper && modelCapabilities.includes("audio") && selectedModel;
+    if (!useRemote) {
+      //fallback to whisper on-device
+      return Whisper.transcribeData(wavBuffer);
+    }
+    try {
+      //encode wav as data uri 
+      const base64Audio = 'data:audio/wav;base64,' + arrayBufferToBase64(wavBuffer);
+
+      //send to remote model with TRANSCRIBE prompt
+      let transcription = '';
+      await AIModule.sendMessage(
+        selectedModel,
+        SYSTEM_PROMPTS.TRANSCRIBE,
+        [{ role: 'user', content: 'Transcribe this audio.', images: [base64Audio] }],
+        (chunk) => { transcription += chunk; }
+      );
+      return transcription.trim() || null;
+    } catch (e) {
+      console.error('Remote transcription failed, falling back to Whisper:', e);
+      return Whisper.transcribeData(wavBuffer);
+    }
+  }, [alwaysWhisper, modelCapabilities, selectedModel]);
+
   const handleRegenerate = useCallback(async (aiMessageId: string) => {
     if (!activeConversation) return;
 
@@ -372,7 +438,7 @@ export default function Index() {
     const historyUpToHere = messagesRef.current.slice(0, msgIndex);
     const taskHistory = historyUpToHere
       .filter((m) => m.content !== "…")
-      .map((m) => ({ role: m.role, content: m.content }));
+      .map((m) => ({ role: m.role, content: m.content, images: m.images }));
 
     if (!incognitoMode) {
       await DB.deleteMessage(aiMessageId);
@@ -620,6 +686,9 @@ export default function Index() {
               incognito={activeConversation ? activeConversation.id.startsWith("incognito_") : incognitoMode}
               isGenerating={activeConversation ? (generatingConvId === activeConversation.id || pendingConvIds.includes(activeConversation.id)) : false}
               onStop={handleStop}
+              onTranscribe={handleTranscribe}
+              canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes("audio") && !!selectedModel}
+              supportsFiles={modelCapabilities.includes("vision") || modelCapabilities.includes("audio")}
             />
           </View>
         </View>
@@ -647,6 +716,7 @@ export default function Index() {
           setAiService(cached.aiService);
           setOllamaUrl(cached.ollamaUrl);
           setSpeakerEnabled(cached.speaker);
+          setAlwaysWhisper(cached.alwaysWhisper);
         }}
         onDataChanged={async () => {
           await loadConversations();

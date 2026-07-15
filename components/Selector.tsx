@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { Dimensions, Image, LayoutRectangle, Modal, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import Animated, { useAnimatedStyle, withTiming, useSharedValue, runOnJS } from "react-native-reanimated";
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const arrowDownIcon = require("../assets/icons/down_arrow.png");
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -27,17 +29,51 @@ export default function Selector({
   fullWidth = false,
 }: SelectorProps) {
   const [visible, setVisible] = useState(false);
+  const progress = useSharedValue(0);
   const triggerRef = useRef<View>(null);
   const [triggerLayout, setTriggerLayout] = useState<LayoutRectangle | null>(null);
+
+  const iconStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotate: `${progress.value * 180}deg` }],
+    };
+  });
+
+  const overlayAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: progress.value,
+    };
+  });
 
   const handleOpen = () => {
     triggerRef.current?.measureInWindow((x, y, width, height) => {
       setTriggerLayout({ x, y, width, height } as LayoutRectangle);
       setVisible(true);
+      progress.value = withTiming(1, { duration: 250 });
+    });
+  };
+
+  const handleClose = (callback?: () => void) => {
+    progress.value = withTiming(0, { duration: 200 }, (finished) => {
+      if (finished) {
+        runOnJS(setVisible)(false);
+        if (callback) {
+          runOnJS(callback)();
+        }
+      }
     });
   };
 
   const selectedOption = options.find((o) => o.id === selectedValue);
+  const estimatedMenuHeight = options.length * 40 + (title ? 30 : 0) + 24;
+
+  const menuAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      maxHeight: progress.value * estimatedMenuHeight,
+      opacity: progress.value,
+      overflow: "hidden",
+    };
+  });
 
   const menuWidth = fullWidth && triggerLayout ? triggerLayout.width : 220;
   let menuLeft = 0;
@@ -52,7 +88,6 @@ export default function Selector({
       menuLeft = 16;
     }
 
-    const estimatedMenuHeight = options.length * 40 + (title ? 30 : 0) + 24;
     menuTop = triggerLayout.y + triggerLayout.height + 4;
     if (menuTop + estimatedMenuHeight > SCREEN_HEIGHT - 16) {
       const upwardTop = triggerLayout.y - estimatedMenuHeight - 4;
@@ -73,7 +108,7 @@ export default function Selector({
         ]}
         ref={triggerRef}
       >
-        <Image source={arrowDownIcon} style={styles.icon} />
+        <Animated.Image source={arrowDownIcon} style={[styles.icon, iconStyle]} />
         <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
           {selectedOption ? selectedOption.label : placeholder}
         </Text>
@@ -82,16 +117,17 @@ export default function Selector({
       <Modal
         visible={visible}
         transparent
-        animationType="fade"
-        onRequestClose={() => setVisible(false)}
+        animationType="none"
+        onRequestClose={() => handleClose()}
       >
-        <Pressable style={styles.overlay} onPress={() => setVisible(false)}>
-          <Pressable
+        <AnimatedPressable style={[styles.overlay, overlayAnimatedStyle]} onPress={() => handleClose()}>
+          <AnimatedPressable
             style={[
               styles.menu,
               triggerLayout
                 ? { top: menuTop, left: menuLeft, width: menuWidth }
                 : {},
+              menuAnimatedStyle,
             ]}
           >
             {title && <Text style={styles.sectionTitle}>{title}</Text>}
@@ -100,8 +136,7 @@ export default function Selector({
                 key={option.id}
                 onPress={() => {
                   Vibration.vibrate(10);
-                  onSelect(option.id);
-                  setVisible(false);
+                  handleClose(() => onSelect(option.id));
                 }}
                 style={({ pressed }) => [
                   styles.option, 
@@ -119,8 +154,8 @@ export default function Selector({
                 </Text>
               </Pressable>
             ))}
-          </Pressable>
-        </Pressable>
+          </AnimatedPressable>
+        </AnimatedPressable>
       </Modal>
     </View>
   );

@@ -66,7 +66,11 @@ export default function Selector({
     <View style={[styles.container, fullWidth && styles.containerFullWidth]}>
       <Pressable
         onPress={handleOpen}
-        style={[styles.trigger, fullWidth && styles.triggerFullWidth]}
+        style={({ pressed }) => [
+          styles.trigger, 
+          fullWidth && styles.triggerFullWidth, 
+          pressed && { backgroundColor: "#eaeaea" }
+        ]}
         ref={triggerRef}
       >
         <Image source={arrowDownIcon} style={styles.icon} />
@@ -99,7 +103,11 @@ export default function Selector({
                   onSelect(option.id);
                   setVisible(false);
                 }}
-                style={[styles.option, option.id === selectedValue && styles.optionSelected]}
+                style={({ pressed }) => [
+                  styles.option, 
+                  option.id === selectedValue ? styles.optionSelected : pressed && { backgroundColor: "rgba(0, 0, 0, 0.05)" },
+                  option.id === selectedValue && pressed && { backgroundColor: "#cc1414" }
+                ]}
               >
                 <Text
                   style={[

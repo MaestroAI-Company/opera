@@ -397,7 +397,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
               </View>
             ) : (
               <Pressable 
-                style={styles.downloadOption} 
+                style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }]} 
                 onPress={() => setDownloadModalVisible(true)}
               >
                 <Image source={downloadIcon} style={styles.downloadIcon} />
@@ -422,16 +422,27 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
 
         <Text style={[styles.sectionTitle, { marginTop: 30 }]}>Data & Storage</Text>
         <View style={styles.buttonRow}>
-          <Pressable style={[styles.actionButton, { flex: 1 }]} onPress={handleExport}>
+          <Pressable 
+            style={({ pressed }) => [styles.actionButton, { flex: 1 }, pressed && { backgroundColor: "#eaeaea" }]} 
+            onPress={handleExport}
+          >
             <Text style={styles.actionButtonText}>Export</Text>
           </Pressable>
-          <Pressable style={[styles.actionButton, { flex: 1 }]} onPress={handleImport}>
+          <Pressable 
+            style={({ pressed }) => [styles.actionButton, { flex: 1 }, pressed && { backgroundColor: "#eaeaea" }]} 
+            onPress={handleImport}
+          >
             <Text style={styles.actionButtonText}>Import</Text>
           </Pressable>
         </View>
 
         <Pressable 
-          style={[styles.actionButton, styles.dangerButton, { marginTop: 15, marginBottom: 20 }]} 
+          style={({ pressed }) => [
+            styles.actionButton, 
+            styles.dangerButton, 
+            { marginTop: 15, marginBottom: 20 }, 
+            pressed && { backgroundColor: "#ffdcdc" }
+          ]} 
           onPress={handleDeleteAll}
         >
           <Text style={[styles.actionButtonText, styles.dangerButtonText]}>Delete all conversations</Text>

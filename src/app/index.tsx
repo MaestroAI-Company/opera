@@ -523,26 +523,22 @@ export default function Index() {
             <Text style={styles.welcomeText}>Welcome</Text>
             <Pressable
               onPress={() => setIncognitoMode((prev) => !prev)}
+              style={({ pressed }) => [
+                styles.incognitoBox,
+                incognitoMode && styles.incognitoBoxActive,
+                pressed && (incognitoMode ? { backgroundColor: "#3e4157" } : { backgroundColor: "#eaeaea" })
+              ]}
             >
-
-              <View
+              <Text
                 style={[
-                  styles.incognitoBox,
-                  incognitoMode && styles.incognitoBoxActive,
+                  styles.incognitoButtonText,
+                  incognitoMode && styles.incognitoButtonTextActive,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.incognitoButtonText,
-                    incognitoMode && styles.incognitoButtonTextActive,
-                  ]}
-                >
-                  {incognitoMode
-                    ? "Disable incognito mode"
-                    : "Enable incognito mode"}
-                </Text>
-              </View>
-
+                {incognitoMode
+                  ? "Disable incognito mode"
+                  : "Enable incognito mode"}
+              </Text>
             </Pressable>
             <Text
               style={[
@@ -588,7 +584,10 @@ export default function Index() {
                   rightElement={
                     <View style={styles.settingsShadowLayer}>
                       <View style={styles.settingsShadowBlock} />
-                      <Pressable style={styles.settingsButton} onPress={() => setSettingsDrawerVisible(true)}>
+                      <Pressable 
+                        style={({ pressed }) => [styles.settingsButton, pressed && { backgroundColor: "#eaeaea" }]} 
+                        onPress={() => setSettingsDrawerVisible(true)}
+                      >
                         <Image source={settingsIcon} style={styles.settingsIcon} />
                       </Pressable>
                     </View>
@@ -598,7 +597,10 @@ export default function Index() {
                 <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' }}>
                     <View style={styles.settingsShadowLayer}>
                       <View style={styles.settingsShadowBlock} />
-                      <Pressable style={styles.settingsButton} onPress={() => setSettingsDrawerVisible(true)}>
+                      <Pressable 
+                        style={({ pressed }) => [styles.settingsButton, pressed && { backgroundColor: "#eaeaea" }]} 
+                        onPress={() => setSettingsDrawerVisible(true)}
+                      >
                         <Image source={settingsIcon} style={styles.settingsIcon} />
                       </Pressable>
                     </View>
@@ -723,8 +725,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#00000017",
     borderRadius: 5,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     backgroundColor: "#fff",
     zIndex: 1,
     marginTop: 20,
@@ -734,7 +736,7 @@ const styles = StyleSheet.create({
     borderColor: "#565A75",
   },
   incognitoButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#222",
     fontFamily: "monospace",
     textAlign: "center",

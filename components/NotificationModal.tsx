@@ -80,11 +80,18 @@ export default function NotificationModal({
               return (
                 <Pressable 
                   key={index} 
-                  style={[
+                  style={({ pressed }) => [
                     styles.button,
                     isPrimary && styles.buttonPrimary,
                     isDanger && styles.buttonDanger,
-                    !isPrimary && !isDanger && styles.buttonSecondary
+                    !isPrimary && !isDanger && styles.buttonSecondary,
+                    pressed && (
+                      isPrimary 
+                        ? { backgroundColor: "#000", borderColor: "#000" } 
+                        : isDanger 
+                          ? { backgroundColor: "#d60e0e", borderColor: "#d60e0e" } 
+                          : { backgroundColor: "#eaeaea" }
+                    )
                   ]} 
                   onPress={btn.onPress}
                 >

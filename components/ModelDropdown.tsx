@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Image, Keyboard, LayoutRectangle, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Dimensions, Image, Keyboard, LayoutRectangle, Modal, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { AIModule } from "../src/services/ai/AIModule";
 import NotificationModal from "./NotificationModal";
 
 const arrowDownIcon = require("../assets/icons/down_arrow.png");
 const downloadIcon = require("../assets/icons/download.png");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const REFLECTIONS = [
   { id: "quick", label: "Quick" },
@@ -94,11 +95,37 @@ export default function ModelDropdown({
     });
   };
 
+  const menuWidth = 220;
+  let menuLeft = 0;
+  let menuTop = 0;
+
+  if (triggerLayout) {
+    menuLeft = triggerLayout.x;
+    if (menuLeft + menuWidth > SCREEN_WIDTH - 16) {
+      menuLeft = SCREEN_WIDTH - menuWidth - 16;
+    }
+    if (menuLeft < 16) {
+      menuLeft = 16;
+    }
+
+    const estimatedMenuHeight = 30 + (models.length || 1) * 40 + 16 + 30 + REFLECTIONS.length * 40 + 24;
+    menuTop = triggerLayout.y + triggerLayout.height + 4;
+    if (menuTop + estimatedMenuHeight > SCREEN_HEIGHT - 16) {
+      const upwardTop = triggerLayout.y - estimatedMenuHeight - 4;
+      if (upwardTop > 16) {
+        menuTop = upwardTop;
+      }
+    }
+  }
+
   return (
     <View style={styles.container}>
       <View ref={triggerRef} style={styles.shadowLayer}>
         <View style={styles.shadowBlock} />
-        <Pressable onPress={handleOpen} style={styles.trigger}>
+        <Pressable 
+          onPress={handleOpen} 
+          style={({ pressed }) => [styles.trigger, pressed && { backgroundColor: "#eaeaea" }]}
+        >
           <Image source={arrowDownIcon} style={styles.icon} />
           <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
             {selectedModel || "Modèle"}
@@ -118,7 +145,7 @@ export default function ModelDropdown({
             style={[
               styles.menu,
               triggerLayout
-                ? { top: triggerLayout.y + triggerLayout.height + 4, left: triggerLayout.x }
+                ? { top: menuTop, left: menuLeft }
                 : {},
             ]}
           >
@@ -136,7 +163,7 @@ export default function ModelDropdown({
                       setVisible(false);
                       setDownloadModalVisible(true);
                     }} 
-                    style={styles.downloadOption}
+                    style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }]}
                   >
                     <Image source={downloadIcon} style={styles.downloadIcon} />
                     <Text style={styles.downloadText}>
@@ -154,10 +181,15 @@ export default function ModelDropdown({
                 <Pressable
                   key={model}
                   onPress={() => {
+                    Vibration.vibrate(10);
                     onModelChange(model);
                     setVisible(false);
                   }}
-                  style={[styles.option, model === selectedModel && styles.optionSelected]}
+                  style={({ pressed }) => [
+                    styles.option, 
+                    model === selectedModel ? styles.optionSelected : pressed && { backgroundColor: "rgba(0, 0, 0, 0.05)" },
+                    model === selectedModel && pressed && { backgroundColor: "#cc1414" }
+                  ]}
                 >
                   <Text
                     style={[styles.optionText, model === selectedModel && styles.optionTextSelected]}
@@ -174,10 +206,15 @@ export default function ModelDropdown({
               <Pressable
                 key={item.id}
                 onPress={() => {
+                  Vibration.vibrate(10);
                   onReflectionChange(item.id);
                   setVisible(false);
                 }}
-                style={[styles.option, item.id === selectedReflection && styles.optionSelected]}
+                style={({ pressed }) => [
+                  styles.option, 
+                  item.id === selectedReflection ? styles.optionSelected : pressed && { backgroundColor: "rgba(0, 0, 0, 0.05)" },
+                  item.id === selectedReflection && pressed && { backgroundColor: "#cc1414" }
+                ]}
               >
                 <Text
                   style={[

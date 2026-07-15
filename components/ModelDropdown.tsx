@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { Dimensions, Image, Keyboard, LayoutRectangle, Modal, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { AIModule } from "../src/services/ai/AIModule";
 import NotificationModal from "./NotificationModal";
+import Animated, { useAnimatedStyle, withTiming, useSharedValue, runOnJS } from "react-native-reanimated";
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const arrowDownIcon = require("../assets/icons/down_arrow.png");
 const downloadIcon = require("../assets/icons/download.png");
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -35,6 +37,30 @@ export default function ModelDropdown({
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
   const triggerRef = useRef<View>(null);
   const [triggerLayout, setTriggerLayout] = useState<LayoutRectangle | null>(null);
+  const progress = useSharedValue(0);
+
+  const iconStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotate: `${progress.value * 180}deg` }],
+    };
+  });
+
+  const overlayAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: progress.value,
+    };
+  });
+
+  const handleClose = (callback?: () => void) => {
+    progress.value = withTiming(0, { duration: 200 }, (finished) => {
+      if (finished) {
+        runOnJS(setVisible)(false);
+        if (callback) {
+          runOnJS(callback)();
+        }
+      }
+    });
+  };
 
   const [isAvailable, setIsAvailable] = useState(true);
 
@@ -91,9 +117,20 @@ export default function ModelDropdown({
     triggerRef.current?.measureInWindow((x, y, width, height) => {
       setTriggerLayout({ x, y, width, height } as LayoutRectangle);
       setVisible(true);
+      progress.value = withTiming(1, { duration: 250 });
       fetchModels();
     });
   };
+
+  const estimatedMenuHeight = 30 + (models.length || 1) * 40 + 16 + 30 + REFLECTIONS.length * 40 + 24;
+
+  const menuAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      maxHeight: progress.value * estimatedMenuHeight,
+      opacity: progress.value,
+      overflow: "hidden",
+    };
+  });
 
   const menuWidth = 220;
   let menuLeft = 0;
@@ -108,7 +145,6 @@ export default function ModelDropdown({
       menuLeft = 16;
     }
 
-    const estimatedMenuHeight = 30 + (models.length || 1) * 40 + 16 + 30 + REFLECTIONS.length * 40 + 24;
     menuTop = triggerLayout.y + triggerLayout.height + 4;
     if (menuTop + estimatedMenuHeight > SCREEN_HEIGHT - 16) {
       const upwardTop = triggerLayout.y - estimatedMenuHeight - 4;
@@ -126,7 +162,7 @@ export default function ModelDropdown({
           onPress={handleOpen} 
           style={({ pressed }) => [styles.trigger, pressed && { backgroundColor: "#eaeaea" }]}
         >
-          <Image source={arrowDownIcon} style={styles.icon} />
+          <Animated.Image source={arrowDownIcon} style={[styles.icon, iconStyle]} />
           <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
             {selectedModel || "Modèle"}
           </Text>
@@ -137,16 +173,17 @@ export default function ModelDropdown({
       <Modal
         visible={visible}
         transparent
-        animationType="fade"
-        onRequestClose={() => setVisible(false)}
+        animationType="none"
+        onRequestClose={() => handleClose()}
       >
-        <Pressable style={styles.overlay} onPress={() => setVisible(false)}>
-          <Pressable
+        <AnimatedPressable style={[styles.overlay, overlayAnimatedStyle]} onPress={() => handleClose()}>
+          <AnimatedPressable
             style={[
               styles.menu,
               triggerLayout
                 ? { top: menuTop, left: menuLeft }
                 : {},
+              menuAnimatedStyle,
             ]}
           >
             <Text style={styles.sectionTitle}>Models</Text>
@@ -160,8 +197,7 @@ export default function ModelDropdown({
                 {isAvailable && (
                   <Pressable 
                     onPress={() => {
-                      setVisible(false);
-                      setDownloadModalVisible(true);
+                      handleClose(() => setDownloadModalVisible(true));
                     }} 
                     style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }]}
                   >
@@ -182,8 +218,7 @@ export default function ModelDropdown({
                   key={model}
                   onPress={() => {
                     Vibration.vibrate(10);
-                    onModelChange(model);
-                    setVisible(false);
+                    handleClose(() => onModelChange(model));
                   }}
                   style={({ pressed }) => [
                     styles.option, 
@@ -207,8 +242,7 @@ export default function ModelDropdown({
                 key={item.id}
                 onPress={() => {
                   Vibration.vibrate(10);
-                  onReflectionChange(item.id);
-                  setVisible(false);
+                  handleClose(() => onReflectionChange(item.id));
                 }}
                 style={({ pressed }) => [
                   styles.option, 
@@ -226,8 +260,8 @@ export default function ModelDropdown({
                 </Text>
               </Pressable>
             ))}
-          </Pressable>
-        </Pressable>
+          </AnimatedPressable>
+        </AnimatedPressable>
       </Modal>
 
       <NotificationModal

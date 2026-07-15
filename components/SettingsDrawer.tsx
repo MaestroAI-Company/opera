@@ -8,9 +8,7 @@ import { AIModule } from "../src/services/ai/AIModule";
 import { BackupService } from "../src/services/BackupService";
 import { Settings } from "../src/services/settings/SettingsService";
 import { Whisper } from "../src/services/whisper/WhisperService";
-import NotificationModal from "./NotificationModal";
-import Selector from "./Selector";
-import TextInputField from "./TextInputField";
+
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.88;
@@ -49,11 +47,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
   const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
-  const [ollamaModelOptions, setOllamaModelOptions] = useState([
-    { id: "llama3", label: "Llama 3" },
-    { id: "mistral", label: "Mistral" },
-    { id: "gemma", label: "Gemma" },
-  ]);
+  const [ollamaModelOptions, setOllamaModelOptions] = useState<{id: string, label: string}[]>([]);
 
   const languageOptions = [
     { id: "fr", label: "Français" },
@@ -134,8 +128,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
     Settings.set("ollamaUrl", v);
     AIModule.configure(v);
   };
-
-
 
   const setWhisperModel = (v: string) => {
     setWhisperModelState(v);
@@ -381,44 +373,33 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
             
             {ollamaError ? (
               <Text style={styles.errorText}>{ollamaError}</Text>
-            ) : ollamaModelOptions.length > 0 ? (
+            ) : (
               <View style={styles.settingRowVertical}>
                 <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Available Models</Text>
-                {ollamaModelOptions.map((model) => (
-                  <Text key={model.id} style={{ fontFamily: "IBMPlexMono-Medium", color: "#555", marginBottom: 4 }}>
-                    • {model.label}
+                {ollamaModelOptions.length > 0 ? (
+                  ollamaModelOptions.map((model) => (
+                    <Text key={model.id} style={{ fontFamily: "IBMPlexMono-Medium", color: "#555", marginBottom: 4 }}>
+                      • {model.label}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={{ fontFamily: "IBMPlexMono-Medium", color: "#888", marginBottom: 10 }}>
+                    Aucun modèle détecté.
                   </Text>
-                ))}
+                )}
+                {ollamaModelOptions.length === 0 && (
+                  <Pressable
+                    style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }, { marginTop: 10 }]}
+                    onPress={() => setDownloadModalVisible(true)}
+                  >
+                    <Image source={downloadIcon} style={styles.downloadIcon} />
+                    <Text style={styles.downloadText}>
+                      {isDownloading ? "Downloading..." : "Download Gemma4?"}
+                    </Text>
+                  </Pressable>
+                )}
               </View>
-
-              {ollamaError ? (
-                <Text style={styles.errorText}>{ollamaError}</Text>
-              ) : ollamaModelOptions.length > 0 ? (
-                <View style={styles.settingRowVertical}>
-                  <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Preferred Model</Text>
-                  <Selector
-                    options={[...ollamaModelOptions].sort((a, b) => {
-                      if (a.id === ollamaModel) return -1;
-                      if (b.id === ollamaModel) return 1;
-                      return a.label.localeCompare(b.label);
-                    })}
-                    selectedValue={ollamaModel}
-                    onSelect={setOllamaModel}
-                    title="Select Model"
-                    fullWidth
-                  />
-                </View>
-              ) : (
-                <Pressable
-                  style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }]}
-                  onPress={() => setDownloadModalVisible(true)}
-                >
-                  <Image source={downloadIcon} style={styles.downloadIcon} />
-                  <Text style={styles.downloadText}>
-                    {isDownloading ? "Downloading..." : "No models. Download Gemma4?"}
-                  </Text>
-                </Pressable>
-              )}
+            )}
             </View>
           )}
 

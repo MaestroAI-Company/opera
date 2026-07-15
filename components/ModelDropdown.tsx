@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Dimensions, Image, Keyboard, LayoutRectangle, Modal, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Dimensions, Image, Keyboard, LayoutRectangle, Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from "react-native";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { AIModule } from "../src/services/ai/AIModule";
 import NotificationModal from "./NotificationModal";
@@ -122,7 +122,9 @@ export default function ModelDropdown({
     });
   };
 
-  const estimatedMenuHeight = 30 + (models.length || 1) * 40 + 16 + 30 + REFLECTIONS.length * 40 + 24;
+  const MAX_MODELS_HEIGHT = 200;
+  const modelsHeight = models.length === 0 ? 80 : Math.min(models.length * 40, MAX_MODELS_HEIGHT);
+  const estimatedMenuHeight = 30 + modelsHeight + 16 + 30 + REFLECTIONS.length * 40 + 24;
 
   const menuAnimatedStyle = useAnimatedStyle(() => {
     return {
@@ -187,53 +189,55 @@ export default function ModelDropdown({
             ]}
           >
             <Text style={styles.sectionTitle}>Models</Text>
-            {loading ? (
-              <Text style={styles.modelStatus}>Loading...</Text>
-            ) : models.length === 0 ? (
-              <View>
-                <Text style={{ color: '#ff4444', textAlign: 'center', marginBottom: 12, paddingHorizontal: 12, fontSize: 13 }}>
-                  Unable to fetch models / Ollama URL undefined
-                </Text>
-                {isAvailable && (
+            <ScrollView style={{ maxHeight: MAX_MODELS_HEIGHT }} showsVerticalScrollIndicator={false} nestedScrollEnabled={true}>
+              {loading ? (
+                <Text style={styles.modelStatus}>Loading...</Text>
+              ) : models.length === 0 ? (
+                <View>
+                  <Text style={{ color: '#ff4444', textAlign: 'center', marginBottom: 12, paddingHorizontal: 12, fontSize: 13 }}>
+                    Unable to fetch models / Ollama URL undefined
+                  </Text>
+                  {isAvailable && (
+                    <Pressable
+                      onPress={() => {
+                        handleClose(() => setDownloadModalVisible(true));
+                      }}
+                      style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }]}
+                    >
+                      <Image source={downloadIcon} style={styles.downloadIcon} />
+                      <Text style={styles.downloadText}>
+                        {isDownloading ? "Downloading..." : "gemma4"}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+              ) : (
+                [...models].sort((a, b) => {
+                  if (a === selectedModel) return -1;
+                  if (b === selectedModel) return 1;
+                  return a.localeCompare(b);
+                }).map((model) => (
                   <Pressable
+                    key={model}
                     onPress={() => {
-                      handleClose(() => setDownloadModalVisible(true));
+                      Vibration.vibrate(10);
+                      handleClose(() => onModelChange(model));
                     }}
-                    style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }]}
+                    style={({ pressed }) => [
+                      styles.option,
+                      model === selectedModel ? styles.optionSelected : pressed && { backgroundColor: "rgba(0, 0, 0, 0.05)" },
+                      model === selectedModel && pressed && { backgroundColor: "#cc1414" }
+                    ]}
                   >
-                    <Image source={downloadIcon} style={styles.downloadIcon} />
-                    <Text style={styles.downloadText}>
-                      {isDownloading ? "Downloading..." : "gemma4"}
+                    <Text
+                      style={[styles.optionText, model === selectedModel && styles.optionTextSelected]}
+                    >
+                      {model}
                     </Text>
                   </Pressable>
-                )}
-              </View>
-            ) : (
-              [...models].sort((a, b) => {
-                if (a === selectedModel) return -1;
-                if (b === selectedModel) return 1;
-                return a.localeCompare(b);
-              }).map((model) => (
-                <Pressable
-                  key={model}
-                  onPress={() => {
-                    Vibration.vibrate(10);
-                    handleClose(() => onModelChange(model));
-                  }}
-                  style={({ pressed }) => [
-                    styles.option,
-                    model === selectedModel ? styles.optionSelected : pressed && { backgroundColor: "rgba(0, 0, 0, 0.05)" },
-                    model === selectedModel && pressed && { backgroundColor: "#cc1414" }
-                  ]}
-                >
-                  <Text
-                    style={[styles.optionText, model === selectedModel && styles.optionTextSelected]}
-                  >
-                    {model}
-                  </Text>
-                </Pressable>
-              ))
-            )}
+                ))
+              )}
+            </ScrollView>
 
             <View style={styles.separator} />
             <Text style={styles.sectionTitle}>Reflection</Text>

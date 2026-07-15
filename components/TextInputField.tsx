@@ -32,7 +32,7 @@ const styles = StyleSheet.create({
   icon: {
     width: 18,
     height: 18,
-    tintColor: "#666",
+    tintColor: "#000",
   },
   input: {
     flex: 1,

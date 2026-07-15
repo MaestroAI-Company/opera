@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
     width: DRAWER_WIDTH,
     backgroundColor: "#fff",
     paddingTop: 60,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
   },
   logo: {
     width: 160,

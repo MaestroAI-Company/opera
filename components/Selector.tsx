@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
-import { Image, LayoutRectangle, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Dimensions, Image, LayoutRectangle, Modal, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 
 const arrowDownIcon = require("../assets/icons/down_arrow.png");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export type SelectorOption = {
   id: string;
@@ -14,6 +15,7 @@ type SelectorProps = {
   onSelect: (value: string) => void;
   placeholder?: string;
   title?: string;
+  fullWidth?: boolean;
 };
 
 export default function Selector({
@@ -22,6 +24,7 @@ export default function Selector({
   onSelect,
   placeholder = "Select...",
   title,
+  fullWidth = false,
 }: SelectorProps) {
   const [visible, setVisible] = useState(false);
   const triggerRef = useRef<View>(null);
@@ -36,17 +39,41 @@ export default function Selector({
 
   const selectedOption = options.find((o) => o.id === selectedValue);
 
+  const menuWidth = fullWidth && triggerLayout ? triggerLayout.width : 220;
+  let menuLeft = 0;
+  let menuTop = 0;
+
+  if (triggerLayout) {
+    menuLeft = triggerLayout.x;
+    if (menuLeft + menuWidth > SCREEN_WIDTH - 16) {
+      menuLeft = SCREEN_WIDTH - menuWidth - 16;
+    }
+    if (menuLeft < 16) {
+      menuLeft = 16;
+    }
+
+    const estimatedMenuHeight = options.length * 40 + (title ? 30 : 0) + 24;
+    menuTop = triggerLayout.y + triggerLayout.height + 4;
+    if (menuTop + estimatedMenuHeight > SCREEN_HEIGHT - 16) {
+      const upwardTop = triggerLayout.y - estimatedMenuHeight - 4;
+      if (upwardTop > 16) {
+        menuTop = upwardTop;
+      }
+    }
+  }
+
   return (
-    <View style={styles.container}>
-      <View ref={triggerRef} style={styles.shadowLayer}>
-        <View style={styles.shadowBlock} />
-        <Pressable onPress={handleOpen} style={styles.trigger}>
-          <Image source={arrowDownIcon} style={styles.icon} />
-          <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
-            {selectedOption ? selectedOption.label : placeholder}
-          </Text>
-        </Pressable>
-      </View>
+    <View style={[styles.container, fullWidth && styles.containerFullWidth]}>
+      <Pressable
+        onPress={handleOpen}
+        style={[styles.trigger, fullWidth && styles.triggerFullWidth]}
+        ref={triggerRef}
+      >
+        <Image source={arrowDownIcon} style={styles.icon} />
+        <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
+          {selectedOption ? selectedOption.label : placeholder}
+        </Text>
+      </Pressable>
 
       <Modal
         visible={visible}
@@ -59,7 +86,7 @@ export default function Selector({
             style={[
               styles.menu,
               triggerLayout
-                ? { top: triggerLayout.y + triggerLayout.height + 4, left: triggerLayout.x }
+                ? { top: menuTop, left: menuLeft, width: menuWidth }
                 : {},
             ]}
           >
@@ -68,6 +95,7 @@ export default function Selector({
               <Pressable
                 key={option.id}
                 onPress={() => {
+                  Vibration.vibrate(10);
                   onSelect(option.id);
                   setVisible(false);
                 }}
@@ -94,17 +122,9 @@ const styles = StyleSheet.create({
   container: {
     alignItems: "flex-start",
   },
-  shadowLayer: {
-    position: "relative",
-  },
-  shadowBlock: {
-    position: "absolute",
-    top: 4,
-    left: -4,
-    right: 4,
-    height: 44,
-    backgroundColor: "#00000013",
-    borderRadius: 5,
+  containerFullWidth: {
+    width: "100%",
+    alignItems: "stretch",
   },
   trigger: {
     flexDirection: "row",
@@ -116,11 +136,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     gap: 8,
     borderRadius: 5,
-    minWidth: 140,
+    minWidth: 120,
     maxWidth: 240,
     overflow: "hidden",
     position: "relative",
     zIndex: 1,
+  },
+  triggerFullWidth: {
+    width: "100%",
+    maxWidth: "100%",
   },
   icon: {
     width: 18,
@@ -130,7 +154,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#000",
     fontFamily: "monospace",
-    flexShrink: 1,
+    flex: 1,
+    textAlign: "right",
   },
   overlay: {
     flex: 1,

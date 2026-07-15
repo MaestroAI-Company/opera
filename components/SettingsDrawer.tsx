@@ -13,7 +13,7 @@ const DRAWER_WIDTH = SCREEN_WIDTH * 0.88;
 
 const linkIcon = require("../assets/icons/link.png");
 const downloadIcon = require("../assets/icons/download.png");
-const penPlaceholderIcon = require("../assets/icons/info.png");
+const penPlaceholderIcon = require("../assets/icons/pencil.png");
 
 type SettingsDrawerProps = {
   visible: boolean;
@@ -304,7 +304,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
       </Animated.View>
 
       <Animated.View style={[styles.content, { transform: [{ translateX }] }]}>
-        <ScrollView contentContainerStyle={{ paddingBottom: 40, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingTop: 60, paddingBottom: 40, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
           <Text style={styles.title}>Settings</Text>
 
         <Text style={styles.sectionTitle}>General</Text>
@@ -392,6 +392,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
                   selectedValue={ollamaModel}
                   onSelect={setOllamaModel}
                   title="Select Model"
+                  fullWidth
                 />
               </View>
             ) : (
@@ -421,29 +422,20 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
 
         <Text style={[styles.sectionTitle, { marginTop: 30 }]}>Data & Storage</Text>
         <View style={styles.buttonRow}>
-          <View style={[styles.shadowLayer, { flex: 1 }]}>
-            <View style={styles.shadowBlock} />
-            <Pressable style={styles.actionButton} onPress={handleExport}>
-              <Text style={styles.actionButtonText}>Export</Text>
-            </Pressable>
-          </View>
-          <View style={[styles.shadowLayer, { flex: 1 }]}>
-            <View style={styles.shadowBlock} />
-            <Pressable style={styles.actionButton} onPress={handleImport}>
-              <Text style={styles.actionButtonText}>Import</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <View style={[styles.shadowLayer, { marginTop: 15, marginBottom: 20 }]}>
-          <View style={[styles.shadowBlock, styles.dangerShadowBlock]} />
-          <Pressable 
-            style={[styles.actionButton, styles.dangerButton]} 
-            onPress={handleDeleteAll}
-          >
-            <Text style={[styles.actionButtonText, styles.dangerButtonText]}>Delete all conversations</Text>
+          <Pressable style={[styles.actionButton, { flex: 1 }]} onPress={handleExport}>
+            <Text style={styles.actionButtonText}>Export</Text>
+          </Pressable>
+          <Pressable style={[styles.actionButton, { flex: 1 }]} onPress={handleImport}>
+            <Text style={styles.actionButtonText}>Import</Text>
           </Pressable>
         </View>
+
+        <Pressable 
+          style={[styles.actionButton, styles.dangerButton, { marginTop: 15, marginBottom: 20 }]} 
+          onPress={handleDeleteAll}
+        >
+          <Text style={[styles.actionButtonText, styles.dangerButtonText]}>Delete all conversations</Text>
+        </Pressable>
         </ScrollView>
       </Animated.View>
 
@@ -483,8 +475,7 @@ const styles = StyleSheet.create({
     right: 0,
     width: DRAWER_WIDTH,
     backgroundColor: "#fff",
-    paddingTop: 60,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
   },
   title: {
     fontSize: 24,
@@ -567,21 +558,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 16,
     marginTop: 10,
-  },
-  shadowLayer: {
-    position: "relative",
-  },
-  shadowBlock: {
-    position: "absolute",
-    top: 4,
-    left: -4,
-    right: 4,
-    bottom: -4,
-    backgroundColor: "#00000013",
-    borderRadius: 5,
-  },
-  dangerShadowBlock: {
-    backgroundColor: "#FF1A1A15",
   },
   actionButton: {
     backgroundColor: "#fff",

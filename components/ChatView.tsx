@@ -1,3 +1,5 @@
+import * as Clipboard from "expo-clipboard";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useRef, useState } from "react";
 import {
   FlatList,
@@ -9,10 +11,8 @@ import {
   Text,
   View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import * as Clipboard from "expo-clipboard";
-import { renderMarkdown } from "./MarkdownText";
 import { Conversation, Message } from "../src/services/db/DatabaseService";
+import { renderMarkdown } from "./MarkdownText";
 
 const butterflyImage = require("../assets/images/butterfly2.png");
 const thinkingGif = require("../assets/icons/thinking.gif");
@@ -60,7 +60,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   return (
     <View style={[styles.bubble, isUser ? (incognito ? styles.userBubbleIncognito : styles.userBubble) : styles.aiBubble]}>
       {isUser ? (
-        <Text 
+        <Text
           style={[styles.bubbleText, styles.userText]}
           selectable={true}
           selectionColor="rgba(255, 255, 255, 0.4)"
@@ -96,8 +96,8 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               >
                 <Image source={reloadIcon} style={{ width: 22, height: 22, tintColor: "#999" }} />
               </Pressable>
-              <Pressable 
-                onPress={() => copyToClipboard(item.content, false)} 
+              <Pressable
+                onPress={() => copyToClipboard(item.content, false)}
                 onLongPress={() => copyToClipboard(item.content, true)}
                 delayLongPress={500}
                 style={({ pressed }) => [styles.toolbarIconContainer, pressed && { backgroundColor: "#eaeaea" }]}
@@ -120,7 +120,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   const [headerHeight, setHeaderHeight] = useState(0);
   const isAtBottomRef = useRef(true);
   const initialScrollDone = useRef(false);
-  
+
   const [snackbarMessage, setSnackbarMessage] = useState("");
   useEffect(() => {
     if (snackbarMessage) {
@@ -147,7 +147,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
     const atTop = contentOffset.y <= headerHeight + 10;
     //threshold for bottom detection
     const atBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 100;
-    
+
     if (!isAutoScrolling.current) {
       isAtBottomRef.current = atBottom;
     }
@@ -201,7 +201,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
             autoScrollTimeout.current = setTimeout(() => {
               isAutoScrolling.current = false;
             }, 500);
-            
+
             //scrollToOffset to avoid android jump
             listRef.current?.scrollToOffset({ offset: h + 1000, animated: true });
           }
@@ -242,19 +242,23 @@ const styles = StyleSheet.create({
   },
   bubble: {
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   userBubble: {
     alignSelf: "flex-end",
     backgroundColor: "#FF1A1A",
     borderRadius: 10,
     maxWidth: "80%",
+    borderWidth: 2,
+    borderColor: "#ffffff52",
   },
   userBubbleIncognito: {
     alignSelf: "flex-end",
     backgroundColor: "#565A75",
     borderRadius: 10,
     maxWidth: "80%",
+    borderWidth: 2,
+    borderColor: "#ffffff52",
   },
   aiBubble: {
     alignSelf: "stretch",

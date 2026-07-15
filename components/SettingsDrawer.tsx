@@ -30,7 +30,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
   const [theme, setThemeState] = useState("system");
   const [aiService, setAiServiceState] = useState("ollama");
   const [ollamaUrl, setOllamaUrlState] = useState("");
-  const [ollamaModel, setOllamaModelState] = useState("");
   const [ollamaError, setOllamaError] = useState("");
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -93,7 +92,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
         setThemeState(s.theme);
         setAiServiceState(s.aiService);
         setOllamaUrlState(s.ollamaUrl);
-        setOllamaModelState(s.ollamaModel);
         setWhisperModelState(s.whisperModel);
         setWhisperLanguageState(s.whisperLanguage);
         setInstructionState(s.instruction);
@@ -131,10 +129,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
     AIModule.configure(v);
   };
 
-  const setOllamaModel = (v: string) => {
-    setOllamaModelState(v);
-    Settings.set("ollamaModel", v);
-  };
+
 
   const setWhisperModel = (v: string) => {
     setWhisperModelState(v);
@@ -170,19 +165,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
           label: m,
         }));
         setOllamaModelOptions(options);
-        
-        //use state callback for latest model
-        setOllamaModelState((currentModel) => {
-          if (!options.find((o) => o.id === currentModel)) {
-            const first = options[0].id;
-            Settings.set("ollamaModel", first);
-            return first;
-          }
-          return currentModel;
-        });
       } else {
         setOllamaModelOptions([]);
-        setOllamaModelState("");
       }
     } catch (e) {
       console.warn("Could not fetch Ollama models", e);
@@ -208,8 +192,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
           label: m,
         }));
         setOllamaModelOptions(options);
-        setOllamaModelState("gemma4");
-        Settings.set("ollamaModel", "gemma4");
       }
     } catch (e) {
       console.error("Failed to download gemma4", e);
@@ -382,18 +364,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
               <Text style={styles.errorText}>{ollamaError}</Text>
             ) : ollamaModelOptions.length > 0 ? (
               <View style={styles.settingRowVertical}>
-                <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Preferred Model</Text>
-                <Selector
-                  options={[...ollamaModelOptions].sort((a, b) => {
-                    if (a.id === ollamaModel) return -1;
-                    if (b.id === ollamaModel) return 1;
-                    return a.label.localeCompare(b.label);
-                  })}
-                  selectedValue={ollamaModel}
-                  onSelect={setOllamaModel}
-                  title="Select Model"
-                  fullWidth
-                />
+                <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Available Models</Text>
+                {ollamaModelOptions.map((model) => (
+                  <Text key={model.id} style={{ fontFamily: "monospace", color: "#555", marginBottom: 4 }}>
+                    • {model.label}
+                  </Text>
+                ))}
               </View>
             ) : (
               <Pressable 

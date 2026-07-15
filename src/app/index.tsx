@@ -93,11 +93,31 @@ export default function Index() {
     setMessages(msgs);
   }, []);
 
-  //start a new empty conversation (reset to welcome screen)
+  //start new empty conversation
   const startNewConversation = useCallback(() => {
     setActiveConversation(null);
     setMessages([]);
   }, []);
+
+  //toggle pin conversation
+  const togglePinConversation = useCallback(async (convId: string, pinned: boolean) => {
+    await DB.togglePinConversation(convId, pinned);
+    setConversations((prev) => 
+      prev.map(c => c.id === convId ? { ...c, pinned: pinned ? 1 : 0 } : c)
+    );
+    if (activeConversation?.id === convId) {
+      setActiveConversation(prev => prev ? { ...prev, pinned: pinned ? 1 : 0 } : prev);
+    }
+  }, [activeConversation]);
+
+  //delete conversation
+  const deleteConversation = useCallback(async (convId: string) => {
+    await DB.deleteConversation(convId);
+    setConversations((prev) => prev.filter(c => c.id !== convId));
+    if (activeConversation?.id === convId) {
+      startNewConversation();
+    }
+  }, [activeConversation, startNewConversation]);
 
   //generate title from first message
   const generateTitle = useCallback(
@@ -404,6 +424,8 @@ export default function Index() {
         selectedConversationId={activeConversation?.id ?? null}
         onSelectConversation={selectConversation}
         onNewConversation={startNewConversation}
+        onDeleteConversation={deleteConversation}
+        onTogglePinConversation={togglePinConversation}
       />
 
       <SettingsDrawer

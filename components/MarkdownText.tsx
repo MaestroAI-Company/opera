@@ -1,5 +1,6 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
+import MathText from "react-native-math";
 
 const s = StyleSheet.create({
   base: { fontSize: 18, lineHeight: 26, color: "#000", fontFamily: "Jakarta" },
@@ -123,6 +124,51 @@ export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode
         <Text key={`code-${i}`} style={[s.base, s.codeBlock]} selectable={true} selectionColor={selColor}>
           {codeLines.join("\n")}
         </Text>
+      );
+      continue;
+    }
+
+    // math block $$
+    if (line.trimStart().startsWith("$$")) {
+      const isSingleLine = line.trimEnd().endsWith("$$") && line.trim().length > 4;
+      if (isSingleLine) {
+        const mathContent = line; // react-native-math needs the $$ intact
+        elements.push(
+          <View key={`math-${i}`} style={{ width: "100%", marginVertical: 8, minHeight: 40, alignSelf: "center", overflow: "hidden", backgroundColor: "transparent" }}>
+            <MathText
+              content={mathContent}
+              textSize={16}
+              textColor={incognito ? "#E0E0E0" : "#333333"}
+              style={{ flex: 1, backgroundColor: "transparent" }}
+            />
+          </View>
+        );
+        i++;
+        continue;
+      }
+
+      const mathLines: string[] = [];
+      mathLines.push(line);
+
+      i++;
+      while (i < lines.length && !lines[i].includes("$$")) {
+        mathLines.push(lines[i]);
+        i++;
+      }
+      if (i < lines.length) {
+        mathLines.push(lines[i]);
+        i++; // skip closing $$
+      }
+
+      elements.push(
+        <View key={`math-${i}`} style={{ width: "100%", marginVertical: 8, minHeight: Math.max(40, mathLines.length * 25), alignSelf: "center", overflow: "hidden", backgroundColor: "transparent" }}>
+          <MathText
+            content={mathLines.join("\n")}
+            textSize={16}
+            textColor={incognito ? "#E0E0E0" : "#333333"}
+            style={{ flex: 1, backgroundColor: "transparent" }}
+          />
+        </View>
       );
       continue;
     }

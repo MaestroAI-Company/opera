@@ -6,6 +6,7 @@ export type Conversation = {
   model: string;
   createdAt: number;
   updatedAt: number;
+  pinned?: number;
 };
 
 export type Message = {
@@ -30,9 +31,17 @@ class DatabaseService {
           name TEXT NOT NULL,
           model TEXT NOT NULL,
           createdAt INTEGER NOT NULL,
-          updatedAt INTEGER NOT NULL
+          updatedAt INTEGER NOT NULL,
+          pinned INTEGER DEFAULT 0
         )`
       );
+      
+      try {
+        await this.db.runAsync('ALTER TABLE conversations ADD COLUMN pinned INTEGER DEFAULT 0');
+      } catch (e) {
+        // ignore, column might already exist
+      }
+
       await this.db.runAsync(
         `CREATE TABLE IF NOT EXISTS messages (
           id TEXT PRIMARY KEY,
@@ -59,10 +68,10 @@ class DatabaseService {
     const db = this.getDb();
     const now = Date.now();
     const id = `conv_${now}_${Math.random().toString(36).slice(2, 7)}`;
-    const conv: Conversation = { id, name: firstName, model, createdAt: now, updatedAt: now };
+    const conv: Conversation = { id, name: firstName, model, createdAt: now, updatedAt: now, pinned: 0 };
     await db.runAsync(
-      'INSERT INTO conversations (id, name, model, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)',
-      [conv.id, conv.name, conv.model, conv.createdAt, conv.updatedAt]
+      'INSERT INTO conversations (id, name, model, createdAt, updatedAt, pinned) VALUES (?, ?, ?, ?, ?, ?)',
+      [conv.id, conv.name, conv.model, conv.createdAt, conv.updatedAt, conv.pinned ?? 0]
     );
     return conv;
   }
@@ -71,6 +80,12 @@ class DatabaseService {
   async renameConversation(id: string, name: string): Promise<void> {
     const db = this.getDb();
     await db.runAsync('UPDATE conversations SET name = ?, updatedAt = ? WHERE id = ?', [name, Date.now(), id]);
+  }
+
+  //toggle pin status
+  async togglePinConversation(id: string, pinned: boolean): Promise<void> {
+    const db = this.getDb();
+    await db.runAsync('UPDATE conversations SET pinned = ? WHERE id = ?', [pinned ? 1 : 0, id]);
   }
 
   //get all conversations ordered by most recent
@@ -142,8 +157,8 @@ class DatabaseService {
 
       for (const conv of conversations) {
         await db.runAsync(
-          'INSERT INTO conversations (id, name, model, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)',
-          [conv.id, conv.name, conv.model, conv.createdAt, conv.updatedAt]
+          'INSERT INTO conversations (id, name, model, createdAt, updatedAt, pinned) VALUES (?, ?, ?, ?, ?, ?)',
+          [conv.id, conv.name, conv.model, conv.createdAt, conv.updatedAt, conv.pinned ?? 0]
         );
       }
 

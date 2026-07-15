@@ -101,7 +101,8 @@ function renderTokens(tokens: Token[], keyBase: number): React.ReactNode[] {
   });
 }
 
-export function renderMarkdown(md: string): React.ReactNode[] {
+export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode[] {
+  const selColor = incognito ? "rgba(86, 90, 117, 0.4)" : "rgba(255, 26, 26, 0.4)";
   const lines = md.split("\n");
   const elements: React.ReactNode[] = [];
   let i = 0;
@@ -119,7 +120,7 @@ export function renderMarkdown(md: string): React.ReactNode[] {
       }
       i++; // skip closing ```
       elements.push(
-        <Text key={`code-${i}`} style={[s.base, s.codeBlock]}>
+        <Text key={`code-${i}`} style={[s.base, s.codeBlock]} selectable={true} selectionColor={selColor}>
           {codeLines.join("\n")}
         </Text>
       );
@@ -132,7 +133,7 @@ export function renderMarkdown(md: string): React.ReactNode[] {
       const level = headingMatch[1].length;
       const style = level === 1 ? s.h1 : level === 2 ? s.h2 : s.h3;
       elements.push(
-        <Text key={`h-${i}`} style={[s.base, style]}>
+        <Text key={`h-${i}`} style={[s.base, style]} selectable={true} selectionColor={selColor}>
           {renderTokens(parseInline(headingMatch[2]), i)}
         </Text>
       );
@@ -144,7 +145,7 @@ export function renderMarkdown(md: string): React.ReactNode[] {
     const bulletMatch = line.match(/^[\s]*[-*]\s+(.*)/);
     if (bulletMatch) {
       elements.push(
-        <Text key={`li-${i}`} style={[s.base, s.paragraph]}>
+        <Text key={`li-${i}`} style={[s.base, s.paragraph]} selectable={true} selectionColor={selColor}>
           {"• "}{renderTokens(parseInline(bulletMatch[1]), i)}
         </Text>
       );
@@ -156,7 +157,7 @@ export function renderMarkdown(md: string): React.ReactNode[] {
     const olMatch = line.match(/^[\s]*(\d+)\.\s+(.*)/);
     if (olMatch) {
       elements.push(
-        <Text key={`oli-${i}`} style={[s.base, s.paragraph]}>
+        <Text key={`oli-${i}`} style={[s.base, s.paragraph]} selectable={true} selectionColor={selColor}>
           {`${olMatch[1]}. `}{renderTokens(parseInline(olMatch[2]), i)}
         </Text>
       );
@@ -168,7 +169,7 @@ export function renderMarkdown(md: string): React.ReactNode[] {
     if (line.trimStart().startsWith("> ")) {
       const quoteText = line.replace(/^[\s]*>\s?/, "");
       elements.push(
-        <Text key={`quote-${i}`} style={[s.base, { borderLeftColor: "#FF1A1A", borderLeftWidth: 3, paddingLeft: 10, marginVertical: 4 }]}>
+        <Text key={`quote-${i}`} style={[s.base, { borderLeftColor: incognito ? "#565A75" : "#FF1A1A", borderLeftWidth: 3, paddingLeft: 10, marginVertical: 4 }]} selectable={true} selectionColor={selColor}>
           {renderTokens(parseInline(quoteText), i)}
         </Text>
       );
@@ -179,7 +180,7 @@ export function renderMarkdown(md: string): React.ReactNode[] {
     // custom interrupted line
     if (line.trim() === "_The user interrupted the response_") {
       elements.push(
-        <Text key={`interrupted-${i}`} style={[s.base, s.italic, { color: "gray", marginTop: 4 }]}>
+        <Text key={`interrupted-${i}`} style={[s.base, s.italic, { color: "gray", marginTop: 4 }]} selectable={true} selectionColor={selColor}>
           The user interrupted the response
         </Text>
       );
@@ -211,7 +212,7 @@ export function renderMarkdown(md: string): React.ReactNode[] {
     
     if (paraLines.length > 0) {
       elements.push(
-        <Text key={`p-${i}`} style={[s.base, s.paragraph]}>
+        <Text key={`p-${i}`} style={[s.base, s.paragraph]} selectable={true} selectionColor={selColor}>
           {renderTokens(parseInline(paraLines.join("\n")), i)}
         </Text>
       );

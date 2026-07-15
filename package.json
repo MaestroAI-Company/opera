@@ -7,6 +7,7 @@
     "buffer": "^6.0.3",
     "expo": "~57.0.4",
     "expo-audio": "~57.0.0",
+    "expo-clipboard": "~57.0.1",
     "expo-constants": "~57.0.3",
     "expo-device": "~57.0.0",
     "expo-document-picker": "~57.0.0",

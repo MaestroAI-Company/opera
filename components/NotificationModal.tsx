@@ -149,13 +149,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     color: "#222",
-    fontFamily: "monospace",
+    fontFamily: "IBMPlexMono-Medium",
     textAlign: "center",
   },
   message: {
     fontSize: 14,
     color: "#555",
-    fontFamily: "monospace",
+    fontFamily: "Jakarta",
     textAlign: "center",
     marginBottom: 20,
     lineHeight: 20,
@@ -193,8 +193,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "#fff",
     fontSize: 14,
-    fontWeight: "bold",
-    fontFamily: "monospace",
+    fontFamily: "IBMPlexMono-Medium",
   },
   buttonTextSecondary: {
     color: "#222",

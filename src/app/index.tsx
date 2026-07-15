@@ -13,8 +13,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ChatBar from "../../components/ChatBar";
 import ChatView from "../../components/ChatView";
 import DrawerMenu from "../../components/DrawerMenu";
-import SettingsDrawer from "../../components/SettingsDrawer";
 import ModelDropdown from "../../components/ModelDropdown";
+import SettingsDrawer from "../../components/SettingsDrawer";
 import TopBar from "../../components/TopBar";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { AIModule } from "../services/ai/AIModule";
@@ -51,7 +51,7 @@ export default function Index() {
 
   const [generatingConvId, setGeneratingConvId] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  
+
   //refs for background processing
   const activeConversationRef = useRef<Conversation | null>(null);
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function Index() {
   const processQueue = async () => {
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
-    
+
     while (requestQueueRef.current.length > 0) {
       const item = requestQueueRef.current.shift();
       setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
@@ -74,7 +74,7 @@ export default function Index() {
         await item.task();
       }
     }
-    
+
     isProcessingRef.current = false;
     setGeneratingConvId(null);
     generatingConvIdRef.current = null;
@@ -106,7 +106,7 @@ export default function Index() {
       } catch (e) {
         console.warn("Failed to load settings at boot", e);
       }
-      
+
       setDbReady(true);
     };
     init();
@@ -121,7 +121,7 @@ export default function Index() {
   const selectConversation = useCallback(async (conv: Conversation) => {
     setActiveConversation(conv);
     const msgs = await DB.getMessages(conv.id);
-    
+
     if (generatingConvIdRef.current === conv.id && streamingMsgIdRef.current) {
       const patched = msgs.map(m => m.id === streamingMsgIdRef.current ? { ...m, content: streamingContentRef.current || "…" } : m);
       setMessages(patched);
@@ -139,7 +139,7 @@ export default function Index() {
   //toggle pin conversation
   const togglePinConversation = useCallback(async (convId: string, pinned: boolean) => {
     await DB.togglePinConversation(convId, pinned);
-    setConversations((prev) => 
+    setConversations((prev) =>
       prev.map(c => c.id === convId ? { ...c, pinned: pinned ? 1 : 0 } : c)
     );
     if (activeConversation?.id === convId) {
@@ -225,7 +225,7 @@ export default function Index() {
       } else {
         userMsg = await DB.addMessage(conv.id, "user", text);
       }
-      
+
       if (isFirstMessage || activeConversationRef.current?.id === conv.id) {
         setMessages((prev) => [...prev, userMsg]);
       }
@@ -258,7 +258,7 @@ export default function Index() {
       } else {
         assistantMsg = await DB.addMessage(conv.id, "assistant", "…");
       }
-      
+
       if (isFirstMessage || activeConversationRef.current?.id === conv.id) {
         setMessages((prev) => [...prev, assistantMsg]);
       }
@@ -266,7 +266,7 @@ export default function Index() {
       const task = async () => {
         setGeneratingConvId(taskConv.id);
         generatingConvIdRef.current = taskConv.id;
-        
+
         streamingMsgIdRef.current = assistantMsg.id;
         streamingContentRef.current = "";
 
@@ -587,8 +587,8 @@ export default function Index() {
                   rightElement={
                     <View style={styles.settingsShadowLayer}>
                       <View style={styles.settingsShadowBlock} />
-                      <Pressable 
-                        style={({ pressed }) => [styles.settingsButton, pressed && { backgroundColor: "#eaeaea" }]} 
+                      <Pressable
+                        style={({ pressed }) => [styles.settingsButton, pressed && { backgroundColor: "#eaeaea" }]}
                         onPress={() => setSettingsDrawerVisible(true)}
                       >
                         <Image source={settingsIcon} style={styles.settingsIcon} />
@@ -598,15 +598,15 @@ export default function Index() {
                 />
               ) : (
                 <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' }}>
-                    <View style={styles.settingsShadowLayer}>
-                      <View style={styles.settingsShadowBlock} />
-                      <Pressable 
-                        style={({ pressed }) => [styles.settingsButton, pressed && { backgroundColor: "#eaeaea" }]} 
-                        onPress={() => setSettingsDrawerVisible(true)}
-                      >
-                        <Image source={settingsIcon} style={styles.settingsIcon} />
-                      </Pressable>
-                    </View>
+                  <View style={styles.settingsShadowLayer}>
+                    <View style={styles.settingsShadowBlock} />
+                    <Pressable
+                      style={({ pressed }) => [styles.settingsButton, pressed && { backgroundColor: "#eaeaea" }]}
+                      onPress={() => setSettingsDrawerVisible(true)}
+                    >
+                      <Image source={settingsIcon} style={styles.settingsIcon} />
+                    </Pressable>
+                  </View>
                 </View>
               )}
             </TopBar>
@@ -689,10 +689,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   welcomeText: {
-    fontSize: 28,
-    fontWeight: "300",
+    fontSize: 34,
     color: "#333",
     letterSpacing: 1,
+    fontFamily: "Petrona",
+    marginVertical: 20,
   },
   settingsShadowLayer: {
     position: "relative",
@@ -741,7 +742,7 @@ const styles = StyleSheet.create({
   incognitoButtonText: {
     fontSize: 13,
     color: "#222",
-    fontFamily: "monospace",
+    fontFamily: "IBMPlexMono-Medium",
     textAlign: "center",
   },
   incognitoButtonTextActive: {
@@ -751,7 +752,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontSize: 12,
     color: "#999",
-    fontFamily: "monospace",
+    fontFamily: "Jakarta",
     textAlign: "center",
     lineHeight: 18,
     maxWidth: 300,

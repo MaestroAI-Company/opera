@@ -115,8 +115,6 @@ MessageItem.displayName = "MessageItem";
 
 export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, generatingMessageId }: ChatViewProps) {
   const listRef = useRef<FlatList>(null);
-  const [showTopGradient, setShowTopGradient] = useState(false);
-  const [showBottomGradient, setShowBottomGradient] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
   const isAtBottomRef = useRef(true);
   const initialScrollDone = useRef(false);
@@ -151,8 +149,6 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
     if (!isAutoScrolling.current) {
       isAtBottomRef.current = atBottom;
     }
-    setShowTopGradient(!atTop);
-    setShowBottomGradient(!atBottom);
   };
 
   const renderItem = ({ item }: { item: Message }) => {
@@ -207,20 +203,16 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
           }
         }}
       />
-      {showTopGradient && (
-        <LinearGradient
-          colors={["#FFF5EC", "rgba(255,245,236,0.9)", "rgba(255,245,236,0)"]}
-          style={styles.gradientTop}
-          pointerEvents="none"
-        />
-      )}
-      {showBottomGradient && (
-        <LinearGradient
-          colors={["rgba(255,245,236,0)", "rgba(255,245,236,0.9)", "#FFF5EC"]}
-          style={styles.gradientBottom}
-          pointerEvents="none"
-        />
-      )}
+      <LinearGradient
+        colors={["#FFF5EC", "rgba(255,245,236,0.9)", "rgba(255,245,236,0)"]}
+        style={styles.gradientTop}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={["rgba(255,245,236,0)", "rgba(255,245,236,0.9)", "#FFF5EC"]}
+        style={styles.gradientBottom}
+        pointerEvents="none"
+      />
       {!!snackbarMessage && (
         <View style={styles.snackbarContainer} pointerEvents="none">
           <View style={styles.snackbar}>
@@ -268,6 +260,7 @@ const styles = StyleSheet.create({
   bubbleText: {
     fontSize: 15,
     lineHeight: 21,
+    fontFamily: "Jakarta",
   },
   userText: {
     color: "#fff",
@@ -287,16 +280,16 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 26,
-    fontWeight: "300",
     color: "#333",
     textAlign: "center",
     letterSpacing: 0.5,
     marginBottom: 12,
+    fontFamily: "Petrona",
   },
   headerDate: {
     fontSize: 13,
     color: "#999",
-    fontFamily: "monospace",
+    fontFamily: "IBMPlexMono-Medium",
   },
   gradientTop: {
     position: "absolute",

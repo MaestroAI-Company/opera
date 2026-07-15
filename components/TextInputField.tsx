@@ -38,7 +38,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: "#222",
-    fontFamily: "monospace",
+    fontFamily: "IBMPlexMono-Medium",
     padding: 0,
   },
 });

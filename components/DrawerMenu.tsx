@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
   quickActionLabel: {
     fontSize: 15,
     color: "#222",
-    fontFamily: "monospace",
+    fontFamily: "IBMPlexMono-Medium",
   },
   scrollContent: {
     paddingBottom: 40,
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 12,
     color: "#888",
-    fontFamily: "monospace",
+    fontFamily: "Jakarta",
     textTransform: "uppercase",
     letterSpacing: 1,
     marginBottom: 8,
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     color: "#aaa",
-    fontFamily: "monospace",
+    fontFamily: "Jakarta",
     textAlign: "center",
     marginTop: 20,
   },
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   discussionText: {
     fontSize: 15,
     color: "#000000ff",
-    fontFamily: "monospace",
+    fontFamily: "IBMPlexMono-Medium",
   },
   discussionTextSelected: {
     color: "#ffffffff",

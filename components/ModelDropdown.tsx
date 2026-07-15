@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Dimensions, Image, Keyboard, LayoutRectangle, Modal, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { AIModule } from "../src/services/ai/AIModule";
 import NotificationModal from "./NotificationModal";
-import Animated, { useAnimatedStyle, withTiming, useSharedValue, runOnJS } from "react-native-reanimated";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const arrowDownIcon = require("../assets/icons/down_arrow.png");
@@ -158,8 +158,8 @@ export default function ModelDropdown({
     <View style={styles.container}>
       <View ref={triggerRef} style={styles.shadowLayer}>
         <View style={styles.shadowBlock} />
-        <Pressable 
-          onPress={handleOpen} 
+        <Pressable
+          onPress={handleOpen}
           style={({ pressed }) => [styles.trigger, pressed && { backgroundColor: "#eaeaea" }]}
         >
           <Animated.Image source={arrowDownIcon} style={[styles.icon, iconStyle]} />
@@ -195,10 +195,10 @@ export default function ModelDropdown({
                   Unable to fetch models / Ollama URL undefined
                 </Text>
                 {isAvailable && (
-                  <Pressable 
+                  <Pressable
                     onPress={() => {
                       handleClose(() => setDownloadModalVisible(true));
-                    }} 
+                    }}
                     style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }]}
                   >
                     <Image source={downloadIcon} style={styles.downloadIcon} />
@@ -221,7 +221,7 @@ export default function ModelDropdown({
                     handleClose(() => onModelChange(model));
                   }}
                   style={({ pressed }) => [
-                    styles.option, 
+                    styles.option,
                     model === selectedModel ? styles.optionSelected : pressed && { backgroundColor: "rgba(0, 0, 0, 0.05)" },
                     model === selectedModel && pressed && { backgroundColor: "#cc1414" }
                   ]}
@@ -245,7 +245,7 @@ export default function ModelDropdown({
                   handleClose(() => onReflectionChange(item.id));
                 }}
                 style={({ pressed }) => [
-                  styles.option, 
+                  styles.option,
                   item.id === selectedReflection ? styles.optionSelected : pressed && { backgroundColor: "rgba(0, 0, 0, 0.05)" },
                   item.id === selectedReflection && pressed && { backgroundColor: "#cc1414" }
                 ]}
@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 15,
     color: "#000",
-    fontFamily: "monospace",
+    fontFamily: "IBMPlexMono-Medium",
     flexShrink: 1,
   },
   overlay: {
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     color: "#888",
     marginBottom: 8,
     marginTop: 4,
-    fontFamily: "monospace",
+    fontFamily: "Jakarta",
     textTransform: "uppercase",
     letterSpacing: 1,
   },
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
   optionText: {
     fontSize: 15,
     color: "#000",
-    fontFamily: "monospace",
+    fontFamily: "IBMPlexMono-Medium",
   },
   optionTextSelected: {
     color: "#FFF",
@@ -395,7 +395,6 @@ const styles = StyleSheet.create({
   downloadText: {
     fontSize: 13,
     color: "#0066cc",
-    fontFamily: "monospace",
-    fontWeight: "bold",
+    fontFamily: "IBMPlexMono-Medium",
   },
 });

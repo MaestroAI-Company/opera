@@ -191,7 +191,7 @@ export default function Index() {
 
       let conv = activeConversation;
       let isFirstMessage = false;
-      const isIncognitoTask = incognitoMode;
+      const isIncognitoTask = conv ? conv.id.startsWith("incognito_") : incognitoMode;
 
       //create conversation if this is the first message
       if (!conv) {
@@ -387,7 +387,7 @@ export default function Index() {
       : SYSTEM_PROMPTS.DEFAULT;
     const taskReflection = selectedReflection;
     const taskConv = activeConversation;
-    const isIncognitoTask = incognitoMode;
+    const isIncognitoTask = taskConv.id.startsWith("incognito_");
 
     let assistantMsg: Message;
     if (isIncognitoTask) {
@@ -567,7 +567,7 @@ export default function Index() {
               conversation={activeConversation}
               contentTopPadding={insets.top + 72}
               contentBottomPadding={88 + insets.bottom}
-              incognito={incognitoMode}
+              incognito={activeConversation.id.startsWith("incognito_")}
               onRegenerate={handleRegenerate}
               speakerEnabled={speakerEnabled}
               generatingMessageId={generatingConvId === activeConversation.id ? streamingMsgIdRef.current : null}
@@ -612,7 +612,7 @@ export default function Index() {
             <ChatBar
               onSend={handleSend}
               onPlusPress={() => console.log("plus pressed")}
-              incognito={incognitoMode}
+              incognito={activeConversation ? activeConversation.id.startsWith("incognito_") : incognitoMode}
               isGenerating={activeConversation ? (generatingConvId === activeConversation.id || pendingConvIds.includes(activeConversation.id)) : false}
               onStop={handleStop}
             />

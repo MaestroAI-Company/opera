@@ -194,9 +194,9 @@ const styles = StyleSheet.create({
     height: 18,
   },
   label: {
-    fontSize: 15,
+    fontSize: 13,
     color: "#000",
-    fontFamily: "monospace",
+    fontFamily: "IBMPlexMono-Medium",
     flex: 1,
     textAlign: "right",
   },
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     color: "#888",
     marginBottom: 8,
     marginTop: 4,
-    fontFamily: "monospace",
+    fontFamily: "Jakarta",
     textTransform: "uppercase",
     letterSpacing: 1,
   },
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
   optionText: {
     fontSize: 15,
     color: "#000",
-    fontFamily: "monospace",
+    fontFamily: "IBMPlexMono-Medium",
   },
   optionTextSelected: {
     color: "#FFF",

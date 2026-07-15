@@ -3,6 +3,7 @@ import {
   Image,
   ImageBackground,
   KeyboardAvoidingView,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -64,6 +65,21 @@ export default function Index() {
   const requestQueueRef = useRef<{ convId: string, task: () => Promise<void>, assistantMsgId: string, isIncognito: boolean }[]>([]);
   const isProcessingRef = useRef(false);
   const generatingConvIdRef = useRef<string | null>(null);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        const isLeftEdge = gestureState.x0 < 40;
+        const isSwipeRight = gestureState.dx > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        return isLeftEdge && isSwipeRight;
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        if (gestureState.dx > 40) {
+          setDrawerVisible(true);
+        }
+      },
+    })
+  ).current;
 
   const processQueue = async () => {
     if (isProcessingRef.current) return;
@@ -573,7 +589,7 @@ export default function Index() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} {...panResponder.panHandlers}>
       <ImageBackground
         source={texture2}
         style={StyleSheet.absoluteFill}

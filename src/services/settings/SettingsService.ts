@@ -11,6 +11,7 @@ export type AppSettings = {
   whisperLanguage: string;
   instruction: string;
   speaker: boolean;
+  alwaysWhisper: boolean;
 };
 
 const DEFAULTS: AppSettings = {
@@ -29,6 +30,7 @@ const DEFAULTS: AppSettings = {
   })(),
   instruction: '',
   speaker: false,
+  alwaysWhisper: false,
 };
 
 class SettingsService {
@@ -76,6 +78,7 @@ class SettingsService {
       whisperLanguage: map['whisperLanguage'] ?? DEFAULTS.whisperLanguage,
       instruction: map['instruction'] ?? DEFAULTS.instruction,
       speaker: map['speaker'] === 'true' ? true : (map['speaker'] === 'false' ? false : DEFAULTS.speaker),
+      alwaysWhisper: map['alwaysWhisper'] === 'true' ? true : (map['alwaysWhisper'] === 'false' ? false : DEFAULTS.alwaysWhisper),
     };
     this.cache = settings;
     return settings;

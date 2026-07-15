@@ -15,6 +15,7 @@ export type Message = {
   role: 'user' | 'assistant';
   content: string;
   createdAt: number;
+  images?: string[];
 };
 
 class DatabaseService {
@@ -52,6 +53,12 @@ class DatabaseService {
           FOREIGN KEY (conversationId) REFERENCES conversations(id)
         )`
       );
+      
+      try {
+        await this.db.runAsync('ALTER TABLE messages ADD COLUMN images TEXT');
+      } catch (e) {
+        // ignore, column might already exist
+      }
     } catch (e) {
       console.error('Database init failed:', e);
       this.db = null;
@@ -111,14 +118,15 @@ class DatabaseService {
   }
 
   //add a message to a conversation
-  async addMessage(conversationId: string, role: 'user' | 'assistant', content: string): Promise<Message> {
+  async addMessage(conversationId: string, role: 'user' | 'assistant', content: string, images?: string[]): Promise<Message> {
     const db = this.getDb();
     const now = Date.now();
     const id = `msg_${now}_${Math.random().toString(36).slice(2, 7)}`;
-    const msg: Message = { id, conversationId, role, content, createdAt: now };
+    const msg: Message = { id, conversationId, role, content, createdAt: now, images };
+    const imagesJson = images ? JSON.stringify(images) : null;
     await db.runAsync(
-      'INSERT INTO messages (id, conversationId, role, content, createdAt) VALUES (?, ?, ?, ?, ?)',
-      [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt]
+      'INSERT INTO messages (id, conversationId, role, content, createdAt, images) VALUES (?, ?, ?, ?, ?, ?)',
+      [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson]
     );
     //update conversation timestamp
     await db.runAsync('UPDATE conversations SET updatedAt = ? WHERE id = ?', [now, conversationId]);
@@ -134,17 +142,24 @@ class DatabaseService {
   //get all messages for a conversation
   async getMessages(conversationId: string): Promise<Message[]> {
     const db = this.getDb();
-    const rows = await db.getAllAsync<Message>(
+    const rows = await db.getAllAsync<any>(
       'SELECT * FROM messages WHERE conversationId = ? ORDER BY createdAt ASC',
       [conversationId]
     );
-    return rows;
+    return rows.map(row => ({
+      ...row,
+      images: row.images ? JSON.parse(row.images) : undefined
+    }));
   }
 
   //get all messages across all conversations (for backup)
   async getAllMessagesAllConversations(): Promise<Message[]> {
     const db = this.getDb();
-    return await db.getAllAsync<Message>('SELECT * FROM messages');
+    const rows = await db.getAllAsync<any>('SELECT * FROM messages');
+    return rows.map(row => ({
+      ...row,
+      images: row.images ? JSON.parse(row.images) : undefined
+    }));
   }
 
   //delete all conversations and messages
@@ -169,9 +184,10 @@ class DatabaseService {
       }
 
       for (const msg of messages) {
+        const imagesJson = msg.images ? JSON.stringify(msg.images) : null;
         await db.runAsync(
-          'INSERT INTO messages (id, conversationId, role, content, createdAt) VALUES (?, ?, ?, ?, ?)',
-          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt]
+          'INSERT INTO messages (id, conversationId, role, content, createdAt, images) VALUES (?, ?, ?, ?, ?, ?)',
+          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson]
         );
       }
     });

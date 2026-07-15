@@ -59,6 +59,23 @@ export class OllamaProvider implements IAIProvider {
     }
   }
 
+  async getModelCapabilities(modelName: string): Promise<string[]> {
+    if (!this.isConfigured()) return [];
+    try {
+      const response = await fetch(`${this.baseUrl}/api/show`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...this.defaultHeaders },
+        body: JSON.stringify({ model: modelName }),
+      });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return data.capabilities || [];
+    } catch (error) {
+      console.error('Error fetching capabilities from Ollama:', error);
+      return [];
+    }
+  }
+
   async downloadService(modelName: string): Promise<void> {
     if (!this.isConfigured()) throw new Error('AI server not configured');
     try {
@@ -85,7 +102,7 @@ export class OllamaProvider implements IAIProvider {
   async sendMessage(
     modelName: string,
     systemPrompt: string,
-    messages: { role: string; content: string }[],
+    messages: { role: string; content: string; images?: string[] }[],
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
     options?: { think?: boolean }
@@ -102,7 +119,15 @@ export class OllamaProvider implements IAIProvider {
         think: options?.think ?? false,
         options: { num_ctx: 16384 }
       };
-      console.log('Ollama request payload:', JSON.stringify(payload, null, 2));
+      
+      const logPayload = {
+        ...payload,
+        messages: payload.messages.map(m => ({
+          ...m,
+          images: m.images ? ['<base64_data_hidden>'] : undefined
+        }))
+      };
+      console.log('Ollama request payload:', JSON.stringify(logPayload, null, 2));
 
       const response = await fetch(`${this.baseUrl}/api/chat`, {
         method: 'POST',

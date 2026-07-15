@@ -1,6 +1,8 @@
 import { AudioModule, useAudioStream } from "expo-audio";
+import * as DocumentPicker from 'expo-document-picker';
 import { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   Easing,
   Image,
@@ -8,11 +10,13 @@ import {
   Platform,
   Pressable,
   StyleSheet,
+  Text,
   TextInput,
   Vibration,
   View,
 } from "react-native";
 import { Whisper } from "../src/services/whisper/WhisperService";
+import NotificationModal from "./NotificationModal";
 
 const nextWhiteIcon = require("../assets/icons/arrow.png");
 const micIcon = require("../assets/icons/microphone.png");
@@ -20,13 +24,18 @@ const addIcon = require("../assets/icons/add.png");
 const stopIcon = require("../assets/icons/stop.png");
 
 type ChatInputBarProps = {
-  onSend?: (message: string) => void;
+  onSend?: (message: string, images?: string[]) => void;
   onPlusPress?: () => void;
   onStop?: () => void;
+  onTranscribe?: (wavBuffer: ArrayBuffer) => Promise<string | null>;
   placeholder?: string;
   incognito?: boolean;
   isGenerating?: boolean;
+  supportsFiles?: boolean;
+  canTranscribeRemotely?: boolean;
 };
+
+type SelectedFile = { uri: string; type: string; name: string };
 
 //wav buffer builder from pcm chunks
 function buildWavBuffer(pcmFloat32Chunks: ArrayBuffer[], sampleRate: number): ArrayBuffer {
@@ -109,14 +118,20 @@ export default function ChatBar({
   onSend,
   onPlusPress,
   onStop,
+  onTranscribe,
   placeholder = "Ask",
   incognito = false,
   isGenerating = false,
+  supportsFiles = false,
+  canTranscribeRemotely = false,
 }: ChatInputBarProps) {
   const [text, setText] = useState("");
   const [whisperAvailable, setWhisperAvailable] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({ title: "", message: "" });
 
   const pcmChunksRef = useRef<ArrayBuffer[]>([]);
   const sampleRateRef = useRef<number>(16000);
@@ -209,13 +224,60 @@ export default function ChatBar({
       if (chunks.length === 0) return null;
       setIsTranscribing(true);
       const wavBuffer = buildWavBuffer(chunks, sampleRateRef.current);
-      const transcribed = await Whisper.transcribeData(wavBuffer);
+      //delegate to parent if provided, otherwise use whisper directly
+      const transcribed = onTranscribe
+        ? await onTranscribe(wavBuffer)
+        : await Whisper.transcribeData(wavBuffer);
       setIsTranscribing(false);
       return transcribed;
     } catch (e) {
       console.error("transcription failed:", e);
       setIsTranscribing(false);
       return null;
+    }
+  };
+
+  const handlePickFiles = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'audio/wav', 'audio/x-wav', 'audio/mpeg', 'audio/mp3'],
+        multiple: true,
+        copyToCacheDirectory: true
+      });
+      if (!result.canceled && result.assets) {
+        const validFiles = [];
+        let hasInvalidFile = false;
+
+        for (const a of result.assets) {
+          const isImage = a.mimeType?.startsWith('image/');
+          const isAudio = a.mimeType?.startsWith('audio/') || a.name.toLowerCase().match(/\.(wav|mp3|m4a|aac|flac|ogg)$/);
+
+          if (isImage) {
+            validFiles.push({ uri: a.uri, type: 'image', name: a.name });
+            continue;
+          }
+
+          if (isAudio) {
+            const ext = a.name.toLowerCase().split('.').pop();
+            if (ext === 'wav' || ext === 'mp3') {
+              validFiles.push({ uri: a.uri, type: 'audio', name: a.name });
+            } else {
+              hasInvalidFile = true;
+            }
+          }
+        }
+
+        if (hasInvalidFile) {
+          setModalConfig({ title: "Unsupported Format", message: "Only WAV and MP3 audio files are supported." });
+          setModalVisible(true);
+        }
+
+        if (validFiles.length > 0) {
+          setSelectedFiles(prev => [...prev, ...validFiles]);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to pick files", e);
     }
   };
 
@@ -235,9 +297,10 @@ export default function ChatBar({
       if (transcribed && transcribed.length > 0) setText(transcribed);
       return;
     }
-    if (text.trim() && onSend) {
-      onSend(text.trim());
+    if ((text.trim() || selectedFiles.length > 0) && onSend) {
+      onSend(text.trim(), selectedFiles.map(f => f.type === 'audio' ? `${f.uri}?name=${encodeURIComponent(f.name)}` : f.uri));
       setText("");
+      setSelectedFiles([]);
     }
   };
 
@@ -253,11 +316,13 @@ export default function ChatBar({
             { transform: [{ scale }], backgroundColor: backgroundColor }
           ]}
         >
-          <Pressable onPress={onPlusPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.plusButton}>
-            <Image source={addIcon} style={styles.plusIcon} />
-          </Pressable>
+          {supportsFiles && (
+            <Pressable onPress={handlePickFiles} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.plusButton}>
+              <Image source={addIcon} style={styles.plusIcon} />
+            </Pressable>
+          )}
 
-          {whisperAvailable && !isGenerating && (
+          {(whisperAvailable || canTranscribeRemotely) && !isGenerating && (
             <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.micButton}>
               <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
                 <Image source={micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} />
@@ -268,17 +333,37 @@ export default function ChatBar({
           {isRecording ? (
             <VoiceIndicator />
           ) : (
-            <TextInput
-              style={[styles.input, { maxHeight: 100 }]}
-              value={isTranscribing ? "Transcribing..." : text}
-              onChangeText={isTranscribing ? undefined : setText}
-              placeholder={placeholder}
-              placeholderTextColor="rgba(255,255,255,0.6)"
-              multiline={true}
-              editable={!isTranscribing}
-              onTouchStart={handlePressIn}
-              onTouchEnd={handlePressOut}
-            />
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              {selectedFiles.length > 0 && (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, paddingBottom: 4 }}>
+                  {selectedFiles.map((file, i) => (
+                    <View key={i} style={styles.filePreviewContainer}>
+                      {file.type === 'image' ? (
+                        <Image source={{ uri: file.uri }} style={styles.filePreviewImage} />
+                      ) : (
+                        <View style={styles.filePreviewAudio}>
+                          <Text style={styles.filePreviewAudioText} numberOfLines={1}>{file.name}</Text>
+                        </View>
+                      )}
+                      <Pressable style={styles.removeFileBtn} onPress={() => setSelectedFiles(prev => prev.filter((_, idx) => idx !== i))}>
+                        <Text style={{color: 'black', fontSize: 10, fontWeight: 'bold'}}>✕</Text>
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+              )}
+              <TextInput
+                style={[styles.input, { maxHeight: 100, minHeight: 24 }]}
+                value={isTranscribing ? "Transcribing..." : text}
+                onChangeText={isTranscribing ? undefined : setText}
+                placeholder={placeholder}
+                placeholderTextColor="rgba(255,255,255,0.6)"
+                multiline={true}
+                editable={!isTranscribing}
+                onTouchStart={handlePressIn}
+                onTouchEnd={handlePressOut}
+              />
+            </View>
           )}
 
           {isGenerating ? (
@@ -292,6 +377,12 @@ export default function ChatBar({
           )}
         </Animated.View>
       </Pressable>
+      <NotificationModal
+        visible={modalVisible}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        onClose={() => setModalVisible(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -349,10 +440,8 @@ const styles = StyleSheet.create({
     resizeMode: "contain",
   },
   input: {
-    flex: 1,
     color: "#fff",
     fontSize: 16,
-    marginLeft: 8,
     paddingVertical: 0,
   },
   voiceIndicatorContainer: {
@@ -379,5 +468,40 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     tintColor: "#fff",
+  },
+  filePreviewContainer: {
+    position: 'relative',
+    marginRight: 6,
+    marginTop: 4,
+  },
+  filePreviewImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 4,
+  },
+  filePreviewAudio: {
+    width: 40,
+    height: 40,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 2,
+  },
+  filePreviewAudioText: {
+    color: 'white',
+    fontSize: 8,
+    textAlign: 'center',
+  },
+  removeFileBtn: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

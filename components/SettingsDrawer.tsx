@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, Dimensions, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View, Alert } from "react-native";
 import Selector from "./Selector";
+import Checkbox from "./Checkbox";
 import TextInputField from "./TextInputField";
 import NotificationModal from "./NotificationModal";
 import { AIModule } from "../src/services/ai/AIModule";
@@ -42,6 +43,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
     }
   });
   const [instruction, setInstructionState] = useState("");
+  const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   const [ollamaModelOptions, setOllamaModelOptions] = useState([
@@ -95,6 +97,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
         setWhisperModelState(s.whisperModel);
         setWhisperLanguageState(s.whisperLanguage);
         setInstructionState(s.instruction);
+        setAlwaysWhisperState(s.alwaysWhisper);
         //apply to services
         AIModule.configure(s.ollamaUrl);
         Whisper.setLanguage(s.whisperLanguage);
@@ -145,6 +148,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
   const setInstruction = (v: string) => {
     setInstructionState(v);
     Settings.set("instruction", v);
+  };
+
+  const setAlwaysWhisper = (v: boolean) => {
+    setAlwaysWhisperState(v);
+    Settings.set("alwaysWhisper", v);
   };
 
   const fetchOllamaModels = useCallback(async () => {
@@ -343,6 +351,14 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
             selectedValue={whisperLanguage}
             onSelect={setWhisperLanguage}
             title="Select Language"
+          />
+        </View>
+
+        <View style={{ marginBottom: 20 }}>
+          <Checkbox
+            label="Always transcribe on-device (Whisper)"
+            checked={alwaysWhisper}
+            onToggle={setAlwaysWhisper}
           />
         </View>
 

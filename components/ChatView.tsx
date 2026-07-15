@@ -60,13 +60,49 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   return (
     <View style={[styles.bubble, isUser ? (incognito ? styles.userBubbleIncognito : styles.userBubble) : styles.aiBubble]}>
       {isUser ? (
-        <Text 
-          style={[styles.bubbleText, styles.userText]}
-          selectable={true}
-          selectionColor="rgba(255, 255, 255, 0.4)"
-        >
-          {item.content}
-        </Text>
+        <View>
+          {item.images && item.images.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+              {item.images.map((uri, i) => {
+                const isAudioPath = uri.toLowerCase().match(/\.(wav|mp3|m4a|aac|flac|ogg)(?:\?.*)?$/);
+                const isAudioData = uri.startsWith('data:audio');
+                const isAudio = isAudioPath || isAudioData;
+                
+                const getFilename = (path: string) => {
+                  if (path.startsWith('data:')) return 'Audio Recording.wav';
+                  if (path.includes('?name=')) {
+                    try {
+                      return decodeURIComponent(path.split('?name=')[1]);
+                    } catch (e) {
+                      // ignore
+                    }
+                  }
+                  try {
+                    return decodeURIComponent(path.split('/').pop() || 'Audio File');
+                  } catch (e) {
+                    return path.split('/').pop() || 'Audio File';
+                  }
+                };
+
+                return isAudio ? (
+                  <View key={i} style={styles.audioAttachmentBubble}>
+                    <Image source={speakerIcon} style={{ width: 14, height: 14, tintColor: '#fff', marginRight: 6 }} />
+                    <Text style={styles.audioAttachmentText} numberOfLines={1} ellipsizeMode="middle">{getFilename(uri)}</Text>
+                  </View>
+                ) : (
+                  <Image key={i} source={{ uri }} style={styles.messageImage} />
+                );
+              })}
+            </View>
+          )}
+          <Text 
+            style={[styles.bubbleText, styles.userText]}
+            selectable={true}
+            selectionColor="rgba(255, 255, 255, 0.4)"
+          >
+            {item.content}
+          </Text>
+        </View>
       ) : (
         <View style={styles.aiContainer}>
           {isThinking ? (
@@ -347,5 +383,23 @@ const styles = StyleSheet.create({
   snackbarText: {
     color: '#fff',
     fontSize: 14,
+  },
+  messageImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 8,
+  },
+  audioAttachmentBubble: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  audioAttachmentText: {
+    color: 'white',
+    fontSize: 12,
   }
 });

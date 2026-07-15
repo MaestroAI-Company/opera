@@ -11,7 +11,7 @@ const pinIcon = require("../assets/icons/pin.png");
 const unpinIcon = require("../assets/icons/unpin.png");
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
-const DRAWER_WIDTH = SCREEN_WIDTH * 0.82;
+const DRAWER_WIDTH = SCREEN_WIDTH * 0.88;
 
 type DrawerMenuProps = {
   visible: boolean;

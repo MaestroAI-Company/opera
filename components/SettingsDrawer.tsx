@@ -9,7 +9,7 @@ import { Whisper } from "../src/services/whisper/WhisperService";
 import { BackupService } from "../src/services/BackupService";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
-const DRAWER_WIDTH = SCREEN_WIDTH * 0.80;
+const DRAWER_WIDTH = SCREEN_WIDTH * 0.88;
 
 const linkIcon = require("../assets/icons/link.png");
 const downloadIcon = require("../assets/icons/download.png");

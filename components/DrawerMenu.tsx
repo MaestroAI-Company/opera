@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, Dimensions, Image, Keyboard, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Conversation } from "../src/services/db/DatabaseService";
 
 const operaLogo = require("../assets/icons/opera.png");
@@ -32,6 +32,7 @@ export default function DrawerMenu({
 
   useEffect(() => {
     if (visible) {
+      Keyboard.dismiss();
       setRendered(true);
       Animated.parallel([
         Animated.timing(translateX, {

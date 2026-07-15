@@ -13,6 +13,7 @@ import { renderMarkdown } from "./MarkdownText";
 import { Conversation, Message } from "../src/services/db/DatabaseService";
 
 const butterflyImage = require("../assets/images/butterfly2.png");
+const thinkingGif = require("../assets/icons/thinking.gif");
 
 type ChatViewProps = {
   messages: Message[];
@@ -31,6 +32,8 @@ function formatDate(timestamp: number): string {
 
 const MessageItem = React.memo(({ item }: { item: Message }) => {
   const isUser = item.role === "user";
+  const isThinking = !isUser && item.content === "…";
+
   return (
     <View style={[styles.bubble, isUser ? styles.userBubble : styles.aiBubble]}>
       {isUser ? (
@@ -39,12 +42,21 @@ const MessageItem = React.memo(({ item }: { item: Message }) => {
         </Text>
       ) : (
         <View style={styles.aiContainer}>
-          {renderMarkdown(item.content)}
+          {isThinking ? (
+            <Image
+              source={thinkingGif}
+              style={styles.thinkingIcon}
+              resizeMode="contain"
+            />
+          ) : (
+            renderMarkdown(item.content)
+          )}
         </View>
       )}
     </View>
   );
 }, (prev, next) => prev.item.content === next.item.content);
+MessageItem.displayName = "MessageItem";
 
 export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding }: ChatViewProps) {
   const listRef = useRef<FlatList>(null);
@@ -54,7 +66,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   const isAtBottomRef = useRef(true);
   const initialScrollDone = useRef(false);
 
-  //scroll past the header so first message is at the top on initial load
+  //scroll past header on first load
   useEffect(() => {
     if (!initialScrollDone.current && messages.length > 0 && headerHeight > 0) {
       setTimeout(() => {
@@ -218,5 +230,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 60,
+  },
+  thinkingIcon: {
+    width: 70,
+    marginTop: 4,
   },
 });

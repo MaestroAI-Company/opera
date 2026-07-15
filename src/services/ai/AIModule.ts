@@ -1,33 +1,31 @@
+import { Platform } from 'react-native';
 import { IAIProvider } from './IAIProvider';
 import { OllamaProvider } from './OllamaProvider';
 
-const SETTINGS = {
-  activeMode: 'OLLAMA' as const,
-  ollamaUrl: 'https://cloud.maestroai.company',
-  ollamaHeaders: {
-    'Authorization': 'Basic ZGV2bm9zZWN1cmV3aG9jYXJlczp3aG9jYXJlcw==',
-  },
-};
+const DEFAULT_URL = Platform.OS === 'android' ? 'http://10.0.2.2:11434' : 'http://127.0.0.1:11434';
 
 class CentralAIModule {
   private providers: Map<string, IAIProvider>;
+  private activeMode: string = 'OLLAMA';
 
   constructor() {
     this.providers = new Map();
-    //initialize providers
-    this.providers.set('OLLAMA', new OllamaProvider(SETTINGS.ollamaUrl, SETTINGS.ollamaHeaders));
+    //initialize providers with defaults
+    this.providers.set('OLLAMA', new OllamaProvider(DEFAULT_URL));
+  }
+
+  //reconfigure ollama provider with url from settings
+  configure(ollamaUrl: string): void {
+    const url = ollamaUrl.trim().length > 0 ? ollamaUrl.trim() : DEFAULT_URL;
+    this.providers.set('OLLAMA', new OllamaProvider(url));
   }
 
   //get active provider
   private getActiveProvider(): IAIProvider {
-    //evaluate active mode
-    const mode = SETTINGS.activeMode;
-    const provider = this.providers.get(mode);
-    
+    const provider = this.providers.get(this.activeMode);
     if (!provider) {
-      throw new Error(`No AI provider configured for mode: ${mode}`);
+      throw new Error(`No AI provider configured for mode: ${this.activeMode}`);
     }
-    
     return provider;
   }
 

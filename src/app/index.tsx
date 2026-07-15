@@ -13,11 +13,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ChatBar from "../../components/ChatBar";
 import ChatView from "../../components/ChatView";
 import DrawerMenu from "../../components/DrawerMenu";
+import SettingsDrawer from "../../components/SettingsDrawer";
 import ModelDropdown from "../../components/ModelDropdown";
 import TopBar from "../../components/TopBar";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { AIModule } from "../services/ai/AIModule";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
+import { Settings } from "../services/settings/SettingsService";
+import { Whisper } from "../services/whisper/WhisperService";
 
 const butterflyImage = require("../../assets/images/butterfly5.png");
 const butterflyGrey = require("../../assets/images/butterfly2_grey.png");
@@ -29,8 +32,12 @@ export default function Index() {
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedReflection, setSelectedReflection] = useState("quick");
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
   const [dbReady, setDbReady] = useState(false);
   const [incognitoMode, setIncognitoMode] = useState(false);
+  const [userInstruction, setUserInstruction] = useState("");
+  const [aiService, setAiService] = useState("ollama");
+  const [ollamaUrl, setOllamaUrl] = useState("");
 
   //conversation state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -44,16 +51,34 @@ export default function Index() {
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  //keep a ref to the latest messages so handleSend always sees fresh data
+  //ref to latest messages for handleSend
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
 
-  //init database on mount
+  //init database and settings on mount
   useEffect(() => {
-    DB.init().then(() => {
-      setDbReady(true);
+    const init = async () => {
+      await DB.init();
       loadConversations();
-    });
+      //load and apply settings
+      try {
+        await Settings.init();
+        const s = await Settings.load();
+        setUserInstruction(s.instruction);
+        if (s.ollamaModel) {
+          setSelectedModel(s.ollamaModel);
+        }
+        setAiService(s.aiService);
+        setOllamaUrl(s.ollamaUrl);
+        AIModule.configure(s.ollamaUrl);
+        Whisper.setLanguage(s.whisperLanguage);
+      } catch (e) {
+        console.warn("Failed to load settings at boot", e);
+      }
+      
+      setDbReady(true);
+    };
+    init();
   }, []);
 
   const loadConversations = async () => {
@@ -74,7 +99,7 @@ export default function Index() {
     setMessages([]);
   }, []);
 
-  //generate a title from the first user message using the AI
+  //generate title from first message
   const generateTitle = useCallback(
     async (convId: string, userMessage: string) => {
       try {
@@ -169,39 +194,14 @@ export default function Index() {
       setIsGenerating(true);
       abortControllerRef.current = new AbortController();
 
+      //build system prompt with optional user instruction
+      const systemPrompt = userInstruction.trim().length > 0
+        ? `${userInstruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
+        : SYSTEM_PROMPTS.DEFAULT;
+
       //send to AI and stream chunks
-      try {
-        await AIModule.sendMessage(
-          selectedModel,
-          SYSTEM_PROMPTS.DEFAULT,
-          [...history, { role: "user", content: text }],
-          async (chunk) => {
-            streamingContentRef.current += chunk;
-            //update message in state
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantMsg.id
-                  ? { ...m, content: streamingContentRef.current }
-                  : m
-              )
-            );
-          },
-          abortControllerRef.current.signal,
-          { think: selectedReflection === "think" }
-        );
-      } catch (e: any) {
-        const isAborted = e.name === "AbortError" ||
-          e.message?.toLowerCase().includes("aborted") ||
-          e.message?.toLowerCase().includes("cancel");
-
-        if (isAborted) {
-          console.log("Generation aborted by user");
-          streamingContentRef.current += "\n\n_The user interrupted the response_";
-        } else {
-          console.error(e);
-          streamingContentRef.current = "Erreur lors de la réponse.";
-        }
-
+      if (aiService === 'ollama' && (!ollamaUrl || ollamaUrl.trim() === '')) {
+        streamingContentRef.current = "Ollama URL is undefined or invalid. Please check your settings.";
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsg.id
@@ -209,9 +209,63 @@ export default function Index() {
               : m
           )
         );
-      } finally {
         setIsGenerating(false);
         abortControllerRef.current = null;
+      } else if (!selectedModel) {
+        streamingContentRef.current = "Please select a model from the top menu before sending a message.";
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsg.id
+              ? { ...m, content: streamingContentRef.current }
+              : m
+          )
+        );
+        setIsGenerating(false);
+        abortControllerRef.current = null;
+      } else {
+        try {
+          await AIModule.sendMessage(
+            selectedModel,
+            systemPrompt,
+            [...history, { role: "user", content: text }],
+            async (chunk) => {
+              streamingContentRef.current += chunk;
+              //update message in state
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMsg.id
+                    ? { ...m, content: streamingContentRef.current }
+                    : m
+                )
+              );
+            },
+            abortControllerRef.current.signal,
+            { think: selectedReflection === "think" }
+          );
+        } catch (e: any) {
+          const isAborted = e.name === "AbortError" ||
+            e.message?.toLowerCase().includes("aborted") ||
+            e.message?.toLowerCase().includes("cancel");
+
+          if (isAborted) {
+            console.log("Generation aborted by user");
+            streamingContentRef.current += "\n\n_The user interrupted the response_";
+          } else {
+            console.error(e);
+            streamingContentRef.current = "Error generating response. Please check your model or server connection.";
+          }
+
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsg.id
+                ? { ...m, content: streamingContentRef.current }
+                : m
+            )
+          );
+        } finally {
+          setIsGenerating(false);
+          abortControllerRef.current = null;
+        }
       }
 
       if (!incognitoMode) {
@@ -226,8 +280,12 @@ export default function Index() {
         generateTitle(conv.id, text);
       }
     },
-    [dbReady, incognitoMode, activeConversation, selectedModel, selectedReflection, generateTitle]
+    [dbReady, incognitoMode, activeConversation, selectedModel, selectedReflection, generateTitle, userInstruction]
   );
+
+  if (!dbReady) {
+    return <View style={styles.container} />;
+  }
 
   return (
     <View style={styles.container}>
@@ -293,26 +351,36 @@ export default function Index() {
             />
           )}
 
-          {/* top bar overlay */}
           <View style={[styles.topBarOverlay, { paddingTop: insets.top }]}>
             <TopBar
               onMenuPress={() => setDrawerVisible(true)}
               onNewPress={startNewConversation}
             >
-              <ModelDropdown
-                selectedModel={selectedModel}
-                selectedReflection={selectedReflection}
-                onModelChange={setSelectedModel}
-                onReflectionChange={setSelectedReflection}
-                rightElement={
-                  <View style={styles.settingsShadowLayer}>
-                    <View style={styles.settingsShadowBlock} />
-                    <Pressable style={styles.settingsButton}>
-                      <Image source={settingsIcon} style={styles.settingsIcon} />
-                    </Pressable>
-                  </View>
-                }
-              />
+              {aiService === "ollama" ? (
+                <ModelDropdown
+                  selectedModel={selectedModel}
+                  selectedReflection={selectedReflection}
+                  onModelChange={setSelectedModel}
+                  onReflectionChange={setSelectedReflection}
+                  rightElement={
+                    <View style={styles.settingsShadowLayer}>
+                      <View style={styles.settingsShadowBlock} />
+                      <Pressable style={styles.settingsButton} onPress={() => setSettingsDrawerVisible(true)}>
+                        <Image source={settingsIcon} style={styles.settingsIcon} />
+                      </Pressable>
+                    </View>
+                  }
+                />
+              ) : (
+                <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' }}>
+                    <View style={styles.settingsShadowLayer}>
+                      <View style={styles.settingsShadowBlock} />
+                      <Pressable style={styles.settingsButton} onPress={() => setSettingsDrawerVisible(true)}>
+                        <Image source={settingsIcon} style={styles.settingsIcon} />
+                      </Pressable>
+                    </View>
+                </View>
+              )}
             </TopBar>
           </View>
 
@@ -336,6 +404,23 @@ export default function Index() {
         selectedConversationId={activeConversation?.id ?? null}
         onSelectConversation={selectConversation}
         onNewConversation={startNewConversation}
+      />
+
+      <SettingsDrawer
+        visible={settingsDrawerVisible}
+        onClose={() => {
+          setSettingsDrawerVisible(false);
+          const cached = Settings.getCached();
+          if (cached.ollamaModel && cached.ollamaModel !== selectedModel) {
+            setSelectedModel(cached.ollamaModel);
+          }
+          setAiService(cached.aiService);
+          setOllamaUrl(cached.ollamaUrl);
+        }}
+        onDataChanged={async () => {
+          await loadConversations();
+          startNewConversation();
+        }}
       />
     </View>
   );

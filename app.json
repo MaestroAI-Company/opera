@@ -47,7 +47,8 @@
         {
           "microphonePermission": "Opera needs access to your microphone for voice-to-text."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

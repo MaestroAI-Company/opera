@@ -6,11 +6,12 @@ const MODEL_ASSET = require("../../../assets/models/ggml-base.bin");
 class WhisperService {
   private context: WhisperContext | null = null;
   private initPromise: Promise<boolean> | null = null;
+  private language: string = "auto";
 
   //initialize whisper context with bundled model
   async init(): Promise<boolean> {
     if (this.context) return true;
-    //if already initializing, wait on the same promise instead of returning false
+    //wait on existing init promise
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async () => {
@@ -33,6 +34,11 @@ class WhisperService {
     return this.initPromise;
   }
 
+  //set transcription language from settings
+  setLanguage(lang: string): void {
+    this.language = lang || "auto";
+  }
+
   //check if whisper is ready
   isAvailable(): boolean {
     return this.context !== null;
@@ -47,7 +53,7 @@ class WhisperService {
     console.log(`[Whisper] Transcribing file ${audioPath}...`);
     const startTime = Date.now();
     const { promise } = this.context.transcribe(audioPath, {
-      language: "auto",
+      language: this.language,
     });
 
     const { result } = await promise;
@@ -64,7 +70,7 @@ class WhisperService {
     console.log(`[Whisper] Transcribing buffer of ${buffer.byteLength} bytes...`);
     const startTime = Date.now();
     const { promise } = this.context.transcribeData(buffer, {
-      language: "auto",
+      language: this.language,
     });
 
     const { result } = await promise;

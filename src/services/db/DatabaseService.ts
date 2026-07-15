@@ -21,6 +21,7 @@ class DatabaseService {
 
   //open db and create tables if needed
   async init(): Promise<void> {
+    if (this.db) return; // already initialized
     try {
       this.db = await SQLite.openDatabaseAsync('opera.db');
       await this.db.runAsync(
@@ -117,6 +118,42 @@ class DatabaseService {
       [conversationId]
     );
     return rows;
+  }
+
+  //get all messages across all conversations (for backup)
+  async getAllMessagesAllConversations(): Promise<Message[]> {
+    const db = this.getDb();
+    return await db.getAllAsync<Message>('SELECT * FROM messages');
+  }
+
+  //delete all conversations and messages
+  async deleteAllConversations(): Promise<void> {
+    const db = this.getDb();
+    await db.runAsync('DELETE FROM messages');
+    await db.runAsync('DELETE FROM conversations');
+  }
+
+  //import backup data (replaces existing conversations and messages)
+  async importBackup(conversations: Conversation[], messages: Message[]): Promise<void> {
+    const db = this.getDb();
+    await db.withTransactionAsync(async () => {
+      await db.runAsync('DELETE FROM messages');
+      await db.runAsync('DELETE FROM conversations');
+
+      for (const conv of conversations) {
+        await db.runAsync(
+          'INSERT INTO conversations (id, name, model, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)',
+          [conv.id, conv.name, conv.model, conv.createdAt, conv.updatedAt]
+        );
+      }
+
+      for (const msg of messages) {
+        await db.runAsync(
+          'INSERT INTO messages (id, conversationId, role, content, createdAt) VALUES (?, ?, ?, ?, ?)',
+          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt]
+        );
+      }
+    });
   }
 }
 

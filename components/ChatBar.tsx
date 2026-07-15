@@ -9,6 +9,7 @@ import {
   Pressable,
   StyleSheet,
   TextInput,
+  Vibration,
   View,
 } from "react-native";
 import { Whisper } from "../src/services/whisper/WhisperService";
@@ -174,6 +175,7 @@ export default function ChatBar({
   }, [isRecording]);
 
   const handlePressIn = () => {
+    Vibration.vibrate(10);
     Animated.timing(pressAnim, { toValue: 1, duration: 150, useNativeDriver: false }).start();
   };
 

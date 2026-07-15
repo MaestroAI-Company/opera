@@ -5,9 +5,12 @@ import Checkbox from "./Checkbox";
 import TextInputField from "./TextInputField";
 import NotificationModal from "./NotificationModal";
 import { AIModule } from "../src/services/ai/AIModule";
+import { BackupService } from "../src/services/BackupService";
 import { Settings } from "../src/services/settings/SettingsService";
 import { Whisper } from "../src/services/whisper/WhisperService";
-import { BackupService } from "../src/services/BackupService";
+import NotificationModal from "./NotificationModal";
+import Selector from "./Selector";
+import TextInputField from "./TextInputField";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.88;
@@ -173,6 +176,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
           label: m,
         }));
         setOllamaModelOptions(options);
+
       } else {
         setOllamaModelOptions([]);
       }
@@ -232,9 +236,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
       "Are you sure you want to delete all conversations? This action cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive", 
+        {
+          text: "Delete",
+          style: "destructive",
           onPress: async () => {
             try {
               await BackupService.deleteAllConversations();
@@ -297,62 +301,61 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
         <ScrollView contentContainerStyle={{ paddingTop: 60, paddingBottom: 40, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
           <Text style={styles.title}>Settings</Text>
 
-        <Text style={styles.sectionTitle}>General</Text>
-        
-        <View style={styles.settingRow}>
-          <Text style={styles.settingLabel}>Language</Text>
-          <Selector
-            options={languageOptions}
-            selectedValue={language}
-            onSelect={setLanguage}
-            title="Select Language"
-          />
-        </View>
+          <Text style={styles.sectionTitle}>General</Text>
 
-        <View style={styles.settingRow}>
-          <Text style={styles.settingLabel}>Theme</Text>
-          <Selector
-            options={themeOptions}
-            selectedValue={theme}
-            onSelect={setTheme}
-            title="Select Theme"
-          />
-        </View>
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Language</Text>
+            <Selector
+              options={languageOptions}
+              selectedValue={language}
+              onSelect={setLanguage}
+              title="Select Language"
+            />
+          </View>
 
-        <Text style={[styles.sectionTitle, { marginTop: 20 }]}>AI</Text>
-        
-        <View style={styles.settingRow}>
-          <Text style={styles.settingLabel}>AI Service</Text>
-          <Selector
-            options={aiServiceOptions}
-            selectedValue={aiService}
-            onSelect={setAiService}
-            title="Select AI Service"
-          />
-        </View>
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Theme</Text>
+            <Selector
+              options={themeOptions}
+              selectedValue={theme}
+              onSelect={setTheme}
+              title="Select Theme"
+            />
+          </View>
 
-        <View style={styles.settingRowVertical}>
-          <View style={[styles.settingRow, { marginBottom: 4, zIndex: 9 }]}>
+          <Text style={[styles.sectionTitle, { marginTop: 20 }]}>AI</Text>
+
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>AI Service</Text>
+            <Selector
+              options={aiServiceOptions}
+              selectedValue={aiService}
+              onSelect={setAiService}
+              title="Select AI Service"
+            />
+          </View>
+
+          <View style={[styles.settingRowVertical, { zIndex: 9 }]}>
             <Text style={styles.settingLabel}>Whisper Model</Text>
+            <Text style={[styles.helpText, { marginBottom: 10 }]}>The larger the size, the longer the processing will take.</Text>
             <Selector
               options={whisperModelOptions}
               selectedValue={whisperModel}
               onSelect={setWhisperModel}
               title="Select Whisper Model"
+              fullWidth
             />
           </View>
-          <Text style={styles.helpText}>The larger the size, the longer the processing will take.</Text>
-        </View>
 
-        <View style={styles.settingRow}>
-          <Text style={styles.settingLabel}>Whisper Language</Text>
-          <Selector
-            options={whisperLanguageOptions}
-            selectedValue={whisperLanguage}
-            onSelect={setWhisperLanguage}
-            title="Select Language"
-          />
-        </View>
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Whisper Language</Text>
+            <Selector
+              options={whisperLanguageOptions}
+              selectedValue={whisperLanguage}
+              onSelect={setWhisperLanguage}
+              title="Select Language"
+            />
+          </View>
 
         <View style={{ marginBottom: 20 }}>
           <Checkbox
@@ -382,63 +385,81 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
               <View style={styles.settingRowVertical}>
                 <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Available Models</Text>
                 {ollamaModelOptions.map((model) => (
-                  <Text key={model.id} style={{ fontFamily: "monospace", color: "#555", marginBottom: 4 }}>
+                  <Text key={model.id} style={{ fontFamily: "IBMPlexMono-Medium", color: "#555", marginBottom: 4 }}>
                     • {model.label}
                   </Text>
                 ))}
               </View>
-            ) : (
-              <Pressable 
-                style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }]} 
-                onPress={() => setDownloadModalVisible(true)}
-              >
-                <Image source={downloadIcon} style={styles.downloadIcon} />
-                <Text style={styles.downloadText}>
-                  {isDownloading ? "Downloading..." : "No models. Download Gemma4?"}
-                </Text>
-              </Pressable>
-            )}
+
+              {ollamaError ? (
+                <Text style={styles.errorText}>{ollamaError}</Text>
+              ) : ollamaModelOptions.length > 0 ? (
+                <View style={styles.settingRowVertical}>
+                  <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Preferred Model</Text>
+                  <Selector
+                    options={[...ollamaModelOptions].sort((a, b) => {
+                      if (a.id === ollamaModel) return -1;
+                      if (b.id === ollamaModel) return 1;
+                      return a.label.localeCompare(b.label);
+                    })}
+                    selectedValue={ollamaModel}
+                    onSelect={setOllamaModel}
+                    title="Select Model"
+                    fullWidth
+                  />
+                </View>
+              ) : (
+                <Pressable
+                  style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }]}
+                  onPress={() => setDownloadModalVisible(true)}
+                >
+                  <Image source={downloadIcon} style={styles.downloadIcon} />
+                  <Text style={styles.downloadText}>
+                    {isDownloading ? "Downloading..." : "No models. Download Gemma4?"}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          )}
+
+          <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Personalization</Text>
+          <View style={styles.settingRowVertical}>
+            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Write your instruction for AI</Text>
+            <TextInputField
+              icon={penPlaceholderIcon}
+              placeholder="Ex: You are a helpful assistant..."
+              value={instruction}
+              onChangeText={setInstruction}
+            />
           </View>
-        )}
 
-        <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Personalization</Text>
-        <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Write your instruction for AI</Text>
-          <TextInputField 
-            icon={penPlaceholderIcon}
-            placeholder="Ex: You are a helpful assistant..."
-            value={instruction}
-            onChangeText={setInstruction}
-          />
-        </View>
+          <Text style={[styles.sectionTitle, { marginTop: 30 }]}>Data & Storage</Text>
+          <View style={styles.buttonRow}>
+            <Pressable
+              style={({ pressed }) => [styles.actionButton, { flex: 1 }, pressed && { backgroundColor: "#eaeaea" }]}
+              onPress={handleExport}
+            >
+              <Text style={styles.actionButtonText}>Export</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.actionButton, { flex: 1 }, pressed && { backgroundColor: "#eaeaea" }]}
+              onPress={handleImport}
+            >
+              <Text style={styles.actionButtonText}>Import</Text>
+            </Pressable>
+          </View>
 
-        <Text style={[styles.sectionTitle, { marginTop: 30 }]}>Data & Storage</Text>
-        <View style={styles.buttonRow}>
-          <Pressable 
-            style={({ pressed }) => [styles.actionButton, { flex: 1 }, pressed && { backgroundColor: "#eaeaea" }]} 
-            onPress={handleExport}
+          <Pressable
+            style={({ pressed }) => [
+              styles.actionButton,
+              styles.dangerButton,
+              { marginTop: 15, marginBottom: 20 },
+              pressed && { backgroundColor: "#ffdcdc" }
+            ]}
+            onPress={handleDeleteAll}
           >
-            <Text style={styles.actionButtonText}>Export</Text>
+            <Text style={[styles.actionButtonText, styles.dangerButtonText]}>Delete all conversations</Text>
           </Pressable>
-          <Pressable 
-            style={({ pressed }) => [styles.actionButton, { flex: 1 }, pressed && { backgroundColor: "#eaeaea" }]} 
-            onPress={handleImport}
-          >
-            <Text style={styles.actionButtonText}>Import</Text>
-          </Pressable>
-        </View>
-
-        <Pressable 
-          style={({ pressed }) => [
-            styles.actionButton, 
-            styles.dangerButton, 
-            { marginTop: 15, marginBottom: 20 }, 
-            pressed && { backgroundColor: "#ffdcdc" }
-          ]} 
-          onPress={handleDeleteAll}
-        >
-          <Text style={[styles.actionButtonText, styles.dangerButtonText]}>Delete all conversations</Text>
-        </Pressable>
         </ScrollView>
       </Animated.View>
 
@@ -455,11 +476,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
       />
     </View>
 
-    
-    
+
+
   );
 
-  
+
 }
 
 const styles = StyleSheet.create({
@@ -481,16 +502,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   title: {
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: 32,
     color: "#222",
     marginBottom: 24,
-    fontFamily: "monospace",
+    fontFamily: "Petrona",
   },
   sectionTitle: {
     fontSize: 12,
     color: "#888",
-    fontFamily: "monospace",
+    fontFamily: "Jakarta",
     textTransform: "uppercase",
     letterSpacing: 1,
     marginBottom: 12,
@@ -498,7 +518,7 @@ const styles = StyleSheet.create({
   placeholderText: {
     fontSize: 14,
     color: "#aaa",
-    fontFamily: "monospace",
+    fontFamily: "Jakarta",
     marginTop: 10,
   },
   settingRow: {
@@ -518,12 +538,12 @@ const styles = StyleSheet.create({
   settingLabel: {
     fontSize: 15,
     color: "#222",
-    fontFamily: "monospace",
+    fontFamily: "IBMPlexMono-Medium",
   },
   errorText: {
     fontSize: 13,
     color: "#FF1A1A",
-    fontFamily: "monospace",
+    fontFamily: "Jakarta",
     marginTop: -10,
     marginBottom: 20,
   },
@@ -547,13 +567,12 @@ const styles = StyleSheet.create({
   downloadText: {
     fontSize: 14,
     color: "#0066cc",
-    fontFamily: "monospace",
-    fontWeight: "bold",
+    fontFamily: "IBMPlexMono-Medium",
   },
   helpText: {
     fontSize: 12,
     color: "#888",
-    fontFamily: "monospace",
+    fontFamily: "Jakarta",
     marginTop: 4,
     marginBottom: 8,
   },
@@ -575,8 +594,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 14,
     color: "#222",
-    fontFamily: "monospace",
-    fontWeight: "bold",
+    fontFamily: "IBMPlexMono-Medium",
   },
   dangerButton: {
     backgroundColor: "#fff0f0",

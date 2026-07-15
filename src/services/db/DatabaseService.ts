@@ -104,6 +104,12 @@ class DatabaseService {
     await db.runAsync('DELETE FROM conversations WHERE id = ?', [id]);
   }
 
+  //delete a single message
+  async deleteMessage(id: string): Promise<void> {
+    const db = this.getDb();
+    await db.runAsync('DELETE FROM messages WHERE id = ?', [id]);
+  }
+
   //add a message to a conversation
   async addMessage(conversationId: string, role: 'user' | 'assistant', content: string): Promise<Message> {
     const db = this.getDb();

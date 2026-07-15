@@ -38,6 +38,7 @@ export default function Index() {
   const [userInstruction, setUserInstruction] = useState("");
   const [aiService, setAiService] = useState("ollama");
   const [ollamaUrl, setOllamaUrl] = useState("");
+  const [speakerEnabled, setSpeakerEnabled] = useState(false);
 
   //conversation state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -48,8 +49,37 @@ export default function Index() {
   const streamingMsgIdRef = useRef<string | null>(null);
   const streamingContentRef = useRef<string>("");
 
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingConvId, setGeneratingConvId] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  //refs for background processing
+  const activeConversationRef = useRef<Conversation | null>(null);
+  useEffect(() => {
+    activeConversationRef.current = activeConversation;
+  }, [activeConversation]);
+
+  const [pendingConvIds, setPendingConvIds] = useState<string[]>([]);
+  const requestQueueRef = useRef<{ convId: string, task: () => Promise<void>, assistantMsgId: string, isIncognito: boolean }[]>([]);
+  const isProcessingRef = useRef(false);
+  const generatingConvIdRef = useRef<string | null>(null);
+
+  const processQueue = async () => {
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
+    
+    while (requestQueueRef.current.length > 0) {
+      const item = requestQueueRef.current.shift();
+      setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
+      if (item) {
+        await item.task();
+      }
+    }
+    
+    isProcessingRef.current = false;
+    setGeneratingConvId(null);
+    generatingConvIdRef.current = null;
+    streamingMsgIdRef.current = null;
+  };
 
   //ref to latest messages for handleSend
   const messagesRef = useRef<Message[]>([]);
@@ -70,6 +100,7 @@ export default function Index() {
         }
         setAiService(s.aiService);
         setOllamaUrl(s.ollamaUrl);
+        setSpeakerEnabled(s.speaker);
         AIModule.configure(s.ollamaUrl);
         Whisper.setLanguage(s.whisperLanguage);
       } catch (e) {
@@ -90,7 +121,13 @@ export default function Index() {
   const selectConversation = useCallback(async (conv: Conversation) => {
     setActiveConversation(conv);
     const msgs = await DB.getMessages(conv.id);
-    setMessages(msgs);
+    
+    if (generatingConvIdRef.current === conv.id && streamingMsgIdRef.current) {
+      const patched = msgs.map(m => m.id === streamingMsgIdRef.current ? { ...m, content: streamingContentRef.current || "…" } : m);
+      setMessages(patched);
+    } else {
+      setMessages(msgs);
+    }
   }, []);
 
   //start new empty conversation
@@ -154,12 +191,13 @@ export default function Index() {
 
       let conv = activeConversation;
       let isFirstMessage = false;
+      const isIncognitoTask = incognitoMode;
 
       //create conversation if this is the first message
       if (!conv) {
         isFirstMessage = true;
         const name = text.length > 30 ? text.slice(0, 30) + "…" : text;
-        if (incognitoMode) {
+        if (isIncognitoTask) {
           conv = {
             id: "incognito_" + Date.now(),
             name,
@@ -174,14 +212,9 @@ export default function Index() {
         setActiveConversation(conv);
       }
 
-      //build history before updating state to avoid double-sending
-      const history = messagesRef.current
-        .filter((m) => m.content !== "…")
-        .map((m) => ({ role: m.role, content: m.content }));
-
-      //save user message
+      //save user message immediately
       let userMsg: Message;
-      if (incognitoMode) {
+      if (isIncognitoTask) {
         userMsg = {
           id: "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
           conversationId: conv.id,
@@ -192,11 +225,29 @@ export default function Index() {
       } else {
         userMsg = await DB.addMessage(conv.id, "user", text);
       }
-      setMessages((prev) => [...prev, userMsg]);
+      
+      if (isFirstMessage || activeConversationRef.current?.id === conv.id) {
+        setMessages((prev) => [...prev, userMsg]);
+      }
 
-      //create empty assistant message for streaming
+      //build history for this task
+      const taskHistory = messagesRef.current
+        .filter((m) => m.content !== "…")
+        .map((m) => ({ role: m.role, content: m.content }));
+      taskHistory.push({ role: "user", content: text });
+
+      const taskSelectedModel = selectedModel;
+      const taskOllamaUrl = ollamaUrl;
+      const taskAiService = aiService;
+      const taskSystemPrompt = userInstruction.trim().length > 0
+        ? `${userInstruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
+        : SYSTEM_PROMPTS.DEFAULT;
+      const taskReflection = selectedReflection;
+      const taskConv = conv;
+
+      //create empty assistant message for streaming immediately
       let assistantMsg: Message;
-      if (incognitoMode) {
+      if (isIncognitoTask) {
         assistantMsg = {
           id: "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
           conversationId: conv.id,
@@ -207,50 +258,69 @@ export default function Index() {
       } else {
         assistantMsg = await DB.addMessage(conv.id, "assistant", "…");
       }
-      streamingMsgIdRef.current = assistantMsg.id;
-      streamingContentRef.current = "";
-      setMessages((prev) => [...prev, assistantMsg]);
+      
+      if (isFirstMessage || activeConversationRef.current?.id === conv.id) {
+        setMessages((prev) => [...prev, assistantMsg]);
+      }
 
-      setIsGenerating(true);
-      abortControllerRef.current = new AbortController();
+      const task = async () => {
+        setGeneratingConvId(taskConv.id);
+        generatingConvIdRef.current = taskConv.id;
+        
+        streamingMsgIdRef.current = assistantMsg.id;
+        streamingContentRef.current = "";
 
-      //build system prompt with optional user instruction
-      const systemPrompt = userInstruction.trim().length > 0
-        ? `${userInstruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
-        : SYSTEM_PROMPTS.DEFAULT;
+        abortControllerRef.current = new AbortController();
 
-      //send to AI and stream chunks
-      if (aiService === 'ollama' && (!ollamaUrl || ollamaUrl.trim() === '')) {
-        streamingContentRef.current = "Ollama URL is undefined or invalid. Please check your settings.";
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantMsg.id
-              ? { ...m, content: streamingContentRef.current }
-              : m
-          )
-        );
-        setIsGenerating(false);
-        abortControllerRef.current = null;
-      } else if (!selectedModel) {
-        streamingContentRef.current = "Please select a model from the top menu before sending a message.";
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantMsg.id
-              ? { ...m, content: streamingContentRef.current }
-              : m
-          )
-        );
-        setIsGenerating(false);
-        abortControllerRef.current = null;
-      } else {
-        try {
-          await AIModule.sendMessage(
-            selectedModel,
-            systemPrompt,
-            [...history, { role: "user", content: text }],
-            async (chunk) => {
-              streamingContentRef.current += chunk;
-              //update message in state
+        //send to AI and stream chunks
+        if (taskAiService === 'ollama' && (!taskOllamaUrl || taskOllamaUrl.trim() === '')) {
+          streamingContentRef.current = "Ollama URL is undefined or invalid. Please check your settings.";
+          if (activeConversationRef.current?.id === taskConv.id) {
+            setMessages((prev) => prev.map((m) => m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current } : m));
+          }
+          abortControllerRef.current = null;
+        } else if (!taskSelectedModel) {
+          streamingContentRef.current = "Please select a model from the top menu before sending a message.";
+          if (activeConversationRef.current?.id === taskConv.id) {
+            setMessages((prev) => prev.map((m) => m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current } : m));
+          }
+          abortControllerRef.current = null;
+        } else {
+          try {
+            await AIModule.sendMessage(
+              taskSelectedModel,
+              taskSystemPrompt,
+              taskHistory,
+              async (chunk) => {
+                streamingContentRef.current += chunk;
+                //update message in state if we are on this conversation
+                if (activeConversationRef.current?.id === taskConv.id) {
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantMsg.id
+                        ? { ...m, content: streamingContentRef.current }
+                        : m
+                    )
+                  );
+                }
+              },
+              abortControllerRef.current.signal,
+              { think: taskReflection === "think" }
+            );
+          } catch (e: any) {
+            const isAborted = e.name === "AbortError" ||
+              e.message?.toLowerCase().includes("aborted") ||
+              e.message?.toLowerCase().includes("cancel");
+
+            if (isAborted) {
+              console.log("Generation aborted by user");
+              streamingContentRef.current += "\n\n_The user interrupted the response_";
+            } else {
+              console.error(e);
+              streamingContentRef.current = "Error generating response. Please check your model or server connection.";
+            }
+
+            if (activeConversationRef.current?.id === taskConv.id) {
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantMsg.id
@@ -258,50 +328,179 @@ export default function Index() {
                     : m
                 )
               );
+            }
+          } finally {
+            abortControllerRef.current = null;
+          }
+        }
+
+        if (!isIncognitoTask) {
+          //save final assistant message content to db
+          await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
+          //refresh conversation list (updatedAt changed)
+          await loadConversations();
+        }
+
+        //generate AI title for new conversations
+        if (isFirstMessage && !isIncognitoTask) {
+          generateTitle(taskConv.id, text);
+        }
+      };
+
+      requestQueueRef.current.push({
+        convId: conv.id,
+        task,
+        assistantMsgId: assistantMsg.id,
+        isIncognito: isIncognitoTask
+      });
+      setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
+      processQueue();
+    },
+    [dbReady, incognitoMode, activeConversation, selectedModel, selectedReflection, generateTitle, userInstruction, aiService, ollamaUrl]
+  );
+
+  const handleRegenerate = useCallback(async (aiMessageId: string) => {
+    if (!activeConversation) return;
+
+    if (generatingConvId === activeConversation.id) {
+      abortControllerRef.current?.abort();
+    }
+
+    const msgIndex = messagesRef.current.findIndex(m => m.id === aiMessageId);
+    if (msgIndex === -1) return;
+
+    const historyUpToHere = messagesRef.current.slice(0, msgIndex);
+    const taskHistory = historyUpToHere
+      .filter((m) => m.content !== "…")
+      .map((m) => ({ role: m.role, content: m.content }));
+
+    if (!incognitoMode) {
+      await DB.deleteMessage(aiMessageId);
+    }
+    setMessages(prev => prev.filter(m => m.id !== aiMessageId));
+
+    const taskSelectedModel = selectedModel;
+    const taskOllamaUrl = ollamaUrl;
+    const taskAiService = aiService;
+    const taskSystemPrompt = userInstruction.trim().length > 0
+      ? `${userInstruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
+      : SYSTEM_PROMPTS.DEFAULT;
+    const taskReflection = selectedReflection;
+    const taskConv = activeConversation;
+    const isIncognitoTask = incognitoMode;
+
+    let assistantMsg: Message;
+    if (isIncognitoTask) {
+      assistantMsg = {
+        id: "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+        conversationId: taskConv.id,
+        role: "assistant",
+        content: "…",
+        createdAt: Date.now(),
+      };
+    } else {
+      assistantMsg = await DB.addMessage(taskConv.id, "assistant", "…");
+    }
+
+    setMessages((prev) => [...prev.filter(m => m.id !== aiMessageId), assistantMsg]);
+
+    const task = async () => {
+      setGeneratingConvId(taskConv.id);
+      generatingConvIdRef.current = taskConv.id;
+      streamingMsgIdRef.current = assistantMsg.id;
+      streamingContentRef.current = "";
+      abortControllerRef.current = new AbortController();
+
+      if (taskAiService === 'ollama' && (!taskOllamaUrl || taskOllamaUrl.trim() === '')) {
+        streamingContentRef.current = "Ollama URL is undefined or invalid. Please check your settings.";
+        if (activeConversationRef.current?.id === taskConv.id) {
+          setMessages((prev) => prev.map((m) => m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current } : m));
+        }
+        abortControllerRef.current = null;
+      } else if (!taskSelectedModel) {
+        streamingContentRef.current = "Please select a model from the top menu before sending a message.";
+        if (activeConversationRef.current?.id === taskConv.id) {
+          setMessages((prev) => prev.map((m) => m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current } : m));
+        }
+        abortControllerRef.current = null;
+      } else {
+        try {
+          await AIModule.sendMessage(
+            taskSelectedModel,
+            taskSystemPrompt,
+            taskHistory,
+            async (chunk) => {
+              streamingContentRef.current += chunk;
+              if (activeConversationRef.current?.id === taskConv.id) {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsg.id
+                      ? { ...m, content: streamingContentRef.current }
+                      : m
+                  )
+                );
+              }
             },
             abortControllerRef.current.signal,
-            { think: selectedReflection === "think" }
+            { think: taskReflection === "think" }
           );
         } catch (e: any) {
-          const isAborted = e.name === "AbortError" ||
-            e.message?.toLowerCase().includes("aborted") ||
-            e.message?.toLowerCase().includes("cancel");
-
+          const isAborted = e.name === "AbortError" || e.message?.toLowerCase().includes("aborted") || e.message?.toLowerCase().includes("cancel");
           if (isAborted) {
-            console.log("Generation aborted by user");
             streamingContentRef.current += "\n\n_The user interrupted the response_";
           } else {
-            console.error(e);
             streamingContentRef.current = "Error generating response. Please check your model or server connection.";
           }
-
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantMsg.id
-                ? { ...m, content: streamingContentRef.current }
-                : m
-            )
-          );
+          if (activeConversationRef.current?.id === taskConv.id) {
+            setMessages((prev) => prev.map((m) => m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current } : m));
+          }
         } finally {
-          setIsGenerating(false);
           abortControllerRef.current = null;
         }
       }
 
-      if (!incognitoMode) {
-        //save final assistant message content to db
+      if (!isIncognitoTask) {
         await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
-        //refresh conversation list (updatedAt changed)
         await loadConversations();
       }
+    };
 
-      //generate AI title for new conversations
-      if (isFirstMessage && conv && !incognitoMode) {
-        generateTitle(conv.id, text);
+    requestQueueRef.current.push({
+      convId: taskConv.id,
+      task,
+      assistantMsgId: assistantMsg.id,
+      isIncognito: isIncognitoTask
+    });
+    setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
+    processQueue();
+
+  }, [activeConversation, generatingConvId, incognitoMode, selectedModel, ollamaUrl, aiService, userInstruction, selectedReflection]);
+
+  const handleStop = useCallback(async () => {
+    const currentConvId = activeConversation?.id;
+    if (!currentConvId) return;
+
+    if (generatingConvId === currentConvId) {
+      abortControllerRef.current?.abort();
+    } else if (pendingConvIds.includes(currentConvId)) {
+      //cancel all pending tasks for this conversation
+      const tasksToCancel = requestQueueRef.current.filter(i => i.convId === currentConvId);
+      requestQueueRef.current = requestQueueRef.current.filter(i => i.convId !== currentConvId);
+      setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
+
+      for (const item of tasksToCancel) {
+        if (!item.isIncognito) {
+          await DB.updateMessageContent(item.assistantMsgId, "\n\n_The user interrupted the response_");
+        }
       }
-    },
-    [dbReady, incognitoMode, activeConversation, selectedModel, selectedReflection, generateTitle, userInstruction]
-  );
+      setMessages(prev => prev.map(m => {
+        if (tasksToCancel.some(t => t.assistantMsgId === m.id)) {
+          return { ...m, content: "\n\n_The user interrupted the response_" };
+        }
+        return m;
+      }));
+    }
+  }, [activeConversation, generatingConvId, pendingConvIds]);
 
   if (!dbReady) {
     return <View style={styles.container} />;
@@ -368,6 +567,10 @@ export default function Index() {
               conversation={activeConversation}
               contentTopPadding={insets.top + 72}
               contentBottomPadding={88 + insets.bottom}
+              incognito={incognitoMode}
+              onRegenerate={handleRegenerate}
+              speakerEnabled={speakerEnabled}
+              generatingMessageId={generatingConvId === activeConversation.id ? streamingMsgIdRef.current : null}
             />
           )}
 
@@ -410,8 +613,8 @@ export default function Index() {
               onSend={handleSend}
               onPlusPress={() => console.log("plus pressed")}
               incognito={incognitoMode}
-              isGenerating={isGenerating}
-              onStop={() => abortControllerRef.current?.abort()}
+              isGenerating={activeConversation ? (generatingConvId === activeConversation.id || pendingConvIds.includes(activeConversation.id)) : false}
+              onStop={handleStop}
             />
           </View>
         </View>
@@ -438,6 +641,7 @@ export default function Index() {
           }
           setAiService(cached.aiService);
           setOllamaUrl(cached.ollamaUrl);
+          setSpeakerEnabled(cached.speaker);
         }}
         onDataChanged={async () => {
           await loadConversations();

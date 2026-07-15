@@ -47,7 +47,7 @@ function formatDate(timestamp: number): string {
   }).format(new Date(timestamp));
 }
 
-const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, showSnackbar, isGenerating }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; }) => {
+const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, showSnackbar, isGenerating, isChatGenerating }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean }) => {
   const isUser = item.role === "user";
   const isThinking = !isUser && item.content === "…";
 
@@ -87,7 +87,12 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               )}
               <Pressable 
                 onPress={() => onRegenerate?.(item.id)} 
-                style={({ pressed }) => [styles.toolbarIconContainer, pressed && { backgroundColor: "#eaeaea" }]}
+                disabled={isChatGenerating}
+                style={({ pressed }) => [
+                  styles.toolbarIconContainer, 
+                  pressed && { backgroundColor: "#eaeaea" },
+                  isChatGenerating && { opacity: 0.3 }
+                ]}
               >
                 <Image source={reloadIcon} style={{ width: 22, height: 22, tintColor: "#999" }} />
               </Pressable>
@@ -105,7 +110,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
       )}
     </View>
   );
-}, (prev, next) => prev.item.content === next.item.content && prev.incognito === next.incognito && prev.speakerEnabled === next.speakerEnabled && prev.isGenerating === next.isGenerating);
+}, (prev, next) => prev.item.content === next.item.content && prev.incognito === next.incognito && prev.speakerEnabled === next.speakerEnabled && prev.isGenerating === next.isGenerating && prev.isChatGenerating === next.isChatGenerating);
 MessageItem.displayName = "MessageItem";
 
 export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, generatingMessageId }: ChatViewProps) {
@@ -151,7 +156,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   };
 
   const renderItem = ({ item }: { item: Message }) => {
-    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} />;
+    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isChatGenerating={!!generatingMessageId} />;
   };
 
   return (

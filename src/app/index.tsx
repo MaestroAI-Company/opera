@@ -579,7 +579,10 @@ export default function Index() {
                 <ModelDropdown
                   selectedModel={selectedModel}
                   selectedReflection={selectedReflection}
-                  onModelChange={setSelectedModel}
+                  onModelChange={(model) => {
+                    setSelectedModel(model);
+                    Settings.set("ollamaModel", model);
+                  }}
                   onReflectionChange={setSelectedReflection}
                   rightElement={
                     <View style={styles.settingsShadowLayer}>

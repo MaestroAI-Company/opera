@@ -22,10 +22,10 @@ build_apk:
   stage: build
   image: reactnativecommunity/react-native-android
   before_script:
-    # Set up Node.js 20
+    #setup node.js 20
     - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
     - apt-get install -y nodejs
-    # Set up JDK 17
+    #setup jdk 17
     - apt-get update && apt-get install -y openjdk-17-jdk
     - update-alternatives --set java /usr/lib/jvm/java-17-openjdk-amd64/bin/java || true
   script:

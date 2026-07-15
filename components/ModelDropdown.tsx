@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Image, LayoutRectangle, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Keyboard, LayoutRectangle, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { AIModule } from "../src/services/ai/AIModule";
+import NotificationModal from "./NotificationModal";
 
 const arrowDownIcon = require("../assets/icons/down_arrow.png");
+const downloadIcon = require("../assets/icons/download.png");
 
 const REFLECTIONS = [
   { id: "quick", label: "Quick" },
@@ -27,20 +29,45 @@ export default function ModelDropdown({
   const [visible, setVisible] = useState(false);
   const [models, setModels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hasFetched, setHasFetched] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadModalVisible, setDownloadModalVisible] = useState(false);
   const triggerRef = useRef<View>(null);
   const [triggerLayout, setTriggerLayout] = useState<LayoutRectangle | null>(null);
 
-  useEffect(() => {
+  const [isAvailable, setIsAvailable] = useState(true);
+
+  const fetchModels = async () => {
     setLoading(true);
-    AIModule.getAvailableModels()
-      .then((fetched) => {
-        setModels(fetched);
-        if (fetched.length > 0 && !selectedModel) {
-          onModelChange(fetched[0]);
-        }
-      })
-      .catch(() => setModels([]))
-      .finally(() => setLoading(false));
+    try {
+      const available = await AIModule.isAvailable();
+      setIsAvailable(available);
+      if (!available) {
+        setModels([]);
+        return;
+      }
+      const fetched = await AIModule.getAvailableModels();
+      setModels(fetched);
+    } catch (e) {
+      setModels([]);
+    } finally {
+      setLoading(false);
+      setHasFetched(true);
+    }
+  };
+
+  useEffect(() => {
+    if (models.length > 0) {
+      if (!selectedModel || !models.includes(selectedModel)) {
+        onModelChange(models[0]);
+      }
+    } else if (hasFetched && !loading && selectedModel) {
+      onModelChange("");
+    }
+  }, [models, selectedModel, loading, hasFetched, onModelChange]);
+
+  useEffect(() => {
+    fetchModels();
   }, []);
 
   useEffect(() => {
@@ -50,21 +77,20 @@ export default function ModelDropdown({
   }, [selectedModel]);
 
   const handlePullModel = () => {
-    setLoading(true);
+    setDownloadModalVisible(false);
+    setIsDownloading(true);
     AIModule.downloadService("gemma4")
-      .then(() => AIModule.getAvailableModels())
-      .then((fetched) => {
-        setModels(fetched);
-        if (fetched.length > 0) onModelChange(fetched[0]);
-      })
+      .then(() => fetchModels())
       .catch(console.error)
-      .finally(() => setLoading(false));
+      .finally(() => setIsDownloading(false));
   };
 
   const handleOpen = () => {
+    Keyboard.dismiss();
     triggerRef.current?.measureInWindow((x, y, width, height) => {
       setTriggerLayout({ x, y, width, height } as LayoutRectangle);
       setVisible(true);
+      fetchModels();
     });
   };
 
@@ -100,11 +126,31 @@ export default function ModelDropdown({
             {loading ? (
               <Text style={styles.modelStatus}>Loading...</Text>
             ) : models.length === 0 ? (
-              <Pressable onPress={handlePullModel} style={styles.option}>
-                <Text style={[styles.optionText, { color: "#0066cc" }]}>gemma4</Text>
-              </Pressable>
+              <View>
+                <Text style={{ color: '#ff4444', textAlign: 'center', marginBottom: 12, paddingHorizontal: 12, fontSize: 13 }}>
+                  Unable to fetch models / Ollama URL undefined
+                </Text>
+                {isAvailable && (
+                  <Pressable 
+                    onPress={() => {
+                      setVisible(false);
+                      setDownloadModalVisible(true);
+                    }} 
+                    style={styles.downloadOption}
+                  >
+                    <Image source={downloadIcon} style={styles.downloadIcon} />
+                    <Text style={styles.downloadText}>
+                      {isDownloading ? "Downloading..." : "gemma4"}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
             ) : (
-              models.map((model) => (
+              [...models].sort((a, b) => {
+                if (a === selectedModel) return -1;
+                if (b === selectedModel) return 1;
+                return a.localeCompare(b);
+              }).map((model) => (
                 <Pressable
                   key={model}
                   onPress={() => {
@@ -146,6 +192,18 @@ export default function ModelDropdown({
           </Pressable>
         </Pressable>
       </Modal>
+
+      <NotificationModal
+        visible={downloadModalVisible}
+        title="Download Gemma4"
+        icon={downloadIcon}
+        message="Do you want to download the Gemma4 model to your Ollama server? This model is several GB in size."
+        onClose={() => setDownloadModalVisible(false)}
+        buttons={[
+          { text: "Cancel", onPress: () => setDownloadModalVisible(false), style: "secondary" },
+          { text: "Download", onPress: handlePullModel, style: "primary" },
+        ]}
+      />
     </View>
   );
 }
@@ -245,5 +303,28 @@ const styles = StyleSheet.create({
   },
   optionTextSelected: {
     color: "#FFF",
+  },
+  downloadOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f5f5f5",
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    borderStyle: "dashed",
+    gap: 8,
+    marginVertical: 4,
+  },
+  downloadIcon: {
+    width: 16,
+    height: 16,
+    tintColor: "#0066cc",
+  },
+  downloadText: {
+    fontSize: 13,
+    color: "#0066cc",
+    fontFamily: "monospace",
+    fontWeight: "bold",
   },
 });

@@ -216,8 +216,7 @@ export function renderMarkdown(md: string): React.ReactNode[] {
         </Text>
       );
     } else {
-      // safety fallback prevent infinite loops in case no condition matched
-      // the paragraph loop also didn't consume anything
+      //safety fallback prevent infinite loop
       i++;
     }
   }

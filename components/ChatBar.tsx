@@ -27,7 +27,7 @@ type ChatInputBarProps = {
   isGenerating?: boolean;
 };
 
-// ... (Fonctions buildWavBuffer et VoiceIndicator inchangées)
+//wav buffer builder from pcm chunks
 function buildWavBuffer(pcmFloat32Chunks: ArrayBuffer[], sampleRate: number): ArrayBuffer {
   const totalSamples = pcmFloat32Chunks.reduce((n, b) => n + b.byteLength / 4, 0);
   const dataBytes = totalSamples * 2;
@@ -240,11 +240,8 @@ export default function ChatBar({
   };
 
   return (
-    // Le composant magique natif qui règle le problème sans calculs manuels
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-    // On peut ajouter un petit offset si ta navbar ou statusbar décale le tout :
-    // keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0} 
     >
       <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.pressableWrapper}>
         <Animated.View
@@ -297,7 +294,6 @@ export default function ChatBar({
   );
 }
 
-// ... (Styles conservés à l'identique)
 const styles = StyleSheet.create({
   pressableWrapper: {
     marginHorizontal: 16,

@@ -30,18 +30,18 @@ function getGroupTitle(timestamp: number): string {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const diffTime = startOfToday - timestamp;
-  
+
   if (diffTime <= 0) return "LAST DISCUSSION";
-  
+
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays === 1) return "1 day ago";
   if (diffDays === 2) return "2 day ago";
   if (diffDays === 3) return "3 day ago";
-  
+
   const dd = String(date.getDate()).padStart(2, '0');
   const mm = String(date.getMonth() + 1).padStart(2, '0');
-  
+
   if (date.getFullYear() === now.getFullYear()) {
     return `DATE (${dd}/${mm})`;
   } else {
@@ -139,14 +139,14 @@ export default function DrawerMenu({
         <View style={styles.rowActions}>
           {isSelected ? (
             <>
-              <Pressable 
-                onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)} 
+              <Pressable
+                onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
                 style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: "rgba(0, 0, 0, 0.15)" }]}
               >
                 <Image source={conv.pinned ? unpinIcon : pinIcon} style={[styles.actionIcon, { tintColor: "#fff" }]} />
               </Pressable>
-              <Pressable 
-                onPress={() => setDeleteConfirmId(conv.id)} 
+              <Pressable
+                onPress={() => setDeleteConfirmId(conv.id)}
                 style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: "rgba(0, 0, 0, 0.15)" }]}
               >
                 <Image source={deleteIcon} style={[styles.actionIcon, { tintColor: "#fff" }]} />
@@ -191,8 +191,8 @@ export default function DrawerMenu({
               <Image source={newIcon} style={styles.quickActionIcon} />
               <Text style={styles.quickActionLabel}>New discussion</Text>
             </Pressable>
-            <Pressable 
-              onPress={onClose} 
+            <Pressable
+              onPress={onClose}
               style={({ pressed }) => [styles.quickActionItem, pressed && { backgroundColor: "#eaeaea" }]}
             >
               <Image source={searchIcon} style={styles.quickActionIcon} />
@@ -336,10 +336,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 10,
+    paddingVertical: 5,
     paddingHorizontal: 8,
     borderRadius: 6,
     marginBottom: 2,
+    borderWidth: 2,
+    borderColor: "#ffffff52",
   },
   discussionRowSelected: {
     backgroundColor: "#FF1A1A",

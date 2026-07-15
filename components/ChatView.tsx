@@ -1,3 +1,5 @@
+import * as Clipboard from "expo-clipboard";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useRef, useState } from "react";
 import {
   FlatList,
@@ -9,10 +11,8 @@ import {
   Text,
   View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import * as Clipboard from "expo-clipboard";
-import { renderMarkdown } from "./MarkdownText";
 import { Conversation, Message } from "../src/services/db/DatabaseService";
+import { renderMarkdown } from "./MarkdownText";
 
 const butterflyImage = require("../assets/images/butterfly2.png");
 const thinkingGif = require("../assets/icons/thinking.gif");
@@ -132,8 +132,8 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               >
                 <Image source={reloadIcon} style={{ width: 22, height: 22, tintColor: "#999" }} />
               </Pressable>
-              <Pressable 
-                onPress={() => copyToClipboard(item.content, false)} 
+              <Pressable
+                onPress={() => copyToClipboard(item.content, false)}
                 onLongPress={() => copyToClipboard(item.content, true)}
                 delayLongPress={500}
                 style={({ pressed }) => [styles.toolbarIconContainer, pressed && { backgroundColor: "#eaeaea" }]}
@@ -151,12 +151,10 @@ MessageItem.displayName = "MessageItem";
 
 export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, generatingMessageId }: ChatViewProps) {
   const listRef = useRef<FlatList>(null);
-  const [showTopGradient, setShowTopGradient] = useState(false);
-  const [showBottomGradient, setShowBottomGradient] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
   const isAtBottomRef = useRef(true);
   const initialScrollDone = useRef(false);
-  
+
   const [snackbarMessage, setSnackbarMessage] = useState("");
   useEffect(() => {
     if (snackbarMessage) {
@@ -183,12 +181,10 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
     const atTop = contentOffset.y <= headerHeight + 10;
     //threshold for bottom detection
     const atBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 100;
-    
+
     if (!isAutoScrolling.current) {
       isAtBottomRef.current = atBottom;
     }
-    setShowTopGradient(!atTop);
-    setShowBottomGradient(!atBottom);
   };
 
   const renderItem = ({ item }: { item: Message }) => {
@@ -237,26 +233,22 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
             autoScrollTimeout.current = setTimeout(() => {
               isAutoScrolling.current = false;
             }, 500);
-            
+
             //scrollToOffset to avoid android jump
             listRef.current?.scrollToOffset({ offset: h + 1000, animated: true });
           }
         }}
       />
-      {showTopGradient && (
-        <LinearGradient
-          colors={["#FFF5EC", "rgba(255,245,236,0.9)", "rgba(255,245,236,0)"]}
-          style={styles.gradientTop}
-          pointerEvents="none"
-        />
-      )}
-      {showBottomGradient && (
-        <LinearGradient
-          colors={["rgba(255,245,236,0)", "rgba(255,245,236,0.9)", "#FFF5EC"]}
-          style={styles.gradientBottom}
-          pointerEvents="none"
-        />
-      )}
+      <LinearGradient
+        colors={["#FFF5EC", "rgba(255,245,236,0.9)", "rgba(255,245,236,0)"]}
+        style={styles.gradientTop}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={["rgba(255,245,236,0)", "rgba(255,245,236,0.9)", "#FFF5EC"]}
+        style={styles.gradientBottom}
+        pointerEvents="none"
+      />
       {!!snackbarMessage && (
         <View style={styles.snackbarContainer} pointerEvents="none">
           <View style={styles.snackbar}>
@@ -278,19 +270,23 @@ const styles = StyleSheet.create({
   },
   bubble: {
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   userBubble: {
     alignSelf: "flex-end",
     backgroundColor: "#FF1A1A",
     borderRadius: 10,
     maxWidth: "80%",
+    borderWidth: 2,
+    borderColor: "#ffffff52",
   },
   userBubbleIncognito: {
     alignSelf: "flex-end",
     backgroundColor: "#565A75",
     borderRadius: 10,
     maxWidth: "80%",
+    borderWidth: 2,
+    borderColor: "#ffffff52",
   },
   aiBubble: {
     alignSelf: "stretch",
@@ -300,6 +296,7 @@ const styles = StyleSheet.create({
   bubbleText: {
     fontSize: 15,
     lineHeight: 21,
+    fontFamily: "Jakarta",
   },
   userText: {
     color: "#fff",
@@ -319,16 +316,16 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 26,
-    fontWeight: "300",
     color: "#333",
     textAlign: "center",
     letterSpacing: 0.5,
     marginBottom: 12,
+    fontFamily: "Petrona",
   },
   headerDate: {
     fontSize: 13,
     color: "#999",
-    fontFamily: "monospace",
+    fontFamily: "IBMPlexMono-Medium",
   },
   gradientTop: {
     position: "absolute",

@@ -21,7 +21,7 @@ export type NotificationModalProps = {
 
   //custom buttons (up to 3)
   buttons?: ModalButton[];
-  
+
   onClose: () => void;
 };
 
@@ -37,10 +37,10 @@ export default function NotificationModal({
   buttons,
   onClose,
 }: NotificationModalProps) {
-  
+
   //fallback to single close button if none provided
-  const activeButtons = buttons && buttons.length > 0 
-    ? buttons.slice(0, 3) 
+  const activeButtons = buttons && buttons.length > 0
+    ? buttons.slice(0, 3)
     : [{ text: "OK", onPress: onClose, style: "primary" as const }];
 
   return (
@@ -52,7 +52,7 @@ export default function NotificationModal({
     >
       <View style={styles.overlay}>
         <View style={styles.container}>
-          
+
           {(title || icon) && (
             <View style={styles.header}>
               {icon && <Image source={icon} style={styles.icon} />}
@@ -64,7 +64,7 @@ export default function NotificationModal({
 
           {showInput && (
             <View style={styles.inputContainer}>
-              <TextInputField 
+              <TextInputField
                 value={inputValue}
                 onChangeText={onInputChange}
                 placeholder={inputPlaceholder}
@@ -76,23 +76,23 @@ export default function NotificationModal({
             {activeButtons.map((btn, index) => {
               const isPrimary = btn.style === "primary" || !btn.style;
               const isDanger = btn.style === "danger";
-              
+
               return (
-                <Pressable 
-                  key={index} 
+                <Pressable
+                  key={index}
                   style={({ pressed }) => [
                     styles.button,
                     isPrimary && styles.buttonPrimary,
                     isDanger && styles.buttonDanger,
                     !isPrimary && !isDanger && styles.buttonSecondary,
                     pressed && (
-                      isPrimary 
-                        ? { backgroundColor: "#000", borderColor: "#000" } 
-                        : isDanger 
-                          ? { backgroundColor: "#d60e0e", borderColor: "#d60e0e" } 
+                      isPrimary
+                        ? { backgroundColor: "#000", borderColor: "#000" }
+                        : isDanger
+                          ? { backgroundColor: "#d60e0e", borderColor: "#d60e0e" }
                           : { backgroundColor: "#eaeaea" }
                     )
-                  ]} 
+                  ]}
                   onPress={btn.onPress}
                 >
                   <Text style={[
@@ -149,13 +149,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     color: "#222",
-    fontFamily: "monospace",
+    fontFamily: "IBMPlexMono-Medium",
     textAlign: "center",
   },
   message: {
     fontSize: 14,
     color: "#555",
-    fontFamily: "monospace",
+    fontFamily: "Jakarta",
     textAlign: "center",
     marginBottom: 20,
     lineHeight: 20,
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   },
   buttonDanger: {
     backgroundColor: "#FF1A1A",
-    borderColor: "#FF1A1A",
+    borderColor: "#ffffff52",
   },
   buttonSecondary: {
     backgroundColor: "#fff",
@@ -193,8 +193,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "#fff",
     fontSize: 14,
-    fontWeight: "bold",
-    fontFamily: "monospace",
+    fontFamily: "IBMPlexMono-Medium",
   },
   buttonTextSecondary: {
     color: "#222",

@@ -2,11 +2,11 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 const s = StyleSheet.create({
-  base: { fontSize: 18, lineHeight: 26, color: "#000" },
+  base: { fontSize: 18, lineHeight: 26, color: "#000", fontFamily: "Jakarta" },
   bold: { fontWeight: "bold" },
   italic: { fontStyle: "italic" },
   code: {
-    fontFamily: "monospace",
+    fontFamily: "IBMPlexMono-Medium",
     backgroundColor: "#f0f0f0",
     color: "#d63384",
     paddingHorizontal: 4,
@@ -14,7 +14,7 @@ const s = StyleSheet.create({
     fontSize: 13,
   },
   codeBlock: {
-    fontFamily: "monospace",
+    fontFamily: "IBMPlexMono-Medium",
     backgroundColor: "#1e1e1e",
     color: "#d4d4d4",
     padding: 8,
@@ -209,7 +209,7 @@ export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode
       paraLines.push(lines[i]);
       i++;
     }
-    
+
     if (paraLines.length > 0) {
       elements.push(
         <Text key={`p-${i}`} style={[s.base, s.paragraph]} selectable={true} selectionColor={selColor}>

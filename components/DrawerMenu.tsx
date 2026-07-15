@@ -122,7 +122,7 @@ export default function DrawerMenu({
     return (
       <View key={conv.id} style={[styles.discussionRow, isSelected && styles.discussionRowSelected]}>
         <Pressable
-          style={styles.discussionTextContainer}
+          style={({ pressed }) => [styles.discussionTextContainer, pressed && { opacity: 0.6 }]}
           onPress={() => {
             onSelectConversation(conv);
             onClose();
@@ -141,13 +141,13 @@ export default function DrawerMenu({
             <>
               <Pressable 
                 onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)} 
-                style={styles.actionIconButton}
+                style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: "rgba(0, 0, 0, 0.15)" }]}
               >
                 <Image source={conv.pinned ? unpinIcon : pinIcon} style={[styles.actionIcon, { tintColor: "#fff" }]} />
               </Pressable>
               <Pressable 
                 onPress={() => setDeleteConfirmId(conv.id)} 
-                style={styles.actionIconButton}
+                style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: "rgba(0, 0, 0, 0.15)" }]}
               >
                 <Image source={deleteIcon} style={[styles.actionIcon, { tintColor: "#fff" }]} />
               </Pressable>
@@ -186,12 +186,15 @@ export default function DrawerMenu({
                 onNewConversation();
                 onClose();
               }}
-              style={styles.quickActionItem}
+              style={({ pressed }) => [styles.quickActionItem, pressed && { backgroundColor: "#eaeaea" }]}
             >
               <Image source={newIcon} style={styles.quickActionIcon} />
               <Text style={styles.quickActionLabel}>New discussion</Text>
             </Pressable>
-            <Pressable onPress={onClose} style={styles.quickActionItem}>
+            <Pressable 
+              onPress={onClose} 
+              style={({ pressed }) => [styles.quickActionItem, pressed && { backgroundColor: "#eaeaea" }]}
+            >
               <Image source={searchIcon} style={styles.quickActionIcon} />
               <Text style={styles.quickActionLabel}>Search</Text>
             </Pressable>
@@ -288,9 +291,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#00000017",
     borderRadius: 5,
-    paddingVertical: 4,
     backgroundColor: "#fff",
     zIndex: 1,
+    overflow: "hidden",
   },
   quickActionItem: {
     flexDirection: "row",
@@ -360,10 +363,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   actionIconButton: {
-    padding: 4,
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 16,
   },
   actionIcon: {
-    width: 16,
-    height: 16,
+    width: 20,
+    height: 20,
   },
 });

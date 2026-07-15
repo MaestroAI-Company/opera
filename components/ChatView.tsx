@@ -81,18 +81,21 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
           {!isUser && !isThinking && !isGenerating && (
             <View style={styles.aiToolbar}>
               {speakerEnabled && (
-                <Pressable style={styles.toolbarIconContainer}>
+                <Pressable style={({ pressed }) => [styles.toolbarIconContainer, pressed && { backgroundColor: "#eaeaea" }]}>
                   <Image source={speakerIcon} style={{ width: 22, height: 22, tintColor: "#999" }} />
                 </Pressable>
               )}
-              <Pressable onPress={() => onRegenerate?.(item.id)} style={styles.toolbarIconContainer}>
+              <Pressable 
+                onPress={() => onRegenerate?.(item.id)} 
+                style={({ pressed }) => [styles.toolbarIconContainer, pressed && { backgroundColor: "#eaeaea" }]}
+              >
                 <Image source={reloadIcon} style={{ width: 22, height: 22, tintColor: "#999" }} />
               </Pressable>
               <Pressable 
                 onPress={() => copyToClipboard(item.content, false)} 
                 onLongPress={() => copyToClipboard(item.content, true)}
                 delayLongPress={500}
-                style={styles.toolbarIconContainer}
+                style={({ pressed }) => [styles.toolbarIconContainer, pressed && { backgroundColor: "#eaeaea" }]}
               >
                 <Image source={copyIcon} style={{ width: 22, height: 22, tintColor: "#999" }} />
               </Pressable>
@@ -249,8 +252,9 @@ const styles = StyleSheet.create({
     maxWidth: "80%",
   },
   aiBubble: {
-    alignSelf: "flex-start",
+    alignSelf: "stretch",
     backgroundColor: "transparent",
+    paddingHorizontal: 0,
   },
   bubbleText: {
     fontSize: 15,
@@ -310,7 +314,11 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   toolbarIconContainer: {
-    padding: 4,
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 16,
   },
   snackbarContainer: {
     position: 'absolute',

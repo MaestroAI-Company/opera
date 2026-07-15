@@ -16,10 +16,16 @@ export default function TopBar({ onMenuPress, onNewPress, children }: TopBarProp
         <View style={styles.shadowLayer}>
           <View style={styles.shadowBlock} />
           <View style={styles.buttonsContainer}>
-            <Pressable onPress={onMenuPress} style={styles.button}>
+            <Pressable 
+              onPress={onMenuPress} 
+              style={({ pressed }) => [styles.button, pressed && { backgroundColor: "#eaeaea" }]}
+            >
               <Image source={moreIcon} style={styles.buttonIcon} />
             </Pressable>
-            <Pressable onPress={onNewPress} style={styles.button}>
+            <Pressable 
+              onPress={onNewPress} 
+              style={({ pressed }) => [styles.button, pressed && { backgroundColor: "#eaeaea" }]}
+            >
               <Image source={addIcon} style={styles.buttonIcon} />
             </Pressable>
           </View>

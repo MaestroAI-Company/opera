@@ -18,6 +18,7 @@ export default function SplashScreen({ onFinish }: Props) {
         source={animation}
         autoPlay
         loop={false}
+        resizeMode="cover"
         style={styles.animation}
         onAnimationFinish={(isCancelled) => {
           if (!isCancelled) {

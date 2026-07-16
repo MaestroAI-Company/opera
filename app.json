@@ -18,7 +18,12 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": true,
-      "package": "ai.maestro.opera"
+      "package": "ai.maestro.opera",
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_DATA_SYNC"
+      ]
     },
     "web": {
       "output": "static",
@@ -48,7 +53,11 @@
           "microphonePermission": "Opera needs access to your microphone for voice-to-text."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "react-native-litert-lm"
+      ],
+      "./plugins/withNotifeeRepo.js"
     ],
     "experiments": {
       "typedRoutes": true,

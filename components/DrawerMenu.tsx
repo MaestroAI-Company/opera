@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Dimensions, Image, Keyboard, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, Dimensions, Image, Keyboard, Pressable, ScrollView, StyleSheet, Text, View, PanResponder } from "react-native";
 import { Conversation } from "../src/services/db/DatabaseService";
 import NotificationModal from "./NotificationModal";
 
@@ -64,6 +64,19 @@ export default function DrawerMenu({
   const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return gestureState.dx < -20 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx < -50) {
+          onClose();
+        }
+      },
+    })
+  ).current;
 
   useEffect(() => {
     if (visible) {
@@ -170,7 +183,10 @@ export default function DrawerMenu({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      <Animated.View style={[styles.content, { transform: [{ translateX }] }]}>
+      <Animated.View 
+        style={[styles.content, { transform: [{ translateX }] }]}
+        {...panResponder.panHandlers}
+      >
         <Image
           source={operaLogo}
           style={styles.logo}

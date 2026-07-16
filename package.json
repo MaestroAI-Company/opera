@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "dependencies": {
     "@expo/ui": "~57.0.4",
+    "@notifee/react-native": "^9.1.8",
     "buffer": "^6.0.3",
     "expo": "~57.0.4",
     "expo-audio": "~57.0.0",
@@ -30,7 +31,9 @@
     "react-dom": "19.2.3",
     "react-native": "0.86.0",
     "react-native-gesture-handler": "~2.32.0",
+    "react-native-litert-lm": "^0.5.0",
     "react-native-math": "^2.0.1",
+    "react-native-nitro-modules": "^0.36.1",
     "react-native-reanimated": "4.5.0",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "4.25.2",

@@ -2,7 +2,6 @@ import { AudioModule, useAudioStream } from "expo-audio";
 import * as DocumentPicker from 'expo-document-picker';
 import { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Animated,
   Easing,
   Image,
@@ -13,7 +12,7 @@ import {
   Text,
   TextInput,
   Vibration,
-  View,
+  View
 } from "react-native";
 import { Whisper } from "../src/services/whisper/WhisperService";
 import NotificationModal from "./NotificationModal";
@@ -137,6 +136,16 @@ export default function ChatBar({
   const sampleRateRef = useRef<number>(16000);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const pressAnim = useRef(new Animated.Value(0)).current;
+  const filesAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(filesAnim, {
+      toValue: selectedFiles.length > 0 ? 1 : 0,
+      duration: 250,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, [selectedFiles.length > 0]);
 
   const { stream } = useAudioStream({
     sampleRate: 16000,
@@ -309,72 +318,92 @@ export default function ChatBar({
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.pressableWrapper}>
-        <Animated.View
-          style={[
-            styles.container,
-            incognito && styles.containerIncognito,
-            { transform: [{ scale }], backgroundColor: backgroundColor }
-          ]}
-        >
-          {supportsFiles && (
-            <Pressable onPress={handlePickFiles} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.plusButton}>
-              <Image source={addIcon} style={styles.plusIcon} />
-            </Pressable>
-          )}
+        <Animated.View style={{ transform: [{ scale }] }}>
+          <Animated.View style={[
+            styles.filesContainerTop,
+            incognito && styles.filesContainerTopIncognito,
+            {
+              maxHeight: filesAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 120] }),
+              opacity: filesAnim,
+              paddingHorizontal: filesAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 6] }),
+              paddingTop: filesAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 6] }),
+              paddingBottom: filesAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 16] }),
+              marginBottom: filesAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -8] }),
+              borderWidth: filesAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 2] }),
+            }
+          ]}>
+            {selectedFiles.length > 0 && (
+              <View style={styles.fileChipsContainer}>
+                {selectedFiles.map((file, i) => (
+                  <View key={i} style={styles.filePreviewContainerTop}>
+                    {file.type === 'image' ? (
+                      <Image source={{ uri: file.uri }} style={styles.filePreviewImageTop} />
+                    ) : (
+                      <View style={styles.filePreviewAudioTop}>
+                        <Text style={styles.filePreviewAudioTextTop} numberOfLines={1}>{file.name}</Text>
+                      </View>
+                    )}
+                    <Pressable style={styles.removeFileBtnTop} onPress={() => setSelectedFiles(prev => prev.filter((_, idx) => idx !== i))}>
+                      <Text style={styles.removeFileBtnTextTop}>✕</Text>
+                    </Pressable>
+                  </View>
+                ))}
+                <Text style={[styles.filesAddedText, incognito && { color: '#ccc' }]}>
+                  {selectedFiles.length} File{selectedFiles.length !== 1 ? 's' : ''} Added
+                </Text>
+              </View>
+            )}
+          </Animated.View>
 
-          {(whisperAvailable || canTranscribeRemotely) && !isGenerating && (
-            <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.micButton}>
-              <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
-                <Image source={micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} />
-              </Animated.View>
-            </Pressable>
-          )}
+          <Animated.View
+            style={[
+              styles.container,
+              incognito && styles.containerIncognito,
+              { backgroundColor: backgroundColor }
+            ]}
+          >
+            {supportsFiles && (
+              <Pressable onPress={handlePickFiles} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.plusButton}>
+                <Image source={addIcon} style={styles.plusIcon} />
+              </Pressable>
+            )}
 
-          {isRecording ? (
-            <VoiceIndicator />
-          ) : (
-            <View style={{ flex: 1, marginLeft: 8 }}>
-              {selectedFiles.length > 0 && (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, paddingBottom: 4 }}>
-                  {selectedFiles.map((file, i) => (
-                    <View key={i} style={styles.filePreviewContainer}>
-                      {file.type === 'image' ? (
-                        <Image source={{ uri: file.uri }} style={styles.filePreviewImage} />
-                      ) : (
-                        <View style={styles.filePreviewAudio}>
-                          <Text style={styles.filePreviewAudioText} numberOfLines={1}>{file.name}</Text>
-                        </View>
-                      )}
-                      <Pressable style={styles.removeFileBtn} onPress={() => setSelectedFiles(prev => prev.filter((_, idx) => idx !== i))}>
-                        <Text style={{color: 'black', fontSize: 10, fontWeight: 'bold'}}>✕</Text>
-                      </Pressable>
-                    </View>
-                  ))}
-                </View>
-              )}
-              <TextInput
-                style={[styles.input, { maxHeight: 100, minHeight: 24 }]}
-                value={isTranscribing ? "Transcribing..." : text}
-                onChangeText={isTranscribing ? undefined : setText}
-                placeholder={placeholder}
-                placeholderTextColor="rgba(255,255,255,0.6)"
-                multiline={true}
-                editable={!isTranscribing}
-                onTouchStart={handlePressIn}
-                onTouchEnd={handlePressOut}
-              />
-            </View>
-          )}
+            {(whisperAvailable || canTranscribeRemotely) && !isGenerating && (
+              <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.micButton}>
+                <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
+                  <Image source={micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} />
+                </Animated.View>
+              </Pressable>
+            )}
 
-          {isGenerating ? (
-            <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.sendButton}>
-              <Image source={stopIcon} style={styles.sendIcon} />
-            </Pressable>
-          ) : (
-            <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.sendButton}>
-              <Image source={nextWhiteIcon} style={styles.sendIcon} />
-            </Pressable>
-          )}
+            {isRecording ? (
+              <VoiceIndicator />
+            ) : (
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                <TextInput
+                  style={[styles.input, { maxHeight: 100, minHeight: 24 }]}
+                  value={isTranscribing ? "Transcribing..." : text}
+                  onChangeText={isTranscribing ? undefined : setText}
+                  placeholder={placeholder}
+                  placeholderTextColor="rgba(255,255,255,0.6)"
+                  multiline={true}
+                  editable={!isTranscribing}
+                  onTouchStart={handlePressIn}
+                  onTouchEnd={handlePressOut}
+                />
+              </View>
+            )}
+
+            {isGenerating ? (
+              <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.sendButton}>
+                <Image source={stopIcon} style={styles.sendIcon} />
+              </Pressable>
+            ) : (
+              <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.sendButton}>
+                <Image source={nextWhiteIcon} style={styles.sendIcon} />
+              </Pressable>
+            )}
+          </Animated.View>
         </Animated.View>
       </Pressable>
       <NotificationModal
@@ -393,6 +422,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   container: {
+    zIndex: 2,
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 10,
@@ -469,39 +499,68 @@ const styles = StyleSheet.create({
     height: 18,
     tintColor: "#fff",
   },
-  filePreviewContainer: {
+  filesContainerTop: {
+    backgroundColor: '#fff',
+    borderColor: '#00000017',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    borderBottomWidth: 0,
+    overflow: 'hidden',
+  },
+  filesContainerTopIncognito: {
+    backgroundColor: '#2A2A35',
+    borderColor: '#00000030',
+  },
+  fileChipsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  filePreviewContainerTop: {
     position: 'relative',
-    marginRight: 6,
-    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  filePreviewImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 4,
+  filePreviewImageTop: {
+    width: 44,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: '#888',
   },
-  filePreviewAudio: {
-    width: 40,
-    height: 40,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  filePreviewAudioTop: {
+    width: 44,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: '#888',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 2,
   },
-  filePreviewAudioText: {
+  filePreviewAudioTextTop: {
     color: 'white',
     fontSize: 8,
     textAlign: 'center',
   },
-  removeFileBtn: {
+  removeFileBtnTop: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: 'white',
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 8,
     width: 16,
     height: 16,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  removeFileBtnTextTop: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  filesAddedText: {
+    fontFamily: "IBMPlexMono-Medium",
+    color: '#999',
+    fontSize: 14,
+    marginLeft: 4,
   },
 });

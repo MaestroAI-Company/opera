@@ -136,16 +136,6 @@ export default function ChatBar({
   const sampleRateRef = useRef<number>(16000);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const pressAnim = useRef(new Animated.Value(0)).current;
-  const filesAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(filesAnim, {
-      toValue: selectedFiles.length > 0 ? 1 : 0,
-      duration: 250,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: false,
-    }).start();
-  }, [selectedFiles.length > 0]);
 
   const { stream } = useAudioStream({
     sampleRate: 16000,
@@ -319,20 +309,8 @@ export default function ChatBar({
     >
       <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.pressableWrapper}>
         <Animated.View style={{ transform: [{ scale }] }}>
-          <Animated.View style={[
-            styles.filesContainerTop,
-            incognito && styles.filesContainerTopIncognito,
-            {
-              maxHeight: filesAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 120] }),
-              opacity: filesAnim,
-              paddingHorizontal: filesAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 6] }),
-              paddingTop: filesAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 6] }),
-              paddingBottom: filesAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 16] }),
-              marginBottom: filesAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -8] }),
-              borderWidth: filesAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 2] }),
-            }
-          ]}>
-            {selectedFiles.length > 0 && (
+          {selectedFiles.length > 0 && (
+            <View style={[styles.filesContainerTop, incognito && styles.filesContainerTopIncognito]}>
               <View style={styles.fileChipsContainer}>
                 {selectedFiles.map((file, i) => (
                   <View key={i} style={styles.filePreviewContainerTop}>
@@ -352,8 +330,8 @@ export default function ChatBar({
                   {selectedFiles.length} File{selectedFiles.length !== 1 ? 's' : ''} Added
                 </Text>
               </View>
-            )}
-          </Animated.View>
+            </View>
+          )}
 
           <Animated.View
             style={[
@@ -501,11 +479,16 @@ const styles = StyleSheet.create({
   },
   filesContainerTop: {
     backgroundColor: '#fff',
+    borderWidth: 2,
     borderColor: '#00000017',
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
     borderBottomWidth: 0,
     overflow: 'hidden',
+    paddingHorizontal: 6,
+    paddingTop: 6,
+    paddingBottom: 16,
+    marginBottom: -16,
   },
   filesContainerTopIncognito: {
     backgroundColor: '#2A2A35',
@@ -525,13 +508,21 @@ const styles = StyleSheet.create({
   filePreviewImageTop: {
     width: 44,
     height: 32,
-    borderRadius: 6,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     backgroundColor: '#888',
+    borderWidth: 2,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   filePreviewAudioTop: {
     width: 44,
     height: 32,
-    borderRadius: 6,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     backgroundColor: '#888',
     justifyContent: 'center',
     alignItems: 'center',

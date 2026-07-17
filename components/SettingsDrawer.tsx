@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, Dimensions, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View, Alert } from "react-native";
 import Selector from "./Selector";
+import ThemeSelector from "./ThemeSelector";
 import Checkbox from "./Checkbox";
 import TextInputField from "./TextInputField";
 import NotificationModal from "./NotificationModal";
@@ -54,11 +55,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
     { id: "en", label: "English" },
   ];
 
-  const themeOptions = [
-    { id: "system", label: "System" },
-    { id: "light", label: "Light" },
-    { id: "dark", label: "Dark" },
-  ];
+
 
   const aiServiceOptions = [
     { id: "ollama", label: "Ollama" },
@@ -295,35 +292,35 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
 
           <Text style={styles.sectionTitle}>General</Text>
 
-          <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Language</Text>
+          <View style={styles.settingRowVertical}>
+            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Language</Text>
             <Selector
               options={languageOptions}
               selectedValue={language}
               onSelect={setLanguage}
               title="Select Language"
+              fullWidth
             />
           </View>
 
-          <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Theme</Text>
-            <Selector
-              options={themeOptions}
+          <View style={styles.settingRowVertical}>
+            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Theme</Text>
+            <ThemeSelector
               selectedValue={theme}
               onSelect={setTheme}
-              title="Select Theme"
             />
           </View>
 
           <Text style={[styles.sectionTitle, { marginTop: 20 }]}>AI</Text>
 
-          <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>AI Service</Text>
+          <View style={styles.settingRowVertical}>
+            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>AI Service</Text>
             <Selector
               options={aiServiceOptions}
               selectedValue={aiService}
               onSelect={setAiService}
               title="Select AI Service"
+              fullWidth
             />
           </View>
 
@@ -339,13 +336,14 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
             />
           </View>
 
-          <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Whisper Language</Text>
+          <View style={styles.settingRowVertical}>
+            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Whisper Language</Text>
             <Selector
               options={whisperLanguageOptions}
               selectedValue={whisperLanguage}
               onSelect={setWhisperLanguage}
               title="Select Language"
+              fullWidth
             />
           </View>
 
@@ -565,7 +563,7 @@ const styles = StyleSheet.create({
   actionButton: {
     backgroundColor: "#fff",
     paddingVertical: 12,
-    borderRadius: 5,
+    borderRadius: 10,
     borderWidth: 2,
     borderColor: "#00000017",
     alignItems: "center",

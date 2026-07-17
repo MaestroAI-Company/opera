@@ -1,9 +1,9 @@
 import { Buffer } from "buffer";
+import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { useFonts } from "expo-font";
 import SplashScreenComponent from "../../components/SplashScreen";
 
 global.Buffer = global.Buffer || Buffer;

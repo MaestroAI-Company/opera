@@ -16,14 +16,14 @@ export default function TopBar({ onMenuPress, onNewPress, children }: TopBarProp
         <View style={styles.shadowLayer}>
           <View style={styles.shadowBlock} />
           <View style={styles.buttonsContainer}>
-            <Pressable 
-              onPress={onMenuPress} 
+            <Pressable
+              onPress={onMenuPress}
               style={({ pressed }) => [styles.button, pressed && { backgroundColor: "#eaeaea" }]}
             >
               <Image source={moreIcon} style={styles.buttonIcon} />
             </Pressable>
-            <Pressable 
-              onPress={onNewPress} 
+            <Pressable
+              onPress={onNewPress}
               style={({ pressed }) => [styles.button, pressed && { backgroundColor: "#eaeaea" }]}
             >
               <Image source={addIcon} style={styles.buttonIcon} />
@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
     right: 4,
     height: 44,
     backgroundColor: "#00000013",
-    borderRadius: 5,
+    borderRadius: 10,
   },
   buttonsContainer: {
     flexDirection: "row",
@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderWidth: 2,
     borderColor: "#00000017",
-    borderRadius: 5,
+    borderRadius: 10,
     position: "relative",
     zIndex: 1,
     overflow: "hidden",

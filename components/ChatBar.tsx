@@ -479,7 +479,7 @@ export default function ChatBar({
                 {(whisperAvailable || canTranscribeRemotely) && !isGenerating && (
                   <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.micButton}>
                     <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
-                      <Image source={isRecording ? stopIcon : micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} tintColor={isRecording ? "#FFD700" : "#fff"} />
+                      <Image source={isRecording ? stopIcon : micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} tintColor="#fff" />
                     </Animated.View>
                   </Pressable>
                 )}
@@ -523,7 +523,7 @@ export default function ChatBar({
 
                 {isGenerating ? (
                   <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.sendButton}>
-                    <Image source={stopIcon} style={styles.sendIcon} />
+                    <Image source={stopIcon} style={styles.sendIcon} tintColor="#fff" />
                   </Pressable>
                 ) : (
                   <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.sendButton}>

@@ -125,19 +125,12 @@ export default function ModelDropdown({
 
   const MAX_MODELS_HEIGHT = 200;
   const modelsHeight = models.length === 0 ? 80 : Math.min(models.length * 40, MAX_MODELS_HEIGHT);
-  const estimatedMenuHeight = 30 + modelsHeight + 16 + 30 + REFLECTIONS.length * 40 + 24;
-
-  const menuAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      maxHeight: progress.value * estimatedMenuHeight,
-      opacity: progress.value,
-      overflow: "hidden",
-    };
-  });
+  let finalMenuHeight = 30 + modelsHeight + 16 + 30 + REFLECTIONS.length * 40 + 24;
 
   const menuWidth = 220;
   let menuLeft = 0;
-  let menuTop = 0;
+  let menuTop: number | undefined = 0;
+  let menuBottom: number | undefined = undefined;
 
   if (triggerLayout) {
     menuLeft = triggerLayout.x + (triggerLayout.width / 2) - (menuWidth / 2);
@@ -148,14 +141,30 @@ export default function ModelDropdown({
       menuLeft = 16;
     }
 
-    menuTop = triggerLayout.y + triggerLayout.height + 4;
-    if (menuTop + estimatedMenuHeight > SCREEN_HEIGHT - 16) {
-      const upwardTop = triggerLayout.y - estimatedMenuHeight - 4;
-      if (upwardTop > 16) {
-        menuTop = upwardTop;
+    const spaceBelow = SCREEN_HEIGHT - (triggerLayout.y + triggerLayout.height) - 16;
+    const spaceAbove = triggerLayout.y - 16;
+
+    if (finalMenuHeight <= spaceBelow) {
+      menuTop = triggerLayout.y + triggerLayout.height + 4;
+    } else if (spaceBelow >= 200 || spaceBelow >= spaceAbove) {
+      menuTop = triggerLayout.y + triggerLayout.height + 4;
+      finalMenuHeight = spaceBelow;
+    } else {
+      if (finalMenuHeight > spaceAbove) {
+        finalMenuHeight = spaceAbove;
       }
+      menuTop = undefined;
+      menuBottom = SCREEN_HEIGHT - triggerLayout.y + 4;
     }
   }
+
+  const menuAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      maxHeight: progress.value * finalMenuHeight,
+      opacity: progress.value,
+      overflow: "hidden",
+    };
+  });
 
   return (
     <View style={styles.container}>
@@ -183,7 +192,7 @@ export default function ModelDropdown({
             style={[
               styles.menu,
               triggerLayout
-                ? { top: menuTop, left: menuLeft }
+                ? { top: menuTop, bottom: menuBottom, left: menuLeft }
                 : {},
               menuAnimatedStyle,
             ]}

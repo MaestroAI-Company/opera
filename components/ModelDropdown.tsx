@@ -19,7 +19,6 @@ type ModelDropdownProps = {
   selectedReflection: string;
   onModelChange: (model: string) => void;
   onReflectionChange: (reflection: string) => void;
-  rightElement?: React.ReactNode;
 };
 
 export default function ModelDropdown({
@@ -27,7 +26,6 @@ export default function ModelDropdown({
   selectedReflection,
   onModelChange,
   onReflectionChange,
-  rightElement,
 }: ModelDropdownProps) {
   const [visible, setVisible] = useState(false);
   const [models, setModels] = useState<string[]>([]);
@@ -139,7 +137,7 @@ export default function ModelDropdown({
   let menuTop = 0;
 
   if (triggerLayout) {
-    menuLeft = triggerLayout.x;
+    menuLeft = triggerLayout.x + (triggerLayout.width / 2) - (menuWidth / 2);
     if (menuLeft + menuWidth > SCREEN_WIDTH - 16) {
       menuLeft = SCREEN_WIDTH - menuWidth - 16;
     }
@@ -170,7 +168,6 @@ export default function ModelDropdown({
           </Text>
         </Pressable>
       </View>
-      {rightElement}
 
       <Modal
         visible={visible}

@@ -1,6 +1,5 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { DB, Conversation, Message } from './db/DatabaseService';
 import { Settings, AppSettings } from './settings/SettingsService';
@@ -49,19 +48,13 @@ class BackupServiceImpl {
         encoding: FileSystem.EncodingType.UTF8,
       });
 
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'application/json',
-          dialogTitle: 'Export Opera Backup',
-        });
-      }
     } catch (e) {
       console.error('Failed to export data', e);
       throw e;
     }
   }
 
-  async importData(): Promise<void> {
+  async importData(): Promise<boolean> {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: 'application/json',
@@ -69,7 +62,7 @@ class BackupServiceImpl {
       });
 
       if (result.canceled || !result.assets || result.assets.length === 0) {
-        return;
+        return false;
       }
 
       const fileUri = result.assets[0].uri;
@@ -88,6 +81,8 @@ class BackupServiceImpl {
 
       //restore conversations and messages
       await DB.importBackup(backup.conversations, backup.messages);
+      
+      return true;
     } catch (e) {
       console.error('Failed to import data', e);
       throw e;

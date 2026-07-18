@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Dimensions, LayoutRectangle, Modal, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Dimensions, LayoutRectangle, Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from "react-native";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -65,19 +65,12 @@ export default function Selector({
   };
 
   const selectedOption = options.find((o) => o.id === selectedValue);
-  const estimatedMenuHeight = options.length * 40 + (title ? 30 : 0) + 24;
-
-  const menuAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      maxHeight: progress.value * estimatedMenuHeight,
-      opacity: progress.value,
-      overflow: "hidden",
-    };
-  });
+  let finalMenuHeight = options.length * 40 + (title ? 30 : 0) + 24;
 
   const menuWidth = fullWidth && triggerLayout ? triggerLayout.width : 220;
   let menuLeft = 0;
-  let menuTop = 0;
+  let menuTop: number | undefined = 0;
+  let menuBottom: number | undefined = undefined;
 
   if (triggerLayout) {
     menuLeft = triggerLayout.x;
@@ -88,14 +81,30 @@ export default function Selector({
       menuLeft = 16;
     }
 
-    menuTop = triggerLayout.y + triggerLayout.height + 4;
-    if (menuTop + estimatedMenuHeight > SCREEN_HEIGHT - 16) {
-      const upwardTop = triggerLayout.y - estimatedMenuHeight - 4;
-      if (upwardTop > 16) {
-        menuTop = upwardTop;
+    const spaceBelow = SCREEN_HEIGHT - (triggerLayout.y + triggerLayout.height) - 16;
+    const spaceAbove = triggerLayout.y - 16;
+
+    if (finalMenuHeight <= spaceBelow) {
+      menuTop = triggerLayout.y + triggerLayout.height + 4;
+    } else if (spaceBelow >= 200 || spaceBelow >= spaceAbove) {
+      menuTop = triggerLayout.y + triggerLayout.height + 4;
+      finalMenuHeight = spaceBelow;
+    } else {
+      if (finalMenuHeight > spaceAbove) {
+        finalMenuHeight = spaceAbove;
       }
+      menuTop = undefined;
+      menuBottom = SCREEN_HEIGHT - triggerLayout.y + 4;
     }
   }
+
+  const menuAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      maxHeight: progress.value * finalMenuHeight,
+      opacity: progress.value,
+      overflow: "hidden",
+    };
+  });
 
   return (
     <View style={[styles.container, fullWidth && styles.containerFullWidth]}>
@@ -125,35 +134,37 @@ export default function Selector({
             style={[
               styles.menu,
               triggerLayout
-                ? { top: menuTop, left: menuLeft, width: menuWidth }
+                ? { top: menuTop, bottom: menuBottom, left: menuLeft, width: menuWidth }
                 : {},
               menuAnimatedStyle,
             ]}
           >
-            {title && <Text style={styles.sectionTitle}>{title}</Text>}
-            {options.map((option) => (
-              <Pressable
-                key={option.id}
-                onPress={() => {
-                  Vibration.vibrate(10);
-                  handleClose(() => onSelect(option.id));
-                }}
-                style={({ pressed }) => [
-                  styles.option,
-                  option.id === selectedValue ? styles.optionSelected : pressed && { backgroundColor: "rgba(0, 0, 0, 0.05)" },
-                  option.id === selectedValue && pressed && { backgroundColor: "#cc1414" }
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    option.id === selectedValue && styles.optionTextSelected,
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 4 }}>
+              {title && <Text style={styles.sectionTitle}>{title}</Text>}
+              {options.map((option) => (
+                <Pressable
+                  key={option.id}
+                  onPress={() => {
+                    Vibration.vibrate(10);
+                    handleClose(() => onSelect(option.id));
+                  }}
+                  style={({ pressed }) => [
+                    styles.option,
+                    option.id === selectedValue ? styles.optionSelected : pressed && { backgroundColor: "rgba(0, 0, 0, 0.05)" },
+                    option.id === selectedValue && pressed && { backgroundColor: "#cc1414" }
                   ]}
                 >
-                  {option.label}
-                </Text>
-              </Pressable>
-            ))}
+                  <Text
+                    style={[
+                      styles.optionText,
+                      option.id === selectedValue && styles.optionTextSelected,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
           </AnimatedPressable>
         </AnimatedPressable>
       </Modal>

@@ -40,11 +40,8 @@ export default function TopBar({ onMenuPress, onNewPress, centerElement, rightEl
         </View>
       </View>
 
-      <View style={styles.centerSection}>
-        {centerElement}
-      </View>
-
       <View style={styles.rightSection}>
+        {centerElement && <View style={{ marginRight: 16 }}>{centerElement}</View>}
         {rightElement}
       </View>
     </View>
@@ -63,13 +60,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "flex-start",
   },
-  centerSection: {
-    flex: 2,
-    alignItems: "center",
-  },
   rightSection: {
     flex: 1,
-    alignItems: "flex-end",
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: "center",
   },
   shadowLayer: {
     position: "relative",

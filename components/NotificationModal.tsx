@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   button: {
     paddingVertical: 10,
     paddingHorizontal: 20,
-    borderRadius: 5,
+    borderRadius: 10,
     borderWidth: 2,
     borderColor: "transparent",
     minWidth: 80,

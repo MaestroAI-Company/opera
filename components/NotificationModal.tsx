@@ -55,7 +55,7 @@ export default function NotificationModal({
 
           {(title || icon) && (
             <View style={styles.header}>
-              {icon && <Image source={icon} style={styles.icon} />}
+              {icon && <Image source={icon} style={styles.icon} tintColor="#222" />}
               {title && <Text style={styles.title}>{title}</Text>}
             </View>
           )}
@@ -127,10 +127,7 @@ const styles = StyleSheet.create({
     padding: 24,
     width: "100%",
     maxWidth: 400,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.15)",
     elevation: 8,
   },
   header: {
@@ -143,7 +140,7 @@ const styles = StyleSheet.create({
   icon: {
     width: 24,
     height: 24,
-    tintColor: "#222",
+    
   },
   title: {
     fontSize: 18,

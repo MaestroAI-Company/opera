@@ -91,7 +91,7 @@ function VoiceIndicator() {
         return Animated.timing(anim, {
           toValue: Math.max(1, Math.min(targetScale, 5)),
           duration: 60,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
         });
       });
       Animated.parallel(animations).start(() => {
@@ -175,13 +175,13 @@ export default function ChatBar({
             toValue: 0.4,
             duration: 600,
             easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== "web",
           }),
           Animated.timing(pulseAnim, {
             toValue: 1,
             duration: 600,
             easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== "web",
           }),
         ])
       );
@@ -290,7 +290,7 @@ export default function ChatBar({
         copyToCacheDirectory: true
       });
       if (!result.canceled && result.assets) {
-        const validFiles = [];
+        const validFiles: SelectedFile[] = [];
         let hasInvalidFile = false;
 
         for (const a of result.assets) {
@@ -406,14 +406,14 @@ export default function ChatBar({
           >
             {supportsFiles && (
               <Pressable onPress={handlePickFiles} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.plusButton}>
-                <Image source={addIcon} style={styles.plusIcon} />
+                <Image source={addIcon} style={styles.plusIcon} tintColor="#fff" />
               </Pressable>
             )}
 
             {(whisperAvailable || canTranscribeRemotely) && !isGenerating && (
               <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.micButton}>
                 <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
-                  <Image source={micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} />
+                  <Image source={isRecording ? stopIcon : micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} tintColor={isRecording ? "#FFD700" : "#fff"} />
                 </Animated.View>
               </Pressable>
             )}
@@ -448,7 +448,7 @@ export default function ChatBar({
               </Pressable>
             ) : (
               <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.sendButton}>
-                <Image source={nextWhiteIcon} style={styles.sendIcon} />
+                <Image source={nextWhiteIcon} style={styles.sendIcon} tintColor="#fff" />
               </Pressable>
             )}
           </Animated.View>
@@ -480,14 +480,11 @@ const styles = StyleSheet.create({
     borderColor: "#00000017",
     minHeight: 56,
     maxHeight: 120,
-    shadowColor: "#FF1A1A",
-    shadowOffset: { width: 2, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 15,
+    boxShadow: "2px 6px 15px #FF1A1A",
     elevation: 6,
   },
   containerIncognito: {
-    shadowColor: "#565A75",
+    boxShadow: "2px 6px 15px #565A75",
   },
   plusButton: {
     width: 28,
@@ -505,17 +502,17 @@ const styles = StyleSheet.create({
   micIcon: {
     width: 18,
     height: 18,
-    tintColor: "#fff",
-    resizeMode: "contain",
+    
+    
   },
   micIconRecording: {
-    tintColor: "#FFD700",
+    
   },
   plusIcon: {
     width: 18,
     height: 18,
-    tintColor: "#fff",
-    resizeMode: "contain",
+    
+    
   },
   input: {
     color: "#fff",
@@ -545,7 +542,7 @@ const styles = StyleSheet.create({
   sendIcon: {
     width: 18,
     height: 18,
-    tintColor: "#fff",
+    
   },
   filesContainerTop: {
     backgroundColor: '#fff',

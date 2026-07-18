@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Dimensions, Image, Keyboard, Pressable, ScrollView, StyleSheet, Text, View, PanResponder } from "react-native";
+import { Animated, Dimensions, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View, PanResponder } from "react-native";
 import { Conversation } from "../src/services/db/DatabaseService";
 import NotificationModal from "./NotificationModal";
+import { useResponsive } from "../src/hooks/useResponsive";
 
 const operaLogo = require("../assets/icons/opera.png");
 const searchIcon = require("../assets/icons/search.png");
@@ -9,9 +10,6 @@ const newIcon = require("../assets/icons/add.png");
 const deleteIcon = require("../assets/icons/delete.png");
 const pinIcon = require("../assets/icons/pin.png");
 const unpinIcon = require("../assets/icons/unpin.png");
-
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const DRAWER_WIDTH = SCREEN_WIDTH * 0.88;
 
 type DrawerMenuProps = {
   visible: boolean;
@@ -23,6 +21,7 @@ type DrawerMenuProps = {
   onDeleteConversation?: (id: string) => void;
   onTogglePinConversation?: (id: string, pinned: boolean) => void;
   isLargeScreen?: boolean;
+  isDesktop?: boolean;
 };
 
 //format group title based on date
@@ -61,11 +60,21 @@ export default function DrawerMenu({
   onDeleteConversation,
   onTogglePinConversation,
   isLargeScreen = false,
+  isDesktop = false,
 }: DrawerMenuProps) {
+  const { width } = useResponsive();
+  const drawerWidth = width * 0.88;
+
   const [rendered, setRendered] = useState(false);
-  const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
+  const translateX = useRef(new Animated.Value(-drawerWidth)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!visible) {
+      translateX.setValue(-drawerWidth);
+    }
+  }, [drawerWidth, visible, translateX]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -88,25 +97,25 @@ export default function DrawerMenu({
         Animated.timing(translateX, {
           toValue: 0,
           duration: 280,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
         }),
         Animated.timing(overlayOpacity, {
           toValue: 1,
           duration: 280,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
         }),
       ]).start();
     } else {
       Animated.parallel([
         Animated.timing(translateX, {
-          toValue: -DRAWER_WIDTH,
+          toValue: -drawerWidth,
           duration: 250,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
         }),
         Animated.timing(overlayOpacity, {
           toValue: 0,
           duration: 250,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
         }),
       ]).start((result) => {
         if (result.finished) {
@@ -158,19 +167,19 @@ export default function DrawerMenu({
                 onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
                 style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: "rgba(0, 0, 0, 0.15)" }]}
               >
-                <Image source={conv.pinned ? unpinIcon : pinIcon} style={[styles.actionIcon, { tintColor: "#fff" }]} />
+                <Image source={conv.pinned ? unpinIcon : pinIcon} style={styles.actionIcon} tintColor="#fff" />
               </Pressable>
               <Pressable
                 onPress={() => setDeleteConfirmId(conv.id)}
                 style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: "rgba(0, 0, 0, 0.15)" }]}
               >
-                <Image source={deleteIcon} style={[styles.actionIcon, { tintColor: "#fff" }]} />
+                <Image source={deleteIcon} style={styles.actionIcon} tintColor="#fff" />
               </Pressable>
             </>
           ) : (
             conv.pinned ? (
               <View style={styles.actionIconButton}>
-                <Image source={pinIcon} style={[styles.actionIcon, { tintColor: "#aaa", opacity: 0.5 }]} />
+                <Image source={pinIcon} style={[styles.actionIcon, { opacity: 0.5 }]} tintColor="#aaa" />
               </View>
             ) : null
           )}
@@ -259,13 +268,11 @@ export default function DrawerMenu({
     />
   );
 
-  const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-
   if (isLargeScreen) {
     if (!visible) return null;
     return (
-      <View style={[styles.largeScreenContainer, isTauri ? styles.floatingContainer : styles.attachedContainer]}>
-        <View style={isTauri ? styles.floatingContent : styles.attachedContent}>
+      <View style={[styles.largeScreenContainer, isDesktop ? styles.floatingContainer : styles.attachedContainer]}>
+        <View style={isDesktop ? styles.floatingContent : styles.attachedContent}>
           {innerContent}
         </View>
         {notificationModal}
@@ -274,13 +281,13 @@ export default function DrawerMenu({
   }
 
   return (
-    <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
+    <View style={[styles.root, { pointerEvents: visible ? "auto" : "none" }]}>
       <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
       <Animated.View 
-        style={[styles.content, { transform: [{ translateX }] }]}
+        style={[styles.content, { width: drawerWidth }, { transform: [{ translateX }] }]}
         {...panResponder.panHandlers}
       >
         {innerContent}
@@ -305,7 +312,6 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     left: 0,
-    width: DRAWER_WIDTH,
     backgroundColor: "#fff",
     paddingTop: 60,
     paddingHorizontal: 16,
@@ -320,10 +326,7 @@ const styles = StyleSheet.create({
     marginTop: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window ? 48 : 16,
     marginBottom: 16,
     borderRadius: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
     elevation: 5,
     overflow: "hidden",
   },

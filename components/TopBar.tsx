@@ -9,10 +9,11 @@ type TopBarProps = {
   centerElement?: React.ReactNode;
   rightElement?: React.ReactNode;
   isLargeScreen?: boolean;
+  isDesktop?: boolean;
 };
 
-export default function TopBar({ onMenuPress, onNewPress, centerElement, rightElement, isLargeScreen }: TopBarProps) {
-  const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+export default function TopBar({ onMenuPress, onNewPress, centerElement, rightElement, isLargeScreen, isDesktop }: TopBarProps) {
+  const showDesktopButtons = isDesktop;
 
   return (
     <View style={styles.topBar}>
@@ -24,15 +25,15 @@ export default function TopBar({ onMenuPress, onNewPress, centerElement, rightEl
               onPress={onMenuPress}
               style={({ pressed }) => [styles.button, pressed && { backgroundColor: "#eaeaea" }]}
             >
-              <Image source={moreIcon} style={styles.buttonIcon} />
-              {isTauri && <Text style={styles.buttonText}>Conversation</Text>}
+              <Image source={moreIcon} style={styles.buttonIcon} resizeMode="contain" tintColor="#333333" />
+              {showDesktopButtons && <Text style={styles.buttonText}>Conversation</Text>}
             </Pressable>
-            {!isTauri && (
+            {!showDesktopButtons && (
               <Pressable
                 onPress={onNewPress}
                 style={({ pressed }) => [styles.button, pressed && { backgroundColor: "#eaeaea" }]}
               >
-                <Image source={addIcon} style={styles.buttonIcon} />
+                <Image source={addIcon} style={styles.buttonIcon} resizeMode="contain" tintColor="#333333" />
               </Pressable>
             )}
           </View>
@@ -103,8 +104,6 @@ const styles = StyleSheet.create({
   buttonIcon: {
     width: 18,
     height: 18,
-    resizeMode: "contain",
-    tintColor: "#333333",
     marginRight: 8,
   },
   buttonText: {

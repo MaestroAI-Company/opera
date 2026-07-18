@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "opera",
+  "productName": "Opera",
   "version": "0.1.0",
   "identifier": "ai.maestro.opera",
   "build": {

@@ -433,6 +433,7 @@ export default function ChatBar({
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={{ width: '100%', maxWidth: 840, alignSelf: 'center' }}
     >
       <View style={{ width: '100%', alignItems: 'center' }}>
         <View style={{ width: '100%', maxWidth: 800 }}>

@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Animated, Dimensions, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View, Alert } from "react-native";
-import Selector from "./Selector";
-import ThemeSelector from "./ThemeSelector";
-import Checkbox from "./Checkbox";
-import TextInputField from "./TextInputField";
-import NotificationModal, { ModalButton } from "./NotificationModal";
+import { Animated, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AIModule } from "../src/services/ai/AIModule";
 import { BackupService } from "../src/services/BackupService";
 import { Settings } from "../src/services/settings/SettingsService";
 import { Whisper } from "../src/services/whisper/WhisperService";
+import Checkbox from "./Checkbox";
+import NotificationModal, { ModalButton } from "./NotificationModal";
+import Selector from "./Selector";
+import TextInputField from "./TextInputField";
+import ThemeSelector from "./ThemeSelector";
 
 
 import { useResponsive } from "../src/hooks/useResponsive";
@@ -48,7 +48,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [isDownloading, setIsDownloading] = useState(false);
 
   const [alertModalVisible, setAlertModalVisible] = useState(false);
-  const [alertConfig, setAlertConfig] = useState<{title: string, message: string, buttons?: ModalButton[]}>({title: '', message: ''});
+  const [alertConfig, setAlertConfig] = useState<{ title: string, message: string, buttons?: ModalButton[] }>({ title: '', message: '' });
 
   const showAlert = (title: string, message: string, buttons?: ModalButton[]) => {
     setAlertConfig({ title, message, buttons });
@@ -66,7 +66,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
-  const [ollamaModelOptions, setOllamaModelOptions] = useState<{id: string, label: string}[]>([]);
+  const [ollamaModelOptions, setOllamaModelOptions] = useState<{ id: string, label: string }[]>([]);
 
   const languageOptions = [
     { id: "fr", label: "Français" },
@@ -268,6 +268,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     );
   };
 
+  const largeScreenAnim = useRef(new Animated.Value(visible ? 1 : 0)).current;
+
   useEffect(() => {
     if (visible) {
       Keyboard.dismiss();
@@ -283,6 +285,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           duration: 280,
           useNativeDriver: Platform.OS !== "web",
         }),
+        Animated.timing(largeScreenAnim, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: false,
+        }),
       ]).start();
     } else {
       Animated.parallel([
@@ -296,6 +303,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           duration: 250,
           useNativeDriver: Platform.OS !== "web",
         }),
+        Animated.timing(largeScreenAnim, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: false,
+        }),
       ]).start((result) => {
         if (result.finished) {
           setRendered(false);
@@ -304,10 +316,10 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     }
   }, [visible, isLargeScreen]);
 
-  if (!isLargeScreen && !rendered) return null;
+  if (!rendered) return null;
 
   const innerContent = (
-    <ScrollView contentContainerStyle={{ paddingTop: 60, paddingBottom: 40, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={{ paddingTop: isDesktop ? 0 : 60, paddingBottom: 40, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
       <Text style={styles.title}>Settings</Text>
 
       <Text style={styles.sectionTitle}>General</Text>
@@ -367,57 +379,57 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         />
       </View>
 
-    <View style={{ marginBottom: 20 }}>
-      <Checkbox
-        label="Always transcribe on-device (Whisper)"
-        checked={alwaysWhisper}
-        onToggle={setAlwaysWhisper}
-      />
-    </View>
+      <View style={{ marginBottom: 20 }}>
+        <Checkbox
+          label="Always transcribe on-device (Whisper)"
+          checked={alwaysWhisper}
+          onToggle={setAlwaysWhisper}
+        />
+      </View>
 
-    {aiService === "ollama" && (
-      <View style={styles.sectionGroup}>
-        <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Ollama</Text>
-        <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Host URL</Text>
-          <TextInputField 
-            icon={linkIcon}
-            placeholder={Platform.OS === 'android' ? 'http://10.0.2.2:11434' : 'http://127.0.0.1:11434'}
-            value={ollamaUrl}
-            onChangeText={setOllamaUrl}
-            onBlur={fetchOllamaModels}
-          />
-        </View>
-        
-        {ollamaError ? (
-          <Text style={styles.errorText}>{ollamaError}</Text>
-        ) : (
+      {aiService === "ollama" && (
+        <View style={styles.sectionGroup}>
+          <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Ollama</Text>
           <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Available Models</Text>
-            {ollamaModelOptions.length > 0 ? (
-              ollamaModelOptions.map((model) => (
-                <Text key={model.id} style={{ fontFamily: "IBMPlexMono-Medium", color: "#555", marginBottom: 4 }}>
-                  • {model.label}
-                </Text>
-              ))
-            ) : (
-              <Text style={{ fontFamily: "IBMPlexMono-Medium", color: "#888", marginBottom: 10 }}>
-                No models detected.
-              </Text>
-            )}
-            {ollamaModelOptions.length === 0 && (
-              <Pressable
-                style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }, { marginTop: 10 }]}
-                onPress={() => setDownloadModalVisible(true)}
-              >
-                <Image source={downloadIcon} style={styles.downloadIcon} tintColor="#0066cc" />
-                <Text style={styles.downloadText}>
-                  {isDownloading ? "Downloading..." : "Download Gemma4?"}
-                </Text>
-              </Pressable>
-            )}
+            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Host URL</Text>
+            <TextInputField
+              icon={linkIcon}
+              placeholder={Platform.OS === 'android' ? 'http://10.0.2.2:11434' : 'http://127.0.0.1:11434'}
+              value={ollamaUrl}
+              onChangeText={setOllamaUrl}
+              onBlur={fetchOllamaModels}
+            />
           </View>
-        )}
+
+          {ollamaError ? (
+            <Text style={styles.errorText}>{ollamaError}</Text>
+          ) : (
+            <View style={styles.settingRowVertical}>
+              <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Available Models</Text>
+              {ollamaModelOptions.length > 0 ? (
+                ollamaModelOptions.map((model) => (
+                  <Text key={model.id} style={{ fontFamily: "IBMPlexMono-Medium", color: "#555", marginBottom: 4 }}>
+                    • {model.label}
+                  </Text>
+                ))
+              ) : (
+                <Text style={{ fontFamily: "IBMPlexMono-Medium", color: "#888", marginBottom: 10 }}>
+                  No models detected.
+                </Text>
+              )}
+              {ollamaModelOptions.length === 0 && (
+                <Pressable
+                  style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }, { marginTop: 10 }]}
+                  onPress={() => setDownloadModalVisible(true)}
+                >
+                  <Image source={downloadIcon} style={styles.downloadIcon} tintColor="#0066cc" />
+                  <Text style={styles.downloadText}>
+                    {isDownloading ? "Downloading..." : "Download Gemma4?"}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          )}
         </View>
       )}
 
@@ -486,14 +498,38 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   );
 
   if (isLargeScreen) {
-    if (!visible) return null;
+    const largeScreenWidth = largeScreenAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 320]
+    });
+    const largeScreenMargin = largeScreenAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 16]
+    });
+    const largeScreenOpacity = largeScreenAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1]
+    });
+
     return (
-      <View style={[styles.largeScreenContainer, isDesktop ? styles.floatingContainer : styles.attachedContainer]}>
-        <View style={isDesktop ? styles.floatingContent : styles.attachedContent}>
-          {innerContent}
+      <Animated.View style={[
+        styles.largeScreenContainer,
+        isDesktop ? styles.floatingContainer : styles.attachedContainer,
+        {
+          width: largeScreenWidth,
+          opacity: largeScreenOpacity,
+          marginLeft: isDesktop ? largeScreenMargin : 0,
+          marginRight: isDesktop ? largeScreenMargin : 0,
+          overflow: "hidden"
+        }
+      ]}>
+        <View style={{ width: 320, flex: 1 }}>
+          <View style={isDesktop ? styles.floatingContent : styles.attachedContent}>
+            {innerContent}
+          </View>
         </View>
         {notificationModal}
-      </View>
+      </Animated.View>
     );
   }
 
@@ -537,10 +573,12 @@ const styles = StyleSheet.create({
   },
   floatingContainer: {
     margin: 16,
-    marginTop: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window ? 48 : 16,
+    marginTop: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window ? 40 : 8,
     marginBottom: 16,
     borderRadius: 10,
-    boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
+    borderWidth: 2,
+    borderColor: "#00000017",
+    boxShadow: "-6px 6px 0px #00000013",
     elevation: 5,
     overflow: "hidden",
   },
@@ -618,7 +656,7 @@ const styles = StyleSheet.create({
   downloadIcon: {
     width: 20,
     height: 20,
-    
+
   },
   downloadText: {
     fontSize: 14,

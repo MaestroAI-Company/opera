@@ -615,45 +615,7 @@ export default function Index() {
         source={texture2}
         style={StyleSheet.absoluteFill}
         imageStyle={styles.backgroundTexture} resizeMode="cover"
-      >
-        {!activeConversation && (
-          <View style={styles.centerContent}>
-            <Image
-              source={incognitoMode ? butterflyGrey : butterflyImage}
-              style={styles.butterfly}
-              resizeMode="contain"
-            />
-            <Text style={styles.welcomeText}>Welcome</Text>
-            <Pressable
-              onPress={() => setIncognitoMode((prev) => !prev)}
-              style={({ pressed }) => [
-                styles.incognitoBox,
-                incognitoMode && styles.incognitoBoxActive,
-                pressed && (incognitoMode ? { backgroundColor: "#3e4157" } : { backgroundColor: "#eaeaea" })
-              ]}
-            >
-              <Text
-                style={[
-                  styles.incognitoButtonText,
-                  incognitoMode && styles.incognitoButtonTextActive,
-                ]}
-              >
-                {incognitoMode
-                  ? "Disable incognito mode"
-                  : "Enable incognito mode"}
-              </Text>
-            </Pressable>
-            <Text
-              style={[
-                styles.incognitoDescription,
-                { opacity: incognitoMode ? 1 : 0 },
-              ]}
-            >
-              Welcome to incognito mode. You can ask quick questions without leaving a trace. Once you close the window, your conversation disappears forever.
-            </Text>
-          </View>
-        )}
-      </ImageBackground>
+      />
 
       <View style={{ flex: 1, flexDirection: isLargeScreen ? "row" : "column" }} pointerEvents="box-none">
         <DrawerMenu
@@ -670,6 +632,44 @@ export default function Index() {
         />
 
         <View style={{ flex: 1, backgroundColor: "transparent" }} pointerEvents="box-none">
+          {!activeConversation && (
+            <View style={styles.centerContent}>
+              <Image
+                source={incognitoMode ? butterflyGrey : butterflyImage}
+                style={styles.butterfly}
+                resizeMode="contain"
+              />
+              <Text style={styles.welcomeText}>Welcome</Text>
+              <Pressable
+                onPress={() => setIncognitoMode((prev) => !prev)}
+                style={({ pressed }) => [
+                  styles.incognitoBox,
+                  incognitoMode && styles.incognitoBoxActive,
+                  pressed && (incognitoMode ? { backgroundColor: "#3e4157" } : { backgroundColor: "#eaeaea" })
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.incognitoButtonText,
+                    incognitoMode && styles.incognitoButtonTextActive,
+                  ]}
+                >
+                  {incognitoMode
+                    ? "Disable incognito mode"
+                    : "Enable incognito mode"}
+                </Text>
+              </Pressable>
+              <Text
+                style={[
+                  styles.incognitoDescription,
+                  { opacity: incognitoMode ? 1 : 0 },
+                ]}
+              >
+                Welcome to incognito mode. You can ask quick questions without leaving a trace. Once you close the window, your conversation disappears forever.
+              </Text>
+            </View>
+          )}
+
           {activeConversation && (
             <ChatView
               messages={messages}

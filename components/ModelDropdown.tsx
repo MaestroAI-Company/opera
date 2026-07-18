@@ -7,6 +7,7 @@ import NotificationModal from "./NotificationModal";
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const arrowDownIcon = require("../assets/icons/down_arrow.png");
 const downloadIcon = require("../assets/icons/download.png");
+const thinkingIcon = require("../assets/icons/thinking.gif");
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const REFLECTIONS = [
@@ -191,11 +192,14 @@ export default function ModelDropdown({
             <Text style={styles.sectionTitle}>Models</Text>
             <ScrollView style={{ maxHeight: MAX_MODELS_HEIGHT }} showsVerticalScrollIndicator={false} nestedScrollEnabled={true}>
               {loading ? (
-                <Text style={styles.modelStatus}>Loading...</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}>
+                  <Image source={thinkingIcon} style={{ width: 16, height: 16, tintColor: '#888888', opacity: 0.7 }} />
+                  <Text style={[styles.modelStatus, { paddingHorizontal: 0, paddingVertical: 0 }]}>Loading...</Text>
+                </View>
               ) : models.length === 0 ? (
                 <View>
                   <Text style={{ color: '#ff4444', textAlign: 'center', marginBottom: 12, paddingHorizontal: 12, fontSize: 13 }}>
-                    Unable to fetch models / Ollama URL undefined
+                    {isAvailable ? "No models found" : "Unable to fetch models / Ollama URL undefined"}
                   </Text>
                   {isAvailable && (
                     <Pressable

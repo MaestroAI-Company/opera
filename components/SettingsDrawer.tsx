@@ -55,6 +55,10 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     setAlertModalVisible(true);
   };
   const [whisperModel, setWhisperModelState] = useState("base");
+  const [whisperInstalled, setWhisperInstalled] = useState<boolean>(false);
+  const [installedWhisperModels, setInstalledWhisperModels] = useState<Record<string, boolean>>({});
+  const [isDownloadingWhisper, setIsDownloadingWhisper] = useState(false);
+  const [whisperDownloadProgress, setWhisperDownloadProgress] = useState<{progress: number, etaSeconds: number, speedStr: string, sizeStr: string} | null>(null);
   const [whisperLanguage, setWhisperLanguageState] = useState(() => {
     try {
       return Intl.DateTimeFormat().resolvedOptions().locale.split('-')[0] || "auto";
@@ -80,10 +84,20 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   ];
 
   const whisperModelOptions = [
-    { id: "tiny", label: "Tiny" },
-    { id: "base", label: "Base" },
-    { id: "small", label: "Small" },
+    { id: "none", label: "None" },
+    { id: "tiny", label: "Tiny", isDownload: !installedWhisperModels["tiny"] },
+    { id: "base", label: "Base", isDownload: !installedWhisperModels["base"] },
+    { id: "small", label: "Small", isDownload: !installedWhisperModels["small"] },
   ];
+
+  const getWhisperSize = (model: string) => {
+    switch (model) {
+      case "tiny": return "31 MB";
+      case "base": return "57 MB";
+      case "small": return "180 MB";
+      default: return "";
+    }
+  };
 
   const whisperLanguageOptions = [
     { id: "auto", label: "Auto" },
@@ -147,6 +161,23 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const setWhisperModel = (v: string) => {
     setWhisperModelState(v);
     Settings.set("whisperModel", v);
+    if (v && v !== "none") {
+      Whisper.isModelInstalled(v).then((installed) => {
+        setWhisperInstalled(installed);
+        setInstalledWhisperModels(prev => ({ ...prev, [v]: installed }));
+        if (installed) {
+          Whisper.init(v).then((success) => {
+            if (!success) {
+              showAlert("Error", `Failed to load Whisper model ${v}. It might be corrupted.`);
+              setWhisperInstalled(false);
+              setInstalledWhisperModels(prev => ({ ...prev, [v]: false }));
+            }
+          });
+        }
+      });
+    } else {
+      setWhisperInstalled(false);
+    }
   };
 
   const setWhisperLanguage = (v: string) => {
@@ -196,8 +227,16 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   useEffect(() => {
     if (visible) {
       fetchOllamaModels();
+      ["tiny", "base", "small"].forEach(m => {
+        Whisper.isModelInstalled(m).then(installed => {
+          setInstalledWhisperModels(prev => ({ ...prev, [m]: installed }));
+        });
+      });
+      if (whisperModel && whisperModel !== "none") {
+        Whisper.isModelInstalled(whisperModel).then(setWhisperInstalled);
+      }
     }
-  }, [visible, fetchOllamaModels]);
+  }, [visible, fetchOllamaModels, whisperModel]);
 
   const handleDownloadGemma = async () => {
     setDownloadModalVisible(false);
@@ -217,6 +256,51 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     } finally {
       setIsDownloading(false);
     }
+  };
+
+  const handleDownloadWhisper = async () => {
+    if (whisperModel === "none") return;
+    setIsDownloadingWhisper(true);
+    setWhisperDownloadProgress(null);
+    try {
+      await Whisper.downloadModel(whisperModel, (progress, etaSeconds, speedStr, sizeStr) => {
+        setWhisperDownloadProgress({ progress, etaSeconds, speedStr, sizeStr });
+      });
+      setWhisperInstalled(true);
+      setInstalledWhisperModels(prev => ({ ...prev, [whisperModel]: true }));
+      showAlert("Success", `Whisper ${whisperModel} model downloaded successfully.`);
+    } catch (e) {
+      console.error("Failed to download whisper model", e);
+      showAlert("Error", "Failed to download Whisper model.");
+    } finally {
+      setIsDownloadingWhisper(false);
+      setWhisperDownloadProgress(null);
+    }
+  };
+
+  const handleDeleteWhisper = () => {
+    if (whisperModel === "none") return;
+    showAlert(
+      "Delete Whisper Model",
+      `Are you sure you want to delete the Whisper ${whisperModel} model?`,
+      [
+        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: "Delete",
+          style: "danger",
+          onPress: async () => {
+            setAlertModalVisible(false);
+            try {
+              await Whisper.deleteModel(whisperModel);
+              setWhisperInstalled(false);
+              setInstalledWhisperModels(prev => ({ ...prev, [whisperModel]: false }));
+            } catch (e) {
+              console.error("Failed to delete whisper model", e);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleExport = async () => {
@@ -344,36 +428,83 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         />
       </View>
 
-      <View style={[styles.settingRowVertical, { zIndex: 9 }]}>
-        <Text style={styles.settingLabel}>Whisper Model</Text>
-        <Text style={[styles.helpText, { marginBottom: 10 }]}>The larger the size, the longer the processing will take.</Text>
-        <Selector
-          options={whisperModelOptions}
-          selectedValue={whisperModel}
-          onSelect={setWhisperModel}
-          title="Select Whisper Model"
-          fullWidth
-        />
-      </View>
+      {Platform.OS !== 'web' && (
+        <>
+          <View style={[styles.settingRowVertical, { zIndex: 9 }]}>
+            <Text style={styles.settingLabel}>Whisper Model</Text>
+            <Text style={[styles.helpText, { marginBottom: 10 }]}>The larger the size, the longer the processing will take.</Text>
+            <Selector
+              options={whisperModelOptions}
+              selectedValue={whisperModel}
+              onSelect={setWhisperModel}
+              title="Select Whisper Model"
+              fullWidth
+            />
+            {whisperModel !== "none" && (
+              <View style={{ marginTop: 10 }}>
+                {whisperInstalled ? (
+                  <Pressable
+                    style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }]}
+                    onPress={handleDeleteWhisper}
+                  >
+                    <Text style={[styles.downloadText, { color: "#FF1A1A" }]}>Delete Model ({getWhisperSize(whisperModel)})</Text>
+                  </Pressable>
+                ) : isDownloadingWhisper ? (
+                  <View style={{ marginTop: 10, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, borderWidth: 1, borderColor: "#eaeaea" }}>
+                    <Text style={{ fontFamily: "IBMPlexMono-Medium", color: "#333", fontSize: 13, marginBottom: 8 }}>
+                      Downloading Whisper {whisperModel}...
+                    </Text>
+                    <View style={{ height: 6, backgroundColor: "#eaeaea", borderRadius: 3, overflow: "hidden", marginBottom: 8 }}>
+                      <View style={{ width: `${(whisperDownloadProgress?.progress || 0) * 100}%`, height: "100%", backgroundColor: "#0066cc" }} />
+                    </View>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ fontFamily: "IBMPlexMono-Medium", color: "#888", fontSize: 11 }}>
+                        {whisperDownloadProgress?.sizeStr || "Starting..."}
+                      </Text>
+                      <Text style={{ fontFamily: "IBMPlexMono-Medium", color: "#888", fontSize: 11 }}>
+                        {whisperDownloadProgress?.etaSeconds ? `${Math.round(whisperDownloadProgress.etaSeconds)}s remaining` : ""}
+                      </Text>
+                    </View>
+                  </View>
+                ) : (
+                  <Pressable
+                    style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }]}
+                    onPress={handleDownloadWhisper}
+                  >
+                    <Image source={downloadIcon} style={styles.downloadIcon} tintColor="#0066cc" />
+                    <Text style={styles.downloadText}>
+                      Download {whisperModel} model ({getWhisperSize(whisperModel)})
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
+          </View>
 
-      <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Whisper Language</Text>
-        <Selector
-          options={whisperLanguageOptions}
-          selectedValue={whisperLanguage}
-          onSelect={setWhisperLanguage}
-          title="Select Language"
-          fullWidth
-        />
-      </View>
+          {whisperModel !== "none" && (
+            <>
+              <View style={styles.settingRowVertical}>
+                <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Whisper Language</Text>
+                <Selector
+                  options={whisperLanguageOptions}
+                  selectedValue={whisperLanguage}
+                  onSelect={setWhisperLanguage}
+                  title="Select Language"
+                  fullWidth
+                />
+              </View>
 
-    <View style={{ marginBottom: 20 }}>
-      <Checkbox
-        label="Always transcribe on-device (Whisper)"
-        checked={alwaysWhisper}
-        onToggle={setAlwaysWhisper}
-      />
-    </View>
+              <View style={{ marginBottom: 20 }}>
+                <Checkbox
+                  label="Always transcribe on-device (Whisper)"
+                  checked={alwaysWhisper}
+                  onToggle={setAlwaysWhisper}
+                />
+              </View>
+            </>
+          )}
+        </>
+      )}
 
     {aiService === "ollama" && (
       <View style={styles.sectionGroup}>

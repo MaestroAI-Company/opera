@@ -13,8 +13,7 @@ global.Buffer = global.Buffer || Buffer;
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const isWebBrowser = Platform.OS === "web" && typeof window !== "undefined" && !("__TAURI_INTERNALS__" in window);
-  const [showLottie, setShowLottie] = useState(!isWebBrowser);
+  const [showLottie, setShowLottie] = useState(Platform.OS !== "web");
   const [fontsLoaded, fontError] = useFonts({
     Petrona: require("../../assets/fonts/Petrona-Medium.ttf"),
     Jakarta: require("../../assets/fonts/PlusJakartaSans-VariableFont_wght.ttf"),

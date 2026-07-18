@@ -26,6 +26,7 @@ import { Settings } from "../services/settings/SettingsService";
 import { Whisper } from "../services/whisper/WhisperService";
 import { useResponsive } from "../hooks/useResponsive";
 
+
 const butterflyImage = require("../../assets/images/butterfly5.png");
 const butterflyGrey = require("../../assets/images/butterfly2_grey.png");
 const texture2 = require("../../assets/images/texture2.png");
@@ -194,13 +195,13 @@ export default function Index() {
 
   //generate title from first message
   const generateTitle = useCallback(
-    async (convId: string, userMessage: string) => {
+    async (convId: string, userMessage: string, images?: string[]) => {
       try {
         let title = "";
         await AIModule.sendMessage(
           selectedModel,
           SYSTEM_PROMPTS.SUMMARIZE,
-          [{ role: "user", content: userMessage }],
+          [{ role: "user", content: userMessage, images }],
           (chunk) => { title += chunk; },
           undefined,
           { think: false }
@@ -393,7 +394,7 @@ export default function Index() {
 
         //generate AI title for new conversations
         if (isFirstMessage && !isIncognitoTask && !isError) {
-          generateTitle(taskConv.id, text);
+          generateTitle(taskConv.id, text, images);
         }
       };
 

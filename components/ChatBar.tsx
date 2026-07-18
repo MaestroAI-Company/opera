@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { Whisper } from "../src/services/whisper/WhisperService";
 import NotificationModal from "./NotificationModal";
+import { TextInputWrapper } from "expo-paste-input";
 
 const nextWhiteIcon = require("../assets/icons/arrow.png");
 const micIcon = require("../assets/icons/microphone.png");
@@ -366,94 +367,173 @@ export default function ChatBar({
     }
   };
 
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !supportsFiles) return;
+
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      const clipboardData = e.clipboardData || (window as any).clipboardData;
+      if (!clipboardData) return;
+
+      const pastedFiles = Array.from(clipboardData.files || []) as File[];
+      if (pastedFiles.length > 0) {
+        e.preventDefault();
+
+        const promises = pastedFiles.map(file => {
+          return new Promise<SelectedFile | null>((resolve) => {
+            const mimeType = file.type;
+            const name = file.name || "pasted_file";
+            const isImage = mimeType.startsWith('image/');
+            const isAudio = mimeType.startsWith('audio/') || name.toLowerCase().match(/\.(wav|mp3|m4a|aac|flac|ogg)$/);
+
+            if (!isImage && !isAudio) {
+              resolve(null);
+              return;
+            }
+
+            if (isAudio) {
+              const ext = name.toLowerCase().split('.').pop();
+              if (ext !== 'wav' && ext !== 'mp3') {
+                resolve(null);
+                return;
+              }
+            }
+
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              resolve({
+                uri: ev.target?.result as string,
+                type: isImage ? 'image' : 'audio',
+                name
+              });
+            };
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(file);
+          });
+        });
+
+        Promise.all(promises).then(results => {
+          const validFiles = results.filter(r => r !== null) as SelectedFile[];
+          
+          if (validFiles.length < pastedFiles.length) {
+            setModalConfig({ title: "Unsupported Format", message: "Only images, WAV and MP3 audio files are supported." });
+            setModalVisible(true);
+          }
+
+          if (validFiles.length > 0) {
+            setSelectedFiles(prev => [...prev, ...validFiles]);
+          }
+        });
+      }
+    };
+
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => window.removeEventListener('paste', handleGlobalPaste);
+  }, [supportsFiles]);
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.pressableWrapper}>
-        <Animated.View style={{ transform: [{ scale }] }}>
-          {selectedFiles.length > 0 && (
-            <View style={[styles.filesContainerTop, incognito && styles.filesContainerTopIncognito]}>
-              <View style={styles.fileChipsContainer}>
-                {selectedFiles.map((file, i) => (
-                  <View key={i} style={styles.filePreviewContainerTop}>
-                    {file.type === 'image' ? (
-                      <Image source={{ uri: file.uri }} style={styles.filePreviewImageTop} />
-                    ) : (
-                      <View style={styles.filePreviewAudioTop}>
-                        <Text style={styles.filePreviewAudioTextTop} numberOfLines={1}>{file.name}</Text>
+      <View style={{ width: '100%', alignItems: 'center' }}>
+        <View style={{ width: '100%', maxWidth: 800 }}>
+          <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.pressableWrapper}>
+            <Animated.View style={{ transform: [{ scale }] }}>
+              {selectedFiles.length > 0 && (
+                <View style={[styles.filesContainerTop, incognito && styles.filesContainerTopIncognito]}>
+                  <View style={styles.fileChipsContainer}>
+                    {selectedFiles.map((file, i) => (
+                      <View key={i} style={styles.filePreviewContainerTop}>
+                        {file.type === 'image' ? (
+                          <Image source={{ uri: file.uri }} style={styles.filePreviewImageTop} />
+                        ) : (
+                          <View style={styles.filePreviewAudioTop}>
+                            <Text style={styles.filePreviewAudioTextTop} numberOfLines={1}>{file.name}</Text>
+                          </View>
+                        )}
+                        <Pressable style={styles.removeFileBtnTop} onPress={() => setSelectedFiles(prev => prev.filter((_, idx) => idx !== i))}>
+                          <Text style={styles.removeFileBtnTextTop}>✕</Text>
+                        </Pressable>
                       </View>
-                    )}
-                    <Pressable style={styles.removeFileBtnTop} onPress={() => setSelectedFiles(prev => prev.filter((_, idx) => idx !== i))}>
-                      <Text style={styles.removeFileBtnTextTop}>✕</Text>
-                    </Pressable>
+                    ))}
+                    <Text style={[styles.filesAddedText, incognito && { color: '#ccc' }]}>
+                      {selectedFiles.length} File{selectedFiles.length !== 1 ? 's' : ''} Added
+                    </Text>
                   </View>
-                ))}
-                <Text style={[styles.filesAddedText, incognito && { color: '#ccc' }]}>
-                  {selectedFiles.length} File{selectedFiles.length !== 1 ? 's' : ''} Added
-                </Text>
-              </View>
-            </View>
-          )}
+                </View>
+              )}
 
-          <Animated.View
-            style={[
-              styles.container,
-              incognito && styles.containerIncognito,
-              { backgroundColor: backgroundColor }
-            ]}
-          >
-            {supportsFiles && (
-              <Pressable onPress={handlePickFiles} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.plusButton}>
-                <Image source={addIcon} style={styles.plusIcon} tintColor="#fff" />
-              </Pressable>
-            )}
+              <Animated.View
+                style={[
+                  styles.container,
+                  incognito && styles.containerIncognito,
+                  { backgroundColor: backgroundColor }
+                ]}
+              >
+                {supportsFiles && (
+                  <Pressable onPress={handlePickFiles} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.plusButton}>
+                    <Image source={addIcon} style={styles.plusIcon} tintColor="#fff" />
+                  </Pressable>
+                )}
 
-            {(whisperAvailable || canTranscribeRemotely) && !isGenerating && (
-              <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.micButton}>
-                <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
-                  <Image source={isRecording ? stopIcon : micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} tintColor={isRecording ? "#FFD700" : "#fff"} />
-                </Animated.View>
-              </Pressable>
-            )}
+                {(whisperAvailable || canTranscribeRemotely) && !isGenerating && (
+                  <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.micButton}>
+                    <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
+                      <Image source={isRecording ? stopIcon : micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} tintColor={isRecording ? "#FFD700" : "#fff"} />
+                    </Animated.View>
+                  </Pressable>
+                )}
 
-            {isRecording ? (
-              <VoiceIndicator />
-            ) : (
-              <View style={{ flex: 1, marginLeft: 8, justifyContent: 'center' }}>
-                <TextInput
-                  style={[
-                    styles.input, 
-                    { maxHeight: 100, minHeight: 20, lineHeight: 20 },
-                    Platform.OS === 'web' && { outlineStyle: 'none', margin: 0, padding: 0, overflow: 'hidden' } as any
-                  ]}
-                  value={isTranscribing ? "Transcribing..." : text}
-                  onChangeText={isTranscribing ? undefined : setText}
-                  placeholder={placeholder}
-                  placeholderTextColor="rgba(255,255,255,0.6)"
-                  multiline={true}
-                  numberOfLines={1}
-                  editable={!isTranscribing}
-                  onTouchStart={handlePressIn}
-                  onTouchEnd={handlePressOut}
-                  onKeyPress={handleKeyPress}
-                />
-              </View>
-            )}
+                {isRecording ? (
+                  <VoiceIndicator />
+                ) : (
+                  <View style={{ flex: 1, marginLeft: 8, justifyContent: 'center' }}>
+                    <TextInputWrapper
+                      onPaste={(payload) => {
+                        if (supportsFiles && payload.type === "images") {
+                          const newFiles = payload.uris.map(uri => ({
+                            uri,
+                            type: "image",
+                            name: uri.split('/').pop() || "pasted_image.png"
+                          }));
+                          setSelectedFiles(prev => [...prev, ...newFiles]);
+                        }
+                      }}
+                    >
+                      <TextInput
+                        style={[
+                          styles.input, 
+                          { maxHeight: 100, minHeight: 36, lineHeight: 20 },
+                          Platform.OS === 'web' && { outlineStyle: 'none', margin: 0, padding: 0, overflow: 'hidden' } as any
+                        ]}
+                        value={isTranscribing ? "Transcribing..." : text}
+                        onChangeText={isTranscribing ? undefined : setText}
+                        placeholder={placeholder}
+                        placeholderTextColor="rgba(255,255,255,0.6)"
+                        multiline={true}
+                        numberOfLines={1}
+                        editable={!isTranscribing}
+                        onTouchStart={handlePressIn}
+                        onTouchEnd={handlePressOut}
+                        onKeyPress={handleKeyPress}
+                      />
+                    </TextInputWrapper>
+                  </View>
+                )}
 
-            {isGenerating ? (
-              <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.sendButton}>
-                <Image source={stopIcon} style={styles.sendIcon} />
-              </Pressable>
-            ) : (
-              <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.sendButton}>
-                <Image source={nextWhiteIcon} style={styles.sendIcon} tintColor="#fff" />
-              </Pressable>
-            )}
-          </Animated.View>
-        </Animated.View>
-      </Pressable>
+                {isGenerating ? (
+                  <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.sendButton}>
+                    <Image source={stopIcon} style={styles.sendIcon} />
+                  </Pressable>
+                ) : (
+                  <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.sendButton}>
+                    <Image source={nextWhiteIcon} style={styles.sendIcon} tintColor="#fff" />
+                  </Pressable>
+                )}
+              </Animated.View>
+            </Animated.View>
+          </Pressable>
+        </View>
+      </View>
       <NotificationModal
         visible={modalVisible}
         title={modalConfig.title}
@@ -517,7 +597,7 @@ const styles = StyleSheet.create({
   input: {
     color: "#fff",
     fontSize: 16,
-    paddingVertical: 0,
+    paddingVertical: 8,
   },
   voiceIndicatorContainer: {
     flex: 1,

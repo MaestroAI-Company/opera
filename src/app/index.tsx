@@ -753,6 +753,10 @@ export default function Index() {
               onTranscribe={handleTranscribe}
               canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes("audio") && !!selectedModel}
               supportsFiles={modelCapabilities.includes("vision") || modelCapabilities.includes("audio")}
+              onOpenSettings={() => {
+                Keyboard.dismiss();
+                setSettingsDrawerVisible(true);
+              }}
             />
           </View>
         </View>

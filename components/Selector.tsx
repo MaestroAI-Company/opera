@@ -1,14 +1,18 @@
 import { useRef, useState } from "react";
-import { Dimensions, LayoutRectangle, Modal, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Dimensions, LayoutRectangle, Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from "react-native";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const arrowDownIcon = require("../assets/icons/down_arrow.png");
+const downloadIcon = require("../assets/icons/download.png");
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export type SelectorOption = {
   id: string;
   label: string;
+  rightIcon?: any;
+  rightIconTintColor?: string;
+  isDownload?: boolean;
 };
 
 type SelectorProps = {
@@ -65,7 +69,8 @@ export default function Selector({
   };
 
   const selectedOption = options.find((o) => o.id === selectedValue);
-  const estimatedMenuHeight = options.length * 40 + (title ? 30 : 0) + 24;
+  const MAX_MENU_HEIGHT = 300;
+  const estimatedMenuHeight = Math.min(options.length * 44 + (title ? 30 : 0) + 24, MAX_MENU_HEIGHT);
 
   const menuAnimatedStyle = useAnimatedStyle(() => {
     return {
@@ -131,29 +136,42 @@ export default function Selector({
             ]}
           >
             {title && <Text style={styles.sectionTitle}>{title}</Text>}
-            {options.map((option) => (
-              <Pressable
-                key={option.id}
-                onPress={() => {
-                  Vibration.vibrate(10);
-                  handleClose(() => onSelect(option.id));
-                }}
-                style={({ pressed }) => [
-                  styles.option,
-                  option.id === selectedValue ? styles.optionSelected : pressed && { backgroundColor: "rgba(0, 0, 0, 0.05)" },
-                  option.id === selectedValue && pressed && { backgroundColor: "#cc1414" }
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    option.id === selectedValue && styles.optionTextSelected,
+            <ScrollView style={{ maxHeight: MAX_MENU_HEIGHT - (title ? 30 : 0) - 24 }} showsVerticalScrollIndicator={false} nestedScrollEnabled={true}>
+              {options.map((option) => (
+                <Pressable
+                  key={option.id}
+                  onPress={() => {
+                    Vibration.vibrate(10);
+                    handleClose(() => onSelect(option.id));
+                  }}
+                  style={({ pressed }) => [
+                    option.isDownload ? styles.downloadOption : styles.option,
+                    option.id === selectedValue && !option.isDownload ? styles.optionSelected : pressed && !option.isDownload && { backgroundColor: "rgba(0, 0, 0, 0.05)" },
+                    option.id === selectedValue && !option.isDownload && pressed && { backgroundColor: "#cc1414" },
+                    option.isDownload && pressed && { backgroundColor: "#eaeaea" }
                   ]}
                 >
-                  {option.label}
-                </Text>
-              </Pressable>
-            ))}
+                  {option.isDownload && (
+                    <Animated.Image source={downloadIcon} style={[styles.downloadIcon, { tintColor: '#0066cc' }]} />
+                  )}
+                  <Text
+                    style={[
+                      option.isDownload ? styles.downloadText : styles.optionText,
+                      option.id === selectedValue && !option.isDownload && styles.optionTextSelected,
+                      !option.isDownload && option.rightIcon && { flex: 1 },
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                  {!option.isDownload && option.rightIcon && (
+                    <Animated.Image 
+                      source={option.rightIcon} 
+                      style={[styles.rightIcon, option.rightIconTintColor ? { tintColor: option.rightIconTintColor } : null]} 
+                    />
+                  )}
+                </Pressable>
+              ))}
+            </ScrollView>
           </AnimatedPressable>
         </AnimatedPressable>
       </Modal>
@@ -243,6 +261,32 @@ const styles = StyleSheet.create({
     fontFamily: "IBMPlexMono-Medium",
   },
   optionTextSelected: {
-    color: "#FFF",
+    color: "#fff",
+  },
+  rightIcon: {
+    width: 14,
+    height: 14,
+    marginLeft: "auto",
+  },
+  downloadOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f5f5f5",
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    borderStyle: "dashed",
+    gap: 8,
+    marginVertical: 4,
+  },
+  downloadIcon: {
+    width: 16,
+    height: 16,
+  },
+  downloadText: {
+    fontSize: 13,
+    color: "#0066cc",
+    fontFamily: "IBMPlexMono-Medium",
   },
 });

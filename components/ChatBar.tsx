@@ -15,6 +15,7 @@ import {
   View
 } from "react-native";
 import { Whisper } from "../src/services/whisper/WhisperService";
+import { Settings } from "../src/services/settings/SettingsService";
 import NotificationModal from "./NotificationModal";
 import { TextInputWrapper } from "expo-paste-input";
 
@@ -33,6 +34,7 @@ type ChatInputBarProps = {
   isGenerating?: boolean;
   supportsFiles?: boolean;
   canTranscribeRemotely?: boolean;
+  onOpenSettings?: () => void;
 };
 
 type SelectedFile = { uri: string; type: string; name: string };
@@ -124,6 +126,7 @@ export default function ChatBar({
   isGenerating = false,
   supportsFiles = false,
   canTranscribeRemotely = false,
+  onOpenSettings,
 }: ChatInputBarProps) {
   const [text, setText] = useState("");
   const [whisperAvailable, setWhisperAvailable] = useState(false);
@@ -131,7 +134,7 @@ export default function ChatBar({
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalConfig, setModalConfig] = useState({ title: "", message: "" });
+  const [modalConfig, setModalConfig] = useState<{title: string, message: string, buttons?: {text: string, onPress: () => void, style?: "primary" | "secondary" | "danger"}[]}>({ title: "", message: "" });
 
   const pcmChunksRef = useRef<ArrayBuffer[]>([]);
   const sampleRateRef = useRef<number>(16000);
@@ -164,7 +167,14 @@ export default function ChatBar({
 
   useEffect(() => {
     AudioModule.requestRecordingPermissionsAsync().catch(() => { });
-    Whisper.init().then((ok) => setWhisperAvailable(ok));
+    const checkWhisper = async () => {
+      const modelName = Settings.getCached().whisperModel || "base";
+      const isInstalled = await Whisper.isModelInstalled(modelName);
+      if (isInstalled) {
+        Whisper.init(modelName).then((ok) => setWhisperAvailable(ok));
+      }
+    };
+    checkWhisper();
   }, []);
 
   useEffect(() => {
@@ -327,7 +337,7 @@ export default function ChatBar({
     }
   };
 
-  const handleMicPress = () => {
+  const handleMicPress = async () => {
     if (isRecording) {
       if (Platform.OS === 'web') {
         if (webAudioProcessorRef.current) webAudioProcessorRef.current.disconnect();
@@ -339,6 +349,58 @@ export default function ChatBar({
       setIsRecording(false);
       pcmChunksRef.current = [];
     } else {
+      if (Platform.OS !== 'web') {
+        const modelName = Settings.getCached().whisperModel || "base";
+        if (modelName === "none") {
+          setModalConfig({
+            title: "Whisper Not Configured",
+            message: "You have disabled on-device transcription. Please select a Whisper model in settings to enable it.",
+            buttons: [
+              { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
+              { text: "Settings", onPress: () => {
+                setModalVisible(false);
+                if (onOpenSettings) onOpenSettings();
+              }, style: "primary" }
+            ]
+          });
+          setModalVisible(true);
+          return;
+        }
+
+        const isInstalled = await Whisper.isModelInstalled(modelName);
+        if (!isInstalled) {
+          setModalConfig({
+            title: "Whisper Not Installed",
+            message: `The Whisper ${modelName} model is required for on-device transcription. Would you like to install it?`,
+            buttons: [
+              { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
+              { text: "Install", onPress: () => {
+                setModalVisible(false);
+                if (onOpenSettings) onOpenSettings();
+              }, style: "primary" }
+            ]
+          });
+          setModalVisible(true);
+          return;
+        }
+
+        const initialized = await Whisper.init(modelName);
+        if (!initialized) {
+          setModalConfig({
+            title: "Initialization Error",
+            message: `Failed to load the Whisper ${modelName} model. It might be corrupted or incompatible. Please try reinstalling it from the settings.`,
+            buttons: [
+              { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
+              { text: "Settings", onPress: () => {
+                setModalVisible(false);
+                if (onOpenSettings) onOpenSettings();
+              }, style: "primary" }
+            ]
+          });
+          setModalVisible(true);
+          return;
+        }
+      }
       startRecording();
     }
   };
@@ -475,7 +537,7 @@ export default function ChatBar({
                   </Pressable>
                 )}
 
-                {(whisperAvailable || canTranscribeRemotely) && !isGenerating && (
+                {((Settings.getCached().whisperModel !== 'none' && Platform.OS !== 'web') || canTranscribeRemotely) && !isGenerating && (
                   <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.micButton}>
                     <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
                       <Image source={isRecording ? stopIcon : micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} tintColor={isRecording ? "#FFD700" : "#fff"} />
@@ -503,7 +565,7 @@ export default function ChatBar({
                         style={[
                           styles.input, 
                           { maxHeight: 100, minHeight: 36, lineHeight: 20 },
-                          Platform.OS === 'web' && { outlineStyle: 'none', margin: 0, padding: 0, overflow: 'hidden' } as any
+                          Platform.OS === 'web' && { outlineStyle: 'none', margin: 0, paddingHorizontal: 0, overflow: 'hidden' } as any
                         ]}
                         value={isTranscribing ? "Transcribing..." : text}
                         onChangeText={isTranscribing ? undefined : setText}
@@ -538,6 +600,7 @@ export default function ChatBar({
         visible={modalVisible}
         title={modalConfig.title}
         message={modalConfig.message}
+        buttons={modalConfig.buttons}
         onClose={() => setModalVisible(false)}
       />
     </KeyboardAvoidingView>

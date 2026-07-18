@@ -16,24 +16,28 @@ class NotificationServiceImpl {
     return this.channelId;
   }
 
-  async displayDownloadProgress(id: string, modelName: string, progress: number, etaSeconds?: number) {
+  async displayDownloadProgress(id: string, modelName: string, progress: number, etaSeconds?: number, speedStr?: string, sizeStr?: string) {
     const channelId = await this.setupChannel();
     
-    let etaText = '';
+    let details = [];
+    if (sizeStr) details.push(sizeStr);
+    if (speedStr) details.push(speedStr);
     if (etaSeconds !== undefined && etaSeconds >= 0) {
       if (etaSeconds < 60) {
-        etaText = ` • ${Math.round(etaSeconds)}s remaining`;
+        details.push(`${Math.round(etaSeconds)}s left`);
       } else {
         const m = Math.floor(etaSeconds / 60);
         const s = Math.round(etaSeconds % 60);
-        etaText = ` • ${m}m ${s}s remaining`;
+        details.push(`${m}m ${s}s left`);
       }
     }
+
+    const detailText = details.length > 0 ? `\n${details.join(' • ')}` : '';
 
     await notifee.displayNotification({
       id,
       title: `Downloading ${modelName}`,
-      body: `${Math.round(progress * 100)}% downloaded${etaText}`,
+      body: `${Math.round(progress * 100)}% downloaded${detailText}`,
       android: {
         channelId: channelId || 'default',
         onlyAlertOnce: true,

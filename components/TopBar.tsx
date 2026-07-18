@@ -6,13 +6,14 @@ const addIcon = require("../assets/icons/add.png");
 type TopBarProps = {
   onMenuPress: () => void;
   onNewPress: () => void;
-  children?: React.ReactNode;
+  centerElement?: React.ReactNode;
+  rightElement?: React.ReactNode;
 };
 
-export default function TopBar({ onMenuPress, onNewPress, children }: TopBarProps) {
+export default function TopBar({ onMenuPress, onNewPress, centerElement, rightElement }: TopBarProps) {
   return (
     <View style={styles.topBar}>
-      <View style={styles.leftButtons}>
+      <View style={styles.leftSection}>
         <View style={styles.shadowLayer}>
           <View style={styles.shadowBlock} />
           <View style={styles.buttonsContainer}>
@@ -32,7 +33,13 @@ export default function TopBar({ onMenuPress, onNewPress, children }: TopBarProp
         </View>
       </View>
 
-      {children}
+      <View style={styles.centerSection}>
+        {centerElement}
+      </View>
+
+      <View style={styles.rightSection}>
+        {rightElement}
+      </View>
     </View>
   );
 }
@@ -45,7 +52,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  leftButtons: {},
+  leftSection: {
+    flex: 1,
+    alignItems: "flex-start",
+  },
+  centerSection: {
+    flex: 2,
+    alignItems: "center",
+  },
+  rightSection: {
+    flex: 1,
+    alignItems: "flex-end",
+  },
   shadowLayer: {
     position: "relative",
   },

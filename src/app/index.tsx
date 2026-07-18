@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
   ImageBackground,
+  Keyboard,
   KeyboardAvoidingView,
   PanResponder,
   Platform,
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -30,6 +32,8 @@ const settingsIcon = require("../../assets/icons/settings.png");
 
 export default function Index() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isLargeScreen = width >= 1024;
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedReflection, setSelectedReflection] = useState("quick");
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -309,14 +313,18 @@ export default function Index() {
 
         abortControllerRef.current = new AbortController();
 
+        let isError = false;
+
         //send to AI and stream chunks
         if (taskAiService === 'ollama' && (!taskOllamaUrl || taskOllamaUrl.trim() === '')) {
+          isError = true;
           streamingContentRef.current = "Ollama URL is undefined or invalid. Please check your settings.";
           if (activeConversationRef.current?.id === taskConv.id) {
             setMessages((prev) => prev.map((m) => m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current } : m));
           }
           abortControllerRef.current = null;
         } else if (!taskSelectedModel) {
+          isError = true;
           streamingContentRef.current = "Please select a model from the top menu before sending a message.";
           if (activeConversationRef.current?.id === taskConv.id) {
             setMessages((prev) => prev.map((m) => m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current } : m));
@@ -353,6 +361,7 @@ export default function Index() {
               console.log("Generation aborted by user");
               streamingContentRef.current += "\n\n_The user interrupted the response_";
             } else {
+              isError = true;
               console.error(e);
               streamingContentRef.current = "Error generating response. Please check your model or server connection.";
             }
@@ -372,14 +381,23 @@ export default function Index() {
         }
 
         if (!isIncognitoTask) {
-          //save final assistant message content to db
-          await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
-          //refresh conversation list (updatedAt changed)
-          await loadConversations();
+          if (isError) {
+            if (isFirstMessage) {
+              await DB.deleteConversation(taskConv.id);
+            } else {
+              await DB.deleteMessage(userMsg.id);
+              await DB.deleteMessage(assistantMsg.id);
+            }
+          } else {
+            //save final assistant message content to db
+            await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
+            //refresh conversation list (updatedAt changed)
+            await loadConversations();
+          }
         }
 
         //generate AI title for new conversations
-        if (isFirstMessage && !isIncognitoTask) {
+        if (isFirstMessage && !isIncognitoTask && !isError) {
           generateTitle(taskConv.id, text);
         }
       };
@@ -492,14 +510,17 @@ export default function Index() {
       streamingMsgIdRef.current = assistantMsg.id;
       streamingContentRef.current = "";
       abortControllerRef.current = new AbortController();
+      let isError = false;
 
       if (taskAiService === 'ollama' && (!taskOllamaUrl || taskOllamaUrl.trim() === '')) {
+        isError = true;
         streamingContentRef.current = "Ollama URL is undefined or invalid. Please check your settings.";
         if (activeConversationRef.current?.id === taskConv.id) {
           setMessages((prev) => prev.map((m) => m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current } : m));
         }
         abortControllerRef.current = null;
       } else if (!taskSelectedModel) {
+        isError = true;
         streamingContentRef.current = "Please select a model from the top menu before sending a message.";
         if (activeConversationRef.current?.id === taskConv.id) {
           setMessages((prev) => prev.map((m) => m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current } : m));
@@ -531,6 +552,7 @@ export default function Index() {
           if (isAborted) {
             streamingContentRef.current += "\n\n_The user interrupted the response_";
           } else {
+            isError = true;
             streamingContentRef.current = "Error generating response. Please check your model or server connection.";
           }
           if (activeConversationRef.current?.id === taskConv.id) {
@@ -542,8 +564,12 @@ export default function Index() {
       }
 
       if (!isIncognitoTask) {
-        await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
-        await loadConversations();
+        if (isError) {
+          await DB.deleteMessage(assistantMsg.id);
+        } else {
+          await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
+          await loadConversations();
+        }
       }
     };
 
@@ -589,7 +615,11 @@ export default function Index() {
   }
 
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      {...(isLargeScreen ? {} : panResponder.panHandlers)}
+    >
       <ImageBackground
         source={texture2}
         style={StyleSheet.absoluteFill}
@@ -634,10 +664,19 @@ export default function Index() {
         )}
       </ImageBackground>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
+      <View style={{ flex: 1, flexDirection: isLargeScreen ? "row" : "column" }}>
+        <DrawerMenu
+          isLargeScreen={isLargeScreen}
+          visible={drawerVisible}
+          onClose={() => setDrawerVisible(false)}
+          conversations={conversations}
+          selectedConversationId={activeConversation?.id ?? null}
+          onSelectConversation={selectConversation}
+          onNewConversation={startNewConversation}
+          onDeleteConversation={deleteConversation}
+          onTogglePinConversation={togglePinConversation}
+        />
+
         <View style={{ flex: 1, backgroundColor: "transparent" }}>
           {activeConversation && (
             <ChatView
@@ -654,44 +693,39 @@ export default function Index() {
 
           <View style={[styles.topBarOverlay, { paddingTop: insets.top }]}>
             <TopBar
-              onMenuPress={() => setDrawerVisible(true)}
+              onMenuPress={() => {
+                Keyboard.dismiss();
+                setDrawerVisible(prev => !prev);
+              }}
               onNewPress={startNewConversation}
-            >
-              {aiService === "ollama" ? (
-                <ModelDropdown
-                  selectedModel={selectedModel}
-                  selectedReflection={selectedReflection}
-                  onModelChange={(model) => {
-                    setSelectedModel(model);
-                    Settings.set("ollamaModel", model);
-                  }}
-                  onReflectionChange={setSelectedReflection}
-                  rightElement={
-                    <View style={styles.settingsShadowLayer}>
-                      <View style={styles.settingsShadowBlock} />
-                      <Pressable
-                        style={({ pressed }) => [styles.settingsButton, pressed && { backgroundColor: "#eaeaea" }]}
-                        onPress={() => setSettingsDrawerVisible(true)}
-                      >
-                        <Image source={settingsIcon} style={styles.settingsIcon} />
-                      </Pressable>
-                    </View>
-                  }
-                />
-              ) : (
-                <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' }}>
-                  <View style={styles.settingsShadowLayer}>
-                    <View style={styles.settingsShadowBlock} />
-                    <Pressable
-                      style={({ pressed }) => [styles.settingsButton, pressed && { backgroundColor: "#eaeaea" }]}
-                      onPress={() => setSettingsDrawerVisible(true)}
-                    >
-                      <Image source={settingsIcon} style={styles.settingsIcon} />
-                    </Pressable>
-                  </View>
+              centerElement={
+                aiService === "ollama" ? (
+                  <ModelDropdown
+                    selectedModel={selectedModel}
+                    selectedReflection={selectedReflection}
+                    onModelChange={(model) => {
+                      setSelectedModel(model);
+                      Settings.set("ollamaModel", model);
+                    }}
+                    onReflectionChange={setSelectedReflection}
+                  />
+                ) : null
+              }
+              rightElement={
+                <View style={styles.settingsShadowLayer}>
+                  <View style={styles.settingsShadowBlock} />
+                  <Pressable
+                    style={({ pressed }) => [styles.settingsButton, pressed && { backgroundColor: "#eaeaea" }]}
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setSettingsDrawerVisible(prev => !prev);
+                    }}
+                  >
+                    <Image source={settingsIcon} style={styles.settingsIcon} />
+                  </Pressable>
                 </View>
-              )}
-            </TopBar>
+              }
+            />
           </View>
 
           {/* bottom bar overlay */}
@@ -708,38 +742,28 @@ export default function Index() {
             />
           </View>
         </View>
-      </KeyboardAvoidingView>
 
-      <DrawerMenu
-        visible={drawerVisible}
-        onClose={() => setDrawerVisible(false)}
-        conversations={conversations}
-        selectedConversationId={activeConversation?.id ?? null}
-        onSelectConversation={selectConversation}
-        onNewConversation={startNewConversation}
-        onDeleteConversation={deleteConversation}
-        onTogglePinConversation={togglePinConversation}
-      />
-
-      <SettingsDrawer
-        visible={settingsDrawerVisible}
-        onClose={() => {
-          setSettingsDrawerVisible(false);
-          const cached = Settings.getCached();
-          if (cached.ollamaModel && cached.ollamaModel !== selectedModel) {
-            setSelectedModel(cached.ollamaModel);
-          }
-          setAiService(cached.aiService);
-          setOllamaUrl(cached.ollamaUrl);
-          setSpeakerEnabled(cached.speaker);
-          setAlwaysWhisper(cached.alwaysWhisper);
-        }}
-        onDataChanged={async () => {
-          await loadConversations();
-          startNewConversation();
-        }}
-      />
-    </View>
+        <SettingsDrawer
+          isLargeScreen={isLargeScreen}
+          visible={settingsDrawerVisible}
+          onClose={() => {
+            setSettingsDrawerVisible(false);
+            const cached = Settings.getCached();
+            if (cached.ollamaModel && cached.ollamaModel !== selectedModel) {
+              setSelectedModel(cached.ollamaModel);
+            }
+            setAiService(cached.aiService);
+            setOllamaUrl(cached.ollamaUrl);
+            setSpeakerEnabled(cached.speaker);
+            setAlwaysWhisper(cached.alwaysWhisper);
+          }}
+          onDataChanged={async () => {
+            await loadConversations();
+            startNewConversation();
+          }}
+        />
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 

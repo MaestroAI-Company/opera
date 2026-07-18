@@ -4,7 +4,7 @@ import Selector from "./Selector";
 import ThemeSelector from "./ThemeSelector";
 import Checkbox from "./Checkbox";
 import TextInputField from "./TextInputField";
-import NotificationModal from "./NotificationModal";
+import NotificationModal, { ModalButton } from "./NotificationModal";
 import { AIModule } from "../src/services/ai/AIModule";
 import { BackupService } from "../src/services/BackupService";
 import { Settings } from "../src/services/settings/SettingsService";
@@ -22,9 +22,10 @@ type SettingsDrawerProps = {
   visible: boolean;
   onClose: () => void;
   onDataChanged?: () => void;
+  isLargeScreen?: boolean;
 };
 
-export default function SettingsDrawer({ visible, onClose, onDataChanged }: SettingsDrawerProps) {
+export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false }: SettingsDrawerProps) {
   const [rendered, setRendered] = useState(false);
   const translateX = useRef(new Animated.Value(DRAWER_WIDTH)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
@@ -36,6 +37,14 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
   const [ollamaError, setOllamaError] = useState("");
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{title: string, message: string, buttons?: ModalButton[]}>({title: '', message: ''});
+
+  const showAlert = (title: string, message: string, buttons?: ModalButton[]) => {
+    setAlertConfig({ title, message, buttons });
+    setAlertModalVisible(true);
+  };
   const [whisperModel, setWhisperModelState] = useState("base");
   const [whisperLanguage, setWhisperLanguageState] = useState(() => {
     try {
@@ -204,37 +213,45 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
   const handleExport = async () => {
     try {
       await BackupService.exportData();
+      showAlert("Success", "Data exported successfully.");
     } catch (e) {
-      Alert.alert("Error", "Failed to export data");
+      showAlert("Error", "Failed to export data");
     }
   };
 
   const handleImport = async () => {
     try {
-      await BackupService.importData();
-      Alert.alert("Success", "Data imported successfully. The app settings and conversations have been restored.");
-      onDataChanged?.();
+      const imported = await BackupService.importData();
+      if (imported) {
+        showAlert("Success", "Data imported successfully. The app settings and conversations have been restored.");
+        onDataChanged?.();
+      }
     } catch (e) {
-      Alert.alert("Error", "Failed to import data");
+      showAlert("Error", "Failed to import data");
     }
   };
 
   const handleDeleteAll = () => {
-    Alert.alert(
+    showAlert(
       "Delete all conversations",
       "Are you sure you want to delete all conversations? This action cannot be undone.",
       [
-        { text: "Cancel", style: "cancel" },
+        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
         {
           text: "Delete",
-          style: "destructive",
+          style: "danger",
           onPress: async () => {
+            setAlertModalVisible(false);
             try {
               await BackupService.deleteAllConversations();
-              Alert.alert("Success", "All conversations deleted.");
-              onDataChanged?.();
+              setTimeout(() => {
+                showAlert("Success", "All conversations deleted.");
+                onDataChanged?.();
+              }, 300);
             } catch (e) {
-              Alert.alert("Error", "Failed to delete conversations");
+              setTimeout(() => {
+                showAlert("Error", "Failed to delete conversations");
+              }, 300);
             }
           }
         }
@@ -276,172 +293,168 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
         }
       });
     }
-  }, [visible]);
+  }, [visible, isLargeScreen]);
 
-  if (!rendered) return null;
+  if (!isLargeScreen && !rendered) return null;
 
-  return (
-    <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
-      <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      </Animated.View>
+  const innerContent = (
+    <ScrollView contentContainerStyle={{ paddingTop: 60, paddingBottom: 40, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+      <Text style={styles.title}>Settings</Text>
 
-      <Animated.View style={[styles.content, { transform: [{ translateX }] }]}>
-        <ScrollView contentContainerStyle={{ paddingTop: 60, paddingBottom: 40, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-          <Text style={styles.title}>Settings</Text>
+      <Text style={styles.sectionTitle}>General</Text>
 
-          <Text style={styles.sectionTitle}>General</Text>
+      <View style={styles.settingRowVertical}>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Language</Text>
+        <Selector
+          options={languageOptions}
+          selectedValue={language}
+          onSelect={setLanguage}
+          title="Select Language"
+          fullWidth
+        />
+      </View>
 
-          <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Language</Text>
-            <Selector
-              options={languageOptions}
-              selectedValue={language}
-              onSelect={setLanguage}
-              title="Select Language"
-              fullWidth
-            />
-          </View>
+      <View style={styles.settingRowVertical}>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Theme</Text>
+        <ThemeSelector
+          selectedValue={theme}
+          onSelect={setTheme}
+        />
+      </View>
 
-          <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Theme</Text>
-            <ThemeSelector
-              selectedValue={theme}
-              onSelect={setTheme}
-            />
-          </View>
+      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>AI</Text>
 
-          <Text style={[styles.sectionTitle, { marginTop: 20 }]}>AI</Text>
+      <View style={styles.settingRowVertical}>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>AI Service</Text>
+        <Selector
+          options={aiServiceOptions}
+          selectedValue={aiService}
+          onSelect={setAiService}
+          title="Select AI Service"
+          fullWidth
+        />
+      </View>
 
-          <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>AI Service</Text>
-            <Selector
-              options={aiServiceOptions}
-              selectedValue={aiService}
-              onSelect={setAiService}
-              title="Select AI Service"
-              fullWidth
-            />
-          </View>
+      <View style={[styles.settingRowVertical, { zIndex: 9 }]}>
+        <Text style={styles.settingLabel}>Whisper Model</Text>
+        <Text style={[styles.helpText, { marginBottom: 10 }]}>The larger the size, the longer the processing will take.</Text>
+        <Selector
+          options={whisperModelOptions}
+          selectedValue={whisperModel}
+          onSelect={setWhisperModel}
+          title="Select Whisper Model"
+          fullWidth
+        />
+      </View>
 
-          <View style={[styles.settingRowVertical, { zIndex: 9 }]}>
-            <Text style={styles.settingLabel}>Whisper Model</Text>
-            <Text style={[styles.helpText, { marginBottom: 10 }]}>The larger the size, the longer the processing will take.</Text>
-            <Selector
-              options={whisperModelOptions}
-              selectedValue={whisperModel}
-              onSelect={setWhisperModel}
-              title="Select Whisper Model"
-              fullWidth
-            />
-          </View>
+      <View style={styles.settingRowVertical}>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Whisper Language</Text>
+        <Selector
+          options={whisperLanguageOptions}
+          selectedValue={whisperLanguage}
+          onSelect={setWhisperLanguage}
+          title="Select Language"
+          fullWidth
+        />
+      </View>
 
-          <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Whisper Language</Text>
-            <Selector
-              options={whisperLanguageOptions}
-              selectedValue={whisperLanguage}
-              onSelect={setWhisperLanguage}
-              title="Select Language"
-              fullWidth
-            />
-          </View>
+    <View style={{ marginBottom: 20 }}>
+      <Checkbox
+        label="Always transcribe on-device (Whisper)"
+        checked={alwaysWhisper}
+        onToggle={setAlwaysWhisper}
+      />
+    </View>
 
-        <View style={{ marginBottom: 20 }}>
-          <Checkbox
-            label="Always transcribe on-device (Whisper)"
-            checked={alwaysWhisper}
-            onToggle={setAlwaysWhisper}
+    {aiService === "ollama" && (
+      <View style={styles.sectionGroup}>
+        <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Ollama</Text>
+        <View style={styles.settingRowVertical}>
+          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Host URL</Text>
+          <TextInputField 
+            icon={linkIcon}
+            placeholder={Platform.OS === 'android' ? 'http://10.0.2.2:11434' : 'http://127.0.0.1:11434'}
+            value={ollamaUrl}
+            onChangeText={setOllamaUrl}
+            onBlur={fetchOllamaModels}
           />
         </View>
-
-        {aiService === "ollama" && (
-          <View style={styles.sectionGroup}>
-            <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Ollama</Text>
-            <View style={styles.settingRowVertical}>
-              <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Host URL</Text>
-              <TextInputField 
-                icon={linkIcon}
-                placeholder={Platform.OS === 'android' ? 'http://10.0.2.2:11434' : 'http://127.0.0.1:11434'}
-                value={ollamaUrl}
-                onChangeText={setOllamaUrl}
-                onBlur={fetchOllamaModels}
-              />
-            </View>
-            
-            {ollamaError ? (
-              <Text style={styles.errorText}>{ollamaError}</Text>
-            ) : (
-              <View style={styles.settingRowVertical}>
-                <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Available Models</Text>
-                {ollamaModelOptions.length > 0 ? (
-                  ollamaModelOptions.map((model) => (
-                    <Text key={model.id} style={{ fontFamily: "IBMPlexMono-Medium", color: "#555", marginBottom: 4 }}>
-                      • {model.label}
-                    </Text>
-                  ))
-                ) : (
-                  <Text style={{ fontFamily: "IBMPlexMono-Medium", color: "#888", marginBottom: 10 }}>
-                    Aucun modèle détecté.
-                  </Text>
-                )}
-                {ollamaModelOptions.length === 0 && (
-                  <Pressable
-                    style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }, { marginTop: 10 }]}
-                    onPress={() => setDownloadModalVisible(true)}
-                  >
-                    <Image source={downloadIcon} style={styles.downloadIcon} />
-                    <Text style={styles.downloadText}>
-                      {isDownloading ? "Downloading..." : "Download Gemma4?"}
-                    </Text>
-                  </Pressable>
-                )}
-              </View>
-            )}
-            </View>
-          )}
-
-          <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Personalization</Text>
+        
+        {ollamaError ? (
+          <Text style={styles.errorText}>{ollamaError}</Text>
+        ) : (
           <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Write your instruction for AI</Text>
-            <TextInputField
-              icon={penPlaceholderIcon}
-              placeholder="Ex: You are a helpful assistant..."
-              value={instruction}
-              onChangeText={setInstruction}
-            />
+            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Available Models</Text>
+            {ollamaModelOptions.length > 0 ? (
+              ollamaModelOptions.map((model) => (
+                <Text key={model.id} style={{ fontFamily: "IBMPlexMono-Medium", color: "#555", marginBottom: 4 }}>
+                  • {model.label}
+                </Text>
+              ))
+            ) : (
+              <Text style={{ fontFamily: "IBMPlexMono-Medium", color: "#888", marginBottom: 10 }}>
+                Aucun modèle détecté.
+              </Text>
+            )}
+            {ollamaModelOptions.length === 0 && (
+              <Pressable
+                style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }, { marginTop: 10 }]}
+                onPress={() => setDownloadModalVisible(true)}
+              >
+                <Image source={downloadIcon} style={styles.downloadIcon} />
+                <Text style={styles.downloadText}>
+                  {isDownloading ? "Downloading..." : "Download Gemma4?"}
+                </Text>
+              </Pressable>
+            )}
           </View>
+        )}
+        </View>
+      )}
 
-          <Text style={[styles.sectionTitle, { marginTop: 30 }]}>Data & Storage</Text>
-          <View style={styles.buttonRow}>
-            <Pressable
-              style={({ pressed }) => [styles.actionButton, { flex: 1 }, pressed && { backgroundColor: "#eaeaea" }]}
-              onPress={handleExport}
-            >
-              <Text style={styles.actionButtonText}>Export</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.actionButton, { flex: 1 }, pressed && { backgroundColor: "#eaeaea" }]}
-              onPress={handleImport}
-            >
-              <Text style={styles.actionButtonText}>Import</Text>
-            </Pressable>
-          </View>
+      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Personalization</Text>
+      <View style={styles.settingRowVertical}>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Write your instruction for AI</Text>
+        <TextInputField
+          icon={penPlaceholderIcon}
+          placeholder="Ex: You are a helpful assistant..."
+          value={instruction}
+          onChangeText={setInstruction}
+        />
+      </View>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionButton,
-              styles.dangerButton,
-              { marginTop: 15, marginBottom: 20 },
-              pressed && { backgroundColor: "#ffdcdc" }
-            ]}
-            onPress={handleDeleteAll}
-          >
-            <Text style={[styles.actionButtonText, styles.dangerButtonText]}>Delete all conversations</Text>
-          </Pressable>
-        </ScrollView>
-      </Animated.View>
+      <Text style={[styles.sectionTitle, { marginTop: 30 }]}>Data & Storage</Text>
+      <View style={styles.buttonRow}>
+        <Pressable
+          style={({ pressed }) => [styles.actionButton, { flex: 1 }, pressed && { backgroundColor: "#eaeaea" }]}
+          onPress={handleExport}
+        >
+          <Text style={styles.actionButtonText}>Export</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.actionButton, { flex: 1 }, pressed && { backgroundColor: "#eaeaea" }]}
+          onPress={handleImport}
+        >
+          <Text style={styles.actionButtonText}>Import</Text>
+        </Pressable>
+      </View>
 
+      <Pressable
+        style={({ pressed }) => [
+          styles.actionButton,
+          styles.dangerButton,
+          { marginTop: 15, marginBottom: 20 },
+          pressed && { backgroundColor: "#ffdcdc" }
+        ]}
+        onPress={handleDeleteAll}
+      >
+        <Text style={[styles.actionButtonText, styles.dangerButtonText]}>Delete all conversations</Text>
+      </Pressable>
+    </ScrollView>
+  );
+
+  const notificationModal = (
+    <>
       <NotificationModal
         visible={downloadModalVisible}
         title="Download Gemma4"
@@ -453,12 +466,41 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged }: Sett
           { text: "Download", onPress: handleDownloadGemma, style: "primary" },
         ]}
       />
-    </View>
-
-
-
+      <NotificationModal
+        visible={alertModalVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onClose={() => setAlertModalVisible(false)}
+        buttons={alertConfig.buttons}
+      />
+    </>
   );
 
+  if (isLargeScreen) {
+    if (!visible) return null;
+    return (
+      <View style={styles.largeScreenContainer}>
+        <View style={styles.largeScreenContent}>
+          {innerContent}
+        </View>
+        {notificationModal}
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
+      <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      </Animated.View>
+
+      <Animated.View style={[styles.content, { transform: [{ translateX }] }]}>
+        {innerContent}
+      </Animated.View>
+
+      {notificationModal}
+    </View>
+  );
 
 }
 
@@ -478,6 +520,17 @@ const styles = StyleSheet.create({
     right: 0,
     width: DRAWER_WIDTH,
     backgroundColor: "#fff",
+    paddingHorizontal: 16,
+  },
+  largeScreenContainer: {
+    width: 320,
+    backgroundColor: "#fff",
+    zIndex: 10,
+    borderLeftWidth: 1,
+    borderLeftColor: "rgba(0,0,0,0.05)",
+  },
+  largeScreenContent: {
+    flex: 1,
     paddingHorizontal: 16,
   },
   title: {

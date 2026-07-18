@@ -22,6 +22,7 @@ type DrawerMenuProps = {
   onNewConversation: () => void;
   onDeleteConversation?: (id: string) => void;
   onTogglePinConversation?: (id: string, pinned: boolean) => void;
+  isLargeScreen?: boolean;
 };
 
 //format group title based on date
@@ -59,6 +60,7 @@ export default function DrawerMenu({
   onNewConversation,
   onDeleteConversation,
   onTogglePinConversation,
+  isLargeScreen = false,
 }: DrawerMenuProps) {
   const [rendered, setRendered] = useState(false);
   const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
@@ -112,9 +114,9 @@ export default function DrawerMenu({
         }
       });
     }
-  }, [visible]);
+  }, [visible, isLargeScreen]);
 
-  if (!rendered) return null;
+  if (!isLargeScreen && !rendered) return null;
 
   //group conversations
   const pinnedConversations = conversations.filter(c => c.pinned);
@@ -177,6 +179,98 @@ export default function DrawerMenu({
     );
   };
 
+  const innerContent = (
+    <>
+      <Image
+        source={operaLogo}
+        style={styles.logo}
+        resizeMode="contain"
+        tintColor="#FF1A1A"
+      />
+
+      <View style={styles.quickActionsShadowLayer}>
+        <View style={styles.quickActionsShadowBlock} />
+        <View style={styles.quickActionsBox}>
+          <Pressable
+            onPress={() => {
+              onNewConversation();
+              if (!isLargeScreen) onClose();
+            }}
+            style={({ pressed }) => [styles.quickActionItem, pressed && { backgroundColor: "#eaeaea" }]}
+          >
+            <Image source={newIcon} style={styles.quickActionIcon} />
+            <Text style={styles.quickActionLabel}>New discussion</Text>
+          </Pressable>
+          <Pressable
+            onPress={onClose}
+            style={({ pressed }) => [styles.quickActionItem, pressed && { backgroundColor: "#eaeaea" }]}
+          >
+            <Image source={searchIcon} style={styles.quickActionIcon} />
+            <Text style={styles.quickActionLabel}>Search</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {conversations.length === 0 && (
+          <Text style={styles.emptyText}>No conversation</Text>
+        )}
+
+        {pinnedConversations.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>PINS</Text>
+            {pinnedConversations.map(renderConversationRow)}
+          </View>
+        )}
+
+        {groups.map((group) => (
+          <View key={group.title} style={styles.section}>
+            <Text style={styles.sectionTitle}>{group.title}</Text>
+            {group.data.map(renderConversationRow)}
+          </View>
+        ))}
+      </ScrollView>
+    </>
+  );
+
+  const notificationModal = (
+    <NotificationModal
+      visible={!!deleteConfirmId}
+      title="Delete Conversation"
+      message="Are you sure you want to delete this conversation? This action cannot be undone."
+      onClose={() => setDeleteConfirmId(null)}
+      buttons={[
+        {
+          text: "Cancel",
+          style: "secondary",
+          onPress: () => setDeleteConfirmId(null)
+        },
+        {
+          text: "Delete",
+          style: "danger",
+          onPress: () => {
+            if (deleteConfirmId) {
+              onDeleteConversation?.(deleteConfirmId);
+            }
+            setDeleteConfirmId(null);
+          }
+        }
+      ]}
+    />
+  );
+
+  if (isLargeScreen) {
+    if (!visible) return null;
+    return (
+      <View style={styles.largeScreenContainer}>
+        <View style={styles.largeScreenContent}>
+          {innerContent}
+        </View>
+        {notificationModal}
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
       <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
@@ -187,80 +281,10 @@ export default function DrawerMenu({
         style={[styles.content, { transform: [{ translateX }] }]}
         {...panResponder.panHandlers}
       >
-        <Image
-          source={operaLogo}
-          style={styles.logo}
-          resizeMode="contain"
-          tintColor="#FF1A1A"
-        />
-
-        <View style={styles.quickActionsShadowLayer}>
-          <View style={styles.quickActionsShadowBlock} />
-          <View style={styles.quickActionsBox}>
-            <Pressable
-              onPress={() => {
-                onNewConversation();
-                onClose();
-              }}
-              style={({ pressed }) => [styles.quickActionItem, pressed && { backgroundColor: "#eaeaea" }]}
-            >
-              <Image source={newIcon} style={styles.quickActionIcon} />
-              <Text style={styles.quickActionLabel}>New discussion</Text>
-            </Pressable>
-            <Pressable
-              onPress={onClose}
-              style={({ pressed }) => [styles.quickActionItem, pressed && { backgroundColor: "#eaeaea" }]}
-            >
-              <Image source={searchIcon} style={styles.quickActionIcon} />
-              <Text style={styles.quickActionLabel}>Search</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          {conversations.length === 0 && (
-            <Text style={styles.emptyText}>No conversation</Text>
-          )}
-
-          {pinnedConversations.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>PINS</Text>
-              {pinnedConversations.map(renderConversationRow)}
-            </View>
-          )}
-
-          {groups.map((group) => (
-            <View key={group.title} style={styles.section}>
-              <Text style={styles.sectionTitle}>{group.title}</Text>
-              {group.data.map(renderConversationRow)}
-            </View>
-          ))}
-        </ScrollView>
+        {innerContent}
       </Animated.View>
 
-      <NotificationModal
-        visible={!!deleteConfirmId}
-        title="Delete Conversation"
-        message="Are you sure you want to delete this conversation? This action cannot be undone."
-        onClose={() => setDeleteConfirmId(null)}
-        buttons={[
-          {
-            text: "Cancel",
-            style: "secondary",
-            onPress: () => setDeleteConfirmId(null)
-          },
-          {
-            text: "Delete",
-            style: "danger",
-            onPress: () => {
-              if (deleteConfirmId) {
-                onDeleteConversation?.(deleteConfirmId);
-              }
-              setDeleteConfirmId(null);
-            }
-          }
-        ]}
-      />
+      {notificationModal}
     </View>
   );
 }
@@ -283,6 +307,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     paddingTop: 60,
     paddingHorizontal: 16,
+  },
+  largeScreenContainer: {
+    width: 320,
+    backgroundColor: "#fff",
+    zIndex: 10,
+    borderRightWidth: 1,
+    borderRightColor: "rgba(0,0,0,0.05)",
+  },
+  largeScreenContent: {
+    paddingTop: 60,
+    paddingHorizontal: 16,
+    flex: 1,
   },
   logo: {
     width: 160,

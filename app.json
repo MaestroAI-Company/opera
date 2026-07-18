@@ -3,12 +3,13 @@
     "name": "Opera",
     "slug": "opera",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icons/opera.png",
     "scheme": "opera",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/icons/opera.png"
+      "icon": "./assets/icons/opera.png",
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {

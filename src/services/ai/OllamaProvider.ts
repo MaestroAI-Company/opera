@@ -1,5 +1,35 @@
-import { fetch } from 'expo/fetch';
+import { fetch as expoFetch } from 'expo/fetch';
 import { IAIProvider } from './IAIProvider';
+
+async function universalFetch(input: string | URL | Request, init?: any): Promise<Response> {
+  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+  
+  if (isTauri) {
+    try {
+      const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+      const customInit = { ...(init || {}) };
+      let headers: any = {};
+      if (customInit.headers) {
+        if (customInit.headers instanceof Headers) {
+          customInit.headers.forEach((value: string, key: string) => { headers[key] = value; });
+        } else {
+          headers = { ...customInit.headers };
+        }
+      }
+      headers['Origin'] = 'http://localhost';
+      customInit.headers = headers;
+      
+      const res = await tauriFetch(input as any, customInit);
+      return res;
+    } catch (e: any) {
+      console.warn("Tauri Fetch Error:", e);
+      throw e;
+    }
+  }
+  
+  return expoFetch(input, init);
+}
+
 
 export class OllamaProvider implements IAIProvider {
   private baseUrl: string;
@@ -18,7 +48,7 @@ export class OllamaProvider implements IAIProvider {
     if (!this.isConfigured()) return false;
     try {
       //check root endpoint
-      const response = await fetch(this.baseUrl, { headers: this.defaultHeaders });
+      const response = await universalFetch(this.baseUrl, { headers: this.defaultHeaders });
       return response.ok;
     } catch (error) {
       return false;
@@ -28,7 +58,7 @@ export class OllamaProvider implements IAIProvider {
   async getAvailableModels(): Promise<string[]> {
     if (!this.isConfigured()) return [];
     try {
-      const response = await fetch(`${this.baseUrl}/api/tags`, { headers: this.defaultHeaders });
+      const response = await universalFetch(`${this.baseUrl}/api/tags`, { headers: this.defaultHeaders });
       if (!response.ok) {
         const text = await response.text();
         throw new Error(`Failed to fetch models: ${response.status} - ${text}`);
@@ -45,7 +75,7 @@ export class OllamaProvider implements IAIProvider {
     if (!this.isConfigured()) return;
     try {
       //preload model
-      await fetch(`${this.baseUrl}/api/generate`, {
+      await universalFetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...this.defaultHeaders },
         body: JSON.stringify({
@@ -61,7 +91,7 @@ export class OllamaProvider implements IAIProvider {
   async getModelCapabilities(modelName: string): Promise<string[]> {
     if (!this.isConfigured()) return [];
     try {
-      const response = await fetch(`${this.baseUrl}/api/show`, {
+      const response = await universalFetch(`${this.baseUrl}/api/show`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...this.defaultHeaders },
         body: JSON.stringify({ model: modelName }),
@@ -78,7 +108,7 @@ export class OllamaProvider implements IAIProvider {
   async downloadService(modelName: string): Promise<void> {
     if (!this.isConfigured()) throw new Error('AI server not configured');
     try {
-      const response = await fetch(`${this.baseUrl}/api/pull`, {
+      const response = await universalFetch(`${this.baseUrl}/api/pull`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...this.defaultHeaders },
         body: JSON.stringify({
@@ -130,7 +160,7 @@ export class OllamaProvider implements IAIProvider {
       };
       console.log('Ollama request payload:', JSON.stringify(logPayload, null, 2));
 
-      const response = await fetch(`${this.baseUrl}/api/chat`, {
+      const response = await universalFetch(`${this.baseUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...this.defaultHeaders },
         body: JSON.stringify(payload),

@@ -5,15 +5,21 @@ import Svg, { Path, Line, Rect } from 'react-native-svg';
 export default function TauriTitleBar() {
   const [isTauri, setIsTauri] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
+  const [isMac, setIsMac] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
-      const isWindows = navigator.userAgent.includes("Windows") || navigator.userAgent.includes("Win32");
-      if (isWindows) {
+      const isWindowsOS = navigator.userAgent.includes("Windows") || navigator.userAgent.includes("Win32");
+      const isMacOS = navigator.userAgent.includes("Mac");
+      if (isWindowsOS || isMacOS) {
         setIsTauri(true);
-        import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
-          getCurrentWindow().isMaximized().then(setIsMaximized);
-        });
+        if (isMacOS) {
+          setIsMac(true);
+        } else {
+          import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
+            getCurrentWindow().isMaximized().then(setIsMaximized);
+          });
+        }
       }
     }
   }, []);
@@ -46,46 +52,48 @@ export default function TauriTitleBar() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.dragRegion} {...({ dataSet: { tauriDragRegion: true } } as any)}>
-        <Image source={require('../assets/images/icon_nobg.png')} style={[styles.icon, { pointerEvents: 'none' } as any]} />
+    <View style={styles.container} pointerEvents="box-none">
+      <View style={[styles.dragRegion, isMac && styles.dragRegionMac]} {...({ dataSet: { tauriDragRegion: true } } as any)}>
+        <Image source={require('../assets/images/icon_nobg.png')} style={[styles.icon, isMac && styles.iconMac, { pointerEvents: 'none' } as any]} />
       </View>
-      <View style={styles.controls}>
-        <Pressable 
-          style={({ pressed, hovered }: any) => [styles.button, hovered && styles.buttonHovered, pressed && styles.buttonPressed]} 
-          onPress={handleMinimize}>
-          {({ pressed, hovered }: any) => (
-            <Svg width="12" height="12" viewBox="0 0 10 10">
-              <Line x1="1" y1="5" x2="9" y2="5" stroke="#333" strokeWidth="1" />
-            </Svg>
-          )}
-        </Pressable>
-        <Pressable 
-          style={({ pressed, hovered }: any) => [styles.button, hovered && styles.buttonHovered, pressed && styles.buttonPressed]} 
-          onPress={handleMaximize}>
-          {({ pressed, hovered }: any) => (
-            <Svg width="12" height="12" viewBox="0 0 10 10">
-              {isMaximized ? (
-                <>
-                  <Rect x="2.5" y="1.5" width="6" height="6" stroke="#333" strokeWidth="1" fill="none" />
-                  <Path d="M 1.5 3.5 V 8.5 H 6.5" stroke="#333" strokeWidth="1" fill="none" />
-                </>
-              ) : (
-                <Rect x="1.5" y="1.5" width="7" height="7" stroke="#333" strokeWidth="1" fill="none" />
-              )}
-            </Svg>
-          )}
-        </Pressable>
-        <Pressable 
-          style={({ pressed, hovered }: any) => [styles.button, hovered && styles.closeButtonHovered, pressed && styles.closeButtonPressed]} 
-          onPress={handleClose}>
-          {({ pressed, hovered }: any) => (
-            <Svg width="12" height="12" viewBox="0 0 10 10">
-              <Path d="M 1 1 L 9 9 M 9 1 L 1 9" stroke={(hovered || pressed) ? "#fff" : "#333"} strokeWidth="1" />
-            </Svg>
-          )}
-        </Pressable>
-      </View>
+      {!isMac && (
+        <View style={styles.controls}>
+          <Pressable 
+            style={({ pressed, hovered }: any) => [styles.button, hovered && styles.buttonHovered, pressed && styles.buttonPressed]} 
+            onPress={handleMinimize}>
+            {({ pressed, hovered }: any) => (
+              <Svg width="12" height="12" viewBox="0 0 10 10">
+                <Line x1="1" y1="5" x2="9" y2="5" stroke="#333" strokeWidth="1" />
+              </Svg>
+            )}
+          </Pressable>
+          <Pressable 
+            style={({ pressed, hovered }: any) => [styles.button, hovered && styles.buttonHovered, pressed && styles.buttonPressed]} 
+            onPress={handleMaximize}>
+            {({ pressed, hovered }: any) => (
+              <Svg width="12" height="12" viewBox="0 0 10 10">
+                {isMaximized ? (
+                  <>
+                    <Rect x="2.5" y="1.5" width="6" height="6" stroke="#333" strokeWidth="1" fill="none" />
+                    <Path d="M 1.5 3.5 V 8.5 H 6.5" stroke="#333" strokeWidth="1" fill="none" />
+                  </>
+                ) : (
+                  <Rect x="1.5" y="1.5" width="7" height="7" stroke="#333" strokeWidth="1" fill="none" />
+                )}
+              </Svg>
+            )}
+          </Pressable>
+          <Pressable 
+            style={({ pressed, hovered }: any) => [styles.button, hovered && styles.closeButtonHovered, pressed && styles.closeButtonPressed]} 
+            onPress={handleClose}>
+            {({ pressed, hovered }: any) => (
+              <Svg width="12" height="12" viewBox="0 0 10 10">
+                <Path d="M 1 1 L 9 9 M 9 1 L 1 9" stroke={(hovered || pressed) ? "#fff" : "#333"} strokeWidth="1" />
+              </Svg>
+            )}
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
@@ -109,11 +117,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingLeft: 12,
   },
+  dragRegionMac: {
+    justifyContent: 'flex-end',
+    paddingLeft: 0,
+    paddingRight: 12,
+  },
   icon: {
     width: 18,
     height: 18,
     marginRight: 8,
-    
+  },
+  iconMac: {
+    marginRight: 0,
   },
   title: {
     fontSize: 12,
@@ -145,7 +160,6 @@ const styles = StyleSheet.create({
   controlIcon: {
     width: 12,
     height: 12,
-    
     tintColor: '#333',
   },
   closeControlIconActive: {

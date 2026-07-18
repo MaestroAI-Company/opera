@@ -2,11 +2,11 @@
 pub fn run() {
   tauri::Builder::default()
     .setup(|app| {
-      #[cfg(any(target_os = "macos", target_os = "linux"))]
+      #[cfg(any(target_os = "windows", target_os = "linux"))]
       {
         use tauri::Manager;
         let window = app.get_webview_window("main").unwrap();
-        window.set_decorations(true).unwrap();
+        window.set_decorations(false).unwrap();
       }
 
       if cfg!(debug_assertions) {

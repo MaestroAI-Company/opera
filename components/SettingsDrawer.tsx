@@ -476,11 +476,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     </>
   );
 
+  const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
   if (isLargeScreen) {
     if (!visible) return null;
     return (
-      <View style={styles.largeScreenContainer}>
-        <View style={styles.largeScreenContent}>
+      <View style={[styles.largeScreenContainer, isTauri ? styles.floatingContainer : styles.attachedContainer]}>
+        <View style={isTauri ? styles.floatingContent : styles.attachedContent}>
           {innerContent}
         </View>
         {notificationModal}
@@ -526,10 +528,29 @@ const styles = StyleSheet.create({
     width: 320,
     backgroundColor: "#fff",
     zIndex: 10,
+  },
+  floatingContainer: {
+    margin: 16,
+    marginTop: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window ? 48 : 16,
+    marginBottom: 16,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+    overflow: "hidden",
+  },
+  attachedContainer: {
     borderLeftWidth: 1,
     borderLeftColor: "rgba(0,0,0,0.05)",
   },
-  largeScreenContent: {
+  floatingContent: {
+    flex: 1,
+    paddingTop: 24,
+    paddingHorizontal: 16,
+  },
+  attachedContent: {
     flex: 1,
     paddingHorizontal: 16,
   },

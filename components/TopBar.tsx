@@ -1,4 +1,4 @@
-import { Image, Pressable, StyleSheet, View } from "react-native";
+import { Image, Pressable, StyleSheet, View, Text } from "react-native";
 
 const moreIcon = require("../assets/icons/More.png");
 const addIcon = require("../assets/icons/add.png");
@@ -8,9 +8,12 @@ type TopBarProps = {
   onNewPress: () => void;
   centerElement?: React.ReactNode;
   rightElement?: React.ReactNode;
+  isLargeScreen?: boolean;
 };
 
-export default function TopBar({ onMenuPress, onNewPress, centerElement, rightElement }: TopBarProps) {
+export default function TopBar({ onMenuPress, onNewPress, centerElement, rightElement, isLargeScreen }: TopBarProps) {
+  const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
   return (
     <View style={styles.topBar}>
       <View style={styles.leftSection}>
@@ -22,13 +25,16 @@ export default function TopBar({ onMenuPress, onNewPress, centerElement, rightEl
               style={({ pressed }) => [styles.button, pressed && { backgroundColor: "#eaeaea" }]}
             >
               <Image source={moreIcon} style={styles.buttonIcon} />
+              {isTauri && <Text style={styles.buttonText}>Conversation</Text>}
             </Pressable>
-            <Pressable
-              onPress={onNewPress}
-              style={({ pressed }) => [styles.button, pressed && { backgroundColor: "#eaeaea" }]}
-            >
-              <Image source={addIcon} style={styles.buttonIcon} />
-            </Pressable>
+            {!isTauri && (
+              <Pressable
+                onPress={onNewPress}
+                style={({ pressed }) => [styles.button, pressed && { backgroundColor: "#eaeaea" }]}
+              >
+                <Image source={addIcon} style={styles.buttonIcon} />
+              </Pressable>
+            )}
           </View>
         </View>
       </View>
@@ -88,8 +94,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   button: {
-    width: 40,
     height: 40,
+    paddingHorizontal: 12,
+    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -98,5 +105,11 @@ const styles = StyleSheet.create({
     height: 18,
     resizeMode: "contain",
     tintColor: "#333333",
+    marginRight: 8,
+  },
+  buttonText: {
+    fontSize: 14,
+    fontFamily: "IBMPlexMono-Medium",
+    color: "#333",
   },
 });

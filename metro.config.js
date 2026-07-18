@@ -14,4 +14,9 @@ config.resolver.extraNodeModules = {
   buffer: require.resolve("buffer"),
 };
 
+// ignore tauri build files
+config.resolver.blockList = [
+  /[\\/]src-tauri[\\/]/,
+].concat(config.resolver.blockList || []);
+
 module.exports = config;

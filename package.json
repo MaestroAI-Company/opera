@@ -4,7 +4,9 @@
   "version": "1.0.0",
   "dependencies": {
     "@expo/ui": "~57.0.4",
+    "@lottiefiles/dotlottie-react": "^0.13.5",
     "@notifee/react-native": "^9.1.8",
+    "@tauri-apps/api": "^2.11.1",
     "buffer": "^6.0.3",
     "expo": "~57.0.4",
     "expo-audio": "~57.0.0",
@@ -44,6 +46,7 @@
     "whisper.rn": "^0.6.0"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4",
     "@types/react": "~19.2.2",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.0",
@@ -56,7 +59,10 @@
     "build:android": "expo prebuild --platform android && cd android && ./gradlew assembleRelease",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "tauri": "tauri",
+    "desktop": "tauri dev",
+    "desktop:build": "tauri build"
   },
   "private": true
 }

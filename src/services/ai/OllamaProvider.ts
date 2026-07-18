@@ -113,7 +113,10 @@ export class OllamaProvider implements IAIProvider {
         model: modelName,
         messages: [
           { role: 'system', content: systemPrompt },
-          ...messages
+          ...messages.map(m => ({
+            ...m,
+            images: m.images && m.images.length > 0 ? m.images : undefined
+          }))
         ],
         stream: true,
         think: options?.think ?? false,
@@ -124,7 +127,7 @@ export class OllamaProvider implements IAIProvider {
         ...payload,
         messages: payload.messages.map(m => ({
           ...m,
-          images: m.images ? ['<base64_data_hidden>'] : undefined
+          images: m.images && m.images.length > 0 ? ['<base64_data_hidden>'] : undefined
         }))
       };
       console.log('Ollama request payload:', JSON.stringify(logPayload, null, 2));

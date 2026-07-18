@@ -259,11 +259,13 @@ export default function DrawerMenu({
     />
   );
 
+  const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
   if (isLargeScreen) {
     if (!visible) return null;
     return (
-      <View style={styles.largeScreenContainer}>
-        <View style={styles.largeScreenContent}>
+      <View style={[styles.largeScreenContainer, isTauri ? styles.floatingContainer : styles.attachedContainer]}>
+        <View style={isTauri ? styles.floatingContent : styles.attachedContent}>
           {innerContent}
         </View>
         {notificationModal}
@@ -312,10 +314,29 @@ const styles = StyleSheet.create({
     width: 320,
     backgroundColor: "#fff",
     zIndex: 10,
+  },
+  floatingContainer: {
+    margin: 16,
+    marginTop: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window ? 48 : 16,
+    marginBottom: 16,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+    overflow: "hidden",
+  },
+  attachedContainer: {
     borderRightWidth: 1,
     borderRightColor: "rgba(0,0,0,0.05)",
   },
-  largeScreenContent: {
+  floatingContent: {
+    paddingTop: 24,
+    paddingHorizontal: 16,
+    flex: 1,
+  },
+  attachedContent: {
     paddingTop: 60,
     paddingHorizontal: 16,
     flex: 1,

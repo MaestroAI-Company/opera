@@ -11,6 +11,8 @@ interface Props {
 export default function SplashScreen({ onFinish }: Props) {
   const animationRef = useRef<LottieView>(null);
 
+  const isDesktop = typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || window.innerWidth > 1024);
+
   return (
     <View style={styles.container}>
       <LottieView
@@ -18,7 +20,7 @@ export default function SplashScreen({ onFinish }: Props) {
         source={animation}
         autoPlay
         loop={false}
-        resizeMode="cover"
+        resizeMode={isDesktop ? "contain" : "cover"}
         style={styles.animation}
         onAnimationFinish={(isCancelled) => {
           if (!isCancelled) {
@@ -32,12 +34,10 @@ export default function SplashScreen({ onFinish }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: "#FDF8F1",
+    justifyContent: "center",
+    alignItems: "center",
   },
   animation: {
     width: "100%",

@@ -1,4 +1,4 @@
 export default function TauriTitleBar() {
-  // On native platforms (iOS/Android), we never need a Tauri title bar.
+  // no need title bar on native platforms
   return null;
 }

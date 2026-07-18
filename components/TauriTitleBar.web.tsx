@@ -47,8 +47,8 @@ export default function TauriTitleBar() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.dragRegion} dataSet={{ tauriDragRegion: true } as any}>
-        <Image source={require('../assets/images/icon_nobg.png')} style={styles.icon} pointerEvents="none" />
+      <View style={styles.dragRegion} {...({ dataSet: { tauriDragRegion: true } } as any)}>
+        <Image source={require('../assets/images/icon_nobg.png')} style={[styles.icon, { pointerEvents: 'none' } as any]} />
       </View>
       <View style={styles.controls}>
         <Pressable 
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     marginRight: 8,
-    resizeMode: 'contain',
+    
   },
   title: {
     fontSize: 12,
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   controlIcon: {
     width: 12,
     height: 12,
-    resizeMode: 'contain',
+    
     tintColor: '#333',
   },
   closeControlIconActive: {

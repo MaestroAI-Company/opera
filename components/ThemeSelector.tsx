@@ -78,9 +78,9 @@ const styles = StyleSheet.create({
   icon: {
     width: 18,
     height: 18,
-    tintColor: "#000",
+    
     marginRight: 10,
-    resizeMode: "contain",
+    
   },
   optionsContainer: {
     flex: 1,

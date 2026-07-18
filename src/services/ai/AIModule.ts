@@ -67,7 +67,7 @@ class CentralAIModule {
     messages: { role: string; content: string; images?: string[] }[],
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
-    options?: { think?: boolean }
+    options?: { think?: boolean | string }
   ): Promise<void> {
     const provider = this.getActiveProvider();
     

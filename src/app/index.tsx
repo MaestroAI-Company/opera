@@ -24,6 +24,7 @@ import { AIModule } from "../services/ai/AIModule";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
 import { Settings } from "../services/settings/SettingsService";
 import { Whisper } from "../services/whisper/WhisperService";
+import { useResponsive } from "../hooks/useResponsive";
 
 const butterflyImage = require("../../assets/images/butterfly5.png");
 const butterflyGrey = require("../../assets/images/butterfly2_grey.png");
@@ -32,10 +33,9 @@ const settingsIcon = require("../../assets/icons/settings.png");
 
 export default function Index() {
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const isLargeScreen = width >= 1024;
+  const { isLargeScreen, isDesktop } = useResponsive();
   const [selectedModel, setSelectedModel] = useState("");
-  const [selectedReflection, setSelectedReflection] = useState("quick");
+  const [selectedReflection, setSelectedReflection] = useState("none");
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
   const [dbReady, setDbReady] = useState(false);
@@ -202,6 +202,8 @@ export default function Index() {
           SYSTEM_PROMPTS.SUMMARIZE,
           [{ role: "user", content: userMessage }],
           (chunk) => { title += chunk; },
+          undefined,
+          { think: false }
         );
         const cleaned = title.trim();
         if (cleaned.length > 0) {
@@ -343,7 +345,7 @@ export default function Index() {
                 }
               },
               abortControllerRef.current.signal,
-              { think: taskReflection === "think" }
+              { think: taskReflection === "none" ? false : taskReflection }
             );
           } catch (e: any) {
             const isAborted = e.name === "AbortError" ||
@@ -443,7 +445,9 @@ export default function Index() {
         selectedModel,
         SYSTEM_PROMPTS.TRANSCRIBE,
         [{ role: 'user', content: 'Transcribe this audio.', images: [base64Audio] }],
-        (chunk) => { transcription += chunk; }
+        (chunk) => { transcription += chunk; },
+        undefined,
+        { think: false }
       );
       return transcription.trim() || null;
     } catch (e) {
@@ -531,7 +535,7 @@ export default function Index() {
               }
             },
             abortControllerRef.current.signal,
-            { think: taskReflection === "think" }
+            { think: taskReflection === "none" ? false : taskReflection }
           );
         } catch (e: any) {
           const isAborted = e.name === "AbortError" || e.message?.toLowerCase().includes("aborted") || e.message?.toLowerCase().includes("cancel");
@@ -609,7 +613,7 @@ export default function Index() {
       <ImageBackground
         source={texture2}
         style={StyleSheet.absoluteFill}
-        imageStyle={styles.backgroundTexture}
+        imageStyle={styles.backgroundTexture} resizeMode="cover"
       >
         {!activeConversation && (
           <View style={styles.centerContent}>
@@ -653,6 +657,7 @@ export default function Index() {
       <View style={{ flex: 1, flexDirection: isLargeScreen ? "row" : "column" }} pointerEvents="box-none">
         <DrawerMenu
           isLargeScreen={isLargeScreen}
+          isDesktop={isDesktop}
           visible={drawerVisible}
           onClose={() => setDrawerVisible(false)}
           conversations={conversations}
@@ -691,11 +696,13 @@ export default function Index() {
               }}
               onNewPress={startNewConversation}
               isLargeScreen={isLargeScreen}
+              isDesktop={isDesktop}
               centerElement={
                 aiService === "ollama" ? (
                   <ModelDropdown
                     selectedModel={selectedModel}
                     selectedReflection={selectedReflection}
+                    showReflection={modelCapabilities.includes("thinking")}
                     onModelChange={(model) => {
                       setSelectedModel(model);
                       Settings.set("ollamaModel", model);
@@ -708,11 +715,14 @@ export default function Index() {
                 <View style={styles.settingsShadowLayer}>
                   <View style={styles.settingsShadowBlock} />
                   <Pressable
-                    style={({ pressed }) => [
-                      styles.settingsButton, 
-                      pressed && { backgroundColor: "#eaeaea" },
-                      !(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) && { paddingHorizontal: 0, width: 44 }
-                    ]}
+                    style={({ pressed }) => {
+                      const showText = isDesktop;
+                      return [
+                        styles.settingsButton, 
+                        pressed && { backgroundColor: "#eaeaea" },
+                        !showText && { paddingHorizontal: 0, width: 44 }
+                      ];
+                    }}
                     onPress={() => {
                       Keyboard.dismiss();
                       setSettingsDrawerVisible(prev => !prev);
@@ -720,9 +730,9 @@ export default function Index() {
                   >
                     <Image 
                       source={settingsIcon} 
-                      style={[styles.settingsIcon, !(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) && { marginRight: 0 }]} 
+                      style={[styles.settingsIcon, !isDesktop && { marginRight: 0 }]} 
                     />
-                    {(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) && (
+                    {isDesktop && (
                       <Text style={styles.settingsButtonText}>Settings</Text>
                     )}
                   </Pressable>
@@ -748,6 +758,7 @@ export default function Index() {
 
         <SettingsDrawer
           isLargeScreen={isLargeScreen}
+          isDesktop={isDesktop}
           visible={settingsDrawerVisible}
           onClose={() => {
             setSettingsDrawerVisible(false);
@@ -775,10 +786,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FFF5EC",
   },
-  backgroundTexture: {
-    opacity: 0.02,
-    resizeMode: "cover",
-  },
+  backgroundTexture: { opacity: 0.02 },
   topBarOverlay: {
     position: "absolute",
     top: 0,

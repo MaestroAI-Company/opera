@@ -10,13 +10,15 @@ const downloadIcon = require("../assets/icons/download.png");
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const REFLECTIONS = [
-  { id: "quick", label: "Quick" },
-  { id: "think", label: "Think" },
+  { id: "none", label: "Quick" },
+  { id: "low", label: "Low" },
+  { id: "high", label: "High" },
 ];
 
 type ModelDropdownProps = {
   selectedModel: string;
   selectedReflection: string;
+  showReflection: boolean;
   onModelChange: (model: string) => void;
   onReflectionChange: (reflection: string) => void;
 };
@@ -24,6 +26,7 @@ type ModelDropdownProps = {
 export default function ModelDropdown({
   selectedModel,
   selectedReflection,
+  showReflection,
   onModelChange,
   onReflectionChange,
 }: ModelDropdownProps) {
@@ -236,31 +239,35 @@ export default function ModelDropdown({
               )}
             </ScrollView>
 
-            <View style={styles.separator} />
-            <Text style={styles.sectionTitle}>Reflection</Text>
-            {REFLECTIONS.map((item) => (
-              <Pressable
-                key={item.id}
-                onPress={() => {
-                  Vibration.vibrate(10);
-                  handleClose(() => onReflectionChange(item.id));
-                }}
-                style={({ pressed }) => [
-                  styles.option,
-                  item.id === selectedReflection ? styles.optionSelected : pressed && { backgroundColor: "rgba(0, 0, 0, 0.05)" },
-                  item.id === selectedReflection && pressed && { backgroundColor: "#cc1414" }
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    item.id === selectedReflection && styles.optionTextSelected,
-                  ]}
-                >
-                  {item.label}
-                </Text>
-              </Pressable>
-            ))}
+            {showReflection && (
+              <>
+                <View style={styles.separator} />
+                <Text style={styles.sectionTitle}>Reflection</Text>
+                {REFLECTIONS.map((item) => (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => {
+                      Vibration.vibrate(10);
+                      handleClose(() => onReflectionChange(item.id));
+                    }}
+                    style={({ pressed }) => [
+                      styles.option,
+                      item.id === selectedReflection ? styles.optionSelected : pressed && { backgroundColor: "rgba(0, 0, 0, 0.05)" },
+                      item.id === selectedReflection && pressed && { backgroundColor: "#cc1414" }
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.optionText,
+                        item.id === selectedReflection && styles.optionTextSelected,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </>
+            )}
           </AnimatedPressable>
         </AnimatedPressable>
       </Modal>
@@ -334,10 +341,7 @@ const styles = StyleSheet.create({
     borderColor: "#00000017",
     padding: 12,
     width: 220,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.15)",
     elevation: 8,
   },
   sectionTitle: {
@@ -393,7 +397,7 @@ const styles = StyleSheet.create({
   downloadIcon: {
     width: 16,
     height: 16,
-    tintColor: "#0066cc",
+    
   },
   downloadText: {
     fontSize: 13,

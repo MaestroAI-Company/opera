@@ -31,8 +31,7 @@ export class OllamaProvider implements IAIProvider {
       const response = await fetch(`${this.baseUrl}/api/tags`, { headers: this.defaultHeaders });
       if (!response.ok) {
         const text = await response.text();
-        console.error(`Failed to fetch models: ${response.status} ${response.statusText}`, text);
-        throw new Error(`Failed to fetch models: ${response.status}`);
+        throw new Error(`Failed to fetch models: ${response.status} - ${text}`);
       }
       const data = await response.json();
       return data.models.map((m: any) => m.name);
@@ -90,8 +89,7 @@ export class OllamaProvider implements IAIProvider {
 
       if (!response.ok) {
         const text = await response.text();
-        console.error(`Failed to pull model: ${response.status} ${response.statusText}`, text);
-        throw new Error(`Failed to pull model: ${response.status}`);
+        throw new Error(`Failed to pull model: ${response.status} - ${text}`);
       }
     } catch (error) {
       console.error('Error pulling Ollama model:', error);
@@ -105,7 +103,7 @@ export class OllamaProvider implements IAIProvider {
     messages: { role: string; content: string; images?: string[] }[],
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
-    options?: { think?: boolean }
+    options?: { think?: boolean | string }
   ): Promise<void> {
     if (!this.isConfigured()) throw new Error('AI server not configured');
     try {
@@ -119,13 +117,13 @@ export class OllamaProvider implements IAIProvider {
           }))
         ],
         stream: true,
-        think: options?.think ?? false,
+        think: options?.think,
         options: { num_ctx: 16384 }
       };
       
       const logPayload = {
         ...payload,
-        messages: payload.messages.map(m => ({
+        messages: payload.messages.map((m: any) => ({
           ...m,
           images: m.images && m.images.length > 0 ? ['<base64_data_hidden>'] : undefined
         }))
@@ -141,7 +139,6 @@ export class OllamaProvider implements IAIProvider {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Ollama error response:', errorText);
         throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
@@ -175,13 +172,6 @@ export class OllamaProvider implements IAIProvider {
         }
       }
     } catch (error: any) {
-      const isAborted = error.name === 'AbortError' || 
-                        error.message?.toLowerCase().includes('cancel') ||
-                        error.message?.toLowerCase().includes('aborted');
-      
-      if (!isAborted) {
-        console.error('Error during Ollama streaming:', error);
-      }
       throw error;
     }
   }

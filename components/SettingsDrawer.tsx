@@ -11,8 +11,7 @@ import { Settings } from "../src/services/settings/SettingsService";
 import { Whisper } from "../src/services/whisper/WhisperService";
 
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const DRAWER_WIDTH = SCREEN_WIDTH * 0.88;
+import { useResponsive } from "../src/hooks/useResponsive";
 
 const linkIcon = require("../assets/icons/link.png");
 const downloadIcon = require("../assets/icons/download.png");
@@ -23,12 +22,22 @@ type SettingsDrawerProps = {
   onClose: () => void;
   onDataChanged?: () => void;
   isLargeScreen?: boolean;
+  isDesktop?: boolean;
 };
 
-export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false }: SettingsDrawerProps) {
+export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false }: SettingsDrawerProps) {
+  const { width } = useResponsive();
+  const drawerWidth = width * 0.88;
+
   const [rendered, setRendered] = useState(false);
-  const translateX = useRef(new Animated.Value(DRAWER_WIDTH)).current;
+  const translateX = useRef(new Animated.Value(drawerWidth)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!visible) {
+      translateX.setValue(drawerWidth);
+    }
+  }, [drawerWidth, visible, translateX]);
 
   const [language, setLanguageState] = useState("fr");
   const [theme, setThemeState] = useState("system");
@@ -267,25 +276,25 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         Animated.timing(translateX, {
           toValue: 0,
           duration: 280,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
         }),
         Animated.timing(overlayOpacity, {
           toValue: 1,
           duration: 280,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
         }),
       ]).start();
     } else {
       Animated.parallel([
         Animated.timing(translateX, {
-          toValue: DRAWER_WIDTH,
+          toValue: drawerWidth,
           duration: 250,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
         }),
         Animated.timing(overlayOpacity, {
           toValue: 0,
           duration: 250,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
         }),
       ]).start((result) => {
         if (result.finished) {
@@ -393,7 +402,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               ))
             ) : (
               <Text style={{ fontFamily: "IBMPlexMono-Medium", color: "#888", marginBottom: 10 }}>
-                Aucun modèle détecté.
+                No models detected.
               </Text>
             )}
             {ollamaModelOptions.length === 0 && (
@@ -401,7 +410,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }, { marginTop: 10 }]}
                 onPress={() => setDownloadModalVisible(true)}
               >
-                <Image source={downloadIcon} style={styles.downloadIcon} />
+                <Image source={downloadIcon} style={styles.downloadIcon} tintColor="#0066cc" />
                 <Text style={styles.downloadText}>
                   {isDownloading ? "Downloading..." : "Download Gemma4?"}
                 </Text>
@@ -476,13 +485,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     </>
   );
 
-  const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-
   if (isLargeScreen) {
     if (!visible) return null;
     return (
-      <View style={[styles.largeScreenContainer, isTauri ? styles.floatingContainer : styles.attachedContainer]}>
-        <View style={isTauri ? styles.floatingContent : styles.attachedContent}>
+      <View style={[styles.largeScreenContainer, isDesktop ? styles.floatingContainer : styles.attachedContainer]}>
+        <View style={isDesktop ? styles.floatingContent : styles.attachedContent}>
           {innerContent}
         </View>
         {notificationModal}
@@ -496,7 +503,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      <Animated.View style={[styles.content, { transform: [{ translateX }] }]}>
+      <Animated.View style={[styles.content, { width: drawerWidth }, { transform: [{ translateX }] }]}>
         {innerContent}
       </Animated.View>
 
@@ -520,7 +527,6 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     right: 0,
-    width: DRAWER_WIDTH,
     backgroundColor: "#fff",
     paddingHorizontal: 16,
   },
@@ -534,10 +540,7 @@ const styles = StyleSheet.create({
     marginTop: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window ? 48 : 16,
     marginBottom: 16,
     borderRadius: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
     elevation: 5,
     overflow: "hidden",
   },
@@ -615,7 +618,7 @@ const styles = StyleSheet.create({
   downloadIcon: {
     width: 20,
     height: 20,
-    tintColor: "#0066cc",
+    
   },
   downloadText: {
     fontSize: 14,

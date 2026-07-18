@@ -69,20 +69,12 @@ export default function Selector({
   };
 
   const selectedOption = options.find((o) => o.id === selectedValue);
-  const MAX_MENU_HEIGHT = 300;
-  const estimatedMenuHeight = Math.min(options.length * 44 + (title ? 30 : 0) + 24, MAX_MENU_HEIGHT);
-
-  const menuAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      maxHeight: progress.value * estimatedMenuHeight,
-      opacity: progress.value,
-      overflow: "hidden",
-    };
-  });
+  let finalMenuHeight = Math.min(options.length * 44 + (title ? 30 : 0) + 24, 300);
 
   const menuWidth = fullWidth && triggerLayout ? triggerLayout.width : 220;
   let menuLeft = 0;
-  let menuTop = 0;
+  let menuTop: number | undefined = 0;
+  let menuBottom: number | undefined = undefined;
 
   if (triggerLayout) {
     menuLeft = triggerLayout.x;
@@ -93,14 +85,30 @@ export default function Selector({
       menuLeft = 16;
     }
 
-    menuTop = triggerLayout.y + triggerLayout.height + 4;
-    if (menuTop + estimatedMenuHeight > SCREEN_HEIGHT - 16) {
-      const upwardTop = triggerLayout.y - estimatedMenuHeight - 4;
-      if (upwardTop > 16) {
-        menuTop = upwardTop;
+    const spaceBelow = SCREEN_HEIGHT - (triggerLayout.y + triggerLayout.height) - 16;
+    const spaceAbove = triggerLayout.y - 16;
+
+    if (finalMenuHeight <= spaceBelow) {
+      menuTop = triggerLayout.y + triggerLayout.height + 4;
+    } else if (spaceBelow >= 200 || spaceBelow >= spaceAbove) {
+      menuTop = triggerLayout.y + triggerLayout.height + 4;
+      finalMenuHeight = spaceBelow;
+    } else {
+      if (finalMenuHeight > spaceAbove) {
+        finalMenuHeight = spaceAbove;
       }
+      menuTop = undefined;
+      menuBottom = SCREEN_HEIGHT - triggerLayout.y + 4;
     }
   }
+
+  const menuAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      maxHeight: progress.value * finalMenuHeight,
+      opacity: progress.value,
+      overflow: "hidden",
+    };
+  });
 
   return (
     <View style={[styles.container, fullWidth && styles.containerFullWidth]}>
@@ -130,13 +138,13 @@ export default function Selector({
             style={[
               styles.menu,
               triggerLayout
-                ? { top: menuTop, left: menuLeft, width: menuWidth }
+                ? { top: menuTop, bottom: menuBottom, left: menuLeft, width: menuWidth }
                 : {},
               menuAnimatedStyle,
             ]}
           >
-            {title && <Text style={styles.sectionTitle}>{title}</Text>}
-            <ScrollView style={{ maxHeight: MAX_MENU_HEIGHT - (title ? 30 : 0) - 24 }} showsVerticalScrollIndicator={false} nestedScrollEnabled={true}>
+            <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled={true} contentContainerStyle={{ paddingBottom: 4 }}>
+              {title && <Text style={styles.sectionTitle}>{title}</Text>}
               {options.map((option) => (
                 <Pressable
                   key={option.id}

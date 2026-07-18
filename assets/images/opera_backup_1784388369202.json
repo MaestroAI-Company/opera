@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "settings": {
+    "language": "fr",
+    "theme": "system",
+    "aiService": "ollama",
+    "ollamaUrl": "",
+    "ollamaModel": "gemma4:latest",
+    "whisperModel": "base",
+    "whisperLanguage": "fr",
+    "instruction": "",
+    "speaker": false,
+    "alwaysWhisper": false
+  },
+  "conversations": [],
+  "messages": []
+}

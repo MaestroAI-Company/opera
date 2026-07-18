@@ -316,14 +316,7 @@ export default function Index() {
         let isError = false;
 
         //send to AI and stream chunks
-        if (taskAiService === 'ollama' && (!taskOllamaUrl || taskOllamaUrl.trim() === '')) {
-          isError = true;
-          streamingContentRef.current = "Ollama URL is undefined or invalid. Please check your settings.";
-          if (activeConversationRef.current?.id === taskConv.id) {
-            setMessages((prev) => prev.map((m) => m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current } : m));
-          }
-          abortControllerRef.current = null;
-        } else if (!taskSelectedModel) {
+        if (!taskSelectedModel) {
           isError = true;
           streamingContentRef.current = "Please select a model from the top menu before sending a message.";
           if (activeConversationRef.current?.id === taskConv.id) {
@@ -512,14 +505,7 @@ export default function Index() {
       abortControllerRef.current = new AbortController();
       let isError = false;
 
-      if (taskAiService === 'ollama' && (!taskOllamaUrl || taskOllamaUrl.trim() === '')) {
-        isError = true;
-        streamingContentRef.current = "Ollama URL is undefined or invalid. Please check your settings.";
-        if (activeConversationRef.current?.id === taskConv.id) {
-          setMessages((prev) => prev.map((m) => m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current } : m));
-        }
-        abortControllerRef.current = null;
-      } else if (!taskSelectedModel) {
+      if (!taskSelectedModel) {
         isError = true;
         streamingContentRef.current = "Please select a model from the top menu before sending a message.";
         if (activeConversationRef.current?.id === taskConv.id) {
@@ -664,7 +650,7 @@ export default function Index() {
         )}
       </ImageBackground>
 
-      <View style={{ flex: 1, flexDirection: isLargeScreen ? "row" : "column" }}>
+      <View style={{ flex: 1, flexDirection: isLargeScreen ? "row" : "column" }} pointerEvents="box-none">
         <DrawerMenu
           isLargeScreen={isLargeScreen}
           visible={drawerVisible}
@@ -677,7 +663,7 @@ export default function Index() {
           onTogglePinConversation={togglePinConversation}
         />
 
-        <View style={{ flex: 1, backgroundColor: "transparent" }}>
+        <View style={{ flex: 1, backgroundColor: "transparent" }} pointerEvents="box-none">
           {activeConversation && (
             <ChatView
               messages={messages}
@@ -691,13 +677,20 @@ export default function Index() {
             />
           )}
 
-          <View style={[styles.topBarOverlay, { paddingTop: insets.top }]}>
+          <View style={[styles.topBarOverlay, { 
+            paddingTop: insets.top + (
+              (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) 
+                ? (navigator.userAgent.includes("Linux") && !navigator.userAgent.includes("Android") ? 0 : 32) 
+                : 0
+            ) 
+          }]} pointerEvents="box-none">
             <TopBar
               onMenuPress={() => {
                 Keyboard.dismiss();
                 setDrawerVisible(prev => !prev);
               }}
               onNewPress={startNewConversation}
+              isLargeScreen={isLargeScreen}
               centerElement={
                 aiService === "ollama" ? (
                   <ModelDropdown
@@ -715,13 +708,23 @@ export default function Index() {
                 <View style={styles.settingsShadowLayer}>
                   <View style={styles.settingsShadowBlock} />
                   <Pressable
-                    style={({ pressed }) => [styles.settingsButton, pressed && { backgroundColor: "#eaeaea" }]}
+                    style={({ pressed }) => [
+                      styles.settingsButton, 
+                      pressed && { backgroundColor: "#eaeaea" },
+                      !(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) && { paddingHorizontal: 0, width: 44 }
+                    ]}
                     onPress={() => {
                       Keyboard.dismiss();
                       setSettingsDrawerVisible(prev => !prev);
                     }}
                   >
-                    <Image source={settingsIcon} style={styles.settingsIcon} />
+                    <Image 
+                      source={settingsIcon} 
+                      style={[styles.settingsIcon, !(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) && { marginRight: 0 }]} 
+                    />
+                    {(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) && (
+                      <Text style={styles.settingsButtonText}>Settings</Text>
+                    )}
                   </Pressable>
                 </View>
               }
@@ -729,7 +732,7 @@ export default function Index() {
           </View>
 
           {/* bottom bar overlay */}
-          <View style={[styles.bottomBarOverlay, { paddingBottom: insets.bottom }]}>
+          <View style={[styles.bottomBarOverlay, { paddingBottom: insets.bottom }]} pointerEvents="box-none">
             <ChatBar
               onSend={handleSend}
               onPlusPress={() => console.log("plus pressed")}
@@ -819,8 +822,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   settingsButton: {
-    width: 44,
     height: 44,
+    paddingHorizontal: 12,
+    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#fff",
@@ -833,6 +837,12 @@ const styles = StyleSheet.create({
   settingsIcon: {
     width: 18,
     height: 18,
+    marginRight: 8,
+  },
+  settingsButtonText: {
+    fontSize: 14,
+    fontFamily: "IBMPlexMono-Medium",
+    color: "#333",
   },
   incognitoBox: {
     position: "relative",

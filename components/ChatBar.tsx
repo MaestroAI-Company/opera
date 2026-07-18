@@ -137,6 +137,10 @@ export default function ChatBar({
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const pressAnim = useRef(new Animated.Value(0)).current;
 
+  const webAudioContextRef = useRef<AudioContext | null>(null);
+  const webAudioStreamRef = useRef<MediaStream | null>(null);
+  const webAudioProcessorRef = useRef<ScriptProcessorNode | null>(null);
+
   const { stream } = useAudioStream({
     sampleRate: 16000,
     channels: 1,
@@ -207,7 +211,34 @@ export default function ChatBar({
     try {
       pcmChunksRef.current = [];
       setIsRecording(true);
-      await stream.start();
+      if (Platform.OS === 'web') {
+        const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
+        webAudioStreamRef.current = ms;
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        const context = new AudioCtx({ sampleRate: 16000 });
+        webAudioContextRef.current = context;
+        const source = context.createMediaStreamSource(ms);
+        const processor = context.createScriptProcessor(4096, 1, 1);
+        processor.onaudioprocess = (e) => {
+          if (isRecordingRef.current) {
+            const inputData = e.inputBuffer.getChannelData(0);
+            const chunk = new Float32Array(inputData);
+            pcmChunksRef.current.push(chunk.buffer);
+            sampleRateRef.current = context.sampleRate;
+            
+            let sum = 0;
+            for (let i = 0; i < chunk.length; i++) {
+              sum += chunk[i] * chunk[i];
+            }
+            currentAudioVolume = Math.sqrt(sum / chunk.length);
+          }
+        };
+        source.connect(processor);
+        processor.connect(context.destination);
+        webAudioProcessorRef.current = processor;
+      } else {
+        await stream?.start();
+      }
     } catch (e) {
       console.error("failed to start audio stream:", e);
       setIsRecording(false);
@@ -216,7 +247,22 @@ export default function ChatBar({
 
   const stopAndTranscribe = async (): Promise<string | null> => {
     try {
-      stream.stop();
+      if (Platform.OS === 'web') {
+        if (webAudioProcessorRef.current) {
+          webAudioProcessorRef.current.disconnect();
+          webAudioProcessorRef.current = null;
+        }
+        if (webAudioContextRef.current) {
+          webAudioContextRef.current.close();
+          webAudioContextRef.current = null;
+        }
+        if (webAudioStreamRef.current) {
+          webAudioStreamRef.current.getTracks().forEach(track => track.stop());
+          webAudioStreamRef.current = null;
+        }
+      } else {
+        stream?.stop();
+      }
       setIsRecording(false);
       const chunks = pcmChunksRef.current;
       pcmChunksRef.current = [];
@@ -282,7 +328,13 @@ export default function ChatBar({
 
   const handleMicPress = () => {
     if (isRecording) {
-      stream.stop();
+      if (Platform.OS === 'web') {
+        if (webAudioProcessorRef.current) webAudioProcessorRef.current.disconnect();
+        if (webAudioContextRef.current) webAudioContextRef.current.close();
+        if (webAudioStreamRef.current) webAudioStreamRef.current.getTracks().forEach(t => t.stop());
+      } else {
+        stream?.stop();
+      }
       setIsRecording(false);
       pcmChunksRef.current = [];
     } else {
@@ -302,6 +354,18 @@ export default function ChatBar({
       setSelectedFiles([]);
     }
   };
+
+  const handleKeyPress = (e: any) => {
+    if (Platform.OS === 'web') {
+      if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+        e.preventDefault();
+        if (!isGenerating) {
+          handleSend();
+        }
+      }
+    }
+  };
+
 
   return (
     <KeyboardAvoidingView
@@ -357,17 +421,23 @@ export default function ChatBar({
             {isRecording ? (
               <VoiceIndicator />
             ) : (
-              <View style={{ flex: 1, marginLeft: 8 }}>
+              <View style={{ flex: 1, marginLeft: 8, justifyContent: 'center' }}>
                 <TextInput
-                  style={[styles.input, { maxHeight: 100, minHeight: 24 }]}
+                  style={[
+                    styles.input, 
+                    { maxHeight: 100, minHeight: 20, lineHeight: 20 },
+                    Platform.OS === 'web' && { outlineStyle: 'none', margin: 0, padding: 0, overflow: 'hidden' } as any
+                  ]}
                   value={isTranscribing ? "Transcribing..." : text}
                   onChangeText={isTranscribing ? undefined : setText}
                   placeholder={placeholder}
                   placeholderTextColor="rgba(255,255,255,0.6)"
                   multiline={true}
+                  numberOfLines={1}
                   editable={!isTranscribing}
                   onTouchStart={handlePressIn}
                   onTouchEnd={handlePressOut}
+                  onKeyPress={handleKeyPress}
                 />
               </View>
             )}

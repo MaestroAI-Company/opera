@@ -67,7 +67,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                 const isAudioPath = uri.toLowerCase().match(/\.(wav|mp3|m4a|aac|flac|ogg)(?:\?.*)?$/);
                 const isAudioData = uri.startsWith('data:audio');
                 const isAudio = isAudioPath || isAudioData;
-                
+
                 const getFilename = (path: string) => {
                   if (path.startsWith('data:')) return 'Audio Recording.wav';
                   if (path.includes('?name=')) {
@@ -95,7 +95,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               })}
             </View>
           )}
-          <Text 
+          <Text
             style={[styles.bubbleText, styles.userText]}
             selectable={true}
             selectionColor="rgba(255, 255, 255, 0.4)"
@@ -121,11 +121,11 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                   <Image source={speakerIcon} style={{ width: 22, height: 22, tintColor: "#999" }} />
                 </Pressable>
               )}
-              <Pressable 
-                onPress={() => onRegenerate?.(item.id)} 
+              <Pressable
+                onPress={() => onRegenerate?.(item.id)}
                 disabled={isChatGenerating}
                 style={({ pressed }) => [
-                  styles.toolbarIconContainer, 
+                  styles.toolbarIconContainer,
                   pressed && { backgroundColor: "#eaeaea" },
                   isChatGenerating && { opacity: 0.3 }
                 ]}

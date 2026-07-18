@@ -257,7 +257,7 @@ export default function Index() {
       } else {
         userMsg = await DB.addMessage(conv.id, "user", text, images);
       }
-      
+
       //attach images to incognito message as well if needed
       if (images && images.length > 0) {
         userMsg.images = images;
@@ -792,7 +792,7 @@ const styles = StyleSheet.create({
     right: 4,
     height: 44,
     backgroundColor: "#00000013",
-    borderRadius: 5,
+    borderRadius: 10,
   },
   settingsButton: {
     width: 44,
@@ -802,7 +802,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderWidth: 2,
     borderColor: "#00000017",
-    borderRadius: 5,
+    borderRadius: 10,
     position: "relative",
     zIndex: 1,
   },
@@ -814,7 +814,7 @@ const styles = StyleSheet.create({
     position: "relative",
     borderWidth: 2,
     borderColor: "#00000017",
-    borderRadius: 5,
+    borderRadius: 10,
     paddingVertical: 8,
     paddingHorizontal: 16,
     backgroundColor: "#fff",

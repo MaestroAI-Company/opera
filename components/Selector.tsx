@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     height: 44,
     backgroundColor: "#fff",
     gap: 8,
-    borderRadius: 5,
+    borderRadius: 10,
     minWidth: 120,
     maxWidth: 240,
     overflow: "hidden",
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
   menu: {
     position: "absolute",
     backgroundColor: "#fff",
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 2,
     borderColor: "#00000017",
     padding: 12,
@@ -237,6 +237,7 @@ const styles = StyleSheet.create({
   },
   optionSelected: {
     backgroundColor: "#FF1A1A",
+    borderWidth: 2,
     borderColor: "#ffffff52",
   },
   optionText: {

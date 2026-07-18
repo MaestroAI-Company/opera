@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
     right: 4,
     height: 44,
     backgroundColor: "#00000013",
-    borderRadius: 5,
+    borderRadius: 10,
   },
   trigger: {
     flexDirection: "row",
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
     height: 44,
     backgroundColor: "#fff",
     gap: 8,
-    borderRadius: 5,
+    borderRadius: 10,
     maxWidth: 180,
     overflow: "hidden",
     position: "relative",
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
   menu: {
     position: "absolute",
     backgroundColor: "#fff",
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 2,
     borderColor: "#00000017",
     padding: 12,
@@ -364,12 +364,14 @@ const styles = StyleSheet.create({
   },
   option: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderRadius: 8,
     marginBottom: 4,
   },
   optionSelected: {
     backgroundColor: "#FF1A1A",
+    borderWidth: 2,
+    borderColor: "#ffffff52",
   },
   optionText: {
     fontSize: 15,

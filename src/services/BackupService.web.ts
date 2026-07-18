@@ -28,6 +28,29 @@ class BackupServiceImpl {
 
       // trigger browser download
       const blob = new Blob([jsonStr], { type: 'application/json' });
+
+      if ('showSaveFilePicker' in window) {
+        try {
+          const handle = await (window as any).showSaveFilePicker({
+            suggestedName: filename,
+            types: [{
+              description: 'JSON Backup',
+              accept: { 'application/json': ['.json'] },
+            }],
+          });
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          return;
+        } catch (err: any) {
+          if (err.name === 'AbortError') {
+            return; // user cancelled
+          }
+          console.error('showSaveFilePicker error, falling back to basic download', err);
+        }
+      }
+
+      // fallback
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

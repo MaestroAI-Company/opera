@@ -113,6 +113,7 @@ export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode
 
     // fenced code block ```
     if (line.trimStart().startsWith("```")) {
+      const language = line.replace(/```/g, "").trim().toLowerCase();
       const codeLines: string[] = [];
       i++;
       while (i < lines.length && !lines[i].trimStart().startsWith("```")) {
@@ -120,6 +121,9 @@ export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode
         i++;
       }
       i++; // skip closing ```
+      
+
+
       elements.push(
         <Text key={`code-${i}`} style={[s.base, s.codeBlock]} selectable={true} selectionColor={selColor}>
           {codeLines.join("\n")}

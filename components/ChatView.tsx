@@ -194,6 +194,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   return (
     <View style={styles.container}>
       <FlatList
+        style={{ width: '100%', maxWidth: 840, alignSelf: 'center' }}
         ref={listRef}
         data={messages}
         keyExtractor={(item) => item.id}

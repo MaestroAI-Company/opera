@@ -89,6 +89,8 @@ export default function DrawerMenu({
     })
   ).current;
 
+  const largeScreenAnim = useRef(new Animated.Value(visible ? 1 : 0)).current;
+
   useEffect(() => {
     if (visible) {
       Keyboard.dismiss();
@@ -104,6 +106,11 @@ export default function DrawerMenu({
           duration: 280,
           useNativeDriver: Platform.OS !== "web",
         }),
+        Animated.timing(largeScreenAnim, {
+          toValue: 1,
+          duration: 280,
+          useNativeDriver: false,
+        }),
       ]).start();
     } else {
       Animated.parallel([
@@ -117,6 +124,11 @@ export default function DrawerMenu({
           duration: 250,
           useNativeDriver: Platform.OS !== "web",
         }),
+        Animated.timing(largeScreenAnim, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: false,
+        }),
       ]).start((result) => {
         if (result.finished) {
           setRendered(false);
@@ -125,7 +137,7 @@ export default function DrawerMenu({
     }
   }, [visible, isLargeScreen]);
 
-  if (!isLargeScreen && !rendered) return null;
+  if (!rendered) return null;
 
   //group conversations
   const pinnedConversations = conversations.filter(c => c.pinned);
@@ -198,7 +210,7 @@ export default function DrawerMenu({
       />
 
       <View style={styles.quickActionsShadowLayer}>
-        <View style={styles.quickActionsShadowBlock} />
+        {!isDesktop && <View style={styles.quickActionsShadowBlock} />}
         <View style={styles.quickActionsBox}>
           <Pressable
             onPress={() => {
@@ -269,14 +281,38 @@ export default function DrawerMenu({
   );
 
   if (isLargeScreen) {
-    if (!visible) return null;
+    const largeScreenWidth = largeScreenAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 320]
+    });
+    const largeScreenMargin = largeScreenAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 16]
+    });
+    const largeScreenOpacity = largeScreenAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1]
+    });
+
     return (
-      <View style={[styles.largeScreenContainer, isDesktop ? styles.floatingContainer : styles.attachedContainer]}>
-        <View style={isDesktop ? styles.floatingContent : styles.attachedContent}>
-          {innerContent}
+      <Animated.View style={[
+        styles.largeScreenContainer,
+        isDesktop ? styles.floatingContainer : styles.attachedContainer,
+        {
+          width: largeScreenWidth,
+          opacity: largeScreenOpacity,
+          marginLeft: isDesktop ? largeScreenMargin : 0,
+          marginRight: isDesktop ? largeScreenMargin : 0,
+          alignItems: 'flex-end',
+        }
+      ]}>
+        <View style={{ width: 320, flex: 1 }}>
+          <View style={isDesktop ? styles.floatingContent : styles.attachedContent}>
+            {innerContent}
+          </View>
         </View>
         {notificationModal}
-      </View>
+      </Animated.View>
     );
   }
 
@@ -323,10 +359,12 @@ const styles = StyleSheet.create({
   },
   floatingContainer: {
     margin: 16,
-    marginTop: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window ? 48 : 16,
+    marginTop: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window ? 40 : 8,
     marginBottom: 16,
     borderRadius: 10,
-    boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
+    borderWidth: 2,
+    borderColor: "#00000017",
+    boxShadow: "-6px 6px 0px #00000013",
     elevation: 5,
     overflow: "hidden",
   },
@@ -433,7 +471,6 @@ const styles = StyleSheet.create({
   },
   discussionTextSelected: {
     color: "#ffffffff",
-    fontWeight: "600",
   },
   rowActions: {
     flexDirection: "row",

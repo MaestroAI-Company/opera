@@ -475,7 +475,7 @@ export default function ChatBar({
       setIsRecording(false);
       pcmChunksRef.current = [];
     } else {
-      if (Platform.OS !== 'web') {
+      if (Platform.OS !== 'web' && !canTranscribeRemotely) {
         const modelName = Settings.getCached().whisperModel || "base";
         if (modelName === "none") {
           setModalConfig({

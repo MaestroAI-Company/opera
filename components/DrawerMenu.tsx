@@ -63,18 +63,13 @@ export default function DrawerMenu({
   isDesktop = false,
 }: DrawerMenuProps) {
   const { width } = useResponsive();
-  const drawerWidth = width * 0.88;
+  const drawerWidth = Math.min(width * 0.88, 360);
 
-  const [rendered, setRendered] = useState(false);
   const translateX = useRef(new Animated.Value(-drawerWidth)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!visible) {
-      translateX.setValue(-drawerWidth);
-    }
-  }, [drawerWidth, visible, translateX]);
+
 
   const panResponder = useRef(
     PanResponder.create({
@@ -94,50 +89,53 @@ export default function DrawerMenu({
   useEffect(() => {
     if (visible) {
       Keyboard.dismiss();
-      setRendered(true);
-      Animated.parallel([
-        Animated.timing(translateX, {
-          toValue: 0,
-          duration: 280,
-          useNativeDriver: Platform.OS !== "web",
-        }),
-        Animated.timing(overlayOpacity, {
-          toValue: 1,
-          duration: 280,
-          useNativeDriver: Platform.OS !== "web",
-        }),
-        Animated.timing(largeScreenAnim, {
+      const anims = [];
+      if (isDesktop) {
+        anims.push(Animated.timing(largeScreenAnim, {
           toValue: 1,
           duration: 280,
           useNativeDriver: false,
-        }),
-      ]).start();
+        }));
+      } else {
+        anims.push(
+          Animated.timing(translateX, {
+            toValue: 0,
+            duration: 280,
+            useNativeDriver: Platform.OS !== "web",
+          }),
+          Animated.timing(overlayOpacity, {
+            toValue: 1,
+            duration: 280,
+            useNativeDriver: Platform.OS !== "web",
+          })
+        );
+      }
+      Animated.parallel(anims).start();
     } else {
-      Animated.parallel([
-        Animated.timing(translateX, {
-          toValue: -drawerWidth,
-          duration: 250,
-          useNativeDriver: Platform.OS !== "web",
-        }),
-        Animated.timing(overlayOpacity, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: Platform.OS !== "web",
-        }),
-        Animated.timing(largeScreenAnim, {
+      const anims = [];
+      if (isDesktop) {
+        anims.push(Animated.timing(largeScreenAnim, {
           toValue: 0,
           duration: 250,
           useNativeDriver: false,
-        }),
-      ]).start((result) => {
-        if (result.finished) {
-          setRendered(false);
-        }
-      });
+        }));
+      } else {
+        anims.push(
+          Animated.timing(translateX, {
+            toValue: -drawerWidth,
+            duration: 250,
+            useNativeDriver: Platform.OS !== "web",
+          }),
+          Animated.timing(overlayOpacity, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: Platform.OS !== "web",
+          })
+        );
+      }
+      Animated.parallel(anims).start();
     }
-  }, [visible, isLargeScreen]);
-
-  if (!rendered) return null;
+  }, [visible, isDesktop, drawerWidth]);
 
   //group conversations
   const pinnedConversations = conversations.filter(c => c.pinned);
@@ -215,7 +213,7 @@ export default function DrawerMenu({
           <Pressable
             onPress={() => {
               onNewConversation();
-              if (!isLargeScreen) onClose();
+              if (!isDesktop) onClose();
             }}
             style={({ pressed }) => [styles.quickActionItem, pressed && { backgroundColor: "#eaeaea" }]}
           >
@@ -280,7 +278,7 @@ export default function DrawerMenu({
     />
   );
 
-  if (isLargeScreen) {
+  if (isDesktop) {
     const largeScreenWidth = largeScreenAnim.interpolate({
       inputRange: [0, 1],
       outputRange: [0, 320]
@@ -316,7 +314,7 @@ export default function DrawerMenu({
     );
   }
 
-  return (
+  const mobileDrawer = (
     <View style={[styles.root, { pointerEvents: visible ? "auto" : "none" }]}>
       <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
@@ -332,12 +330,15 @@ export default function DrawerMenu({
       {notificationModal}
     </View>
   );
+
+  return mobileDrawer;
 }
 
 const styles = StyleSheet.create({
   root: {
     ...StyleSheet.absoluteFill,
-    zIndex: 100,
+    zIndex: 1000,
+    elevation: 1000,
   },
   overlay: {
     ...StyleSheet.absoluteFill,

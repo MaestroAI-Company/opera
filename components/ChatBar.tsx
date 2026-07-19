@@ -475,7 +475,7 @@ export default function ChatBar({
       setIsRecording(false);
       pcmChunksRef.current = [];
     } else {
-      if (Platform.OS !== 'web' && !canTranscribeRemotely) {
+      if (!canTranscribeRemotely) {
         const modelName = Settings.getCached().whisperModel || "base";
         if (modelName === "none") {
           setModalConfig({
@@ -664,7 +664,7 @@ export default function ChatBar({
                   </Pressable>
                 )}
 
-                {((Settings.getCached().whisperModel !== 'none' && Platform.OS !== 'web') || canTranscribeRemotely) && !isGenerating && (
+                {((Settings.getCached().whisperModel !== 'none') || canTranscribeRemotely) && !isGenerating && (
                   <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.micButton}>
                     <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
                       <Image source={isRecording ? stopIcon : micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} tintColor="#fff" />

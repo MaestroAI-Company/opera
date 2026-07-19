@@ -440,7 +440,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         />
       </View>
 
-      {Platform.OS !== 'web' && (
+      {true && (
         <>
           <View style={[styles.settingRowVertical, { zIndex: 9 }]}>
             <Text style={styles.settingLabel}>Whisper Model</Text>

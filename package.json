@@ -8,6 +8,7 @@
     "@notifee/react-native": "^9.1.8",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-http": "^2.5.9",
+    "@xenova/transformers": "^2.17.2",
     "buffer": "^6.0.3",
     "expo": "~57.0.4",
     "expo-audio": "~57.0.0",

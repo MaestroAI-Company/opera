@@ -726,7 +726,17 @@ export default function Index() {
                     }}
                     onPress={() => {
                       Keyboard.dismiss();
-                      setSettingsDrawerVisible(prev => !prev);
+                      if (settingsDrawerVisible) {
+                        const cached = Settings.getCached();
+                        if (cached.ollamaModel && cached.ollamaModel !== selectedModel) {
+                          setSelectedModel(cached.ollamaModel);
+                        }
+                        setAiService(cached.aiService);
+                        setOllamaUrl(cached.ollamaUrl);
+                        setSpeakerEnabled(cached.speaker);
+                        setAlwaysWhisper(cached.alwaysWhisper);
+                      }
+                      setSettingsDrawerVisible(!settingsDrawerVisible);
                     }}
                   >
                     <Image 

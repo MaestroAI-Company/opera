@@ -12,12 +12,19 @@ import {
   Text,
   TextInput,
   Vibration,
-  View
+  View,
+  Keyboard,
+  PanResponder,
+  LayoutAnimation,
+  ScrollView
 } from "react-native";
 import { Whisper } from "../src/services/whisper/WhisperService";
 import { Settings } from "../src/services/settings/SettingsService";
 import NotificationModal from "./NotificationModal";
 import { TextInputWrapper } from "expo-paste-input";
+import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library/legacy';
+import AttachmentSheet, { SelectedFile } from "./AttachmentSheet";
 
 const nextWhiteIcon = require("../assets/icons/arrow.png");
 const micIcon = require("../assets/icons/microphone.png");
@@ -36,8 +43,6 @@ type ChatInputBarProps = {
   canTranscribeRemotely?: boolean;
   onOpenSettings?: () => void;
 };
-
-type SelectedFile = { uri: string; type: string; name: string };
 
 //wav buffer builder from pcm chunks
 function buildWavBuffer(pcmFloat32Chunks: ArrayBuffer[], sampleRate: number): ArrayBuffer {
@@ -135,6 +140,126 @@ export default function ChatBar({
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState<{title: string, message: string, buttons?: {text: string, onPress: () => void, style?: "primary" | "secondary" | "danger"}[]}>({ title: "", message: "" });
+  const [isAttachmentSheetVisible, setIsAttachmentSheetVisible] = useState(false);
+  const [recentPhotos, setRecentPhotos] = useState<any[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+
+  const setSheetVisible = (value: boolean | ((prev: boolean) => boolean)) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsAttachmentSheetVisible(value);
+  };
+
+  useEffect(() => {
+    if (!isAttachmentSheetVisible) {
+      setIsSelectionMode(false);
+    }
+  }, [isAttachmentSheetVisible]);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        if (isAttachmentSheetVisible) {
+          setIsAttachmentSheetVisible(false);
+        }
+      }
+    );
+    return () => {
+      showSubscription.remove();
+    };
+  }, [isAttachmentSheetVisible]);
+
+  useEffect(() => {
+    if (selectedFiles.length === 0 && isSelectionMode) {
+      setIsSelectionMode(false);
+    }
+  }, [selectedFiles.length, isSelectionMode]);
+
+  const toggleAttachmentSheet = () => {
+    if (!isAttachmentSheetVisible) {
+      Keyboard.dismiss();
+    }
+    setIsAttachmentSheetVisible(prev => !prev);
+  };
+
+  useEffect(() => {
+    const getRecentPhotos = async () => {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status === 'granted') {
+        const media = await MediaLibrary.getAssetsAsync({
+          mediaType: 'photo',
+          first: 10,
+          sortBy: ['creationTime'],
+        });
+        setRecentPhotos(media.assets);
+      }
+    };
+    if (isAttachmentSheetVisible) {
+      getRecentPhotos();
+    }
+  }, [isAttachmentSheetVisible]);
+
+  const handleCamera = async () => {
+    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+    if (permissionResult.granted === false) {
+      setModalConfig({ title: "Permission Denied", message: "You've refused to allow this app to access your camera!" });
+      setModalVisible(true);
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: false,
+      quality: 1,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const asset = result.assets[0];
+      setSelectedFiles(prev => [...prev, {
+        uri: asset.uri,
+        type: 'image',
+        name: asset.fileName || 'camera_image.jpg'
+      }]);
+      setIsAttachmentSheetVisible(false);
+    }
+  };
+
+  const handlePhotos = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permissionResult.granted === false) {
+      setModalConfig({ title: "Permission Denied", message: "You've refused to allow this app to access your photos!" });
+      setModalVisible(true);
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      quality: 1,
+    });
+    if (!result.canceled && result.assets) {
+      const newFiles = result.assets.map(asset => ({
+        uri: asset.uri,
+        type: 'image',
+        name: asset.fileName || 'photo.jpg'
+      }));
+      setSelectedFiles(prev => [...prev, ...newFiles]);
+      setIsAttachmentSheetVisible(false);
+    }
+  };
+
+  const handleSelectRecentPhoto = (photo: any) => {
+    const isSelected = selectedFiles.some(f => f.uri === (photo.uri || photo.localUri));
+    if (isSelected) {
+      setSelectedFiles(prev => prev.filter(f => f.uri !== (photo.uri || photo.localUri)));
+    } else {
+      setSelectedFiles(prev => [...prev, {
+        uri: photo.uri || photo.localUri,
+        type: 'image',
+        name: photo.filename || 'recent_photo.jpg'
+      }]);
+    }
+  };
+
+  const handleLongPressRecentPhoto = (photo: any) => {
+    handleSelectRecentPhoto(photo);
+  };
 
   const pcmChunksRef = useRef<ArrayBuffer[]>([]);
   const sampleRateRef = useRef<number>(16000);
@@ -331,6 +456,7 @@ export default function ChatBar({
         if (validFiles.length > 0) {
           setSelectedFiles(prev => [...prev, ...validFiles]);
         }
+        setIsAttachmentSheetVisible(false);
       }
     } catch (e) {
       console.error("Failed to pick files", e);
@@ -533,7 +659,7 @@ export default function ChatBar({
                 ]}
               >
                 {supportsFiles && (
-                  <Pressable onPress={handlePickFiles} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.plusButton}>
+                  <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.plusButton}>
                     <Image source={addIcon} style={styles.plusIcon} tintColor="#fff" />
                   </Pressable>
                 )}
@@ -595,6 +721,19 @@ export default function ChatBar({
               </Animated.View>
             </Animated.View>
           </Pressable>
+
+          <AttachmentSheet
+            visible={isAttachmentSheetVisible}
+            incognito={incognito}
+            onClose={() => setIsAttachmentSheetVisible(false)}
+            onCamera={handleCamera}
+            onPickFiles={handlePickFiles}
+            onPhotos={handlePhotos}
+            recentPhotos={recentPhotos}
+            selectedFiles={selectedFiles}
+            onSelectRecentPhoto={handleSelectRecentPhoto}
+            onLongPressRecentPhoto={handleLongPressRecentPhoto}
+          />
         </View>
       </View>
       <NotificationModal

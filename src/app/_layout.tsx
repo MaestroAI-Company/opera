@@ -44,6 +44,14 @@ export default function RootLayout() {
     lockMobileOrientation();
   }, []);
 
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      const handleContextMenu = (e: Event) => e.preventDefault();
+      document.addEventListener("contextmenu", handleContextMenu);
+      return () => document.removeEventListener("contextmenu", handleContextMenu);
+    }
+  }, []);
+
   if (showLottie || (!fontsLoaded && !fontError)) {
     return (
       <SplashScreenComponent

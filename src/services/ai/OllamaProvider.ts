@@ -1,5 +1,6 @@
 import { fetch as expoFetch } from 'expo/fetch';
 import { IAIProvider } from './IAIProvider';
+import { NotificationService } from '../notifications/NotificationService';
 
 async function universalFetch(input: string | URL | Request, init?: any): Promise<Response> {
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -105,7 +106,7 @@ export class OllamaProvider implements IAIProvider {
     }
   }
 
-  async downloadService(modelName: string): Promise<void> {
+  async downloadService(modelName: string, onProgress?: (progress: number, etaSeconds: number, speedStr: string, sizeStr: string) => void): Promise<void> {
     if (!this.isConfigured()) throw new Error('AI server not configured');
     try {
       const response = await universalFetch(`${this.baseUrl}/api/pull`, {
@@ -113,7 +114,7 @@ export class OllamaProvider implements IAIProvider {
         headers: { 'Content-Type': 'application/json', ...this.defaultHeaders },
         body: JSON.stringify({
           name: modelName,
-          stream: false
+          stream: true
         }),
       });
 
@@ -121,8 +122,86 @@ export class OllamaProvider implements IAIProvider {
         const text = await response.text();
         throw new Error(`Failed to pull model: ${response.status} - ${text}`);
       }
+
+      if (!response.body) {
+        throw new Error('No response body for streaming');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+
+      const startTime = Date.now();
+
+      const formatBytes = (bytes: number) => {
+        if (bytes === 0 || !bytes) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      };
+
+      const downloadId = `ollama-${modelName}`;
+
+      let lastCompleted = -1;
+      let lastTime = Date.now();
+      let smoothedSpeed = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunkText = decoder.decode(value, { stream: true });
+        const lines = chunkText.split('\n').filter((line) => line.trim() !== '');
+
+        for (const line of lines) {
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed.total && parsed.completed !== undefined) {
+              const now = Date.now();
+
+              if (lastCompleted === -1 || parsed.completed < lastCompleted) {
+                // First chunk or switched to a new layer
+                lastCompleted = parsed.completed;
+                lastTime = now;
+                smoothedSpeed = 0;
+              } else {
+                const elapsedSeconds = (now - lastTime) / 1000;
+                if (elapsedSeconds >= 0.5) { 
+                  const currentSpeed = (parsed.completed - lastCompleted) / elapsedSeconds;
+                  smoothedSpeed = smoothedSpeed === 0 ? currentSpeed : smoothedSpeed * 0.7 + currentSpeed * 0.3;
+                  lastCompleted = parsed.completed;
+                  lastTime = now;
+                }
+              }
+
+              const etaSeconds = smoothedSpeed > 0 ? (parsed.total - parsed.completed) / smoothedSpeed : 0;
+              
+              const sizeStr = `${formatBytes(parsed.completed)} / ${formatBytes(parsed.total)}`;
+              const speedStr = smoothedSpeed > 0 ? `${formatBytes(smoothedSpeed)}/s` : 'Calcul...';
+              const progress = parsed.total > 0 ? parsed.completed / parsed.total : 0;
+              
+              if (onProgress) {
+                onProgress(progress, etaSeconds, speedStr, sizeStr);
+              }
+              
+              NotificationService.displayDownloadProgress(
+                downloadId,
+                `Ollama ${modelName}`,
+                progress,
+                etaSeconds,
+                speedStr,
+                sizeStr
+              );
+            }
+          } catch (e) {
+            //ignore incomplete json
+          }
+        }
+      }
+      await NotificationService.displayDownloadFinished(downloadId, `Ollama ${modelName}`);
     } catch (error) {
       console.error('Error pulling Ollama model:', error);
+      await NotificationService.cancelNotification(`ollama-${modelName}`);
       throw error;
     }
   }

@@ -22,5 +22,5 @@ export interface IAIProvider {
   ): Promise<void>;
 
   //pull model (optional)
-  downloadService?(modelName: string): Promise<void>;
+  downloadService?(modelName: string, onProgress?: (progress: number, etaSeconds: number, speedStr: string, sizeStr: string) => void): Promise<void>;
 }

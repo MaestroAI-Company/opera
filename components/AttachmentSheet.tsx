@@ -1,13 +1,11 @@
-import React, { useRef } from 'react';
 import {
   Image,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
-  PanResponder,
-  ScrollView,
 } from 'react-native';
 
 const cameraIcon = require("../assets/icons/camera.png");
@@ -19,7 +17,6 @@ export type SelectedFile = { uri: string; type: string; name: string };
 type AttachmentSheetProps = {
   visible: boolean;
   incognito?: boolean;
-  onClose: () => void;
   onCamera: () => void;
   onPickFiles: () => void;
   onPhotos: () => void;
@@ -27,12 +24,13 @@ type AttachmentSheetProps = {
   selectedFiles: SelectedFile[];
   onSelectRecentPhoto: (photo: any) => void;
   onLongPressRecentPhoto: (photo: any) => void;
+  panHandlers?: any;
+  bottomInset?: number;
 };
 
 export default function AttachmentSheet({
   visible,
   incognito = false,
-  onClose,
   onCamera,
   onPickFiles,
   onPhotos,
@@ -40,26 +38,17 @@ export default function AttachmentSheet({
   selectedFiles,
   onSelectRecentPhoto,
   onLongPressRecentPhoto,
+  panHandlers,
+  bottomInset = 0,
 }: AttachmentSheetProps) {
-  const handlePanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderRelease: (e, gestureState) => {
-        if (gestureState.dy > 50) {
-          onClose();
-        }
-      },
-    })
-  ).current;
-
-  if (!visible) return null;
-
+  // allow continuous height measurement
   return (
     <View style={[
-      styles.inlineSheet, 
+      styles.inlineSheet,
       incognito && styles.inlineSheetIncognito,
+      { paddingBottom: (Platform.OS === 'ios' ? 20 : 10) + bottomInset }
     ]}>
-      <View style={styles.sheetHandleContainer} {...handlePanResponder.panHandlers}>
+      <View style={styles.sheetHandleContainer} {...panHandlers}>
         <View style={[styles.sheetHandle, incognito && styles.sheetHandleIncognito]} />
       </View>
 
@@ -95,12 +84,12 @@ export default function AttachmentSheet({
                 }
               ]}
             >
-              <Image 
-                source={{ uri: photo.uri || photo.localUri }} 
+              <Image
+                source={{ uri: photo.uri || photo.localUri }}
                 style={[
                   styles.sheetRecentPhoto,
                   { opacity: selectedFiles.some(f => f.uri === (photo.uri || photo.localUri)) ? 0.7 : 1 }
-                ]} 
+                ]}
               />
             </Pressable>
           ))}
@@ -118,15 +107,11 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === 'ios' ? 20 : 10,
     paddingTop: 12,
     width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 10,
+
   },
   inlineSheetIncognito: {
     backgroundColor: '#2A2A35',
-    borderTopWidth: 1,
+    borderTopWidth: 0,
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderColor: '#3e4157',
@@ -157,10 +142,10 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 70,
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#e0e0e0',
   },
   sheetIconButtonIncognito: {

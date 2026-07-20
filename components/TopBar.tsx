@@ -41,7 +41,7 @@ export default function TopBar({ onMenuPress, onNewPress, centerElement, rightEl
       </View>
 
       <View style={styles.rightSection}>
-        {centerElement && <View style={{ marginRight: 16 }}>{centerElement}</View>}
+        {centerElement && <View style={{ marginRight: isDesktop ? 16 : 4 }}>{centerElement}</View>}
         {rightElement}
       </View>
     </View>
@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   },
   button: {
     height: 40,
-    paddingHorizontal: 12,
+    paddingHorizontal: 11,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
@@ -99,11 +99,11 @@ const styles = StyleSheet.create({
   buttonIcon: {
     width: 18,
     height: 18,
-    marginRight: 8,
   },
   buttonText: {
     fontSize: 14,
     fontFamily: "IBMPlexMono-Medium",
     color: "#333",
+    marginLeft: 8,
   },
 });

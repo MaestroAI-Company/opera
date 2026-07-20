@@ -59,6 +59,38 @@ class DatabaseService {
       } catch (e) {
         // ignore, column might already exist
       }
+
+      await this.db.runAsync(
+        `CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+          content,
+          conversationId UNINDEXED
+        )`
+      );
+
+      await this.db.runAsync(
+        `CREATE TRIGGER IF NOT EXISTS messages_ai AFTER INSERT ON messages BEGIN
+          INSERT INTO messages_fts(rowid, content, conversationId) VALUES (new.rowid, new.content, new.conversationId);
+        END;`
+      );
+
+      await this.db.runAsync(
+        `CREATE TRIGGER IF NOT EXISTS messages_ad AFTER DELETE ON messages BEGIN
+          INSERT INTO messages_fts(messages_fts, rowid, content, conversationId) VALUES('delete', old.rowid, old.content, old.conversationId);
+        END;`
+      );
+
+      await this.db.runAsync(
+        `CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
+          INSERT INTO messages_fts(messages_fts, rowid, content, conversationId) VALUES('delete', old.rowid, old.content, old.conversationId);
+          INSERT INTO messages_fts(rowid, content, conversationId) VALUES (new.rowid, new.content, new.conversationId);
+        END;`
+      );
+
+      const ftsCount = await this.db.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM messages_fts');
+      if (ftsCount && ftsCount.count === 0) {
+        await this.db.runAsync('INSERT INTO messages_fts(rowid, content, conversationId) SELECT rowid, content, conversationId FROM messages');
+      }
+
     } catch (e) {
       console.error('Database init failed:', e);
       this.db = null;
@@ -100,6 +132,26 @@ class DatabaseService {
     const db = this.getDb();
     const rows = await db.getAllAsync<Conversation>(
       'SELECT * FROM conversations ORDER BY updatedAt DESC'
+    );
+    return rows;
+  }
+
+  //search conversations and messages
+  async searchConversations(query: string): Promise<Conversation[]> {
+    const db = this.getDb();
+    if (!query.trim()) return [];
+
+    //format query for fts
+    const ftsQuery = query.replace(/"/g, '""') + '*';
+
+    const rows = await db.getAllAsync<Conversation>(
+      `SELECT DISTINCT c.* 
+       FROM conversations c
+       LEFT JOIN messages_fts m_fts ON c.id = m_fts.conversationId
+       WHERE c.name LIKE ? OR m_fts.content MATCH ?
+       ORDER BY c.updatedAt DESC
+       LIMIT 50`,
+       [`%${query}%`, ftsQuery]
     );
     return rows;
   }

@@ -2,6 +2,7 @@ import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Animated,
   FlatList,
   Image,
   NativeScrollEvent,
@@ -47,9 +48,56 @@ function formatDate(timestamp: number): string {
   }).format(new Date(timestamp));
 }
 
+const FlashingText = ({ text }: { text: string }) => {
+  const opacity = useRef(new Animated.Value(0.4)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.4, duration: 600, useNativeDriver: true })
+      ])
+    ).start();
+  }, [opacity]);
+
+  return (
+    <Animated.Text style={[styles.flashingText, { opacity }]} numberOfLines={2}>
+      {text}
+    </Animated.Text>
+  );
+};
+
 const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, showSnackbar, isGenerating, isChatGenerating }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean }) => {
   const isUser = item.role === "user";
-  const isThinking = !isUser && item.content === "…";
+  
+  const thinkMatch = item.content.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
+  const isThinkingFinished = item.content.includes("</think>");
+  const hasThinkingText = thinkMatch !== null;
+  const thinkingText = thinkMatch ? thinkMatch[1].trim() : "";
+  
+  const isCurrentlyThinking = !isUser && (item.content === "…" || (isGenerating && hasThinkingText && !isThinkingFinished));
+
+  const extractSteps = (text: string) => {
+    const stepRegex = /^\s*(?:(?:\d+[\.\)]|[-*])\s*)?\*\*(.*?)\*\*/gm;
+    const steps = [];
+    let match;
+    while ((match = stepRegex.exec(text)) !== null) {
+      let stepText = match[1].replace(/:$/, '').trim();
+      steps.push(stepText);
+    }
+    
+    if (steps.length > 0) {
+      return `${steps.length}. ${steps[steps.length - 1]}`;
+    } else {
+      const lines = text.split('\n').filter(l => l.trim().length > 0);
+      return lines.length > 0 ? lines[lines.length - 1] : "Thinking...";
+    }
+  };
+
+  const currentThought = extractSteps(thinkingText);
+
+  const displayContent = item.content === "…" ? "…" : item.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
+  const finalContent = displayContent.length > 0 ? displayContent : "…";
 
   const copyToClipboard = async (text: string, isMarkdown: boolean) => {
     const contentToCopy = isMarkdown ? text : stripMarkdown(text);
@@ -105,16 +153,21 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
         </View>
       ) : (
         <View style={styles.aiContainer}>
-          {isThinking ? (
-            <Image
-              source={thinkingGif}
-              style={styles.thinkingIcon}
-              resizeMode="contain"
-            />
+          {isCurrentlyThinking ? (
+            <View style={styles.thinkingContainer}>
+              <Image
+                source={thinkingGif}
+                style={styles.thinkingIcon}
+                resizeMode="contain"
+              />
+              {hasThinkingText && (
+                <FlashingText text={currentThought} />
+              )}
+            </View>
           ) : (
-            renderMarkdown(item.content, incognito)
+            renderMarkdown(finalContent, incognito)
           )}
-          {!isUser && !isThinking && !isGenerating && (
+          {!isUser && !isCurrentlyThinking && !isGenerating && (
             <View style={styles.aiToolbar}>
               {speakerEnabled && (
                 <Pressable style={({ pressed }) => [styles.toolbarIconContainer, pressed && { backgroundColor: "#eaeaea" }]}>
@@ -342,9 +395,19 @@ const styles = StyleSheet.create({
     right: 0,
     height: 60,
   },
+  thinkingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   thinkingIcon: {
     width: 70,
-    marginTop: 4,
+  },
+  flashingText: {
+    color: "#666",
+    fontSize: 14,
+    fontFamily: "IBMPlexMono-Medium",
+    flexShrink: 1,
   },
   aiToolbar: {
     flexDirection: "row",

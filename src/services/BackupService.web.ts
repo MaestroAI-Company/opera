@@ -10,7 +10,7 @@ export type BackupData = {
 
 class BackupServiceImpl {
   // export data to json file download
-  async exportData(): Promise<void> {
+  async exportData(): Promise<boolean> {
     try {
       const settings = Settings.getCached();
       const conversations = await DB.getConversations();
@@ -41,10 +41,10 @@ class BackupServiceImpl {
           const writable = await handle.createWritable();
           await writable.write(blob);
           await writable.close();
-          return;
+          return true;
         } catch (err: any) {
           if (err.name === 'AbortError') {
-            return; // user cancelled
+            return false; // user cancelled
           }
           console.error('showSaveFilePicker error, falling back to basic download', err);
         }
@@ -59,6 +59,7 @@ class BackupServiceImpl {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      return true;
     } catch (e) {
       console.error('failed to export data', e);
       throw e;

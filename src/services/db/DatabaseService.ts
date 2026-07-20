@@ -67,21 +67,24 @@ class DatabaseService {
         )`
       );
 
+      await this.db.runAsync(`DROP TRIGGER IF EXISTS messages_ai`);
       await this.db.runAsync(
-        `CREATE TRIGGER IF NOT EXISTS messages_ai AFTER INSERT ON messages BEGIN
+        `CREATE TRIGGER messages_ai AFTER INSERT ON messages BEGIN
           INSERT INTO messages_fts(rowid, content, conversationId) VALUES (new.rowid, new.content, new.conversationId);
         END;`
       );
 
+      await this.db.runAsync(`DROP TRIGGER IF EXISTS messages_ad`);
       await this.db.runAsync(
-        `CREATE TRIGGER IF NOT EXISTS messages_ad AFTER DELETE ON messages BEGIN
-          INSERT INTO messages_fts(messages_fts, rowid, content, conversationId) VALUES('delete', old.rowid, old.content, old.conversationId);
+        `CREATE TRIGGER messages_ad AFTER DELETE ON messages BEGIN
+          DELETE FROM messages_fts WHERE rowid = old.rowid;
         END;`
       );
 
+      await this.db.runAsync(`DROP TRIGGER IF EXISTS messages_au`);
       await this.db.runAsync(
-        `CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
-          INSERT INTO messages_fts(messages_fts, rowid, content, conversationId) VALUES('delete', old.rowid, old.content, old.conversationId);
+        `CREATE TRIGGER messages_au AFTER UPDATE ON messages BEGIN
+          DELETE FROM messages_fts WHERE rowid = old.rowid;
           INSERT INTO messages_fts(rowid, content, conversationId) VALUES (new.rowid, new.content, new.conversationId);
         END;`
       );

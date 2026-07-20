@@ -47,10 +47,10 @@ class CentralAIModule {
   }
 
   // download service
-  async downloadService(modelName: string): Promise<void> {
+  async downloadService(modelName: string, onProgress?: (progress: number, etaSeconds: number, speedStr: string, sizeStr: string) => void): Promise<void> {
     const provider = this.getActiveProvider();
     if (provider.downloadService) {
-      return provider.downloadService(modelName);
+      return provider.downloadService(modelName, onProgress);
     }
     throw new Error('download service not supported');
   }

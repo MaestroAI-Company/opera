@@ -9,6 +9,7 @@ import NotificationModal, { ModalButton } from "./NotificationModal";
 import Selector from "./Selector";
 import TextInputField from "./TextInputField";
 import ThemeSelector from "./ThemeSelector";
+import DownloadProgress from "./DownloadProgress";
 
 
 import { useResponsive } from "../src/hooks/useResponsive";
@@ -41,6 +42,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [ollamaError, setOllamaError] = useState("");
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [gemmaDownloadProgress, setGemmaDownloadProgress] = useState<{progress: number, etaSeconds: number, speedStr: string, sizeStr: string} | null>(null);
 
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{ title: string, message: string, buttons?: ModalButton[] }>({ title: '', message: '' });
@@ -238,8 +240,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const handleDownloadGemma = async () => {
     setDownloadModalVisible(false);
     setIsDownloading(true);
+    setGemmaDownloadProgress(null);
     try {
-      await AIModule.downloadService("gemma4");
+      await AIModule.downloadService("gemma4", (progress, etaSeconds, speedStr, sizeStr) => {
+        setGemmaDownloadProgress({ progress, etaSeconds, speedStr, sizeStr });
+      });
       const fetchedModels = await AIModule.getAvailableModels();
       if (fetchedModels && fetchedModels.length > 0) {
         const options = fetchedModels.map((m: string) => ({
@@ -250,8 +255,10 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       }
     } catch (e) {
       console.error("Failed to download gemma4", e);
+      showAlert("Error", "Failed to download model.");
     } finally {
       setIsDownloading(false);
+      setGemmaDownloadProgress(null);
     }
   };
 
@@ -464,22 +471,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                     <Text style={[styles.downloadText, { color: "#FF1A1A" }]}>Delete Model ({getWhisperSize(whisperModel)})</Text>
                   </Pressable>
                 ) : isDownloadingWhisper ? (
-                  <View style={{ marginTop: 10, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, borderWidth: 1, borderColor: "#eaeaea" }}>
-                    <Text style={{ fontFamily: "IBMPlexMono-Medium", color: "#333", fontSize: 13, marginBottom: 8 }}>
-                      Downloading Whisper {whisperModel}...
-                    </Text>
-                    <View style={{ height: 6, backgroundColor: "#eaeaea", borderRadius: 3, overflow: "hidden", marginBottom: 8 }}>
-                      <View style={{ width: `${(whisperDownloadProgress?.progress || 0) * 100}%`, height: "100%", backgroundColor: "#0066cc" }} />
-                    </View>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                      <Text style={{ fontFamily: "IBMPlexMono-Medium", color: "#888", fontSize: 11 }}>
-                        {whisperDownloadProgress?.sizeStr || "Starting..."}
-                      </Text>
-                      <Text style={{ fontFamily: "IBMPlexMono-Medium", color: "#888", fontSize: 11 }}>
-                        {whisperDownloadProgress?.etaSeconds ? `${Math.round(whisperDownloadProgress.etaSeconds)}s remaining` : ""}
-                      </Text>
-                    </View>
-                  </View>
+                  <DownloadProgress
+                    title={`Downloading Whisper ${whisperModel}...`}
+                    progress={whisperDownloadProgress?.progress || 0}
+                    sizeStr={whisperDownloadProgress?.sizeStr}
+                    etaSeconds={whisperDownloadProgress?.etaSeconds}
+                  />
                 ) : (
                   <Pressable
                     style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }]}
@@ -551,15 +548,24 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 </Text>
               )}
               {ollamaModelOptions.length === 0 && (
-                <Pressable
-                  style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }, { marginTop: 10 }]}
-                  onPress={() => setDownloadModalVisible(true)}
-                >
-                  <Image source={downloadIcon} style={styles.downloadIcon} tintColor="#0066cc" />
-                  <Text style={styles.downloadText}>
-                    {isDownloading ? "Downloading..." : "Download Gemma4?"}
-                  </Text>
-                </Pressable>
+                isDownloading ? (
+                  <DownloadProgress
+                    title="Downloading Gemma4..."
+                    progress={gemmaDownloadProgress?.progress || 0}
+                    sizeStr={gemmaDownloadProgress?.sizeStr}
+                    etaSeconds={gemmaDownloadProgress?.etaSeconds}
+                  />
+                ) : (
+                  <Pressable
+                    style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }, { marginTop: 10 }]}
+                    onPress={() => setDownloadModalVisible(true)}
+                  >
+                    <Image source={downloadIcon} style={styles.downloadIcon} tintColor="#0066cc" />
+                    <Text style={styles.downloadText}>
+                      Download Gemma4?
+                    </Text>
+                  </Pressable>
+                )
               )}
             </View>
           )}

@@ -181,6 +181,8 @@ export class OllamaProvider implements IAIProvider {
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
       
+      let isThinkingMode = false;
+      
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -192,14 +194,36 @@ export class OllamaProvider implements IAIProvider {
         for (const line of lines) {
           try {
             const parsed = JSON.parse(line);
-            if (parsed.message?.content) {
-              onChunk(parsed.message.content);
+            
+            if (parsed.message) {
+              // handle thinking stream
+              if (typeof parsed.message.thinking === 'string' && parsed.message.thinking.length > 0) {
+                if (!isThinkingMode) {
+                  onChunk("<think>\n");
+                  isThinkingMode = true;
+                }
+                onChunk(parsed.message.thinking);
+              }
+              
+              // handle actual content stream
+              if (typeof parsed.message.content === 'string' && parsed.message.content.length > 0) {
+                if (isThinkingMode) {
+                  onChunk("\n</think>\n");
+                  isThinkingMode = false;
+                }
+                onChunk(parsed.message.content);
+              }
             }
           } catch (e) {
             //ignore incomplete json
             console.warn('Failed to parse Ollama chunk:', line);
           }
         }
+      }
+      
+      // close thinking mode if stream ended abruptly
+      if (isThinkingMode) {
+        onChunk("\n</think>\n");
       }
     } catch (error: any) {
       throw error;

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Dimensions, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View, PanResponder } from "react-native";
-import { Conversation } from "../src/services/db/DatabaseService";
+import { Animated, Dimensions, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View, PanResponder, TextInput } from "react-native";
+import { Conversation, DB } from "../src/services/db/DatabaseService";
 import NotificationModal from "./NotificationModal";
 import { useResponsive } from "../src/hooks/useResponsive";
 
@@ -10,13 +10,14 @@ const newIcon = require("../assets/icons/add.png");
 const deleteIcon = require("../assets/icons/delete.png");
 const pinIcon = require("../assets/icons/pin.png");
 const unpinIcon = require("../assets/icons/unpin.png");
+const arrowIcon = require("../assets/icons/arrow.png");
 
 type DrawerMenuProps = {
   visible: boolean;
   onClose: () => void;
   conversations: Conversation[];
   selectedConversationId: string | null;
-  onSelectConversation: (conv: Conversation) => void;
+  onSelectConversation: (conv: Conversation, highlightTerm?: string) => void;
   onNewConversation: () => void;
   onDeleteConversation?: (id: string) => void;
   onTogglePinConversation?: (id: string, pinned: boolean) => void;
@@ -68,9 +69,28 @@ export default function DrawerMenu({
   const translateX = useRef(new Animated.Value(-drawerWidth)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Conversation[]>([]);
+  const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!visible) {
+      setIsSearching(false);
+      setSearchQuery("");
+      setSearchResults([]);
+      setSelectedSearchId(null);
+    }
+  }, [visible]);
 
-
+  // Triggering Fast Refresh
+  useEffect(() => {
+    if (isSearching && searchQuery.trim().length > 0) {
+      DB.searchConversations(searchQuery).then(setSearchResults).catch(console.error);
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchQuery, isSearching]);
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
@@ -198,6 +218,84 @@ export default function DrawerMenu({
     );
   };
 
+  const searchContent = (
+    <View style={{ flex: 1 }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <Text style={{ fontFamily: "Recoleta-Regular", fontSize: 32 }}>Search</Text>
+      </View>
+
+      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24, gap: 12 }}>
+        <Pressable onPress={() => { setIsSearching(false); setSearchQuery(""); setSelectedSearchId(null); }} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
+          <Image source={arrowIcon} style={{ width: 24, height: 24, transform: [{ rotate: '-180deg' }] }} tintColor="#666" />
+        </Pressable>
+
+        <View style={styles.searchInputContainer}>
+          <Image source={searchIcon} style={{ width: 16, height: 16, tintColor: "#999" }} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+            placeholderTextColor="#999"
+          />
+        </View>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.sectionTitle}>RESULTS</Text>
+        {searchResults.length === 0 && searchQuery.length > 0 ? (
+          <Text style={styles.emptyText}>No results found</Text>
+        ) : (
+          searchResults.map((conv) => {
+            const isSelected = conv.id === selectedSearchId;
+            const formattedDate = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(conv.updatedAt));
+
+            return (
+              <View key={conv.id} style={[styles.discussionRow, isSelected && styles.discussionRowSelected]}>
+                <Pressable
+                  style={({ pressed }) => [styles.discussionTextContainer, pressed && { opacity: 0.6 }]}
+                  onPress={() => {
+                    setSelectedSearchId(conv.id);
+                    onSelectConversation(conv, searchQuery);
+                    if (!isDesktop) onClose();
+                  }}
+                >
+                  <Text style={[styles.discussionText, isSelected && styles.discussionTextSelected]} numberOfLines={1}>
+                    {conv.name}
+                  </Text>
+                </Pressable>
+
+                <View style={styles.rowActions}>
+                  {isSelected ? (
+                    <>
+                      <Pressable
+                        onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
+                        style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: "rgba(0, 0, 0, 0.15)" }]}
+                      >
+                        <Image source={conv.pinned ? unpinIcon : pinIcon} style={styles.actionIcon} tintColor="#fff" />
+                      </Pressable>
+                      <Pressable
+                        onPress={() => setDeleteConfirmId(conv.id)}
+                        style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: "rgba(0, 0, 0, 0.15)" }]}
+                      >
+                        <Image source={deleteIcon} style={styles.actionIcon} tintColor="#fff" />
+                      </Pressable>
+                    </>
+                  ) : (
+                    <Text style={{ fontSize: 12, color: "#888", fontFamily: "IBMPlexMono-Medium" }}>
+                      {formattedDate}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            );
+          })
+        )}
+      </ScrollView>
+    </View>
+  );
+
   const innerContent = (
     <>
       <Image
@@ -221,7 +319,7 @@ export default function DrawerMenu({
             <Text style={styles.quickActionLabel}>New discussion</Text>
           </Pressable>
           <Pressable
-            onPress={onClose}
+            onPress={() => setIsSearching(true)}
             style={({ pressed }) => [styles.quickActionItem, pressed && { backgroundColor: "#eaeaea" }]}
           >
             <Image source={searchIcon} style={styles.quickActionIcon} />
@@ -306,7 +404,7 @@ export default function DrawerMenu({
       ]}>
         <View style={{ width: 320, flex: 1 }}>
           <View style={isDesktop ? styles.floatingContent : styles.attachedContent}>
-            {innerContent}
+            {isSearching ? searchContent : innerContent}
           </View>
         </View>
         {notificationModal}
@@ -324,7 +422,7 @@ export default function DrawerMenu({
         style={[styles.content, { width: drawerWidth }, { transform: [{ translateX }] }]}
         {...panResponder.panHandlers}
       >
-        {innerContent}
+        {isSearching ? searchContent : innerContent}
       </Animated.View>
 
       {notificationModal}
@@ -488,5 +586,23 @@ const styles = StyleSheet.create({
   actionIcon: {
     width: 20,
     height: 20,
+  },
+  searchInputContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderWidth: 2,
+    borderColor: "#00000017",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: "IBMPlexMono-Medium",
+    color: "#000",
   },
 });

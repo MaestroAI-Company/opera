@@ -75,6 +75,29 @@ class DatabaseService {
     return [...this.conversations].sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
+  // search conversations and messages
+  async searchConversations(query: string): Promise<Conversation[]> {
+    if (!query.trim()) return [];
+    
+    const lowerQuery = query.toLowerCase();
+    
+    // find conversation IDs that have matching messages
+    const matchingMessageConvIds = new Set(
+      this.messages
+        .filter(m => m.content.toLowerCase().includes(lowerQuery))
+        .map(m => m.conversationId)
+    );
+    
+    // filter conversations
+    const filteredConvs = this.conversations.filter(c => 
+      c.name.toLowerCase().includes(lowerQuery) || matchingMessageConvIds.has(c.id)
+    );
+    
+    return filteredConvs
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, 50);
+  }
+
   // delete conversation and messages
   async deleteConversation(id: string): Promise<void> {
     this.conversations = this.conversations.filter(c => c.id !== id);

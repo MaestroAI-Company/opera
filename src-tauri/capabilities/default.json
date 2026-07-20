@@ -15,8 +15,8 @@
     {
       "identifier": "http:default",
       "allow": [
-        { "url": "http://*:11434" },
-        { "url": "http://*:11434/**" }
+        { "url": "http://**" },
+        { "url": "https://**" }
       ]
     }
   ]

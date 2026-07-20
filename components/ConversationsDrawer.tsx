@@ -12,7 +12,7 @@ const pinIcon = require("../assets/icons/pin.png");
 const unpinIcon = require("../assets/icons/unpin.png");
 const arrowIcon = require("../assets/icons/arrow.png");
 
-type DrawerMenuProps = {
+type ConversationsDrawerProps = {
   visible: boolean;
   onClose: () => void;
   conversations: Conversation[];
@@ -51,7 +51,7 @@ function getGroupTitle(timestamp: number): string {
   }
 }
 
-export default function DrawerMenu({
+export default function ConversationsDrawer({
   visible,
   onClose,
   conversations,
@@ -62,7 +62,7 @@ export default function DrawerMenu({
   onTogglePinConversation,
   isLargeScreen = false,
   isDesktop = false,
-}: DrawerMenuProps) {
+}: ConversationsDrawerProps) {
   const { width } = useResponsive();
   const drawerWidth = Math.min(width * 0.88, 360);
 
@@ -225,7 +225,7 @@ export default function DrawerMenu({
       </View>
 
       <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24, gap: 12 }}>
-        <Pressable onPress={() => { setIsSearching(false); setSearchQuery(""); setSelectedSearchId(null); }} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
+        <Pressable onPress={() => { Keyboard.dismiss(); setIsSearching(false); setSearchQuery(""); setSelectedSearchId(null); }} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
           <Image source={arrowIcon} style={{ width: 24, height: 24, transform: [{ rotate: '-180deg' }] }} tintColor="#666" />
         </Pressable>
 

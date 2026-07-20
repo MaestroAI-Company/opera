@@ -302,8 +302,10 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const handleExport = async () => {
     try {
-      await BackupService.exportData();
-      showAlert("Success", "Data exported successfully.");
+      const exported = await BackupService.exportData();
+      if (exported !== false) {
+        showAlert("Success", "Data exported successfully.");
+      }
     } catch (e) {
       showAlert("Error", "Failed to export data");
     }

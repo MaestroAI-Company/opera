@@ -16,7 +16,7 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ChatBar from "../../components/ChatBar";
 import ChatView from "../../components/ChatView";
-import DrawerMenu from "../../components/DrawerMenu";
+import ConversationsDrawer from "../../components/ConversationsDrawer";
 import ModelDropdown from "../../components/ModelDropdown";
 import SettingsDrawer from "../../components/SettingsDrawer";
 import TopBar from "../../components/TopBar";
@@ -48,6 +48,7 @@ export default function Index() {
   const [speakerEnabled, setSpeakerEnabled] = useState(false);
   const [modelCapabilities, setModelCapabilities] = useState<string[]>([]);
   const [alwaysWhisper, setAlwaysWhisper] = useState(false);
+  const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
 
   //conversation state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -642,7 +643,7 @@ export default function Index() {
       >
 
       <View style={{ flex: 1, flexDirection: isLargeScreen ? "row" : "column" }} pointerEvents="box-none">
-        <DrawerMenu
+        <ConversationsDrawer
           isLargeScreen={isLargeScreen}
           isDesktop={isDesktop}
           visible={drawerVisible}
@@ -712,7 +713,8 @@ export default function Index() {
               (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) 
                 ? (navigator.userAgent.includes("Linux") && !navigator.userAgent.includes("Android") ? 0 : 32) 
                 : 0
-            ) 
+            ),
+            zIndex: attachmentSheetVisible ? 200 : undefined,
           }]} pointerEvents="box-none">
             <TopBar
               onMenuPress={() => {
@@ -791,6 +793,7 @@ export default function Index() {
                 Keyboard.dismiss();
                 setSettingsDrawerVisible(true);
               }}
+              onAttachmentSheetVisibilityChange={setAttachmentSheetVisible}
             />
           </View>
         </View>

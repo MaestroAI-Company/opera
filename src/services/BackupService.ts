@@ -12,7 +12,7 @@ export type BackupData = {
 };
 
 class BackupServiceImpl {
-  async exportData(): Promise<void> {
+  async exportData(): Promise<boolean> {
     try {
       const settings = Settings.getCached();
       const conversations = await DB.getConversations();
@@ -39,14 +39,16 @@ class BackupServiceImpl {
           await FileSystem.writeAsStringAsync(fileUri, jsonStr, {
             encoding: FileSystem.EncodingType.UTF8,
           });
-          return;
+          return true;
         }
+        return false;
       }
       
       const fileUri = `${FileSystem.documentDirectory}${filename}`;
       await FileSystem.writeAsStringAsync(fileUri, jsonStr, {
         encoding: FileSystem.EncodingType.UTF8,
       });
+      return true;
 
     } catch (e) {
       console.error('Failed to export data', e);

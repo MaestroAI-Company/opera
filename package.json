@@ -69,7 +69,7 @@
     "lint": "expo lint",
     "tauri": "tauri",
     "desktop": "tauri dev",
-    "desktop:build": "tauri build"
+    "build:desktop": "tauri build"
   },
   "private": true
 }

@@ -1,30 +1,31 @@
 import { AudioModule, useAudioStream } from "expo-audio";
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library/legacy';
+import { TextInputWrapper } from "expo-paste-input";
 import { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  BackHandler,
   Easing,
   Image,
-  KeyboardAvoidingView,
+  Keyboard,
+  LayoutAnimation,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   Vibration,
-  View,
-  Keyboard,
-  PanResponder,
-  LayoutAnimation,
-  ScrollView
+  View
 } from "react-native";
-import { Whisper } from "../src/services/whisper/WhisperService";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Settings } from "../src/services/settings/SettingsService";
-import NotificationModal from "./NotificationModal";
-import { TextInputWrapper } from "expo-paste-input";
-import * as ImagePicker from 'expo-image-picker';
-import * as MediaLibrary from 'expo-media-library/legacy';
+import { Whisper } from "../src/services/whisper/WhisperService";
 import AttachmentSheet, { SelectedFile } from "./AttachmentSheet";
+import NotificationModal from "./NotificationModal";
 
 const nextWhiteIcon = require("../assets/icons/arrow.png");
 const micIcon = require("../assets/icons/microphone.png");
@@ -133,21 +134,54 @@ export default function ChatBar({
   canTranscribeRemotely = false,
   onOpenSettings,
 }: ChatInputBarProps) {
+  const insets = useSafeAreaInsets();
+  const bottomInsetToFill = insets.bottom + 16;
   const [text, setText] = useState("");
   const [whisperAvailable, setWhisperAvailable] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalConfig, setModalConfig] = useState<{title: string, message: string, buttons?: {text: string, onPress: () => void, style?: "primary" | "secondary" | "danger"}[]}>({ title: "", message: "" });
+  const [modalConfig, setModalConfig] = useState<{ title: string, message: string, buttons?: { text: string, onPress: () => void, style?: "primary" | "secondary" | "danger" }[] }>({ title: "", message: "" });
   const [isAttachmentSheetVisible, setIsAttachmentSheetVisible] = useState(false);
   const [recentPhotos, setRecentPhotos] = useState<any[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
 
-  const setSheetVisible = (value: boolean | ((prev: boolean) => boolean)) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setIsAttachmentSheetVisible(value);
+  const sheetTranslateY = useRef(new Animated.Value(0)).current;
+  const sheetHeightRef = useRef(300);
+
+  const closeSheet = () => {
+    Animated.timing(sheetTranslateY, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsAttachmentSheetVisible(false);
+    });
   };
+
+  const handlePanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderMove: (e, gestureState) => {
+        if (gestureState.dy > 0) {
+          sheetTranslateY.setValue(-(sheetHeightRef.current - bottomInsetToFill) + gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (e, gestureState) => {
+        if (gestureState.dy > 100 || gestureState.vy > 0.5) {
+          closeSheet();
+        } else {
+          Animated.spring(sheetTranslateY, {
+            toValue: -(sheetHeightRef.current - bottomInsetToFill),
+            useNativeDriver: true,
+            bounciness: 4,
+            speed: 12,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   useEffect(() => {
     if (!isAttachmentSheetVisible) {
@@ -160,7 +194,7 @@ export default function ChatBar({
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       () => {
         if (isAttachmentSheetVisible) {
-          setIsAttachmentSheetVisible(false);
+          closeSheet();
         }
       }
     );
@@ -170,16 +204,44 @@ export default function ChatBar({
   }, [isAttachmentSheetVisible]);
 
   useEffect(() => {
+    const handleBackButton = () => {
+      if (isAttachmentSheetVisible) {
+        closeSheet();
+        return true;
+      }
+      return false;
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      handleBackButton
+    );
+
+    return () => backHandler.remove();
+  }, [isAttachmentSheetVisible]);
+
+  useEffect(() => {
     if (selectedFiles.length === 0 && isSelectionMode) {
       setIsSelectionMode(false);
     }
   }, [selectedFiles.length, isSelectionMode]);
 
   const toggleAttachmentSheet = () => {
-    if (!isAttachmentSheetVisible) {
+    if (isAttachmentSheetVisible) {
+      closeSheet();
+    } else {
       Keyboard.dismiss();
+      setIsAttachmentSheetVisible(true);
+      // wait for keyboard to dismiss before animating up
+      setTimeout(() => {
+        Animated.spring(sheetTranslateY, {
+          toValue: -(sheetHeightRef.current - bottomInsetToFill),
+          useNativeDriver: true,
+          bounciness: 4,
+          speed: 12,
+        }).start();
+      }, 50);
     }
-    setIsAttachmentSheetVisible(prev => !prev);
   };
 
   useEffect(() => {
@@ -361,7 +423,7 @@ export default function ChatBar({
             const chunk = new Float32Array(inputData);
             pcmChunksRef.current.push(chunk.buffer);
             sampleRateRef.current = context.sampleRate;
-            
+
             let sum = 0;
             for (let i = 0; i < chunk.length; i++) {
               sum += chunk[i] * chunk[i];
@@ -483,10 +545,12 @@ export default function ChatBar({
             message: "You have disabled on-device transcription. Please select a Whisper model in settings to enable it.",
             buttons: [
               { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
-              { text: "Settings", onPress: () => {
-                setModalVisible(false);
-                if (onOpenSettings) onOpenSettings();
-              }, style: "primary" }
+              {
+                text: "Settings", onPress: () => {
+                  setModalVisible(false);
+                  if (onOpenSettings) onOpenSettings();
+                }, style: "primary"
+              }
             ]
           });
           setModalVisible(true);
@@ -500,10 +564,12 @@ export default function ChatBar({
             message: `The Whisper ${modelName} model is required for on-device transcription. Would you like to install it?`,
             buttons: [
               { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
-              { text: "Install", onPress: () => {
-                setModalVisible(false);
-                if (onOpenSettings) onOpenSettings();
-              }, style: "primary" }
+              {
+                text: "Install", onPress: () => {
+                  setModalVisible(false);
+                  if (onOpenSettings) onOpenSettings();
+                }, style: "primary"
+              }
             ]
           });
           setModalVisible(true);
@@ -517,10 +583,12 @@ export default function ChatBar({
             message: `Failed to load the Whisper ${modelName} model. It might be corrupted or incompatible. Please try reinstalling it from the settings.`,
             buttons: [
               { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
-              { text: "Settings", onPress: () => {
-                setModalVisible(false);
-                if (onOpenSettings) onOpenSettings();
-              }, style: "primary" }
+              {
+                text: "Settings", onPress: () => {
+                  setModalVisible(false);
+                  if (onOpenSettings) onOpenSettings();
+                }, style: "primary"
+              }
             ]
           });
           setModalVisible(true);
@@ -601,7 +669,7 @@ export default function ChatBar({
 
         Promise.all(promises).then(results => {
           const validFiles = results.filter(r => r !== null) as SelectedFile[];
-          
+
           if (validFiles.length < pastedFiles.length) {
             setModalConfig({ title: "Unsupported Format", message: "Only images, WAV and MP3 audio files are supported." });
             setModalVisible(true);
@@ -624,7 +692,7 @@ export default function ChatBar({
       style={{ width: '100%', maxWidth: 840, alignSelf: 'center' }}
     >
       <View style={{ width: '100%', alignItems: 'center' }}>
-        <View style={{ width: '100%', maxWidth: 800 }}>
+        <Animated.View style={{ width: '100%', maxWidth: 800, transform: [{ translateY: sheetTranslateY }] }}>
           <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.pressableWrapper}>
             <Animated.View style={{ transform: [{ scale }] }}>
               {selectedFiles.length > 0 && (
@@ -690,7 +758,7 @@ export default function ChatBar({
                     >
                       <TextInput
                         style={[
-                          styles.input, 
+                          styles.input,
                           { maxHeight: 100, minHeight: 36, lineHeight: 20 },
                           Platform.OS === 'web' && { outlineStyle: 'none', margin: 0, paddingHorizontal: 0, overflow: 'hidden' } as any
                         ]}
@@ -722,19 +790,50 @@ export default function ChatBar({
             </Animated.View>
           </Pressable>
 
-          <AttachmentSheet
-            visible={isAttachmentSheetVisible}
-            incognito={incognito}
-            onClose={() => setIsAttachmentSheetVisible(false)}
-            onCamera={handleCamera}
-            onPickFiles={handlePickFiles}
-            onPhotos={handlePhotos}
-            recentPhotos={recentPhotos}
-            selectedFiles={selectedFiles}
-            onSelectRecentPhoto={handleSelectRecentPhoto}
-            onLongPressRecentPhoto={handleLongPressRecentPhoto}
-          />
-        </View>
+          {/* render sheet absolutely positioned below screen to measure height */}
+          <Animated.View 
+            style={{ 
+              position: 'absolute', 
+              top: '100%', 
+              width: '100%', 
+              zIndex: 1,
+              transform: [{
+                translateY: sheetTranslateY.interpolate({
+                  inputRange: [-150, 0],
+                  outputRange: [0, 80],
+                  extrapolate: 'clamp'
+                })
+              }]
+            }}
+            onLayout={(e) => {
+              const newHeight = Math.max(150, e.nativeEvent.layout.height);
+              sheetHeightRef.current = newHeight;
+              // adjust drawer smoothly if visible and height changes
+              if (isAttachmentSheetVisible) {
+                Animated.spring(sheetTranslateY, {
+                  toValue: -(newHeight - bottomInsetToFill),
+                  useNativeDriver: true,
+                  bounciness: 4,
+                  speed: 12,
+                }).start();
+              }
+            }}
+          >
+            <AttachmentSheet
+              bottomInset={bottomInsetToFill}
+              visible={isAttachmentSheetVisible}
+              incognito={incognito}
+              onCamera={handleCamera}
+              onPickFiles={handlePickFiles}
+              onPhotos={handlePhotos}
+              recentPhotos={recentPhotos}
+              selectedFiles={selectedFiles}
+              onSelectRecentPhoto={handleSelectRecentPhoto}
+              onLongPressRecentPhoto={handleLongPressRecentPhoto}
+              panHandlers={handlePanResponder.panHandlers}
+            />
+          </Animated.View>
+        </Animated.View>
       </View>
       <NotificationModal
         visible={modalVisible}
@@ -763,8 +862,8 @@ const styles = StyleSheet.create({
     borderColor: "#00000017",
     minHeight: 56,
     maxHeight: 120,
-    boxShadow: "2px 6px 15px #FF1A1A",
-    elevation: 6,
+    boxShadow: "2px 6px 22px #FF1A1A",
+    elevation: 8,
   },
   containerIncognito: {
     boxShadow: "2px 6px 15px #565A75",
@@ -785,17 +884,17 @@ const styles = StyleSheet.create({
   micIcon: {
     width: 18,
     height: 18,
-    
-    
+
+
   },
   micIconRecording: {
-    
+
   },
   plusIcon: {
     width: 18,
     height: 18,
-    
-    
+
+
   },
   input: {
     color: "#fff",
@@ -825,7 +924,7 @@ const styles = StyleSheet.create({
   sendIcon: {
     width: 18,
     height: 18,
-    
+
   },
   filesContainerTop: {
     backgroundColor: '#fff',

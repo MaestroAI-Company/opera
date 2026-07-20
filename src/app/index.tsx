@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  BackHandler,
   Image,
   ImageBackground,
   Keyboard,
-  KeyboardAvoidingView,
   PanResponder,
   Platform,
   Pressable,
@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ChatBar from "../../components/ChatBar";
 import ChatView from "../../components/ChatView";
@@ -65,6 +66,28 @@ export default function Index() {
   useEffect(() => {
     activeConversationRef.current = activeConversation;
   }, [activeConversation]);
+
+  useEffect(() => {
+    const handleBackButton = () => {
+      //close drawers on android back press
+      if (settingsDrawerVisible) {
+        setSettingsDrawerVisible(false);
+        return true;
+      }
+      if (drawerVisible) {
+        setDrawerVisible(false);
+        return true;
+      }
+      return false;
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      handleBackButton
+    );
+
+    return () => backHandler.remove();
+  }, [drawerVisible, settingsDrawerVisible]);
 
   const [pendingConvIds, setPendingConvIds] = useState<string[]>([]);
   const requestQueueRef = useRef<{ convId: string, task: () => Promise<void>, assistantMsgId: string, isIncognito: boolean }[]>([]);
@@ -606,16 +629,17 @@ export default function Index() {
   }
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      {...(isLargeScreen ? {} : panResponder.panHandlers)}
-    >
+    <View style={styles.container}>
       <ImageBackground
         source={texture2}
         style={StyleSheet.absoluteFill}
         imageStyle={styles.backgroundTexture} resizeMode="cover"
       />
+      <KeyboardAvoidingView 
+        style={[styles.container, { backgroundColor: "transparent" }]} 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        {...(isLargeScreen ? {} : panResponder.panHandlers)}
+      >
 
       <View style={{ flex: 1, flexDirection: isLargeScreen ? "row" : "column" }} pointerEvents="box-none">
         <DrawerMenu
@@ -792,7 +816,8 @@ export default function Index() {
           }}
         />
       </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 

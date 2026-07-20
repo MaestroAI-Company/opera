@@ -1,10 +1,13 @@
 import { Buffer } from "buffer";
+import * as Device from "expo-device";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
+import * as ScreenOrientation from "expo-screen-orientation";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import SplashScreenComponent from "../../components/SplashScreen";
 import TauriTitleBar from "../../components/TauriTitleBar";
 
@@ -26,6 +29,21 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
+  useEffect(() => {
+    async function lockMobileOrientation() {
+      //lock orientation on phone only
+      if (Platform.OS !== "web") {
+        const deviceType = await Device.getDeviceTypeAsync();
+        if (deviceType === Device.DeviceType.PHONE) {
+          await ScreenOrientation.lockAsync(
+            ScreenOrientation.OrientationLock.PORTRAIT_UP
+          );
+        }
+      }
+    }
+    lockMobileOrientation();
+  }, []);
+
   if (showLottie || (!fontsLoaded && !fontError)) {
     return (
       <SplashScreenComponent
@@ -35,10 +53,10 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <KeyboardProvider statusBarTranslucent={false}>
       <TauriTitleBar />
       <Stack screenOptions={{ headerShown: false }} />
       <StatusBar style="dark" />
-    </>
+    </KeyboardProvider>
   );
 }

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
 import {
   BackHandler,
   Image,
   ImageBackground,
   Keyboard,
+  Linking,
   PanResponder,
   Platform,
   Pressable,
@@ -11,6 +13,7 @@ import {
   Text,
   useWindowDimensions,
   View,
+  AppState,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -41,6 +44,8 @@ export default function Index() {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
   const [dbReady, setDbReady] = useState(false);
+  
+  const { convId } = useLocalSearchParams<{ convId?: string }>();
   const [incognitoMode, setIncognitoMode] = useState(false);
   const [userInstruction, setUserInstruction] = useState("");
   const [aiService, setAiService] = useState("ollama");
@@ -178,6 +183,29 @@ export default function Index() {
     setConversations(convs);
   };
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active" && dbReady) {
+        loadConversations();
+        if (activeConversationRef.current) {
+          DB.getMessages(activeConversationRef.current.id).then((msgs) => {
+            // keep streaming content if generating
+            if (generatingConvIdRef.current === activeConversationRef.current?.id && streamingMsgIdRef.current) {
+              const patched = msgs.map(m => m.id === streamingMsgIdRef.current ? { ...m, content: streamingContentRef.current || "…" } : m);
+              setMessages(patched);
+            } else {
+              setMessages(msgs);
+            }
+          });
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [dbReady]);
+
   //load messages when a conversation is selected
   const selectConversation = useCallback(async (conv: Conversation) => {
     setActiveConversation(conv);
@@ -190,6 +218,36 @@ export default function Index() {
       setMessages(msgs);
     }
   }, []);
+
+  //select conversation from cold start deep link
+  useEffect(() => {
+    if (convId && conversations.length > 0 && dbReady) {
+      const target = conversations.find(c => c.id === convId);
+      if (target && target.id !== activeConversationRef.current?.id) {
+        selectConversation(target);
+      }
+    }
+  }, [convId, conversations, dbReady, selectConversation]);
+
+  //select conversation from warm start deep link
+  useEffect(() => {
+    if (!dbReady) return;
+    const handleUrl = ({ url }: { url: string }) => {
+      try {
+        const parsed = new URL(url);
+        const id = parsed.searchParams.get('convId');
+        if (id) {
+          // load conversations first
+          DB.getConversations().then(convs => {
+            const target = convs.find(c => c.id === id);
+            if (target) selectConversation(target);
+          });
+        }
+      } catch {}
+    };
+    const sub = Linking.addEventListener('url', handleUrl);
+    return () => sub.remove();
+  }, [dbReady, selectConversation]);
 
   //start new empty conversation
   const startNewConversation = useCallback(() => {
@@ -780,7 +838,7 @@ export default function Index() {
           </View>
 
           {/* bottom bar overlay */}
-          <View style={[styles.bottomBarOverlay, { paddingBottom: insets.bottom }]} pointerEvents="box-none">
+          <View style={[styles.bottomBarOverlay]} pointerEvents="box-none">
             <ChatBar
               onSend={handleSend}
               onPlusPress={() => console.log("plus pressed")}

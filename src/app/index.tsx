@@ -639,6 +639,7 @@ export default function Index() {
       <KeyboardAvoidingView 
         style={[styles.container, { backgroundColor: "transparent" }]} 
         behavior={Platform.OS === "ios" ? "padding" : "height"}
+        enabled={!settingsDrawerVisible && (isLargeScreen || !drawerVisible)}
         {...(isLargeScreen ? {} : panResponder.panHandlers)}
       >
 
@@ -794,6 +795,7 @@ export default function Index() {
                 setSettingsDrawerVisible(true);
               }}
               onAttachmentSheetVisibilityChange={setAttachmentSheetVisible}
+              enabled={!settingsDrawerVisible && (isLargeScreen || !drawerVisible)}
             />
           </View>
         </View>

@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Dimensions, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View, PanResponder, TextInput } from "react-native";
+import { Animated, Image, Keyboard, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useResponsive } from "../src/hooks/useResponsive";
 import { Conversation, DB } from "../src/services/db/DatabaseService";
 import NotificationModal from "./NotificationModal";
-import { useResponsive } from "../src/hooks/useResponsive";
 
-const operaLogo = require("../assets/icons/opera.png");
 const searchIcon = require("../assets/icons/search.png");
 const newIcon = require("../assets/icons/add.png");
 const deleteIcon = require("../assets/icons/delete.png");
@@ -220,8 +219,8 @@ export default function ConversationsDrawer({
 
   const searchContent = (
     <View style={{ flex: 1 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <Text style={{ fontFamily: "Recoleta-Regular", fontSize: 32 }}>Search</Text>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <Text style={styles.title}>Search</Text>
       </View>
 
       <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24, gap: 12 }}>
@@ -230,10 +229,10 @@ export default function ConversationsDrawer({
         </Pressable>
 
         <View style={styles.searchInputContainer}>
-          <Image source={searchIcon} style={{ width: 16, height: 16, tintColor: "#999" }} />
+          <Image source={searchIcon} style={{ width: 16, height: 16, tintColor: "#000" }} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search..."
+            placeholder="Search conversations"
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoFocus
@@ -256,6 +255,7 @@ export default function ConversationsDrawer({
                 <Pressable
                   style={({ pressed }) => [styles.discussionTextContainer, pressed && { opacity: 0.6 }]}
                   onPress={() => {
+                    Keyboard.dismiss();
                     setSelectedSearchId(conv.id);
                     onSelectConversation(conv, searchQuery);
                     if (!isDesktop) onClose();
@@ -298,15 +298,9 @@ export default function ConversationsDrawer({
 
   const innerContent = (
     <>
-      <Image
-        source={operaLogo}
-        style={styles.logo}
-        resizeMode="contain"
-        tintColor="#FF1A1A"
-      />
+      <Text style={styles.title}>Discussions</Text>
 
       <View style={styles.quickActionsShadowLayer}>
-        {!isDesktop && <View style={styles.quickActionsShadowBlock} />}
         <View style={styles.quickActionsBox}>
           <Pressable
             onPress={() => {
@@ -418,7 +412,7 @@ export default function ConversationsDrawer({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      <Animated.View 
+      <Animated.View
         style={[styles.content, { width: drawerWidth }, { transform: [{ translateX }] }]}
         {...panResponder.panHandlers}
       >
@@ -481,23 +475,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     flex: 1,
   },
-  logo: {
-    width: 160,
-    height: 35,
+  title: {
+    fontSize: 32,
+    color: "#222",
     marginBottom: 24,
+    fontFamily: "Petrona",
   },
   quickActionsShadowLayer: {
     position: "relative",
     marginBottom: 24,
-  },
-  quickActionsShadowBlock: {
-    position: "absolute",
-    top: 6,
-    left: -6,
-    right: 6,
-    bottom: -6,
-    backgroundColor: "#00000013",
-    borderRadius: 10,
   },
   quickActionsBox: {
     position: "relative",
@@ -551,7 +537,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 5,
     paddingHorizontal: 8,
-    borderRadius: 6,
+    borderRadius: 10,
     marginBottom: 2,
     borderWidth: 2,
     borderColor: "#ffffff52",
@@ -596,7 +582,6 @@ const styles = StyleSheet.create({
     borderColor: "#00000017",
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
     gap: 8,
   },
   searchInput: {

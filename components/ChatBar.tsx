@@ -45,6 +45,7 @@ type ChatInputBarProps = {
   canTranscribeRemotely?: boolean;
   onOpenSettings?: () => void;
   onAttachmentSheetVisibilityChange?: (visible: boolean) => void;
+  enabled?: boolean;
 };
 
 //wav buffer builder from pcm chunks
@@ -136,6 +137,7 @@ export default function ChatBar({
   canTranscribeRemotely = false,
   onOpenSettings,
   onAttachmentSheetVisibilityChange,
+  enabled = true,
 }: ChatInputBarProps) {
   const insets = useSafeAreaInsets();
   const bottomInsetToFill = insets.bottom + 16;
@@ -720,6 +722,7 @@ export default function ChatBar({
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
+      enabled={enabled}
       style={{ width: '100%', maxWidth: 840, alignSelf: 'center' }}
     >
       <View style={{ width: '100%', alignItems: 'center', zIndex: 2, elevation: 9 }}>

@@ -3,7 +3,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library/legacy';
 import { TextInputWrapper } from "expo-paste-input";
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import {
   Animated,
   BackHandler,
@@ -38,6 +38,7 @@ type ChatInputBarProps = {
   onPlusPress?: () => void;
   onStop?: () => void;
   onTranscribe?: (wavBuffer: ArrayBuffer) => Promise<string | null>;
+  onTranscribeError?: () => void;
   placeholder?: string;
   incognito?: boolean;
   isGenerating?: boolean;
@@ -46,6 +47,11 @@ type ChatInputBarProps = {
   onOpenSettings?: () => void;
   onAttachmentSheetVisibilityChange?: (visible: boolean) => void;
   enabled?: boolean;
+  autoStartMic?: boolean;
+};
+
+export type ChatBarHandle = {
+  stopRecording: () => void;
 };
 
 //wav buffer builder from pcm chunks
@@ -125,11 +131,12 @@ function VoiceIndicator() {
   );
 }
 
-export default function ChatBar({
+const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   onSend,
   onPlusPress,
   onStop,
   onTranscribe,
+  onTranscribeError,
   placeholder = "Ask",
   incognito = false,
   isGenerating = false,
@@ -138,7 +145,28 @@ export default function ChatBar({
   onOpenSettings,
   onAttachmentSheetVisibilityChange,
   enabled = true,
-}: ChatInputBarProps) {
+  autoStartMic = false,
+}, ref) {
+  useImperativeHandle(ref, () => ({
+    stopRecording: () => {
+      if (isRecording) {
+        if (Platform.OS === 'web') {
+          if (webAudioProcessorRef.current) webAudioProcessorRef.current.disconnect();
+          if (webAudioContextRef.current) webAudioContextRef.current.close();
+          if (webAudioStreamRef.current) webAudioStreamRef.current.getTracks().forEach(t => t.stop());
+        } else {
+          stream?.stop();
+        }
+        setIsRecording(false);
+        pcmChunksRef.current = [];
+      }
+    },
+    clear: () => {
+      setText("");
+      setSelectedFiles([]);
+    }
+  }));
+
   const insets = useSafeAreaInsets();
   const bottomInsetToFill = insets.bottom + 16;
   const [text, setText] = useState("");
@@ -151,6 +179,7 @@ export default function ChatBar({
   const [isAttachmentSheetVisible, setIsAttachmentSheetVisible] = useState(false);
   const [recentPhotos, setRecentPhotos] = useState<any[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const autoStartedRef = useRef(false);
 
   const barTranslateY = useRef(new Animated.Value(0)).current;
   const sheetTranslateY = useRef(new Animated.Value(Dimensions.get('window').height)).current;
@@ -178,7 +207,7 @@ export default function ChatBar({
       onStartShouldSetPanResponder: () => true,
       onPanResponderMove: (e, gestureState) => {
         if (gestureState.dy > 0) {
-          const openY = -(sheetHeightRef.current);
+          const openY = -(sheetHeightRef.current - insets.bottom);
           barTranslateY.setValue(Math.min(0, openY + gestureState.dy));
           sheetTranslateY.setValue(Math.max(0, gestureState.dy));
         }
@@ -189,7 +218,7 @@ export default function ChatBar({
         } else {
           Animated.parallel([
             Animated.spring(barTranslateY, {
-              toValue: -(sheetHeightRef.current),
+              toValue: -(sheetHeightRef.current - insets.bottom),
               useNativeDriver: true,
               bounciness: 4,
               speed: 12,
@@ -236,6 +265,18 @@ export default function ChatBar({
         closeSheet();
         return true;
       }
+      if (isRecording) {
+        if (Platform.OS === 'web') {
+          if (webAudioProcessorRef.current) webAudioProcessorRef.current.disconnect();
+          if (webAudioContextRef.current) webAudioContextRef.current.close();
+          if (webAudioStreamRef.current) webAudioStreamRef.current.getTracks().forEach(t => t.stop());
+        } else {
+          stream?.stop();
+        }
+        setIsRecording(false);
+        pcmChunksRef.current = [];
+        return true;
+      }
       return false;
     };
 
@@ -245,7 +286,7 @@ export default function ChatBar({
     );
 
     return () => backHandler.remove();
-  }, [isAttachmentSheetVisible]);
+  }, [isAttachmentSheetVisible, isRecording, stream]);
 
   useEffect(() => {
     if (selectedFiles.length === 0 && isSelectionMode) {
@@ -253,34 +294,45 @@ export default function ChatBar({
     }
   }, [selectedFiles.length, isSelectionMode]);
 
-  const toggleAttachmentSheet = () => {
+  useEffect(() => {
+    if (autoStartMic && !autoStartedRef.current) {
+      autoStartedRef.current = true;
+      // skip whisper checks, parent handles transcription
+      setTimeout(() => startRecording(), 800);
+    }
+  }, [autoStartMic]);
+
+  const toggleAttachmentSheet = async () => {
     if (isAttachmentSheetVisible) {
       closeSheet();
     } else {
       Keyboard.dismiss();
+      const { status } = await MediaLibrary.getPermissionsAsync();
+      if (status !== 'granted') {
+        await MediaLibrary.requestPermissionsAsync();
+      }
       setIsAttachmentSheetVisible(true);
     }
   };
 
   useEffect(() => {
     if (isAttachmentSheetVisible) {
-      Animated.parallel([
-        Animated.spring(barTranslateY, {
-          toValue: -(sheetHeightRef.current),
-          useNativeDriver: true,
-          bounciness: 4,
-          speed: 12,
-        }),
-        Animated.spring(sheetTranslateY, {
-          toValue: 0,
-          useNativeDriver: true,
-          bounciness: 4,
-          speed: 12,
-        }),
-      ]).start();
+      Animated.spring(barTranslateY, {
+        toValue: -(sheetHeightRef.current - insets.bottom),
+        useNativeDriver: true,
+        bounciness: 4,
+        speed: 12,
+      }).start();
+
+      Animated.spring(sheetTranslateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        bounciness: 4,
+        speed: 12,
+      }).start();
 
       const getRecentPhotos = async () => {
-        const { status } = await MediaLibrary.requestPermissionsAsync();
+        const { status } = await MediaLibrary.getPermissionsAsync();
         if (status === 'granted') {
           const media = await MediaLibrary.getAssetsAsync({
             mediaType: 'photo',
@@ -635,7 +687,16 @@ export default function ChatBar({
   const handleSend = async () => {
     if (isRecording) {
       const transcribed = await stopAndTranscribe();
-      if (transcribed && transcribed.length > 0) setText(transcribed);
+      if (autoStartMic) {
+        // auto-send transcription in overlay mode
+        if (transcribed && transcribed.length > 0 && onSend) {
+          onSend(transcribed, []);
+        } else if (!transcribed) {
+          onTranscribeError?.();
+        }
+      } else {
+        if (transcribed && transcribed.length > 0) setText(transcribed);
+      }
       return;
     }
     if ((text.trim() || selectedFiles.length > 0) && onSend) {
@@ -725,7 +786,7 @@ export default function ChatBar({
       enabled={enabled}
       style={{ width: '100%', maxWidth: 840, alignSelf: 'center' }}
     >
-      <View style={{ width: '100%', alignItems: 'center', zIndex: 2, elevation: 9 }}>
+      <View style={{ width: '100%', alignItems: 'center', zIndex: 2, elevation: 9, paddingBottom: insets.bottom }}>
         <Animated.View style={{ width: '100%', maxWidth: 800, transform: [{ translateY: barTranslateY }], zIndex: 2, elevation: 9 }}>
           <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.pressableWrapper}>
             <Animated.View style={{ transform: [{ scale }] }}>
@@ -846,7 +907,7 @@ export default function ChatBar({
             sheetHeightRef.current = newHeight;
             if (isAttachmentSheetVisible) {
               Animated.spring(barTranslateY, {
-                toValue: -newHeight,
+                toValue: -(newHeight - insets.bottom),
                 useNativeDriver: true,
                 bounciness: 4,
                 speed: 12,
@@ -879,7 +940,9 @@ export default function ChatBar({
       />
     </KeyboardAvoidingView>
   );
-}
+});
+
+export default ChatBar;
 
 const styles = StyleSheet.create({
   pressableWrapper: {

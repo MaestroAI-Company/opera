@@ -1,0 +1,156 @@
+package __PACKAGE_NAME__;
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.PixelFormat;
+import android.hardware.HardwareBuffer;
+import android.os.Build;
+import android.os.Bundle;
+import android.service.voice.VoiceInteractionSession;
+import android.app.assist.AssistStructure;
+import android.app.assist.AssistStructure.ViewNode;
+import android.app.assist.AssistStructure.WindowNode;
+import android.util.Log;
+
+public class MaestroSession extends VoiceInteractionSession {
+
+    private static final String TAG = "MaestroSession";
+
+    private boolean activityStarted = false;
+    private final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable startOverlayRunnable = new Runnable() {
+        @Override
+        public void run() {
+            startOverlayActivity();
+        }
+    };
+
+    public MaestroSession(Context context) { 
+        super(context); 
+    }
+
+    @Override
+    public void onHandleScreenshot(Bitmap screenshot) {
+        Log.d(TAG, "onHandleScreenshot called. screenshot is null? " + (screenshot == null));
+        if (screenshot != null) {
+            try {
+                Log.d(TAG, "Screenshot size: " + screenshot.getWidth() + "x" + screenshot.getHeight());
+                ScreenshotHolder.set(screenshot);
+            } catch (Throwable t) {
+                Log.w(TAG, "onHandleScreenshot failed: " + t.getMessage());
+            }
+        }
+        // start the activity now that we have the screenshot
+        startOverlayActivity();
+    }
+
+    @Override
+    public void onHandleAssist(Bundle data, AssistStructure structure, android.app.assist.AssistContent content) {
+        super.onHandleAssist(data, structure, content);
+        if (structure != null && structure.getActivityComponent() != null) {
+            String pkg = structure.getActivityComponent().getPackageName();
+            Log.d(TAG, "onHandleAssist: current package = " + pkg);
+            ScreenshotHolder.setAppPackage(pkg);
+
+            // flatten the assist structure to extract visible text
+            String screenText = flattenStructure(structure);
+            ScreenshotHolder.setScreenText(screenText);
+            Log.d(TAG, "onHandleAssist: extracted " + screenText.length() + " chars of screen text");
+        } else {
+            ScreenshotHolder.setAppPackage("Unknown");
+            ScreenshotHolder.setScreenText(null);
+        }
+    }
+
+    /**
+     * recursively flatten the AssistStructure tree into a single string.
+     * filters out invisible nodes and uses newline separators to preserve
+     * reading order for downstream entity extraction.
+     */
+    private String flattenStructure(AssistStructure structure) {
+        StringBuilder sb = new StringBuilder();
+        int windowCount = structure.getWindowNodeCount();
+        for (int i = 0; i < windowCount; i++) {
+            WindowNode windowNode = structure.getWindowNodeAt(i);
+            ViewNode rootView = windowNode.getRootViewNode();
+            if (rootView != null) {
+                flattenViewNode(rootView, sb);
+            }
+        }
+        return sb.toString().trim();
+    }
+
+    private void flattenViewNode(ViewNode node, StringBuilder sb) {
+        // skip invisible nodes
+        int visibility = node.getVisibility();
+        if (visibility != android.view.View.VISIBLE) {
+            return;
+        }
+
+        // extract text from this node
+        CharSequence text = node.getText();
+        if (text != null && text.length() > 0) {
+            String trimmed = text.toString().trim();
+            if (!trimmed.isEmpty()) {
+                sb.append(trimmed).append("\n");
+            }
+        }
+
+        // also check content description (useful for icons/images with labels)
+        CharSequence contentDesc = node.getContentDescription();
+        if (contentDesc != null && contentDesc.length() > 0) {
+            String trimmed = contentDesc.toString().trim();
+            if (!trimmed.isEmpty() && (text == null || !trimmed.equals(text.toString().trim()))) {
+                sb.append(trimmed).append("\n");
+            }
+        }
+
+        // recurse into children
+        int childCount = node.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            ViewNode child = node.getChildAt(i);
+            if (child != null) {
+                flattenViewNode(child, sb);
+            }
+        }
+    }
+
+    @Override
+    public void onShow(Bundle args, int showFlags) {
+        super.onShow(args, showFlags);
+        Log.d(TAG, "onShow called with flags: " + showFlags);
+        activityStarted = false;
+        
+        // If the system promises a screenshot, we wait for it (max 1000ms)
+        if ((showFlags & VoiceInteractionSession.SHOW_WITH_SCREENSHOT) != 0) {
+            handler.postDelayed(startOverlayRunnable, 1000);
+        } else {
+            startOverlayActivity();
+        }
+    }
+
+    private void startOverlayActivity() {
+        if (activityStarted) return;
+        activityStarted = true;
+        handler.removeCallbacks(startOverlayRunnable);
+
+        Intent intent = new Intent(getContext(), OverlayActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        boolean started = false;
+        try {
+            startAssistantActivity(intent);
+            started = true;
+        } catch (Exception e) {
+            Log.w(TAG, "startAssistantActivity failed, trying startActivity: " + e.getMessage());
+            try {
+                getContext().startActivity(intent);
+                started = true;
+            } catch (Exception e2) {
+                Log.e(TAG, "startActivity also failed: " + e2.getMessage());
+            }
+        }
+        if (started) {
+            hide();
+        }
+    }
+}

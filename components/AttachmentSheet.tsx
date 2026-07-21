@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   sheetHandle: {
     width: 40,
     height: 4,
-    borderRadius: 2,
+    borderRadius: 10,
     backgroundColor: '#ccc',
   },
   sheetHandleIncognito: {
@@ -153,8 +153,8 @@ const styles = StyleSheet.create({
     borderColor: '#565A75',
   },
   sheetIcon: {
-    width: 24,
-    height: 24,
+    width: 18,
+    height: 18,
     marginBottom: 4,
     tintColor: '#000',
   },
@@ -175,12 +175,12 @@ const styles = StyleSheet.create({
   },
   sheetRecentPhotoWrapper: {
     marginRight: 10,
-    borderRadius: 8,
+    borderRadius: 10,
     overflow: 'hidden',
   },
   sheetRecentPhoto: {
     width: 80,
     height: 80,
-    borderRadius: 8,
+    borderRadius: 10,
   },
 });

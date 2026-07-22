@@ -1,3 +1,5 @@
+import { ToolCall, ToolDefinition } from './tools/ITool';
+
 export interface IAIProvider {
   //check if service is online
   isAvailable(): Promise<boolean>;
@@ -8,18 +10,18 @@ export interface IAIProvider {
   //preload model
   preloadModel(modelName: string): Promise<void>;
 
-  //get model capabilities (e.g. vision)
+  //get model capabilities (e.g. vision, tools)
   getModelCapabilities?(modelName: string): Promise<string[]>;
 
-  //send message and stream response
+  //send message and stream response, returns tool calls if any
   sendMessage(
     modelName: string,
     systemPrompt: string,
-    messages: { role: string; content: string; images?: string[] }[],
+    messages: { role: string; content: string; images?: string[]; tool_calls?: any[] }[],
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
-    options?: { think?: boolean | string }
-  ): Promise<void>;
+    options?: { think?: boolean | string; tools?: ToolDefinition[] }
+  ): Promise<{ toolCalls?: ToolCall[] }>;
 
   //pull model (optional)
   downloadService?(modelName: string, onProgress?: (progress: number, etaSeconds: number, speedStr: string, sizeStr: string) => void): Promise<void>;

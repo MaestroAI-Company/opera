@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { Conversation, Message } from "../src/services/db/DatabaseService";
 import { renderMarkdown } from "./MarkdownText";
+import { AIModule } from "../src/services/ai/AIModule";
 
 const butterflyImage = require("../assets/images/butterfly2.png");
 const thinkingGif = require("../assets/icons/thinking.gif");
@@ -72,12 +73,10 @@ const FlashingText = ({ text }: { text: string }) => {
 const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, showSnackbar, isGenerating, isChatGenerating }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean }) => {
   const isUser = item.role === "user";
   
-  const thinkMatch = item.content.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
-  const isThinkingFinished = item.content.includes("</think>");
-  const hasThinkingText = thinkMatch !== null;
-  const thinkingText = thinkMatch ? thinkMatch[1].trim() : "";
-  
-  const isCurrentlyThinking = !isUser && (item.content === "…" || (isGenerating && hasThinkingText && !isThinkingFinished));
+  const thinkMatches = [...item.content.matchAll(/<think>([\s\S]*?)(?:<\/think>|$)/g)];
+  const isThinkingFinished = thinkMatches.length > 0 ? thinkMatches[thinkMatches.length - 1][0].endsWith("</think>") : false;
+  const hasThinkingText = thinkMatches.length > 0;
+  const thinkingText = thinkMatches.map(m => m[1].trim()).filter(t => t.length > 0).join('\n');
 
   const extractSteps = (text: string) => {
     const stepRegex = /^\s*(?:(?:\d+[\.\)]|[-*])\s*)?\*\*(.*?)\*\*/gm;
@@ -96,7 +95,38 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
     }
   };
 
-  const currentThought = extractSteps(thinkingText);
+  const [activeTool, setActiveTool] = useState<{name: string | null, args: any | null}>({ name: null, args: null });
+  useEffect(() => {
+    if (!isGenerating) return;
+    const unsub = AIModule.SharedGenerationState.subscribe(() => {
+      setActiveTool({ 
+        name: AIModule.SharedGenerationState.activeToolName, 
+        args: AIModule.SharedGenerationState.activeToolArgs 
+      });
+    });
+    setActiveTool({ 
+      name: AIModule.SharedGenerationState.activeToolName, 
+      args: AIModule.SharedGenerationState.activeToolArgs 
+    });
+    return unsub;
+  }, [isGenerating]);
+
+  let currentThought = extractSteps(thinkingText);
+  if (activeTool.name) {
+    if (activeTool.name === 'web_search') {
+      currentThought = `Searching the web for "${activeTool.args?.query || ''}"...`;
+    } else {
+      currentThought = `Running tool: ${activeTool.name}...`;
+    }
+  }
+
+  const displayContentTemp = item.content === "…" ? "…" : item.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
+  
+  // if activeTool is present, it's definitely thinking
+  const isCurrentlyThinking = !isUser && (
+    item.content === "…" || 
+    (isGenerating && (hasThinkingText || activeTool.name) && (!isThinkingFinished || displayContentTemp === "" || activeTool.name))
+  );
 
   const displayContent = item.content === "…" ? "…" : item.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
   const finalContent = displayContent.length > 0 ? displayContent : "…";

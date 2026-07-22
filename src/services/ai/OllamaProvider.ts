@@ -1,36 +1,7 @@
-import { fetch as expoFetch } from 'expo/fetch';
 import { IAIProvider } from './IAIProvider';
+import { ToolCall, ToolDefinition } from './tools/ITool';
 import { NotificationService } from '../notifications/NotificationService';
-
-async function universalFetch(input: string | URL | Request, init?: any): Promise<Response> {
-  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-  
-  if (isTauri) {
-    try {
-      const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
-      const customInit = { ...(init || {}) };
-      let headers: any = {};
-      if (customInit.headers) {
-        if (customInit.headers instanceof Headers) {
-          customInit.headers.forEach((value: string, key: string) => { headers[key] = value; });
-        } else {
-          headers = { ...customInit.headers };
-        }
-      }
-      headers['Origin'] = 'http://localhost';
-      customInit.headers = headers;
-      
-      const res = await tauriFetch(input as any, customInit);
-      return res;
-    } catch (e: any) {
-      console.warn("Tauri Fetch Error:", e);
-      throw e;
-    }
-  }
-  
-  return expoFetch(input, init);
-}
-
+import { universalFetch } from './utils/universalFetch';
 
 export class OllamaProvider implements IAIProvider {
   private baseUrl: string;
@@ -209,14 +180,14 @@ export class OllamaProvider implements IAIProvider {
   async sendMessage(
     modelName: string,
     systemPrompt: string,
-    messages: { role: string; content: string; images?: string[] }[],
+    messages: { role: string; content: string; images?: string[]; tool_calls?: any[] }[],
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
-    options?: { think?: boolean | string }
-  ): Promise<void> {
+    options?: { think?: boolean | string; tools?: ToolDefinition[] }
+  ): Promise<{ toolCalls?: ToolCall[] }> {
     if (!this.isConfigured()) throw new Error('AI server not configured');
     try {
-      const payload = {
+      const payload: any = {
         model: modelName,
         messages: [
           { role: 'system', content: systemPrompt },
@@ -227,17 +198,16 @@ export class OllamaProvider implements IAIProvider {
         ],
         stream: true,
         think: options?.think,
-        options: { num_ctx: 16384 }
+        options: { num_ctx: 16384 },
       };
+
+      //add tools if provided
+      if (options?.tools && options.tools.length > 0) {
+        payload.tools = options.tools;
+      }
       
-      const logPayload = {
-        ...payload,
-        messages: payload.messages.map((m: any) => ({
-          ...m,
-          images: m.images && m.images.length > 0 ? ['<base64_data_hidden>'] : undefined
-        }))
-      };
-      console.log('Ollama request payload:', JSON.stringify(logPayload, null, 2));
+      //log simplified request
+      console.log(`[OllamaProvider] sending request to ${modelName} with ${payload.messages.length} messages`);
 
       const response = await universalFetch(`${this.baseUrl}/api/chat`, {
         method: 'POST',
@@ -255,12 +225,16 @@ export class OllamaProvider implements IAIProvider {
         throw new Error('No response body for streaming');
       }
 
+      //log response start
+      console.log(`[OllamaProvider] started receiving response from ${modelName}`);
+
       //read stream chunks
       
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
       
       let isThinkingMode = false;
+      const collectedToolCalls: ToolCall[] = [];
       
       while (true) {
         const { done, value } = await reader.read();
@@ -292,6 +266,11 @@ export class OllamaProvider implements IAIProvider {
                 }
                 onChunk(parsed.message.content);
               }
+
+              //collect tool calls
+              if (parsed.message.tool_calls && Array.isArray(parsed.message.tool_calls)) {
+                collectedToolCalls.push(...parsed.message.tool_calls);
+              }
             }
           } catch (e) {
             //ignore incomplete json
@@ -300,10 +279,12 @@ export class OllamaProvider implements IAIProvider {
         }
       }
       
-      // close thinking mode if stream ended abruptly
+      //close thinking mode if stream ended abruptly
       if (isThinkingMode) {
         onChunk("\n</think>\n");
       }
+
+      return { toolCalls: collectedToolCalls.length > 0 ? collectedToolCalls : undefined };
     } catch (error: any) {
       throw error;
     }

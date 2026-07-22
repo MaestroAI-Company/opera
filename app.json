@@ -75,10 +75,8 @@
           "cameraPermission": "Opera needs access to your camera to take photos."
         }
       ],
-      [
-        "react-native-litert-lm"
-      ],
-      "./plugins/withNotifeeRepo.js"
+      "./plugins/withNotifeeRepo.js",
+      "./plugins/withNativeAndroid"
     ],
     "experiments": {
       "typedRoutes": true,

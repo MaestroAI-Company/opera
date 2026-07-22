@@ -364,55 +364,63 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.menuContainer}>
       <Text style={styles.title}>Settings</Text>
 
-      <Pressable
-        style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
-        onPress={() => setActiveSubPage("general")}
-      >
-        <Image source={addIcon} style={styles.plusIcon} tintColor="#000" />
-        <View style={styles.navTextContainer}>
-          <Text style={styles.navTitle}>General</Text>
-          <Text style={styles.navSubtitle}>Language, Theme, Cloud Storage</Text>
-        </View>
-      </Pressable>
+      <View style={styles.groupShadowLayer}>
+        <View style={styles.groupBox}>
+          <Pressable
+            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("general")}
+          >
+            <Image source={addIcon} style={styles.plusIcon} tintColor="#000" />
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>General</Text>
+              <Text style={styles.navSubtitle}>Language, Theme, Cloud Storage</Text>
+            </View>
+          </Pressable>
 
-      <Pressable
-        style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
-        onPress={() => setActiveSubPage("models")}
-      >
-        <Image source={addIcon} style={styles.plusIcon} tintColor="#000" />
-        <View style={styles.navTextContainer}>
-          <Text style={styles.navTitle}>Models & Server</Text>
-          <Text style={styles.navSubtitle}>Ollama server, Whisper Model, TOD, Instructions</Text>
-        </View>
-      </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("models")}
+          >
+            <Image source={addIcon} style={styles.plusIcon} tintColor="#000" />
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>Models & Server</Text>
+              <Text style={styles.navSubtitle}>Ollama server, Whisper Model, TOD, Instructions</Text>
+            </View>
+          </Pressable>
 
-      <Pressable
-        style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
-        onPress={() => setActiveSubPage("confidentiality")}
-      >
-        <Image source={addIcon} style={styles.plusIcon} tintColor="#000" />
-        <View style={styles.navTextContainer}>
-          <Text style={styles.navTitle}>Confidentiality</Text>
-          <Text style={styles.navSubtitle}>Data privacy, Usage analytics</Text>
+          <Pressable
+            style={({ pressed }) => [styles.navItem, styles.navItemLast, pressed && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("tools")}
+          >
+            <Image source={addIcon} style={styles.plusIcon} tintColor="#000" />
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>Tools & Widgets</Text>
+              <Text style={styles.navSubtitle}>Websearch</Text>
+            </View>
+          </Pressable>
         </View>
-      </Pressable>
+      </View>
 
-      <Pressable
-        style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
-        onPress={() => setActiveSubPage("tools")}
-      >
-        <Image source={addIcon} style={styles.plusIcon} tintColor="#000" />
-        <View style={styles.navTextContainer}>
-          <Text style={styles.navTitle}>Tools & Widgets</Text>
-          <Text style={styles.navSubtitle}>Websearch</Text>
-        </View>
-      </Pressable>
+      <View style={styles.groupShadowLayer}>
+        <View style={styles.groupBox}>
+          <Pressable
+            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("confidentiality")}
+          >
+            <Image source={addIcon} style={styles.plusIcon} tintColor="#000" />
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>Confidentiality</Text>
+              <Text style={styles.navSubtitle}>Data privacy, Usage analytics</Text>
+            </View>
+          </Pressable>
 
-      <View style={styles.navItem}>
-        <Image source={addIcon} style={styles.plusIcon} tintColor="#000" />
-        <View style={styles.navTextContainer}>
-          <Text style={styles.navTitle}>Social Links</Text>
-          <Text style={styles.navSubtitle}>Github, Instagram, Website</Text>
+          <View style={[styles.navItem, styles.navItemLast]}>
+            <Image source={addIcon} style={styles.plusIcon} tintColor="#000" />
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>Social Links</Text>
+              <Text style={styles.navSubtitle}>Github, Instagram, Website</Text>
+            </View>
+          </View>
         </View>
       </View>
     </View>
@@ -751,14 +759,31 @@ const styles = StyleSheet.create({
     height: 18,
     transform: [{ rotate: "-180deg" }],
   },
+  groupShadowLayer: {
+    position: "relative",
+    marginBottom: 20,
+  },
+  groupBox: {
+    position: "relative",
+    borderWidth: 2,
+    borderColor: "#00000017",
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    zIndex: 1,
+    overflow: "hidden",
+  },
   navItem: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     gap: 12,
   },
+  navItemLast: {
+    marginBottom: 0,
+  },
   navItemPressed: {
-    opacity: 0.6,
+    backgroundColor: "#eaeaea",
   },
   plusIcon: {
     width: 16,
@@ -824,7 +849,7 @@ const styles = StyleSheet.create({
   helpText: {
     fontSize: 12,
     color: "#888",
-    fontFamily: "IBMPlexMono-Medium",
+    fontFamily: "Jakarta",
     marginTop: 4,
   },
 });

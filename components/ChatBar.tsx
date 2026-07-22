@@ -11,7 +11,6 @@ import {
   Easing,
   Image,
   Keyboard,
-  LayoutAnimation,
   PanResponder,
   Platform,
   Pressable,
@@ -842,7 +841,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                       <TextInput
                         style={[
                           styles.input,
-                          { maxHeight: 100, minHeight: 36, lineHeight: 20 },
+                          { maxHeight: 36, minHeight: 36, lineHeight: 20 },
                           Platform.OS === 'web' && { outlineStyle: 'none', margin: 0, paddingHorizontal: 0, overflow: 'hidden' } as any
                         ]}
                         value={isTranscribing ? "Transcribing..." : text}
@@ -946,8 +945,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderWidth: 2,
     borderColor: "#00000017",
-    minHeight: 56,
-    maxHeight: 120,
+    height: 56,
     boxShadow: "2px 6px 22px #FF1A1A",
     elevation: 8,
   },
@@ -994,10 +992,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginLeft: 8,
     marginRight: 8,
-    gap: 6,
+    gap: 12,
   },
   voiceSquare: {
-    width: 6,
+    width: 3,
     height: 6,
     backgroundColor: "#fff",
   },

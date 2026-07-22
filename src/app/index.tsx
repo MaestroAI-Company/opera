@@ -26,6 +26,7 @@ import TopBar from "../../components/TopBar";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { AIModule } from "../services/ai/AIModule";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
+import { NotificationService } from '../services/notifications/NotificationService';
 import { Settings } from "../services/settings/SettingsService";
 import { Whisper } from "../services/whisper/WhisperService";
 import { useResponsive } from "../hooks/useResponsive";
@@ -136,6 +137,37 @@ export default function Index() {
   //ref to latest messages for handleSend
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
+
+  // Synchronize with shared generation from overlay
+  useEffect(() => {
+    return AIModule.SharedGenerationState.subscribe(() => {
+      const activeState = AIModule.SharedGenerationState;
+      if (activeState.activeConvId && activeConversationRef.current?.id === activeState.activeConvId) {
+        if (generatingConvIdRef.current !== activeState.activeConvId) {
+          setGeneratingConvId(activeState.activeConvId);
+          generatingConvIdRef.current = activeState.activeConvId;
+          streamingMsgIdRef.current = activeState.activeMsgId;
+        }
+        streamingContentRef.current = activeState.content;
+        setMessages((prev) => {
+          const msgExists = prev.some(m => m.id === activeState.activeMsgId);
+          if (!msgExists) return prev;
+          return prev.map((m) =>
+            m.id === activeState.activeMsgId
+              ? { ...m, content: activeState.content }
+              : m
+          );
+        });
+      } else if (!activeState.activeConvId && generatingConvIdRef.current === activeConversationRef.current?.id && !isProcessingRef.current) {
+        setGeneratingConvId(null);
+        generatingConvIdRef.current = null;
+        streamingMsgIdRef.current = null;
+        if (activeConversationRef.current) {
+          DB.getMessages(activeConversationRef.current.id).then(setMessages);
+        }
+      }
+    });
+  }, []);
 
   //init database and settings on mount
   useEffect(() => {

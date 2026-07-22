@@ -52,6 +52,7 @@ type ChatInputBarProps = {
 
 export type ChatBarHandle = {
   stopRecording: () => void;
+  clear: () => void;
 };
 
 //wav buffer builder from pcm chunks
@@ -259,6 +260,36 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     };
   }, [isAttachmentSheetVisible]);
 
+  const pcmChunksRef = useRef<ArrayBuffer[]>([]);
+  const sampleRateRef = useRef<number>(16000);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pressAnim = useRef(new Animated.Value(0)).current;
+
+  const webAudioContextRef = useRef<AudioContext | null>(null);
+  const webAudioStreamRef = useRef<MediaStream | null>(null);
+  const webAudioProcessorRef = useRef<ScriptProcessorNode | null>(null);
+
+  const isRecordingRef = useRef(false);
+
+  const { stream } = useAudioStream({
+    sampleRate: 16000,
+    channels: 1,
+    encoding: "float32",
+    onBuffer: (buffer) => {
+      // process audio buffer
+      if (isRecordingRef.current) {
+        pcmChunksRef.current.push(buffer.data);
+        sampleRateRef.current = buffer.sampleRate;
+        const f32 = new Float32Array(buffer.data);
+        let sum = 0;
+        for (let i = 0; i < f32.length; i++) {
+          sum += f32[i] * f32[i];
+        }
+        currentAudioVolume = Math.sqrt(sum / f32.length);
+      }
+    },
+  });
+
   useEffect(() => {
     const handleBackButton = () => {
       if (isAttachmentSheetVisible) {
@@ -408,34 +439,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     handleSelectRecentPhoto(photo);
   };
 
-  const pcmChunksRef = useRef<ArrayBuffer[]>([]);
-  const sampleRateRef = useRef<number>(16000);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const pressAnim = useRef(new Animated.Value(0)).current;
 
-  const webAudioContextRef = useRef<AudioContext | null>(null);
-  const webAudioStreamRef = useRef<MediaStream | null>(null);
-  const webAudioProcessorRef = useRef<ScriptProcessorNode | null>(null);
-
-  const { stream } = useAudioStream({
-    sampleRate: 16000,
-    channels: 1,
-    encoding: "float32",
-    onBuffer: (buffer) => {
-      if (isRecordingRef.current) {
-        pcmChunksRef.current.push(buffer.data);
-        sampleRateRef.current = buffer.sampleRate;
-        const f32 = new Float32Array(buffer.data);
-        let sum = 0;
-        for (let i = 0; i < f32.length; i++) {
-          sum += f32[i] * f32[i];
-        }
-        currentAudioVolume = Math.sqrt(sum / f32.length);
-      }
-    },
-  });
-
-  const isRecordingRef = useRef(false);
 
   useEffect(() => {
     AudioModule.requestRecordingPermissionsAsync().catch(() => { });
@@ -687,15 +691,10 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const handleSend = async () => {
     if (isRecording) {
       const transcribed = await stopAndTranscribe();
-      if (autoStartMic) {
-        // auto-send transcription in overlay mode
-        if (transcribed && transcribed.length > 0 && onSend) {
-          onSend(transcribed, []);
-        } else if (!transcribed) {
-          onTranscribeError?.();
-        }
-      } else {
-        if (transcribed && transcribed.length > 0) setText(transcribed);
+      if (transcribed && transcribed.length > 0) {
+        setText(transcribed);
+      } else if (autoStartMic && !transcribed) {
+        onTranscribeError?.();
       }
       return;
     }

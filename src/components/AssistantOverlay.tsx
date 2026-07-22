@@ -24,6 +24,7 @@ import { SYSTEM_PROMPTS } from '../../constants/prompts';
 import { Whisper } from '../services/whisper/WhisperService';
 import { NotificationService } from '../services/notifications/NotificationService';
 import ModelDropdown from '../../components/ModelDropdown';
+import SearchWebView from '../../components/SearchWebView';
 import { useResponsive } from '../hooks/useResponsive';
 
 export default function AssistantOverlayWrapper() {
@@ -138,6 +139,17 @@ function AssistantOverlay() {
   // modal state for whisper errors
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState<{ title: string, message: string, buttons?: any[] }>({ title: '', message: '' });
+
+  const [activeTool, setActiveTool] = useState<{name: string | null, args: any | null}>({ name: null, args: null });
+  useEffect(() => {
+    const unsub = AIModule.SharedGenerationState.subscribe(() => {
+      setActiveTool({ 
+        name: AIModule.SharedGenerationState.activeToolName, 
+        args: AIModule.SharedGenerationState.activeToolArgs 
+      });
+    });
+    return unsub;
+  }, []);
 
   // raf-throttle streaming updates to ~60fps
   const rafPendingRef = useRef(false);
@@ -362,7 +374,7 @@ function AssistantOverlay() {
       abortControllerRef.current = null;
     } else {
       try {
-        await AIModule.sendMessage(
+        await AIModule.sendMessageWithTools(
           model,
           taskSystemPrompt,
           taskHistory,
@@ -509,17 +521,26 @@ function AssistantOverlay() {
   if (lastMsg) {
     const isGenerating = generatingConvId === activeConversation?.id
       && streamingMsgIdRef.current === lastMsg.id;
-    const thinkMatch = lastMsg.content.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
-    const thinkDone = lastMsg.content.includes('</think>');
-    hasThinkingText = thinkMatch !== null;
-    const thinkingText = thinkMatch ? thinkMatch[1].trim() : '';
-    isThinking = lastMsg.content === '…' || (isGenerating && hasThinkingText && !thinkDone);
-
-    if (hasThinkingText) currentThought = extractThinkStep(thinkingText);
+    const thinkMatches = [...lastMsg.content.matchAll(/<think>([\s\S]*?)(?:<\/think>|$)/g)];
+    const thinkDone = thinkMatches.length > 0 ? thinkMatches[thinkMatches.length - 1][0].endsWith("</think>") : false;
+    hasThinkingText = thinkMatches.length > 0;
+    const thinkingText = thinkMatches.map(m => m[1].trim()).filter(t => t.length > 0).join('\n');
 
     const stripped = lastMsg.content === '…'
       ? '…'
       : lastMsg.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
+    
+    isThinking = lastMsg.content === '…' || (isGenerating && (hasThinkingText || activeTool.name) && (!thinkDone || stripped === '' || activeTool.name));
+
+    if (hasThinkingText) currentThought = extractThinkStep(thinkingText);
+    if (activeTool.name) {
+      if (activeTool.name === 'web_search') {
+        currentThought = `Searching the web for "${activeTool.args?.query || ''}"...`;
+      } else {
+        currentThought = `Running tool: ${activeTool.name}...`;
+      }
+    }
+
     finalContent = stripped.length > 0 ? stripped : '…';
   }
 
@@ -604,6 +625,8 @@ function AssistantOverlay() {
         buttons={modalConfig.buttons}
         onClose={() => setModalVisible(false)}
       />
+
+      <SearchWebView />
     </KeyboardAvoidingView>
   );
 }

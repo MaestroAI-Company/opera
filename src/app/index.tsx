@@ -22,6 +22,7 @@ import ChatView from "../../components/ChatView";
 import ConversationsDrawer from "../../components/ConversationsDrawer";
 import ModelDropdown from "../../components/ModelDropdown";
 import SettingsDrawer from "../../components/SettingsDrawer";
+import SearchWebView from "../../components/SearchWebView";
 import TopBar from "../../components/TopBar";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { AIModule } from "../services/ai/AIModule";
@@ -442,7 +443,7 @@ export default function Index() {
           abortControllerRef.current = null;
         } else {
           try {
-            await AIModule.sendMessage(
+            await AIModule.sendMessageWithTools(
               taskSelectedModel,
               taskSystemPrompt,
               taskHistory,
@@ -586,10 +587,14 @@ export default function Index() {
       .filter((m) => m.content !== "…")
       .map((m) => ({ role: m.role, content: m.content, images: m.images }));
 
+    const messagesToDelete = messagesRef.current.slice(msgIndex);
+
     if (!incognitoMode) {
-      await DB.deleteMessage(aiMessageId);
+      for (const m of messagesToDelete) {
+        await DB.deleteMessage(m.id);
+      }
     }
-    setMessages(prev => prev.filter(m => m.id !== aiMessageId));
+    setMessages([...historyUpToHere]);
 
     const taskSelectedModel = selectedModel;
     const taskOllamaUrl = ollamaUrl;
@@ -633,7 +638,7 @@ export default function Index() {
         abortControllerRef.current = null;
       } else {
         try {
-          await AIModule.sendMessage(
+          await AIModule.sendMessageWithTools(
             taskSelectedModel,
             taskSystemPrompt,
             taskHistory,
@@ -912,6 +917,8 @@ export default function Index() {
         />
       </View>
       </KeyboardAvoidingView>
+
+      <SearchWebView />
     </View>
   );
 }

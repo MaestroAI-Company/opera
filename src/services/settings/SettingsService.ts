@@ -12,6 +12,7 @@ export type AppSettings = {
   instruction: string;
   speaker: boolean;
   alwaysWhisper: boolean;
+  autoStartMic: boolean;
 };
 
 const DEFAULTS: AppSettings = {
@@ -31,6 +32,7 @@ const DEFAULTS: AppSettings = {
   instruction: '',
   speaker: false,
   alwaysWhisper: false,
+  autoStartMic: true,
 };
 
 class SettingsService {

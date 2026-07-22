@@ -61,7 +61,7 @@ export default function RootLayout() {
   }
 
   return (
-    <KeyboardProvider statusBarTranslucent={false}>
+    <KeyboardProvider>
       <TauriTitleBar />
       <Stack screenOptions={{ headerShown: false }} />
       <StatusBar style="dark" />

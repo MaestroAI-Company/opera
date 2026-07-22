@@ -65,6 +65,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   });
   const [instruction, setInstructionState] = useState("");
   const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
+  const [autoStartMic, setAutoStartMicState] = useState(true);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   const [ollamaModelOptions, setOllamaModelOptions] = useState<{ id: string, label: string }[]>([]);
@@ -121,6 +122,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setWhisperLanguageState(s.whisperLanguage);
         setInstructionState(s.instruction);
         setAlwaysWhisperState(s.alwaysWhisper);
+        setAutoStartMicState(s.autoStartMic);
         //apply to services
         AIModule.configure(s.ollamaUrl);
         Whisper.setLanguage(s.whisperLanguage);
@@ -191,6 +193,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const setAlwaysWhisper = (v: boolean) => {
     setAlwaysWhisperState(v);
     Settings.set("alwaysWhisper", v);
+  };
+
+  const setAutoStartMic = (v: boolean) => {
+    setAutoStartMicState(v);
+    Settings.set("autoStartMic", v);
   };
 
   const fetchOllamaModels = useCallback(async () => {
@@ -510,6 +517,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                   label="Always transcribe on-device (Whisper)"
                   checked={alwaysWhisper}
                   onToggle={setAlwaysWhisper}
+                />
+              </View>
+              <View style={{ marginBottom: 20 }}>
+                <Checkbox
+                  label="Auto start mic in overlay"
+                  checked={autoStartMic}
+                  onToggle={setAutoStartMic}
                 />
               </View>
             </>

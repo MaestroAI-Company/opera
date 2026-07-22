@@ -30,6 +30,8 @@ type ChatViewProps = {
   onRegenerate?: (messageId: string) => void;
   speakerEnabled?: boolean;
   generatingMessageId?: string | null;
+  hideHeader?: boolean;
+  hideGradients?: boolean;
 };
 
 const stripMarkdown = (md: string) => {
@@ -202,7 +204,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
 }, (prev, next) => prev.item.content === next.item.content && prev.incognito === next.incognito && prev.speakerEnabled === next.speakerEnabled && prev.isGenerating === next.isGenerating && prev.isChatGenerating === next.isChatGenerating);
 MessageItem.displayName = "MessageItem";
 
-export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, generatingMessageId }: ChatViewProps) {
+export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, generatingMessageId, hideHeader, hideGradients }: ChatViewProps) {
   const listRef = useRef<FlatList>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
   const isAtBottomRef = useRef(true);
@@ -253,7 +255,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         ListHeaderComponent={
-          conversation ? (
+          !hideHeader && conversation ? (
             <View
               style={styles.conversationHeader}
               onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
@@ -293,16 +295,20 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
           }
         }}
       />
-      <LinearGradient
-        colors={["#FFF5EC", "rgba(255,245,236,0.9)", "rgba(255,245,236,0)"]}
-        style={styles.gradientTop}
-        pointerEvents="none"
-      />
-      <LinearGradient
-        colors={["rgba(255,245,236,0)", "rgba(255,245,236,0.9)", "#FFF5EC"]}
-        style={styles.gradientBottom}
-        pointerEvents="none"
-      />
+      {!hideGradients && (
+        <>
+          <LinearGradient
+            colors={["#FFF5EC", "rgba(255,245,236,0.9)", "rgba(255,245,236,0)"]}
+            style={styles.gradientTop}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={["rgba(255,245,236,0)", "rgba(255,245,236,0.9)", "#FFF5EC"]}
+            style={styles.gradientBottom}
+            pointerEvents="none"
+          />
+        </>
+      )}
       {!!snackbarMessage && (
         <View style={styles.snackbarContainer} pointerEvents="none">
           <View style={styles.snackbar}>

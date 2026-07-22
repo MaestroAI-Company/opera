@@ -22,7 +22,9 @@ import { Settings } from '../services/settings/SettingsService';
 import { AIModule } from '../services/ai/AIModule';
 import { SYSTEM_PROMPTS } from '../../constants/prompts';
 import { Whisper } from '../services/whisper/WhisperService';
+import { NotificationService } from '../services/notifications/NotificationService';
 import ModelDropdown from '../../components/ModelDropdown';
+import { useResponsive } from '../hooks/useResponsive';
 
 export default function AssistantOverlayWrapper() {
   return (
@@ -92,6 +94,7 @@ const BUBBLE_HEIGHT_RATIO = 0.42;
 
 function AssistantOverlay() {
   const insets = useSafeAreaInsets();
+  const { isLargeScreen } = useResponsive();
   const [ready, setReady] = useState(false);
 
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
@@ -343,6 +346,11 @@ function AssistantOverlay() {
     streamingContentRef.current = '';
     abortControllerRef.current = new AbortController();
 
+    AIModule.SharedGenerationState.activeConvId = conv.id;
+    AIModule.SharedGenerationState.activeMsgId = assistantMsg.id;
+    AIModule.SharedGenerationState.content = '';
+    AIModule.SharedGenerationState.abort = () => abortControllerRef.current?.abort();
+
     let isError = false;
 
     if (!model) {
@@ -360,6 +368,8 @@ function AssistantOverlay() {
           taskHistory,
           chunk => {
             streamingContentRef.current += chunk;
+            AIModule.SharedGenerationState.content = streamingContentRef.current;
+            AIModule.SharedGenerationState.notify();
             scheduleFlush(assistantMsg.id);
           },
           abortControllerRef.current.signal,
@@ -402,6 +412,10 @@ function AssistantOverlay() {
 
     setGeneratingConvId(null);
     streamingMsgIdRef.current = null;
+    
+    AIModule.SharedGenerationState.activeConvId = null;
+    AIModule.SharedGenerationState.activeMsgId = null;
+    AIModule.SharedGenerationState.notify();
   }, [scheduleFlush, generateTitle]);
 
   const handleStop = useCallback(() => {
@@ -565,7 +579,7 @@ function AssistantOverlay() {
           </View>
         )}
 
-        <View style={styles.bottomBarOverlay} pointerEvents="box-none">
+        <View style={[styles.bottomBarOverlay, isLargeScreen && styles.bottomBarOverlayLarge]} pointerEvents="box-none">
           <ChatBar
             ref={chatBarRef}
             onSend={handleSend}
@@ -601,7 +615,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    // style backdrop background
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
   chatContainer: {
@@ -621,6 +640,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
+  },
+  bottomBarOverlayLarge: {
+    bottom: 24,
+    right: 24,
+    left: 'auto',
+    width: 450,
   },
   overlayBubbleWrapper: {
     flex: 1,

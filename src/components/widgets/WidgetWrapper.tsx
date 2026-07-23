@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { IWidget } from '../../services/widgets/WidgetManager';
 
 interface WidgetWrapperProps {
@@ -35,18 +35,17 @@ export default function WidgetWrapper({ widget, title, children }: WidgetWrapper
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#ffffff52',
+    borderColor: "#00000017",
     overflow: 'hidden',
-    marginVertical: 8,
     width: '100%',
+    padding: 5,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    marginBottom: 5,
     backgroundColor: '#FFFFFF',
   },
   icon: {
@@ -57,7 +56,7 @@ const styles = StyleSheet.create({
   },
   titleText: {
     fontSize: 14,
-    fontFamily: 'Jakarta',
+    fontFamily: "IBMPlexMono-Medium",
     color: '#333333',
     fontWeight: '600',
   },

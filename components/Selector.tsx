@@ -172,9 +172,9 @@ export default function Selector({
                     {option.label}
                   </Text>
                   {!option.isDownload && option.rightIcon && (
-                    <Animated.Image 
-                      source={option.rightIcon} 
-                      style={[styles.rightIcon, option.rightIconTintColor ? { tintColor: option.rightIconTintColor } : null]} 
+                    <Animated.Image
+                      source={option.rightIcon}
+                      style={[styles.rightIcon, option.rightIconTintColor ? { tintColor: option.rightIconTintColor } : null]}
                     />
                   )}
                 </Pressable>
@@ -199,7 +199,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#00000017",
     paddingHorizontal: 12,
     height: 44,
     backgroundColor: "#fff",

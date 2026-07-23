@@ -1,5 +1,4 @@
-import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { IWidget } from '../../services/widgets/WidgetManager';
 
@@ -12,13 +11,13 @@ export interface MapsWidgetData {
 }
 
 const generateMapHtml = (points: MapsWidgetData['points']) => {
-  const markersJs = points.map(p => 
+  const markersJs = points.map(p =>
     `var m = L.marker([${p.lat}, ${p.lng}]).addTo(map).bindPopup("${p.name.replace(/"/g, '\\"')}");
      bounds.push([${p.lat}, ${p.lng}]);`
   ).join('\n');
 
-  const polylineJs = points.length > 1 
-    ? `var route = L.polyline(bounds, {color: 'blue', weight: 4, opacity: 0.7, dashArray: '10, 10'}).addTo(map);` 
+  const polylineJs = points.length > 1
+    ? `var route = L.polyline(bounds, {color: 'blue', weight: 4, opacity: 0.7, dashArray: '10, 10'}).addTo(map);`
     : '';
 
   const setViewJs = points.length === 1
@@ -104,8 +103,7 @@ const styles = StyleSheet.create({
     height: 300,
     width: '100%',
     backgroundColor: '#EAEAEA',
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
+    borderRadius: 5,
     overflow: 'hidden',
   }
 });

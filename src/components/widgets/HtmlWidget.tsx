@@ -1,5 +1,4 @@
-import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { IWidget } from '../../services/widgets/WidgetManager';
 
@@ -27,16 +26,16 @@ export const HtmlWidget: IWidget<HtmlWidgetData> = {
     return (
       <View style={[styles.container, { height: widgetHeight }]}>
         {Platform.OS === 'web' ? (
-          <iframe 
+          <iframe
             src={data.url}
             srcDoc={data.html}
             style={{ width: '100%', height: '100%', border: 'none' }}
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
           />
         ) : (
-          <WebView 
-            source={source} 
-            style={{ flex: 1 }} 
+          <WebView
+            source={source}
+            style={{ flex: 1 }}
             scrollEnabled={true}
             bounces={false}
             javaScriptEnabled={true}
@@ -51,8 +50,7 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     backgroundColor: '#FFFFFF',
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
+    borderRadius: 5,
     overflow: 'hidden',
   }
 });

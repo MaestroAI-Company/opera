@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
   },
   container: {
     backgroundColor: "#fff",
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 2,
     borderColor: "#00000017",
     padding: 24,
@@ -140,11 +140,10 @@ const styles = StyleSheet.create({
   icon: {
     width: 24,
     height: 24,
-    
+
   },
   title: {
     fontSize: 18,
-    fontWeight: "bold",
     color: "#222",
     fontFamily: "IBMPlexMono-Medium",
     textAlign: "center",
@@ -169,15 +168,15 @@ const styles = StyleSheet.create({
   button: {
     paddingVertical: 10,
     paddingHorizontal: 20,
-    borderRadius: 10,
+    borderRadius: 5,
     borderWidth: 2,
     borderColor: "transparent",
     minWidth: 80,
     alignItems: "center",
   },
   buttonPrimary: {
-    backgroundColor: "#222",
-    borderColor: "#222",
+    backgroundColor: "#FF1A1A",
+    borderColor: "#ffffff52",
   },
   buttonDanger: {
     backgroundColor: "#FF1A1A",

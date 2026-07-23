@@ -10,8 +10,16 @@ import { Platform } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import SplashScreenComponent from "../../components/SplashScreen";
 import TauriTitleBar from "../../components/TauriTitleBar";
+import { WidgetManager } from "../services/widgets/WidgetManager";
+import { MapsWidget } from "../components/widgets/MapsWidget";
+import { HtmlWidget } from "../components/widgets/HtmlWidget";
+import { MermaidWidget } from "../components/widgets/MermaidWidget";
 
 global.Buffer = global.Buffer || Buffer;
+
+WidgetManager.registerWidget(MapsWidget);
+WidgetManager.registerWidget(HtmlWidget);
+WidgetManager.registerWidget(MermaidWidget);
 
 SplashScreen.preventAutoHideAsync();
 

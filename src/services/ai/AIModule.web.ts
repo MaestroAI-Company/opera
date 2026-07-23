@@ -4,6 +4,20 @@ import { OllamaProvider } from './OllamaProvider';
 const DEFAULT_URL = 'http://127.0.0.1:11434';
 
 class CentralAIModule {
+  public SharedGenerationState = {
+    activeConvId: null as string | null,
+    activeMsgId: null as string | null,
+    content: '',
+    abort: () => {},
+    listeners: new Set<() => void>(),
+    subscribe(cb: () => void) {
+      this.listeners.add(cb);
+      return () => { this.listeners.delete(cb); };
+    },
+    notify() {
+      this.listeners.forEach(l => l());
+    }
+  };
   private providers: Map<string, IAIProvider>;
   private activeMode: string = 'OLLAMA';
 

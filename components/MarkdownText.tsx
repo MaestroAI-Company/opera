@@ -1,6 +1,8 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import MathText from "react-native-math";
+import { WidgetManager } from "../src/services/widgets/WidgetManager";
+import WidgetWrapper from "../src/components/widgets/WidgetWrapper";
 
 const s = StyleSheet.create({
   base: { fontSize: 18, lineHeight: 26, color: "#000", fontFamily: "Jakarta" },
@@ -113,16 +115,70 @@ export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode
 
     // fenced code block ```
     if (line.trimStart().startsWith("```")) {
-      const language = line.replace(/```/g, "").trim().toLowerCase();
+      const header = line.trimStart().substring(3).trim();
+      const language = header.split(" ")[0].toLowerCase();
       const codeLines: string[] = [];
       i++;
-      while (i < lines.length && !lines[i].trimStart().startsWith("```")) {
+      let isClosed = false;
+      while (i < lines.length) {
+        if (lines[i].trimStart().startsWith("```")) {
+          isClosed = true;
+          i++;
+          break;
+        }
         codeLines.push(lines[i]);
         i++;
       }
-      i++; // skip closing ```
       
+      if (language === "widget") {
+        const idMatch = header.match(/id="([^"]+)"/);
+        const titleMatch = header.match(/title="([^"]+)"/);
+        const widgetId = idMatch ? idMatch[1] : null;
+        const widgetTitle = titleMatch ? titleMatch[1] : undefined;
+        
+        const widget = widgetId ? WidgetManager.getWidget(widgetId) : undefined;
+        if (widget) {
+          if (!isClosed) {
+            elements.push(
+              <View key={`loading-${i}`} style={{ padding: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.03)', borderRadius: 12, marginVertical: 8 }}>
+                <Text style={{ fontFamily: 'Jakarta', color: '#666', fontStyle: 'italic' }}>
+                  Génération du widget {widgetTitle || widget.name}...
+                </Text>
+              </View>
+            );
+            continue;
+          }
 
+          let data;
+          const rawJson = codeLines.join("\n");
+          try {
+            data = JSON.parse(rawJson);
+          } catch (e1: any) {
+            try {
+              // sanitize raw json
+              const sanitized = rawJson.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, (match) => {
+                return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+              });
+              data = JSON.parse(sanitized);
+            } catch (e2: any) {
+              // fallback to code block on parse error
+              elements.push(
+                <Text key={`code-${i}`} style={[s.base, s.codeBlock]} selectable={true} selectionColor={selColor}>
+                  {`[Widget Data Error: ${e1.message}]\n${rawJson}`}
+                </Text>
+              );
+              continue;
+            }
+          }
+
+          elements.push(
+            <WidgetWrapper key={`widget-${i}`} widget={widget} title={widgetTitle}>
+              <widget.component data={data} />
+            </WidgetWrapper>
+          );
+          continue;
+        }
+      }
 
       elements.push(
         <Text key={`code-${i}`} style={[s.base, s.codeBlock]} selectable={true} selectionColor={selColor}>

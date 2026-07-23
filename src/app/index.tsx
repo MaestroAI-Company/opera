@@ -30,6 +30,7 @@ import { NotificationService } from '../services/notifications/NotificationServi
 import { Settings } from "../services/settings/SettingsService";
 import { Whisper } from "../services/whisper/WhisperService";
 import { useResponsive } from "../hooks/useResponsive";
+import { WidgetManager } from "../services/widgets/WidgetManager";
 
 
 const butterflyImage = require("../../assets/images/butterfly5.png");
@@ -397,9 +398,9 @@ export default function Index() {
       const taskSelectedModel = selectedModel;
       const taskOllamaUrl = ollamaUrl;
       const taskAiService = aiService;
-      const taskSystemPrompt = userInstruction.trim().length > 0
+      const taskSystemPrompt = (userInstruction.trim().length > 0
         ? `${userInstruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
-        : SYSTEM_PROMPTS.DEFAULT;
+        : SYSTEM_PROMPTS.DEFAULT) + WidgetManager.getSystemPromptSegment();
       const taskReflection = selectedReflection;
       const taskConv = conv;
 
@@ -594,9 +595,9 @@ export default function Index() {
     const taskSelectedModel = selectedModel;
     const taskOllamaUrl = ollamaUrl;
     const taskAiService = aiService;
-    const taskSystemPrompt = userInstruction.trim().length > 0
+    const taskSystemPrompt = (userInstruction.trim().length > 0
       ? `${userInstruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
-      : SYSTEM_PROMPTS.DEFAULT;
+      : SYSTEM_PROMPTS.DEFAULT) + WidgetManager.getSystemPromptSegment();
     const taskReflection = selectedReflection;
     const taskConv = activeConversation;
     const isIncognitoTask = taskConv.id.startsWith("incognito_");

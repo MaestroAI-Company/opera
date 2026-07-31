@@ -87,7 +87,7 @@ export default function NotificationModal({
                     !isPrimary && !isDanger && styles.buttonSecondary,
                     pressed && (
                       isPrimary
-                        ? { backgroundColor: "#000", borderColor: "#000" }
+                        ? { backgroundColor: "#D61515", borderColor: "#D61515" }
                         : isDanger
                           ? { backgroundColor: "#d60e0e", borderColor: "#d60e0e" }
                           : { backgroundColor: "#eaeaea" }
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
   },
   container: {
     backgroundColor: "#fff",
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 2,
     borderColor: "#00000017",
     padding: 24,
@@ -169,15 +169,15 @@ const styles = StyleSheet.create({
   button: {
     paddingVertical: 10,
     paddingHorizontal: 20,
-    borderRadius: 10,
+    borderRadius: 5,
     borderWidth: 2,
     borderColor: "transparent",
     minWidth: 80,
     alignItems: "center",
   },
   buttonPrimary: {
-    backgroundColor: "#222",
-    borderColor: "#222",
+    backgroundColor: "#FF1A1A",
+    borderColor: "#ffffff52",
   },
   buttonDanger: {
     backgroundColor: "#FF1A1A",

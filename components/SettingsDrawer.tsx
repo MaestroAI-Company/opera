@@ -17,7 +17,11 @@ const downloadIcon = require("../assets/icons/download.png");
 const deleteIcon = require("../assets/icons/delete.png");
 const penPlaceholderIcon = require("../assets/icons/pencil.png");
 const arrowIcon = require("../assets/icons/arrow.png");
-const addIcon = require("../assets/icons/add.png");
+const generalIcon = require("../assets/icons/general.png");
+const serverIcon = require("../assets/icons/server.png");
+const toolIcon = require("../assets/icons/tool.png");
+const confidentialityIcon = require("../assets/icons/confidentiality.png");
+const socialIcon = require("../assets/icons/social.png");
 
 type SettingsDrawerProps = {
   visible: boolean;
@@ -415,7 +419,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
             onPress={() => setActiveSubPage("general")}
           >
-            <Image source={addIcon} style={styles.plusIcon} tintColor="#000" />
+            <Image source={generalIcon} style={styles.menuIcon} tintColor="#000" />
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>General</Text>
               <Text style={styles.navSubtitle}>Language, Theme, Cloud Storage</Text>
@@ -426,7 +430,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
             onPress={() => setActiveSubPage("models")}
           >
-            <Image source={addIcon} style={styles.plusIcon} tintColor="#000" />
+            <Image source={serverIcon} style={styles.menuIcon} tintColor="#000" />
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>Models & Server</Text>
               <Text style={styles.navSubtitle}>Ollama server, Whisper Model, TOD, Instructions</Text>
@@ -437,7 +441,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             style={({ pressed }) => [styles.navItem, styles.navItemLast, pressed && styles.navItemPressed]}
             onPress={() => setActiveSubPage("tools")}
           >
-            <Image source={addIcon} style={styles.plusIcon} tintColor="#000" />
+            <Image source={toolIcon} style={styles.menuIcon} tintColor="#000" />
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>Tools & Widgets</Text>
               <Text style={styles.navSubtitle}>Websearch</Text>
@@ -452,7 +456,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
             onPress={() => setActiveSubPage("confidentiality")}
           >
-            <Image source={addIcon} style={styles.plusIcon} tintColor="#000" />
+            <Image source={confidentialityIcon} style={styles.menuIcon} tintColor="#000" />
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>Confidentiality</Text>
               <Text style={styles.navSubtitle}>Data privacy, Usage analytics</Text>
@@ -460,7 +464,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           </Pressable>
 
           <View style={[styles.navItem, styles.navItemLast]}>
-            <Image source={addIcon} style={styles.plusIcon} tintColor="#000" />
+            <Image source={socialIcon} style={styles.menuIcon} tintColor="#000" />
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>Social Links</Text>
               <Text style={styles.navSubtitle}>Github, Instagram, Website</Text>
@@ -811,9 +815,9 @@ const styles = StyleSheet.create({
   navItemPressed: {
     backgroundColor: "#eaeaea",
   },
-  plusIcon: {
-    width: 16,
-    height: 16,
+  menuIcon: {
+    width: 18,
+    height: 18,
   },
   navTextContainer: {
     flex: 1,
@@ -869,7 +873,7 @@ const styles = StyleSheet.create({
   },
   downloadText: {
     fontSize: 14,
-    color: "#ff7b00",
+    color: "#FF1A1A",
     fontFamily: "IBMPlexMono-Medium",
   },
   helpText: {

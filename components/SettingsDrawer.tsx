@@ -14,6 +14,7 @@ import { useResponsive } from "../src/hooks/useResponsive";
 
 const linkIcon = require("../assets/icons/link.png");
 const downloadIcon = require("../assets/icons/download.png");
+const deleteIcon = require("../assets/icons/delete.png");
 const penPlaceholderIcon = require("../assets/icons/pencil.png");
 const arrowIcon = require("../assets/icons/arrow.png");
 const addIcon = require("../assets/icons/add.png");
@@ -83,11 +84,57 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     { id: "none", label: "None" },
   ];
 
+  const handleDeleteWhisper = () => {
+    if (whisperModel === "none") return;
+    showAlert(
+      "Delete Whisper Model",
+      `Are you sure you want to delete the Whisper ${whisperModel} model?`,
+      [
+        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: "Delete",
+          style: "danger",
+          onPress: async () => {
+            setAlertModalVisible(false);
+            try {
+              await Whisper.deleteModel(whisperModel);
+              setWhisperInstalled(false);
+              setInstalledWhisperModels(prev => ({ ...prev, [whisperModel]: false }));
+            } catch (e) {
+              console.error("Failed to delete whisper model", e);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const whisperModelOptions = [
     { id: "none", label: "None" },
-    { id: "tiny", label: "Tiny", isDownload: !installedWhisperModels["tiny"] },
-    { id: "base", label: "Base", isDownload: !installedWhisperModels["base"] },
-    { id: "small", label: "Small", isDownload: !installedWhisperModels["small"] },
+    {
+      id: "tiny",
+      label: "Tiny",
+      isDownload: !installedWhisperModels["tiny"],
+      ...(installedWhisperModels["tiny"] && whisperModel === "tiny"
+        ? { rightIcon: deleteIcon, rightIconTintColor: "#ffffff", onRightIconPress: handleDeleteWhisper }
+        : {}),
+    },
+    {
+      id: "base",
+      label: "Base",
+      isDownload: !installedWhisperModels["base"],
+      ...(installedWhisperModels["base"] && whisperModel === "base"
+        ? { rightIcon: deleteIcon, rightIconTintColor: "#ffffff", onRightIconPress: handleDeleteWhisper }
+        : {}),
+    },
+    {
+      id: "small",
+      label: "Small",
+      isDownload: !installedWhisperModels["small"],
+      ...(installedWhisperModels["small"] && whisperModel === "small"
+        ? { rightIcon: deleteIcon, rightIconTintColor: "#ffffff", onRightIconPress: handleDeleteWhisper }
+        : {}),
+    },
   ];
 
   const getWhisperSize = (model: string) => {
@@ -248,17 +295,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     }
   };
 
-  const handleDownloadWhisper = async () => {
-    if (whisperModel === "none") return;
+  const handleDownloadWhisper = async (modelToDownload?: string) => {
+    const model = modelToDownload || whisperModel;
+    if (model === "none") return;
     setIsDownloadingWhisper(true);
     setWhisperDownloadProgress(null);
     try {
-      await Whisper.downloadModel(whisperModel, (progress, etaSeconds, speedStr, sizeStr) => {
+      await Whisper.downloadModel(model, (progress, etaSeconds, speedStr, sizeStr) => {
         setWhisperDownloadProgress({ progress, etaSeconds, speedStr, sizeStr });
       });
       setWhisperInstalled(true);
-      setInstalledWhisperModels(prev => ({ ...prev, [whisperModel]: true }));
-      showAlert("Success", `Whisper ${whisperModel} model downloaded successfully.`);
+      setInstalledWhisperModels(prev => ({ ...prev, [model]: true }));
+      setWhisperModel(model);
+      showAlert("Success", `Whisper ${model} model downloaded successfully.`);
     } catch (e) {
       console.error("Failed to download whisper model", e);
       showAlert("Error", "Failed to download Whisper model.");
@@ -268,25 +317,21 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     }
   };
 
-  const handleDeleteWhisper = () => {
-    if (whisperModel === "none") return;
+  const handleSelectWhisperModel = (v: string) => {
+    if (v === "none" || installedWhisperModels[v]) {
+      setWhisperModel(v);
+      return;
+    }
     showAlert(
-      "Delete Whisper Model",
-      `Are you sure you want to delete the Whisper ${whisperModel} model?`,
+      "Download Whisper Model",
+      `Are you sure you want to download the Whisper ${v} model (${getWhisperSize(v)})?`,
       [
         { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
         {
-          text: "Delete",
-          style: "danger",
-          onPress: async () => {
+          text: "Download",
+          onPress: () => {
             setAlertModalVisible(false);
-            try {
-              await Whisper.deleteModel(whisperModel);
-              setWhisperInstalled(false);
-              setInstalledWhisperModels(prev => ({ ...prev, [whisperModel]: false }));
-            } catch (e) {
-              console.error("Failed to delete whisper model", e);
-            }
+            handleDownloadWhisper(v);
           }
         }
       ]
@@ -495,37 +540,18 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <Selector
           options={whisperModelOptions}
           selectedValue={whisperModel}
-          onSelect={setWhisperModel}
+          onSelect={handleSelectWhisperModel}
           title="Select Whisper Model"
           fullWidth
         />
-        {whisperModel !== "none" && (
+        {isDownloadingWhisper && (
           <View style={{ marginTop: 10 }}>
-            {whisperInstalled ? (
-              <Pressable
-                style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }]}
-                onPress={handleDeleteWhisper}
-              >
-                <Text style={[styles.downloadText, { color: "#FF1A1A" }]}>Delete Model ({getWhisperSize(whisperModel)})</Text>
-              </Pressable>
-            ) : isDownloadingWhisper ? (
-              <DownloadProgress
-                title={`Downloading Whisper ${whisperModel}...`}
-                progress={whisperDownloadProgress?.progress || 0}
-                sizeStr={whisperDownloadProgress?.sizeStr}
-                etaSeconds={whisperDownloadProgress?.etaSeconds}
-              />
-            ) : (
-              <Pressable
-                style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }]}
-                onPress={handleDownloadWhisper}
-              >
-                <Image source={downloadIcon} style={styles.downloadIcon} tintColor="#0066cc" />
-                <Text style={styles.downloadText}>
-                  Download {whisperModel} model ({getWhisperSize(whisperModel)})
-                </Text>
-              </Pressable>
-            )}
+            <DownloadProgress
+              title={`Downloading Whisper ${whisperModel}...`}
+              progress={whisperDownloadProgress?.progress || 0}
+              sizeStr={whisperDownloadProgress?.sizeStr}
+              etaSeconds={whisperDownloadProgress?.etaSeconds}
+            />
           </View>
         )}
       </View>
@@ -830,7 +856,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#f5f5f5",
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: "#e0e0e0",
     borderStyle: "dashed",
@@ -843,7 +869,7 @@ const styles = StyleSheet.create({
   },
   downloadText: {
     fontSize: 14,
-    color: "#0066cc",
+    color: "#ff7b00",
     fontFamily: "IBMPlexMono-Medium",
   },
   helpText: {

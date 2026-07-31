@@ -12,6 +12,7 @@ export type SelectorOption = {
   label: string;
   rightIcon?: any;
   rightIconTintColor?: string;
+  onRightIconPress?: () => void;
   isDownload?: boolean;
 };
 
@@ -160,7 +161,7 @@ export default function Selector({
                   ]}
                 >
                   {option.isDownload && (
-                    <Animated.Image source={downloadIcon} style={[styles.downloadIcon, { tintColor: '#0066cc' }]} />
+                    <Animated.Image source={downloadIcon} style={[styles.downloadIcon, { tintColor: '#FF1A1A' }]} />
                   )}
                   <Text
                     style={[
@@ -172,10 +173,27 @@ export default function Selector({
                     {option.label}
                   </Text>
                   {!option.isDownload && option.rightIcon && (
-                    <Animated.Image 
-                      source={option.rightIcon} 
-                      style={[styles.rightIcon, option.rightIconTintColor ? { tintColor: option.rightIconTintColor } : null]} 
-                    />
+                    option.onRightIconPress ? (
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          Vibration.vibrate(10);
+                          handleClose(() => option.onRightIconPress?.());
+                        }}
+                        hitSlop={8}
+                        style={styles.rightIconPressable}
+                      >
+                        <Animated.Image
+                          source={option.rightIcon}
+                          style={[styles.rightIcon, option.rightIconTintColor ? { tintColor: option.rightIconTintColor } : null]}
+                        />
+                      </Pressable>
+                    ) : (
+                      <Animated.Image
+                        source={option.rightIcon}
+                        style={[styles.rightIcon, option.rightIconTintColor ? { tintColor: option.rightIconTintColor } : null]}
+                      />
+                    )
                   )}
                 </Pressable>
               ))}
@@ -251,6 +269,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   option: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 5,
@@ -271,22 +291,29 @@ const styles = StyleSheet.create({
   optionTextSelected: {
     color: "#fff",
   },
+  rightIconPressable: {
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: "auto",
+    padding: 2,
+  },
   rightIcon: {
-    width: 14,
-    height: 14,
+    width: 18,
+    height: 18,
     marginLeft: "auto",
   },
   downloadOption: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#f5f5f5",
-    padding: 10,
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: "#e0e0e0",
     borderStyle: "dashed",
     gap: 8,
-    marginVertical: 4,
+    marginBottom: 4,
   },
   downloadIcon: {
     width: 16,
@@ -294,7 +321,7 @@ const styles = StyleSheet.create({
   },
   downloadText: {
     fontSize: 13,
-    color: "#0066cc",
+    color: "#FF1A1A",
     fontFamily: "IBMPlexMono-Medium",
   },
 });

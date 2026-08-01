@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  AppState,
   BackHandler,
   Image,
   ImageBackground,
@@ -11,9 +12,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  useWindowDimensions,
-  View,
-  AppState,
+  View
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -25,12 +24,12 @@ import SettingsDrawer from "../../components/SettingsDrawer";
 import SearchWebView from "../../components/SearchWebView";
 import TopBar from "../../components/TopBar";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
+import { useResponsive } from "../hooks/useResponsive";
 import { AIModule } from "../services/ai/AIModule";
+import { AICoreSTT } from "../services/ai/AICoreSpeechService";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
-import { NotificationService } from '../services/notifications/NotificationService';
 import { Settings } from "../services/settings/SettingsService";
 import { Whisper } from "../services/whisper/WhisperService";
-import { useResponsive } from "../hooks/useResponsive";
 import { WidgetManager } from "../services/widgets/WidgetManager";
 
 
@@ -46,8 +45,9 @@ export default function Index() {
   const [selectedReflection, setSelectedReflection] = useState("none");
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
+  const [settingsInitialSubPage, setSettingsInitialSubPage] = useState<"main" | "general" | "models" | "confidentiality" | "tools">("main");
   const [dbReady, setDbReady] = useState(false);
-  
+
   const { convId } = useLocalSearchParams<{ convId?: string }>();
   const [incognitoMode, setIncognitoMode] = useState(false);
   const [userInstruction, setUserInstruction] = useState("");
@@ -57,6 +57,7 @@ export default function Index() {
   const [modelCapabilities, setModelCapabilities] = useState<string[]>([]);
   const [alwaysWhisper, setAlwaysWhisper] = useState(false);
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
+  const [aicoreSTTReady, setAicoreSTTReady] = useState(false);
 
   //conversation state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -97,6 +98,16 @@ export default function Index() {
 
     return () => backHandler.remove();
   }, [drawerVisible, settingsDrawerVisible]);
+
+  const openDrawerSafely = useCallback((openFn: () => void) => {
+    const wasKeyboardOpen = typeof Keyboard.metrics === 'function' ? !!Keyboard.metrics() : false;
+    Keyboard.dismiss();
+    if (wasKeyboardOpen) {
+      setTimeout(openFn, 50);
+    } else {
+      openFn();
+    }
+  }, []);
 
   const [pendingConvIds, setPendingConvIds] = useState<string[]>([]);
   const requestQueueRef = useRef<{ convId: string, task: () => Promise<void>, assistantMsgId: string, isIncognito: boolean }[]>([]);
@@ -189,6 +200,7 @@ export default function Index() {
         setSpeakerEnabled(s.speaker);
         setAlwaysWhisper(s.alwaysWhisper);
         AIModule.configure(s.ollamaUrl);
+        AIModule.setMode(s.aiService);
         Whisper.setLanguage(s.whisperLanguage);
       } catch (e) {
         console.warn("Failed to load settings at boot", e);
@@ -202,7 +214,7 @@ export default function Index() {
   //fetch model capabilities when selectedModel changes
   useEffect(() => {
     const fetchCapabilities = async () => {
-      if (selectedModel && aiService === "ollama") {
+      if (selectedModel) {
         const caps = await AIModule.getModelCapabilities(selectedModel);
         setModelCapabilities(caps);
       } else {
@@ -211,6 +223,22 @@ export default function Index() {
     };
     fetchCapabilities();
   }, [selectedModel, aiService, ollamaUrl]);
+
+  //check gemini stt model when aicore mode active
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      if (aiService !== "aicore" || Platform.OS !== "android") {
+        setAicoreSTTReady(false);
+        return;
+      }
+      const locale = Settings.getCached().whisperLanguage || "en-US";
+      const ready = await AICoreSTT.ensureReady(locale);
+      if (!cancelled) setAicoreSTTReady(ready);
+    };
+    check();
+    return () => { cancelled = true; };
+  }, [aiService]);
 
   const loadConversations = async () => {
     const convs = await DB.getConversations();
@@ -277,7 +305,7 @@ export default function Index() {
             if (target) selectConversation(target);
           });
         }
-      } catch {}
+      } catch { }
     };
     const sub = Linking.addEventListener('url', handleUrl);
     return () => sub.remove();
@@ -548,9 +576,24 @@ export default function Index() {
   //transcribe audio: use remote model if it supports audio and user hasnt forced whisper
   const handleTranscribe = useCallback(async (wavBuffer: ArrayBuffer): Promise<string | null> => {
     const useRemote = !alwaysWhisper && modelCapabilities.includes("audio") && selectedModel;
+    
+    const transcribeWithWhisper = async () => {
+      if (!Whisper.isAvailable()) {
+        const modelName = Settings.getCached().whisperModel || "base";
+        if (modelName !== "none" && await Whisper.isModelInstalled(modelName)) {
+           await Whisper.init(modelName);
+        }
+      }
+      if (Whisper.isAvailable()) {
+        return Whisper.transcribeData(wavBuffer);
+      }
+      console.error('Whisper fallback failed because Whisper is not initialized or installed.');
+      return null;
+    };
+
     if (!useRemote) {
       //fallback to whisper on-device
-      return Whisper.transcribeData(wavBuffer);
+      return transcribeWithWhisper();
     }
     try {
       //encode wav as data uri 
@@ -569,7 +612,7 @@ export default function Index() {
       return transcription.trim() || null;
     } catch (e) {
       console.error('Remote transcription failed, falling back to Whisper:', e);
-      return Whisper.transcribeData(wavBuffer);
+      return transcribeWithWhisper();
     }
   }, [alwaysWhisper, modelCapabilities, selectedModel]);
 
@@ -732,191 +775,199 @@ export default function Index() {
         style={StyleSheet.absoluteFill}
         imageStyle={styles.backgroundTexture} resizeMode="cover"
       />
-      <KeyboardAvoidingView 
-        style={[styles.container, { backgroundColor: "transparent" }]} 
+      <KeyboardAvoidingView
+        style={[styles.container, { backgroundColor: "transparent" }]}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        enabled={!settingsDrawerVisible && (isLargeScreen || !drawerVisible)}
         {...(isLargeScreen ? {} : panResponder.panHandlers)}
       >
 
-      <View style={{ flex: 1, flexDirection: isLargeScreen ? "row" : "column" }} pointerEvents="box-none">
-        <ConversationsDrawer
-          isLargeScreen={isLargeScreen}
-          isDesktop={isDesktop}
-          visible={drawerVisible}
-          onClose={() => setDrawerVisible(false)}
-          conversations={conversations}
-          selectedConversationId={activeConversation?.id ?? null}
-          onSelectConversation={selectConversation}
-          onNewConversation={startNewConversation}
-          onDeleteConversation={deleteConversation}
-          onTogglePinConversation={togglePinConversation}
-        />
+        <View style={{ flex: 1, flexDirection: isLargeScreen ? "row" : "column" }} pointerEvents="box-none">
+          <ConversationsDrawer
+            isLargeScreen={isLargeScreen}
+            isDesktop={isDesktop}
+            visible={drawerVisible}
+            onClose={() => setDrawerVisible(false)}
+            conversations={conversations}
+            selectedConversationId={activeConversation?.id ?? null}
+            onSelectConversation={selectConversation}
+            onNewConversation={startNewConversation}
+            onDeleteConversation={deleteConversation}
+            onTogglePinConversation={togglePinConversation}
+          />
 
-        <View style={{ flex: 1, backgroundColor: "transparent" }} pointerEvents="box-none">
-          {!activeConversation && (
-            <View style={styles.centerContent}>
-              <Image
-                source={incognitoMode ? butterflyGrey : butterflyImage}
-                style={styles.butterfly}
-                resizeMode="contain"
-              />
-              <Text style={styles.welcomeText}>Welcome</Text>
-              <Pressable
-                onPress={() => setIncognitoMode((prev) => !prev)}
-                style={({ pressed }) => [
-                  styles.incognitoBox,
-                  incognitoMode && styles.incognitoBoxActive,
-                  pressed && (incognitoMode ? { backgroundColor: "#3e4157" } : { backgroundColor: "#eaeaea" })
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.incognitoButtonText,
-                    incognitoMode && styles.incognitoButtonTextActive,
+          <View style={{ flex: 1, backgroundColor: "transparent" }} pointerEvents="box-none">
+            {!activeConversation && (
+              <View style={styles.centerContent}>
+                <Image
+                  source={incognitoMode ? butterflyGrey : butterflyImage}
+                  style={styles.butterfly}
+                  resizeMode="contain"
+                />
+                <Text style={styles.welcomeText}>Welcome</Text>
+                <Pressable
+                  onPress={() => setIncognitoMode((prev) => !prev)}
+                  style={({ pressed }) => [
+                    styles.incognitoBox,
+                    incognitoMode && styles.incognitoBoxActive,
+                    pressed && (incognitoMode ? { backgroundColor: "#3e4157" } : { backgroundColor: "#eaeaea" })
                   ]}
                 >
-                  {incognitoMode
-                    ? "Disable incognito mode"
-                    : "Enable incognito mode"}
-                </Text>
-              </Pressable>
-              <Text
-                style={[
-                  styles.incognitoDescription,
-                  { opacity: incognitoMode ? 1 : 0 },
-                ]}
-              >
-                Welcome to incognito mode. You can ask quick questions without leaving a trace. Once you close the window, your conversation disappears forever.
-              </Text>
-            </View>
-          )}
-
-          {activeConversation && (
-            <ChatView
-              messages={messages}
-              conversation={activeConversation}
-              contentTopPadding={insets.top + 72}
-              contentBottomPadding={88 + insets.bottom}
-              incognito={activeConversation.id.startsWith("incognito_")}
-              onRegenerate={handleRegenerate}
-              speakerEnabled={speakerEnabled}
-              generatingMessageId={generatingConvId === activeConversation.id ? streamingMsgIdRef.current : null}
-            />
-          )}
-
-          <View style={[styles.topBarOverlay, { 
-            paddingTop: insets.top + (
-              (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) 
-                ? (navigator.userAgent.includes("Linux") && !navigator.userAgent.includes("Android") ? 0 : 32) 
-                : 0
-            ),
-            zIndex: attachmentSheetVisible ? 200 : undefined,
-          }]} pointerEvents="box-none">
-            <TopBar
-              onMenuPress={() => {
-                Keyboard.dismiss();
-                setDrawerVisible(prev => !prev);
-              }}
-              onNewPress={startNewConversation}
-              isLargeScreen={isLargeScreen}
-              isDesktop={isDesktop}
-              centerElement={
-                aiService === "ollama" ? (
-                  <ModelDropdown
-                    selectedModel={selectedModel}
-                    selectedReflection={selectedReflection}
-                    showReflection={modelCapabilities.includes("thinking")}
-                    onModelChange={(model) => {
-                      setSelectedModel(model);
-                      Settings.set("ollamaModel", model);
-                    }}
-                    onReflectionChange={setSelectedReflection}
-                  />
-                ) : null
-              }
-              rightElement={
-                <View style={styles.settingsShadowLayer}>
-                  <View style={styles.settingsShadowBlock} />
-                  <Pressable
-                    style={({ pressed }) => {
-                      const showText = isDesktop;
-                      return [
-                        styles.settingsButton, 
-                        pressed && { backgroundColor: "#eaeaea" },
-                        !showText && { paddingHorizontal: 0, width: 44 }
-                      ];
-                    }}
-                    onPress={() => {
-                      Keyboard.dismiss();
-                      if (settingsDrawerVisible) {
-                        const cached = Settings.getCached();
-                        if (cached.ollamaModel && cached.ollamaModel !== selectedModel) {
-                          setSelectedModel(cached.ollamaModel);
-                        }
-                        setAiService(cached.aiService);
-                        setOllamaUrl(cached.ollamaUrl);
-                        setSpeakerEnabled(cached.speaker);
-                        setAlwaysWhisper(cached.alwaysWhisper);
-                      }
-                      setSettingsDrawerVisible(!settingsDrawerVisible);
-                    }}
+                  <Text
+                    style={[
+                      styles.incognitoButtonText,
+                      incognitoMode && styles.incognitoButtonTextActive,
+                    ]}
                   >
-                    <Image 
-                      source={settingsIcon} 
-                      style={[styles.settingsIcon, !isDesktop && { marginRight: 0 }]} 
+                    {incognitoMode
+                      ? "Disable incognito mode"
+                      : "Enable incognito mode"}
+                  </Text>
+                </Pressable>
+                <Text
+                  style={[
+                    styles.incognitoDescription,
+                    { opacity: incognitoMode ? 1 : 0 },
+                  ]}
+                >
+                  Welcome to incognito mode. You can ask quick questions without leaving a trace. Once you close the window, your conversation disappears forever.
+                </Text>
+              </View>
+            )}
+
+            {activeConversation && (
+              <ChatView
+                messages={messages}
+                conversation={activeConversation}
+                contentTopPadding={insets.top + 72}
+                contentBottomPadding={88 + insets.bottom}
+                incognito={activeConversation.id.startsWith("incognito_")}
+                onRegenerate={handleRegenerate}
+                speakerEnabled={speakerEnabled}
+                generatingMessageId={generatingConvId === activeConversation.id ? streamingMsgIdRef.current : null}
+                onOpenConfidentiality={() => {
+                  setSettingsInitialSubPage("confidentiality");
+                  setSettingsDrawerVisible(true);
+                }}
+              />
+            )}
+
+            <View style={[styles.topBarOverlay, {
+              paddingTop: insets.top + (
+                (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window)
+                  ? (navigator.userAgent.includes("Linux") && !navigator.userAgent.includes("Android") ? 0 : 32)
+                  : 0
+              ),
+              zIndex: attachmentSheetVisible ? 200 : undefined,
+            }]} pointerEvents="box-none">
+              <TopBar
+                onMenuPress={() => {
+                  openDrawerSafely(() => setDrawerVisible(prev => !prev));
+                }}
+                onNewPress={startNewConversation}
+                isLargeScreen={isLargeScreen}
+                isDesktop={isDesktop}
+                centerElement={
+                  (aiService === "ollama" || aiService === "aicore") ? (
+                    <ModelDropdown
+                      selectedModel={selectedModel}
+                      selectedReflection={selectedReflection}
+                      showReflection={modelCapabilities.includes("thinking")}
+                      onModelChange={(model) => {
+                        setSelectedModel(model);
+                        Settings.set("ollamaModel", model);
+                      }}
+                      onReflectionChange={setSelectedReflection}
                     />
-                    {isDesktop && (
-                      <Text style={styles.settingsButtonText}>Settings</Text>
-                    )}
-                  </Pressable>
-                </View>
+                  ) : null
+                }
+                rightElement={
+                  <View style={styles.settingsShadowLayer}>
+                    <View style={styles.settingsShadowBlock} />
+                    <Pressable
+                      style={({ pressed }) => {
+                        const showText = isDesktop;
+                        return [
+                          styles.settingsButton,
+                          pressed && { backgroundColor: "#eaeaea" },
+                          !showText && { paddingHorizontal: 0, width: 44 }
+                        ];
+                      }}
+                      onPress={() => {
+                        openDrawerSafely(() => {
+                          if (settingsDrawerVisible) {
+                            const cached = Settings.getCached();
+                            if (cached.ollamaModel && cached.ollamaModel !== selectedModel) {
+                              setSelectedModel(cached.ollamaModel);
+                            }
+                            setAiService(cached.aiService);
+                            setOllamaUrl(cached.ollamaUrl);
+                            setSpeakerEnabled(cached.speaker);
+                            setAlwaysWhisper(cached.alwaysWhisper);
+                          }
+                          setSettingsDrawerVisible(!settingsDrawerVisible);
+                        });
+                      }}
+                    >
+                      <Image
+                        source={settingsIcon}
+                        style={[styles.settingsIcon, !isDesktop && { marginRight: 0 }]}
+                      />
+                      {isDesktop && (
+                        <Text style={styles.settingsButtonText}>Settings</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                }
+              />
+            </View>
+
+            {/* bottom bar overlay */}
+            <View style={[styles.bottomBarOverlay]} pointerEvents="box-none">
+              <ChatBar
+                onSend={handleSend}
+                onPlusPress={() => console.log("plus pressed")}
+                incognito={activeConversation ? activeConversation.id.startsWith("incognito_") : incognitoMode}
+                isGenerating={activeConversation ? (generatingConvId === activeConversation.id || pendingConvIds.includes(activeConversation.id)) : false}
+                onStop={handleStop}
+                onTranscribe={handleTranscribe}
+                canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes("audio") && !!selectedModel}
+                supportsFiles={modelCapabilities.includes("vision") || modelCapabilities.includes("audio")}
+                aicoreSTT={aiService === "aicore" && aicoreSTTReady}
+                onOpenSettings={() => {
+                  openDrawerSafely(() => {
+                    setSettingsInitialSubPage("main");
+                    setSettingsDrawerVisible(true);
+                  });
+                }}
+                onAttachmentSheetVisibilityChange={setAttachmentSheetVisible}
+                enabled={!settingsDrawerVisible && (isLargeScreen || !drawerVisible)}
+              />
+            </View>
+          </View>
+
+          <SettingsDrawer
+            isLargeScreen={isLargeScreen}
+            isDesktop={isDesktop}
+            visible={settingsDrawerVisible}
+            initialSubPage={settingsInitialSubPage}
+            onClose={() => {
+              setSettingsDrawerVisible(false);
+              setSettingsInitialSubPage("main");
+              const cached = Settings.getCached();
+              if (cached.ollamaModel && cached.ollamaModel !== selectedModel) {
+                setSelectedModel(cached.ollamaModel);
               }
-            />
-          </View>
-
-          {/* bottom bar overlay */}
-          <View style={[styles.bottomBarOverlay]} pointerEvents="box-none">
-            <ChatBar
-              onSend={handleSend}
-              onPlusPress={() => console.log("plus pressed")}
-              incognito={activeConversation ? activeConversation.id.startsWith("incognito_") : incognitoMode}
-              isGenerating={activeConversation ? (generatingConvId === activeConversation.id || pendingConvIds.includes(activeConversation.id)) : false}
-              onStop={handleStop}
-              onTranscribe={handleTranscribe}
-              canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes("audio") && !!selectedModel}
-              supportsFiles={modelCapabilities.includes("vision") || modelCapabilities.includes("audio")}
-              onOpenSettings={() => {
-                Keyboard.dismiss();
-                setSettingsDrawerVisible(true);
-              }}
-              onAttachmentSheetVisibilityChange={setAttachmentSheetVisible}
-              enabled={!settingsDrawerVisible && (isLargeScreen || !drawerVisible)}
-            />
-          </View>
+              setAiService(cached.aiService);
+              setOllamaUrl(cached.ollamaUrl);
+              setSpeakerEnabled(cached.speaker);
+              setAlwaysWhisper(cached.alwaysWhisper);
+            }}
+            onDataChanged={async () => {
+              await loadConversations();
+              startNewConversation();
+            }}
+          />
         </View>
-
-        <SettingsDrawer
-          isLargeScreen={isLargeScreen}
-          isDesktop={isDesktop}
-          visible={settingsDrawerVisible}
-          onClose={() => {
-            setSettingsDrawerVisible(false);
-            const cached = Settings.getCached();
-            if (cached.ollamaModel && cached.ollamaModel !== selectedModel) {
-              setSelectedModel(cached.ollamaModel);
-            }
-            setAiService(cached.aiService);
-            setOllamaUrl(cached.ollamaUrl);
-            setSpeakerEnabled(cached.speaker);
-            setAlwaysWhisper(cached.alwaysWhisper);
-          }}
-          onDataChanged={async () => {
-            await loadConversations();
-            startNewConversation();
-          }}
-        />
-      </View>
       </KeyboardAvoidingView>
 
       <SearchWebView />

@@ -206,8 +206,11 @@ export class OllamaProvider implements IAIProvider {
         payload.tools = options.tools;
       }
       
-      //log simplified request
-      console.log(`[OllamaProvider] sending request to ${modelName} with ${payload.messages.length} messages`);
+      const logPayload = {
+        ...payload,
+        messages: '[HIDDEN]'
+      };
+      console.log(`[OllamaProvider] sending request:`, JSON.stringify(logPayload, null, 2));
 
       const response = await universalFetch(`${this.baseUrl}/api/chat`, {
         method: 'POST',

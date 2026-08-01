@@ -87,7 +87,7 @@ export default function NotificationModal({
                     !isPrimary && !isDanger && styles.buttonSecondary,
                     pressed && (
                       isPrimary
-                        ? { backgroundColor: "#000", borderColor: "#000" }
+                        ? { backgroundColor: "#D61515", borderColor: "#D61515" }
                         : isDanger
                           ? { backgroundColor: "#d60e0e", borderColor: "#d60e0e" }
                           : { backgroundColor: "#eaeaea" }

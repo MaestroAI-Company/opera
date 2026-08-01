@@ -225,7 +225,7 @@ export default function ConversationsDrawer({
 
       <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24, gap: 12 }}>
         <Pressable onPress={() => { Keyboard.dismiss(); setIsSearching(false); setSearchQuery(""); setSelectedSearchId(null); }} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
-          <Image source={arrowIcon} style={{ width: 24, height: 24, transform: [{ rotate: '-180deg' }] }} tintColor="#666" />
+          <Image source={arrowIcon} style={{ width: 18, height: 18, transform: [{ rotate: '-180deg' }] }} tintColor="#000" />
         </Pressable>
 
         <View style={styles.searchInputContainer}>
@@ -570,8 +570,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   actionIcon: {
-    width: 20,
-    height: 20,
+    width: 18,
+    height: 18,
   },
   searchInputContainer: {
     flex: 1,

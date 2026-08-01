@@ -30,18 +30,23 @@ type SettingsDrawerProps = {
   onDataChanged?: () => void;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
+  initialSubPage?: SubPage;
 };
 
 type SubPage = "main" | "general" | "models" | "confidentiality" | "tools";
 
-export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false }: SettingsDrawerProps) {
+export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
   const { width } = useResponsive();
   const drawerWidth = Math.min(width * 0.88, 360);
 
   const translateX = useRef(new Animated.Value(drawerWidth)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
-  const [activeSubPage, setActiveSubPage] = useState<SubPage>("main");
+  const [activeSubPage, setActiveSubPage] = useState<SubPage>(initialSubPage ?? "main");
+
+  useEffect(() => {
+    if (visible) setActiveSubPage(initialSubPage ?? "main");
+  }, [visible, initialSubPage]);
 
   const [language, setLanguageState] = useState("en");
   const [theme, setThemeState] = useState("system");
@@ -235,13 +240,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     };
     loadSettings();
   }, []);
-
-  //reset subpage when drawer reopens
-  useEffect(() => {
-    if (visible) {
-      setActiveSubPage("main");
-    }
-  }, [visible]);
 
   //save helpers
   const setLanguage = (v: string) => {

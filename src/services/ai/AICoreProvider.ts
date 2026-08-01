@@ -1,5 +1,6 @@
 import { DeviceEventEmitter, NativeModules, Platform } from 'react-native';
 import { IAIProvider } from './IAIProvider';
+import { ToolCall, ToolDefinition } from './tools/ITool';
 
 const MODULE = Platform.OS === 'android' ? (NativeModules.AICoreModule as any) : null;
 
@@ -64,11 +65,11 @@ export class AICoreProvider implements IAIProvider {
   async sendMessage(
     modelName: string,
     systemPrompt: string,
-    messages: { role: string; content: string; images?: string[] }[],
+    messages: { role: string; content: string; images?: string[]; tool_calls?: any[] }[],
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
-    options?: { think?: boolean | string }
-  ): Promise<void> {
+    options?: { think?: boolean | string; tools?: ToolDefinition[] }
+  ): Promise<{ toolCalls?: ToolCall[] }> {
     if (!this.supported()) throw new Error('AICore not available on this device');
     const requestId = `aicore_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
@@ -84,7 +85,7 @@ export class AICoreProvider implements IAIProvider {
     signal?.addEventListener('abort', onAbort);
 
     try {
-      await new Promise<void>((resolve, reject) => {
+      return await new Promise<{ toolCalls?: ToolCall[] }>((resolve, reject) => {
         const tokenSub = DeviceEventEmitter.addListener('AICoreToken', (e: any) => {
           if (e.requestId === requestId && e.chunk) onChunk(e.chunk);
         });
@@ -103,7 +104,7 @@ export class AICoreProvider implements IAIProvider {
         MODULE.generateContentStream(modelName, systemPrompt, prompt, firstImage, !!options?.think, requestId)
           .then(() => {
             cleanup();
-            resolve();
+            resolve({});
           })
           .catch((e: any) => {
             cleanup();

@@ -26,6 +26,7 @@ import { NotificationService } from '../services/notifications/NotificationServi
 import ModelDropdown from '../../components/ModelDropdown';
 import SearchWebView from '../../components/SearchWebView';
 import { useResponsive } from '../hooks/useResponsive';
+import { WidgetManager } from '../services/widgets/WidgetManager';
 
 export default function AssistantOverlayWrapper() {
   return (
@@ -346,9 +347,9 @@ function AssistantOverlay() {
       .map(m => ({ role: m.role, content: m.content, images: m.images }));
     taskHistory.push({ role: 'user', content: text, images });
 
-    const taskSystemPrompt = instruction.trim().length > 0
+    const taskSystemPrompt = (instruction.trim().length > 0
       ? `${instruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
-      : SYSTEM_PROMPTS.DEFAULT;
+      : SYSTEM_PROMPTS.DEFAULT) + WidgetManager.getSystemPromptSegment();
 
     const assistantMsg = await DB.addMessage(conv.id, 'assistant', '…');
     setMessages(prev => [...prev, assistantMsg]);

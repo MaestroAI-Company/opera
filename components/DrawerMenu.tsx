@@ -11,7 +11,7 @@ const pinIcon = require("../assets/icons/pin.png");
 const unpinIcon = require("../assets/icons/unpin.png");
 const arrowIcon = require("../assets/icons/arrow.png");
 
-type ConversationsDrawerProps = {
+type DrawerMenuProps = {
   visible: boolean;
   onClose: () => void;
   conversations: Conversation[];
@@ -50,7 +50,7 @@ function getGroupTitle(timestamp: number): string {
   }
 }
 
-export default function ConversationsDrawer({
+export default function DrawerMenu({
   visible,
   onClose,
   conversations,
@@ -61,7 +61,7 @@ export default function ConversationsDrawer({
   onTogglePinConversation,
   isLargeScreen = false,
   isDesktop = false,
-}: ConversationsDrawerProps) {
+}: DrawerMenuProps) {
   const { width } = useResponsive();
   const drawerWidth = Math.min(width * 0.88, 360);
 
@@ -224,7 +224,7 @@ export default function ConversationsDrawer({
       </View>
 
       <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24, gap: 12 }}>
-        <Pressable onPress={() => { Keyboard.dismiss(); setIsSearching(false); setSearchQuery(""); setSelectedSearchId(null); }} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
+        <Pressable onPress={() => { setIsSearching(false); setSearchQuery(""); setSelectedSearchId(null); }} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
           <Image source={arrowIcon} style={{ width: 18, height: 18, transform: [{ rotate: '-180deg' }] }} tintColor="#000" />
         </Pressable>
 
@@ -255,7 +255,6 @@ export default function ConversationsDrawer({
                 <Pressable
                   style={({ pressed }) => [styles.discussionTextContainer, pressed && { opacity: 0.6 }]}
                   onPress={() => {
-                    Keyboard.dismiss();
                     setSelectedSearchId(conv.id);
                     onSelectConversation(conv, searchQuery);
                     if (!isDesktop) onClose();
@@ -570,8 +569,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   actionIcon: {
-    width: 18,
-    height: 18,
+    width: 20,
+    height: 20,
   },
   searchInputContainer: {
     flex: 1,

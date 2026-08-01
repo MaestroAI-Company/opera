@@ -2,6 +2,7 @@ import { IAIProvider } from './IAIProvider';
 import { OllamaProvider } from './OllamaProvider';
 import { ToolManager } from './tools/ToolManager';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
+import { AICoreProvider } from './AICoreProvider';
 
 const DEFAULT_URL = 'http://127.0.0.1:11434';
 
@@ -31,6 +32,12 @@ class CentralAIModule {
     this.providers = new Map();
     // initialize providers
     this.providers.set('OLLAMA', new OllamaProvider(DEFAULT_URL));
+    this.providers.set('AICORE', new AICoreProvider());
+  }
+
+  // switch active provider from settings
+  setMode(mode: string): void {
+    this.activeMode = (mode || 'ollama').toUpperCase();
   }
 
   // configure ollama url

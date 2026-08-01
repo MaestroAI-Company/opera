@@ -4,19 +4,25 @@ import { AIModule } from "../src/services/ai/AIModule";
 import { BackupService } from "../src/services/BackupService";
 import { Settings } from "../src/services/settings/SettingsService";
 import { Whisper } from "../src/services/whisper/WhisperService";
-import Checkbox from "./Checkbox";
+import DownloadProgress from "./DownloadProgress";
 import NotificationModal, { ModalButton } from "./NotificationModal";
 import Selector from "./Selector";
 import TextInputField from "./TextInputField";
 import ThemeSelector from "./ThemeSelector";
-import DownloadProgress from "./DownloadProgress";
-
+import Toggle from "./Toggle";
 
 import { useResponsive } from "../src/hooks/useResponsive";
 
 const linkIcon = require("../assets/icons/link.png");
 const downloadIcon = require("../assets/icons/download.png");
+const deleteIcon = require("../assets/icons/delete.png");
 const penPlaceholderIcon = require("../assets/icons/pencil.png");
+const arrowIcon = require("../assets/icons/arrow.png");
+const generalIcon = require("../assets/icons/general.png");
+const serverIcon = require("../assets/icons/server.png");
+const toolIcon = require("../assets/icons/tool.png");
+const confidentialityIcon = require("../assets/icons/confidentiality.png");
+const socialIcon = require("../assets/icons/social.png");
 
 type SettingsDrawerProps = {
   visible: boolean;
@@ -24,25 +30,32 @@ type SettingsDrawerProps = {
   onDataChanged?: () => void;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
+  initialSubPage?: SubPage;
 };
 
-export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false }: SettingsDrawerProps) {
+type SubPage = "main" | "general" | "models" | "confidentiality" | "tools";
+
+export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
   const { width } = useResponsive();
   const drawerWidth = Math.min(width * 0.88, 360);
 
   const translateX = useRef(new Animated.Value(drawerWidth)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
+  const [activeSubPage, setActiveSubPage] = useState<SubPage>(initialSubPage ?? "main");
 
+  useEffect(() => {
+    if (visible) setActiveSubPage(initialSubPage ?? "main");
+  }, [visible, initialSubPage]);
 
-  const [language, setLanguageState] = useState("fr");
+  const [language, setLanguageState] = useState("en");
   const [theme, setThemeState] = useState("system");
   const [aiService, setAiServiceState] = useState("ollama");
   const [ollamaUrl, setOllamaUrlState] = useState("");
   const [ollamaError, setOllamaError] = useState("");
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [gemmaDownloadProgress, setGemmaDownloadProgress] = useState<{progress: number, etaSeconds: number, speedStr: string, sizeStr: string} | null>(null);
+  const [gemmaDownloadProgress, setGemmaDownloadProgress] = useState<{ progress: number, etaSeconds: number, speedStr: string, sizeStr: string } | null>(null);
 
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{ title: string, message: string, buttons?: ModalButton[] }>({ title: '', message: '' });
@@ -51,11 +64,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     setAlertConfig({ title, message, buttons });
     setAlertModalVisible(true);
   };
-  const [whisperModel, setWhisperModelState] = useState("base");
+  const [whisperModel, setWhisperModelState] = useState("none");
   const [whisperInstalled, setWhisperInstalled] = useState<boolean>(false);
   const [installedWhisperModels, setInstalledWhisperModels] = useState<Record<string, boolean>>({});
   const [isDownloadingWhisper, setIsDownloadingWhisper] = useState(false);
-  const [whisperDownloadProgress, setWhisperDownloadProgress] = useState<{progress: number, etaSeconds: number, speedStr: string, sizeStr: string} | null>(null);
+  const [whisperDownloadProgress, setWhisperDownloadProgress] = useState<{ progress: number, etaSeconds: number, speedStr: string, sizeStr: string } | null>(null);
   const [whisperLanguage, setWhisperLanguageState] = useState(() => {
     try {
       return Intl.DateTimeFormat().resolvedOptions().locale.split('-')[0] || "auto";
@@ -64,28 +77,140 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     }
   });
   const [instruction, setInstructionState] = useState("");
-  const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
-  const [autoStartMic, setAutoStartMicState] = useState(true);
+  const [alwaysWhisper, setAlwaysWhisperState] = useState(true);
+  const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(true);
+  const [usageAnalytics, setUsageAnalyticsState] = useState(true);
+  const [useWebsearch, setUseWebsearchState] = useState(true);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   const [ollamaModelOptions, setOllamaModelOptions] = useState<{ id: string, label: string }[]>([]);
 
   const languageOptions = [
-    { id: "fr", label: "Français" },
     { id: "en", label: "English" },
+    { id: "fr", label: "Français" },
   ];
 
-
+  const cloudStorageOptions = [
+    { id: "none", label: "None" },
+  ];
 
   const aiServiceOptions = [
     { id: "ollama", label: "Ollama" },
+    ...(Platform.OS === "android"
+      ? [{ id: "aicore", label: "Gemini Nano (On-Device)" }]
+      : []),
   ];
+
+  const handleExportData = async () => {
+    try {
+      const ok = await BackupService.exportData();
+      if (ok) showAlert("Export", "Data exported successfully.");
+    } catch {
+      showAlert("Error", "Failed to export data.");
+    }
+  };
+
+  const handleImportData = async () => {
+    showAlert(
+      "Import Data",
+      "This will replace all your current conversations and settings. Are you sure?",
+      [
+        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: "Import",
+          style: "primary",
+          onPress: async () => {
+            setAlertModalVisible(false);
+            try {
+              const ok = await BackupService.importData();
+              if (ok) {
+                showAlert("Import", "Data imported successfully.");
+                onDataChanged?.();
+              }
+            } catch {
+              showAlert("Error", "Failed to import data.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAllConversations = () => {
+    showAlert(
+      "Delete All Conversations",
+      "This will permanently delete all conversations. This action cannot be undone.",
+      [
+        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: "Delete All",
+          style: "danger",
+          onPress: async () => {
+            setAlertModalVisible(false);
+            try {
+              await BackupService.deleteAllConversations();
+              onDataChanged?.();
+              showAlert("Done", "All conversations deleted.");
+            } catch {
+              showAlert("Error", "Failed to delete conversations.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteWhisper = () => {
+    if (whisperModel === "none") return;
+    showAlert(
+      "Delete Whisper Model",
+      `Are you sure you want to delete the Whisper ${whisperModel} model?`,
+      [
+        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: "Delete",
+          style: "danger",
+          onPress: async () => {
+            setAlertModalVisible(false);
+            try {
+              await Whisper.deleteModel(whisperModel);
+              setWhisperInstalled(false);
+              setInstalledWhisperModels(prev => ({ ...prev, [whisperModel]: false }));
+            } catch (e) {
+              console.error("Failed to delete whisper model", e);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const whisperModelOptions = [
     { id: "none", label: "None" },
-    { id: "tiny", label: "Tiny", isDownload: !installedWhisperModels["tiny"] },
-    { id: "base", label: "Base", isDownload: !installedWhisperModels["base"] },
-    { id: "small", label: "Small", isDownload: !installedWhisperModels["small"] },
+    {
+      id: "tiny",
+      label: "Tiny",
+      isDownload: !installedWhisperModels["tiny"],
+      ...(installedWhisperModels["tiny"] && whisperModel === "tiny"
+        ? { rightIcon: deleteIcon, rightIconTintColor: "#ffffff", onRightIconPress: handleDeleteWhisper }
+        : {}),
+    },
+    {
+      id: "base",
+      label: "Base",
+      isDownload: !installedWhisperModels["base"],
+      ...(installedWhisperModels["base"] && whisperModel === "base"
+        ? { rightIcon: deleteIcon, rightIconTintColor: "#ffffff", onRightIconPress: handleDeleteWhisper }
+        : {}),
+    },
+    {
+      id: "small",
+      label: "Small",
+      isDownload: !installedWhisperModels["small"],
+      ...(installedWhisperModels["small"] && whisperModel === "small"
+        ? { rightIcon: deleteIcon, rightIconTintColor: "#ffffff", onRightIconPress: handleDeleteWhisper }
+        : {}),
+    },
   ];
 
   const getWhisperSize = (model: string) => {
@@ -97,24 +222,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     }
   };
 
-  const whisperLanguageOptions = [
-    { id: "auto", label: "Auto" },
-    { id: "en", label: "English" },
-    { id: "fr", label: "Français" },
-    { id: "es", label: "Español" },
-    { id: "de", label: "Deutsch" },
-  ];
-  if (whisperLanguage !== "auto" && !whisperLanguageOptions.find(o => o.id === whisperLanguage)) {
-    whisperLanguageOptions.push({ id: whisperLanguage, label: whisperLanguage.toUpperCase() });
-  }
-
   //load settings on first open
   useEffect(() => {
     const loadSettings = async () => {
       try {
         await Settings.init();
         const s = await Settings.load();
-        setLanguageState(s.language);
+        setLanguageState(s.language || "en");
         setThemeState(s.theme);
         setAiServiceState(s.aiService);
         setOllamaUrlState(s.ollamaUrl);
@@ -122,9 +236,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setWhisperLanguageState(s.whisperLanguage);
         setInstructionState(s.instruction);
         setAlwaysWhisperState(s.alwaysWhisper);
-        setAutoStartMicState(s.autoStartMic);
         //apply to services
         AIModule.configure(s.ollamaUrl);
+        AIModule.setMode(s.aiService);
         Whisper.setLanguage(s.whisperLanguage);
       } catch (e) {
         console.warn("Failed to load settings", e);
@@ -135,7 +249,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     loadSettings();
   }, []);
 
-  //save helpers — save setting and apply side effect
+  //save helpers
   const setLanguage = (v: string) => {
     setLanguageState(v);
     Settings.set("language", v);
@@ -146,15 +260,16 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     Settings.set("theme", v);
   };
 
-  const setAiService = (v: string) => {
-    setAiServiceState(v);
-    Settings.set("aiService", v);
-  };
-
   const setOllamaUrl = (v: string) => {
     setOllamaUrlState(v);
     Settings.set("ollamaUrl", v);
     AIModule.configure(v);
+  };
+
+  const setAiService = (v: string) => {
+    setAiServiceState(v);
+    Settings.set("aiService", v);
+    AIModule.setMode(v);
   };
 
   const setWhisperModel = (v: string) => {
@@ -179,12 +294,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     }
   };
 
-  const setWhisperLanguage = (v: string) => {
-    setWhisperLanguageState(v);
-    Settings.set("whisperLanguage", v);
-    Whisper.setLanguage(v);
-  };
-
   const setInstruction = (v: string) => {
     setInstructionState(v);
     Settings.set("instruction", v);
@@ -195,13 +304,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     Settings.set("alwaysWhisper", v);
   };
 
-  const setAutoStartMic = (v: boolean) => {
-    setAutoStartMicState(v);
-    Settings.set("autoStartMic", v);
-  };
-
   const fetchOllamaModels = useCallback(async () => {
-    if (aiService !== "ollama" || !settingsLoaded) return;
+    if (!settingsLoaded) return;
     try {
       const isAvailable = await AIModule.isAvailable();
       if (!isAvailable) {
@@ -218,16 +322,14 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           label: m,
         }));
         setOllamaModelOptions(options);
-
       } else {
         setOllamaModelOptions([]);
       }
     } catch (e) {
       console.warn("Could not fetch Ollama models", e);
     }
-  }, [aiService, settingsLoaded]);
+  }, [settingsLoaded]);
 
-  //fetch models on open
   useEffect(() => {
     if (visible) {
       setTimeout(() => {
@@ -240,7 +342,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         if (whisperModel && whisperModel !== "none") {
           Whisper.isModelInstalled(whisperModel).then(setWhisperInstalled);
         }
-      }, 300); // Wait for the 280ms open animation to finish
+      }, 300);
     }
   }, [visible, fetchOllamaModels, whisperModel]);
 
@@ -269,17 +371,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     }
   };
 
-  const handleDownloadWhisper = async () => {
-    if (whisperModel === "none") return;
+  const handleDownloadWhisper = async (modelToDownload?: string) => {
+    const model = modelToDownload || whisperModel;
+    if (model === "none") return;
     setIsDownloadingWhisper(true);
     setWhisperDownloadProgress(null);
     try {
-      await Whisper.downloadModel(whisperModel, (progress, etaSeconds, speedStr, sizeStr) => {
+      await Whisper.downloadModel(model, (progress, etaSeconds, speedStr, sizeStr) => {
         setWhisperDownloadProgress({ progress, etaSeconds, speedStr, sizeStr });
       });
       setWhisperInstalled(true);
-      setInstalledWhisperModels(prev => ({ ...prev, [whisperModel]: true }));
-      showAlert("Success", `Whisper ${whisperModel} model downloaded successfully.`);
+      setInstalledWhisperModels(prev => ({ ...prev, [model]: true }));
+      setWhisperModel(model);
+      showAlert("Success", `Whisper ${model} model downloaded successfully.`);
     } catch (e) {
       console.error("Failed to download whisper model", e);
       showAlert("Error", "Failed to download Whisper model.");
@@ -289,76 +393,21 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     }
   };
 
-  const handleDeleteWhisper = () => {
-    if (whisperModel === "none") return;
+  const handleSelectWhisperModel = (v: string) => {
+    if (v === "none" || installedWhisperModels[v]) {
+      setWhisperModel(v);
+      return;
+    }
     showAlert(
-      "Delete Whisper Model",
-      `Are you sure you want to delete the Whisper ${whisperModel} model?`,
+      "Download Whisper Model",
+      `Are you sure you want to download the Whisper ${v} model (${getWhisperSize(v)})?`,
       [
         { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
         {
-          text: "Delete",
-          style: "danger",
-          onPress: async () => {
+          text: "Download",
+          onPress: () => {
             setAlertModalVisible(false);
-            try {
-              await Whisper.deleteModel(whisperModel);
-              setWhisperInstalled(false);
-              setInstalledWhisperModels(prev => ({ ...prev, [whisperModel]: false }));
-            } catch (e) {
-              console.error("Failed to delete whisper model", e);
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const handleExport = async () => {
-    try {
-      const exported = await BackupService.exportData();
-      if (exported !== false) {
-        showAlert("Success", "Data exported successfully.");
-      }
-    } catch (e) {
-      showAlert("Error", "Failed to export data");
-    }
-  };
-
-  const handleImport = async () => {
-    try {
-      const imported = await BackupService.importData();
-      if (imported) {
-        showAlert("Success", "Data imported successfully. The app settings and conversations have been restored.");
-        onDataChanged?.();
-      }
-    } catch (e) {
-      showAlert("Error", "Failed to import data");
-    }
-  };
-
-  const handleDeleteAll = () => {
-    showAlert(
-      "Delete all conversations",
-      "Are you sure you want to delete all conversations? This action cannot be undone.",
-      [
-        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
-        {
-          text: "Delete",
-          style: "danger",
-          onPress: async () => {
-            setAlertModalVisible(false);
-            try {
-              await BackupService.deleteAllConversations();
-              setTimeout(() => {
-                showAlert("Success", "All conversations deleted.");
-                onDataChanged?.();
-              }, 300);
-            } catch (e) {
-              setTimeout(() => {
-                showAlert("Error", "Failed to delete conversations");
-              }, 300);
-            }
+            handleDownloadWhisper(v);
           }
         }
       ]
@@ -418,11 +467,90 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     }
   }, [visible, isDesktop, drawerWidth]);
 
-  const innerContent = (
-    <ScrollView contentContainerStyle={{ paddingTop: isDesktop ? 0 : 60, paddingBottom: 40, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+  // back header for subpages
+  const renderSubPageHeader = (title: string) => (
+    <View style={styles.subPageHeader}>
+      <Text style={[styles.title, { marginBottom: 12 }]}>{title}</Text>
+      <Pressable
+        onPress={() => setActiveSubPage("main")}
+        style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.6 }]}
+      >
+        <Image source={arrowIcon} style={styles.backIcon} tintColor="#000" />
+      </Pressable>
+    </View>
+  );
+
+  // main navigation page content
+  const mainPageContent = (
+    <View style={styles.menuContainer}>
       <Text style={styles.title}>Settings</Text>
 
-      <Text style={styles.sectionTitle}>General</Text>
+      <View style={styles.groupShadowLayer}>
+        <View style={styles.groupBox}>
+          <Pressable
+            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("general")}
+          >
+            <Image source={generalIcon} style={styles.menuIcon} tintColor="#000" />
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>General</Text>
+              <Text style={styles.navSubtitle}>Language, Theme, Cloud Storage</Text>
+            </View>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("models")}
+          >
+            <Image source={serverIcon} style={styles.menuIcon} tintColor="#000" />
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>Models & Server</Text>
+              <Text style={styles.navSubtitle}>Ollama server, Whisper Model, TOD, Instructions</Text>
+            </View>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [styles.navItem, styles.navItemLast, pressed && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("tools")}
+          >
+            <Image source={toolIcon} style={styles.menuIcon} tintColor="#000" />
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>Tools & Widgets</Text>
+              <Text style={styles.navSubtitle}>Websearch</Text>
+            </View>
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.groupShadowLayer}>
+        <View style={styles.groupBox}>
+          <Pressable
+            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("confidentiality")}
+          >
+            <Image source={confidentialityIcon} style={styles.menuIcon} tintColor="#000" />
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>Confidentiality</Text>
+              <Text style={styles.navSubtitle}>Data privacy, Usage analytics</Text>
+            </View>
+          </Pressable>
+
+          <View style={[styles.navItem, styles.navItemLast]}>
+            <Image source={socialIcon} style={styles.menuIcon} tintColor="#000" />
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>Social Links</Text>
+              <Text style={styles.navSubtitle}>Github, Instagram, Website</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
+  // general subpage content
+  const generalSubPageContent = (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("General")}
 
       <View style={styles.settingRowVertical}>
         <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Language</Text>
@@ -436,14 +564,39 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       </View>
 
       <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Theme</Text>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Theme app</Text>
         <ThemeSelector
           selectedValue={theme}
           onSelect={setTheme}
         />
       </View>
 
-      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>AI</Text>
+      <View style={styles.settingRowVertical}>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Cloud storage</Text>
+        <Selector
+          options={cloudStorageOptions}
+          selectedValue="none"
+          onSelect={() => { }}
+          title="Select Cloud Storage"
+          fullWidth
+        />
+      </View>
+
+      <View style={styles.toggleRow}>
+        <Text style={styles.settingLabel}>Show technical details</Text>
+        <Toggle
+          checked={showTechnicalDetails}
+          onToggle={setShowTechnicalDetailsState}
+        />
+      </View>
+      <Text style={styles.helpText}>Include technical data in AI responses</Text>
+    </View>
+  );
+
+  // models & server subpage content
+  const modelsSubPageContent = (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("Models & Server")}
 
       <View style={styles.settingRowVertical}>
         <Text style={[styles.settingLabel, { marginBottom: 10 }]}>AI Service</Text>
@@ -455,175 +608,140 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           fullWidth
         />
       </View>
-
-      {true && (
-        <>
-          <View style={[styles.settingRowVertical, { zIndex: 9 }]}>
-            <Text style={styles.settingLabel}>Whisper Model</Text>
-            <Text style={[styles.helpText, { marginBottom: 10 }]}>The larger the size, the longer the processing will take.</Text>
-            <Selector
-              options={whisperModelOptions}
-              selectedValue={whisperModel}
-              onSelect={setWhisperModel}
-              title="Select Whisper Model"
-              fullWidth
-            />
-            {whisperModel !== "none" && (
-              <View style={{ marginTop: 10 }}>
-                {whisperInstalled ? (
-                  <Pressable
-                    style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }]}
-                    onPress={handleDeleteWhisper}
-                  >
-                    <Text style={[styles.downloadText, { color: "#FF1A1A" }]}>Delete Model ({getWhisperSize(whisperModel)})</Text>
-                  </Pressable>
-                ) : isDownloadingWhisper ? (
-                  <DownloadProgress
-                    title={`Downloading Whisper ${whisperModel}...`}
-                    progress={whisperDownloadProgress?.progress || 0}
-                    sizeStr={whisperDownloadProgress?.sizeStr}
-                    etaSeconds={whisperDownloadProgress?.etaSeconds}
-                  />
-                ) : (
-                  <Pressable
-                    style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }]}
-                    onPress={handleDownloadWhisper}
-                  >
-                    <Image source={downloadIcon} style={styles.downloadIcon} tintColor="#0066cc" />
-                    <Text style={styles.downloadText}>
-                      Download {whisperModel} model ({getWhisperSize(whisperModel)})
-                    </Text>
-                  </Pressable>
-                )}
-              </View>
-            )}
-          </View>
-
-          {whisperModel !== "none" && (
-            <>
-              <View style={styles.settingRowVertical}>
-                <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Whisper Language</Text>
-                <Selector
-                  options={whisperLanguageOptions}
-                  selectedValue={whisperLanguage}
-                  onSelect={setWhisperLanguage}
-                  title="Select Language"
-                  fullWidth
-                />
-              </View>
-
-              <View style={{ marginBottom: 20 }}>
-                <Checkbox
-                  label="Always transcribe on-device (Whisper)"
-                  checked={alwaysWhisper}
-                  onToggle={setAlwaysWhisper}
-                />
-              </View>
-              <View style={{ marginBottom: 20 }}>
-                <Checkbox
-                  label="Auto start mic in overlay"
-                  checked={autoStartMic}
-                  onToggle={setAutoStartMic}
-                />
-              </View>
-            </>
-          )}
-        </>
+      {aiService !== "ollama" && (
+        <Text style={[styles.helpText, { marginBottom: 20 }]}>
+          Uses Gemini Nano directly on this device. No server needed.
+        </Text>
       )}
 
       {aiService === "ollama" && (
-        <View style={styles.sectionGroup}>
-          <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Ollama</Text>
-          <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Host URL</Text>
-            <TextInputField
-              icon={linkIcon}
-              placeholder={Platform.OS === 'android' ? 'http://10.0.2.2:11434' : 'http://127.0.0.1:11434'}
-              value={ollamaUrl}
-              onChangeText={setOllamaUrl}
-              onBlur={fetchOllamaModels}
-            />
-          </View>
-
-          {ollamaError ? (
-            <Text style={styles.errorText}>{ollamaError}</Text>
-          ) : (
-            <View style={styles.settingRowVertical}>
-              <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Available Models</Text>
-              {ollamaModelOptions.length > 0 ? (
-                ollamaModelOptions.map((model) => (
-                  <Text key={model.id} style={{ fontFamily: "IBMPlexMono-Medium", color: "#555", marginBottom: 4 }}>
-                    • {model.label}
-                  </Text>
-                ))
-              ) : (
-                <Text style={{ fontFamily: "IBMPlexMono-Medium", color: "#888", marginBottom: 10 }}>
-                  No models detected.
-                </Text>
-              )}
-              {ollamaModelOptions.length === 0 && (
-                isDownloading ? (
-                  <DownloadProgress
-                    title="Downloading Gemma4..."
-                    progress={gemmaDownloadProgress?.progress || 0}
-                    sizeStr={gemmaDownloadProgress?.sizeStr}
-                    etaSeconds={gemmaDownloadProgress?.etaSeconds}
-                  />
-                ) : (
-                  <Pressable
-                    style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }, { marginTop: 10 }]}
-                    onPress={() => setDownloadModalVisible(true)}
-                  >
-                    <Image source={downloadIcon} style={styles.downloadIcon} tintColor="#0066cc" />
-                    <Text style={styles.downloadText}>
-                      Download Gemma4?
-                    </Text>
-                  </Pressable>
-                )
-              )}
-            </View>
-          )}
+        <View style={styles.settingRowVertical}>
+          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Ollama server</Text>
+          <TextInputField
+            icon={linkIcon}
+            placeholder="server link"
+            value={ollamaUrl}
+            onChangeText={setOllamaUrl}
+            onBlur={fetchOllamaModels}
+          />
         </View>
       )}
+      {aiService === "ollama" && ollamaError ? <Text style={styles.errorText}>{ollamaError}</Text> : null}
 
-      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Personalization</Text>
-      <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Write your instruction for AI</Text>
+      <View style={[styles.settingRowVertical, { zIndex: 9 }]}>
+        <Text style={styles.settingLabel}>Whisper Model</Text>
+        <Text style={[styles.helpText, { marginBottom: 10 }]}>The larger size, the longer the processing will take.</Text>
+        <Selector
+          options={whisperModelOptions}
+          selectedValue={whisperModel}
+          onSelect={handleSelectWhisperModel}
+          title="Select Whisper Model"
+          fullWidth
+        />
+        {isDownloadingWhisper && (
+          <View style={{ marginTop: 10 }}>
+            <DownloadProgress
+              title={`Downloading Whisper ${whisperModel}...`}
+              progress={whisperDownloadProgress?.progress || 0}
+              sizeStr={whisperDownloadProgress?.sizeStr}
+              etaSeconds={whisperDownloadProgress?.etaSeconds}
+            />
+          </View>
+        )}
+      </View>
+
+      <View style={[styles.toggleRow, { marginTop: 10 }]}>
+        <Text style={styles.settingLabel}>Transcribe-On-Device</Text>
+        <Toggle
+          checked={alwaysWhisper}
+          onToggle={setAlwaysWhisper}
+        />
+      </View>
+      <Text style={styles.helpText}>Process audio transcriptions locally on your device</Text>
+
+      <View style={[styles.settingRowVertical, { marginTop: 24 }]}>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Write your instructions to AI</Text>
         <TextInputField
           icon={penPlaceholderIcon}
-          placeholder="Ex: You are a helpful assistant..."
+          placeholder="write"
           value={instruction}
           onChangeText={setInstruction}
         />
       </View>
+    </View>
+  );
 
-      <Text style={[styles.sectionTitle, { marginTop: 30 }]}>Data & Storage</Text>
-      <View style={styles.buttonRow}>
-        <Pressable
-          style={({ pressed }) => [styles.actionButton, { flex: 1 }, pressed && { backgroundColor: "#eaeaea" }]}
-          onPress={handleExport}
-        >
-          <Text style={styles.actionButtonText}>Export</Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.actionButton, { flex: 1 }, pressed && { backgroundColor: "#eaeaea" }]}
-          onPress={handleImport}
-        >
-          <Text style={styles.actionButtonText}>Import</Text>
-        </Pressable>
+  // confidentiality subpage content
+  const confidentialitySubPageContent = (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("Confidentiality")}
+
+      <View style={{ marginBottom: 24 }}>
+        <Text style={styles.settingLabel}>Data privacy</Text>
+        <Text style={styles.helpText}>Datausage</Text>
       </View>
 
-      <Pressable
-        style={({ pressed }) => [
-          styles.actionButton,
-          styles.dangerButton,
-          { marginTop: 15, marginBottom: 20 },
-          pressed && { backgroundColor: "#ffdcdc" }
-        ]}
-        onPress={handleDeleteAll}
-      >
-        <Text style={[styles.actionButtonText, styles.dangerButtonText]}>Delete all conversations</Text>
-      </Pressable>
+      <View style={styles.toggleRow}>
+        <Text style={styles.settingLabel}>Usage analytics</Text>
+        <Toggle
+          checked={usageAnalytics}
+          onToggle={setUsageAnalyticsState}
+        />
+      </View>
+      <Text style={styles.helpText}>Help improve the app by sharing daily active counts without exposing your chats</Text>
+
+      <View style={{ marginTop: 28, gap: 8 }}>
+        <Text style={styles.settingLabel}>Data management</Text>
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+          <Pressable style={({ pressed }) => [styles.dataBtn, pressed && styles.dataBtnPressed]} onPress={handleExportData}>
+            <Text style={styles.dataBtnText}>Export</Text>
+          </Pressable>
+          <Pressable style={({ pressed }) => [styles.dataBtn, pressed && styles.dataBtnPressed]} onPress={handleImportData}>
+            <Text style={styles.dataBtnText}>Import</Text>
+          </Pressable>
+        </View>
+        <Pressable style={({ pressed }) => [styles.dataBtn, styles.dataBtnDanger, pressed && styles.dataBtnDangerPressed]} onPress={handleDeleteAllConversations}>
+          <Text style={styles.dataBtnTextDanger}>Delete all conversations</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  // tools & widgets subpage content
+  const toolsSubPageContent = (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("Tools & Widgets")}
+
+      <View style={styles.toggleRow}>
+        <Text style={styles.settingLabel}>Use websearch</Text>
+        <Toggle
+          checked={useWebsearch}
+          onToggle={setUseWebsearchState}
+        />
+      </View>
+      <Text style={styles.helpText}>Allow the assistant to search the web for real-time information</Text>
+    </View>
+  );
+
+  const getSubPageContent = () => {
+    switch (activeSubPage) {
+      case "general":
+        return generalSubPageContent;
+      case "models":
+        return modelsSubPageContent;
+      case "confidentiality":
+        return confidentialitySubPageContent;
+      case "tools":
+        return toolsSubPageContent;
+      case "main":
+      default:
+        return mainPageContent;
+    }
+  };
+
+  const innerContent = (
+    <ScrollView contentContainerStyle={{ paddingTop: isDesktop ? 0 : 60, paddingBottom: 40, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+      {getSubPageContent()}
     </ScrollView>
   );
 
@@ -756,38 +874,84 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     fontFamily: "Petrona",
   },
-  sectionTitle: {
-    fontSize: 12,
-    color: "#888",
-    fontFamily: "Jakarta",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 12,
+  menuContainer: {
+    flex: 1,
   },
-  placeholderText: {
-    fontSize: 14,
-    color: "#aaa",
-    fontFamily: "Jakarta",
-    marginTop: 10,
+  subPageContainer: {
+    flex: 1,
   },
-  settingRow: {
+  subPageHeader: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    marginBottom: 20,
+  },
+  backButton: {
+    paddingVertical: 4,
+    paddingRight: 12,
+  },
+  backIcon: {
+    width: 18,
+    height: 18,
+    transform: [{ rotate: "-180deg" }],
+  },
+  groupShadowLayer: {
+    position: "relative",
+    marginBottom: 20,
+  },
+  groupBox: {
+    position: "relative",
+    borderWidth: 2,
+    borderColor: "#00000017",
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    zIndex: 1,
+    overflow: "hidden",
+  },
+  navItem: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 20,
-    zIndex: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    gap: 12,
+  },
+  navItemLast: {
+    marginBottom: 0,
+  },
+  navItemPressed: {
+    backgroundColor: "#eaeaea",
+  },
+  menuIcon: {
+    width: 18,
+    height: 18,
+  },
+  navTextContainer: {
+    flex: 1,
+  },
+  navTitle: {
+    fontSize: 18,
+    fontFamily: "IBMPlexMono-Medium",
+    color: "#000",
+    marginBottom: 2,
+  },
+  navSubtitle: {
+    fontSize: 12,
+    fontFamily: "Jakarta",
+    color: "#888",
   },
   settingRowVertical: {
     marginBottom: 20,
     zIndex: 10,
   },
-  sectionGroup: {
-    marginBottom: 10,
-  },
   settingLabel: {
     fontSize: 15,
     color: "#222",
     fontFamily: "IBMPlexMono-Medium",
+  },
+  toggleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
   },
   errorText: {
     fontSize: 13,
@@ -801,7 +965,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#f5f5f5",
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: "#e0e0e0",
     borderStyle: "dashed",
@@ -811,11 +975,10 @@ const styles = StyleSheet.create({
   downloadIcon: {
     width: 20,
     height: 20,
-
   },
   downloadText: {
     fontSize: 14,
-    color: "#0066cc",
+    color: "#FF1A1A",
     fontFamily: "IBMPlexMono-Medium",
   },
   helpText: {
@@ -823,33 +986,36 @@ const styles = StyleSheet.create({
     color: "#888",
     fontFamily: "Jakarta",
     marginTop: 4,
-    marginBottom: 8,
   },
-  buttonRow: {
-    flexDirection: "row",
-    gap: 16,
-    marginTop: 10,
-  },
-  actionButton: {
-    backgroundColor: "#fff",
-    paddingVertical: 12,
+  dataBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderRadius: 10,
     borderWidth: 2,
     borderColor: "#00000017",
     alignItems: "center",
-    position: "relative",
-    zIndex: 1,
+    justifyContent: "center",
+    backgroundColor: "#fff",
   },
-  actionButtonText: {
-    fontSize: 14,
-    color: "#222",
+  dataBtnPressed: {
+    backgroundColor: "#eaeaea",
+  },
+  dataBtnText: {
+    fontSize: 13,
     fontFamily: "IBMPlexMono-Medium",
+    color: "#222",
   },
-  dangerButton: {
+  dataBtnDanger: {
+    borderColor: "#FF1A1A22",
+    backgroundColor: "#fff",
+  },
+  dataBtnDangerPressed: {
     backgroundColor: "#fff0f0",
-    borderColor: "#ffcccc",
   },
-  dangerButtonText: {
+  dataBtnTextDanger: {
+    fontSize: 13,
+    fontFamily: "IBMPlexMono-Medium",
     color: "#FF1A1A",
   },
 });

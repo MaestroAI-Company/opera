@@ -11,7 +11,6 @@ import {
   Easing,
   Image,
   Keyboard,
-  LayoutAnimation,
   PanResponder,
   Platform,
   Pressable,
@@ -23,6 +22,7 @@ import {
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AICoreSTT } from "../src/services/ai/AICoreSpeechService";
 import { Settings } from "../src/services/settings/SettingsService";
 import { Whisper } from "../src/services/whisper/WhisperService";
 import AttachmentSheet, { SelectedFile } from "./AttachmentSheet";
@@ -48,6 +48,7 @@ type ChatInputBarProps = {
   onAttachmentSheetVisibilityChange?: (visible: boolean) => void;
   enabled?: boolean;
   autoStartMic?: boolean;
+  aicoreSTT?: boolean;
 };
 
 export type ChatBarHandle = {
@@ -147,6 +148,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   onAttachmentSheetVisibilityChange,
   enabled = true,
   autoStartMic = false,
+  aicoreSTT = false,
 }, ref) {
   useImperativeHandle(ref, () => ({
     stopRecording: () => {
@@ -254,6 +256,68 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const pressAnim = useRef(new Animated.Value(0)).current;
 
+  const aicoreFinalTextRef = useRef<string>("");
+  const aicorePartialTextRef = useRef<string>("");
+  const aicoreStartTimeRef = useRef(0);
+  const sttModeRef = useRef<'aicore' | 'whisper'>('whisper');
+
+  const stopAICoreVolume = () => {
+    currentAudioVolume = 0;
+  };
+
+  //native stt, partials fill input, rms drives volume
+  const startAICoreSTT = async () => {
+    try {
+      sttModeRef.current = 'aicore';
+      aicoreFinalTextRef.current = "";
+      aicorePartialTextRef.current = "";
+      aicoreStartTimeRef.current = Date.now();
+      setText("");
+      setIsRecording(true);
+      let locale = Settings.getCached().whisperLanguage || "en-US";
+      if (locale === "auto" || locale.length > 5) locale = "en-US";
+      console.log(`[AICore STT] Starting native speech recognition (locale: ${locale}, featureStatus: ${await AICoreSTT.checkStatus(locale)})`);
+      await AICoreSTT.start(locale, {
+        onPartial: (t) => { if (t) { aicorePartialTextRef.current = t; setText(t); } },
+        onFinal: (t) => { aicoreFinalTextRef.current = t; },
+        onVolume: (v) => { currentAudioVolume = v; },
+        onError: async (msg) => {
+          console.error("AICore STT error, falling back to Whisper:", msg);
+          stopAICoreVolume();
+          await AICoreSTT.stop().catch(() => {});
+          await startWhisperRecording();
+        },
+        onDone: () => {},
+      });
+    } catch (e) {
+      console.error("failed to start AICore STT, falling back to Whisper:", e);
+      stopAICoreVolume();
+      await AICoreSTT.stop().catch(() => {});
+      await startWhisperRecording();
+    }
+  };
+
+  //stop stt, send final text or fill input
+  const stopAICoreSTT = async (send: boolean) => {
+    stopAICoreVolume();
+    setIsRecording(false);
+    await AICoreSTT.stop();
+    const finalText = aicoreFinalTextRef.current.trim();
+    aicoreFinalTextRef.current = "";
+    aicorePartialTextRef.current = "";
+    console.log(`[AICore STT] Session completed in ${Date.now() - aicoreStartTimeRef.current}ms`);
+    if (finalText.length > 0) {
+      if (send) {
+        onSend?.(finalText);
+        setText("");
+      } else {
+        setText(finalText);
+      }
+    } else if (autoStartMic) {
+      onTranscribeError?.();
+    }
+  };
+
   const webAudioContextRef = useRef<AudioContext | null>(null);
   const webAudioStreamRef = useRef<MediaStream | null>(null);
   const webAudioProcessorRef = useRef<ScriptProcessorNode | null>(null);
@@ -290,6 +354,9 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
           if (webAudioProcessorRef.current) webAudioProcessorRef.current.disconnect();
           if (webAudioContextRef.current) webAudioContextRef.current.close();
           if (webAudioStreamRef.current) webAudioStreamRef.current.getTracks().forEach(t => t.stop());
+        } else if (sttModeRef.current === 'aicore') {
+          stopAICoreVolume();
+          AICoreSTT.stop().catch(() => {});
         } else {
           stream?.stop();
         }
@@ -306,7 +373,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     );
 
     return () => backHandler.remove();
-  }, [isAttachmentSheetVisible, isRecording, stream]);
+  }, [isAttachmentSheetVisible, isRecording, stream, aicoreSTT]);
 
   useEffect(() => {
     if (selectedFiles.length === 0 && isSelectionMode) {
@@ -318,9 +385,9 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     if (autoStartMic && !autoStartedRef.current) {
       autoStartedRef.current = true;
       // skip whisper checks, parent handles transcription
-      setTimeout(() => startRecording(), 800);
+      setTimeout(() => (aicoreSTT ? startAICoreSTT() : startRecording()), 800);
     }
-  }, [autoStartMic]);
+  }, [autoStartMic, aicoreSTT]);
 
   const toggleAttachmentSheet = async () => {
     if (isAttachmentSheetVisible) {
@@ -485,6 +552,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
   const startRecording = async () => {
     try {
+      sttModeRef.current = 'whisper';
       pcmChunksRef.current = [];
       setIsRecording(true);
       if (Platform.OS === 'web') {
@@ -603,85 +671,108 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     }
   };
 
+  const startWhisperRecording = async () => {
+    if (!canTranscribeRemotely) {
+      const modelName = Settings.getCached().whisperModel || "base";
+      if (modelName === "none") {
+        setModalConfig({
+          title: "Whisper Not Configured",
+          message: "You have disabled on-device transcription. Please select a Whisper model in settings to enable it.",
+          buttons: [
+            { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
+            {
+              text: "Settings", onPress: () => {
+                setModalVisible(false);
+                if (onOpenSettings) onOpenSettings();
+              }, style: "primary"
+            }
+          ]
+        });
+        setModalVisible(true);
+        setIsRecording(false);
+        return;
+      }
+
+      const isInstalled = await Whisper.isModelInstalled(modelName);
+      if (!isInstalled) {
+        setModalConfig({
+          title: "Whisper Not Installed",
+          message: `The Whisper ${modelName} model is required for on-device transcription. Would you like to install it?`,
+          buttons: [
+            { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
+            {
+              text: "Install", onPress: () => {
+                setModalVisible(false);
+                if (onOpenSettings) onOpenSettings();
+              }, style: "primary"
+            }
+          ]
+        });
+        setModalVisible(true);
+        setIsRecording(false);
+        return;
+      }
+
+      const initialized = await Whisper.init(modelName);
+      if (!initialized) {
+        setModalConfig({
+          title: "Initialization Error",
+          message: `Failed to load the Whisper ${modelName} model. It might be corrupted or incompatible. Please try reinstalling it from the settings.`,
+          buttons: [
+            { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
+            {
+              text: "Settings", onPress: () => {
+                setModalVisible(false);
+                if (onOpenSettings) onOpenSettings();
+              }, style: "primary"
+            }
+          ]
+        });
+        setModalVisible(true);
+        setIsRecording(false);
+        return;
+      }
+    }
+    await startRecording();
+  };
+
   const handleMicPress = async () => {
     if (isRecording) {
-      if (Platform.OS === 'web') {
-        if (webAudioProcessorRef.current) webAudioProcessorRef.current.disconnect();
-        if (webAudioContextRef.current) webAudioContextRef.current.close();
-        if (webAudioStreamRef.current) webAudioStreamRef.current.getTracks().forEach(t => t.stop());
+      if (sttModeRef.current === 'aicore') {
+        await stopAICoreSTT(true);
       } else {
-        stream?.stop();
+        if (Platform.OS === 'web') {
+          if (webAudioProcessorRef.current) webAudioProcessorRef.current.disconnect();
+          if (webAudioContextRef.current) webAudioContextRef.current.close();
+          if (webAudioStreamRef.current) webAudioStreamRef.current.getTracks().forEach(t => t.stop());
+        } else {
+          stream?.stop();
+        }
+        setIsRecording(false);
+        pcmChunksRef.current = [];
       }
-      setIsRecording(false);
-      pcmChunksRef.current = [];
     } else {
-      if (!canTranscribeRemotely) {
-        const modelName = Settings.getCached().whisperModel || "base";
-        if (modelName === "none") {
-          setModalConfig({
-            title: "Whisper Not Configured",
-            message: "You have disabled on-device transcription. Please select a Whisper model in settings to enable it.",
-            buttons: [
-              { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
-              {
-                text: "Settings", onPress: () => {
-                  setModalVisible(false);
-                  if (onOpenSettings) onOpenSettings();
-                }, style: "primary"
-              }
-            ]
-          });
-          setModalVisible(true);
-          return;
-        }
-
-        const isInstalled = await Whisper.isModelInstalled(modelName);
-        if (!isInstalled) {
-          setModalConfig({
-            title: "Whisper Not Installed",
-            message: `The Whisper ${modelName} model is required for on-device transcription. Would you like to install it?`,
-            buttons: [
-              { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
-              {
-                text: "Install", onPress: () => {
-                  setModalVisible(false);
-                  if (onOpenSettings) onOpenSettings();
-                }, style: "primary"
-              }
-            ]
-          });
-          setModalVisible(true);
-          return;
-        }
-
-        const initialized = await Whisper.init(modelName);
-        if (!initialized) {
-          setModalConfig({
-            title: "Initialization Error",
-            message: `Failed to load the Whisper ${modelName} model. It might be corrupted or incompatible. Please try reinstalling it from the settings.`,
-            buttons: [
-              { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
-              {
-                text: "Settings", onPress: () => {
-                  setModalVisible(false);
-                  if (onOpenSettings) onOpenSettings();
-                }, style: "primary"
-              }
-            ]
-          });
-          setModalVisible(true);
-          return;
-        }
+      if (aicoreSTT) {
+        await startAICoreSTT();
+        return;
       }
-      startRecording();
+      await startWhisperRecording();
     }
   };
 
   const handleSend = async () => {
     if (isRecording) {
+      if (sttModeRef.current === 'aicore') {
+        await stopAICoreSTT(true);
+        return;
+      }
       const transcribed = await stopAndTranscribe();
+      const partial = aicorePartialTextRef.current.trim();
+      aicorePartialTextRef.current = "";
       if (transcribed && transcribed.length > 0) {
-        setText(transcribed);
+        setText(partial ? `${partial} ${transcribed}` : transcribed);
+      } else if (partial) {
+        setText(partial);
       } else if (autoStartMic && !transcribed) {
         onTranscribeError?.();
       }
@@ -815,7 +906,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                   </Pressable>
                 )}
 
-                {((Settings.getCached().whisperModel !== 'none') || canTranscribeRemotely) && !isGenerating && (
+                {((Settings.getCached().whisperModel !== 'none') || canTranscribeRemotely || aicoreSTT) && !isGenerating && (
                   <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.micButton}>
                     <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
                       <Image source={isRecording ? stopIcon : micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} tintColor="#fff" />
@@ -842,7 +933,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                       <TextInput
                         style={[
                           styles.input,
-                          { maxHeight: 100, minHeight: 36, lineHeight: 20 },
+                          { maxHeight: 36, minHeight: 36, lineHeight: 20 },
                           Platform.OS === 'web' && { outlineStyle: 'none', margin: 0, paddingHorizontal: 0, overflow: 'hidden' } as any
                         ]}
                         value={isTranscribing ? "Transcribing..." : text}
@@ -946,8 +1037,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderWidth: 2,
     borderColor: "#00000017",
-    minHeight: 56,
-    maxHeight: 120,
+    height: 56,
     boxShadow: "2px 6px 22px #FF1A1A",
     elevation: 8,
   },
@@ -994,10 +1084,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginLeft: 8,
     marginRight: 8,
-    gap: 6,
+    gap: 12,
   },
   voiceSquare: {
-    width: 6,
+    width: 3,
     height: 6,
     backgroundColor: "#fff",
   },

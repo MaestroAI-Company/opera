@@ -169,7 +169,7 @@ class WhisperService {
     });
 
     const { result } = await promise;
-    console.log(`[Whisper] File transcription completed in ${Date.now() - startTime}ms: "${result.trim()}"`);
+    console.log(`[Whisper] File transcription completed in ${Date.now() - startTime}ms`);
     return result.trim();
   }
 
@@ -186,7 +186,7 @@ class WhisperService {
     });
 
     const { result } = await promise;
-    console.log(`[Whisper] Buffer transcription completed in ${Date.now() - startTime}ms: "${result.trim()}"`);
+    console.log(`[Whisper] Buffer transcription completed in ${Date.now() - startTime}ms`);
     return result.trim();
   }
 

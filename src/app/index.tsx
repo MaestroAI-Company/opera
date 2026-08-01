@@ -25,6 +25,7 @@ import SettingsDrawer from "../../components/SettingsDrawer";
 import TopBar from "../../components/TopBar";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { AIModule } from "../services/ai/AIModule";
+import { AICoreSTT } from "../services/ai/AICoreSpeechService";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
 import { NotificationService } from '../services/notifications/NotificationService';
 import { Settings } from "../services/settings/SettingsService";
@@ -55,6 +56,7 @@ export default function Index() {
   const [modelCapabilities, setModelCapabilities] = useState<string[]>([]);
   const [alwaysWhisper, setAlwaysWhisper] = useState(false);
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
+  const [aicoreSTTReady, setAicoreSTTReady] = useState(false);
 
   //conversation state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -187,6 +189,7 @@ export default function Index() {
         setSpeakerEnabled(s.speaker);
         setAlwaysWhisper(s.alwaysWhisper);
         AIModule.configure(s.ollamaUrl);
+        AIModule.setMode(s.aiService);
         Whisper.setLanguage(s.whisperLanguage);
       } catch (e) {
         console.warn("Failed to load settings at boot", e);
@@ -200,7 +203,7 @@ export default function Index() {
   //fetch model capabilities when selectedModel changes
   useEffect(() => {
     const fetchCapabilities = async () => {
-      if (selectedModel && aiService === "ollama") {
+      if (selectedModel) {
         const caps = await AIModule.getModelCapabilities(selectedModel);
         setModelCapabilities(caps);
       } else {
@@ -209,6 +212,22 @@ export default function Index() {
     };
     fetchCapabilities();
   }, [selectedModel, aiService, ollamaUrl]);
+
+  //check gemini stt model when aicore mode active
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      if (aiService !== "aicore" || Platform.OS !== "android") {
+        setAicoreSTTReady(false);
+        return;
+      }
+      const locale = Settings.getCached().whisperLanguage || "en-US";
+      const ready = await AICoreSTT.ensureReady(locale);
+      if (!cancelled) setAicoreSTTReady(ready);
+    };
+    check();
+    return () => { cancelled = true; };
+  }, [aiService]);
 
   const loadConversations = async () => {
     const convs = await DB.getConversations();
@@ -816,18 +835,16 @@ export default function Index() {
               isLargeScreen={isLargeScreen}
               isDesktop={isDesktop}
               centerElement={
-                aiService === "ollama" ? (
-                  <ModelDropdown
-                    selectedModel={selectedModel}
-                    selectedReflection={selectedReflection}
-                    showReflection={modelCapabilities.includes("thinking")}
-                    onModelChange={(model) => {
-                      setSelectedModel(model);
-                      Settings.set("ollamaModel", model);
-                    }}
-                    onReflectionChange={setSelectedReflection}
-                  />
-                ) : null
+                <ModelDropdown
+                  selectedModel={selectedModel}
+                  selectedReflection={selectedReflection}
+                  showReflection={modelCapabilities.includes("thinking")}
+                  onModelChange={(model) => {
+                    setSelectedModel(model);
+                    Settings.set("ollamaModel", model);
+                  }}
+                  onReflectionChange={setSelectedReflection}
+                />
               }
               rightElement={
                 <View style={styles.settingsShadowLayer}>
@@ -880,6 +897,7 @@ export default function Index() {
               onTranscribe={handleTranscribe}
               canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes("audio") && !!selectedModel}
               supportsFiles={modelCapabilities.includes("vision") || modelCapabilities.includes("audio")}
+              aicoreSTT={aiService === "aicore" && aicoreSTTReady}
               onOpenSettings={() => {
                 Keyboard.dismiss();
                 setSettingsDrawerVisible(true);

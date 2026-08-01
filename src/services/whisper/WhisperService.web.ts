@@ -6,6 +6,7 @@ class WhisperService {
     if (typeof self === 'undefined') {
       (global as any).self = global;
     }
+    //@ts-ignore
     const { pipeline, env } = await import('@xenova/transformers/dist/transformers.js');
     env.allowLocalModels = false;
     env.useBrowserCache = true;

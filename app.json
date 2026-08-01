@@ -55,6 +55,14 @@
       ],
       "expo-sqlite",
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
+      [
         "expo-audio",
         {
           "microphonePermission": "Opera needs access to your microphone for voice-to-text."

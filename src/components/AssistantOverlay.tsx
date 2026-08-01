@@ -20,6 +20,7 @@ import { renderMarkdown } from '../../components/MarkdownText';
 import { Conversation, DB, Message } from '../services/db/DatabaseService';
 import { Settings } from '../services/settings/SettingsService';
 import { AIModule } from '../services/ai/AIModule';
+import { AICoreSTT } from '../services/ai/AICoreSpeechService';
 import { SYSTEM_PROMPTS } from '../../constants/prompts';
 import { Whisper } from '../services/whisper/WhisperService';
 import { NotificationService } from '../services/notifications/NotificationService';
@@ -243,6 +244,7 @@ function AssistantOverlay() {
         // store setting — passed to ChatBar only after capabilities resolve
         autoStartMicSetting.current = s.autoStartMic ?? true;
         AIModule.configure(s.ollamaUrl);
+        AIModule.setMode(s.aiService);
         Whisper.setLanguage(s.whisperLanguage);
 
         // preload model into RAM so first response is fast
@@ -272,7 +274,7 @@ function AssistantOverlay() {
   useEffect(() => {
     let cancelled = false;
     setCapabilitiesReady(false);
-    if (selectedModel && aiService === 'ollama') {
+    if (selectedModel) {
       AIModule.getModelCapabilities(selectedModel).then(caps => {
         if (!cancelled) {
           setModelCapabilities(caps);
@@ -285,6 +287,23 @@ function AssistantOverlay() {
     }
     return () => { cancelled = true; };
   }, [selectedModel, aiService, ollamaUrl]);
+
+  //check gemini stt model when aicore mode active
+  const [aicoreSTTReady, setAicoreSTTReady] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      if (aiService !== 'aicore' || Platform.OS !== 'android') {
+        setAicoreSTTReady(false);
+        return;
+      }
+      const locale = Settings.getCached().whisperLanguage || 'en-US';
+      const ready = await AICoreSTT.ensureReady(locale);
+      if (!cancelled) setAicoreSTTReady(ready);
+    };
+    check();
+    return () => { cancelled = true; };
+  }, [aiService]);
 
   const generateTitle = useCallback(async (convId: string, userMessage: string, images?: string[]) => {
     try {
@@ -532,21 +551,19 @@ function AssistantOverlay() {
 
       {/* model selector — top center */}
       <View style={[styles.topBar, { paddingTop: insets.top + 16 }]} pointerEvents="box-none">
-        {aiService === 'ollama' && (
-          <ModelDropdown
-            selectedModel={selectedModel}
-            selectedReflection={selectedReflection}
-            showReflection={modelCapabilities.includes('thinking')}
-            onModelChange={model => {
-              setSelectedModel(model);
-              selectedModelRef.current = model;
-              Settings.set('ollamaModel', model);
-              // preload newly selected model
-              AIModule.preloadModel(model).catch(() => {});
-            }}
-            onReflectionChange={setReflection}
-          />
-        )}
+        <ModelDropdown
+          selectedModel={selectedModel}
+          selectedReflection={selectedReflection}
+          showReflection={modelCapabilities.includes('thinking')}
+          onModelChange={model => {
+            setSelectedModel(model);
+            selectedModelRef.current = model;
+            Settings.set('ollamaModel', model);
+            // preload newly selected model
+            AIModule.preloadModel(model).catch(() => {});
+          }}
+          onReflectionChange={setReflection}
+        />
       </View>
 
       {/* chat area */}
@@ -590,6 +607,7 @@ function AssistantOverlay() {
             onTranscribe={handleTranscribe}
             canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes('audio') && !!selectedModel}
             supportsFiles={modelCapabilities.includes('vision') || modelCapabilities.includes('audio')}
+            aicoreSTT={aiService === 'aicore' && aicoreSTTReady}
             onOpenSettings={() => {}}
             enabled={true}
             autoStartMic={capabilitiesReady && autoStartMicSetting.current}

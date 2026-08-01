@@ -25,6 +25,7 @@ import TopBar from "../../components/TopBar";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { useResponsive } from "../hooks/useResponsive";
 import { AIModule } from "../services/ai/AIModule";
+import { AICoreSTT } from "../services/ai/AICoreSpeechService";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
 import { Settings } from "../services/settings/SettingsService";
 import { Whisper } from "../services/whisper/WhisperService";
@@ -54,6 +55,7 @@ export default function Index() {
   const [modelCapabilities, setModelCapabilities] = useState<string[]>([]);
   const [alwaysWhisper, setAlwaysWhisper] = useState(false);
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
+  const [aicoreSTTReady, setAicoreSTTReady] = useState(false);
 
   //conversation state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -94,6 +96,16 @@ export default function Index() {
 
     return () => backHandler.remove();
   }, [drawerVisible, settingsDrawerVisible]);
+
+  const openDrawerSafely = useCallback((openFn: () => void) => {
+    const wasKeyboardOpen = typeof Keyboard.metrics === 'function' ? !!Keyboard.metrics() : false;
+    Keyboard.dismiss();
+    if (wasKeyboardOpen) {
+      setTimeout(openFn, 50);
+    } else {
+      openFn();
+    }
+  }, []);
 
   const [pendingConvIds, setPendingConvIds] = useState<string[]>([]);
   const requestQueueRef = useRef<{ convId: string, task: () => Promise<void>, assistantMsgId: string, isIncognito: boolean }[]>([]);
@@ -186,6 +198,7 @@ export default function Index() {
         setSpeakerEnabled(s.speaker);
         setAlwaysWhisper(s.alwaysWhisper);
         AIModule.configure(s.ollamaUrl);
+        AIModule.setMode(s.aiService);
         Whisper.setLanguage(s.whisperLanguage);
       } catch (e) {
         console.warn("Failed to load settings at boot", e);
@@ -199,7 +212,7 @@ export default function Index() {
   //fetch model capabilities when selectedModel changes
   useEffect(() => {
     const fetchCapabilities = async () => {
-      if (selectedModel && aiService === "ollama") {
+      if (selectedModel) {
         const caps = await AIModule.getModelCapabilities(selectedModel);
         setModelCapabilities(caps);
       } else {
@@ -208,6 +221,22 @@ export default function Index() {
     };
     fetchCapabilities();
   }, [selectedModel, aiService, ollamaUrl]);
+
+  //check gemini stt model when aicore mode active
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      if (aiService !== "aicore" || Platform.OS !== "android") {
+        setAicoreSTTReady(false);
+        return;
+      }
+      const locale = Settings.getCached().whisperLanguage || "en-US";
+      const ready = await AICoreSTT.ensureReady(locale);
+      if (!cancelled) setAicoreSTTReady(ready);
+    };
+    check();
+    return () => { cancelled = true; };
+  }, [aiService]);
 
   const loadConversations = async () => {
     const convs = await DB.getConversations();
@@ -545,9 +574,24 @@ export default function Index() {
   //transcribe audio: use remote model if it supports audio and user hasnt forced whisper
   const handleTranscribe = useCallback(async (wavBuffer: ArrayBuffer): Promise<string | null> => {
     const useRemote = !alwaysWhisper && modelCapabilities.includes("audio") && selectedModel;
+    
+    const transcribeWithWhisper = async () => {
+      if (!Whisper.isAvailable()) {
+        const modelName = Settings.getCached().whisperModel || "base";
+        if (modelName !== "none" && await Whisper.isModelInstalled(modelName)) {
+           await Whisper.init(modelName);
+        }
+      }
+      if (Whisper.isAvailable()) {
+        return Whisper.transcribeData(wavBuffer);
+      }
+      console.error('Whisper fallback failed because Whisper is not initialized or installed.');
+      return null;
+    };
+
     if (!useRemote) {
       //fallback to whisper on-device
-      return Whisper.transcribeData(wavBuffer);
+      return transcribeWithWhisper();
     }
     try {
       //encode wav as data uri 
@@ -566,7 +610,7 @@ export default function Index() {
       return transcription.trim() || null;
     } catch (e) {
       console.error('Remote transcription failed, falling back to Whisper:', e);
-      return Whisper.transcribeData(wavBuffer);
+      return transcribeWithWhisper();
     }
   }, [alwaysWhisper, modelCapabilities, selectedModel]);
 
@@ -728,7 +772,6 @@ export default function Index() {
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: "transparent" }]}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        enabled={!settingsDrawerVisible && (isLargeScreen || !drawerVisible)}
         {...(isLargeScreen ? {} : panResponder.panHandlers)}
       >
 
@@ -812,14 +855,13 @@ export default function Index() {
             }]} pointerEvents="box-none">
               <TopBar
                 onMenuPress={() => {
-                  Keyboard.dismiss();
-                  setDrawerVisible(prev => !prev);
+                  openDrawerSafely(() => setDrawerVisible(prev => !prev));
                 }}
                 onNewPress={startNewConversation}
                 isLargeScreen={isLargeScreen}
                 isDesktop={isDesktop}
                 centerElement={
-                  aiService === "ollama" ? (
+                  (aiService === "ollama" || aiService === "aicore") ? (
                     <ModelDropdown
                       selectedModel={selectedModel}
                       selectedReflection={selectedReflection}
@@ -845,18 +887,19 @@ export default function Index() {
                         ];
                       }}
                       onPress={() => {
-                        Keyboard.dismiss();
-                        if (settingsDrawerVisible) {
-                          const cached = Settings.getCached();
-                          if (cached.ollamaModel && cached.ollamaModel !== selectedModel) {
-                            setSelectedModel(cached.ollamaModel);
+                        openDrawerSafely(() => {
+                          if (settingsDrawerVisible) {
+                            const cached = Settings.getCached();
+                            if (cached.ollamaModel && cached.ollamaModel !== selectedModel) {
+                              setSelectedModel(cached.ollamaModel);
+                            }
+                            setAiService(cached.aiService);
+                            setOllamaUrl(cached.ollamaUrl);
+                            setSpeakerEnabled(cached.speaker);
+                            setAlwaysWhisper(cached.alwaysWhisper);
                           }
-                          setAiService(cached.aiService);
-                          setOllamaUrl(cached.ollamaUrl);
-                          setSpeakerEnabled(cached.speaker);
-                          setAlwaysWhisper(cached.alwaysWhisper);
-                        }
-                        setSettingsDrawerVisible(!settingsDrawerVisible);
+                          setSettingsDrawerVisible(!settingsDrawerVisible);
+                        });
                       }}
                     >
                       <Image
@@ -883,10 +926,12 @@ export default function Index() {
                 onTranscribe={handleTranscribe}
                 canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes("audio") && !!selectedModel}
                 supportsFiles={modelCapabilities.includes("vision") || modelCapabilities.includes("audio")}
+                aicoreSTT={aiService === "aicore" && aicoreSTTReady}
                 onOpenSettings={() => {
-                  Keyboard.dismiss();
-                  setSettingsInitialSubPage("main");
-                  setSettingsDrawerVisible(true);
+                  openDrawerSafely(() => {
+                    setSettingsInitialSubPage("main");
+                    setSettingsDrawerVisible(true);
+                  });
                 }}
                 onAttachmentSheetVisibilityChange={setAttachmentSheetVisible}
                 enabled={!settingsDrawerVisible && (isLargeScreen || !drawerVisible)}

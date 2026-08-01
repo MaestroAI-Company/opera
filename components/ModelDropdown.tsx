@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Dimensions, Image, Keyboard, LayoutRectangle, Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from "react-native";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { AIModule } from "../src/services/ai/AIModule";
+import { getAICoreModelLabel } from "../src/services/ai/AICoreProvider";
 import NotificationModal from "./NotificationModal";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -167,6 +168,10 @@ export default function ModelDropdown({
     };
   });
 
+  //friendly label for aicore variants
+  const displayName = (model: string) =>
+    model.startsWith("aicore-") ? getAICoreModelLabel(model) : model;
+
   return (
     <View style={styles.container}>
       <View ref={triggerRef} style={styles.shadowLayer}>
@@ -177,7 +182,7 @@ export default function ModelDropdown({
         >
           <Animated.Image source={arrowDownIcon} style={[styles.icon, iconStyle]} />
           <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
-            {selectedModel || "Modèle"}
+            {selectedModel ? displayName(selectedModel) : "Modèle"}
           </Text>
         </Pressable>
       </View>
@@ -245,7 +250,7 @@ export default function ModelDropdown({
                     <Text
                       style={[styles.optionText, model === selectedModel && styles.optionTextSelected]}
                     >
-                      {model}
+                      {displayName(model)}
                     </Text>
                   </Pressable>
                 ))

@@ -232,10 +232,7 @@ export class OllamaProvider implements IAIProvider {
       
       const logPayload = {
         ...payload,
-        messages: payload.messages.map((m: any) => ({
-          ...m,
-          images: m.images && m.images.length > 0 ? ['<base64_data_hidden>'] : undefined
-        }))
+        messages: '[HIDDEN]'
       };
       console.log('Ollama request payload:', JSON.stringify(logPayload, null, 2));
 

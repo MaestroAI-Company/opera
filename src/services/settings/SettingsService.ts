@@ -81,6 +81,7 @@ class SettingsService {
       instruction: map['instruction'] ?? DEFAULTS.instruction,
       speaker: map['speaker'] === 'true' ? true : (map['speaker'] === 'false' ? false : DEFAULTS.speaker),
       alwaysWhisper: map['alwaysWhisper'] === 'true' ? true : (map['alwaysWhisper'] === 'false' ? false : DEFAULTS.alwaysWhisper),
+      autoStartMic: map['autoStartMic'] === 'true' ? true : (map['autoStartMic'] === 'false' ? false : DEFAULTS.autoStartMic),
     };
     this.cache = settings;
     return settings;

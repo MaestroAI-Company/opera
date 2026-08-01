@@ -79,7 +79,6 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   const hasThinkingText = thinkMatches.length > 0;
   const thinkingText = thinkMatches.map(m => m[1].trim()).filter(t => t.length > 0).join('\n');
 
-  const isCurrentlyThinking = !isUser && (item.content === "…" || (isGenerating && hasThinkingText && !isThinkingFinished));
 
   const extractSteps = (text: string) => {
     const stepRegex = /^\s*(?:(?:\d+[\.\)]|[-*])\s*)?\*\*(.*?)\*\*/gm;

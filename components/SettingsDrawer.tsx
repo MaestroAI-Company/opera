@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AIModule } from "../src/services/ai/AIModule";
+import { BackupService } from "../src/services/BackupService";
 import { Settings } from "../src/services/settings/SettingsService";
 import { Whisper } from "../src/services/whisper/WhisperService";
 import DownloadProgress from "./DownloadProgress";
@@ -87,6 +88,65 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const cloudStorageOptions = [
     { id: "none", label: "None" },
   ];
+
+  const handleExportData = async () => {
+    try {
+      const ok = await BackupService.exportData();
+      if (ok) showAlert("Export", "Data exported successfully.");
+    } catch {
+      showAlert("Error", "Failed to export data.");
+    }
+  };
+
+  const handleImportData = async () => {
+    showAlert(
+      "Import Data",
+      "This will replace all your current conversations and settings. Are you sure?",
+      [
+        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: "Import",
+          style: "primary",
+          onPress: async () => {
+            setAlertModalVisible(false);
+            try {
+              const ok = await BackupService.importData();
+              if (ok) {
+                showAlert("Import", "Data imported successfully.");
+                onDataChanged?.();
+              }
+            } catch {
+              showAlert("Error", "Failed to import data.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAllConversations = () => {
+    showAlert(
+      "Delete All Conversations",
+      "This will permanently delete all conversations. This action cannot be undone.",
+      [
+        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: "Delete All",
+          style: "danger",
+          onPress: async () => {
+            setAlertModalVisible(false);
+            try {
+              await BackupService.deleteAllConversations();
+              onDataChanged?.();
+              showAlert("Done", "All conversations deleted.");
+            } catch {
+              showAlert("Error", "Failed to delete conversations.");
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleDeleteWhisper = () => {
     if (whisperModel === "none") return;
@@ -599,6 +659,21 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         />
       </View>
       <Text style={styles.helpText}>Help improve the app by sharing daily active counts without exposing your chats</Text>
+
+      <View style={{ marginTop: 28, gap: 8 }}>
+        <Text style={styles.settingLabel}>Data management</Text>
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+          <Pressable style={({ pressed }) => [styles.dataBtn, pressed && styles.dataBtnPressed]} onPress={handleExportData}>
+            <Text style={styles.dataBtnText}>Export</Text>
+          </Pressable>
+          <Pressable style={({ pressed }) => [styles.dataBtn, pressed && styles.dataBtnPressed]} onPress={handleImportData}>
+            <Text style={styles.dataBtnText}>Import</Text>
+          </Pressable>
+        </View>
+        <Pressable style={({ pressed }) => [styles.dataBtn, styles.dataBtnDanger, pressed && styles.dataBtnDangerPressed]} onPress={handleDeleteAllConversations}>
+          <Text style={styles.dataBtnTextDanger}>Delete all conversations</Text>
+        </Pressable>
+      </View>
     </View>
   );
 
@@ -881,5 +956,36 @@ const styles = StyleSheet.create({
     color: "#888",
     fontFamily: "Jakarta",
     marginTop: 4,
+  },
+  dataBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "#00000017",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+  },
+  dataBtnPressed: {
+    backgroundColor: "#eaeaea",
+  },
+  dataBtnText: {
+    fontSize: 13,
+    fontFamily: "IBMPlexMono-Medium",
+    color: "#222",
+  },
+  dataBtnDanger: {
+    borderColor: "#FF1A1A22",
+    backgroundColor: "#fff",
+  },
+  dataBtnDangerPressed: {
+    backgroundColor: "#fff0f0",
+  },
+  dataBtnTextDanger: {
+    fontSize: 13,
+    fontFamily: "IBMPlexMono-Medium",
+    color: "#FF1A1A",
   },
 });

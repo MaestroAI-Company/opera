@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
   },
   trackChecked: {
     backgroundColor: "#FF1A1A",
-    borderColor: "#E60000",
+    borderColor: "#ffffff52",
   },
   trackUnchecked: {
     backgroundColor: "#FFFFFF",

@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import { IAIProvider } from './IAIProvider';
 import { OllamaProvider } from './OllamaProvider';
+import { AICoreProvider } from './AICoreProvider';
 
 const DEFAULT_URL = Platform.OS === 'android' ? 'http://10.0.2.2:11434' : 'http://127.0.0.1:11434';
 
@@ -29,6 +30,13 @@ class CentralAIModule {
     this.providers = new Map();
     //initialize providers with defaults
     this.providers.set('OLLAMA', new OllamaProvider(DEFAULT_URL));
+    //gemini nano via ml kit genai, only usable on android
+    this.providers.set('AICORE', new AICoreProvider());
+  }
+
+  //switch active provider from settings
+  setMode(mode: string): void {
+    this.activeMode = (mode || 'ollama').toUpperCase();
   }
 
   //reconfigure ollama provider with url from settings

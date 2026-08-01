@@ -94,6 +94,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     { id: "none", label: "None" },
   ];
 
+  const aiServiceOptions = [
+    { id: "ollama", label: "Ollama" },
+    ...(Platform.OS === "android"
+      ? [{ id: "aicore", label: "Gemini Nano (On-Device)" }]
+      : []),
+  ];
+
   const handleExportData = async () => {
     try {
       const ok = await BackupService.exportData();
@@ -231,6 +238,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setAlwaysWhisperState(s.alwaysWhisper);
         //apply to services
         AIModule.configure(s.ollamaUrl);
+        AIModule.setMode(s.aiService);
         Whisper.setLanguage(s.whisperLanguage);
       } catch (e) {
         console.warn("Failed to load settings", e);
@@ -256,6 +264,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     setOllamaUrlState(v);
     Settings.set("ollamaUrl", v);
     AIModule.configure(v);
+  };
+
+  const setAiService = (v: string) => {
+    setAiServiceState(v);
+    Settings.set("aiService", v);
+    AIModule.setMode(v);
   };
 
   const setWhisperModel = (v: string) => {
@@ -585,16 +599,34 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {renderSubPageHeader("Models & Server")}
 
       <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Ollama server</Text>
-        <TextInputField
-          icon={linkIcon}
-          placeholder="server link"
-          value={ollamaUrl}
-          onChangeText={setOllamaUrl}
-          onBlur={fetchOllamaModels}
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>AI Service</Text>
+        <Selector
+          options={aiServiceOptions}
+          selectedValue={aiService}
+          onSelect={setAiService}
+          title="Select AI Service"
+          fullWidth
         />
       </View>
-      {ollamaError ? <Text style={styles.errorText}>{ollamaError}</Text> : null}
+      {aiService !== "ollama" && (
+        <Text style={[styles.helpText, { marginBottom: 20 }]}>
+          Uses Gemini Nano directly on this device. No server needed.
+        </Text>
+      )}
+
+      {aiService === "ollama" && (
+        <View style={styles.settingRowVertical}>
+          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Ollama server</Text>
+          <TextInputField
+            icon={linkIcon}
+            placeholder="server link"
+            value={ollamaUrl}
+            onChangeText={setOllamaUrl}
+            onBlur={fetchOllamaModels}
+          />
+        </View>
+      )}
+      {aiService === "ollama" && ollamaError ? <Text style={styles.errorText}>{ollamaError}</Text> : null}
 
       <View style={[styles.settingRowVertical, { zIndex: 9 }]}>
         <Text style={styles.settingLabel}>Whisper Model</Text>

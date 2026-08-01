@@ -123,9 +123,7 @@ function withNativeAndroid(config) {
 
       // copy themes
       const themesPath = path.join(valuesDir, 'themes.xml');
-      if (!fs.existsSync(themesPath)) {
-        copyTemplate('res/values/themes.xml', themesPath, packageName);
-      }
+      copyTemplate('res/values/themes.xml', themesPath, packageName);
 
       // copy Java sources
       copyTemplate('src/MaestroVoiceService.java', path.join(javaDir, 'MaestroVoiceService.java'), packageName);
@@ -134,10 +132,13 @@ function withNativeAndroid(config) {
       copyTemplate('src/MaestroRecognitionService.java', path.join(javaDir, 'MaestroRecognitionService.java'), packageName);
       copyTemplate('src/OverlayActivity.java', path.join(javaDir, 'OverlayActivity.java'), packageName);
 
-      // copy Kotlin sources (only if not already present)
-      if (!fs.existsSync(path.join(javaDir, 'ScreenshotHolder.kt'))) {
-        copyTemplate('src/ScreenshotHolder.kt', path.join(javaDir, 'ScreenshotHolder.kt'), packageName);
-      }
+      // copy Kotlin sources
+      copyTemplate('src/ScreenshotHolder.kt', path.join(javaDir, 'ScreenshotHolder.kt'), packageName);
+
+      // AICore (ML Kit GenAI) modules
+      copyTemplate('src/AICorePackage.kt', path.join(javaDir, 'AICorePackage.kt'), packageName);
+      copyTemplate('src/AICoreModule.kt', path.join(javaDir, 'AICoreModule.kt'), packageName);
+      copyTemplate('src/AICoreSpeechModule.kt', path.join(javaDir, 'AICoreSpeechModule.kt'), packageName);
       // useless modules removed
 
       // YOLO model removed
@@ -167,7 +168,7 @@ function withNativeAndroid(config) {
     let { contents } = config.modResults;
     const isKotlin = contents.includes('.packages.apply');
 
-    const packagesToRegister = [];
+    const packagesToRegister = ['AICorePackage'];
 
     for (const pkg of packagesToRegister) {
       const importLine = `import ${packageName}.${pkg}${isKotlin ? '' : ';'}`;
@@ -199,6 +200,31 @@ function withNativeAndroid(config) {
     return config;
   });
 
+  // 4. add ML Kit GenAI (AICore) dependencies
+  config = withAppBuildGradle(config, (config) => {
+    let contents = config.modResults.contents;
+    //mlkit compiled with newer kotlin, skip version check
+    if (!contents.includes('Xskip-metadata-version-check')) {
+      const anchor = "    namespace 'ai.maestro.opera'";
+      contents = contents.replace(
+        anchor,
+        anchor + '\n\n' +
+        '    //mlkit compiled with newer kotlin, skip version check\n' +
+        '    kotlinOptions {\n' +
+        '        freeCompilerArgs += "-Xskip-metadata-version-check"\n' +
+        '    }'
+      );
+    }
+    if (contents.includes('genai-prompt')) return config;
+    contents = contents.replace(
+      'dependencies {',
+      'dependencies {\n' +
+      '    implementation("com.google.mlkit:genai-prompt:1.0.0-beta4")\n' +
+      '    implementation("com.google.mlkit:genai-speech-recognition:1.0.0-alpha1")'
+    );
+    config.modResults.contents = contents;
+    return config;
+  });
 
   return config;
 }

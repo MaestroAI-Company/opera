@@ -16,6 +16,7 @@ import { Conversation, Message } from "../src/services/db/DatabaseService";
 import { renderMarkdown } from "./MarkdownText";
 
 const butterflyImage = require("../assets/images/butterfly2.png");
+const butterflyGreyImage = require("../assets/images/butterfly2_grey.png");
 const thinkingGif = require("../assets/icons/thinking.gif");
 const speakerIcon = require("../assets/icons/speaker.png");
 const reloadIcon = require("../assets/icons/reload.png");
@@ -32,6 +33,7 @@ type ChatViewProps = {
   generatingMessageId?: string | null;
   hideHeader?: boolean;
   hideGradients?: boolean;
+  onOpenConfidentiality?: () => void;
 };
 
 const stripMarkdown = (md: string) => {
@@ -71,12 +73,12 @@ const FlashingText = ({ text }: { text: string }) => {
 
 const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, showSnackbar, isGenerating, isChatGenerating }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean }) => {
   const isUser = item.role === "user";
-  
+
   const thinkMatch = item.content.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
   const isThinkingFinished = item.content.includes("</think>");
   const hasThinkingText = thinkMatch !== null;
   const thinkingText = thinkMatch ? thinkMatch[1].trim() : "";
-  
+
   const isCurrentlyThinking = !isUser && (item.content === "…" || (isGenerating && hasThinkingText && !isThinkingFinished));
 
   const extractSteps = (text: string) => {
@@ -87,7 +89,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
       let stepText = match[1].replace(/:$/, '').trim();
       steps.push(stepText);
     }
-    
+
     if (steps.length > 0) {
       return `${steps.length}. ${steps[steps.length - 1]}`;
     } else {
@@ -204,7 +206,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
 }, (prev, next) => prev.item.content === next.item.content && prev.incognito === next.incognito && prev.speakerEnabled === next.speakerEnabled && prev.isGenerating === next.isGenerating && prev.isChatGenerating === next.isChatGenerating);
 MessageItem.displayName = "MessageItem";
 
-export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, generatingMessageId, hideHeader, hideGradients }: ChatViewProps) {
+export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, generatingMessageId, hideHeader, hideGradients, onOpenConfidentiality }: ChatViewProps) {
   const listRef = useRef<FlatList>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
   const isAtBottomRef = useRef(true);
@@ -257,11 +259,11 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
         ListHeaderComponent={
           !hideHeader && conversation ? (
             <View
-              style={styles.conversationHeader}
+              style={styles.headerBlock}
               onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
             >
               <Image
-                source={butterflyImage}
+                source={incognito ? butterflyGreyImage : butterflyImage}
                 style={styles.headerButterfly}
                 resizeMode="contain"
               />
@@ -271,6 +273,20 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
               <Text style={styles.headerDate}>
                 {formatDate(conversation.createdAt)}
               </Text>
+              <View style={styles.disclaimerContainer}>
+                <Text style={styles.disclaimerText}>
+                  AI responses may be inaccurate. Verify important facts.{" "}
+                </Text>
+                <Pressable
+                  onPress={() => onOpenConfidentiality?.()}
+                  hitSlop={8}
+                  style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                >
+                  <Text style={[styles.disclaimerLink, incognito && styles.disclaimerLinkIncognito]}>
+                    Confidentiality
+                  </Text>
+                </Pressable>
+              </View>
             </View>
           ) : null
         }
@@ -364,10 +380,10 @@ const styles = StyleSheet.create({
   aiContainer: {
     gap: 2,
   },
-  conversationHeader: {
+  headerBlock: {
     alignItems: "center",
-    paddingVertical: 20,
-    marginBottom: 10,
+    paddingTop: 16,
+    paddingBottom: 20,
   },
   headerButterfly: {
     width: 100,
@@ -379,13 +395,14 @@ const styles = StyleSheet.create({
     color: "#333",
     textAlign: "center",
     letterSpacing: 0.5,
-    marginBottom: 12,
+    marginBottom: 8,
     fontFamily: "Petrona",
   },
   headerDate: {
-    fontSize: 13,
+    fontSize: 14,
     color: "#999",
-    fontFamily: "IBMPlexMono-Medium",
+    fontFamily: "Plusjakarta",
+    marginBottom: 12,
   },
   gradientTop: {
     position: "absolute",
@@ -465,5 +482,28 @@ const styles = StyleSheet.create({
   audioAttachmentText: {
     color: 'white',
     fontSize: 12,
-  }
+  },
+  disclaimerContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 20,
+    marginHorizontal: 16,
+  },
+  disclaimerText: {
+    fontSize: 14,
+    color: '#aaa',
+    textAlign: 'center',
+    fontFamily: 'Jakarta',
+  },
+  disclaimerLink: {
+    color: '#FF1A1A',
+    textDecorationLine: 'underline',
+    fontFamily: 'Jakarta',
+  },
+  disclaimerLinkIncognito: {
+    color: '#565A75',
+  },
 });

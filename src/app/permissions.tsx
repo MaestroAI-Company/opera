@@ -15,7 +15,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Settings } from "../services/settings/SettingsService";
 
 const texture2 = require("../../assets/images/texture2.png");
 const micIcon = require("../../assets/icons/microphone.png");

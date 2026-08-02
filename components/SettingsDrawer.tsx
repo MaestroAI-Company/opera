@@ -17,6 +17,7 @@ const linkIcon = require("../assets/icons/link.png");
 const downloadIcon = require("../assets/icons/download.png");
 const deleteIcon = require("../assets/icons/delete.png");
 const penPlaceholderIcon = require("../assets/icons/pencil.png");
+const profilIcon = require("../assets/icons/profil.png");
 const arrowIcon = require("../assets/icons/arrow.png");
 const generalIcon = require("../assets/icons/general.png");
 const serverIcon = require("../assets/icons/server.png");
@@ -497,7 +498,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         style={({ pressed }) => [styles.profileCard, pressed && styles.navItemPressed]}
         onPress={() => setActiveSubPage("profile")}
       >
-        <Image source={penPlaceholderIcon} style={styles.menuIcon} tintColor="#000" />
+        <Image source={profilIcon} style={styles.menuIcon} tintColor="#000" />
         <View style={styles.navTextContainer}>
           <Text style={styles.navTitle}>{username || "Set your username"}</Text>
           <Text style={styles.navSubtitle}>Username, AI Instructions</Text>
@@ -596,10 +597,10 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   // general subpage
   const generalSubPageContent = (
     <View style={styles.subPageContainer}>
-        {renderSubPageHeader("General")}
+      {renderSubPageHeader("General")}
 
-        <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
-          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Language</Text>
+      <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Language</Text>
         <Selector
           options={languageOptions}
           selectedValue={language}

@@ -1,66 +1,15 @@
 import { DeviceEventEmitter, NativeModules, Platform } from "react-native";
 import { IAIProvider } from "./IAIProvider";
 import { ToolCall, ToolDefinition } from "./tools/ITool";
+import {
+  parseToolCalls,
+  buildToolSystemPrompt,
+  buildToolResultsPrompt,
+  extractContentBeforeToolCalls,
+} from "./tools/toolCallParser";
 
 const MODULE =
   Platform.OS === "android" ? (NativeModules.AICoreModule as any) : null;
-
-//normalize tool name
-function normalizeName(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-//extract json block
-function extractBracesBlock(text: string, start: number): string | null {
-  let depth = 0;
-  for (let i = start; i < text.length; i++) {
-    if (text[i] === "{") depth++;
-    else if (text[i] === "}") {
-      depth--;
-      if (depth === 0) return text.slice(start, i + 1);
-    }
-  }
-  return null;
-}
-
-//parse nano tool calls
-function parseToolCalls(text: string, knownNames: string[]): ToolCall[] | null {
-  const result: ToolCall[] = [];
-
-  //regex to find function opening
-  const regex = /"function"\s*:\s*\{/g;
-  let match;
-
-  while ((match = regex.exec(text)) !== null) {
-    //start of match
-    const objStart = match.index + match[0].length - 1;
-
-    const block = extractBracesBlock(text, objStart);
-    if (!block) continue;
-
-    try {
-      const funcValue = JSON.parse(block);
-      if (
-        typeof funcValue?.name === "string" &&
-        typeof funcValue?.arguments === "object"
-      ) {
-        //match tool name
-        const normalized = normalizeName(funcValue.name);
-        const matched =
-          knownNames.find((n) => normalizeName(n) === normalized) ??
-          funcValue.name;
-        result.push({
-          function: { name: matched, arguments: funcValue.arguments },
-        });
-      }
-    } catch {}
-
-    //advance regex index
-    regex.lastIndex = objStart + block.length;
-  }
-
-  return result.length > 0 ? result : null;
-}
 
 const MODEL_LABELS: Record<string, string> = {
   "aicore-nano-full-stable": "Gemini Nano - Full (Stable)",
@@ -133,7 +82,7 @@ export class AICoreProvider implements IAIProvider {
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
     options?: { think?: boolean | string; tools?: ToolDefinition[] },
-  ): Promise<{ toolCalls?: ToolCall[] }> {
+  ): Promise<{ toolCalls?: ToolCall[], content?: string }> {
     if (!this.supported())
       throw new Error("AICore not available on this device");
     const requestId = `aicore_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -143,8 +92,7 @@ export class AICoreProvider implements IAIProvider {
 
     //add tools to prompt
     const effectiveSystemPrompt = hasTools
-      ? systemPrompt +
-        `\n\n[Available Tools]\n${JSON.stringify(tools, null, 2)}\n\nCRITICAL INSTRUCTION: If you need to call a tool, you MUST output ONLY the raw JSON block. DO NOT write any conversational text (e.g. "Je vais chercher..."). DO NOT wrap the JSON in markdown backticks. Output EXACTLY and ONLY this format:\n{"tool_calls":[{"function":{"name":"<tool_name>","arguments":{<args>}}}]}\nIf you do not need tools, respond normally.`
+      ? buildToolSystemPrompt(systemPrompt, tools)
       : systemPrompt;
 
     //build prompt
@@ -157,11 +105,8 @@ export class AICoreProvider implements IAIProvider {
     //add tool results
     const toolResults = messages
       .filter((m) => m.role === "tool")
-      .map((m) => `[Tool Result]\n${m.content}`);
-    const fullPrompt =
-      toolResults.length > 0
-        ? prompt + "\n\n" + toolResults.join("\n\n")
-        : prompt;
+      .map((m) => `[SYSTEM: Automated Tool Execution Result]\n${m.content}`);
+    const fullPrompt = buildToolResultsPrompt(prompt, toolResults);
 
     const firstImage =
       messages
@@ -174,7 +119,7 @@ export class AICoreProvider implements IAIProvider {
     signal?.addEventListener("abort", onAbort);
 
     try {
-      return await new Promise<{ toolCalls?: ToolCall[] }>(
+      return await new Promise<{ toolCalls?: ToolCall[], content?: string }>(
         (resolve, reject) => {
           let accumulated = "";
           //stream mode state
@@ -201,8 +146,9 @@ export class AICoreProvider implements IAIProvider {
                 if (isMarkdown && trimmed.length < 10) return; //wait for full json block
 
                 if (trimmed.startsWith("{") || trimmed.startsWith("```json")) {
-                  //buffer tool call
-                  streamMode = false;
+                  //stream tool call for ui
+                  streamMode = true;
+                  onChunk(accumulated);
                 } else {
                   //flush normal text
                   streamMode = true;
@@ -242,12 +188,15 @@ export class AICoreProvider implements IAIProvider {
               }
               //parse accumulated json
               const knownNames = tools.map((t) => t.function.name);
-              const toolCalls = parseToolCalls(accumulated, knownNames);
+              const cleanedAccumulated = accumulated.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '');
+              const toolCalls = parseToolCalls(cleanedAccumulated, knownNames);
               if (toolCalls) {
-                resolve({ toolCalls });
+                resolve({ toolCalls, content: extractContentBeforeToolCalls(accumulated) });
               } else {
-                //flush non tool text
-                onChunk(accumulated);
+                //flush non tool text if not already flushed
+                if (streamMode !== true) {
+                  onChunk(accumulated);
+                }
                 resolve({});
               }
             })

@@ -38,13 +38,13 @@ export class OllamaProvider implements IAIProvider {
       const data = await response.json();
       return data.models.map((m: any) => m.name);
     } catch (error) {
-      console.error('Error fetching available models from Ollama:', error);
+      console.warn('Could not fetch available models from Ollama (is it running?):', error);
       return [];
     }
   }
 
   async preloadModel(modelName: string): Promise<void> {
-    if (!this.isConfigured()) return;
+    if (!this.isConfigured() || !modelName) return;
     try {
       //preload model
       await universalFetch(`${this.baseUrl}/api/generate`, {
@@ -56,7 +56,7 @@ export class OllamaProvider implements IAIProvider {
         }),
       });
     } catch (error) {
-      console.error('Error preloading Ollama model:', error);
+      console.warn(`Could not preload Ollama model "${modelName}":`, error);
     }
   }
 
@@ -72,7 +72,7 @@ export class OllamaProvider implements IAIProvider {
       const data = await response.json();
       return data.capabilities || [];
     } catch (error) {
-      console.error('Error fetching capabilities from Ollama:', error);
+      console.warn(`Could not fetch capabilities for "${modelName}" from Ollama:`, error);
       return [];
     }
   }
@@ -184,7 +184,7 @@ export class OllamaProvider implements IAIProvider {
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
     options?: { think?: boolean | string; tools?: ToolDefinition[] }
-  ): Promise<{ toolCalls?: ToolCall[] }> {
+  ): Promise<{ toolCalls?: ToolCall[], content?: string }> {
     if (!this.isConfigured()) throw new Error('AI server not configured');
     try {
       const payload: any = {
@@ -239,6 +239,8 @@ export class OllamaProvider implements IAIProvider {
       let isThinkingMode = false;
       const collectedToolCalls: ToolCall[] = [];
       
+      let accumulatedContent = '';
+      
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -267,6 +269,7 @@ export class OllamaProvider implements IAIProvider {
                   onChunk("\n</think>\n");
                   isThinkingMode = false;
                 }
+                accumulatedContent += parsed.message.content;
                 onChunk(parsed.message.content);
               }
 
@@ -287,7 +290,10 @@ export class OllamaProvider implements IAIProvider {
         onChunk("\n</think>\n");
       }
 
-      return { toolCalls: collectedToolCalls.length > 0 ? collectedToolCalls : undefined };
+      return { 
+        toolCalls: collectedToolCalls.length > 0 ? collectedToolCalls : undefined,
+        content: accumulatedContent.trim()
+      };
     } catch (error: any) {
       throw error;
     }

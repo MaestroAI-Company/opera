@@ -1,8 +1,38 @@
-import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { Animated, StyleSheet, Text, View, Image } from "react-native";
 import MathText from "react-native-math";
 import { WidgetManager } from "../src/services/widgets/WidgetManager";
 import WidgetWrapper from "../src/components/widgets/WidgetWrapper";
+
+const toolIcon = require("../assets/icons/tool.png");
+
+const ToolCallBubble = ({ toolName, isGenerating }: { toolName: string, isGenerating?: boolean }) => {
+  const opacity = useRef(new Animated.Value(isGenerating ? 0.4 : 1)).current;
+
+  useEffect(() => {
+    if (isGenerating) {
+      const anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(opacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.4, duration: 600, useNativeDriver: true }),
+        ])
+      );
+      anim.start();
+      return () => anim.stop();
+    } else {
+      opacity.setValue(1);
+    }
+  }, [isGenerating, opacity]);
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.04)', padding: 10, borderRadius: 12, marginVertical: 6, alignSelf: 'flex-start' }}>
+      <Image source={toolIcon} style={{ width: 18, height: 18, marginRight: 8, opacity: 0.7, tintColor: '#666' }} />
+      <Animated.Text style={{ fontFamily: 'IBMPlexMono-Medium', fontSize: 13, color: '#555', opacity }}>
+        {isGenerating ? `Using tool: ${toolName}...` : `Used tool: ${toolName}`}
+      </Animated.Text>
+    </View>
+  );
+};
 
 const s = StyleSheet.create({
   base: { fontSize: 18, lineHeight: 26, color: "#000", fontFamily: "Jakarta" },
@@ -104,9 +134,100 @@ function renderTokens(tokens: Token[], keyBase: number): React.ReactNode[] {
   });
 }
 
-export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode[] {
+type ToolCallBlock = { start: number; end: number; json: string };
+
+//scan raw toolcall json blocks in a non-code segment
+function pushRawToolCallBlocks(md: string, from: number, to: number, blocks: ToolCallBlock[]): void {
+  let searchIndex = from;
+  while (true) {
+    const start = md.indexOf('{', searchIndex);
+    if (start === -1 || start >= to) break;
+    
+    let braces = 0;
+    let endIndex = -1;
+    let inString = false;
+    let escape = false;
+    for (let j = start; j < to; j++) {
+      const char = md[j];
+      if (escape) { escape = false; continue; }
+      if (char === '\\') { escape = true; continue; }
+      if (char === '"') { inString = !inString; continue; }
+      if (!inString) {
+        if (char === '{') braces++;
+        else if (char === '}') braces--;
+      }
+      if (braces === 0 && j > start) { endIndex = j; break; }
+    }
+    
+    const blockEnd = endIndex !== -1 ? endIndex + 1 : to;
+    const blockText = md.substring(start, blockEnd);
+    
+    const cleanBlockText = blockText.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '');
+    
+    if (/^\{\s*"?\s*(?:tool[\s\n]*_[\s\n]*calls|name|function)\s*"?\s*:/i.test(cleanBlockText)) {
+      blocks.push({ start, end: blockEnd, json: blockText });
+      searchIndex = blockEnd;
+    } else {
+      searchIndex = start + 1;
+    }
+  }
+}
+
+//scan toolcall json blocks (fenced or raw), skipping raw blocks inside code fences
+function findToolCallBlocks(md: string): ToolCallBlock[] {
+  const blocks: ToolCallBlock[] = [];
+  const fenceRe = /```[^\n]*/g;
+  let segmentStart = 0;
+  let m;
+  while ((m = fenceRe.exec(md)) !== null) {
+    const fenceStart = m.index;
+    pushRawToolCallBlocks(md, segmentStart, fenceStart, blocks);
+
+    const headerLang = m[0].replace(/^```/, '').trim().split(' ')[0].toLowerCase();
+    const contentStart = fenceStart + m[0].length;
+    const closeRe = /```/g;
+    closeRe.lastIndex = contentStart;
+    const close = closeRe.exec(md);
+    const contentEnd = close ? close.index : md.length;
+    const closeEnd = close ? close.index + 3 : md.length;
+
+    if (headerLang === '' || headerLang === 'json' || headerLang === 'toolcall') {
+      const inner = md.substring(contentStart, contentEnd).trim();
+      const cleanInner = inner.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim();
+      if (/^\{\s*"?\s*(?:tool[\s\n]*_[\s\n]*calls|name|function)\s*"?\s*:[\s\S]*\}$/i.test(cleanInner)) {
+        blocks.push({ start: fenceStart, end: closeEnd, json: inner });
+      }
+    }
+
+    segmentStart = closeEnd;
+    fenceRe.lastIndex = closeEnd;
+  }
+  pushRawToolCallBlocks(md, segmentStart, md.length, blocks);
+  return blocks;
+}
+
+export function hasConversationalText(md: string): boolean {
+  if (md === "…" || md.trim() === "") return false;
+  let clean = md.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
+  const blocks = findToolCallBlocks(clean);
+  for (let k = blocks.length - 1; k >= 0; k--) {
+    clean = clean.substring(0, blocks[k].start) + clean.substring(blocks[k].end);
+  }
+  return clean.trim().length > 0;
+}
+
+export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: boolean): React.ReactNode[] {
   const selColor = incognito ? "rgba(86, 90, 117, 0.4)" : "rgba(255, 26, 26, 0.4)";
-  const lines = md.split("\n");
+  
+  //wrap toolcall blocks for bubble rendering
+  let processedMd = md;
+  const blocks = findToolCallBlocks(processedMd);
+  for (let k = blocks.length - 1; k >= 0; k--) {
+    const b = blocks[k];
+    processedMd = processedMd.substring(0, b.start) + '\n```toolcall\n' + b.json + '\n```\n' + processedMd.substring(b.end);
+  }
+
+  const lines = processedMd.split("\n");
   const elements: React.ReactNode[] = [];
   let i = 0;
 
@@ -178,6 +299,40 @@ export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode
           );
           continue;
         }
+      }
+
+      if (language === "toolcall") {
+        const rawJson = codeLines.join("\n");
+        const cleanJson = rawJson.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
+        
+        let toolNames: string[] = [];
+        try {
+          const data = JSON.parse(cleanJson);
+          if (data?.tool_calls && Array.isArray(data.tool_calls)) {
+            data.tool_calls.forEach((tc: any) => {
+              if (tc?.function?.name) toolNames.push(tc.function.name);
+            });
+          } else if (data?.name) {
+            toolNames.push(data.name);
+          }
+        } catch (e) {
+          // fallback regex for incomplete JSON during streaming
+          const nameMatches = cleanJson.matchAll(/"name"\s*:\s*"([^"]+)"/g);
+          for (const match of nameMatches) {
+            toolNames.push(match[1]);
+          }
+        }
+        
+        if (toolNames.length === 0) {
+          toolNames = ["Tool"];
+        }
+
+        toolNames.forEach((tName, idx) => {
+          elements.push(
+            <ToolCallBubble key={`toolcall-${i}-${idx}`} toolName={tName} isGenerating={isGenerating} />
+          );
+        });
+        continue;
       }
 
       elements.push(

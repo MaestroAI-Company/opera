@@ -13,7 +13,7 @@ import {
   View,
 } from "react-native";
 import { Conversation, Message } from "../src/services/db/DatabaseService";
-import { renderMarkdown } from "./MarkdownText";
+import { renderMarkdown, hasConversationalText } from "./MarkdownText";
 import { AIModule } from "../src/services/ai/AIModule";
 
 const butterflyImage = require("../assets/images/butterfly2.png");
@@ -75,7 +75,6 @@ const FlashingText = ({ text }: { text: string }) => {
 const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, showSnackbar, isGenerating, isChatGenerating }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean }) => {
   const isUser = item.role === "user";
   const thinkMatches = [...item.content.matchAll(/<think>([\s\S]*?)(?:<\/think>|$)/g)];
-  const isThinkingFinished = thinkMatches.length > 0 ? thinkMatches[thinkMatches.length - 1][0].endsWith("</think>") : false;
   const hasThinkingText = thinkMatches.length > 0;
   const thinkingText = thinkMatches.map(m => m[1].trim()).filter(t => t.length > 0).join('\n');
 
@@ -113,25 +112,23 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
     return unsub;
   }, [isGenerating]);
 
-  let currentThought = extractSteps(thinkingText);
-  if (activeTool.name) {
+  const hasConvText = hasConversationalText(item.content);
+  
+  const displayContent = item.content === "…" ? "…" : item.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
+  const finalContent = displayContent.length > 0 ? displayContent : "…";
+  
+  const showToolBubble = activeTool.name !== null && !hasThinkingText;
+  const showMarkdown = hasConvText || (!isGenerating && finalContent !== "…" && finalContent !== "") || (showToolBubble && finalContent !== "…");
+  const isCurrentlyThinking = !isUser && isGenerating && (!hasConvText || hasThinkingText) && !(showToolBubble && finalContent !== "…");
+
+  let currentThought = hasThinkingText ? extractSteps(thinkingText) : "";
+  if (activeTool.name && !showMarkdown) {
     if (activeTool.name === 'web_search') {
       currentThought = `Searching the web for "${activeTool.args?.query || ''}"...`;
     } else {
       currentThought = `Running tool: ${activeTool.name}...`;
     }
   }
-
-  const displayContentTemp = item.content === "…" ? "…" : item.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
-  
-  // if activeTool is present, it's definitely thinking
-  const isCurrentlyThinking = !isUser && (
-    item.content === "…" || 
-    (isGenerating && (hasThinkingText || activeTool.name) && (!isThinkingFinished || displayContentTemp === "" || activeTool.name))
-  );
-
-  const displayContent = item.content === "…" ? "…" : item.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
-  const finalContent = displayContent.length > 0 ? displayContent : "…";
 
   const copyToClipboard = async (text: string, isMarkdown: boolean) => {
     const contentToCopy = isMarkdown ? text : stripMarkdown(text);
@@ -187,19 +184,18 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
         </View>
       ) : (
         <View style={styles.aiContainer}>
-          {isCurrentlyThinking ? (
+          {isCurrentlyThinking && (
             <View style={styles.thinkingContainer}>
               <Image
                 source={thinkingGif}
                 style={styles.thinkingIcon}
                 resizeMode="contain"
               />
-              {hasThinkingText && (
-                <FlashingText text={currentThought} />
-              )}
+              {!!currentThought && <FlashingText text={currentThought} />}
             </View>
-          ) : (
-            renderMarkdown(finalContent, incognito)
+          )}
+          {showMarkdown && (
+            renderMarkdown(finalContent, incognito, isGenerating)
           )}
           {!isUser && !isCurrentlyThinking && !isGenerating && (
             <View style={styles.aiToolbar}>

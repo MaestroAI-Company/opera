@@ -1,6 +1,7 @@
 import { IAIProvider } from './IAIProvider';
 import { OllamaProvider } from './OllamaProvider';
 import { ToolManager } from './tools/ToolManager';
+import { sendMessageWithToolPrompt } from './tools/fallbackToolCall';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { AICoreProvider } from './AICoreProvider';
 
@@ -155,7 +156,7 @@ class CentralAIModule {
       supportsTools = caps.includes('tools');
     } catch {}
 
-    const tools = supportsTools ? ToolManager.getDefinitions() : [];
+    const tools = ToolManager.getDefinitions();
     const processedMessages = await this.processImages(messages);
     const enhancedPrompt = systemPrompt + `\n\n[System Context]\nCurrent Date and Time: ${new Date().toLocaleString()}`;
 
@@ -167,10 +168,13 @@ class CentralAIModule {
     //tool call loop (max 3 rounds)
     let currentMessages = [...processedMessages];
     for (let round = 0; round < 3; round++) {
-      const result = await provider.sendMessage(
-        modelName, enhancedPrompt, currentMessages, onChunk, signal,
-        { ...options, tools }
-      );
+      //use native tool calling or fallback to prompt injection (aicore method)
+      const result = supportsTools
+        ? await provider.sendMessage(
+            modelName, enhancedPrompt, currentMessages, onChunk, signal,
+            { ...options, tools }
+          )
+        : await sendMessageWithToolPrompt(provider, modelName, enhancedPrompt, currentMessages, onChunk, signal, options, tools);
 
       if (!result?.toolCalls || result.toolCalls.length === 0) return;
 
@@ -190,7 +194,7 @@ class CentralAIModule {
       //add assistant message with tool_calls to history
       currentMessages.push({
         role: 'assistant',
-        content: '',
+        content: result.content || '',
         tool_calls: result.toolCalls,
       });
 

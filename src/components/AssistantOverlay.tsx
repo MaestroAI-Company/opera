@@ -16,7 +16,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { BackHandler } from 'react-native';
 import ChatBar, { ChatBarHandle } from '../../components/ChatBar';
 import NotificationModal from '../../components/NotificationModal';
-import { renderMarkdown } from '../../components/MarkdownText';
+import { renderMarkdown, hasConversationalText } from '../../components/MarkdownText';
 import { Conversation, DB, Message } from '../services/db/DatabaseService';
 import { Settings } from '../services/settings/SettingsService';
 import { AIModule } from '../services/ai/AIModule';
@@ -540,31 +540,36 @@ function AssistantOverlay() {
   let hasThinkingText = false;
   let currentThought = 'Thinking...';
   let finalContent = '…';
+  let isGenerating = false;
+  let showMarkdown = false;
 
   if (lastMsg) {
-    const isGenerating = generatingConvId === activeConversation?.id
+    isGenerating = generatingConvId === activeConversation?.id
       && streamingMsgIdRef.current === lastMsg.id;
-    const thinkMatches = [...lastMsg.content.matchAll(/<think>([\s\S]*?)(?:<\/think>|$)/g)];
-    const thinkDone = thinkMatches.length > 0 ? thinkMatches[thinkMatches.length - 1][0].endsWith("</think>") : false;
+    const streamText = isGenerating ? streamingContentRef.current : lastMsg.content;
+    const thinkMatches = [...streamText.matchAll(/<think>([\s\S]*?)(?:<\/think>|$)/g)];
     hasThinkingText = thinkMatches.length > 0;
     const thinkingText = thinkMatches.map(m => m[1].trim()).filter(t => t.length > 0).join('\n');
+      
+    const displayContent = streamText.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
+    finalContent = displayContent.length > 0 ? displayContent : "…";
 
-    const stripped = lastMsg.content === '…'
-      ? '…'
-      : lastMsg.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
+    const hasConvText = hasConversationalText(streamText);
     
-    isThinking = lastMsg.content === '…' || (isGenerating && (hasThinkingText || !!activeTool.name) && (!thinkDone || stripped === '' || !!activeTool.name));
+    const showToolBubble = activeTool.name !== null && !hasThinkingText;
+    showMarkdown = hasConvText || (!isGenerating && finalContent !== "…" && finalContent !== "") || (showToolBubble && finalContent !== "…");
+    isThinking = isGenerating && (!hasConvText || hasThinkingText) && !(showToolBubble && finalContent !== "…");
 
     if (hasThinkingText) currentThought = extractThinkStep(thinkingText);
-    if (activeTool.name) {
+    else currentThought = '';
+
+    if (activeTool.name && !showMarkdown) {
       if (activeTool.name === 'web_search') {
         currentThought = `Searching the web for "${activeTool.args?.query || ''}"...`;
       } else {
         currentThought = `Running tool: ${activeTool.name}...`;
       }
     }
-
-    finalContent = stripped.length > 0 ? stripped : '…';
   }
 
   return (
@@ -608,13 +613,14 @@ function AssistantOverlay() {
               <Animated.View style={[styles.pullIndicator, { opacity: handleOpacity }]} />
 
               <ScrollView style={styles.bubbleScroll} showsVerticalScrollIndicator={false}>
-                {isThinking ? (
+                {isThinking && (
                   <View style={styles.thinkingContainer}>
                     <Image source={thinkingGif} style={styles.thinkingIcon} resizeMode="contain" />
-                    {hasThinkingText && <FlashingText text={currentThought} />}
+                    {!!currentThought && <FlashingText text={currentThought} />}
                   </View>
-                ) : (
-                  renderMarkdown(finalContent, false)
+                )}
+                {showMarkdown && (
+                  renderMarkdown(finalContent, false, isGenerating)
                 )}
               </ScrollView>
             </Animated.View>

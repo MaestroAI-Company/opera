@@ -1,4 +1,5 @@
 import React from 'react';
+import { PluginRegistry } from '../plugins/PluginRegistry';
 
 export interface IWidget<T = any> {
   id: string;
@@ -8,6 +9,7 @@ export interface IWidget<T = any> {
   icon?: any; // asset path
   description: string; // system prompt description
   schema: string; // json schema definition
+  enabledByDefault?: boolean; // default enabled state in settings
   component: React.ComponentType<{ data: T }>;
 }
 
@@ -26,12 +28,21 @@ class CentralWidgetManager {
     return this.widgets.get(id);
   }
 
+  //get widgets for ui
   getAllWidgets(): IWidget[] {
     return Array.from(this.widgets.values());
   }
 
+  //get enabled widgets
+  getEnabledWidgets(): IWidget[] {
+    return Array.from(this.widgets.values()).filter(w =>
+      PluginRegistry.isEnabled('widget', w.id, w.enabledByDefault ?? false)
+    );
+  }
+
   getSystemPromptSegment(): string {
-    if (this.widgets.size === 0) return '';
+    const enabledWidgets = this.getEnabledWidgets();
+    if (enabledWidgets.length === 0) return '';
 
     let prompt = `\n\n## WIDGET SYSTEM\n`;
     prompt += `You can display interactive UI widgets to the user by returning a special fenced code block in your response. The widget will be parsed and rendered natively.\n`;
@@ -43,7 +54,7 @@ class CentralWidgetManager {
     prompt += `CRITICAL: The JSON data must be strictly valid. Do NOT use actual newlines inside strings (use \\n instead).\n`;
     prompt += `Available Widgets (You MUST use the exact ID provided below as WIDGET_ID):\n`;
 
-    for (const widget of this.widgets.values()) {
+    for (const widget of enabledWidgets) {
       prompt += `- Widget ID: **${widget.id}**\n`;
       prompt += `  - Name: ${widget.name}\n`;
       prompt += `  - Description: ${widget.description}\n`;
@@ -58,3 +69,4 @@ class CentralWidgetManager {
 }
 
 export const WidgetManager = new CentralWidgetManager();
+

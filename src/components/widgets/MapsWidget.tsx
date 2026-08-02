@@ -67,6 +67,7 @@ export const MapsWidget: IWidget<MapsWidgetData> = {
   name: 'Map',
   hasBorder: true,
   aiDefinesTitle: true,
+  enabledByDefault: true,
   description: 'Displays an interactive map. If multiple points are provided, it automatically draws a route connecting them.',
   schema: `{
     "points": [

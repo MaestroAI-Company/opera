@@ -13,6 +13,8 @@ export type AppSettings = {
   speaker: boolean;
   alwaysWhisper: boolean;
   autoStartMic: boolean;
+  hasSeenOnboarding: boolean;
+  username: string;
 };
 
 const DEFAULTS: AppSettings = {
@@ -33,6 +35,8 @@ const DEFAULTS: AppSettings = {
   speaker: false,
   alwaysWhisper: false,
   autoStartMic: true,
+  hasSeenOnboarding: false,
+  username: '',
 };
 
 class SettingsService {
@@ -82,6 +86,8 @@ class SettingsService {
       speaker: map['speaker'] === 'true' ? true : (map['speaker'] === 'false' ? false : DEFAULTS.speaker),
       alwaysWhisper: map['alwaysWhisper'] === 'true' ? true : (map['alwaysWhisper'] === 'false' ? false : DEFAULTS.alwaysWhisper),
       autoStartMic: map['autoStartMic'] === 'true' ? true : (map['autoStartMic'] === 'false' ? false : DEFAULTS.autoStartMic),
+      hasSeenOnboarding: map['hasSeenOnboarding'] === 'true' ? true : DEFAULTS.hasSeenOnboarding,
+      username: map['username'] ?? DEFAULTS.username,
     };
     this.cache = settings;
     return settings;

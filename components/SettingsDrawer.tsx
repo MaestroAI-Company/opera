@@ -33,7 +33,7 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "models" | "confidentiality" | "tools";
+type SubPage = "main" | "general" | "models" | "confidentiality" | "tools" | "profile";
 
 export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
   const { width } = useResponsive();
@@ -77,6 +77,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     }
   });
   const [instruction, setInstructionState] = useState("");
+  const [username, setUsernameState] = useState("");
   const [alwaysWhisper, setAlwaysWhisperState] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(true);
   const [usageAnalytics, setUsageAnalyticsState] = useState(true);
@@ -235,6 +236,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setWhisperModelState(s.whisperModel);
         setWhisperLanguageState(s.whisperLanguage);
         setInstructionState(s.instruction);
+        setUsernameState(s.username || "");
         setAlwaysWhisperState(s.alwaysWhisper);
         //apply to services
         AIModule.configure(s.ollamaUrl);
@@ -297,6 +299,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const setInstruction = (v: string) => {
     setInstructionState(v);
     Settings.set("instruction", v);
+  };
+
+  const setUsername = (v: string) => {
+    setUsernameState(v);
+    Settings.set("username", v);
   };
 
   const setAlwaysWhisper = (v: boolean) => {
@@ -485,6 +492,18 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.menuContainer}>
       <Text style={styles.title}>Settings</Text>
 
+      {/* profile section */}
+      <Pressable
+        style={({ pressed }) => [styles.profileCard, pressed && styles.navItemPressed]}
+        onPress={() => setActiveSubPage("profile")}
+      >
+        <Image source={penPlaceholderIcon} style={styles.menuIcon} tintColor="#000" />
+        <View style={styles.navTextContainer}>
+          <Text style={styles.navTitle}>{username || "Set your username"}</Text>
+          <Text style={styles.navSubtitle}>Username, AI Instructions</Text>
+        </View>
+      </Pressable>
+
       <View style={styles.groupShadowLayer}>
         <View style={styles.groupBox}>
           <Pressable
@@ -505,7 +524,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             <Image source={serverIcon} style={styles.menuIcon} tintColor="#000" />
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>Models & Server</Text>
-              <Text style={styles.navSubtitle}>Ollama server, Whisper Model, TOD, Instructions</Text>
+              <Text style={styles.navSubtitle}>Ollama server, Whisper Model, TOD</Text>
             </View>
           </Pressable>
 
@@ -547,13 +566,40 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     </View>
   );
 
-  // general subpage content
-  const generalSubPageContent = (
+  // profile subpage
+  const profileSubPageContent = (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("General")}
+      {renderSubPageHeader("Profile")}
 
       <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Language</Text>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Username</Text>
+        <TextInputField
+          icon={penPlaceholderIcon}
+          placeholder="Enter your username"
+          value={username}
+          onChangeText={setUsername}
+        />
+      </View>
+
+      <View style={[styles.settingRowVertical, { marginTop: 16 }]}>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Write your instructions to AI</Text>
+        <TextInputField
+          icon={penPlaceholderIcon}
+          placeholder="write"
+          value={instruction}
+          onChangeText={setInstruction}
+        />
+      </View>
+    </View>
+  );
+
+  // general subpage
+  const generalSubPageContent = (
+    <View style={styles.subPageContainer}>
+        {renderSubPageHeader("General")}
+
+        <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
+          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Language</Text>
         <Selector
           options={languageOptions}
           selectedValue={language}
@@ -658,16 +704,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         />
       </View>
       <Text style={styles.helpText}>Process audio transcriptions locally on your device</Text>
-
-      <View style={[styles.settingRowVertical, { marginTop: 24 }]}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Write your instructions to AI</Text>
-        <TextInputField
-          icon={penPlaceholderIcon}
-          placeholder="write"
-          value={instruction}
-          onChangeText={setInstruction}
-        />
-      </View>
     </View>
   );
 
@@ -725,6 +761,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const getSubPageContent = () => {
     switch (activeSubPage) {
+      case "profile":
+        return profileSubPageContent;
       case "general":
         return generalSubPageContent;
       case "models":
@@ -877,6 +915,18 @@ const styles = StyleSheet.create({
   menuContainer: {
     flex: 1,
   },
+  profileCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#00000017",
+    padding: 14,
+    marginBottom: 20,
+    gap: 12,
+  },
+
   subPageContainer: {
     flex: 1,
   },

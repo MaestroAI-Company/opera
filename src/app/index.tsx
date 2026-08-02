@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AppState,
@@ -38,6 +38,7 @@ const settingsIcon = require("../../assets/icons/settings.png");
 
 export default function Index() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { isLargeScreen, isDesktop } = useResponsive();
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedReflection, setSelectedReflection] = useState("none");
@@ -189,6 +190,12 @@ export default function Index() {
       try {
         await Settings.init();
         const s = await Settings.load();
+        
+        if (!s.hasSeenOnboarding) {
+          router.replace("/starting");
+          return;
+        }
+
         setUserInstruction(s.instruction);
         if (s.ollamaModel) {
           setSelectedModel(s.ollamaModel);

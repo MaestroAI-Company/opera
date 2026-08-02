@@ -31,6 +31,7 @@ import { Conversation, DB, Message } from "../services/db/DatabaseService";
 import { Settings } from "../services/settings/SettingsService";
 import { Whisper } from "../services/whisper/WhisperService";
 import { WidgetManager } from "../services/widgets/WidgetManager";
+import { PluginRegistry } from "../services/plugins/PluginRegistry";
 
 
 const butterflyImage = require("../../assets/images/butterfly5.png");
@@ -191,6 +192,8 @@ export default function Index() {
       try {
         await Settings.init();
         const s = await Settings.load();
+        await PluginRegistry.init();
+        await PluginRegistry.loadAll();
         setUserInstruction(s.instruction);
         if (s.ollamaModel) {
           setSelectedModel(s.ollamaModel);

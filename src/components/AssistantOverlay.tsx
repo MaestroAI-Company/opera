@@ -28,6 +28,7 @@ import ModelDropdown from '../../components/ModelDropdown';
 import SearchWebView from '../../components/SearchWebView';
 import { useResponsive } from '../hooks/useResponsive';
 import { WidgetManager } from '../services/widgets/WidgetManager';
+import { PluginRegistry } from '../services/plugins/PluginRegistry';
 
 export default function AssistantOverlayWrapper() {
   return (
@@ -246,6 +247,8 @@ function AssistantOverlay() {
       try {
         await Settings.init();
         const s = await Settings.load();
+        await PluginRegistry.init();
+        await PluginRegistry.loadAll();
         setUserInstruction(s.instruction);
         if (s.ollamaModel) {
           setSelectedModel(s.ollamaModel);
@@ -550,7 +553,7 @@ function AssistantOverlay() {
       ? '…'
       : lastMsg.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
     
-    isThinking = lastMsg.content === '…' || (isGenerating && (hasThinkingText || activeTool.name) && (!thinkDone || stripped === '' || activeTool.name));
+    isThinking = lastMsg.content === '…' || (isGenerating && (hasThinkingText || !!activeTool.name) && (!thinkDone || stripped === '' || !!activeTool.name));
 
     if (hasThinkingText) currentThought = extractThinkStep(thinkingText);
     if (activeTool.name) {

@@ -23,5 +23,8 @@ export interface ToolDefinition {
 //interface for all tools
 export interface ITool {
   definition: ToolDefinition;
+  displayName?: string;
+  displayDescription?: string;
+  enabledByDefault?: boolean;
   execute(args: Record<string, any>, summarize?: (text: string) => Promise<string>): Promise<string>;
 }

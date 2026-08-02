@@ -1,6 +1,7 @@
 import { ITool, ToolCall, ToolDefinition } from './ITool';
 import { SearchTool } from './SearchTool';
 import { FetchPagesTool } from './FetchPagesTool';
+import { PluginRegistry } from '../../plugins/PluginRegistry';
 
 class ToolManagerService {
   private tools: Map<string, ITool> = new Map();
@@ -16,9 +17,20 @@ class ToolManagerService {
     this.tools.set(tool.definition.function.name, tool);
   }
 
-  //get all tool definitions for ollama payload
+  //get tools for ui
+  getAllTools(): ITool[] {
+    return Array.from(this.tools.values());
+  }
+
+  //get enabled tools
   getDefinitions(): ToolDefinition[] {
-    return Array.from(this.tools.values()).map(t => t.definition);
+    return Array.from(this.tools.values())
+      .filter(t => {
+        const name = t.definition.function.name;
+        const defaultEnabled = t.enabledByDefault ?? false;
+        return PluginRegistry.isEnabled('tool', name, defaultEnabled);
+      })
+      .map(t => t.definition);
   }
 
   //execute a tool by name
@@ -32,13 +44,15 @@ class ToolManagerService {
       console.warn(`[ToolManager] Attempted to execute unknown tool: ${name}`);
       return `Tool "${name}" not found.`;
     }
-    
-    console.log(`[ToolManager] Executing tool: ${name}`);
-    console.log(`[ToolManager] Arguments:`, JSON.stringify(args, null, 2));
-    
+
+    //check tool status
+    const defaultEnabled = tool.enabledByDefault ?? false;
+    if (!PluginRegistry.isEnabled('tool', name, defaultEnabled)) {
+      return `Tool "${name}" is disabled.`;
+    }
+
     try {
       const result = await tool.execute(args, summarize);
-      console.log(`[ToolManager] Tool ${name} finished successfully.`);
       return result;
     } catch (e: any) {
       console.error(`[ToolManager] Tool ${name} failed:`, e);
@@ -48,3 +62,4 @@ class ToolManagerService {
 }
 
 export const ToolManager = new ToolManagerService();
+

@@ -9,7 +9,8 @@
     "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/icons/opera.png",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "ai.maestro.opera"
     },
     "android": {
       "adaptiveIcon": {
@@ -29,7 +30,11 @@
         "android.permission.READ_MEDIA_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
       ]
     },
     "web": {

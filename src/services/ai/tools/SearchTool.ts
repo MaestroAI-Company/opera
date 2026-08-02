@@ -12,7 +12,7 @@ export class SearchTool implements ITool {
     type: 'function',
     function: {
       name: 'web_search',
-      description: 'Search the web for current information. Use this to find sources. This returns a list of web pages with a short snippet of their content.You MUST use the fetch_pages tool afterwards to read the full content of the most relevant sources.',
+      description: 'Search the web for current information. Use this to find sources. This returns a list of web pages with a short snippet of their content.IMPORTANT: You MUST use the fetch_pages tool afterwards to read the full content of the most relevant sources.',
       parameters: {
         type: 'object',
         properties: {
@@ -84,7 +84,7 @@ export class SearchTool implements ITool {
         return `### Result ${i + 1}: ${r.title}\n**URL:** ${r.url}\n**Snippet:** ${r.snippet || 'No snippet available.'}`;
       });
 
-      return `Search results for "${query}":\n\n${formatted.join('\n\n---\n\n')}\n\nSelect up to 2 URLs from the results above and use the fetch_pages tool to read their full contents. CRITICAL: Always prioritize well-known, highly trusted, and official sources (e.g. major news outlets, official documentation, renowned encyclopedias) over obscure blogs or unreliable sites.`;
+      return `Search results for "${query}":\n\n${formatted.join('\n\n---\n\n')}\n\nCRITICAL INSTRUCTION: You MUST NOT answer the user's question yet based only on these short snippets. You MUST call the fetch_pages tool on up to 2 of the most relevant URLs above to read their full contents first. Always prioritize well-known, highly trusted, and official sources over obscure blogs or unreliable sites.`;
     } catch (e: any) {
       return `Search failed: ${e.message}`;
     }

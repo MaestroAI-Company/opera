@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { universalFetch } from '../utils/universalFetch';
 
 const MAX_CONTENT_LENGTH = 4000;
+const SUMMARIZE_THRESHOLD = 8000;
 
 export class FetchPagesTool implements ITool {
   displayName = 'Fetch Pages';
@@ -87,7 +88,7 @@ export class FetchPagesTool implements ITool {
         results.map(async (r) => {
           let content = r.content || 'No content extracted.';
 
-          if (content.length > MAX_CONTENT_LENGTH && summarize) {
+          if (content.length > SUMMARIZE_THRESHOLD && summarize) {
             try {
               content = await summarize(content);
             } catch {

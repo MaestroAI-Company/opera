@@ -5,8 +5,8 @@ const config = getDefaultConfig(__dirname);
 //disable package exports resolution (whisper.rn missing "." entry)
 config.resolver.unstable_enablePackageExports = false;
 
-//add .bin extension for whisper model bundling
-config.resolver.assetExts.push("bin");
+//add .bin extension for whisper model bundling and .wasm for expo-sqlite web
+config.resolver.assetExts.push("bin", "wasm");
 
 //polyfill for node core module "buffer" (used by safe-buffer in whisper.rn)
 config.resolver.extraNodeModules = {

@@ -21,7 +21,7 @@ export interface IAIProvider {
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
     options?: { think?: boolean | string; tools?: ToolDefinition[] }
-  ): Promise<{ toolCalls?: ToolCall[] }>;
+  ): Promise<{ toolCalls?: ToolCall[], content?: string }>;
 
   //pull model (optional)
   downloadService?(modelName: string, onProgress?: (progress: number, etaSeconds: number, speedStr: string, sizeStr: string) => void): Promise<void>;

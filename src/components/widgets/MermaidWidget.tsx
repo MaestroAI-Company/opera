@@ -7,8 +7,22 @@ export interface MermaidWidgetData {
   mermaid: string;
 }
 
-const generateMermaidHtml = (code: string) => {
-  const safeCode = encodeURIComponent(code);
+// sanitize in TS scope so regex escaping works correctly
+function sanitizeMermaid(code: string): string {
+  code = code.replace(/--<\|>/g, '<-->');
+  code = code.replace(/^\s*style\s+\w+\s+fill:[^;]+;?\s*$/gm, '');
+  code = code.replace(/^\s*note_\w+\[.*?\]\s*--.*?note_\w+\[.*?\];?\s*$/gm, '');
+  code = code.replace(/^\s*note_\w+\[.*?\];?\s*$/gm, '');
+  code = code.replace(/^(\s*(?:subgraph|end).*?);$/gm, '$1');
+  code = code.replace(/\n{3,}/g, '\n\n');
+  return code.trim();
+}
+
+const generateMermaidHtml = (rawCode: string) => {
+  const processed = sanitizeMermaid(rawCode.replace(/\\n/g, '<br/>'));
+  const safeCode = encodeURIComponent(processed);
+  const safeFallback = encodeURIComponent(rawCode);
+
   return `
 <!DOCTYPE html>
 <html>
@@ -18,25 +32,25 @@ const generateMermaidHtml = (code: string) => {
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
         mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
-        
+
         async function renderDiagram() {
             try {
-                let code = decodeURIComponent("${safeCode}");
-                // replace literal newlines
-                code = code.replace(/\\\\n/g, '<br/>');
+                const code = decodeURIComponent("${safeCode}");
                 const { svg } = await mermaid.render('mermaid-svg', code);
                 document.getElementById('container').innerHTML = svg;
             } catch (err) {
-                let code = decodeURIComponent("${safeCode}");
-                document.getElementById('container').innerHTML = '<div style="color:red; font-family:sans-serif; padding:10px;"><b>Syntax Error in Mermaid diagram</b><br/><pre style="font-size:10px; background:#eee; padding:5px; border-radius:5px; overflow-x:auto;">' + code.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre></div>';
+                const raw = decodeURIComponent("${safeFallback}");
+                document.getElementById('container').innerHTML =
+                    '<pre style="font-size:11px; font-family:monospace; background:#f4f4f4; padding:12px; border-radius:8px; overflow-x:auto; color:#333; white-space:pre-wrap;">' +
+                    raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+                    '</pre>';
             }
         }
         renderDiagram();
-    </script>
+    <\/script>
     <style>
         body { margin: 0; padding: 16px; background-color: transparent; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Jakarta', sans-serif; overflow: auto; }
         #container { background-color: transparent; max-width: 100%; display: flex; justify-content: center; }
-        /* hide scrollbars */
         ::-webkit-scrollbar { width: 0px; height: 0px; }
     </style>
 </head>
@@ -50,7 +64,7 @@ const generateMermaidHtml = (code: string) => {
 export const MermaidWidget: IWidget<MermaidWidgetData> = {
   id: 'diagram',
   name: 'Diagram',
-  hasBorder: false, // no wrapper border
+  hasBorder: false,
   aiDefinesTitle: false,
   description: 'Displays a flowchart, sequence diagram, or mindmap using Mermaid.js syntax. CRITICAL: Do NOT use \\n for line breaks inside diagram nodes or messages. You MUST use <br/> instead. Output valid Mermaid syntax in the "mermaid" property. When you explain something, you can use it to illustrate.',
   schema: `{

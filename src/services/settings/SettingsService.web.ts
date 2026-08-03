@@ -9,6 +9,10 @@ export type AppSettings = {
   instruction: string;
   speaker: boolean;
   alwaysWhisper: boolean;
+  autoStartMic: boolean;
+  hasSeenOnboarding: boolean;
+  username: string;
+  includeDateTime: boolean;
 };
 
 const DEFAULTS: AppSettings = {
@@ -28,6 +32,10 @@ const DEFAULTS: AppSettings = {
   instruction: '',
   speaker: false,
   alwaysWhisper: false,
+  autoStartMic: true,
+  hasSeenOnboarding: false,
+  username: '',
+  includeDateTime: true,
 };
 
 class SettingsService {
@@ -59,6 +67,10 @@ class SettingsService {
         instruction: parsed.instruction ?? DEFAULTS.instruction,
         speaker: typeof parsed.speaker === 'boolean' ? parsed.speaker : DEFAULTS.speaker,
         alwaysWhisper: typeof parsed.alwaysWhisper === 'boolean' ? parsed.alwaysWhisper : DEFAULTS.alwaysWhisper,
+        autoStartMic: typeof parsed.autoStartMic === 'boolean' ? parsed.autoStartMic : DEFAULTS.autoStartMic,
+        hasSeenOnboarding: typeof parsed.hasSeenOnboarding === 'boolean' ? parsed.hasSeenOnboarding : DEFAULTS.hasSeenOnboarding,
+        username: parsed.username ?? DEFAULTS.username,
+        includeDateTime: typeof parsed.includeDateTime === 'boolean' ? parsed.includeDateTime : DEFAULTS.includeDateTime,
       };
       
       this.cache = settings;

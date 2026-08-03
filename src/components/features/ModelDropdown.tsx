@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Dimensions, Image, Keyboard, LayoutRectangle, Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from "react-native";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { AIModule } from "../src/services/ai/AIModule";
-import { getAICoreModelLabel } from "../src/services/ai/AICoreProvider";
-import NotificationModal from "./NotificationModal";
+import { AIModule } from "../../services/ai/AIModule";
+import { getAICoreModelLabel } from "../../services/ai/AICoreProvider";
+import NotificationModal from "../ui/NotificationModal";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-const arrowDownIcon = require("../assets/icons/down_arrow.png");
-const downloadIcon = require("../assets/icons/download.png");
-const thinkingIcon = require("../assets/icons/thinking.gif");
+const arrowDownIcon = require("../../../assets/icons/down_arrow.png");
+const downloadIcon = require("../../../assets/icons/download.png");
+const thinkingIcon = require("../../../assets/icons/thinking.gif");
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const REFLECTIONS = [

@@ -1,29 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { AIModule } from "../src/services/ai/AIModule";
-import { BackupService } from "../src/services/BackupService";
-import { Settings } from "../src/services/settings/SettingsService";
-import { Whisper } from "../src/services/whisper/WhisperService";
-import DownloadProgress from "./DownloadProgress";
-import NotificationModal, { ModalButton } from "./NotificationModal";
-import Selector from "./Selector";
-import TextInputField from "./TextInputField";
-import ThemeSelector from "./ThemeSelector";
-import Toggle from "./Toggle";
+import { AIModule } from "../../services/ai/AIModule";
+import { BackupService } from "../../services/BackupService";
+import { Settings } from "../../services/settings/SettingsService";
+import { Whisper } from "../../services/whisper/WhisperService";
+import DownloadProgress from "../ui/DownloadProgress";
+import NotificationModal, { ModalButton } from "../ui/NotificationModal";
+import Selector from "../ui/Selector";
+import TextInputField from "../ui/TextInputField";
+import ThemeSelector from "../ui/ThemeSelector";
+import Toggle from "../ui/Toggle";
 
-import { useResponsive } from "../src/hooks/useResponsive";
+import { useResponsive } from "../../hooks/useResponsive";
 
-const linkIcon = require("../assets/icons/link.png");
-const downloadIcon = require("../assets/icons/download.png");
-const deleteIcon = require("../assets/icons/delete.png");
-const penPlaceholderIcon = require("../assets/icons/pencil.png");
-const profilIcon = require("../assets/icons/profil.png");
-const arrowIcon = require("../assets/icons/arrow.png");
-const generalIcon = require("../assets/icons/general.png");
-const serverIcon = require("../assets/icons/server.png");
-const toolIcon = require("../assets/icons/tool.png");
-const confidentialityIcon = require("../assets/icons/confidentiality.png");
-const socialIcon = require("../assets/icons/social.png");
+const linkIcon = require("../../../assets/icons/link.png");
+const downloadIcon = require("../../../assets/icons/download.png");
+const deleteIcon = require("../../../assets/icons/delete.png");
+const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
+const profilIcon = require("../../../assets/icons/profil.png");
+const arrowIcon = require("../../../assets/icons/arrow.png");
+const generalIcon = require("../../../assets/icons/general.png");
+const serverIcon = require("../../../assets/icons/server.png");
+const toolIcon = require("../../../assets/icons/tool.png");
+const confidentialityIcon = require("../../../assets/icons/confidentiality.png");
+const socialIcon = require("../../../assets/icons/social.png");
 
 type SettingsDrawerProps = {
   visible: boolean;
@@ -83,6 +83,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(true);
   const [usageAnalytics, setUsageAnalyticsState] = useState(true);
   const [useWebsearch, setUseWebsearchState] = useState(true);
+  const [includeDateTime, setIncludeDateTimeState] = useState(true);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   const [ollamaModelOptions, setOllamaModelOptions] = useState<{ id: string, label: string }[]>([]);
@@ -238,6 +239,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setWhisperLanguageState(s.whisperLanguage);
         setInstructionState(s.instruction);
         setUsernameState(s.username || "");
+        setIncludeDateTimeState(s.includeDateTime ?? true);
         setAlwaysWhisperState(s.alwaysWhisper);
         //apply to services
         AIModule.configure(s.ollamaUrl);
@@ -305,6 +307,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const setUsername = (v: string) => {
     setUsernameState(v);
     Settings.set("username", v);
+  };
+
+  const setIncludeDateTime = (v: boolean) => {
+    setIncludeDateTimeState(v);
+    Settings.set("includeDateTime", v);
   };
 
   const setAlwaysWhisper = (v: boolean) => {
@@ -591,6 +598,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           onChangeText={setInstruction}
         />
       </View>
+
+      <View style={[styles.toggleRow, { marginTop: 16 }]}>
+        <Text style={styles.settingLabel}>Date and time in context</Text>
+        <Toggle
+          checked={includeDateTime}
+          onToggle={setIncludeDateTime}
+        />
+      </View>
+      <Text style={styles.helpText}>Provide the current date and time to the AI context</Text>
     </View>
   );
 

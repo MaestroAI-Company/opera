@@ -3,8 +3,8 @@ import { Dimensions, LayoutRectangle, Modal, Pressable, ScrollView, StyleSheet, 
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-const arrowDownIcon = require("../assets/icons/down_arrow.png");
-const downloadIcon = require("../assets/icons/download.png");
+const arrowDownIcon = require("../../../assets/icons/down_arrow.png");
+const downloadIcon = require("../../../assets/icons/download.png");
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export type SelectorOption = {

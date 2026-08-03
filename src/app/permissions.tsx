@@ -1,6 +1,5 @@
-import { AudioModule } from "expo-audio";
 import * as ImagePicker from "expo-image-picker";
-import * as MediaLibrary from "expo-media-library";
+import * as MediaLibrary from "expo-media-library/legacy";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -15,6 +14,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useResponsive } from "../hooks/useResponsive";
 
 const texture2 = require("../../assets/images/texture2.png");
 const micIcon = require("../../assets/icons/microphone.png");
@@ -31,46 +31,88 @@ type Permission = {
   request: () => Promise<boolean>;
 };
 
+const isWeb = Platform.OS === "web";
+
+const WEB_PERMISSIONS: Permission[] = [
+  {
+    id: "microphone",
+    icon: micIcon,
+    label: "Microphone",
+    description: "To dictate your messages by voice.",
+    status: "idle",
+    request: async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((t) => t.stop());
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  },
+  {
+    id: "camera",
+    icon: cameraIcon,
+    label: "Camera",
+    description: "To photograph and analyze documents.",
+    status: "idle",
+    request: async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach((t) => t.stop());
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  },
+];
+
+const NATIVE_PERMISSIONS: Permission[] = [
+  {
+    id: "microphone",
+    icon: micIcon,
+    label: "Microphone",
+    description: "To dictate your messages by voice.",
+    status: "idle",
+    request: async () => {
+      const { AudioModule } = require("expo-audio");
+      const { granted } = await AudioModule.requestRecordingPermissionsAsync();
+      return granted;
+    },
+  },
+  {
+    id: "camera",
+    icon: cameraIcon,
+    label: "Camera",
+    description: "To photograph and analyze documents.",
+    status: "idle",
+    request: async () => {
+      const { granted } = await ImagePicker.requestCameraPermissionsAsync();
+      return granted;
+    },
+  },
+  {
+    id: "photos",
+    icon: photoIcon,
+    label: "Photos",
+    description: "To share images from your gallery.",
+    status: "idle",
+    request: async () => {
+      const { granted } = await MediaLibrary.requestPermissionsAsync();
+      return granted;
+    },
+  },
+];
+
 export default function PermissionsPage() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isLargeScreen } = useResponsive();
 
-  const [permissions, setPermissions] = useState<Permission[]>([
-    {
-      id: "microphone",
-      icon: micIcon,
-      label: "Microphone",
-      description: "To dictate your messages by voice.",
-      status: "idle",
-      request: async () => {
-        if (Platform.OS === "web") return true;
-        const { granted } = await AudioModule.requestRecordingPermissionsAsync();
-        return granted;
-      },
-    },
-    {
-      id: "camera",
-      icon: cameraIcon,
-      label: "Camera",
-      description: "To photograph and analyze documents.",
-      status: "idle",
-      request: async () => {
-        const { granted } = await ImagePicker.requestCameraPermissionsAsync();
-        return granted;
-      },
-    },
-    {
-      id: "photos",
-      icon: photoIcon,
-      label: "Photos",
-      description: "To share images from your gallery.",
-      status: "idle",
-      request: async () => {
-        const { granted } = await MediaLibrary.requestPermissionsAsync();
-        return granted;
-      },
-    },
-  ]);
+  const [permissions, setPermissions] = useState<Permission[]>(
+    isWeb ? WEB_PERMISSIONS : NATIVE_PERMISSIONS
+  );
 
   const requestPermission = async (id: string) => {
     const perm = permissions.find((p) => p.id === id);
@@ -98,14 +140,17 @@ export default function PermissionsPage() {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+        <View style={isLargeScreen && styles.pageContentLarge}>
+          <View style={styles.header}>
           <Text style={styles.title}>Permissions</Text>
           <Text style={styles.subtitle}>
-            Opera needs a few permissions to work at its best. You can change them at any time in your device{" "}
-            <Text style={styles.settingsLink} onPress={() => Linking.openSettings()}>
-              settings ↗
-            </Text>
-            .
+            {isWeb
+              ? "Opera needs a few permissions to work at its best. You can manage them at any time from your browser's site settings."
+              : <>Opera needs a few permissions to work at its best. You can change them at any time in your device{" "}
+                <Text style={styles.settingsLink} onPress={() => Linking.openSettings()}>
+                  settings ↗
+                </Text>
+                .</>}
           </Text>
         </View>
 
@@ -147,12 +192,13 @@ export default function PermissionsPage() {
               </View>
             );
           })}
+          </View>
         </View>
       </ScrollView>
 
       <View style={styles.footer}>
         <Pressable
-          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+          style={({ pressed }) => [styles.button, isLargeScreen && styles.buttonLarge, pressed && styles.buttonPressed]}
           onPress={handleContinue}
         >
           <Text style={styles.buttonText}>Continue</Text>
@@ -177,6 +223,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingTop: 32,
     paddingBottom: 24,
+  },
+  pageContentLarge: {
+    alignSelf: "center",
+    width: "100%",
+    maxWidth: 640,
   },
   header: {
     marginBottom: 36,
@@ -282,6 +333,9 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     backgroundColor: "#D61515",
+  },
+  buttonLarge: {
+    maxWidth: 420,
   },
   buttonText: {
     fontFamily: "IBMPlexMono-Medium",

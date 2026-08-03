@@ -9,7 +9,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import TextInputField from "../../components/TextInputField";
+import TextInputField from "../components/ui/TextInputField";
+import { useResponsive } from "../hooks/useResponsive";
 import { Settings } from "../services/settings/SettingsService";
 
 const texture2 = require("../../assets/images/texture2.png");
@@ -18,6 +19,7 @@ const profilIcon = require("../../assets/icons/pencil.png");
 export default function UsernamePage() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isLargeScreen } = useResponsive();
   const [username, setUsername] = useState(() => Settings.getCached().username || "");
 
   const handleFinish = async () => {
@@ -38,27 +40,29 @@ export default function UsernamePage() {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.title}>What should we call you?</Text>
-          <Text style={styles.subtitle}>
-            Enter your name to personalize your experience with Opera.
-          </Text>
-        </View>
+        <View style={isLargeScreen && styles.pageContentLarge}>
+          <View style={styles.header}>
+            <Text style={styles.title}>What should we call you?</Text>
+            <Text style={styles.subtitle}>
+              Enter your name to personalize your experience with Opera.
+            </Text>
+          </View>
 
-        <View style={styles.inputWrapper}>
-          <TextInputField
-            icon={profilIcon}
-            value={username}
-            onChangeText={setUsername}
-            placeholder="Enter your name"
-            autoFocus
-          />
+          <View style={styles.inputWrapper}>
+            <TextInputField
+              icon={profilIcon}
+              value={username}
+              onChangeText={setUsername}
+              placeholder="Enter your name"
+              autoFocus
+            />
+          </View>
         </View>
       </ScrollView>
 
       <View style={styles.footer}>
         <Pressable
-          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+          style={({ pressed }) => [styles.button, isLargeScreen && styles.buttonLarge, pressed && styles.buttonPressed]}
           onPress={handleFinish}
         >
           <Text style={styles.buttonText}>Continue</Text>
@@ -83,6 +87,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingTop: 32,
     paddingBottom: 24,
+  },
+  pageContentLarge: {
+    alignSelf: "center",
+    width: "100%",
+    maxWidth: 640,
   },
   header: {
     marginBottom: 36,
@@ -119,6 +128,9 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     backgroundColor: "#D61515",
+  },
+  buttonLarge: {
+    maxWidth: 420,
   },
   buttonText: {
     fontFamily: "IBMPlexMono-Medium",

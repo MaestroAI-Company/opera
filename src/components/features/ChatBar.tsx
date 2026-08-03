@@ -1,4 +1,4 @@
-import { AudioModule, useAudioStream } from "expo-audio";
+
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library/legacy';
@@ -22,16 +22,18 @@ import {
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AICoreSTT } from "../src/services/ai/AICoreSpeechService";
-import { Settings } from "../src/services/settings/SettingsService";
-import { Whisper } from "../src/services/whisper/WhisperService";
-import AttachmentSheet, { SelectedFile } from "./AttachmentSheet";
-import NotificationModal from "./NotificationModal";
 
-const nextWhiteIcon = require("../assets/icons/arrow.png");
-const micIcon = require("../assets/icons/microphone.png");
-const addIcon = require("../assets/icons/add.png");
-const stopIcon = require("../assets/icons/stop.png");
+const { AudioModule, useAudioStream } = Platform.OS === 'web' ? { AudioModule: null, useAudioStream: () => ({ stream: null }) } : require("expo-audio");
+import { AICoreSTT } from "../../services/ai/AICoreSpeechService";
+import { Settings } from "../../services/settings/SettingsService";
+import { Whisper } from "../../services/whisper/WhisperService";
+import AttachmentSheet, { SelectedFile } from "./AttachmentSheet";
+import NotificationModal from "../ui/NotificationModal";
+
+const nextWhiteIcon = require("../../../assets/icons/arrow.png");
+const micIcon = require("../../../assets/icons/microphone.png");
+const addIcon = require("../../../assets/icons/add.png");
+const stopIcon = require("../../../assets/icons/stop.png");
 
 type ChatInputBarProps = {
   onSend?: (message: string, images?: string[]) => void;
@@ -498,7 +500,9 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
 
   useEffect(() => {
-    AudioModule.requestRecordingPermissionsAsync().catch(() => { });
+    if (AudioModule) {
+      AudioModule.requestRecordingPermissionsAsync().catch(() => { });
+    }
     const checkWhisper = async () => {
       const modelName = Settings.getCached().whisperModel || "base";
       const isInstalled = await Whisper.isModelInstalled(modelName);

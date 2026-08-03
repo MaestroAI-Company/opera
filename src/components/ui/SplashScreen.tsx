@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import LottieView from "lottie-react-native";
 
-const animation = require("../assets/animations/Splashscreen.json");
+const animation = require("../../../assets/animations/Splashscreen.json");
 
 interface Props {
   onFinish: () => void;

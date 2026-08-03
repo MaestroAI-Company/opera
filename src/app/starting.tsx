@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useResponsive } from "../hooks/useResponsive";
 
 const butterflyImage = require("../../assets/images/butterfly2.png");
 const texture2 = require("../../assets/images/texture2.png");
@@ -20,6 +21,7 @@ const FULL_TEXT = "AI for all,\nprivacy for freedom";
 export default function StartingPage() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isLargeScreen } = useResponsive();
 
   const [displayedText, setDisplayedText] = useState("");
 
@@ -131,11 +133,12 @@ export default function StartingPage() {
       </Animated.View>
 
       {/* Content */}
-      <View style={styles.content}>
+      <View style={[styles.content, isLargeScreen && styles.contentLarge]}>
         <Animated.Image
           source={butterflyImage}
           style={[
             styles.image,
+            isLargeScreen && styles.imageLarge,
             {
               opacity: butterflyOpacity,
               transform: [{ scale: butterflyScale }],
@@ -145,11 +148,11 @@ export default function StartingPage() {
         />
         <View style={styles.titleWrapper}>
           {/* Reserve layout dimensions to prevent any layout shifts */}
-          <Text style={[styles.title, { opacity: 0 }]}>
+          <Text style={[styles.title, isLargeScreen && styles.titleLarge, { opacity: 0 }]}>
             {FULL_TEXT}
           </Text>
           {/* Typewriter text overlay */}
-          <Text style={[styles.title, styles.titleOverlay]}>
+          <Text style={[styles.title, isLargeScreen && styles.titleLarge, styles.titleOverlay]}>
             {displayedText}
           </Text>
         </View>
@@ -166,7 +169,7 @@ export default function StartingPage() {
         ]}
       >
         <Pressable
-          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+          style={({ pressed }) => [styles.button, isLargeScreen && styles.buttonLarge, pressed && styles.buttonPressed]}
           onPress={handleContinue}
         >
           <Text style={styles.buttonText}>Get started</Text>
@@ -198,12 +201,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 40,
   },
+  contentLarge: {
+    paddingHorizontal: 48,
+    alignItems: "center",
+  },
   image: {
     width: 250,
     height: 250,
     alignSelf: "flex-start",
     marginBottom: 20,
     marginLeft: -20,
+  },
+  imageLarge: {
+    width: 340,
+    height: 340,
+    alignSelf: "center",
+    marginLeft: 0,
   },
   titleWrapper: {
     position: "relative",
@@ -214,6 +227,10 @@ const styles = StyleSheet.create({
     color: "#fff",
     textAlign: "left",
     lineHeight: 52,
+  },
+  titleLarge: {
+    fontSize: 64,
+    lineHeight: 72,
   },
   titleOverlay: {
     position: "absolute",
@@ -238,6 +255,9 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     backgroundColor: "#eaeaea",
+  },
+  buttonLarge: {
+    maxWidth: 420,
   },
   buttonText: {
     fontFamily: "IBMPlexMono-Medium",

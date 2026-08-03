@@ -12,15 +12,15 @@ import {
   Text,
   View,
 } from "react-native";
-import { Conversation, Message } from "../src/services/db/DatabaseService";
-import { renderMarkdown } from "./MarkdownText";
+import { Conversation, Message } from "../../services/db/DatabaseService";
+import { renderMarkdown } from "../ui/MarkdownText";
 
-const butterflyImage = require("../assets/images/butterfly2.png");
-const butterflyGreyImage = require("../assets/images/butterfly2_grey.png");
-const thinkingGif = require("../assets/icons/thinking.gif");
-const speakerIcon = require("../assets/icons/speaker.png");
-const reloadIcon = require("../assets/icons/reload.png");
-const copyIcon = require("../assets/icons/copy.png");
+const butterflyImage = require("../../../assets/images/butterfly2.png");
+const butterflyGreyImage = require("../../../assets/images/butterfly2_grey.png");
+const thinkingGif = require("../../../assets/icons/thinking.gif");
+const speakerIcon = require("../../../assets/icons/speaker.png");
+const reloadIcon = require("../../../assets/icons/reload.png");
+const copyIcon = require("../../../assets/icons/copy.png");
 
 type ChatViewProps = {
   messages: Message[];

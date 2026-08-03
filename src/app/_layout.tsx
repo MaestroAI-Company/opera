@@ -8,8 +8,8 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
-import SplashScreenComponent from "../../components/SplashScreen";
-import TauriTitleBar from "../../components/TauriTitleBar";
+import SplashScreenComponent from "../components/ui/SplashScreen";
+import TauriTitleBar from "../components/features/TauriTitleBar";
 
 global.Buffer = global.Buffer || Buffer;
 

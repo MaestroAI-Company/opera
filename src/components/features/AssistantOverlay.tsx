@@ -14,18 +14,18 @@ import {
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackHandler } from 'react-native';
-import ChatBar, { ChatBarHandle } from '../../components/ChatBar';
-import NotificationModal from '../../components/NotificationModal';
-import { renderMarkdown } from '../../components/MarkdownText';
-import { Conversation, DB, Message } from '../services/db/DatabaseService';
-import { Settings } from '../services/settings/SettingsService';
-import { AIModule } from '../services/ai/AIModule';
-import { AICoreSTT } from '../services/ai/AICoreSpeechService';
-import { SYSTEM_PROMPTS } from '../../constants/prompts';
-import { Whisper } from '../services/whisper/WhisperService';
-import { NotificationService } from '../services/notifications/NotificationService';
-import ModelDropdown from '../../components/ModelDropdown';
-import { useResponsive } from '../hooks/useResponsive';
+import ChatBar, { ChatBarHandle } from './ChatBar';
+import NotificationModal from '../ui/NotificationModal';
+import { renderMarkdown } from '../ui/MarkdownText';
+import { Conversation, DB, Message } from '../../services/db/DatabaseService';
+import { Settings } from '../../services/settings/SettingsService';
+import { AIModule } from '../../services/ai/AIModule';
+import { AICoreSTT } from '../../services/ai/AICoreSpeechService';
+import { SYSTEM_PROMPTS } from '../../../constants/prompts';
+import { Whisper } from '../../services/whisper/WhisperService';
+import { NotificationService } from '../../services/notifications/NotificationService';
+import ModelDropdown from './ModelDropdown';
+import { useResponsive } from '../../hooks/useResponsive';
 
 export default function AssistantOverlayWrapper() {
   return (
@@ -37,7 +37,7 @@ export default function AssistantOverlayWrapper() {
   );
 }
 
-const thinkingGif = require('../../assets/icons/thinking.gif');
+const thinkingGif = require('../../../assets/icons/thinking.gif');
 
 // isolated flashing text — never causes parent re-renders
 const FlashingText = React.memo(({ text }: { text: string }) => {

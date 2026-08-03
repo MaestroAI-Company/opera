@@ -1,7 +1,7 @@
 import { Image, Pressable, StyleSheet, View, Text } from "react-native";
 
-const moreIcon = require("../assets/icons/More.png");
-const addIcon = require("../assets/icons/add.png");
+const moreIcon = require("../../../assets/icons/More.png");
+const addIcon = require("../../../assets/icons/add.png");
 
 type TopBarProps = {
   onMenuPress: () => void;

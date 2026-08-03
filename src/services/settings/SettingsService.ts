@@ -15,6 +15,7 @@ export type AppSettings = {
   autoStartMic: boolean;
   hasSeenOnboarding: boolean;
   username: string;
+  includeDateTime: boolean;
 };
 
 const DEFAULTS: AppSettings = {
@@ -37,6 +38,7 @@ const DEFAULTS: AppSettings = {
   autoStartMic: true,
   hasSeenOnboarding: false,
   username: '',
+  includeDateTime: true,
 };
 
 class SettingsService {
@@ -88,6 +90,7 @@ class SettingsService {
       autoStartMic: map['autoStartMic'] === 'true' ? true : (map['autoStartMic'] === 'false' ? false : DEFAULTS.autoStartMic),
       hasSeenOnboarding: map['hasSeenOnboarding'] === 'true' ? true : DEFAULTS.hasSeenOnboarding,
       username: map['username'] ?? DEFAULTS.username,
+      includeDateTime: map['includeDateTime'] === 'true' ? true : (map['includeDateTime'] === 'false' ? false : DEFAULTS.includeDateTime),
     };
     this.cache = settings;
     return settings;

@@ -16,12 +16,12 @@ import {
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import ChatBar from "../../components/ChatBar";
-import ChatView from "../../components/ChatView";
-import ConversationsDrawer from "../../components/ConversationsDrawer";
-import ModelDropdown from "../../components/ModelDropdown";
-import SettingsDrawer from "../../components/SettingsDrawer";
-import TopBar from "../../components/TopBar";
+import ChatBar from "../components/features/ChatBar";
+import ChatView from "../components/features/ChatView";
+import ConversationsDrawer from "../components/features/ConversationsDrawer";
+import ModelDropdown from "../components/features/ModelDropdown";
+import SettingsDrawer from "../components/features/SettingsDrawer";
+import TopBar from "../components/features/TopBar";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { useResponsive } from "../hooks/useResponsive";
 import { AIModule } from "../services/ai/AIModule";
@@ -50,6 +50,8 @@ export default function Index() {
   const { convId } = useLocalSearchParams<{ convId?: string }>();
   const [incognitoMode, setIncognitoMode] = useState(false);
   const [userInstruction, setUserInstruction] = useState("");
+  const [includeDateTime, setIncludeDateTime] = useState(true);
+  const [username, setUsername] = useState("");
   const [aiService, setAiService] = useState("ollama");
   const [ollamaUrl, setOllamaUrl] = useState("");
   const [speakerEnabled, setSpeakerEnabled] = useState(false);
@@ -197,6 +199,8 @@ export default function Index() {
         }
 
         setUserInstruction(s.instruction);
+        setIncludeDateTime(s.includeDateTime ?? true);
+        setUsername(s.username || "");
         if (s.ollamaModel) {
           setSelectedModel(s.ollamaModel);
         }
@@ -432,9 +436,19 @@ export default function Index() {
       const taskSelectedModel = selectedModel;
       const taskOllamaUrl = ollamaUrl;
       const taskAiService = aiService;
-      const taskSystemPrompt = userInstruction.trim().length > 0
+      let taskSystemPrompt = userInstruction.trim().length > 0
         ? `${userInstruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
         : SYSTEM_PROMPTS.DEFAULT;
+      let extraContext = [];
+      if (includeDateTime) {
+        extraContext.push(`Current Date and Time: ${new Date().toLocaleString()}`);
+      }
+      if (username) {
+        extraContext.push(`User's name: ${username}`);
+      }
+      if (extraContext.length > 0) {
+        taskSystemPrompt += `\n\n---\n\n${extraContext.join('\n')}`;
+      }
       const taskReflection = selectedReflection;
       const taskConv = conv;
 
@@ -644,9 +658,19 @@ export default function Index() {
     const taskSelectedModel = selectedModel;
     const taskOllamaUrl = ollamaUrl;
     const taskAiService = aiService;
-    const taskSystemPrompt = userInstruction.trim().length > 0
+    let taskSystemPrompt = userInstruction.trim().length > 0
       ? `${userInstruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
       : SYSTEM_PROMPTS.DEFAULT;
+    let extraContext = [];
+    if (includeDateTime) {
+      extraContext.push(`Current Date and Time: ${new Date().toLocaleString()}`);
+    }
+    if (username) {
+      extraContext.push(`User's name: ${username}`);
+    }
+    if (extraContext.length > 0) {
+      taskSystemPrompt += `\n\n---\n\n${extraContext.join('\n')}`;
+    }
     const taskReflection = selectedReflection;
     const taskConv = activeConversation;
     const isIncognitoTask = taskConv.id.startsWith("incognito_");

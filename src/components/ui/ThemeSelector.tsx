@@ -1,9 +1,9 @@
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 // load theme icons
-const autoIcon = require("../assets/icons/auto.png");
-const lightIcon = require("../assets/icons/light.png");
-const darkIcon = require("../assets/icons/dark.png");
+const autoIcon = require("../../../assets/icons/auto.png");
+const lightIcon = require("../../../assets/icons/light.png");
+const darkIcon = require("../../../assets/icons/dark.png");
 
 type ThemeSelectorProps = {
   selectedValue: string;

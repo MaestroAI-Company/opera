@@ -60,7 +60,6 @@
   },
   "scripts": {
     "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "build:android": "expo prebuild --platform android && cd android && ./gradlew assembleRelease",
     "ios": "expo run:ios",

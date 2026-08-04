@@ -137,7 +137,7 @@ function renderTokens(tokens: Token[], keyBase: number): React.ReactNode[] {
 type ToolCallBlock = { start: number; end: number; json: string };
 
 //scan raw toolcall json blocks in a non-code segment
-function pushRawToolCallBlocks(md: string, from: number, to: number, blocks: ToolCallBlock[]): void {
+function pushRawToolCallBlocks(md: string, from: number, to: number, blocks: ToolCallBlock[], allowPartial: boolean): void {
   let searchIndex = from;
   while (true) {
     const start = md.indexOf('{', searchIndex);
@@ -159,12 +159,17 @@ function pushRawToolCallBlocks(md: string, from: number, to: number, blocks: Too
       if (braces === 0 && j > start) { endIndex = j; break; }
     }
     
+    const isPartial = endIndex === -1 && allowPartial;
     const blockEnd = endIndex !== -1 ? endIndex + 1 : to;
     const blockText = md.substring(start, blockEnd);
     
     const cleanBlockText = blockText.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '');
     
-    if (/^\{\s*"?\s*(?:tool[\s\n]*_[\s\n]*calls|name|function)\s*"?\s*:/i.test(cleanBlockText)) {
+    //partial streaming: accept an open block as soon as it looks like a tool call
+    const looksLikeTool = /^\{\s*"?\s*(?:tool[\s\n]*_[\s\n]*calls|name|function)\s*"?\s*:/i.test(cleanBlockText);
+    const partialLooksLikeTool = isPartial && /^\{\s*"?\s*(?:tool[\s\n]*_[\s\n]*calls|name|function)/i.test(cleanBlockText);
+    
+    if (looksLikeTool || partialLooksLikeTool) {
       blocks.push({ start, end: blockEnd, json: blockText });
       searchIndex = blockEnd;
     } else {
@@ -174,14 +179,14 @@ function pushRawToolCallBlocks(md: string, from: number, to: number, blocks: Too
 }
 
 //scan toolcall json blocks (fenced or raw), skipping raw blocks inside code fences
-function findToolCallBlocks(md: string): ToolCallBlock[] {
+function findToolCallBlocks(md: string, allowPartial = false): ToolCallBlock[] {
   const blocks: ToolCallBlock[] = [];
   const fenceRe = /```[^\n]*/g;
   let segmentStart = 0;
   let m;
   while ((m = fenceRe.exec(md)) !== null) {
     const fenceStart = m.index;
-    pushRawToolCallBlocks(md, segmentStart, fenceStart, blocks);
+    pushRawToolCallBlocks(md, segmentStart, fenceStart, blocks, allowPartial);
 
     const headerLang = m[0].replace(/^```/, '').trim().split(' ')[0].toLowerCase();
     const contentStart = fenceStart + m[0].length;
@@ -194,7 +199,9 @@ function findToolCallBlocks(md: string): ToolCallBlock[] {
     if (headerLang === '' || headerLang === 'json' || headerLang === 'toolcall') {
       const inner = md.substring(contentStart, contentEnd).trim();
       const cleanInner = inner.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim();
-      if (/^\{\s*"?\s*(?:tool[\s\n]*_[\s\n]*calls|name|function)\s*"?\s*:[\s\S]*\}$/i.test(cleanInner)) {
+      const fullMatch = /^\{\s*"?\s*(?:tool[\s\n]*_[\s\n]*calls|name|function)\s*"?\s*:[\s\S]*\}$/i.test(cleanInner);
+      const partialMatch = allowPartial && !close && /^\{\s*"?\s*(?:tool[\s\n]*_[\s\n]*calls|name|function)/i.test(cleanInner);
+      if (fullMatch || partialMatch) {
         blocks.push({ start: fenceStart, end: closeEnd, json: inner });
       }
     }
@@ -202,7 +209,7 @@ function findToolCallBlocks(md: string): ToolCallBlock[] {
     segmentStart = closeEnd;
     fenceRe.lastIndex = closeEnd;
   }
-  pushRawToolCallBlocks(md, segmentStart, md.length, blocks);
+  pushRawToolCallBlocks(md, segmentStart, md.length, blocks, allowPartial);
   return blocks;
 }
 
@@ -216,12 +223,104 @@ export function hasConversationalText(md: string): boolean {
   return clean.trim().length > 0;
 }
 
+//extract tool names from a raw toolcall json block (tolerant of incomplete streaming json)
+export function parseToolNames(json: string): string[] {
+  const clean = json.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
+  const names: string[] = [];
+  try {
+    const data = JSON.parse(clean);
+    if (data?.tool_calls && Array.isArray(data.tool_calls)) {
+      data.tool_calls.forEach((tc: any) => {
+        if (tc?.function?.name) names.push(tc.function.name);
+      });
+    } else if (data?.name) {
+      names.push(data.name);
+    }
+  } catch (e) {
+    const nameMatches = clean.matchAll(/"name"\s*:\s*"([^"]+)"/g);
+    for (const match of nameMatches) names.push(match[1]);
+  }
+  return names;
+}
+
+//last visible thinking step for the thinking row
+export function extractThinkStep(thinkingText: string): string {
+  const stepRegex = /^\s*(?:(?:\d+[.)!]|[-*])\s*)?\*\*(.*?)\*\*/gm;
+  const steps: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = stepRegex.exec(thinkingText)) !== null) {
+    steps.push(match[1].replace(/:$/, '').trim());
+  }
+  if (steps.length > 0) return `${steps.length}. ${steps[steps.length - 1]}`;
+  const lines = thinkingText.split('\n').filter(l => l.trim().length > 0);
+  return lines.length > 0 ? lines[lines.length - 1] : 'Thinking...';
+}
+
+export type LiveTool = { name: string | null; args: any } | null;
+
+export type ChatDisplay = {
+  thinkingText: string;
+  toolNames: string[];
+  finalContent: string;
+  showThinkingRow: boolean;
+  showMarkdown: boolean;
+  currentThought: string;
+};
+
+//single source of truth for the chat bubble display (thinking / tools / streaming)
+export function deriveChatDisplay(raw: string, isGenerating: boolean, liveTool: LiveTool, canThink = false): ChatDisplay {
+  const normalized = raw === '…' ? '' : raw;
+  const thinkMatches = [...normalized.matchAll(/<think>([\s\S]*?)(?:<\/think>|$)/g)];
+  const thinkingText = thinkMatches.map(m => m[1].trim()).filter(t => t.length > 0).join('\n');
+
+  const stripped = normalized.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '');
+  const blocks = findToolCallBlocks(stripped, isGenerating);
+
+  //keep the tool json in finalContent so renderMarkdown turns it into bubbles,
+  //compute conversational presence on a copy without the blocks
+  let contentOnly = stripped;
+  const contentToolNames: string[] = [];
+  for (let k = blocks.length - 1; k >= 0; k--) {
+    const b = blocks[k];
+    contentOnly = contentOnly.substring(0, b.start) + contentOnly.substring(b.end);
+    contentToolNames.push(...parseToolNames(b.json));
+  }
+
+  const toolNames: string[] = [];
+  for (const n of contentToolNames) {
+    if (n && n !== 'Tool' && !toolNames.includes(n)) toolNames.push(n);
+  }
+  const liveName = isGenerating ? liveTool?.name : null;
+  if (liveName && !toolNames.includes(liveName)) toolNames.push(liveName);
+
+  const hasConvText = contentOnly.trim().length > 0;
+  const hasTool = toolNames.length > 0;
+
+  let showThinkingRow = false;
+  let currentThought = '';
+  if (isGenerating) {
+    showThinkingRow = thinkingText.length > 0 || (!hasConvText && !hasTool);
+    if (thinkingText.length > 0) {
+      currentThought = extractThinkStep(thinkingText);
+    } else if (liveName) {
+      currentThought = liveName === 'web_search'
+        ? `Searching the web for "${liveTool?.args?.query || ''}"...`
+        : `Running tool: ${liveName}...`;
+    } else if (canThink) {
+      currentThought = 'Thinking...';
+    }
+  }
+
+  const showMarkdown = hasConvText || hasTool;
+  return { thinkingText, toolNames, finalContent: stripped, showThinkingRow, showMarkdown, currentThought };
+}
+
 export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: boolean): React.ReactNode[] {
   const selColor = incognito ? "rgba(86, 90, 117, 0.4)" : "rgba(255, 26, 26, 0.4)";
   
   //wrap toolcall blocks for bubble rendering
   let processedMd = md;
-  const blocks = findToolCallBlocks(processedMd);
+  const blocks = findToolCallBlocks(processedMd, isGenerating);
   for (let k = blocks.length - 1; k >= 0; k--) {
     const b = blocks[k];
     processedMd = processedMd.substring(0, b.start) + '\n```toolcall\n' + b.json + '\n```\n' + processedMd.substring(b.end);
@@ -303,25 +402,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
 
       if (language === "toolcall") {
         const rawJson = codeLines.join("\n");
-        const cleanJson = rawJson.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
-        
-        let toolNames: string[] = [];
-        try {
-          const data = JSON.parse(cleanJson);
-          if (data?.tool_calls && Array.isArray(data.tool_calls)) {
-            data.tool_calls.forEach((tc: any) => {
-              if (tc?.function?.name) toolNames.push(tc.function.name);
-            });
-          } else if (data?.name) {
-            toolNames.push(data.name);
-          }
-        } catch (e) {
-          // fallback regex for incomplete JSON during streaming
-          const nameMatches = cleanJson.matchAll(/"name"\s*:\s*"([^"]+)"/g);
-          for (const match of nameMatches) {
-            toolNames.push(match[1]);
-          }
-        }
+        let toolNames = parseToolNames(rawJson);
         
         if (toolNames.length === 0) {
           toolNames = ["Tool"];

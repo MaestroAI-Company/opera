@@ -2,6 +2,7 @@ import {
   Image,
   Platform,
   Pressable,
+  TouchableOpacity,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,7 +13,7 @@ const cameraIcon = require("../../../assets/icons/camera.png");
 const fileIcon = require("../../../assets/icons/file.png");
 const photoIcon = require("../../../assets/icons/photo.png");
 
-export type SelectedFile = { uri: string; type: string; name: string };
+export type SelectedFile = { uri: string; type: string; name: string; id?: string };
 
 type AttachmentSheetProps = {
   visible: boolean;
@@ -68,9 +69,10 @@ export default function AttachmentSheet({
       </View>
 
       {recentPhotos.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sheetRecentPhotosContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sheetRecentPhotosContainer} keyboardShouldPersistTaps="handled">
           {recentPhotos.map((photo) => (
-            <Pressable
+            <TouchableOpacity
+              activeOpacity={0.8}
               key={photo.id}
               onPress={() => onSelectRecentPhoto(photo)}
               onLongPress={() => onLongPressRecentPhoto(photo)}
@@ -78,7 +80,7 @@ export default function AttachmentSheet({
                 styles.sheetRecentPhotoWrapper,
                 {
                   borderWidth: 2,
-                  borderColor: selectedFiles.some(f => f.uri === (photo.uri || photo.localUri))
+                  borderColor: selectedFiles.some(f => (f.id && f.id === photo.id) || f.uri === (photo.uri || photo.localUri))
                     ? (incognito ? '#fff' : '#FF1A1A')
                     : 'transparent'
                 }
@@ -88,10 +90,10 @@ export default function AttachmentSheet({
                 source={{ uri: photo.uri || photo.localUri }}
                 style={[
                   styles.sheetRecentPhoto,
-                  { opacity: selectedFiles.some(f => f.uri === (photo.uri || photo.localUri)) ? 0.7 : 1 }
+                  { opacity: selectedFiles.some(f => (f.id && f.id === photo.id) || f.uri === (photo.uri || photo.localUri)) ? 0.7 : 1 }
                 ]}
               />
-            </Pressable>
+            </TouchableOpacity>
           ))}
         </ScrollView>
       )}

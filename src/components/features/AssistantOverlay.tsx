@@ -24,6 +24,7 @@ import { AICoreSTT } from '../../services/ai/AICoreSpeechService';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { Whisper } from '../../services/whisper/WhisperService';
 import { NotificationService } from '../../services/notifications/NotificationService';
+import { CloudSync } from '../../services/CloudSyncService';
 import ModelDropdown from './ModelDropdown';
 import { useResponsive } from '../../hooks/useResponsive';
 
@@ -425,6 +426,7 @@ function AssistantOverlay() {
       }
     } else {
       await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
+      CloudSync.requestAutoSync(0); //push completed ai message right away
     }
 
     if (isFirstMessage && !isError) generateTitle(conv.id, text, images);

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AppState,
   BackHandler,
+  DeviceEventEmitter,
   Image,
   ImageBackground,
   Keyboard,
@@ -24,8 +25,8 @@ import SettingsDrawer from "../components/features/SettingsDrawer";
 import TopBar from "../components/features/TopBar";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { useResponsive } from "../hooks/useResponsive";
-import { AIModule } from "../services/ai/AIModule";
 import { AICoreSTT } from "../services/ai/AICoreSpeechService";
+import { AIModule } from "../services/ai/AIModule";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
 import { Settings } from "../services/settings/SettingsService";
 import { Whisper } from "../services/whisper/WhisperService";
@@ -50,8 +51,6 @@ export default function Index() {
   const { convId } = useLocalSearchParams<{ convId?: string }>();
   const [incognitoMode, setIncognitoMode] = useState(false);
   const [userInstruction, setUserInstruction] = useState("");
-  const [includeDateTime, setIncludeDateTime] = useState(true);
-  const [username, setUsername] = useState("");
   const [aiService, setAiService] = useState("ollama");
   const [ollamaUrl, setOllamaUrl] = useState("");
   const [speakerEnabled, setSpeakerEnabled] = useState(false);
@@ -192,15 +191,13 @@ export default function Index() {
       try {
         await Settings.init();
         const s = await Settings.load();
-        
+
         if (!s.hasSeenOnboarding) {
           router.replace("/starting");
           return;
         }
 
         setUserInstruction(s.instruction);
-        setIncludeDateTime(s.includeDateTime ?? true);
-        setUsername(s.username || "");
         if (s.ollamaModel) {
           setSelectedModel(s.ollamaModel);
         }
@@ -275,6 +272,15 @@ export default function Index() {
     return () => {
       subscription.remove();
     };
+  }, [dbReady]);
+
+  //refresh conversation list on any db change (including cloud merges)
+  useEffect(() => {
+    if (!dbReady) return;
+    const sub = DeviceEventEmitter.addListener("DATA_CHANGED", () => {
+      loadConversations();
+    });
+    return () => sub.remove();
   }, [dbReady]);
 
   //load messages when a conversation is selected
@@ -436,19 +442,9 @@ export default function Index() {
       const taskSelectedModel = selectedModel;
       const taskOllamaUrl = ollamaUrl;
       const taskAiService = aiService;
-      let taskSystemPrompt = userInstruction.trim().length > 0
+      const taskSystemPrompt = userInstruction.trim().length > 0
         ? `${userInstruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
         : SYSTEM_PROMPTS.DEFAULT;
-      let extraContext = [];
-      if (includeDateTime) {
-        extraContext.push(`Current Date and Time: ${new Date().toLocaleString()}`);
-      }
-      if (username) {
-        extraContext.push(`User's name: ${username}`);
-      }
-      if (extraContext.length > 0) {
-        taskSystemPrompt += `\n\n---\n\n${extraContext.join('\n')}`;
-      }
       const taskReflection = selectedReflection;
       const taskConv = conv;
 
@@ -595,12 +591,12 @@ export default function Index() {
   //transcribe audio: use remote model if it supports audio and user hasnt forced whisper
   const handleTranscribe = useCallback(async (wavBuffer: ArrayBuffer): Promise<string | null> => {
     const useRemote = !alwaysWhisper && modelCapabilities.includes("audio") && selectedModel;
-    
+
     const transcribeWithWhisper = async () => {
       if (!Whisper.isAvailable()) {
         const modelName = Settings.getCached().whisperModel || "base";
         if (modelName !== "none" && await Whisper.isModelInstalled(modelName)) {
-           await Whisper.init(modelName);
+          await Whisper.init(modelName);
         }
       }
       if (Whisper.isAvailable()) {
@@ -658,19 +654,9 @@ export default function Index() {
     const taskSelectedModel = selectedModel;
     const taskOllamaUrl = ollamaUrl;
     const taskAiService = aiService;
-    let taskSystemPrompt = userInstruction.trim().length > 0
+    const taskSystemPrompt = userInstruction.trim().length > 0
       ? `${userInstruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
       : SYSTEM_PROMPTS.DEFAULT;
-    let extraContext = [];
-    if (includeDateTime) {
-      extraContext.push(`Current Date and Time: ${new Date().toLocaleString()}`);
-    }
-    if (username) {
-      extraContext.push(`User's name: ${username}`);
-    }
-    if (extraContext.length > 0) {
-      taskSystemPrompt += `\n\n---\n\n${extraContext.join('\n')}`;
-    }
     const taskReflection = selectedReflection;
     const taskConv = activeConversation;
     const isIncognitoTask = taskConv.id.startsWith("incognito_");

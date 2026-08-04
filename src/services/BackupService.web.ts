@@ -1,11 +1,13 @@
-import { DB, Conversation, Message } from './db/DatabaseService';
+import { DB, Conversation, Message, SyncTombstone } from './db/DatabaseService';
 import { Settings, AppSettings } from './settings/SettingsService';
 
 export type BackupData = {
   version: number;
   settings: AppSettings;
+  settingsUpdatedAt?: number;
   conversations: Conversation[];
   messages: Message[];
+  tombstones?: SyncTombstone[];
 };
 
 class BackupServiceImpl {
@@ -15,12 +17,15 @@ class BackupServiceImpl {
       const settings = Settings.getCached();
       const conversations = await DB.getConversations();
       const messages = await DB.getAllMessagesAllConversations();
+      const tombstones = await DB.getTombstones();
 
       const backup: BackupData = {
-        version: 1,
+        version: 2,
         settings,
+        settingsUpdatedAt: await Settings.getSettingsUpdatedAt(),
         conversations,
         messages,
+        tombstones,
       };
 
       const jsonStr = JSON.stringify(backup, null, 2);
@@ -94,7 +99,7 @@ class BackupServiceImpl {
                 await Settings.setMany(backup.settings);
 
                 // restore database
-                await DB.importBackup(backup.conversations, backup.messages);
+                await DB.importBackup(backup.conversations, backup.messages, backup.tombstones ?? []);
                 
                 resolve(true);
               } catch (err) {

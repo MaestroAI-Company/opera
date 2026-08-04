@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { Platform } from 'react-native';
+import { Platform, DeviceEventEmitter } from 'react-native';
 
 export type AppSettings = {
   language: string;
@@ -40,6 +40,8 @@ const DEFAULTS: AppSettings = {
   username: '',
   includeDateTime: true,
 };
+
+const SETTINGS_UPDATED_AT_KEY = '__settings_updated_at';
 
 class SettingsService {
   private db: SQLite.SQLiteDatabase | null = null;
@@ -103,9 +105,11 @@ class SettingsService {
       'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
       [key, String(value)]
     );
+    await this.bumpSettingsUpdatedAt();
     if (this.cache) {
       (this.cache as any)[key] = value;
     }
+    DeviceEventEmitter.emit('DATA_CHANGED');
   }
 
   //save multiple settings at once
@@ -117,9 +121,49 @@ class SettingsService {
         [key, String(value)]
       );
     }
+    await this.bumpSettingsUpdatedAt();
     if (this.cache) {
       Object.assign(this.cache, partial);
     }
+    DeviceEventEmitter.emit('DATA_CHANGED');
+  }
+
+  //apply cloud settings without emitting DATA_CHANGED or bumping local timestamp
+  async applyCloudSettings(partial: Partial<AppSettings>): Promise<void> {
+    const db = this.getDb();
+    for (const [key, value] of Object.entries(partial)) {
+      await db.runAsync(
+        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+        [key, String(value)]
+      );
+    }
+    if (this.cache) {
+      Object.assign(this.cache, partial);
+    }
+  }
+
+  //get timestamp of last local settings change
+  async getSettingsUpdatedAt(): Promise<number> {
+    const db = this.getDb();
+    const row = await db.getFirstAsync<{value: string}>('SELECT value FROM settings WHERE key = ?', [SETTINGS_UPDATED_AT_KEY]);
+    return row ? (parseInt(row.value, 10) || 0) : 0;
+  }
+
+  //force the settings timestamp (used by sync merge, no emit)
+  async setSettingsUpdatedAt(value: number): Promise<void> {
+    const db = this.getDb();
+    await db.runAsync(
+      'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+      [SETTINGS_UPDATED_AT_KEY, String(value)]
+    );
+  }
+
+  private async bumpSettingsUpdatedAt(): Promise<void> {
+    const db = this.getDb();
+    await db.runAsync(
+      'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+      [SETTINGS_UPDATED_AT_KEY, String(Date.now())]
+    );
   }
 
   //get cached settings (after load)

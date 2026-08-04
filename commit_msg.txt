@@ -1,6 +1,0 @@
-refactor(ui): restructure components directory and improve responsive layouts
-
-- Refactor (Structure): moved all React components from root components/ to src/components/ to consolidate source files.
-- Refactor (UI): updated starting.tsx and username.tsx to handle large screen layouts and preserve layout dimensions.
-- Feature (Settings): synchronized missing settings (autoStartMic, hasSeenOnboarding, username) to SettingsService.web.ts and added includeDateTime flag across all platforms.
-- Chore (CI): removed deprecated gitlab-ci.yml build pipeline.

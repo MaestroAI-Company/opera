@@ -1,6 +1,7 @@
 
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as MediaLibrary from 'expo-media-library/legacy';
 import { TextInputWrapper } from "expo-paste-input";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
@@ -34,6 +35,31 @@ const nextWhiteIcon = require("../../../assets/icons/arrow.png");
 const micIcon = require("../../../assets/icons/microphone.png");
 const addIcon = require("../../../assets/icons/add.png");
 const stopIcon = require("../../../assets/icons/stop.png");
+
+const IMAGE_MAX_WIDTH = 1280;
+const IMAGE_COMPRESS_QUALITY = 0.7;
+
+//compress and resize an image to a base64 data uri
+const compressImageToDataUri = async (uri: string): Promise<string> => {
+  try {
+    const context = ImageManipulator.manipulate(uri);
+    const preview = await context.renderAsync();
+    if (preview.width > IMAGE_MAX_WIDTH) {
+      context.reset();
+      context.resize({ width: IMAGE_MAX_WIDTH });
+    }
+    const ref = preview.width > IMAGE_MAX_WIDTH ? await context.renderAsync() : preview;
+    const result = await ref.saveAsync({
+      compress: IMAGE_COMPRESS_QUALITY,
+      format: SaveFormat.JPEG,
+      base64: true,
+    });
+    if (result.base64) return `data:image/jpeg;base64,${result.base64}`;
+  } catch (e) {
+    console.error('Failed to compress image:', e);
+  }
+  return uri;
+};
 
 type ChatInputBarProps = {
   onSend?: (message: string, images?: string[]) => void;
@@ -783,7 +809,12 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       return;
     }
     if ((text.trim() || selectedFiles.length > 0) && onSend) {
-      onSend(text.trim(), selectedFiles.map(f => f.type === 'audio' ? `${f.uri}?name=${encodeURIComponent(f.name)}` : f.uri));
+      const images = await Promise.all(
+        selectedFiles.map(f => f.type === 'image'
+          ? compressImageToDataUri(f.uri)
+          : Promise.resolve(`${f.uri}?name=${encodeURIComponent(f.name)}`))
+      );
+      onSend(text.trim(), images);
       setText("");
       setSelectedFiles([]);
     }

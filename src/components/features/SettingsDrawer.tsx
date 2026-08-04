@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Animated, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, DeviceEventEmitter, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AIModule } from "../../services/ai/AIModule";
 import { BackupService } from "../../services/BackupService";
 import { Settings } from "../../services/settings/SettingsService";
@@ -10,6 +10,10 @@ import Selector from "../ui/Selector";
 import TextInputField from "../ui/TextInputField";
 import ThemeSelector from "../ui/ThemeSelector";
 import Toggle from "../ui/Toggle";
+import CloudSyncBox from "./CloudSyncBox";
+import { CloudSync } from "../../services/CloudSyncService";
+import { CloudUserInfo } from "../../services/cloud/CloudProvider";
+import { CLOUD_PROVIDERS, getCloudProviderDefinition } from "../../services/cloud/registry";
 
 import { useResponsive } from "../../hooks/useResponsive";
 
@@ -46,7 +50,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [activeSubPage, setActiveSubPage] = useState<SubPage>(initialSubPage ?? "main");
 
   useEffect(() => {
-    if (visible) setActiveSubPage(initialSubPage ?? "main");
+    if (visible) {
+      setActiveSubPage(initialSubPage ?? "main");
+      CloudSync.requestAutoSync(0);
+      refreshLastSync();
+    }
   }, [visible, initialSubPage]);
 
   const [language, setLanguageState] = useState("en");
@@ -58,11 +66,24 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [isDownloading, setIsDownloading] = useState(false);
   const [gemmaDownloadProgress, setGemmaDownloadProgress] = useState<{ progress: number, etaSeconds: number, speedStr: string, sizeStr: string } | null>(null);
 
-  const [alertModalVisible, setAlertModalVisible] = useState(false);
-  const [alertConfig, setAlertConfig] = useState<{ title: string, message: string, buttons?: ModalButton[] }>({ title: '', message: '' });
+  const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
+  const [lastSyncSize, setLastSyncSize] = useState<number | null>(null);
 
-  const showAlert = (title: string, message: string, buttons?: ModalButton[]) => {
-    setAlertConfig({ title, message, buttons });
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{ 
+    title: string, 
+    message: string, 
+    buttons?: ModalButton[], 
+    showInput?: boolean, 
+    inputValue?: string, 
+    onInputChange?: (text: string) => void,
+    inputPlaceholder?: string,
+    inputSecureTextEntry?: boolean,
+    inputKeyboardType?: any,
+  }>({ title: '', message: '' });
+
+  const showAlert = (title: string, message: string, buttons?: ModalButton[], extraProps?: any) => {
+    setAlertConfig({ title, message, buttons, ...extraProps });
     setAlertModalVisible(true);
   };
   const [whisperModel, setWhisperModelState] = useState("none");
@@ -86,6 +107,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [includeDateTime, setIncludeDateTimeState] = useState(true);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
+  const [cloudProvider, setCloudProvider] = useState<string>("none");
+  const [cloudUserInfo, setCloudUserInfo] = useState<CloudUserInfo | null>(null);
+  const [hasSyncPin, setHasSyncPin] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
   const [ollamaModelOptions, setOllamaModelOptions] = useState<{ id: string, label: string }[]>([]);
 
   const languageOptions = [
@@ -95,6 +121,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const cloudStorageOptions = [
     { id: "none", label: "None" },
+    ...CLOUD_PROVIDERS.map(def => ({ id: def.id, label: def.label })),
   ];
 
   const aiServiceOptions = [
@@ -247,6 +274,22 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         Whisper.setLanguage(s.whisperLanguage);
       } catch (e) {
         console.warn("Failed to load settings", e);
+      }
+
+      try {
+        await CloudSync.init();
+        setCloudProvider(CloudSync.getProviderName());
+        setHasSyncPin(CloudSync.hasPin());
+        if (CloudSync.getProviderName() !== "none") {
+          const ui = await CloudSync.getUserInfo();
+          setCloudUserInfo(ui);
+          const time = await CloudSync.getLastSyncTime();
+          setLastSyncTime(time);
+          const size = await CloudSync.getLastSyncSize();
+          setLastSyncSize(size);
+        }
+      } catch (e) {
+        console.warn("Failed to init CloudSync", e);
       } finally {
         setSettingsLoaded(true);
       }
@@ -318,6 +361,161 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     setAlwaysWhisperState(v);
     Settings.set("alwaysWhisper", v);
   };
+
+  const completeCloudConnect = async (v: string) => {
+    const pinSet = CloudSync.hasPin();
+    setHasSyncPin(pinSet);
+    if (v !== "none") {
+      const ui = await CloudSync.getUserInfo();
+      setCloudUserInfo(ui);
+
+      //wait to avoid ui lag
+      setTimeout(async () => {
+        const cloudBackupExists = await CloudSync.hasCloudBackup();
+        if (cloudBackupExists) {
+          handleUnlockSyncPin();
+        } else {
+          handleCreateSyncPin();
+        }
+      }, 100);
+    } else {
+      setCloudUserInfo(null);
+    }
+  };
+
+  const connectProvider = async (providerName: string) => {
+    setCloudProvider(providerName);
+    const success = await CloudSync.setProvider(providerName);
+    if (success) {
+      await completeCloudConnect(providerName);
+    } else {
+      setCloudProvider("none");
+      setCloudUserInfo(null);
+      showAlert("Connection Error", `Could not connect to ${getCloudProviderDefinition(providerName)?.label ?? providerName}. Check your settings and try again.`);
+    }
+  };
+
+  const handleSetCloudProvider = async (v: string) => {
+    if (v === "none") {
+      setCloudProvider("none");
+      const success = await CloudSync.setProvider("none");
+      if (success) {
+        await completeCloudConnect("none");
+      }
+      return;
+    }
+
+    const def = getCloudProviderDefinition(v);
+    if (!def) return;
+
+    //providers with a setup component need config before connecting
+    if (def.SetupComponent && !(await CloudSync.isProviderConfigured(v))) {
+      if (cloudProvider !== "none") {
+        await CloudSync.setProvider("none");
+        setCloudUserInfo(null);
+        setHasSyncPin(false);
+      }
+      setCloudProvider(v);
+      return;
+    }
+
+    await connectProvider(v);
+  };
+
+  const handleCreateSyncPin = () => {
+    let currentInput = "";
+    showAlert("Create Sync PIN", "No cloud backup found. Create a 4 to 6 digit PIN. If you forget this PIN, you will lose access to your cloud backups.", [
+      { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+      { text: "Create", style: "primary", onPress: async () => {
+        if (currentInput.length >= 4 && currentInput.length <= 6) {
+          await CloudSync.setPin(currentInput);
+          setHasSyncPin(true);
+          setAlertModalVisible(false);
+          handleSyncNow();
+        } else {
+          setAlertModalVisible(false);
+          setTimeout(() => showAlert("Error", "PIN must be 4 to 6 digits."), 300);
+        }
+      }}
+    ], {
+      showInput: true,
+      inputPlaceholder: "Enter 4-6 digits",
+      inputSecureTextEntry: true,
+      inputKeyboardType: "numeric",
+      onInputChange: (text: string) => { 
+        currentInput = text; 
+        setAlertConfig(prev => ({ ...prev, inputValue: text }));
+      }
+    });
+  };
+
+  const handleUnlockSyncPin = () => {
+    let currentInput = "";
+    showAlert("Unlock Cloud Backup", "A cloud backup was found. Enter your PIN to unlock it and resume sync.", [
+      { text: "Forgot Code", onPress: handleForgetSyncPin, style: "danger" },
+      { text: "Unlock", style: "primary", onPress: async () => {
+        setAlertModalVisible(false);
+        const success = await CloudSync.verifyAndSetPin(currentInput);
+        if (success) {
+          setHasSyncPin(true);
+          setTimeout(() => showAlert("Success", "Backup unlocked successfully!"), 300);
+        } else {
+          setTimeout(() => showAlert("Error", "Incorrect PIN. Could not decrypt backup.", [
+             { text: "Try Again", onPress: handleUnlockSyncPin, style: "primary" },
+             { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" }
+          ]), 300);
+        }
+      }}
+    ], {
+      showInput: true,
+      inputPlaceholder: "Enter 4-6 digits",
+      inputSecureTextEntry: true,
+      inputKeyboardType: "numeric",
+      onInputChange: (text: string) => { 
+        currentInput = text; 
+        setAlertConfig(prev => ({ ...prev, inputValue: text }));
+      }
+    });
+  };
+
+  const handleForgetSyncPin = () => {
+    showAlert("Reset Backup?", "This will permanently delete your existing cloud backup so you can create a new PIN. Are you sure?", [
+      { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+      { text: "Delete & Reset", style: "danger", onPress: async () => {
+        await CloudSync.forgetCode();
+        setHasSyncPin(false);
+        setAlertModalVisible(false);
+        setTimeout(() => handleCreateSyncPin(), 400);
+      }}
+    ]);
+  };
+
+  const handleSyncNow = async () => {
+    setIsSyncing(true);
+    const result = await CloudSync.sync();
+    setIsSyncing(false);
+    if (result.success) {
+      onDataChanged?.();
+      await refreshLastSync();
+      showAlert("Success", "Data synchronized successfully.");
+    } else {
+      showAlert("Sync Error", result.error || "Unknown error occurred.");
+    }
+  };
+
+  const refreshLastSync = useCallback(async () => {
+    const time = await CloudSync.getLastSyncTime();
+    setLastSyncTime(time);
+    const size = await CloudSync.getLastSyncSize();
+    setLastSyncSize(size);
+  }, []);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener("SYNC_COMPLETED", () => {
+      refreshLastSync();
+    });
+    return () => sub.remove();
+  }, [refreshLastSync]);
 
   const fetchOllamaModels = useCallback(async () => {
     if (!settingsLoaded) return;
@@ -638,11 +836,29 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Cloud storage</Text>
         <Selector
           options={cloudStorageOptions}
-          selectedValue="none"
-          onSelect={() => { }}
+          selectedValue={cloudProvider}
+          onSelect={handleSetCloudProvider}
           title="Select Cloud Storage"
           fullWidth
         />
+        {cloudProvider !== "none" && !cloudUserInfo && (() => {
+          const def = getCloudProviderDefinition(cloudProvider);
+          if (!def?.SetupComponent) return null;
+          const Setup = def.SetupComponent;
+          return <Setup onDone={() => connectProvider(def.id)} />;
+        })()}
+        {cloudProvider !== "none" && (
+          <CloudSyncBox
+            userInfo={cloudUserInfo}
+            hasPin={hasSyncPin}
+            lastSyncTime={lastSyncTime}
+            lastSyncSize={lastSyncSize}
+            onSetPin={hasSyncPin ? () => {} : handleCreateSyncPin}
+            onDisconnect={() => handleSetCloudProvider("none")}
+            onSync={handleSyncNow}
+            isSyncing={isSyncing}
+          />
+        )}
       </View>
 
       <View style={styles.toggleRow}>
@@ -819,6 +1035,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         message={alertConfig.message}
         onClose={() => setAlertModalVisible(false)}
         buttons={alertConfig.buttons}
+        showInput={alertConfig.showInput}
+        inputValue={alertConfig.inputValue}
+        onInputChange={alertConfig.onInputChange}
+        inputPlaceholder={alertConfig.inputPlaceholder}
+        inputSecureTextEntry={alertConfig.inputSecureTextEntry}
+        inputKeyboardType={alertConfig.inputKeyboardType}
       />
     </>
   );

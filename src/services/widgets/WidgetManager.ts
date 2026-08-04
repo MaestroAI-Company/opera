@@ -52,6 +52,7 @@ class CentralWidgetManager {
     prompt += `\`\`\`\n\n`;
     prompt += `Only use the title attribute if the widget's aiDefinesTitle is true. The json data must conform to the widget's schema.\n`;
     prompt += `CRITICAL: The JSON data must be strictly valid. Do NOT use actual newlines inside strings (use \\n instead).\n`;
+    prompt += `CRITICAL: The WIDGET_ID MUST be one of the widget IDs listed below EXACTLY. Tool names (e.g. math_calculate, web_search, fetch_pages) are NOT widgets and must NEVER be used as a widget ID. Widgets and tools are two SEPARATE systems: tools are called through the tool-calling mechanism, never through a widget block. If a tool could help, call the tool instead of emitting a widget block.\n`;
     prompt += `Available Widgets (You MUST use the exact ID provided below as WIDGET_ID):\n`;
 
     for (const widget of enabledWidgets) {

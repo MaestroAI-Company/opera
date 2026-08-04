@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, StyleSheet, Text, View, Image } from "react-native";
 import MathText from "react-native-math";
-import { WidgetManager } from "../src/services/widgets/WidgetManager";
-import WidgetWrapper from "../src/components/widgets/WidgetWrapper";
+import { WidgetManager } from "../../services/widgets/WidgetManager";
+import WidgetWrapper from "../widgets/WidgetWrapper";
 
-const toolIcon = require("../assets/icons/tool.png");
+const toolIcon = require("../../assets/icons/tool.png");
 
 const ToolCallBubble = ({ toolName, isGenerating }: { toolName: string, isGenerating?: boolean }) => {
   const opacity = useRef(new Animated.Value(isGenerating ? 0.4 : 1)).current;

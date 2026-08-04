@@ -5,11 +5,16 @@
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/icons/opera.png",
-    "scheme": "opera",
+    "scheme": [
+      "opera",
+      "com.googleusercontent.apps.390321100520-3mi4mkdrdt8ke2nvl3ksbjef000ad5eg",
+      "com.googleusercontent.apps.390321100520-8pkv241s2finuqth4cc9h74ii4ph99af"
+    ],
     "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/icons/opera.png",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "ai.maestro.opera"
     },
     "android": {
       "adaptiveIcon": {
@@ -29,7 +34,11 @@
         "android.permission.READ_MEDIA_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
       ]
     },
     "web": {

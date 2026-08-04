@@ -14,21 +14,22 @@ import {
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackHandler } from 'react-native';
-import ChatBar, { ChatBarHandle } from '../../components/ChatBar';
-import NotificationModal from '../../components/NotificationModal';
-import { renderMarkdown, deriveChatDisplay, ChatDisplay } from '../../components/MarkdownText';
-import { Conversation, DB, Message } from '../services/db/DatabaseService';
-import { Settings } from '../services/settings/SettingsService';
-import { AIModule } from '../services/ai/AIModule';
-import { AICoreSTT } from '../services/ai/AICoreSpeechService';
-import { SYSTEM_PROMPTS } from '../../constants/prompts';
-import { Whisper } from '../services/whisper/WhisperService';
-import { NotificationService } from '../services/notifications/NotificationService';
-import ModelDropdown from '../../components/ModelDropdown';
-import SearchWebView from '../../components/SearchWebView';
-import { useResponsive } from '../hooks/useResponsive';
-import { WidgetManager } from '../services/widgets/WidgetManager';
-import { PluginRegistry } from '../services/plugins/PluginRegistry';
+import ChatBar, { ChatBarHandle } from './ChatBar';
+import NotificationModal from '../ui/NotificationModal';
+import { renderMarkdown, deriveChatDisplay, ChatDisplay } from '../ui/MarkdownText';
+import { Conversation, DB, Message } from '../../services/db/DatabaseService';
+import { Settings } from '../../services/settings/SettingsService';
+import { AIModule } from '../../services/ai/AIModule';
+import { AICoreSTT } from '../../services/ai/AICoreSpeechService';
+import { SYSTEM_PROMPTS } from '../../../constants/prompts';
+import { Whisper } from '../../services/whisper/WhisperService';
+import { NotificationService } from '../../services/notifications/NotificationService';
+import { CloudSync } from '../../services/CloudSyncService';
+import ModelDropdown from './ModelDropdown';
+import SearchWebView from '../../../components/SearchWebView';
+import { useResponsive } from '../../hooks/useResponsive';
+import { WidgetManager } from '../../services/widgets/WidgetManager';
+import { PluginRegistry } from '../../services/plugins/PluginRegistry';
 
 export default function AssistantOverlayWrapper() {
   return (
@@ -40,7 +41,7 @@ export default function AssistantOverlayWrapper() {
   );
 }
 
-const thinkingGif = require('../../assets/icons/thinking.gif');
+const thinkingGif = require('../../../assets/icons/thinking.gif');
 
 // isolated flashing text — never causes parent re-renders
 const FlashingText = React.memo(({ text }: { text: string }) => {
@@ -430,6 +431,7 @@ function AssistantOverlay() {
       }
     } else {
       await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
+      CloudSync.requestAutoSync(0); //push completed ai message right away
     }
 
     if (isFirstMessage && !isError) generateTitle(conv.id, text, images);

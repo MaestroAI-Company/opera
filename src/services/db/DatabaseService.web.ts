@@ -1,3 +1,5 @@
+import { DeviceEventEmitter } from 'react-native';
+
 export type Conversation = {
   id: string;
   name: string;
@@ -14,6 +16,12 @@ export type Message = {
   content: string;
   createdAt: number;
   images?: string[];
+};
+
+export type SyncTombstone = {
+  kind: 'conversation' | 'message';
+  id: string;
+  deletedAt: number;
 };
 
 class DatabaseService {
@@ -43,6 +51,39 @@ class DatabaseService {
     localStorage.setItem('opera_messages', JSON.stringify(this.messages));
   }
 
+  //get tombstones from localstorage
+  async getTombstones(): Promise<SyncTombstone[]> {
+    try {
+      const stored = localStorage.getItem('opera_tombstones');
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  //replace local tombstone registry
+  async setTombstones(items: SyncTombstone[]): Promise<void> {
+    localStorage.setItem('opera_tombstones', JSON.stringify(items));
+  }
+
+  //merge items into the local tombstone registry (keep newest deletedAt)
+  async recordTombstones(items: SyncTombstone[]): Promise<void> {
+    const existing = await this.getTombstones();
+    const map = new Map<string, SyncTombstone>();
+    for (const t of existing) map.set(t.kind + ':' + t.id, t);
+    for (const t of items) {
+      const key = t.kind + ':' + t.id;
+      const cur = map.get(key);
+      if (!cur || t.deletedAt > cur.deletedAt) map.set(key, t);
+    }
+    await this.setTombstones(Array.from(map.values()));
+  }
+
+  //clear all tombstones
+  async clearTombstones(): Promise<void> {
+    localStorage.removeItem('opera_tombstones');
+  }
+
   // create conversation
   async createConversation(model: string, firstName: string): Promise<Conversation> {
     const now = Date.now();
@@ -51,6 +92,7 @@ class DatabaseService {
     
     this.conversations.push(conv);
     this.saveConversations();
+    DeviceEventEmitter.emit('DATA_CHANGED');
     return conv;
   }
 
@@ -60,14 +102,16 @@ class DatabaseService {
       c.id === id ? { ...c, name, updatedAt: Date.now() } : c
     );
     this.saveConversations();
+    DeviceEventEmitter.emit('DATA_CHANGED');
   }
 
   // toggle pin status
   async togglePinConversation(id: string, pinned: boolean): Promise<void> {
     this.conversations = this.conversations.map(c => 
-      c.id === id ? { ...c, pinned: pinned ? 1 : 0 } : c
+      c.id === id ? { ...c, pinned: pinned ? 1 : 0, updatedAt: Date.now() } : c
     );
     this.saveConversations();
+    DeviceEventEmitter.emit('DATA_CHANGED');
   }
 
   // get conversations ordered by updated time
@@ -99,17 +143,25 @@ class DatabaseService {
   }
 
   // delete conversation and messages
-  async deleteConversation(id: string): Promise<void> {
+  async deleteConversation(id: string, opts?: { recordTombstone?: boolean }): Promise<void> {
+    if (opts?.recordTombstone !== false) {
+      await this.recordTombstones([{ kind: 'conversation', id, deletedAt: Date.now() }]);
+    }
     this.conversations = this.conversations.filter(c => c.id !== id);
     this.messages = this.messages.filter(m => m.conversationId !== id);
     this.saveConversations();
     this.saveMessages();
+    DeviceEventEmitter.emit('DATA_CHANGED');
   }
 
   // delete single message
-  async deleteMessage(id: string): Promise<void> {
+  async deleteMessage(id: string, opts?: { recordTombstone?: boolean }): Promise<void> {
+    if (opts?.recordTombstone !== false) {
+      await this.recordTombstones([{ kind: 'message', id, deletedAt: Date.now() }]);
+    }
     this.messages = this.messages.filter(m => m.id !== id);
     this.saveMessages();
+    DeviceEventEmitter.emit('DATA_CHANGED');
   }
 
   // add message to conversation
@@ -125,6 +177,7 @@ class DatabaseService {
     
     this.saveConversations();
     this.saveMessages();
+    DeviceEventEmitter.emit('DATA_CHANGED');
     return msg;
   }
 
@@ -134,6 +187,7 @@ class DatabaseService {
       m.id === id ? { ...m, content } : m
     );
     this.saveMessages();
+    DeviceEventEmitter.emit('DATA_CHANGED');
   }
 
   // get messages for conversation
@@ -150,18 +204,33 @@ class DatabaseService {
 
   // delete all data
   async deleteAllConversations(): Promise<void> {
+    await this.recordTombstones(this.conversations.map(c => ({ kind: 'conversation', id: c.id, deletedAt: Date.now() })));
     this.conversations = [];
     this.messages = [];
     this.saveConversations();
     this.saveMessages();
+    DeviceEventEmitter.emit('DATA_CHANGED');
   }
 
   // import backup data
-  async importBackup(conversations: Conversation[], messages: Message[]): Promise<void> {
+  async importBackup(conversations: Conversation[], messages: Message[], tombstones?: SyncTombstone[]): Promise<void> {
     this.conversations = conversations;
     this.messages = messages;
     this.saveConversations();
     this.saveMessages();
+    await this.setTombstones(tombstones ?? []);
+    DeviceEventEmitter.emit('DATA_CHANGED');
+  }
+
+  //replace a conversation and its messages (used by sync merge)
+  async replaceConversationWithMessages(conv: Conversation, messages: Message[]): Promise<void> {
+    this.conversations = this.conversations.filter(c => c.id !== conv.id);
+    this.messages = this.messages.filter(m => m.conversationId !== conv.id);
+    this.conversations.push(conv);
+    this.messages.push(...messages);
+    this.saveConversations();
+    this.saveMessages();
+    DeviceEventEmitter.emit('DATA_CHANGED');
   }
 }
 

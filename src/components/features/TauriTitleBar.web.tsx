@@ -54,7 +54,7 @@ export default function TauriTitleBar() {
   return (
     <View style={styles.container} pointerEvents="box-none">
       <View style={[styles.dragRegion, isMac && styles.dragRegionMac]} {...({ dataSet: { tauriDragRegion: true } } as any)}>
-        <Image source={require('../assets/images/icon_nobg.png')} style={[styles.icon, isMac && styles.iconMac, { pointerEvents: 'none' } as any]} />
+        <Image source={require('../../../assets/images/icon_nobg.png')} style={[styles.icon, isMac && styles.iconMac, { pointerEvents: 'none' } as any]} />
       </View>
       {!isMac && (
         <View style={styles.controls}>

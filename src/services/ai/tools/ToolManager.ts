@@ -1,6 +1,7 @@
 import { ITool, ToolCall, ToolDefinition } from './ITool';
 import { SearchTool } from './SearchTool';
 import { FetchPagesTool } from './FetchPagesTool';
+import { MathTool } from './MathTool';
 import { PluginRegistry } from '../../plugins/PluginRegistry';
 
 class ToolManagerService {
@@ -10,6 +11,7 @@ class ToolManagerService {
     //register built-in tools
     this.register(new SearchTool());
     this.register(new FetchPagesTool());
+    this.register(new MathTool());
   }
 
   //register a tool

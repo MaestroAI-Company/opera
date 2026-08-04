@@ -52,7 +52,7 @@ export function parseToolCalls(text: string, knownNames: string[]): ToolCall[] |
 //build system prompt with tool instructions
 export function buildToolSystemPrompt(systemPrompt: string, tools: ToolDefinition[]): string {
   return systemPrompt +
-    `\n\n[Available Tools]\n${JSON.stringify(tools, null, 2)}\n\nCRITICAL INSTRUCTION: If you need to call a tool, you MUST output ONLY the raw JSON block. DO NOT write any conversational text (e.g. "Je vais chercher..."). DO NOT wrap the JSON in markdown backticks. Output EXACTLY and ONLY this format:\n{"tool_calls":[{"function":{"name":"<tool_name>","arguments":{<args>}}}]}\nIf you do not need tools, respond normally.`;
+    `\n\n[Available Tools]\n${JSON.stringify(tools, null, 2)}\n\nCRITICAL INSTRUCTION: If you need to call a tool, you MUST output ONLY the raw JSON block. DO NOT write any conversational text (e.g. "Je vais chercher..."). DO NOT wrap the JSON in markdown backticks. Output EXACTLY and ONLY this format:\n{"tool_calls":[{"function":{"name":"<tool_name>","arguments":{<args>}}}]}\nTools are called ONLY through this {"tool_calls":[...]} JSON block. Tools are NOT widgets: never emit a widget block (a fenced widget code block) to use a tool, and never use a tool name as a widget ID. Widget blocks are for the widgets listed in the WIDGET SYSTEM section only. If you do not need tools, respond normally.`;
 }
 
 //format tool results into prompt

@@ -4,10 +4,12 @@ import { CloudUserInfo } from '../../services/cloud/CloudProvider';
 
 type CloudSyncBoxProps = {
   userInfo: CloudUserInfo | null;
-  hasPin: boolean;
+  status: "locked" | "ready";
+  hasBackup: boolean;
   lastSyncTime?: number | null;
   lastSyncSize?: number | null;
-  onSetPin: () => void;
+  onEnterPin: () => void;
+  onCreatePin: () => void;
   onDisconnect: () => void;
   onSync: () => void;
   isSyncing: boolean;
@@ -21,15 +23,19 @@ const formatSize = (bytes: number): string => {
 
 export default function CloudSyncBox({
   userInfo,
-  hasPin,
+  status,
+  hasBackup,
   lastSyncTime,
   lastSyncSize,
-  onSetPin,
+  onEnterPin,
+  onCreatePin,
   onDisconnect,
   onSync,
   isSyncing,
 }: CloudSyncBoxProps) {
   if (!userInfo) return null;
+
+  const locked = status === "locked";
 
   return (
     <View style={styles.container}>
@@ -47,11 +53,9 @@ export default function CloudSyncBox({
 
       <View style={styles.statusRow}>
         <Text style={styles.statusText}>
-          {!hasPin ? 'Encryption PIN missing' : 
-           lastSyncTime ? `Last synced: ${new Date(lastSyncTime).toLocaleString()}` : 
-           'Ready to sync'}
+          {locked ? "Setup not finished" : lastSyncTime ? `Last synced: ${new Date(lastSyncTime).toLocaleString()}` : "Ready to sync"}
         </Text>
-        {hasPin && lastSyncTime && lastSyncSize != null && (
+        {!locked && lastSyncTime && lastSyncSize != null && (
           <Text style={styles.statusText}>
             Backup size: {formatSize(lastSyncSize)}
           </Text>
@@ -59,15 +63,21 @@ export default function CloudSyncBox({
       </View>
 
       <View style={styles.actionsRow}>
-        {!hasPin ? (
-          <Pressable style={styles.actionBtn} onPress={onSetPin}>
-            <Text style={styles.actionBtnText}>Set Code</Text>
-          </Pressable>
+        {locked ? (
+          hasBackup ? (
+            <Pressable style={styles.actionBtn} onPress={onEnterPin}>
+              <Text style={styles.actionBtnText}>Enter PIN</Text>
+            </Pressable>
+          ) : (
+            <Pressable style={styles.actionBtn} onPress={onCreatePin}>
+              <Text style={styles.actionBtnText}>Create PIN</Text>
+            </Pressable>
+          )
         ) : (
           <>
             <Pressable style={[styles.actionBtn, styles.syncBtn]} onPress={onSync} disabled={isSyncing}>
-              <Text style={[styles.actionBtnText, { color: '#fff' }]}>
-                {isSyncing ? 'Syncing...' : 'Sync Now'}
+              <Text style={[styles.actionBtnText, { color: "#fff" }]}>
+                {isSyncing ? "Syncing..." : "Sync Now"}
               </Text>
             </Pressable>
             <Pressable style={styles.actionBtnDanger} onPress={onDisconnect}>

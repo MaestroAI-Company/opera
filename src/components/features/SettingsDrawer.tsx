@@ -121,6 +121,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [cloudProvider, setCloudProvider] = useState<string>("none");
   const [cloudUserInfo, setCloudUserInfo] = useState<CloudUserInfo | null>(null);
   const [hasSyncPin, setHasSyncPin] = useState(false);
+  const [hasCloudBackup, setHasCloudBackup] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
   const [ollamaModelOptions, setOllamaModelOptions] = useState<{ id: string, label: string }[]>([]);
@@ -298,6 +299,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           setLastSyncTime(time);
           const size = await CloudSync.getLastSyncSize();
           setLastSyncSize(size);
+          setHasCloudBackup(await CloudSync.hasCloudBackup());
         }
       } catch (e) {
         console.warn("Failed to init CloudSync", e);
@@ -397,6 +399,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       //wait to avoid ui lag
       setTimeout(async () => {
         const cloudBackupExists = await CloudSync.hasCloudBackup();
+        setHasCloudBackup(cloudBackupExists);
         if (cloudBackupExists) {
           handleUnlockSyncPin();
         } else {
@@ -405,6 +408,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       }, 100);
     } else {
       setCloudUserInfo(null);
+      setHasSyncPin(false);
+      setHasCloudBackup(false);
     }
   };
 
@@ -541,6 +546,14 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     });
     return () => sub.remove();
   }, [refreshLastSync]);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener("SYNC_PIN_INVALIDATED", async () => {
+      setHasSyncPin(false);
+      setHasCloudBackup(await CloudSync.hasCloudBackup());
+    });
+    return () => sub.remove();
+  }, []);
 
   const fetchOllamaModels = useCallback(async () => {
     if (!settingsLoaded) return;
@@ -875,10 +888,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         {cloudProvider !== "none" && (
           <CloudSyncBox
             userInfo={cloudUserInfo}
-            hasPin={hasSyncPin}
+            status={hasSyncPin ? "ready" : "locked"}
+            hasBackup={hasCloudBackup}
             lastSyncTime={lastSyncTime}
             lastSyncSize={lastSyncSize}
-            onSetPin={hasSyncPin ? () => {} : handleCreateSyncPin}
+            onEnterPin={handleUnlockSyncPin}
+            onCreatePin={handleCreateSyncPin}
             onDisconnect={() => handleSetCloudProvider("none")}
             onSync={handleSyncNow}
             isSyncing={isSyncing}

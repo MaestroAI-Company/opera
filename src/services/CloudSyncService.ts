@@ -122,6 +122,7 @@ class CloudSyncServiceImpl {
       this.lastSaltB64 = null;
       await this.setStorageItem(CLOUD_PROVIDER_KEY, null);
       await this.setStorageItem(LAST_SYNC_SIZE_KEY, null);
+      await this.clearPin();
       return true;
     }
 
@@ -190,11 +191,15 @@ class CloudSyncServiceImpl {
     if (this.provider) {
       await this.provider.deleteFile(SYNC_FILE_NAME);
     }
+    await this.clearPin();
+    await this.setStorageItem(LAST_SYNC_SIZE_KEY, null);
+  }
+
+  private async clearPin(): Promise<void> {
     this.pin = null;
     this.keyCache.clear();
     this.lastSaltB64 = null;
     await this.setStorageItem(SYNC_PIN_KEY, null);
-    await this.setStorageItem(LAST_SYNC_SIZE_KEY, null);
   }
 
   private deriveKey(pin: string, saltB64: string, iterations: number): CryptoJS.lib.WordArray {
@@ -265,6 +270,9 @@ class CloudSyncServiceImpl {
       if (encryptedCloudData) {
         const decryptedStr = this.decrypt(encryptedCloudData, this.pin);
         if (!decryptedStr) {
+          //code no longer valid, clear stored pin
+          await this.clearPin();
+          DeviceEventEmitter.emit('SYNC_PIN_INVALIDATED');
           if (isBackground) this.isAutoSyncing = false;
           return { success: false, error: 'Invalid PIN. Could not decrypt cloud backup.' };
         }

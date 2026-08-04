@@ -18,6 +18,8 @@ export type NotificationModalProps = {
   inputValue?: string;
   onInputChange?: (text: string) => void;
   inputPlaceholder?: string;
+  inputSecureTextEntry?: boolean;
+  inputKeyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
 
   //custom buttons (up to 3)
   buttons?: ModalButton[];
@@ -34,6 +36,8 @@ export default function NotificationModal({
   inputValue,
   onInputChange,
   inputPlaceholder,
+  inputSecureTextEntry,
+  inputKeyboardType,
   buttons,
   onClose,
 }: NotificationModalProps) {
@@ -65,9 +69,11 @@ export default function NotificationModal({
           {showInput && (
             <View style={styles.inputContainer}>
               <TextInputField
-                value={inputValue}
+                value={inputValue || ""}
                 onChangeText={onInputChange}
                 placeholder={inputPlaceholder}
+                secureTextEntry={inputSecureTextEntry}
+                keyboardType={inputKeyboardType}
               />
             </View>
           )}

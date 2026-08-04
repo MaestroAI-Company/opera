@@ -5,7 +5,11 @@
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/icons/opera.png",
-    "scheme": "opera",
+    "scheme": [
+      "opera",
+      "com.googleusercontent.apps.390321100520-3mi4mkdrdt8ke2nvl3ksbjef000ad5eg",
+      "com.googleusercontent.apps.390321100520-8pkv241s2finuqth4cc9h74ii4ph99af"
+    ],
     "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/icons/opera.png",

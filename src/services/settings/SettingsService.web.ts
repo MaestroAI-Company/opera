@@ -89,17 +89,43 @@ class SettingsService {
     }
   }
 
+  //timestamp of last local settings change
+  async getSettingsUpdatedAt(): Promise<number> {
+    const stored = localStorage.getItem('opera_settings_updated_at');
+    return stored ? (parseInt(stored, 10) || 0) : 0;
+  }
+
+  //force the settings timestamp (used by sync merge)
+  async setSettingsUpdatedAt(value: number): Promise<void> {
+    localStorage.setItem('opera_settings_updated_at', String(value));
+  }
+
+  private bumpSettingsUpdatedAt(): void {
+    localStorage.setItem('opera_settings_updated_at', String(Date.now()));
+  }
+
   // set single key-value
   async set<K extends keyof AppSettings>(key: K, value: AppSettings[K]): Promise<void> {
     if (!this.cache) {
       this.cache = { ...DEFAULTS };
     }
     (this.cache as any)[key] = value;
+    this.bumpSettingsUpdatedAt();
     this.save();
   }
 
   // set multiple settings
   async setMany(partial: Partial<AppSettings>): Promise<void> {
+    if (!this.cache) {
+      this.cache = { ...DEFAULTS };
+    }
+    Object.assign(this.cache, partial);
+    this.bumpSettingsUpdatedAt();
+    this.save();
+  }
+
+  //apply cloud settings without bumping local timestamp
+  async applyCloudSettings(partial: Partial<AppSettings>): Promise<void> {
     if (!this.cache) {
       this.cache = { ...DEFAULTS };
     }

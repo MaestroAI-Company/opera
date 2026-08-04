@@ -1,3 +1,4 @@
+import "react-native-get-random-values";
 import { Buffer } from "buffer";
 import * as Device from "expo-device";
 import { useFonts } from "expo-font";
@@ -11,8 +12,11 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import SplashScreenComponent from "../components/ui/SplashScreen";
 import TauriTitleBar from "../components/features/TauriTitleBar";
 
+import * as WebBrowser from "expo-web-browser";
+
 global.Buffer = global.Buffer || Buffer;
 
+WebBrowser.maybeCompleteAuthSession();
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {

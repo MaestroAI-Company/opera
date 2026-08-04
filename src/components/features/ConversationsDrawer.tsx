@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, Image, Keyboard, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useResponsive } from "../../hooks/useResponsive";
 import { Conversation, DB } from "../../services/db/DatabaseService";
+import { CloudSync } from "../../services/CloudSyncService";
 import NotificationModal from "../ui/NotificationModal";
 
 const searchIcon = require("../../../assets/icons/search.png");
@@ -107,6 +108,7 @@ export default function ConversationsDrawer({
 
   useEffect(() => {
     if (visible) {
+      CloudSync.requestAutoSync(0);
       Keyboard.dismiss();
       const anims = [];
       if (isDesktop) {

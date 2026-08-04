@@ -16,7 +16,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { BackHandler } from 'react-native';
 import ChatBar, { ChatBarHandle } from '../../components/ChatBar';
 import NotificationModal from '../../components/NotificationModal';
-import { renderMarkdown, hasConversationalText } from '../../components/MarkdownText';
+import { renderMarkdown, deriveChatDisplay, ChatDisplay } from '../../components/MarkdownText';
 import { Conversation, DB, Message } from '../services/db/DatabaseService';
 import { Settings } from '../services/settings/SettingsService';
 import { AIModule } from '../services/ai/AIModule';
@@ -62,17 +62,6 @@ const FlashingText = React.memo(({ text }: { text: string }) => {
   );
 });
 
-function extractThinkStep(thinkingText: string): string {
-  const stepRegex = /^\s*(?:(?:\d+[.)!]|[-*])\s*)?\*\*(.*?)\*\*/gm;
-  const steps: string[] = [];
-  let match: RegExpExecArray | null;
-  while ((match = stepRegex.exec(thinkingText)) !== null) {
-    steps.push(match[1].replace(/:$/, '').trim());
-  }
-  if (steps.length > 0) return `${steps.length}. ${steps[steps.length - 1]}`;
-  const lines = thinkingText.split('\n').filter(l => l.trim().length > 0);
-  return lines.length > 0 ? lines[lines.length - 1] : 'Thinking...';
-}
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -536,40 +525,22 @@ function AssistantOverlay() {
     ? [...messages].reverse().find(m => m.role === 'assistant') ?? null
     : null;
 
-  let isThinking = false;
-  let hasThinkingText = false;
-  let currentThought = 'Thinking...';
-  let finalContent = '…';
   let isGenerating = false;
-  let showMarkdown = false;
+  let disp: ChatDisplay = {
+    thinkingText: '', toolNames: [], finalContent: '',
+    showThinkingRow: false, showMarkdown: false, currentThought: '',
+  };
 
   if (lastMsg) {
     isGenerating = generatingConvId === activeConversation?.id
       && streamingMsgIdRef.current === lastMsg.id;
     const streamText = isGenerating ? streamingContentRef.current : lastMsg.content;
-    const thinkMatches = [...streamText.matchAll(/<think>([\s\S]*?)(?:<\/think>|$)/g)];
-    hasThinkingText = thinkMatches.length > 0;
-    const thinkingText = thinkMatches.map(m => m[1].trim()).filter(t => t.length > 0).join('\n');
-      
-    const displayContent = streamText.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
-    finalContent = displayContent.length > 0 ? displayContent : "…";
-
-    const hasConvText = hasConversationalText(streamText);
-    
-    const showToolBubble = activeTool.name !== null && !hasThinkingText;
-    showMarkdown = hasConvText || (!isGenerating && finalContent !== "…" && finalContent !== "") || (showToolBubble && finalContent !== "…");
-    isThinking = isGenerating && (!hasConvText || hasThinkingText) && !(showToolBubble && finalContent !== "…");
-
-    if (hasThinkingText) currentThought = extractThinkStep(thinkingText);
-    else currentThought = '';
-
-    if (activeTool.name && !showMarkdown) {
-      if (activeTool.name === 'web_search') {
-        currentThought = `Searching the web for "${activeTool.args?.query || ''}"...`;
-      } else {
-        currentThought = `Running tool: ${activeTool.name}...`;
-      }
-    }
+    disp = deriveChatDisplay(
+      streamText,
+      isGenerating,
+      activeTool,
+      modelCapabilities.includes('thinking') && selectedReflection !== 'none'
+    );
   }
 
   return (
@@ -613,14 +584,14 @@ function AssistantOverlay() {
               <Animated.View style={[styles.pullIndicator, { opacity: handleOpacity }]} />
 
               <ScrollView style={styles.bubbleScroll} showsVerticalScrollIndicator={false}>
-                {isThinking && (
+                {disp.showThinkingRow && (
                   <View style={styles.thinkingContainer}>
                     <Image source={thinkingGif} style={styles.thinkingIcon} resizeMode="contain" />
-                    {!!currentThought && <FlashingText text={currentThought} />}
+                    {!!disp.currentThought && <FlashingText text={disp.currentThought} />}
                   </View>
                 )}
-                {showMarkdown && (
-                  renderMarkdown(finalContent, false, isGenerating)
+                {disp.showMarkdown && (
+                  renderMarkdown(disp.finalContent, false, isGenerating)
                 )}
               </ScrollView>
             </Animated.View>

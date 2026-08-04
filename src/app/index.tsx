@@ -851,6 +851,7 @@ export default function Index() {
                   setSettingsInitialSubPage("confidentiality");
                   setSettingsDrawerVisible(true);
                 }}
+                canThink={modelCapabilities.includes("thinking") && selectedReflection !== "none"}
               />
             )}
 

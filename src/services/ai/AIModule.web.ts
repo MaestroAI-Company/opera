@@ -165,9 +165,23 @@ class CentralAIModule {
       return;
     }
 
-    //tool call loop (max 3 rounds)
+    //tool call loop: keep calling tools until the model answers (max 5 rounds)
     let currentMessages = [...processedMessages];
-    for (let round = 0; round < 3; round++) {
+
+    const summarize = async (text: string): Promise<string> => {
+      let summary = '';
+      await provider.sendMessage(
+        modelName, SYSTEM_PROMPTS.SEARCH_SUMMARIZE,
+        [{ role: 'user', content: text }],
+        chunk => { summary += chunk; },
+        signal,
+        { think: false }
+      );
+      return summary;
+    };
+
+    //one model round: stream, parse tool calls, execute them. returns true if tools ran
+    const runToolRound = async (): Promise<boolean> => {
       //use native tool calling or fallback to prompt injection (aicore method)
       const result = supportsTools
         ? await provider.sendMessage(
@@ -176,25 +190,12 @@ class CentralAIModule {
           )
         : await sendMessageWithToolPrompt(provider, modelName, enhancedPrompt, currentMessages, onChunk, signal, options, tools);
 
-      if (!result?.toolCalls || result.toolCalls.length === 0) return;
+      if (!result?.toolCalls || result.toolCalls.length === 0) return false;
 
-      //summarize callback for tools that need it
-      const summarize = async (text: string): Promise<string> => {
-        let summary = '';
-        await provider.sendMessage(
-          modelName, SYSTEM_PROMPTS.SEARCH_SUMMARIZE,
-          [{ role: 'user', content: text }],
-          chunk => { summary += chunk; },
-          signal,
-          { think: false }
-        );
-        return summary;
-      };
-
-      //add assistant message with tool_calls to history
+      //add assistant message with tool_calls to history (keep only visible text)
       currentMessages.push({
         role: 'assistant',
-        content: result.content || '',
+        content: (result.content || '').replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim(),
         tool_calls: result.toolCalls,
       });
 
@@ -204,16 +205,26 @@ class CentralAIModule {
         this.SharedGenerationState.activeToolName = toolName;
         this.SharedGenerationState.activeToolArgs = tc.function.arguments;
         this.SharedGenerationState.notify();
-        
+
         const toolResult = await ToolManager.execute(tc.function.name, tc.function.arguments, summarize);
-        
+
         this.SharedGenerationState.activeToolName = null;
         this.SharedGenerationState.activeToolArgs = null;
         this.SharedGenerationState.notify();
-        
+
         currentMessages.push({ role: 'tool', content: toolResult });
       }
+      return true;
+    };
+
+    const MAX_TOOL_ROUNDS = 5;
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      if (!(await runToolRound())) return;
     }
+
+    //cap reached while the model kept requesting tools: force one final generation
+    //round so the answer is never lost after the last tool call
+    await runToolRound();
   }
 }
 

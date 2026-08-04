@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Animated, Image, Keyboard, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { useResponsive } from "../src/hooks/useResponsive";
-import { Conversation, DB } from "../src/services/db/DatabaseService";
-import NotificationModal from "./NotificationModal";
+import { useResponsive } from "../../hooks/useResponsive";
+import { Conversation, DB } from "../../services/db/DatabaseService";
+import { CloudSync } from "../../services/CloudSyncService";
+import NotificationModal from "../ui/NotificationModal";
 
-const searchIcon = require("../assets/icons/search.png");
-const newIcon = require("../assets/icons/add.png");
-const deleteIcon = require("../assets/icons/delete.png");
-const pinIcon = require("../assets/icons/pin.png");
-const unpinIcon = require("../assets/icons/unpin.png");
-const arrowIcon = require("../assets/icons/arrow.png");
+const searchIcon = require("../../../assets/icons/search.png");
+const newIcon = require("../../../assets/icons/add.png");
+const deleteIcon = require("../../../assets/icons/delete.png");
+const pinIcon = require("../../../assets/icons/pin.png");
+const unpinIcon = require("../../../assets/icons/unpin.png");
+const arrowIcon = require("../../../assets/icons/arrow.png");
 
 type ConversationsDrawerProps = {
   visible: boolean;
@@ -107,6 +108,7 @@ export default function ConversationsDrawer({
 
   useEffect(() => {
     if (visible) {
+      CloudSync.requestAutoSync(0);
       Keyboard.dismiss();
       const anims = [];
       if (isDesktop) {

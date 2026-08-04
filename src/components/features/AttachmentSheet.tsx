@@ -8,9 +8,9 @@ import {
   View,
 } from 'react-native';
 
-const cameraIcon = require("../assets/icons/camera.png");
-const fileIcon = require("../assets/icons/file.png");
-const photoIcon = require("../assets/icons/photo.png");
+const cameraIcon = require("../../../assets/icons/camera.png");
+const fileIcon = require("../../../assets/icons/file.png");
+const photoIcon = require("../../../assets/icons/photo.png");
 
 export type SelectedFile = { uri: string; type: string; name: string };
 

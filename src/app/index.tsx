@@ -1,8 +1,9 @@
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AppState,
   BackHandler,
+  DeviceEventEmitter,
   Image,
   ImageBackground,
   Keyboard,
@@ -16,17 +17,17 @@ import {
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import ChatBar from "../../components/ChatBar";
-import ChatView from "../../components/ChatView";
-import ConversationsDrawer from "../../components/ConversationsDrawer";
-import ModelDropdown from "../../components/ModelDropdown";
-import SettingsDrawer from "../../components/SettingsDrawer";
+import ChatBar from "../components/features/ChatBar";
+import ChatView from "../components/features/ChatView";
+import ConversationsDrawer from "../components/features/ConversationsDrawer";
+import ModelDropdown from "../components/features/ModelDropdown";
+import SettingsDrawer from "../components/features/SettingsDrawer";
 import SearchWebView from "../../components/SearchWebView";
-import TopBar from "../../components/TopBar";
+import TopBar from "../components/features/TopBar";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { useResponsive } from "../hooks/useResponsive";
-import { AIModule } from "../services/ai/AIModule";
 import { AICoreSTT } from "../services/ai/AICoreSpeechService";
+import { AIModule } from "../services/ai/AIModule";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
 import { Settings } from "../services/settings/SettingsService";
 import { Whisper } from "../services/whisper/WhisperService";
@@ -41,6 +42,7 @@ const settingsIcon = require("../../assets/icons/settings.png");
 
 export default function Index() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { isLargeScreen, isDesktop } = useResponsive();
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedReflection, setSelectedReflection] = useState("none");
@@ -194,6 +196,12 @@ export default function Index() {
         const s = await Settings.load();
         await PluginRegistry.init();
         await PluginRegistry.loadAll();
+
+        if (!s.hasSeenOnboarding) {
+          router.replace("/starting");
+          return;
+        }
+
         setUserInstruction(s.instruction);
         if (s.ollamaModel) {
           setSelectedModel(s.ollamaModel);
@@ -269,6 +277,15 @@ export default function Index() {
     return () => {
       subscription.remove();
     };
+  }, [dbReady]);
+
+  //refresh conversation list on any db change (including cloud merges)
+  useEffect(() => {
+    if (!dbReady) return;
+    const sub = DeviceEventEmitter.addListener("DATA_CHANGED", () => {
+      loadConversations();
+    });
+    return () => sub.remove();
   }, [dbReady]);
 
   //load messages when a conversation is selected
@@ -579,12 +596,12 @@ export default function Index() {
   //transcribe audio: use remote model if it supports audio and user hasnt forced whisper
   const handleTranscribe = useCallback(async (wavBuffer: ArrayBuffer): Promise<string | null> => {
     const useRemote = !alwaysWhisper && modelCapabilities.includes("audio") && selectedModel;
-    
+
     const transcribeWithWhisper = async () => {
       if (!Whisper.isAvailable()) {
         const modelName = Settings.getCached().whisperModel || "base";
         if (modelName !== "none" && await Whisper.isModelInstalled(modelName)) {
-           await Whisper.init(modelName);
+          await Whisper.init(modelName);
         }
       }
       if (Whisper.isAvailable()) {

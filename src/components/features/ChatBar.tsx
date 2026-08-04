@@ -201,25 +201,12 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const autoStartedRef = useRef(false);
 
-  const barTranslateY = useRef(new Animated.Value(0)).current;
-  const sheetTranslateY = useRef(new Animated.Value(Dimensions.get('window').height)).current;
-  const sheetHeightRef = useRef(300);
+  const sheetHeightAnim = useRef(new Animated.Value(0)).current;
+  const spacerHeightAnim = useRef(new Animated.Value(insets.bottom)).current;
+  const targetSheetHeight = useRef(200);
 
   const closeSheet = () => {
-    Animated.parallel([
-      Animated.timing(barTranslateY, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-      Animated.timing(sheetTranslateY, {
-        toValue: Dimensions.get('window').height,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setIsAttachmentSheetVisible(false);
-    });
+    setIsAttachmentSheetVisible(false);
   };
 
   const handlePanResponder = useRef(
@@ -227,29 +214,19 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       onStartShouldSetPanResponder: () => true,
       onPanResponderMove: (e, gestureState) => {
         if (gestureState.dy > 0) {
-          const openY = -(sheetHeightRef.current - insets.bottom);
-          barTranslateY.setValue(Math.min(0, openY + gestureState.dy));
-          sheetTranslateY.setValue(Math.max(0, gestureState.dy));
+          sheetHeightAnim.setValue(Math.max(0, targetSheetHeight.current - gestureState.dy));
         }
       },
       onPanResponderRelease: (e, gestureState) => {
         if (gestureState.dy > 100 || gestureState.vy > 0.5) {
           closeSheet();
         } else {
-          Animated.parallel([
-            Animated.spring(barTranslateY, {
-              toValue: -(sheetHeightRef.current - insets.bottom),
-              useNativeDriver: true,
-              bounciness: 4,
-              speed: 12,
-            }),
-            Animated.spring(sheetTranslateY, {
-              toValue: 0,
-              useNativeDriver: true,
-              bounciness: 4,
-              speed: 12,
-            }),
-          ]).start();
+          Animated.spring(sheetHeightAnim, {
+            toValue: targetSheetHeight.current,
+            useNativeDriver: false,
+            bounciness: 4,
+            speed: 12,
+          }).start();
         }
       },
     })
@@ -432,19 +409,19 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
   useEffect(() => {
     if (isAttachmentSheetVisible) {
-      Animated.spring(barTranslateY, {
-        toValue: -(sheetHeightRef.current - insets.bottom),
-        useNativeDriver: true,
-        bounciness: 4,
-        speed: 12,
-      }).start();
-
-      Animated.spring(sheetTranslateY, {
-        toValue: 0,
-        useNativeDriver: true,
-        bounciness: 4,
-        speed: 12,
-      }).start();
+      Animated.parallel([
+        Animated.spring(sheetHeightAnim, {
+          toValue: targetSheetHeight.current,
+          useNativeDriver: false,
+          bounciness: 4,
+          speed: 12,
+        }),
+        Animated.timing(spacerHeightAnim, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: false,
+        })
+      ]).start();
 
       const getRecentPhotos = async () => {
         const { status } = await MediaLibrary.getPermissionsAsync();
@@ -458,6 +435,19 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         }
       };
       getRecentPhotos();
+    } else {
+      Animated.parallel([
+        Animated.timing(sheetHeightAnim, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: false,
+        }),
+        Animated.timing(spacerHeightAnim, {
+          toValue: insets.bottom,
+          duration: 250,
+          useNativeDriver: false,
+        })
+      ]).start();
     }
   }, [isAttachmentSheetVisible]);
 
@@ -507,16 +497,20 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   };
 
   const handleSelectRecentPhoto = (photo: any) => {
-    const isSelected = selectedFiles.some(f => f.uri === (photo.uri || photo.localUri));
-    if (isSelected) {
-      setSelectedFiles(prev => prev.filter(f => f.uri !== (photo.uri || photo.localUri)));
-    } else {
-      setSelectedFiles(prev => [...prev, {
-        uri: photo.uri || photo.localUri,
-        type: 'image',
-        name: photo.filename || 'recent_photo.jpg'
-      }]);
-    }
+    setSelectedFiles(prev => {
+      const targetUri = photo.uri || photo.localUri;
+      const isSelected = prev.some(f => (f.id && f.id === photo.id) || f.uri === targetUri);
+      if (isSelected) {
+        return prev.filter(f => !((f.id && f.id === photo.id) || f.uri === targetUri));
+      } else {
+        return [...prev, {
+          uri: targetUri,
+          type: 'image',
+          name: photo.filename || 'recent_photo.jpg',
+          id: photo.id
+        }];
+      }
+    });
   };
 
   const handleLongPressRecentPhoto = (photo: any) => {
@@ -900,8 +894,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       enabled={enabled}
       style={{ width: '100%', maxWidth: 840, alignSelf: 'center' }}
     >
-      <View style={{ width: '100%', alignItems: 'center', zIndex: 2, elevation: 9, paddingBottom: insets.bottom }}>
-        <Animated.View style={{ width: '100%', maxWidth: 800, transform: [{ translateY: barTranslateY }], zIndex: 2, elevation: 9 }}>
+      <View style={{ width: '100%', alignItems: 'center', zIndex: 2, elevation: 9 }}>
+        <Animated.View style={{ width: '100%', maxWidth: 800, zIndex: 2, elevation: 9 }}>
           <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.pressableWrapper}>
             <Animated.View style={{ transform: [{ scale }] }}>
               {selectedFiles.length > 0 && (
@@ -1002,27 +996,24 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         </Animated.View>
       </View>
 
+      <Animated.View style={{ width: '100%', height: spacerHeightAnim }} />
+
       {/* attachment sheet */}
       <Animated.View
-        pointerEvents={isAttachmentSheetVisible ? 'auto' : 'none'}
         style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 1,
-          opacity: isAttachmentSheetVisible ? 1 : 0,
-          transform: [{ translateY: sheetTranslateY }],
+          height: sheetHeightAnim,
+          overflow: 'hidden',
+          width: '100%',
         }}
       >
         <View onLayout={(e) => {
           const newHeight = Math.max(150, e.nativeEvent.layout.height);
-          if (sheetHeightRef.current !== newHeight) {
-            sheetHeightRef.current = newHeight;
+          if (targetSheetHeight.current !== newHeight) {
+            targetSheetHeight.current = newHeight;
             if (isAttachmentSheetVisible) {
-              Animated.spring(barTranslateY, {
-                toValue: -(newHeight - insets.bottom),
-                useNativeDriver: true,
+              Animated.spring(sheetHeightAnim, {
+                toValue: newHeight,
+                useNativeDriver: false,
                 bounciness: 4,
                 speed: 12,
               }).start();

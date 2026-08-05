@@ -1,10 +1,42 @@
-import React, { useState } from "react";
-import { Linking, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { Animated, Linking, StyleSheet, Text, View, Image } from "react-native";
 import MathText from "react-native-math";
 import AutoHeightWebView from "react-native-autoheight-webview";
 import CodeHighlighter from "react-native-code-highlighter";
 import { vs2015 } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { WidgetManager } from "../../services/widgets/WidgetManager";
+import WidgetWrapper from "../widgets/WidgetWrapper";
+
+const toolIcon = require("../../../assets/icons/tool.png");
+
+const ToolCallBubble = ({ toolName, isGenerating }: { toolName: string, isGenerating?: boolean }) => {
+  const opacity = useRef(new Animated.Value(isGenerating ? 0.4 : 1)).current;
+
+  useEffect(() => {
+    if (isGenerating) {
+      const anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(opacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.4, duration: 600, useNativeDriver: true }),
+        ])
+      );
+      anim.start();
+      return () => anim.stop();
+    } else {
+      opacity.setValue(1);
+    }
+  }, [isGenerating, opacity]);
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.04)', padding: 10, borderRadius: 12, marginVertical: 6, alignSelf: 'flex-start' }}>
+      <Image source={toolIcon} style={{ width: 18, height: 18, marginRight: 8, opacity: 0.7, tintColor: '#666' }} />
+      <Animated.Text style={{ fontFamily: 'IBMPlexMono-Medium', fontSize: 13, color: '#555', opacity }}>
+        {isGenerating ? `Using tool: ${toolName}...` : `Used tool: ${toolName}`}
+      </Animated.Text>
+    </View>
+  );
+};
 
 const s = StyleSheet.create({
   base: { fontSize: FontSizes.lg, lineHeight: 26, color: Colors.textPrimary, fontFamily: Fonts.body },
@@ -149,6 +181,187 @@ function renderTokens(tokens: Token[], keyBase: number): React.ReactNode[] {
   });
 }
 
+type ToolCallBlock = { start: number; end: number; json: string };
+
+//scan raw toolcall json blocks in a non-code segment
+function pushRawToolCallBlocks(md: string, from: number, to: number, blocks: ToolCallBlock[], allowPartial: boolean): void {
+  let searchIndex = from;
+  while (true) {
+    const start = md.indexOf('{', searchIndex);
+    if (start === -1 || start >= to) break;
+    
+    let braces = 0;
+    let endIndex = -1;
+    let inString = false;
+    let escape = false;
+    for (let j = start; j < to; j++) {
+      const char = md[j];
+      if (escape) { escape = false; continue; }
+      if (char === '\\') { escape = true; continue; }
+      if (char === '"') { inString = !inString; continue; }
+      if (!inString) {
+        if (char === '{') braces++;
+        else if (char === '}') braces--;
+      }
+      if (braces === 0 && j > start) { endIndex = j; break; }
+    }
+    
+    const isPartial = endIndex === -1 && allowPartial;
+    const blockEnd = endIndex !== -1 ? endIndex + 1 : to;
+    const blockText = md.substring(start, blockEnd);
+    
+    const cleanBlockText = blockText.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '');
+    
+    //partial streaming: accept an open block as soon as it looks like a tool call
+    const looksLikeTool = /^\{\s*"?\s*(?:tool[\s\n]*_[\s\n]*calls|name|function)\s*"?\s*:/i.test(cleanBlockText);
+    const partialLooksLikeTool = isPartial && /^\{\s*"?\s*(?:tool[\s\n]*_[\s\n]*calls|name|function)/i.test(cleanBlockText);
+    
+    if (looksLikeTool || partialLooksLikeTool) {
+      blocks.push({ start, end: blockEnd, json: blockText });
+      searchIndex = blockEnd;
+    } else {
+      searchIndex = start + 1;
+    }
+  }
+}
+
+//scan toolcall json blocks (fenced or raw), skipping raw blocks inside code fences
+function findToolCallBlocks(md: string, allowPartial = false): ToolCallBlock[] {
+  const blocks: ToolCallBlock[] = [];
+  const fenceRe = /```[^\n]*/g;
+  let segmentStart = 0;
+  let m;
+  while ((m = fenceRe.exec(md)) !== null) {
+    const fenceStart = m.index;
+    pushRawToolCallBlocks(md, segmentStart, fenceStart, blocks, allowPartial);
+
+    const headerLang = m[0].replace(/^```/, '').trim().split(' ')[0].toLowerCase();
+    const contentStart = fenceStart + m[0].length;
+    const closeRe = /```/g;
+    closeRe.lastIndex = contentStart;
+    const close = closeRe.exec(md);
+    const contentEnd = close ? close.index : md.length;
+    const closeEnd = close ? close.index + 3 : md.length;
+
+    if (headerLang === '' || headerLang === 'json' || headerLang === 'toolcall') {
+      const inner = md.substring(contentStart, contentEnd).trim();
+      const cleanInner = inner.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim();
+      const fullMatch = /^\{\s*"?\s*(?:tool[\s\n]*_[\s\n]*calls|name|function)\s*"?\s*:[\s\S]*\}$/i.test(cleanInner);
+      const partialMatch = allowPartial && !close && /^\{\s*"?\s*(?:tool[\s\n]*_[\s\n]*calls|name|function)/i.test(cleanInner);
+      if (fullMatch || partialMatch) {
+        blocks.push({ start: fenceStart, end: closeEnd, json: inner });
+      }
+    }
+
+    segmentStart = closeEnd;
+    fenceRe.lastIndex = closeEnd;
+  }
+  pushRawToolCallBlocks(md, segmentStart, md.length, blocks, allowPartial);
+  return blocks;
+}
+
+export function hasConversationalText(md: string): boolean {
+  if (md === "…" || md.trim() === "") return false;
+  let clean = md.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
+  const blocks = findToolCallBlocks(clean);
+  for (let k = blocks.length - 1; k >= 0; k--) {
+    clean = clean.substring(0, blocks[k].start) + clean.substring(blocks[k].end);
+  }
+  return clean.trim().length > 0;
+}
+
+//extract tool names from a raw toolcall json block (tolerant of incomplete streaming json)
+export function parseToolNames(json: string): string[] {
+  const clean = json.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
+  const names: string[] = [];
+  try {
+    const data = JSON.parse(clean);
+    if (data?.tool_calls && Array.isArray(data.tool_calls)) {
+      data.tool_calls.forEach((tc: any) => {
+        if (tc?.function?.name) names.push(tc.function.name);
+      });
+    } else if (data?.name) {
+      names.push(data.name);
+    }
+  } catch (e) {
+    const nameMatches = clean.matchAll(/"name"\s*:\s*"([^"]+)"/g);
+    for (const match of nameMatches) names.push(match[1]);
+  }
+  return names;
+}
+
+//last visible thinking step for the thinking row
+export function extractThinkStep(thinkingText: string): string {
+  const stepRegex = /^\s*(?:(?:\d+[.)!]|[-*])\s*)?\*\*(.*?)\*\*/gm;
+  const steps: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = stepRegex.exec(thinkingText)) !== null) {
+    steps.push(match[1].replace(/:$/, '').trim());
+  }
+  if (steps.length > 0) return `${steps.length}. ${steps[steps.length - 1]}`;
+  const lines = thinkingText.split('\n').filter(l => l.trim().length > 0);
+  return lines.length > 0 ? lines[lines.length - 1] : 'Thinking...';
+}
+
+export type LiveTool = { name: string | null; args: any } | null;
+
+export type ChatDisplay = {
+  thinkingText: string;
+  toolNames: string[];
+  finalContent: string;
+  showThinkingRow: boolean;
+  showMarkdown: boolean;
+  currentThought: string;
+};
+
+//single source of truth for the chat bubble display (thinking / tools / streaming)
+export function deriveChatDisplay(raw: string, isGenerating: boolean, liveTool: LiveTool, canThink = false): ChatDisplay {
+  const normalized = raw === '…' ? '' : raw;
+  const thinkMatches = [...normalized.matchAll(/<think>([\s\S]*?)(?:<\/think>|$)/g)];
+  const thinkingText = thinkMatches.map(m => m[1].trim()).filter(t => t.length > 0).join('\n');
+
+  const stripped = normalized.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '');
+  const blocks = findToolCallBlocks(stripped, isGenerating);
+
+  //keep the tool json in finalContent so renderMarkdown turns it into bubbles,
+  //compute conversational presence on a copy without the blocks
+  let contentOnly = stripped;
+  const contentToolNames: string[] = [];
+  for (let k = blocks.length - 1; k >= 0; k--) {
+    const b = blocks[k];
+    contentOnly = contentOnly.substring(0, b.start) + contentOnly.substring(b.end);
+    contentToolNames.push(...parseToolNames(b.json));
+  }
+
+  const toolNames: string[] = [];
+  for (const n of contentToolNames) {
+    if (n && n !== 'Tool' && !toolNames.includes(n)) toolNames.push(n);
+  }
+  const liveName = isGenerating ? liveTool?.name : null;
+  if (liveName && !toolNames.includes(liveName)) toolNames.push(liveName);
+
+  const hasConvText = contentOnly.trim().length > 0;
+  const hasTool = toolNames.length > 0;
+
+  let showThinkingRow = false;
+  let currentThought = '';
+  if (isGenerating) {
+    showThinkingRow = thinkingText.length > 0 || (!hasConvText && !hasTool);
+    if (thinkingText.length > 0) {
+      currentThought = extractThinkStep(thinkingText);
+    } else if (liveName) {
+      currentThought = liveName === 'web_search'
+        ? `Searching the web for "${liveTool?.args?.query || ''}"...`
+        : `Running tool: ${liveName}...`;
+    } else if (canThink) {
+      currentThought = 'Thinking...';
+    }
+  }
+
+  const showMarkdown = hasConvText || hasTool;
+  return { thinkingText, toolNames, finalContent: stripped, showThinkingRow, showMarkdown, currentThought };
+}
+
 function splitMath(text: string): { kind: "text" | "math"; content: string }[] {
   const parts: { kind: "text" | "math"; content: string }[] = [];
   const re = /\$([^$]+)\$/g;
@@ -280,9 +493,18 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
   );
 }
 
-export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode[] {
+export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: boolean): React.ReactNode[] {
   const selColor = incognito ? Colors.incognitoSelection : Colors.primarySelection;
-  const lines = md.split("\n");
+  
+  //wrap toolcall blocks for bubble rendering
+  let processedMd = md;
+  const blocks = findToolCallBlocks(processedMd, isGenerating);
+  for (let k = blocks.length - 1; k >= 0; k--) {
+    const b = blocks[k];
+    processedMd = processedMd.substring(0, b.start) + '\n```toolcall\n' + b.json + '\n```\n' + processedMd.substring(b.end);
+  }
+
+  const lines = processedMd.split("\n");
   const elements: React.ReactNode[] = [];
   let i = 0;
 
@@ -291,16 +513,86 @@ export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode
 
     // fenced code block ```
     if (line.trimStart().startsWith("```")) {
-      const language = line.replace(/```/g, "").trim().toLowerCase();
+      const header = line.trimStart().substring(3).trim();
+      const language = header.split(" ")[0].toLowerCase();
       const codeLines: string[] = [];
       i++;
-      while (i < lines.length && !lines[i].trimStart().startsWith("```")) {
+      let isClosed = false;
+      while (i < lines.length) {
+        if (lines[i].trimStart().startsWith("```")) {
+          isClosed = true;
+          i++;
+          break;
+        }
         codeLines.push(lines[i]);
         i++;
       }
-      i++; // skip closing ```
       
+      if (language === "widget") {
+        const idMatch = header.match(/id="([^"]+)"/);
+        const titleMatch = header.match(/title="([^"]+)"/);
+        const widgetId = idMatch ? idMatch[1] : null;
+        const widgetTitle = titleMatch ? titleMatch[1] : undefined;
+        
+        const widget = widgetId ? WidgetManager.getWidget(widgetId) : undefined;
+        if (widget) {
+          if (!isClosed) {
+            elements.push(
+              <View key={`loading-${i}`} style={{ padding: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.03)', borderRadius: 12, marginVertical: 8 }}>
+                <Text style={{ fontFamily: 'Jakarta', color: '#666', fontStyle: 'italic' }}>
+                  Génération du widget {widgetTitle || widget.name}...
+                </Text>
+              </View>
+            );
+            continue;
+          }
 
+          let data;
+          const rawJson = codeLines.join("\n");
+          try {
+            data = JSON.parse(rawJson);
+          } catch (e1: any) {
+            try {
+              // sanitize raw json
+              const sanitized = rawJson.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, (match) => {
+                return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+              });
+              data = JSON.parse(sanitized);
+            } catch (e2: any) {
+              // fallback to code block on parse error
+              elements.push(
+                <Text key={`code-${i}`} style={[s.base, s.codeBlock]} selectable={true} selectionColor={selColor}>
+                  {`[Widget Data Error: ${e1.message}]\n${rawJson}`}
+                </Text>
+              );
+              continue;
+            }
+          }
+
+          elements.push(
+            <WidgetWrapper key={`widget-${i}`} widget={widget} title={widgetTitle}>
+              <widget.component data={data} />
+            </WidgetWrapper>
+          );
+          continue;
+        }
+      }
+
+      if (language === "toolcall") {
+        const rawJson = codeLines.join("\n");
+        let toolNames = parseToolNames(rawJson);
+        
+        if (toolNames.length === 0) {
+          toolNames = ["Tool"];
+        }
+
+        toolNames.forEach((tName, idx) => {
+          elements.push(
+            <ToolCallBubble key={`toolcall-${i}-${idx}`} toolName={tName} isGenerating={isGenerating} />
+          );
+        });
+        continue;
+      }
 
       elements.push(
         <CodeBlock key={`code-${i}`} code={codeLines.join("\n")} language={language} />

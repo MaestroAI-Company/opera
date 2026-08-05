@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, DeviceEventEmitter, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AIModule } from "../../services/ai/AIModule";
+import { ToolManager } from "../../services/ai/tools/ToolManager";
+import { ITool } from "../../services/ai/tools/ITool";
 import { BackupService } from "../../services/BackupService";
+import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { Settings } from "../../services/settings/SettingsService";
+import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
 import { STT } from "../../services/speech/STTService";
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 
@@ -115,9 +119,16 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [autoSpeak, setAutoSpeakState] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(false);
   const [usageAnalytics, setUsageAnalyticsState] = useState(true);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  //plugin enabled states (tool name or widget id -> bool)
+  const [pluginStates, setPluginStates] = useState<Record<string, boolean>>({});
+
+  const allTools: ITool[] = ToolManager.getAllTools();
+  const allWidgets: IWidget[] = WidgetManager.getAllWidgets();
+
   const [useWebsearch, setUseWebsearchState] = useState(true);
   const [includeDateTime, setIncludeDateTimeState] = useState(true);
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   const [cloudProvider, setCloudProvider] = useState<string>("none");
   const [cloudUserInfo, setCloudUserInfo] = useState<CloudUserInfo | null>(null);
@@ -313,6 +324,20 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     };
     loadSettings();
   }, []);
+
+  //load plugin states when settings tab opens
+  useEffect(() => {
+    if (activeSubPage !== 'tools') return;
+    const states: Record<string, boolean> = {};
+    for (const tool of allTools) {
+      const name = tool.definition.function.name;
+      states[`tool:${name}`] = PluginRegistry.isEnabled('tool', name, tool.enabledByDefault ?? false);
+    }
+    for (const widget of allWidgets) {
+      states[`widget:${widget.id}`] = PluginRegistry.isEnabled('widget', widget.id, widget.enabledByDefault ?? false);
+    }
+    setPluginStates(states);
+  }, [activeSubPage]);
 
   //save helpers
   const setLanguage = (v: string) => {
@@ -1050,14 +1075,58 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("Tools & Widgets")}
 
-      <View style={styles.toggleRow}>
-        <Text style={styles.settingLabel}>Use websearch</Text>
-        <Toggle
-          checked={useWebsearch}
-          onToggle={setUseWebsearchState}
-        />
-      </View>
-      <Text style={styles.helpText}>Allow the assistant to search the web for real-time information</Text>
+      {/* tools section */}
+      <Text style={styles.sectionTitle}>Tools</Text>
+      {allTools.map((tool, i) => {
+        const name = tool.definition.function.name;
+        const key = `tool:${name}`;
+        const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
+        return (
+          <View key={name}>
+            <View style={styles.toggleRow}>
+              <View style={styles.pluginTextContainer}>
+                <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
+                {tool.displayDescription ? (
+                  <Text style={styles.helpText}>{tool.displayDescription}</Text>
+                ) : null}
+              </View>
+              <Toggle
+                checked={enabled}
+                onToggle={async (v) => {
+                  setPluginStates(prev => ({ ...prev, [key]: v }));
+                  await PluginRegistry.setEnabled('tool', name, v);
+                }}
+              />
+            </View>
+            {i < allTools.length - 1 && <View style={styles.separator} />}
+          </View>
+        );
+      })}
+
+      {/* widgets section */}
+      <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Widgets</Text>
+      {allWidgets.map((widget, i) => {
+        const key = `widget:${widget.id}`;
+        const enabled = pluginStates[key] ?? (widget.enabledByDefault ?? false);
+        return (
+          <View key={widget.id}>
+            <View style={styles.toggleRow}>
+              <View style={styles.pluginTextContainer}>
+                <Text style={styles.settingLabel}>{widget.name}</Text>
+                <Text style={styles.helpText}>{widget.description.split('.')[0]}.</Text>
+              </View>
+              <Toggle
+                checked={enabled}
+                onToggle={async (v) => {
+                  setPluginStates(prev => ({ ...prev, [key]: v }));
+                  await PluginRegistry.setEnabled('widget', widget.id, v);
+                }}
+              />
+            </View>
+            {i < allWidgets.length - 1 && <View style={styles.separator} />}
+          </View>
+        );
+      })}
     </View>
   );
 
@@ -1375,5 +1444,23 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.caption,
     fontFamily: Fonts.mono,
     color: Colors.primary,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontFamily: "IBMPlexMono-Medium",
+    color: "#888",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  pluginTextContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: "#00000010",
+    marginVertical: 8,
   },
 });

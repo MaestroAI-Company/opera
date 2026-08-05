@@ -1,37 +1,8 @@
-import { fetch as expoFetch } from 'expo/fetch';
 import { IAIProvider } from './IAIProvider';
+import { ToolCall, ToolDefinition } from './tools/ITool';
 import { NotificationService } from '../notifications/NotificationService';
 import { MessageMetrics } from '../db/DatabaseService';
-
-async function universalFetch(input: string | URL | Request, init?: any): Promise<Response> {
-  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-  
-  if (isTauri) {
-    try {
-      const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
-      const customInit = { ...(init || {}) };
-      let headers: any = {};
-      if (customInit.headers) {
-        if (customInit.headers instanceof Headers) {
-          customInit.headers.forEach((value: string, key: string) => { headers[key] = value; });
-        } else {
-          headers = { ...customInit.headers };
-        }
-      }
-      headers['Origin'] = 'http://localhost';
-      customInit.headers = headers;
-      
-      const res = await tauriFetch(input as any, customInit);
-      return res;
-    } catch (e: any) {
-      console.warn("Tauri Fetch Error:", e);
-      throw e;
-    }
-  }
-  
-  return expoFetch(input, init);
-}
-
+import { universalFetch } from './utils/universalFetch';
 
 export class OllamaProvider implements IAIProvider {
   private baseUrl: string;
@@ -68,13 +39,13 @@ export class OllamaProvider implements IAIProvider {
       const data = await response.json();
       return data.models.map((m: any) => m.name);
     } catch (error) {
-      console.error('Error fetching available models from Ollama:', error);
+      console.warn('Could not fetch available models from Ollama (is it running?):', error);
       return [];
     }
   }
 
   async preloadModel(modelName: string): Promise<void> {
-    if (!this.isConfigured()) return;
+    if (!this.isConfigured() || !modelName) return;
     try {
       //preload model
       await universalFetch(`${this.baseUrl}/api/generate`, {
@@ -86,7 +57,7 @@ export class OllamaProvider implements IAIProvider {
         }),
       });
     } catch (error) {
-      console.error('Error preloading Ollama model:', error);
+      console.warn(`Could not preload Ollama model "${modelName}":`, error);
     }
   }
 
@@ -102,7 +73,7 @@ export class OllamaProvider implements IAIProvider {
       const data = await response.json();
       return data.capabilities || [];
     } catch (error) {
-      console.error('Error fetching capabilities from Ollama:', error);
+      console.warn(`Could not fetch capabilities for "${modelName}" from Ollama:`, error);
       return [];
     }
   }
@@ -210,15 +181,15 @@ export class OllamaProvider implements IAIProvider {
   async sendMessage(
     modelName: string,
     systemPrompt: string,
-    messages: { role: string; content: string; images?: string[] }[],
+    messages: { role: string; content: string; images?: string[]; tool_calls?: any[] }[],
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
-    options?: { think?: boolean | string },
+    options?: { think?: boolean | string; tools?: ToolDefinition[] },
     onMetrics?: (metrics: MessageMetrics) => void
-  ): Promise<void> {
+  ): Promise<{ toolCalls?: ToolCall[], content?: string }> {
     if (!this.isConfigured()) throw new Error('AI server not configured');
     try {
-      const payload = {
+      const payload: any = {
         model: modelName,
         messages: [
           { role: 'system', content: systemPrompt },
@@ -229,14 +200,19 @@ export class OllamaProvider implements IAIProvider {
         ],
         stream: true,
         think: options?.think,
-        options: { num_ctx: 16384 }
+        options: { num_ctx: 16384 },
       };
+
+      //add tools if provided
+      if (options?.tools && options.tools.length > 0) {
+        payload.tools = options.tools;
+      }
       
       const logPayload = {
         ...payload,
         messages: '[HIDDEN]'
       };
-      console.log('Ollama request payload:', JSON.stringify(logPayload, null, 2));
+      console.log(`[OllamaProvider] sending request:`, JSON.stringify(logPayload, null, 2));
 
       const response = await universalFetch(`${this.baseUrl}/api/chat`, {
         method: 'POST',
@@ -254,12 +230,18 @@ export class OllamaProvider implements IAIProvider {
         throw new Error('No response body for streaming');
       }
 
+      //log response start
+      console.log(`[OllamaProvider] started receiving response from ${modelName}`);
+
       //read stream chunks
       
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
       
       let isThinkingMode = false;
+      const collectedToolCalls: ToolCall[] = [];
+      
+      let accumulatedContent = '';
       
       while (true) {
         const { done, value } = await reader.read();
@@ -289,7 +271,13 @@ export class OllamaProvider implements IAIProvider {
                   onChunk("\n</think>\n");
                   isThinkingMode = false;
                 }
+                accumulatedContent += parsed.message.content;
                 onChunk(parsed.message.content);
+              }
+
+              //collect tool calls
+              if (parsed.message.tool_calls && Array.isArray(parsed.message.tool_calls)) {
+                collectedToolCalls.push(...parsed.message.tool_calls);
               }
             }
             
@@ -312,10 +300,15 @@ export class OllamaProvider implements IAIProvider {
         }
       }
       
-      // close thinking mode if stream ended abruptly
+      //close thinking mode if stream ended abruptly
       if (isThinkingMode) {
         onChunk("\n</think>\n");
       }
+
+      return { 
+        toolCalls: collectedToolCalls.length > 0 ? collectedToolCalls : undefined,
+        content: accumulatedContent.trim()
+      };
     } catch (error: any) {
       throw error;
     }

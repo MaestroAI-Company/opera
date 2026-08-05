@@ -13,9 +13,10 @@ import {
   View,
 } from "react-native";
 import { Conversation, Message } from "../../services/db/DatabaseService";
+import { renderMarkdown, deriveChatDisplay } from "../ui/MarkdownText";
+import { AIModule } from "../../services/ai/AIModule";
 import { Settings } from "../../services/settings/SettingsService";
 import { TTS } from "../../services/speech/TTSService";
-import { renderMarkdown } from "../ui/MarkdownText";
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 
 const butterflyImage = require("../../../assets/images/butterfly2.png");
@@ -39,6 +40,7 @@ type ChatViewProps = {
   hideHeader?: boolean;
   hideGradients?: boolean;
   onOpenConfidentiality?: () => void;
+  canThink?: boolean;
 };
 
 const stripMarkdown = (md: string) => {
@@ -76,38 +78,28 @@ const FlashingText = ({ text }: { text: string }) => {
   );
 };
 
-const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isChatGenerating, showMetrics, fallbackModel }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string }) => {
+const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isChatGenerating, showMetrics, fallbackModel, canThink }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string; canThink?: boolean }) => {
   const isUser = item.role === "user";
   const [showDetails, setShowDetails] = useState(false);
 
-  const thinkMatch = item.content.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
-  const isThinkingFinished = item.content.includes("</think>");
-  const hasThinkingText = thinkMatch !== null;
-  const thinkingText = thinkMatch ? thinkMatch[1].trim() : "";
+  const [activeTool, setActiveTool] = useState<{name: string | null, args: any | null}>({ name: null, args: null });
+  useEffect(() => {
+    if (!isGenerating) return;
+    const unsub = AIModule.SharedGenerationState.subscribe(() => {
+      setActiveTool({ 
+        name: AIModule.SharedGenerationState.activeToolName, 
+        args: AIModule.SharedGenerationState.activeToolArgs 
+      });
+    });
+    setActiveTool({ 
+      name: AIModule.SharedGenerationState.activeToolName, 
+      args: AIModule.SharedGenerationState.activeToolArgs 
+    });
+    return unsub;
+  }, [isGenerating]);
 
-  const isCurrentlyThinking = !isUser && (item.content === "…" || (isGenerating && hasThinkingText && !isThinkingFinished));
-
-  const extractSteps = (text: string) => {
-    const stepRegex = /^\s*(?:(?:\d+[\.\)]|[-*])\s*)?\*\*(.*?)\*\*/gm;
-    const steps = [];
-    let match;
-    while ((match = stepRegex.exec(text)) !== null) {
-      let stepText = match[1].replace(/:$/, '').trim();
-      steps.push(stepText);
-    }
-
-    if (steps.length > 0) {
-      return `${steps.length}. ${steps[steps.length - 1]}`;
-    } else {
-      const lines = text.split('\n').filter(l => l.trim().length > 0);
-      return lines.length > 0 ? lines[lines.length - 1] : "Thinking...";
-    }
-  };
-
-  const currentThought = extractSteps(thinkingText);
-
-  const displayContent = item.content === "…" ? "…" : item.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
-  const finalContent = displayContent.length > 0 ? displayContent : "…";
+  const disp = deriveChatDisplay(item.content, !!isGenerating, activeTool, !!canThink);
+  const isCurrentlyThinking = !isUser && disp.showThinkingRow;
 
   const metricRows = [
     { label: "ai_model", value: item.metrics?.model || fallbackModel || "N/A" },
@@ -170,19 +162,18 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
         </View>
       ) : (
         <View style={styles.aiContainer}>
-          {isCurrentlyThinking ? (
+          {isCurrentlyThinking && (
             <View style={styles.thinkingContainer}>
               <Image
                 source={thinkingGif}
                 style={styles.thinkingIcon}
                 resizeMode="contain"
               />
-              {hasThinkingText && (
-                <FlashingText text={currentThought} />
-              )}
+              {!!disp.currentThought && <FlashingText text={disp.currentThought} />}
             </View>
-          ) : (
-            renderMarkdown(finalContent, incognito)
+          )}
+          {disp.showMarkdown && (
+            renderMarkdown(disp.finalContent, incognito, isGenerating)
           )}
           {!isUser && !isCurrentlyThinking && !isGenerating && (
             <View style={styles.aiToolbar}>
@@ -238,10 +229,10 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
       )}
     </View>
   );
-}, (prev, next) => prev.item.content === next.item.content && prev.item.metrics === next.item.metrics && prev.incognito === next.incognito && prev.speakerEnabled === next.speakerEnabled && prev.isGenerating === next.isGenerating && prev.isChatGenerating === next.isChatGenerating && prev.isSpeaking === next.isSpeaking && prev.showMetrics === next.showMetrics);
+}, (prev, next) => prev.item.content === next.item.content && prev.item.metrics === next.item.metrics && prev.incognito === next.incognito && prev.speakerEnabled === next.speakerEnabled && prev.isGenerating === next.isGenerating && prev.isChatGenerating === next.isChatGenerating && prev.isSpeaking === next.isSpeaking && prev.showMetrics === next.showMetrics && prev.canThink === next.canThink);
 MessageItem.displayName = "MessageItem";
 
-export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, hideHeader, hideGradients, onOpenConfidentiality }: ChatViewProps) {
+export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, hideHeader, hideGradients, onOpenConfidentiality, canThink }: ChatViewProps) {
   const listRef = useRef<FlatList>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
   const isAtBottomRef = useRef(true);
@@ -296,7 +287,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   };
 
   const renderItem = ({ item }: { item: Message }) => {
-    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} />;
+    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} />;
   };
 
   return (

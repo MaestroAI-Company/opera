@@ -11,10 +11,18 @@ import { Platform } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import SplashScreenComponent from "../components/ui/SplashScreen";
 import TauriTitleBar from "../components/features/TauriTitleBar";
+import { WidgetManager } from "../services/widgets/WidgetManager";
+import { MapsWidget } from "../components/widgets/MapsWidget";
+import { HtmlWidget } from "../components/widgets/HtmlWidget";
+import { MermaidWidget } from "../components/widgets/MermaidWidget";
 
 import * as WebBrowser from "expo-web-browser";
 
 global.Buffer = global.Buffer || Buffer;
+
+WidgetManager.registerWidget(MapsWidget);
+WidgetManager.registerWidget(HtmlWidget);
+WidgetManager.registerWidget(MermaidWidget);
 
 WebBrowser.maybeCompleteAuthSession();
 SplashScreen.preventAutoHideAsync();

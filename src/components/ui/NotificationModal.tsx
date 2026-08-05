@@ -147,15 +147,15 @@ const styles = StyleSheet.create({
   icon: {
     width: 24,
     height: 24,
-    
+
   },
-  title: {
+    title: {
     fontSize: FontSizes.lg,
     fontWeight: "bold",
     color: Colors.textSecondary,
     fontFamily: Fonts.mono,
-    textAlign: "center",
-  },
+      textAlign: "center",
+    },
   message: {
     fontSize: FontSizes.bodyMd,
     color: Colors.textMuted,

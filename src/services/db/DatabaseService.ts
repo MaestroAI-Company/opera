@@ -10,6 +10,13 @@ export type Conversation = {
   pinned?: number;
 };
 
+export type MessageMetrics = {
+  model?: string;
+  timeSec?: number;
+  tokens?: number;
+  tokensPerSec?: number;
+};
+
 export type Message = {
   id: string;
   conversationId: string;
@@ -17,6 +24,7 @@ export type Message = {
   content: string;
   createdAt: number;
   images?: string[];
+  metrics?: MessageMetrics;
 };
 
 export type SyncTombstone = {
@@ -64,6 +72,12 @@ class DatabaseService {
       try {
         await this.db.runAsync('ALTER TABLE messages ADD COLUMN images TEXT');
       } catch (e) {
+        // ignore, column might already exist
+      }
+
+      try {
+        await this.db.runAsync('ALTER TABLE messages ADD COLUMN metrics TEXT');
+      } catch {
         // ignore, column might already exist
       }
 
@@ -259,6 +273,12 @@ class DatabaseService {
     DeviceEventEmitter.emit('DATA_CHANGED');
   }
 
+  //store generation metrics for a message
+  async updateMessageMetrics(id: string, metrics: MessageMetrics): Promise<void> {
+    const db = this.getDb();
+    await db.runAsync('UPDATE messages SET metrics = ? WHERE id = ?', [JSON.stringify(metrics), id]);
+  }
+
   //get all messages for a conversation
   async getMessages(conversationId: string): Promise<Message[]> {
     const db = this.getDb();
@@ -268,7 +288,8 @@ class DatabaseService {
     );
     return rows.map(row => ({
       ...row,
-      images: row.images ? JSON.parse(row.images) : undefined
+      images: row.images ? JSON.parse(row.images) : undefined,
+      metrics: row.metrics ? JSON.parse(row.metrics) : undefined
     }));
   }
 
@@ -278,7 +299,8 @@ class DatabaseService {
     const rows = await db.getAllAsync<any>('SELECT * FROM messages');
     return rows.map(row => ({
       ...row,
-      images: row.images ? JSON.parse(row.images) : undefined
+      images: row.images ? JSON.parse(row.images) : undefined,
+      metrics: row.metrics ? JSON.parse(row.metrics) : undefined
     }));
   }
 
@@ -308,9 +330,10 @@ class DatabaseService {
 
       for (const msg of messages) {
         const imagesJson = msg.images ? JSON.stringify(msg.images) : null;
+        const metricsJson = msg.metrics ? JSON.stringify(msg.metrics) : null;
         await db.runAsync(
-          'INSERT INTO messages (id, conversationId, role, content, createdAt, images) VALUES (?, ?, ?, ?, ?, ?)',
-          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson]
+          'INSERT INTO messages (id, conversationId, role, content, createdAt, images, metrics) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson, metricsJson]
         );
       }
     });
@@ -330,9 +353,10 @@ class DatabaseService {
       );
       for (const msg of messages) {
         const imagesJson = msg.images ? JSON.stringify(msg.images) : null;
+        const metricsJson = msg.metrics ? JSON.stringify(msg.metrics) : null;
         await db.runAsync(
-          'INSERT INTO messages (id, conversationId, role, content, createdAt, images) VALUES (?, ?, ?, ?, ?, ?)',
-          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson]
+          'INSERT INTO messages (id, conversationId, role, content, createdAt, images, metrics) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson, metricsJson]
         );
       }
     });

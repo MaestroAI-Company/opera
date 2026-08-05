@@ -17,6 +17,7 @@ export type AppSettings = {
   hasSeenOnboarding: boolean;
   username: string;
   includeDateTime: boolean;
+  showTechnicalDetails: boolean;
 };
 
 const DEFAULTS: AppSettings = {
@@ -41,6 +42,7 @@ const DEFAULTS: AppSettings = {
   hasSeenOnboarding: false,
   username: '',
   includeDateTime: true,
+  showTechnicalDetails: false,
 };
 
 const SETTINGS_UPDATED_AT_KEY = '__settings_updated_at';
@@ -96,6 +98,7 @@ class SettingsService {
       hasSeenOnboarding: map['hasSeenOnboarding'] === 'true' ? true : DEFAULTS.hasSeenOnboarding,
       username: map['username'] ?? DEFAULTS.username,
       includeDateTime: map['includeDateTime'] === 'true' ? true : (map['includeDateTime'] === 'false' ? false : DEFAULTS.includeDateTime),
+      showTechnicalDetails: map['showTechnicalDetails'] === 'true' ? true : (map['showTechnicalDetails'] === 'false' ? false : DEFAULTS.showTechnicalDetails),
     };
     this.cache = settings;
     return settings;

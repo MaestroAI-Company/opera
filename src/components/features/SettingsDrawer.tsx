@@ -113,7 +113,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [alwaysWhisper, setAlwaysWhisperState] = useState(true);
   const [speaker, setSpeakerState] = useState(true);
   const [autoSpeak, setAutoSpeakState] = useState(true);
-  const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(true);
+  const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(false);
   const [usageAnalytics, setUsageAnalyticsState] = useState(true);
   const [useWebsearch, setUseWebsearchState] = useState(true);
   const [includeDateTime, setIncludeDateTimeState] = useState(true);
@@ -283,6 +283,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setAlwaysWhisperState(s.alwaysWhisper);
         setSpeakerState(s.speaker);
         setAutoSpeakState(s.autoSpeak);
+        setShowTechnicalDetailsState(s.showTechnicalDetails);
         //apply to services
         AIModule.configure(s.ollamaUrl);
         AIModule.setMode(s.aiService);
@@ -386,6 +387,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const setAutoSpeak = (v: boolean) => {
     setAutoSpeakState(v);
     Settings.set("autoSpeak", v);
+  };
+
+  const setShowTechnicalDetails = (v: boolean) => {
+    setShowTechnicalDetailsState(v);
+    Settings.set("showTechnicalDetails", v);
   };
 
   const completeCloudConnect = async (v: string) => {
@@ -906,7 +912,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <Text style={styles.settingLabel}>Show technical details</Text>
         <Toggle
           checked={showTechnicalDetails}
-          onToggle={setShowTechnicalDetailsState}
+          onToggle={setShowTechnicalDetails}
         />
       </View>
       <Text style={styles.helpText}>Include technical data in AI responses</Text>

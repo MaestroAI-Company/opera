@@ -1,3 +1,5 @@
+import { MessageMetrics } from '../db/DatabaseService';
+
 export interface IAIProvider {
   //check if service is online
   isAvailable(): Promise<boolean>;
@@ -18,7 +20,8 @@ export interface IAIProvider {
     messages: { role: string; content: string; images?: string[] }[],
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
-    options?: { think?: boolean | string }
+    options?: { think?: boolean | string },
+    onMetrics?: (metrics: MessageMetrics) => void
   ): Promise<void>;
 
   //pull model (optional)

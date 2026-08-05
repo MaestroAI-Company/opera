@@ -24,6 +24,7 @@ const thinkingGif = require("../../../assets/icons/thinking.gif");
 const speakerIcon = require("../../../assets/icons/speaker.png");
 const reloadIcon = require("../../../assets/icons/reload.png");
 const copyIcon = require("../../../assets/icons/copy.png");
+const infoIcon = require("../../../assets/icons/info.png");
 
 type ChatViewProps = {
   messages: Message[];
@@ -33,6 +34,7 @@ type ChatViewProps = {
   incognito?: boolean;
   onRegenerate?: (messageId: string) => void;
   speakerEnabled?: boolean;
+  showMetrics?: boolean;
   generatingMessageId?: string | null;
   hideHeader?: boolean;
   hideGradients?: boolean;
@@ -74,8 +76,9 @@ const FlashingText = ({ text }: { text: string }) => {
   );
 };
 
-const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isChatGenerating }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean }) => {
+const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isChatGenerating, showMetrics, fallbackModel }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string }) => {
   const isUser = item.role === "user";
+  const [showDetails, setShowDetails] = useState(false);
 
   const thinkMatch = item.content.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
   const isThinkingFinished = item.content.includes("</think>");
@@ -105,6 +108,13 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
 
   const displayContent = item.content === "…" ? "…" : item.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
   const finalContent = displayContent.length > 0 ? displayContent : "…";
+
+  const metricRows = [
+    { label: "ai_model", value: item.metrics?.model || fallbackModel || "N/A" },
+    { label: "time", value: item.metrics?.timeSec != null ? `${item.metrics.timeSec.toFixed(1)}s` : "N/A" },
+    { label: "tokens", value: item.metrics?.tokens != null ? String(item.metrics.tokens) : "N/A" },
+    { label: "tokens_per_sec", value: item.metrics?.tokensPerSec != null ? item.metrics.tokensPerSec.toFixed(1) : "N/A" },
+  ];
 
   const copyToClipboard = async (text: string, isMarkdown: boolean) => {
     const contentToCopy = isMarkdown ? text : stripMarkdown(text);
@@ -203,16 +213,35 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               >
                 <Image source={copyIcon} style={{ width: 22, height: 22, tintColor: Colors.textDisabled }} />
               </Pressable>
+              {showMetrics && (
+                <Pressable
+                  onPress={() => setShowDetails(prev => !prev)}
+                  style={({ pressed }) => [styles.toolbarIconContainer, pressed && { backgroundColor: Colors.surfacePressed }]}
+                >
+                  <Image source={infoIcon} style={{ width: 22, height: 22, tintColor: showDetails ? (incognito ? Colors.incognito : Colors.primary) : Colors.textDisabled }} />
+                </Pressable>
+              )}
+            </View>
+          )}
+          {showMetrics && showDetails && (
+            <View style={styles.metricsCard}>
+              {metricRows.map(row => (
+                <View key={row.label} style={styles.metricsRow}>
+                  <Text style={styles.metricsLabel}>{row.label}</Text>
+                  <Text style={styles.metricsSeparator}> : </Text>
+                  <Text style={[styles.metricsValue, incognito && { color: Colors.incognito }]}>{row.value}</Text>
+                </View>
+              ))}
             </View>
           )}
         </View>
       )}
     </View>
   );
-}, (prev, next) => prev.item.content === next.item.content && prev.incognito === next.incognito && prev.speakerEnabled === next.speakerEnabled && prev.isGenerating === next.isGenerating && prev.isChatGenerating === next.isChatGenerating && prev.isSpeaking === next.isSpeaking);
+}, (prev, next) => prev.item.content === next.item.content && prev.item.metrics === next.item.metrics && prev.incognito === next.incognito && prev.speakerEnabled === next.speakerEnabled && prev.isGenerating === next.isGenerating && prev.isChatGenerating === next.isChatGenerating && prev.isSpeaking === next.isSpeaking && prev.showMetrics === next.showMetrics);
 MessageItem.displayName = "MessageItem";
 
-export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, generatingMessageId, hideHeader, hideGradients, onOpenConfidentiality }: ChatViewProps) {
+export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, hideHeader, hideGradients, onOpenConfidentiality }: ChatViewProps) {
   const listRef = useRef<FlatList>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
   const isAtBottomRef = useRef(true);
@@ -267,7 +296,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   };
 
   const renderItem = ({ item }: { item: Message }) => {
-    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isChatGenerating={!!generatingMessageId} />;
+    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} />;
   };
 
   return (
@@ -466,6 +495,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderRadius: Radius.huge,
+  },
+  metricsCard: {
+    marginTop: 4,
+    gap: 3,
+  },
+  metricsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  metricsLabel: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.label,
+    color: Colors.textFaint,
+    minWidth: 110,
+  },
+  metricsSeparator: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.label,
+    color: Colors.textFaint,
+  },
+  metricsValue: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.label,
+    color: Colors.primary,
   },
   snackbarContainer: {
     position: 'absolute',

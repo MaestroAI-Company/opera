@@ -26,7 +26,7 @@ import TopBar from "../components/features/TopBar";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { useResponsive } from "../hooks/useResponsive";
 import { AIModule } from "../services/ai/AIModule";
-import { Conversation, DB, Message } from "../services/db/DatabaseService";
+import { Conversation, DB, Message, MessageMetrics } from "../services/db/DatabaseService";
 import { Settings } from "../services/settings/SettingsService";
 import { STT } from "../services/speech/STTService";
 import { TTS } from "../services/speech/TTSService";
@@ -66,6 +66,7 @@ export default function Index() {
   const [speakerEnabled, setSpeakerEnabled] = useState(false);
   const [modelCapabilities, setModelCapabilities] = useState<string[]>([]);
   const [alwaysWhisper, setAlwaysWhisper] = useState(false);
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
 
   //conversation state
@@ -214,6 +215,7 @@ export default function Index() {
         setOllamaUrl(s.ollamaUrl);
         setSpeakerEnabled(s.speaker);
         setAlwaysWhisper(s.alwaysWhisper);
+        setShowTechnicalDetails(s.showTechnicalDetails);
         AIModule.configure(s.ollamaUrl);
         AIModule.setMode(s.aiService);
         STT.setLanguage(s.whisperLanguage);
@@ -469,6 +471,7 @@ export default function Index() {
         abortControllerRef.current = new AbortController();
 
         let isError = false;
+        let messageMetrics: MessageMetrics | undefined;
 
         //send to AI and stream chunks
         if (!taskSelectedModel) {
@@ -498,7 +501,13 @@ export default function Index() {
                 }
               },
               abortControllerRef.current.signal,
-              { think: taskReflection === "none" ? false : taskReflection }
+              { think: taskReflection === "none" ? false : taskReflection },
+              (m) => {
+                messageMetrics = m;
+                if (activeConversationRef.current?.id === taskConv.id) {
+                  setMessages((prev) => prev.map((msg) => msg.id === assistantMsg.id ? { ...msg, metrics: m } : msg));
+                }
+              }
             );
           } catch (e: any) {
             const isAborted = e.name === "AbortError" ||
@@ -539,6 +548,9 @@ export default function Index() {
           } else {
             //save final assistant message content to db
             await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
+            if (messageMetrics) {
+              await DB.updateMessageMetrics(assistantMsg.id, messageMetrics);
+            }
             //refresh conversation list (updatedAt changed)
             await loadConversations();
           }
@@ -681,6 +693,7 @@ export default function Index() {
       streamingContentRef.current = "";
       abortControllerRef.current = new AbortController();
       let isError = false;
+      let messageMetrics: MessageMetrics | undefined;
 
       if (!taskSelectedModel) {
         isError = true;
@@ -708,7 +721,13 @@ export default function Index() {
               }
             },
             abortControllerRef.current.signal,
-            { think: taskReflection === "none" ? false : taskReflection }
+            { think: taskReflection === "none" ? false : taskReflection },
+            (m) => {
+              messageMetrics = m;
+              if (activeConversationRef.current?.id === taskConv.id) {
+                setMessages((prev) => prev.map((msg) => msg.id === assistantMsg.id ? { ...msg, metrics: m } : msg));
+              }
+            }
           );
         } catch (e: any) {
           const isAborted = e.name === "AbortError" || e.message?.toLowerCase().includes("aborted") || e.message?.toLowerCase().includes("cancel");
@@ -731,6 +750,9 @@ export default function Index() {
           await DB.deleteMessage(assistantMsg.id);
         } else {
           await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
+          if (messageMetrics) {
+            await DB.updateMessageMetrics(assistantMsg.id, messageMetrics);
+          }
           await loadConversations();
         }
       }
@@ -852,6 +874,7 @@ export default function Index() {
                 incognito={activeConversation.id.startsWith("incognito_")}
                 onRegenerate={handleRegenerate}
                 speakerEnabled={speakerEnabled}
+                showMetrics={showTechnicalDetails}
                 generatingMessageId={generatingConvId === activeConversation.id ? streamingMsgIdRef.current : null}
                 onOpenConfidentiality={() => {
                   setSettingsInitialSubPage("confidentiality");
@@ -912,6 +935,7 @@ export default function Index() {
                             setOllamaUrl(cached.ollamaUrl);
                             setSpeakerEnabled(cached.speaker);
                             setAlwaysWhisper(cached.alwaysWhisper);
+                            setShowTechnicalDetails(cached.showTechnicalDetails);
                           }
                           setSettingsDrawerVisible(!settingsDrawerVisible);
                         });
@@ -969,6 +993,7 @@ export default function Index() {
               setOllamaUrl(cached.ollamaUrl);
               setSpeakerEnabled(cached.speaker);
               setAlwaysWhisper(cached.alwaysWhisper);
+              setShowTechnicalDetails(cached.showTechnicalDetails);
             }}
             onDataChanged={async () => {
               await loadConversations();

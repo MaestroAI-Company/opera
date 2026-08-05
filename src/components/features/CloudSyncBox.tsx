@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
 import { CloudUserInfo } from '../../services/cloud/CloudProvider';
+import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 
 type CloudSyncBoxProps = {
   userInfo: CloudUserInfo | null;
@@ -76,7 +77,7 @@ export default function CloudSyncBox({
         ) : (
           <>
             <Pressable style={[styles.actionBtn, styles.syncBtn]} onPress={onSync} disabled={isSyncing}>
-              <Text style={[styles.actionBtnText, { color: "#fff" }]}>
+              <Text style={[styles.actionBtnText, { color: Colors.surface }]}>
                 {isSyncing ? "Syncing..." : "Sync Now"}
               </Text>
             </Pressable>
@@ -92,11 +93,11 @@ export default function CloudSyncBox({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
+    backgroundColor: Colors.surfaceMuted,
+    borderRadius: Radius.xl,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: Colors.codeBlockText,
     marginTop: 12,
   },
   userInfoRow: {
@@ -107,36 +108,36 @@ const styles = StyleSheet.create({
   avatar: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: Radius.pill,
     marginRight: 12,
   },
   avatarPlaceholder: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: '#ccc',
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.textDisabledStrong,
     marginRight: 12,
   },
   userInfoText: {
     flex: 1,
   },
   name: {
-    fontSize: 16,
-    fontFamily: 'IBMPlexMono-Medium',
-    color: '#222',
+    fontSize: FontSizes.md,
+    fontFamily: Fonts.mono,
+    color: Colors.textSecondary,
   },
   email: {
-    fontSize: 14,
-    fontFamily: 'Jakarta',
-    color: '#666',
+    fontSize: FontSizes.bodyMd,
+    fontFamily: Fonts.body,
+    color: Colors.textBody,
   },
   statusRow: {
     marginBottom: 16,
   },
   statusText: {
-    fontSize: 12,
-    fontFamily: 'Jakarta',
-    color: '#444',
+    fontSize: FontSizes.label,
+    fontFamily: Fonts.body,
+    color: Colors.textStrong,
     fontStyle: 'italic',
   },
   actionsRow: {
@@ -147,36 +148,36 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 6,
+    borderRadius: Radius.lg,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: Colors.textDisabledStrong,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: Colors.surface,
   },
   syncBtn: {
-    backgroundColor: '#FF1A1A',
-    borderColor: '#FF1A1A',
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
   actionBtnDanger: {
     flex: 1,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 6,
+    borderRadius: Radius.lg,
     borderWidth: 1,
-    borderColor: '#ffcccc',
+    borderColor: Colors.dangerBorderSoft,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff5f5',
+    backgroundColor: Colors.dangerBgSoft,
   },
   actionBtnText: {
-    fontSize: 12,
-    fontFamily: 'IBMPlexMono-Medium',
-    color: '#222',
+    fontSize: FontSizes.label,
+    fontFamily: Fonts.mono,
+    color: Colors.textSecondary,
   },
   actionBtnTextDanger: {
-    fontSize: 12,
-    fontFamily: 'IBMPlexMono-Medium',
-    color: '#d60e0e',
+    fontSize: FontSizes.label,
+    fontFamily: Fonts.mono,
+    color: Colors.primaryPressed,
   },
 });

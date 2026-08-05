@@ -1,3 +1,4 @@
+import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 // load theme icons
@@ -66,10 +67,10 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl,
     borderWidth: 2,
-    borderColor: "#00000017",
+    borderColor: Colors.border,
     height: 44,
     paddingLeft: 12,
     paddingRight: 4,
@@ -94,19 +95,19 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 5,
+    borderRadius: Radius.md,
   },
   optionButtonActive: {
-    backgroundColor: "#FF1A1A",
+    backgroundColor: Colors.primary,
     borderWidth: 2,
-    borderColor: "rgba(255, 255, 255, 0.3)",
+    borderColor: Colors.borderOnPrimary,
   },
   optionText: {
-    fontFamily: "IBMPlexMono-Medium",
-    fontSize: 14,
-    color: "#000",
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.bodyMd,
+    color: Colors.textPrimary,
   },
   optionTextActive: {
-    color: "#fff",
+    color: Colors.surface,
   },
 });

@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Dimensions, LayoutRectangle, Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from "react-native";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const arrowDownIcon = require("../../../assets/icons/down_arrow.png");
@@ -118,7 +119,7 @@ export default function Selector({
         style={({ pressed }) => [
           styles.trigger,
           fullWidth && styles.triggerFullWidth,
-          pressed && { backgroundColor: "#eaeaea" }
+          pressed && { backgroundColor: Colors.surfacePressed }
         ]}
         ref={triggerRef}
       >
@@ -155,13 +156,13 @@ export default function Selector({
                   }}
                   style={({ pressed }) => [
                     option.isDownload ? styles.downloadOption : styles.option,
-                    option.id === selectedValue && !option.isDownload ? styles.optionSelected : pressed && !option.isDownload && { backgroundColor: "rgba(0, 0, 0, 0.05)" },
-                    option.id === selectedValue && !option.isDownload && pressed && { backgroundColor: "#cc1414" },
-                    option.isDownload && pressed && { backgroundColor: "#eaeaea" }
+                    option.id === selectedValue && !option.isDownload ? styles.optionSelected : pressed && !option.isDownload && { backgroundColor: Colors.overlaySubtle },
+                    option.id === selectedValue && !option.isDownload && pressed && { backgroundColor: Colors.primaryActive },
+                    option.isDownload && pressed && { backgroundColor: Colors.surfacePressed }
                   ]}
                 >
                   {option.isDownload && (
-                    <Animated.Image source={downloadIcon} style={[styles.downloadIcon, { tintColor: '#FF1A1A' }]} />
+                    <Animated.Image source={downloadIcon} style={[styles.downloadIcon, { tintColor: Colors.primary }]} />
                   )}
                   <Text
                     style={[
@@ -217,12 +218,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#00000017",
+    borderColor: Colors.border,
     paddingHorizontal: 12,
     height: 44,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.surface,
     gap: 8,
-    borderRadius: 10,
+    borderRadius: Radius.xxl,
     minWidth: 120,
     maxWidth: 240,
     overflow: "hidden",
@@ -238,33 +239,33 @@ const styles = StyleSheet.create({
     height: 18,
   },
   label: {
-    fontSize: 13,
-    color: "#000",
-    fontFamily: "IBMPlexMono-Medium",
+    fontSize: FontSizes.caption,
+    color: Colors.textPrimary,
+    fontFamily: Fonts.mono,
     flex: 1,
     textAlign: "right",
   },
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.15)",
+    backgroundColor: Colors.overlay,
   },
   menu: {
     position: "absolute",
-    backgroundColor: "#fff",
-    borderRadius: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl,
     borderWidth: 2,
-    borderColor: "#00000017",
+    borderColor: Colors.border,
     padding: 12,
     width: 220,
-    boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.15)",
+    boxShadow: `0px 4px 12px ${Colors.overlay}`,
     elevation: 8,
   },
   sectionTitle: {
-    fontSize: 12,
-    color: "#888",
+    fontSize: FontSizes.label,
+    color: Colors.textFaint,
     marginBottom: 8,
     marginTop: 4,
-    fontFamily: "Jakarta",
+    fontFamily: Fonts.body,
     textTransform: "uppercase",
     letterSpacing: 1,
   },
@@ -273,23 +274,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 5,
+    borderRadius: Radius.md,
     marginBottom: 4,
     borderWidth: 2,
     borderColor: "transparent",
   },
   optionSelected: {
-    backgroundColor: "#FF1A1A",
+    backgroundColor: Colors.primary,
     borderWidth: 2,
-    borderColor: "#ffffff52",
+    borderColor: Colors.borderOnPrimary,
   },
   optionText: {
-    fontSize: 15,
-    color: "#000",
-    fontFamily: "IBMPlexMono-Medium",
+    fontSize: FontSizes.body,
+    color: Colors.textPrimary,
+    fontFamily: Fonts.mono,
   },
   optionTextSelected: {
-    color: "#fff",
+    color: Colors.surface,
   },
   rightIconPressable: {
     justifyContent: "center",
@@ -305,12 +306,12 @@ const styles = StyleSheet.create({
   downloadOption: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f5f5f5",
+    backgroundColor: Colors.surfaceSubtle,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 5,
+    borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: Colors.codeBlockText,
     borderStyle: "dashed",
     gap: 8,
     marginBottom: 4,
@@ -320,8 +321,8 @@ const styles = StyleSheet.create({
     height: 16,
   },
   downloadText: {
-    fontSize: 13,
-    color: "#FF1A1A",
-    fontFamily: "IBMPlexMono-Medium",
+    fontSize: FontSizes.caption,
+    color: Colors.primary,
+    fontFamily: Fonts.mono,
   },
 });

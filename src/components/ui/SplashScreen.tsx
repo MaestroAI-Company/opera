@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import LottieView from "lottie-react-native";
+import { Colors } from "../../../constants/theme";
 
 const animation = require("../../../assets/animations/Splashscreen.json");
 
@@ -35,7 +36,7 @@ export default function SplashScreen({ onFinish }: Props) {
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#FDF8F1",
+    backgroundColor: Colors.backgroundSplash,
     justifyContent: "center",
     alignItems: "center",
   },

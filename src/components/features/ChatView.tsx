@@ -16,6 +16,7 @@ import { Conversation, Message } from "../../services/db/DatabaseService";
 import { Settings } from "../../services/settings/SettingsService";
 import { TTS } from "../../services/speech/TTSService";
 import { renderMarkdown } from "../ui/MarkdownText";
+import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 
 const butterflyImage = require("../../../assets/images/butterfly2.png");
 const butterflyGreyImage = require("../../../assets/images/butterfly2_grey.png");
@@ -140,7 +141,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
 
                 return isAudio ? (
                   <View key={i} style={styles.audioAttachmentBubble}>
-                    <Image source={speakerIcon} style={{ width: 14, height: 14, tintColor: '#fff', marginRight: 6 }} />
+                    <Image source={speakerIcon} style={{ width: 14, height: 14, tintColor: Colors.surface, marginRight: 6 }} />
                     <Text style={styles.audioAttachmentText} numberOfLines={1} ellipsizeMode="middle">{getFilename(uri)}</Text>
                   </View>
                 ) : (
@@ -152,7 +153,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
           <Text
             style={[styles.bubbleText, styles.userText]}
             selectable={true}
-            selectionColor="rgba(255, 255, 255, 0.4)"
+            selectionColor={Colors.whiteDim}
           >
             {item.content}
           </Text>
@@ -178,9 +179,9 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               {speakerEnabled && (
                 <Pressable
                   onPress={() => onSpeak?.(item)}
-                  style={({ pressed }) => [styles.toolbarIconContainer, pressed && { backgroundColor: "#eaeaea" }]}
+                  style={({ pressed }) => [styles.toolbarIconContainer, pressed && { backgroundColor: Colors.surfacePressed }]}
                 >
-                  <Image source={speakerIcon} style={{ width: 22, height: 22, tintColor: isSpeaking ? "#FF1A1A" : "#999" }} />
+                  <Image source={speakerIcon} style={{ width: 22, height: 22, tintColor: isSpeaking ? Colors.primary : Colors.textDisabled }} />
                 </Pressable>
               )}
               <Pressable
@@ -188,19 +189,19 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                 disabled={isChatGenerating}
                 style={({ pressed }) => [
                   styles.toolbarIconContainer,
-                  pressed && { backgroundColor: "#eaeaea" },
+                  pressed && { backgroundColor: Colors.surfacePressed },
                   isChatGenerating && { opacity: 0.3 }
                 ]}
               >
-                <Image source={reloadIcon} style={{ width: 22, height: 22, tintColor: "#999" }} />
+                <Image source={reloadIcon} style={{ width: 22, height: 22, tintColor: Colors.textDisabled }} />
               </Pressable>
               <Pressable
                 onPress={() => copyToClipboard(item.content, false)}
                 onLongPress={() => copyToClipboard(item.content, true)}
                 delayLongPress={500}
-                style={({ pressed }) => [styles.toolbarIconContainer, pressed && { backgroundColor: "#eaeaea" }]}
+                style={({ pressed }) => [styles.toolbarIconContainer, pressed && { backgroundColor: Colors.surfacePressed }]}
               >
-                <Image source={copyIcon} style={{ width: 22, height: 22, tintColor: "#999" }} />
+                <Image source={copyIcon} style={{ width: 22, height: 22, tintColor: Colors.textDisabled }} />
               </Pressable>
             </View>
           )}
@@ -335,12 +336,12 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
       {!hideGradients && (
         <>
           <LinearGradient
-            colors={["#FFF5EC", "rgba(255,245,236,0.9)", "rgba(255,245,236,0)"]}
+            colors={[Colors.background, Colors.backgroundFade, Colors.backgroundClear]}
             style={styles.gradientTop}
             pointerEvents="none"
           />
           <LinearGradient
-            colors={["rgba(255,245,236,0)", "rgba(255,245,236,0.9)", "#FFF5EC"]}
+            colors={[Colors.backgroundClear, Colors.backgroundFade, Colors.background]}
             style={styles.gradientBottom}
             pointerEvents="none"
           />
@@ -371,19 +372,19 @@ const styles = StyleSheet.create({
   },
   userBubble: {
     alignSelf: "flex-end",
-    backgroundColor: "#FF1A1A",
-    borderRadius: 10,
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.xxl,
     maxWidth: "80%",
     borderWidth: 2,
-    borderColor: "#ffffff52",
+    borderColor: Colors.borderOnPrimary,
   },
   userBubbleIncognito: {
     alignSelf: "flex-end",
-    backgroundColor: "#565A75",
-    borderRadius: 10,
+    backgroundColor: Colors.incognito,
+    borderRadius: Radius.xxl,
     maxWidth: "80%",
     borderWidth: 2,
-    borderColor: "#ffffff52",
+    borderColor: Colors.borderOnPrimary,
   },
   aiBubble: {
     alignSelf: "stretch",
@@ -391,12 +392,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
   },
   bubbleText: {
-    fontSize: 15,
+    fontSize: FontSizes.body,
     lineHeight: 21,
-    fontFamily: "Jakarta",
+    fontFamily: Fonts.body,
   },
   userText: {
-    color: "#fff",
+    color: Colors.surface,
   },
   aiContainer: {
     gap: 2,
@@ -412,17 +413,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   headerTitle: {
-    fontSize: 26,
-    color: "#333",
+    fontSize: FontSizes.displayMd,
+    color: Colors.textTertiary,
     textAlign: "center",
     letterSpacing: 0.5,
     marginBottom: 8,
-    fontFamily: "Petrona",
+    fontFamily: Fonts.display,
   },
   headerDate: {
-    fontSize: 14,
-    color: "#999",
-    fontFamily: "Plusjakarta",
+    fontSize: FontSizes.bodyMd,
+    color: Colors.textDisabled,
+    fontFamily: Fonts.body,
     marginBottom: 12,
   },
   gradientTop: {
@@ -448,9 +449,9 @@ const styles = StyleSheet.create({
     width: 70,
   },
   flashingText: {
-    color: "#666",
-    fontSize: 14,
-    fontFamily: "IBMPlexMono-Medium",
+    color: Colors.textBody,
+    fontSize: FontSizes.bodyMd,
+    fontFamily: Fonts.mono,
     flexShrink: 1,
   },
   aiToolbar: {
@@ -464,7 +465,7 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 16,
+    borderRadius: Radius.huge,
   },
   snackbarContainer: {
     position: 'absolute',
@@ -475,34 +476,34 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   snackbar: {
-    backgroundColor: '#333',
+    backgroundColor: Colors.textTertiary,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 20,
-    boxShadow: "0px 2px 3.84px rgba(0, 0, 0, 0.25)",
+    borderRadius: Radius.pill,
+    boxShadow: `0px 2px 3.84px ${Colors.scrimDrawer}`,
     elevation: 5,
   },
   snackbarText: {
-    color: '#fff',
-    fontSize: 14,
+    color: Colors.surface,
+    fontSize: FontSizes.bodyMd,
   },
   messageImage: {
     width: 120,
     height: 120,
-    borderRadius: 8,
+    borderRadius: Radius.xl,
   },
   audioAttachmentBubble: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: Colors.whiteFaint,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: Radius.huge,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
   audioAttachmentText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: FontSizes.label,
   },
   disclaimerContainer: {
     flexDirection: 'row',
@@ -514,17 +515,17 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   disclaimerText: {
-    fontSize: 14,
-    color: '#aaa',
+    fontSize: FontSizes.bodyMd,
+    color: Colors.textPlaceholder,
     textAlign: 'center',
-    fontFamily: 'Jakarta',
+    fontFamily: Fonts.body,
   },
   disclaimerLink: {
-    color: '#FF1A1A',
+    color: Colors.primary,
     textDecorationLine: 'underline',
-    fontFamily: 'Jakarta',
+    fontFamily: Fonts.body,
   },
   disclaimerLinkIncognito: {
-    color: '#565A75',
+    color: Colors.incognito,
   },
 });

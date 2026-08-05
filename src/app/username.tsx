@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TextInputField from "../components/ui/TextInputField";
 import { useResponsive } from "../hooks/useResponsive";
 import { Settings } from "../services/settings/SettingsService";
+import { Colors, Fonts, FontSizes, Radius } from "../../constants/theme";
 
 const texture2 = require("../../assets/images/texture2.png");
 const profilIcon = require("../../assets/icons/pencil.png");
@@ -78,7 +79,7 @@ export default function UsernamePage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFF5EC",
+    backgroundColor: Colors.background,
   },
   backgroundTexture: {
     opacity: 0.02,
@@ -97,15 +98,15 @@ const styles = StyleSheet.create({
     marginBottom: 36,
   },
   title: {
-    fontFamily: "Petrona",
-    fontSize: 36,
-    color: "#222",
+    fontFamily: Fonts.display,
+    fontSize: FontSizes.displayLg,
+    color: Colors.textSecondary,
     marginBottom: 12,
   },
   subtitle: {
-    fontFamily: "Jakarta",
-    fontSize: 14,
-    color: "#666",
+    fontFamily: Fonts.body,
+    fontSize: FontSizes.bodyMd,
+    color: Colors.textBody,
     lineHeight: 22,
   },
   inputWrapper: {
@@ -117,29 +118,29 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   button: {
-    backgroundColor: "#FF1A1A",
+    backgroundColor: Colors.primary,
     paddingVertical: 10,
     paddingHorizontal: 20,
-    borderRadius: 10,
+    borderRadius: Radius.xxl,
     borderWidth: 2,
-    borderColor: "#ffffff52",
+    borderColor: Colors.borderOnPrimary,
     alignItems: "center",
     width: "100%",
   },
   buttonPressed: {
-    backgroundColor: "#D61515",
+    backgroundColor: Colors.primaryPressed,
   },
   buttonLarge: {
     maxWidth: 420,
   },
   buttonText: {
-    fontFamily: "IBMPlexMono-Medium",
-    fontSize: 14,
-    color: "#fff",
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.bodyMd,
+    color: Colors.surface,
   },
   skipText: {
-    fontFamily: "Jakarta",
-    fontSize: 13,
-    color: "#999",
+    fontFamily: Fonts.body,
+    fontSize: FontSizes.caption,
+    color: Colors.textDisabled,
   },
 });

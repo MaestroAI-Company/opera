@@ -30,6 +30,7 @@ import { Conversation, DB, Message } from "../services/db/DatabaseService";
 import { Settings } from "../services/settings/SettingsService";
 import { STT } from "../services/speech/STTService";
 import { TTS } from "../services/speech/TTSService";
+import { Colors, Fonts, FontSizes, Radius } from "../../constants/theme";
 
 //web whisper surface, only used in browser flows
 const WebSTT = STT as unknown as {
@@ -817,7 +818,7 @@ export default function Index() {
                   style={({ pressed }) => [
                     styles.incognitoBox,
                     incognitoMode && styles.incognitoBoxActive,
-                    pressed && (incognitoMode ? { backgroundColor: "#3e4157" } : { backgroundColor: "#eaeaea" })
+                    pressed && (incognitoMode ? { backgroundColor: Colors.incognitoPressed } : { backgroundColor: Colors.surfacePressed })
                   ]}
                 >
                   <Text
@@ -896,7 +897,7 @@ export default function Index() {
                         const showText = isDesktop;
                         return [
                           styles.settingsButton,
-                          pressed && { backgroundColor: "#eaeaea" },
+                          pressed && { backgroundColor: Colors.surfacePressed },
                           !showText && { paddingHorizontal: 0, width: 44 }
                         ];
                       }}
@@ -983,7 +984,7 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFF5EC",
+    backgroundColor: Colors.background,
   },
   backgroundTexture: { opacity: 0.02 },
   topBarOverlay: {
@@ -1010,10 +1011,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   welcomeText: {
-    fontSize: 34,
-    color: "#333",
+    fontSize: FontSizes.displayXl,
+    color: Colors.textTertiary,
     letterSpacing: 1,
-    fontFamily: "Petrona",
+    fontFamily: Fonts.display,
     marginVertical: 20,
   },
   settingsShadowLayer: {
@@ -1026,8 +1027,8 @@ const styles = StyleSheet.create({
     left: -4,
     right: 4,
     height: 44,
-    backgroundColor: "#00000013",
-    borderRadius: 10,
+    backgroundColor: Colors.shadowInk,
+    borderRadius: Radius.xxl,
   },
   settingsButton: {
     height: 44,
@@ -1035,10 +1036,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: Colors.surface,
     borderWidth: 2,
-    borderColor: "#00000017",
-    borderRadius: 10,
+    borderColor: Colors.border,
+    borderRadius: Radius.xxl,
     position: "relative",
     zIndex: 1,
   },
@@ -1048,39 +1049,39 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   settingsButtonText: {
-    fontSize: 14,
-    fontFamily: "IBMPlexMono-Medium",
-    color: "#333",
+    fontSize: FontSizes.bodyMd,
+    fontFamily: Fonts.mono,
+    color: Colors.textTertiary,
   },
   incognitoBox: {
     position: "relative",
     borderWidth: 2,
-    borderColor: "#00000017",
-    borderRadius: 10,
+    borderColor: Colors.border,
+    borderRadius: Radius.xxl,
     paddingVertical: 8,
     paddingHorizontal: 16,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.surface,
     zIndex: 1,
     marginTop: 20,
   },
   incognitoBoxActive: {
-    backgroundColor: "#565A75",
-    borderColor: "#565A75",
+    backgroundColor: Colors.incognito,
+    borderColor: Colors.incognito,
   },
   incognitoButtonText: {
-    fontSize: 13,
-    color: "#222",
-    fontFamily: "IBMPlexMono-Medium",
+    fontSize: FontSizes.caption,
+    color: Colors.textSecondary,
+    fontFamily: Fonts.mono,
     textAlign: "center",
   },
   incognitoButtonTextActive: {
-    color: "#fff",
+    color: Colors.surface,
   },
   incognitoDescription: {
     marginTop: 14,
-    fontSize: 12,
-    color: "#999",
-    fontFamily: "Jakarta",
+    fontSize: FontSizes.label,
+    color: Colors.textDisabled,
+    fontFamily: Fonts.body,
     textAlign: "center",
     lineHeight: 18,
     maxWidth: 300,

@@ -1,3 +1,4 @@
+import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 type CheckboxProps = {
@@ -35,27 +36,27 @@ const styles = StyleSheet.create({
   box: {
     width: 20,
     height: 20,
-    borderRadius: 4,
+    borderRadius: Radius.sm,
     borderWidth: 2,
-    borderColor: "#00000017",
-    backgroundColor: "#fff",
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
     justifyContent: "center",
     alignItems: "center",
   },
   boxChecked: {
-    backgroundColor: "#FF1A1A",
-    borderColor: "#FF1A1A",
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
   checkmark: {
-    color: "#fff",
-    fontSize: 13,
+    color: Colors.surface,
+    fontSize: FontSizes.caption,
     fontWeight: "bold",
     lineHeight: 16,
   },
   label: {
-    fontSize: 14,
-    color: "#222",
-    fontFamily: "monospace",
+    fontSize: FontSizes.bodyMd,
+    color: Colors.textSecondary,
+    fontFamily: Fonts.mono,
     flex: 1,
   },
 });

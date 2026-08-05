@@ -4,6 +4,7 @@ import { AIModule } from "../../services/ai/AIModule";
 import { BackupService } from "../../services/BackupService";
 import { Settings } from "../../services/settings/SettingsService";
 import { STT } from "../../services/speech/STTService";
+import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 
 //web whisper surface, only used in browser flows
 const WebSTT = STT as unknown as {
@@ -234,7 +235,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       label: "Tiny",
       isDownload: !installedWhisperModels["tiny"],
       ...(installedWhisperModels["tiny"] && whisperModel === "tiny"
-        ? { rightIcon: deleteIcon, rightIconTintColor: "#ffffff", onRightIconPress: handleDeleteWhisper }
+        ? { rightIcon: deleteIcon, rightIconTintColor: Colors.surface, onRightIconPress: handleDeleteWhisper }
         : {}),
     },
     {
@@ -242,7 +243,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       label: "Base",
       isDownload: !installedWhisperModels["base"],
       ...(installedWhisperModels["base"] && whisperModel === "base"
-        ? { rightIcon: deleteIcon, rightIconTintColor: "#ffffff", onRightIconPress: handleDeleteWhisper }
+        ? { rightIcon: deleteIcon, rightIconTintColor: Colors.surface, onRightIconPress: handleDeleteWhisper }
         : {}),
     },
     {
@@ -250,7 +251,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       label: "Small",
       isDownload: !installedWhisperModels["small"],
       ...(installedWhisperModels["small"] && whisperModel === "small"
-        ? { rightIcon: deleteIcon, rightIconTintColor: "#ffffff", onRightIconPress: handleDeleteWhisper }
+        ? { rightIcon: deleteIcon, rightIconTintColor: Colors.surface, onRightIconPress: handleDeleteWhisper }
         : {}),
     },
   ];
@@ -726,7 +727,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         onPress={() => setActiveSubPage("main")}
         style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.6 }]}
       >
-        <Image source={arrowIcon} style={styles.backIcon} tintColor="#000" />
+        <Image source={arrowIcon} style={styles.backIcon} tintColor={Colors.textPrimary} />
       </Pressable>
     </View>
   );
@@ -741,7 +742,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         style={({ pressed }) => [styles.profileCard, pressed && styles.navItemPressed]}
         onPress={() => setActiveSubPage("profile")}
       >
-        <Image source={profilIcon} style={styles.menuIcon} tintColor="#000" />
+        <Image source={profilIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
         <View style={styles.navTextContainer}>
           <Text style={styles.navTitle}>{username || "Set your username"}</Text>
           <Text style={styles.navSubtitle}>Username, AI Instructions</Text>
@@ -754,7 +755,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
             onPress={() => setActiveSubPage("general")}
           >
-            <Image source={generalIcon} style={styles.menuIcon} tintColor="#000" />
+            <Image source={generalIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>General</Text>
               <Text style={styles.navSubtitle}>Language, Theme, Cloud Storage</Text>
@@ -765,7 +766,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
             onPress={() => setActiveSubPage("models")}
           >
-            <Image source={serverIcon} style={styles.menuIcon} tintColor="#000" />
+            <Image source={serverIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>Models & Server</Text>
               <Text style={styles.navSubtitle}>Ollama server, Whisper Model, TOD</Text>
@@ -776,7 +777,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             style={({ pressed }) => [styles.navItem, styles.navItemLast, pressed && styles.navItemPressed]}
             onPress={() => setActiveSubPage("tools")}
           >
-            <Image source={toolIcon} style={styles.menuIcon} tintColor="#000" />
+            <Image source={toolIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>Tools & Widgets</Text>
               <Text style={styles.navSubtitle}>Websearch</Text>
@@ -791,7 +792,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
             onPress={() => setActiveSubPage("confidentiality")}
           >
-            <Image source={confidentialityIcon} style={styles.menuIcon} tintColor="#000" />
+            <Image source={confidentialityIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>Confidentiality</Text>
               <Text style={styles.navSubtitle}>Data privacy, Usage analytics</Text>
@@ -799,7 +800,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           </Pressable>
 
           <View style={[styles.navItem, styles.navItemLast]}>
-            <Image source={socialIcon} style={styles.menuIcon} tintColor="#000" />
+            <Image source={socialIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>Social Links</Text>
               <Text style={styles.navSubtitle}>Github, Instagram, Website</Text>
@@ -1168,35 +1169,35 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(0,0,0,0.25)",
+    backgroundColor: Colors.scrimDrawer,
   },
   content: {
     position: "absolute",
     top: 0,
     bottom: 0,
     right: 0,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.surface,
     paddingHorizontal: 16,
   },
   largeScreenContainer: {
     width: 320,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.surface,
     zIndex: 10,
   },
   floatingContainer: {
     margin: 16,
     marginTop: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window ? 40 : 8,
     marginBottom: 16,
-    borderRadius: 10,
+    borderRadius: Radius.xxl,
     borderWidth: 2,
-    borderColor: "#00000017",
-    boxShadow: "-6px 6px 0px #00000013",
+    borderColor: Colors.border,
+    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
     elevation: 5,
     overflow: "hidden",
   },
   attachedContainer: {
     borderLeftWidth: 1,
-    borderLeftColor: "rgba(0,0,0,0.05)",
+    borderLeftColor: Colors.overlaySubtle,
   },
   floatingContent: {
     flex: 1,
@@ -1208,10 +1209,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   title: {
-    fontSize: 32,
-    color: "#222",
+    fontSize: FontSizes.xxxl,
+    color: Colors.textSecondary,
     marginBottom: 24,
-    fontFamily: "Petrona",
+    fontFamily: Fonts.display,
   },
   menuContainer: {
     flex: 1,
@@ -1219,10 +1220,10 @@ const styles = StyleSheet.create({
   profileCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg2,
     borderWidth: 2,
-    borderColor: "#00000017",
+    borderColor: Colors.border,
     padding: 14,
     marginBottom: 20,
     gap: 12,
@@ -1252,9 +1253,9 @@ const styles = StyleSheet.create({
   groupBox: {
     position: "relative",
     borderWidth: 2,
-    borderColor: "#00000017",
-    borderRadius: 10,
-    backgroundColor: "#fff",
+    borderColor: Colors.border,
+    borderRadius: Radius.xxl,
+    backgroundColor: Colors.surface,
     zIndex: 1,
     overflow: "hidden",
   },
@@ -1269,7 +1270,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   navItemPressed: {
-    backgroundColor: "#eaeaea",
+    backgroundColor: Colors.surfacePressed,
   },
   menuIcon: {
     width: 18,
@@ -1279,24 +1280,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   navTitle: {
-    fontSize: 18,
-    fontFamily: "IBMPlexMono-Medium",
-    color: "#000",
+    fontSize: FontSizes.lg,
+    fontFamily: Fonts.mono,
+    color: Colors.textPrimary,
     marginBottom: 2,
   },
   navSubtitle: {
-    fontSize: 12,
-    fontFamily: "Jakarta",
-    color: "#888",
+    fontSize: FontSizes.label,
+    fontFamily: Fonts.body,
+    color: Colors.textFaint,
   },
   settingRowVertical: {
     marginBottom: 20,
     zIndex: 10,
   },
   settingLabel: {
-    fontSize: 15,
-    color: "#222",
-    fontFamily: "IBMPlexMono-Medium",
+    fontSize: FontSizes.body,
+    color: Colors.textSecondary,
+    fontFamily: Fonts.mono,
   },
   toggleRow: {
     flexDirection: "row",
@@ -1305,20 +1306,20 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   errorText: {
-    fontSize: 13,
-    color: "#FF1A1A",
-    fontFamily: "Jakarta",
+    fontSize: FontSizes.caption,
+    color: Colors.primary,
+    fontFamily: Fonts.body,
     marginTop: -10,
     marginBottom: 20,
   },
   downloadOption: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f5f5f5",
+    backgroundColor: Colors.surfaceSubtle,
     padding: 12,
-    borderRadius: 5,
+    borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: Colors.codeBlockText,
     borderStyle: "dashed",
     gap: 10,
     marginBottom: 20,
@@ -1328,45 +1329,45 @@ const styles = StyleSheet.create({
     height: 20,
   },
   downloadText: {
-    fontSize: 14,
-    color: "#FF1A1A",
-    fontFamily: "IBMPlexMono-Medium",
+    fontSize: FontSizes.bodyMd,
+    color: Colors.primary,
+    fontFamily: Fonts.mono,
   },
   helpText: {
-    fontSize: 12,
-    color: "#888",
-    fontFamily: "Jakarta",
+    fontSize: FontSizes.label,
+    color: Colors.textFaint,
+    fontFamily: Fonts.body,
     marginTop: 4,
   },
   dataBtn: {
     flex: 1,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    borderRadius: 10,
+    borderRadius: Radius.xxl,
     borderWidth: 2,
-    borderColor: "#00000017",
+    borderColor: Colors.border,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff",
+    backgroundColor: Colors.surface,
   },
   dataBtnPressed: {
-    backgroundColor: "#eaeaea",
+    backgroundColor: Colors.surfacePressed,
   },
   dataBtnText: {
-    fontSize: 13,
-    fontFamily: "IBMPlexMono-Medium",
-    color: "#222",
+    fontSize: FontSizes.caption,
+    fontFamily: Fonts.mono,
+    color: Colors.textSecondary,
   },
   dataBtnDanger: {
-    borderColor: "#FF1A1A22",
-    backgroundColor: "#fff",
+    borderColor: Colors.dangerBorder,
+    backgroundColor: Colors.surface,
   },
   dataBtnDangerPressed: {
-    backgroundColor: "#fff0f0",
+    backgroundColor: Colors.dangerBg,
   },
   dataBtnTextDanger: {
-    fontSize: 13,
-    fontFamily: "IBMPlexMono-Medium",
-    color: "#FF1A1A",
+    fontSize: FontSizes.caption,
+    fontFamily: Fonts.mono,
+    color: Colors.primary,
   },
 });

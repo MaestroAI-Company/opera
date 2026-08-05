@@ -1,5 +1,6 @@
 import { Image, ImageSourcePropType, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import TextInputField from "./TextInputField";
+import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 
 export type ModalButton = {
   text: string;
@@ -59,7 +60,7 @@ export default function NotificationModal({
 
           {(title || icon) && (
             <View style={styles.header}>
-              {icon && <Image source={icon} style={styles.icon} tintColor="#222" />}
+              {icon && <Image source={icon} style={styles.icon} tintColor={Colors.textSecondary} />}
               {title && <Text style={styles.title}>{title}</Text>}
             </View>
           )}
@@ -93,10 +94,10 @@ export default function NotificationModal({
                     !isPrimary && !isDanger && styles.buttonSecondary,
                     pressed && (
                       isPrimary
-                        ? { backgroundColor: "#D61515", borderColor: "#D61515" }
+                        ? { backgroundColor: Colors.primaryPressed, borderColor: Colors.primaryPressed }
                         : isDanger
-                          ? { backgroundColor: "#d60e0e", borderColor: "#d60e0e" }
-                          : { backgroundColor: "#eaeaea" }
+                          ? { backgroundColor: Colors.primaryPressed, borderColor: Colors.primaryPressed }
+                          : { backgroundColor: Colors.surfacePressed }
                     )
                   ]}
                   onPress={btn.onPress}
@@ -120,20 +121,20 @@ export default function NotificationModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: Colors.scrimModal,
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
   },
   container: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl,
     borderWidth: 2,
-    borderColor: "#00000017",
+    borderColor: Colors.border,
     padding: 24,
     width: "100%",
     maxWidth: 400,
-    boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.15)",
+    boxShadow: `0px 4px 12px ${Colors.overlay}`,
     elevation: 8,
   },
   header: {
@@ -149,16 +150,16 @@ const styles = StyleSheet.create({
     
   },
   title: {
-    fontSize: 18,
+    fontSize: FontSizes.lg,
     fontWeight: "bold",
-    color: "#222",
-    fontFamily: "IBMPlexMono-Medium",
+    color: Colors.textSecondary,
+    fontFamily: Fonts.mono,
     textAlign: "center",
   },
   message: {
-    fontSize: 14,
-    color: "#555",
-    fontFamily: "Jakarta",
+    fontSize: FontSizes.bodyMd,
+    color: Colors.textMuted,
+    fontFamily: Fonts.body,
     textAlign: "center",
     marginBottom: 20,
     lineHeight: 20,
@@ -175,30 +176,30 @@ const styles = StyleSheet.create({
   button: {
     paddingVertical: 10,
     paddingHorizontal: 20,
-    borderRadius: 5,
+    borderRadius: Radius.md,
     borderWidth: 2,
     borderColor: "transparent",
     minWidth: 80,
     alignItems: "center",
   },
   buttonPrimary: {
-    backgroundColor: "#FF1A1A",
-    borderColor: "#ffffff52",
+    backgroundColor: Colors.primary,
+    borderColor: Colors.borderOnPrimary,
   },
   buttonDanger: {
-    backgroundColor: "#FF1A1A",
-    borderColor: "#ffffff52",
+    backgroundColor: Colors.primary,
+    borderColor: Colors.borderOnPrimary,
   },
   buttonSecondary: {
-    backgroundColor: "#fff",
-    borderColor: "#00000017",
+    backgroundColor: Colors.surface,
+    borderColor: Colors.border,
   },
   buttonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontFamily: "IBMPlexMono-Medium",
+    color: Colors.surface,
+    fontSize: FontSizes.bodyMd,
+    fontFamily: Fonts.mono,
   },
   buttonTextSecondary: {
-    color: "#222",
+    color: Colors.textSecondary,
   },
 });

@@ -1,3 +1,4 @@
+import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import {
   Image,
   Platform,
@@ -81,7 +82,7 @@ export default function AttachmentSheet({
                 {
                   borderWidth: 2,
                   borderColor: selectedFiles.some(f => (f.id && f.id === photo.id) || f.uri === (photo.uri || photo.localUri))
-                    ? (incognito ? '#fff' : '#FF1A1A')
+                    ? (incognito ? Colors.surface : Colors.primary)
                     : 'transparent'
                 }
               ]}
@@ -103,20 +104,20 @@ export default function AttachmentSheet({
 
 const styles = StyleSheet.create({
   inlineSheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.huge2,
+    borderTopRightRadius: Radius.huge2,
     paddingBottom: Platform.OS === 'ios' ? 20 : 10,
     paddingTop: 12,
     width: '100%',
 
   },
   inlineSheetIncognito: {
-    backgroundColor: '#2A2A35',
+    backgroundColor: Colors.incognitoSurface,
     borderTopWidth: 0,
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    borderColor: '#3e4157',
+    borderColor: Colors.incognitoPressed,
   },
   sheetHandleContainer: {
     alignItems: 'center',
@@ -127,11 +128,11 @@ const styles = StyleSheet.create({
   sheetHandle: {
     width: 40,
     height: 4,
-    borderRadius: 10,
-    backgroundColor: '#ccc',
+    borderRadius: Radius.xxl,
+    backgroundColor: Colors.textDisabledStrong,
   },
   sheetHandleIncognito: {
-    backgroundColor: '#565A75',
+    backgroundColor: Colors.incognito,
   },
   sheetButtonsRow: {
     flexDirection: 'row',
@@ -143,33 +144,33 @@ const styles = StyleSheet.create({
   sheetIconButton: {
     flex: 1,
     height: 70,
-    backgroundColor: '#fff',
-    borderRadius: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#e0e0e0',
+    borderColor: Colors.codeBlockText,
   },
   sheetIconButtonIncognito: {
-    backgroundColor: '#3e4157',
-    borderColor: '#565A75',
+    backgroundColor: Colors.incognitoPressed,
+    borderColor: Colors.incognito,
   },
   sheetIcon: {
     width: 18,
     height: 18,
     marginBottom: 4,
-    tintColor: '#000',
+    tintColor: Colors.textPrimary,
   },
   sheetIconIncognito: {
-    tintColor: '#fff',
+    tintColor: Colors.surface,
   },
   sheetIconText: {
-    fontSize: 12,
-    color: '#000',
-    fontFamily: 'IBMPlexMono-Medium',
+    fontSize: FontSizes.label,
+    color: Colors.textPrimary,
+    fontFamily: Fonts.mono,
   },
   sheetTextIncognito: {
-    color: '#fff',
+    color: Colors.surface,
   },
   sheetRecentPhotosContainer: {
     paddingHorizontal: 16,
@@ -177,12 +178,12 @@ const styles = StyleSheet.create({
   },
   sheetRecentPhotoWrapper: {
     marginRight: 10,
-    borderRadius: 10,
+    borderRadius: Radius.xxl,
     overflow: 'hidden',
   },
   sheetRecentPhoto: {
     width: 80,
     height: 80,
-    borderRadius: 10,
+    borderRadius: Radius.xxl,
   },
 });

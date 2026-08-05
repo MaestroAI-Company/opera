@@ -78,6 +78,10 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - Do not add new components or modify existing ones unless explicitly asked.
 - Keep the UI design as close as possible to the original design.
 - When you need to add a new component, make sure it matches the existing design.
+- Read `DESIGN.md` before any UI work and follow the design system it defines.
+- Always use the design tokens from `constants/theme.ts` (`Colors`, `Fonts`, `FontSizes`, `Spacing`, `Radius`). Never hardcode colors, fonts, sizes, or radii.
+- New components must follow the existing conventions: 2px sticker outlines, 10px default radius (`Radius.xxl`), token-driven styling.
+- Branding: the app is **Opera**, the AI assistant is **Maestro**. Do not swap or confuse the two names.
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.

@@ -77,21 +77,19 @@ export default function AttachmentSheet({
               key={photo.id}
               onPress={() => onSelectRecentPhoto(photo)}
               onLongPress={() => onLongPressRecentPhoto(photo)}
-              style={[
-                styles.sheetRecentPhotoWrapper,
-                {
-                  borderWidth: 2,
-                  borderColor: selectedFiles.some(f => (f.id && f.id === photo.id) || f.uri === (photo.uri || photo.localUri))
-                    ? (incognito ? Colors.surface : Colors.primary)
-                    : 'transparent'
-                }
-              ]}
+              style={styles.sheetRecentPhotoWrapper}
             >
               <Image
                 source={{ uri: photo.uri || photo.localUri }}
                 style={[
                   styles.sheetRecentPhoto,
-                  { opacity: selectedFiles.some(f => (f.id && f.id === photo.id) || f.uri === (photo.uri || photo.localUri)) ? 0.7 : 1 }
+                  { 
+                    opacity: selectedFiles.some(f => (f.id && f.id === photo.id) || f.uri === (photo.uri || photo.localUri)) ? 0.7 : 1,
+                    borderWidth: 2,
+                    borderColor: selectedFiles.some(f => (f.id && f.id === photo.id) || f.uri === (photo.uri || photo.localUri))
+                      ? (incognito ? Colors.surface : Colors.primary)
+                      : 'transparent'
+                  }
                 ]}
               />
             </TouchableOpacity>
@@ -179,7 +177,6 @@ const styles = StyleSheet.create({
   sheetRecentPhotoWrapper: {
     marginRight: 10,
     borderRadius: Radius.xxl,
-    overflow: 'hidden',
   },
   sheetRecentPhoto: {
     width: 80,

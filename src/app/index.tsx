@@ -24,6 +24,7 @@ import ModelDropdown from "../components/features/ModelDropdown";
 import SettingsDrawer from "../components/features/SettingsDrawer";
 import SearchWebView from "../../components/SearchWebView";
 import TopBar from "../components/features/TopBar";
+import NotificationModal from "../components/ui/NotificationModal";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { useResponsive } from "../hooks/useResponsive";
 import { AIModule } from "../services/ai/AIModule";
@@ -60,6 +61,17 @@ export default function Index() {
   const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
   const [settingsInitialSubPage, setSettingsInitialSubPage] = useState<"main" | "general" | "models" | "confidentiality" | "tools">("main");
   const [dbReady, setDbReady] = useState(false);
+  const [showDataWarning, setShowDataWarning] = useState(false);
+
+  const drawerVisibleRef = useRef(drawerVisible);
+  useEffect(() => {
+    drawerVisibleRef.current = drawerVisible;
+  }, [drawerVisible]);
+
+  const settingsDrawerVisibleRef = useRef(settingsDrawerVisible);
+  useEffect(() => {
+    settingsDrawerVisibleRef.current = settingsDrawerVisible;
+  }, [settingsDrawerVisible]);
 
   const { convId } = useLocalSearchParams<{ convId?: string }>();
   const [incognitoMode, setIncognitoMode] = useState(false);
@@ -92,12 +104,12 @@ export default function Index() {
 
   useEffect(() => {
     const handleBackButton = () => {
-      //close drawers on android back press
-      if (settingsDrawerVisible) {
+      //close drawers on android back press, after drawer-level handlers
+      if (settingsDrawerVisibleRef.current) {
         setSettingsDrawerVisible(false);
         return true;
       }
-      if (drawerVisible) {
+      if (drawerVisibleRef.current) {
         setDrawerVisible(false);
         return true;
       }
@@ -110,7 +122,7 @@ export default function Index() {
     );
 
     return () => backHandler.remove();
-  }, [drawerVisible, settingsDrawerVisible]);
+  }, []);
 
   const openDrawerSafely = useCallback((openFn: () => void) => {
     const wasKeyboardOpen = typeof Keyboard.metrics === 'function' ? !!Keyboard.metrics() : false;
@@ -130,13 +142,29 @@ export default function Index() {
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
+        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        if (!isHorizontal || Math.abs(gestureState.dx) <= 10) return false;
+        
+        if (settingsDrawerVisibleRef.current && gestureState.dx > 0) return true;
+        if (drawerVisibleRef.current && gestureState.dx < 0) return true;
+        
         const isLeftEdge = gestureState.x0 < 40;
-        const isSwipeRight = gestureState.dx > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-        return isLeftEdge && isSwipeRight;
+        if (isLeftEdge && gestureState.dx > 0) return true;
+        return gestureState.dx < 0;
       },
       onPanResponderRelease: (evt, gestureState) => {
         if (gestureState.dx > 40) {
-          setDrawerVisible(true);
+          if (settingsDrawerVisibleRef.current) {
+            setSettingsDrawerVisible(false);
+          } else {
+            setDrawerVisible(true);
+          }
+        } else if (gestureState.dx < -40) {
+          if (drawerVisibleRef.current) {
+            setDrawerVisible(false);
+          } else {
+            setSettingsDrawerVisible(true);
+          }
         }
       },
     })
@@ -164,7 +192,7 @@ export default function Index() {
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
 
-  // Synchronize with shared generation from overlay
+  //sync with shared generation from overlay
   useEffect(() => {
     return AIModule.SharedGenerationState.subscribe(() => {
       const activeState = AIModule.SharedGenerationState;
@@ -199,6 +227,9 @@ export default function Index() {
   useEffect(() => {
     const init = async () => {
       await DB.init();
+      if (await DB.detectDataIssues()) {
+        setShowDataWarning(true);
+      }
       loadConversations();
       //load and apply settings
       try {
@@ -818,6 +849,7 @@ export default function Index() {
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: "transparent" }]}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
+        enabled={!drawerVisible && !settingsDrawerVisible}
         {...(isLargeScreen ? {} : panResponder.panHandlers)}
       >
 
@@ -903,6 +935,7 @@ export default function Index() {
             }]} pointerEvents="box-none">
               <TopBar
                 onMenuPress={() => {
+                  if (settingsDrawerVisible) return;
                   openDrawerSafely(() => setDrawerVisible(prev => !prev));
                 }}
                 onNewPress={startNewConversation}
@@ -935,6 +968,7 @@ export default function Index() {
                         ];
                       }}
                       onPress={() => {
+                        if (drawerVisible) return;
                         openDrawerSafely(() => {
                           if (settingsDrawerVisible) {
                             const cached = Settings.getCached();
@@ -1014,6 +1048,25 @@ export default function Index() {
       </KeyboardAvoidingView>
 
       <SearchWebView />
+
+      <NotificationModal
+        visible={showDataWarning}
+        title="Possible data inconsistency"
+        message="After this update, some saved data may be inconsistent. If you encounter any problems, go to Settings → Confidentiality to export your data or delete all conversations."
+        onClose={() => setShowDataWarning(false)}
+        buttons={[
+          {
+            text: "Go to Settings",
+            style: "primary",
+            onPress: () => {
+              setShowDataWarning(false);
+              setSettingsInitialSubPage("confidentiality");
+              setSettingsDrawerVisible(true);
+            },
+          },
+          { text: "Later", style: "secondary", onPress: () => setShowDataWarning(false) },
+        ]}
+      />
     </View>
   );
 }

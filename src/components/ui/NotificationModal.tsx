@@ -22,7 +22,7 @@ export type NotificationModalProps = {
   inputSecureTextEntry?: boolean;
   inputKeyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
 
-  //custom buttons (up to 3)
+  //custom buttons (up to 4)
   buttons?: ModalButton[];
 
   onClose: () => void;
@@ -45,7 +45,7 @@ export default function NotificationModal({
 
   //fallback to single close button if none provided
   const activeButtons = buttons && buttons.length > 0
-    ? buttons.slice(0, 3)
+    ? buttons.slice(0, 4)
     : [{ text: "OK", onPress: onClose, style: "primary" as const }];
 
   return (
@@ -55,7 +55,7 @@ export default function NotificationModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
+      <Pressable style={styles.overlay} onPress={onClose}>
         <View style={styles.container}>
 
           {(title || icon) && (
@@ -113,7 +113,7 @@ export default function NotificationModal({
             })}
           </View>
         </View>
-      </View>
+      </Pressable>
     </Modal>
   );
 }

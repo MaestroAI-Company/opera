@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Image, Keyboard, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Animated, BackHandler, Image, Keyboard, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useResponsive } from "../../hooks/useResponsive";
 import { Conversation, DB } from "../../services/db/DatabaseService";
 import { CloudSync } from "../../services/CloudSyncService";
@@ -83,6 +83,22 @@ export default function ConversationsDrawer({
       setSelectedSearchId(null);
     }
   }, [visible]);
+
+  //native back exits search mode, then lets parent close the drawer
+  useEffect(() => {
+    if (!visible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (isSearching) {
+        Keyboard.dismiss();
+        setIsSearching(false);
+        setSearchQuery("");
+        setSelectedSearchId(null);
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [visible, isSearching]);
 
   // Triggering Fast Refresh
   useEffect(() => {

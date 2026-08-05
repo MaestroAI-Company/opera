@@ -133,6 +133,29 @@ class DatabaseService {
     return this.db;
   }
 
+  //check saved data for inconsistencies that can appear after an update or partial import
+  async detectDataIssues(): Promise<boolean> {
+    const db = this.getDb();
+    //orphan messages pointing to a missing conversation
+    const orphan = await db.getFirstAsync<{count: number}>(
+      'SELECT COUNT(*) as count FROM messages m LEFT JOIN conversations c ON m.conversationId = c.id WHERE c.id IS NULL'
+    );
+    if (orphan && orphan.count > 0) return true;
+    //malformed json in message columns
+    const rows = await db.getAllAsync<{ images?: string | null; metrics?: string | null }>(
+      'SELECT images, metrics FROM messages'
+    );
+    for (const row of rows) {
+      if (row.images) {
+        try { JSON.parse(row.images); } catch { return true; }
+      }
+      if (row.metrics) {
+        try { JSON.parse(row.metrics); } catch { return true; }
+      }
+    }
+    return false;
+  }
+
   //get tombstones (deleted items waiting to propagate via sync)
   async getTombstones(): Promise<SyncTombstone[]> {
     const db = this.getDb();

@@ -92,6 +92,12 @@ class DatabaseService {
     localStorage.removeItem('opera_tombstones');
   }
 
+  //check saved data for inconsistencies that can appear after an update or partial import
+  async detectDataIssues(): Promise<boolean> {
+    const convIds = new Set(this.conversations.map(c => c.id));
+    return this.messages.some(m => !convIds.has(m.conversationId));
+  }
+
   // create conversation
   async createConversation(model: string, firstName: string): Promise<Conversation> {
     const now = Date.now();

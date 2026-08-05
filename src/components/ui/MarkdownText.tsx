@@ -67,7 +67,7 @@ const s = StyleSheet.create({
   paragraph: { marginVertical: 2 },
   spacing: { height: 8 },
   strike: { textDecorationLine: "line-through" },
-  link: { color: Colors.link, textDecorationLine: "underline" },
+  link: { color: Colors.primary, textDecorationLine: "underline" },
   tableCell: { fontSize: FontSizes.body, lineHeight: 20, color: Colors.textPrimary, fontFamily: Fonts.body },
   tableCellBox: { flex: 1, paddingHorizontal: 8, paddingVertical: 6 },
   inlineRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },

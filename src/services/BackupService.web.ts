@@ -10,23 +10,45 @@ export type BackupData = {
   tombstones?: SyncTombstone[];
 };
 
+//backup file may contain only selected parts
+export type BackupFile = {
+  version: number;
+  settings?: AppSettings;
+  settingsUpdatedAt?: number;
+  conversations?: Conversation[];
+  messages?: Message[];
+  tombstones?: SyncTombstone[];
+};
+
+export type BackupScope = {
+  includeSettings: boolean;
+  includeConversations: boolean;
+};
+
+export type ImportResult = {
+  success: boolean;
+  warning?: string;
+};
+
 class BackupServiceImpl {
   // export data to json file download
-  async exportData(): Promise<boolean> {
+  async exportData(scope?: BackupScope): Promise<boolean> {
     try {
-      const settings = Settings.getCached();
-      const conversations = await DB.getConversations();
-      const messages = await DB.getAllMessagesAllConversations();
-      const tombstones = await DB.getTombstones();
+      const includeSettings = scope?.includeSettings ?? true;
+      const includeConversations = scope?.includeConversations ?? true;
 
-      const backup: BackupData = {
-        version: 2,
-        settings,
-        settingsUpdatedAt: await Settings.getSettingsUpdatedAt(),
-        conversations,
-        messages,
-        tombstones,
-      };
+      const backup: BackupFile = { version: 2 };
+
+      if (includeSettings) {
+        backup.settings = Settings.getCached();
+        backup.settingsUpdatedAt = await Settings.getSettingsUpdatedAt();
+      }
+
+      if (includeConversations) {
+        backup.conversations = await DB.getConversations();
+        backup.messages = await DB.getAllMessagesAllConversations();
+        backup.tombstones = await DB.getTombstones();
+      }
 
       const jsonStr = JSON.stringify(backup, null, 2);
       const filename = `opera_backup_${Date.now()}.json`;
@@ -72,16 +94,19 @@ class BackupServiceImpl {
   }
 
   // import data from local json file
-  async importData(): Promise<boolean> {
+  async importData(scope?: BackupScope): Promise<ImportResult> {
     try {
-      return new Promise<boolean>((resolve, reject) => {
+      const includeSettings = scope?.includeSettings ?? true;
+      const includeConversations = scope?.includeConversations ?? true;
+
+      return new Promise<ImportResult>((resolve, reject) => {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.json';
         input.onchange = async (event: any) => {
           const file = event.target.files?.[0];
           if (!file) {
-            resolve(false);
+            resolve({ success: false });
             return;
           }
           try {
@@ -89,19 +114,36 @@ class BackupServiceImpl {
             reader.onload = async (e) => {
               try {
                 const jsonStr = e.target?.result as string;
-                const backup: BackupData = JSON.parse(jsonStr);
+                const backup: BackupFile = JSON.parse(jsonStr);
 
-                if (!backup.settings || !backup.conversations || !backup.messages) {
-                  throw new Error('invalid backup file format');
+                if (includeSettings && !backup.settings) {
+                  throw new Error('Backup file contains no settings');
+                }
+                if (includeConversations && (!backup.conversations || !backup.messages)) {
+                  throw new Error('Backup file contains no conversations');
+                }
+
+                //check internal consistency of imported json (warn but still import)
+                let warning: string | undefined;
+                if (includeConversations && backup.conversations && backup.messages) {
+                  const convIds = new Set(backup.conversations.map(c => c.id));
+                  const orphans = backup.messages.filter(m => !convIds.has(m.conversationId));
+                  if (orphans.length > 0) {
+                    warning = `Data imported, but the backup file is inconsistent: ${orphans.length} message(s) reference a missing conversation.`;
+                  }
                 }
 
                 // restore settings
-                await Settings.setMany(backup.settings);
+                if (includeSettings && backup.settings) {
+                  await Settings.setMany(backup.settings);
+                }
 
                 // restore database
-                await DB.importBackup(backup.conversations, backup.messages, backup.tombstones ?? []);
-                
-                resolve(true);
+                if (includeConversations && backup.conversations && backup.messages) {
+                  await DB.importBackup(backup.conversations, backup.messages, backup.tombstones ?? []);
+                }
+
+                resolve({ success: true, warning });
               } catch (err) {
                 reject(err);
               }

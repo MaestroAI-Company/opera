@@ -17,15 +17,15 @@ import { Colors, Fonts, FontSizes, Radius } from "../../constants/theme";
 const texture2 = require("../../assets/images/texture2.png");
 const profilIcon = require("../../assets/icons/pencil.png");
 
-export default function UsernamePage() {
+export default function NamePage() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isLargeScreen } = useResponsive();
-  const [username, setUsername] = useState(() => Settings.getCached().username || "");
+  const [name, setName] = useState(() => Settings.getCached().name || "");
 
   const handleFinish = async () => {
-    if (username.trim()) {
-      await Settings.set("username", username.trim());
+    if (name.trim()) {
+      await Settings.set("name", name.trim());
     }
     await Settings.set("hasSeenOnboarding", true);
     router.replace("/");
@@ -52,8 +52,8 @@ export default function UsernamePage() {
           <View style={styles.inputWrapper}>
             <TextInputField
               icon={profilIcon}
-              value={username}
-              onChangeText={setUsername}
+              value={name}
+              onChangeText={setName}
               placeholder="Enter your name"
               autoFocus
             />

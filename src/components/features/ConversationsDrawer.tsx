@@ -4,6 +4,7 @@ import { useResponsive } from "../../hooks/useResponsive";
 import { Conversation, DB } from "../../services/db/DatabaseService";
 import { CloudSync } from "../../services/CloudSyncService";
 import NotificationModal from "../ui/NotificationModal";
+import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 
 const searchIcon = require("../../../assets/icons/search.png");
 const newIcon = require("../../../assets/icons/add.png");
@@ -196,21 +197,21 @@ export default function ConversationsDrawer({
             <>
               <Pressable
                 onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
-                style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: "rgba(0, 0, 0, 0.15)" }]}
+                style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: Colors.overlay }]}
               >
-                <Image source={conv.pinned ? unpinIcon : pinIcon} style={styles.actionIcon} tintColor="#fff" />
+                <Image source={conv.pinned ? unpinIcon : pinIcon} style={styles.actionIcon} tintColor={Colors.surface} />
               </Pressable>
               <Pressable
                 onPress={() => setDeleteConfirmId(conv.id)}
-                style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: "rgba(0, 0, 0, 0.15)" }]}
+                style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: Colors.overlay }]}
               >
-                <Image source={deleteIcon} style={styles.actionIcon} tintColor="#fff" />
+                <Image source={deleteIcon} style={styles.actionIcon} tintColor={Colors.surface} />
               </Pressable>
             </>
           ) : (
             conv.pinned ? (
               <View style={styles.actionIconButton}>
-                <Image source={pinIcon} style={[styles.actionIcon, { opacity: 0.5 }]} tintColor="#aaa" />
+                <Image source={pinIcon} style={[styles.actionIcon, { opacity: 0.5 }]} tintColor={Colors.textPlaceholder} />
               </View>
             ) : null
           )}
@@ -227,18 +228,18 @@ export default function ConversationsDrawer({
 
       <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24, gap: 12 }}>
         <Pressable onPress={() => { Keyboard.dismiss(); setIsSearching(false); setSearchQuery(""); setSelectedSearchId(null); }} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
-          <Image source={arrowIcon} style={{ width: 18, height: 18, transform: [{ rotate: '-180deg' }] }} tintColor="#000" />
+          <Image source={arrowIcon} style={{ width: 18, height: 18, transform: [{ rotate: '-180deg' }] }} tintColor={Colors.textPrimary} />
         </Pressable>
 
         <View style={styles.searchInputContainer}>
-          <Image source={searchIcon} style={{ width: 16, height: 16, tintColor: "#000" }} />
+          <Image source={searchIcon} style={{ width: 16, height: 16, tintColor: Colors.textPrimary }} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search conversations"
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoFocus
-            placeholderTextColor="#999"
+            placeholderTextColor={Colors.textDisabled}
           />
         </View>
       </View>
@@ -273,19 +274,19 @@ export default function ConversationsDrawer({
                     <>
                       <Pressable
                         onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
-                        style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: "rgba(0, 0, 0, 0.15)" }]}
+                        style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: Colors.overlay }]}
                       >
-                        <Image source={conv.pinned ? unpinIcon : pinIcon} style={styles.actionIcon} tintColor="#fff" />
+                        <Image source={conv.pinned ? unpinIcon : pinIcon} style={styles.actionIcon} tintColor={Colors.surface} />
                       </Pressable>
                       <Pressable
                         onPress={() => setDeleteConfirmId(conv.id)}
-                        style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: "rgba(0, 0, 0, 0.15)" }]}
+                        style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: Colors.overlay }]}
                       >
-                        <Image source={deleteIcon} style={styles.actionIcon} tintColor="#fff" />
+                        <Image source={deleteIcon} style={styles.actionIcon} tintColor={Colors.surface} />
                       </Pressable>
                     </>
                   ) : (
-                    <Text style={{ fontSize: 12, color: "#888", fontFamily: "IBMPlexMono-Medium" }}>
+                    <Text style={{ fontSize: FontSizes.label, color: Colors.textFaint, fontFamily: Fonts.mono }}>
                       {formattedDate}
                     </Text>
                   )}
@@ -309,14 +310,14 @@ export default function ConversationsDrawer({
               onNewConversation();
               if (!isDesktop) onClose();
             }}
-            style={({ pressed }) => [styles.quickActionItem, pressed && { backgroundColor: "#eaeaea" }]}
+            style={({ pressed }) => [styles.quickActionItem, pressed && { backgroundColor: Colors.surfacePressed }]}
           >
             <Image source={newIcon} style={styles.quickActionIcon} />
             <Text style={styles.quickActionLabel}>New discussion</Text>
           </Pressable>
           <Pressable
             onPress={() => setIsSearching(true)}
-            style={({ pressed }) => [styles.quickActionItem, pressed && { backgroundColor: "#eaeaea" }]}
+            style={({ pressed }) => [styles.quickActionItem, pressed && { backgroundColor: Colors.surfacePressed }]}
           >
             <Image source={searchIcon} style={styles.quickActionIcon} />
             <Text style={styles.quickActionLabel}>Search</Text>
@@ -436,36 +437,36 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(0,0,0,0.25)",
+    backgroundColor: Colors.scrimDrawer,
   },
   content: {
     position: "absolute",
     top: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.surface,
     paddingTop: 60,
     paddingHorizontal: 16,
   },
   largeScreenContainer: {
     width: 320,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.surface,
     zIndex: 10,
   },
   floatingContainer: {
     margin: 16,
     marginTop: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window ? 40 : 8,
     marginBottom: 16,
-    borderRadius: 10,
+    borderRadius: Radius.xxl,
     borderWidth: 2,
-    borderColor: "#00000017",
-    boxShadow: "-6px 6px 0px #00000013",
+    borderColor: Colors.border,
+    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
     elevation: 5,
     overflow: "hidden",
   },
   attachedContainer: {
     borderRightWidth: 1,
-    borderRightColor: "rgba(0,0,0,0.05)",
+    borderRightColor: Colors.overlaySubtle,
   },
   floatingContent: {
     paddingTop: 24,
@@ -478,10 +479,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 32,
-    color: "#222",
+    fontSize: FontSizes.xxxl,
+    color: Colors.textSecondary,
     marginBottom: 24,
-    fontFamily: "Petrona",
+    fontFamily: Fonts.display,
   },
   quickActionsShadowLayer: {
     position: "relative",
@@ -490,9 +491,9 @@ const styles = StyleSheet.create({
   quickActionsBox: {
     position: "relative",
     borderWidth: 2,
-    borderColor: "#00000017",
-    borderRadius: 10,
-    backgroundColor: "#fff",
+    borderColor: Colors.border,
+    borderRadius: Radius.xxl,
+    backgroundColor: Colors.surface,
     zIndex: 1,
     overflow: "hidden",
   },
@@ -508,9 +509,9 @@ const styles = StyleSheet.create({
     height: 18,
   },
   quickActionLabel: {
-    fontSize: 15,
-    color: "#222",
-    fontFamily: "IBMPlexMono-Medium",
+    fontSize: FontSizes.body,
+    color: Colors.textSecondary,
+    fontFamily: Fonts.mono,
   },
   scrollContent: {
     paddingBottom: 40,
@@ -519,17 +520,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 12,
-    color: "#888",
-    fontFamily: "Jakarta",
+    fontSize: FontSizes.label,
+    color: Colors.textFaint,
+    fontFamily: Fonts.body,
     textTransform: "uppercase",
     letterSpacing: 1,
     marginBottom: 8,
   },
   emptyText: {
-    fontSize: 14,
-    color: "#aaa",
-    fontFamily: "Jakarta",
+    fontSize: FontSizes.bodyMd,
+    color: Colors.textPlaceholder,
+    fontFamily: Fonts.body,
     textAlign: "center",
     marginTop: 20,
   },
@@ -539,25 +540,25 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 5,
     paddingHorizontal: 8,
-    borderRadius: 10,
+    borderRadius: Radius.xxl,
     marginBottom: 2,
     borderWidth: 2,
-    borderColor: "#ffffff52",
+    borderColor: Colors.borderOnPrimary,
   },
   discussionRowSelected: {
-    backgroundColor: "#FF1A1A",
+    backgroundColor: Colors.primary,
   },
   discussionTextContainer: {
     flex: 1,
     marginRight: 8,
   },
   discussionText: {
-    fontSize: 15,
-    color: "#000000ff",
-    fontFamily: "IBMPlexMono-Medium",
+    fontSize: FontSizes.body,
+    color: Colors.textPrimary,
+    fontFamily: Fonts.mono,
   },
   discussionTextSelected: {
-    color: "#ffffffff",
+    color: Colors.surface,
   },
   rowActions: {
     flexDirection: "row",
@@ -569,7 +570,7 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 16,
+    borderRadius: Radius.huge,
   },
   actionIcon: {
     width: 18,
@@ -579,17 +580,17 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: Colors.surface,
     borderWidth: 2,
-    borderColor: "#00000017",
-    borderRadius: 8,
+    borderColor: Colors.border,
+    borderRadius: Radius.xl,
     paddingHorizontal: 12,
     gap: 8,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
-    fontFamily: "IBMPlexMono-Medium",
-    color: "#000",
+    fontSize: FontSizes.md,
+    fontFamily: Fonts.mono,
+    color: Colors.textPrimary,
   },
 });

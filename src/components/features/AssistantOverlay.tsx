@@ -10,10 +10,10 @@ import {
   PanResponder,
   Linking,
   ScrollView,
+  BackHandler,
 } from 'react-native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BackHandler } from 'react-native';
 import ChatBar, { ChatBarHandle } from './ChatBar';
 import NotificationModal from '../ui/NotificationModal';
 import { renderMarkdown } from '../ui/MarkdownText';
@@ -23,6 +23,11 @@ import { AIModule } from '../../services/ai/AIModule';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { STT } from '../../services/speech/STTService';
 import { TTS } from '../../services/speech/TTSService';
+import { NotificationService } from '../../services/notifications/NotificationService';
+import { CloudSync } from '../../services/CloudSyncService';
+import ModelDropdown from './ModelDropdown';
+import { useResponsive } from '../../hooks/useResponsive';
+import { Colors, Fonts, FontSizes, Radius } from '../../../constants/theme';
 
 //web whisper surface, only used in browser flows
 const WebSTT = STT as unknown as {
@@ -32,10 +37,6 @@ const WebSTT = STT as unknown as {
   setLanguage(lang: string): void;
   transcribeData(buffer: ArrayBuffer): Promise<string>;
 };
-import { NotificationService } from '../../services/notifications/NotificationService';
-import { CloudSync } from '../../services/CloudSyncService';
-import ModelDropdown from './ModelDropdown';
-import { useResponsive } from '../../hooks/useResponsive';
 
 export default function AssistantOverlayWrapper() {
   return (
@@ -637,7 +638,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: Colors.scrimModal,
   },
   chatContainer: {
     flex: 0.7,
@@ -671,14 +672,14 @@ const styles = StyleSheet.create({
   overlayBubble: {
     alignSelf: 'center',
     width: '90%',
-    backgroundColor: '#FFF5EC',
+    backgroundColor: Colors.background,
     borderWidth: 2,
-    borderColor: '#ffffff52',
-    borderRadius: 16,
+    borderColor: Colors.borderOnPrimary,
+    borderRadius: Radius.huge,
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 16,
-    shadowColor: '#000',
+    shadowColor: Colors.textPrimary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
@@ -691,8 +692,8 @@ const styles = StyleSheet.create({
   pullIndicator: {
     width: 36,
     height: 4,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    borderRadius: 2,
+    backgroundColor: Colors.scrimDrawer,
+    borderRadius: Radius.xs,
     alignSelf: 'center',
     marginBottom: 12,
   },
@@ -705,9 +706,9 @@ const styles = StyleSheet.create({
     width: 60,
   },
   flashingText: {
-    color: '#666',
-    fontSize: 14,
-    fontFamily: 'IBMPlexMono-Medium',
+    color: Colors.textBody,
+    fontSize: FontSizes.bodyMd,
+    fontFamily: Fonts.mono,
     flexShrink: 1,
   },
 });

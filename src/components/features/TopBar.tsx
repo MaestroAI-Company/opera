@@ -1,3 +1,4 @@
+import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { Image, Pressable, StyleSheet, View, Text } from "react-native";
 
 const moreIcon = require("../../../assets/icons/More.png");
@@ -23,17 +24,17 @@ export default function TopBar({ onMenuPress, onNewPress, centerElement, rightEl
           <View style={styles.buttonsContainer}>
             <Pressable
               onPress={onMenuPress}
-              style={({ pressed }) => [styles.button, pressed && { backgroundColor: "#eaeaea" }]}
+              style={({ pressed }) => [styles.button, pressed && { backgroundColor: Colors.surfacePressed }]}
             >
-              <Image source={moreIcon} style={styles.buttonIcon} resizeMode="contain" tintColor="#333333" />
+              <Image source={moreIcon} style={styles.buttonIcon} resizeMode="contain" tintColor={Colors.textTertiary} />
               {showDesktopButtons && <Text style={styles.buttonText}>Conversation</Text>}
             </Pressable>
             {!showDesktopButtons && (
               <Pressable
                 onPress={onNewPress}
-                style={({ pressed }) => [styles.button, pressed && { backgroundColor: "#eaeaea" }]}
+                style={({ pressed }) => [styles.button, pressed && { backgroundColor: Colors.surfacePressed }]}
               >
-                <Image source={addIcon} style={styles.buttonIcon} resizeMode="contain" tintColor="#333333" />
+                <Image source={addIcon} style={styles.buttonIcon} resizeMode="contain" tintColor={Colors.textTertiary} />
               </Pressable>
             )}
           </View>
@@ -75,16 +76,16 @@ const styles = StyleSheet.create({
     left: -4,
     right: 4,
     height: 44,
-    backgroundColor: "#00000013",
-    borderRadius: 10,
+    backgroundColor: Colors.shadowInk,
+    borderRadius: Radius.xxl,
   },
   buttonsContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: Colors.surface,
     borderWidth: 2,
-    borderColor: "#00000017",
-    borderRadius: 10,
+    borderColor: Colors.border,
+    borderRadius: Radius.xxl,
     position: "relative",
     zIndex: 1,
     overflow: "hidden",
@@ -101,9 +102,9 @@ const styles = StyleSheet.create({
     height: 18,
   },
   buttonText: {
-    fontSize: 14,
-    fontFamily: "IBMPlexMono-Medium",
-    color: "#333",
+    fontSize: FontSizes.bodyMd,
+    fontFamily: Fonts.mono,
+    color: Colors.textTertiary,
     marginLeft: 8,
   },
 });

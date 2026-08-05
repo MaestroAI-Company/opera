@@ -1,5 +1,6 @@
 import notifee, { AndroidImportance } from '@notifee/react-native';
 import { Platform } from 'react-native';
+import { Colors } from "../../../constants/theme";
 
 class NotificationServiceImpl {
   private channelId: string | null = null;
@@ -43,7 +44,7 @@ class NotificationServiceImpl {
         onlyAlertOnce: true,
         asForegroundService: true, //keep app alive in background
         smallIcon: 'ic_launcher',
-        color: '#FF1A1A',
+        color: Colors.primary,
         progress: {
           max: 100,
           current: Math.round(progress * 100),

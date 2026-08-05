@@ -28,6 +28,7 @@ import { Settings } from "../../services/settings/SettingsService";
 import { STT } from "../../services/speech/STTService";
 import AttachmentSheet, { SelectedFile } from "./AttachmentSheet";
 import NotificationModal from "../ui/NotificationModal";
+import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 
 const nextWhiteIcon = require("../../../assets/icons/arrow.png");
 const micIcon = require("../../../assets/icons/microphone.png");
@@ -578,7 +579,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const scale = pressAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] });
   const backgroundColor = pressAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: incognito ? ["#565A75", "#70748E"] : ["#FF1A1A", "#FF4D4D"],
+    outputRange: incognito ? [Colors.incognito, Colors.incognitoBright] : [Colors.primary, Colors.primaryBright],
   });
 
   const startRecording = async () => {
@@ -906,7 +907,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                         </Pressable>
                       </View>
                     ))}
-                    <Text style={[styles.filesAddedText, incognito && { color: '#ccc' }]}>
+                    <Text style={[styles.filesAddedText, incognito && { color: Colors.textDisabledStrong }]}>
                       {selectedFiles.length} File{selectedFiles.length !== 1 ? 's' : ''} Added
                     </Text>
                   </View>
@@ -922,14 +923,14 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
               >
                 {supportsFiles && (
                   <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.plusButton}>
-                    <Image source={addIcon} style={styles.plusIcon} tintColor="#fff" />
+                    <Image source={addIcon} style={styles.plusIcon} tintColor={Colors.surface} />
                   </Pressable>
                 )}
 
                 {(Platform.OS !== 'web' || Settings.getCached().whisperModel !== 'none' || canTranscribeRemotely) && !isGenerating && (
                   <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.micButton}>
                     <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
-                      <Image source={isRecording ? stopIcon : micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} tintColor="#fff" />
+                      <Image source={isRecording ? stopIcon : micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} tintColor={Colors.surface} />
                     </Animated.View>
                   </Pressable>
                 )}
@@ -959,7 +960,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                         value={isTranscribing ? "Transcribing..." : text}
                         onChangeText={isTranscribing ? undefined : setText}
                         placeholder={placeholder}
-                        placeholderTextColor="rgba(255,255,255,0.6)"
+                        placeholderTextColor={Colors.whiteSoft}
                         multiline={true}
                         numberOfLines={1}
                         editable={!isTranscribing}
@@ -973,11 +974,11 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
                 {isGenerating ? (
                   <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.sendButton}>
-                    <Image source={stopIcon} style={styles.sendIcon} tintColor="#fff" />
+                    <Image source={stopIcon} style={styles.sendIcon} tintColor={Colors.surface} />
                   </Pressable>
                 ) : (
                   <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.sendButton}>
-                    <Image source={nextWhiteIcon} style={styles.sendIcon} tintColor="#fff" />
+                    <Image source={nextWhiteIcon} style={styles.sendIcon} tintColor={Colors.surface} />
                   </Pressable>
                 )}
               </Animated.View>
@@ -1049,17 +1050,17 @@ const styles = StyleSheet.create({
     zIndex: 2,
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 10,
+    borderRadius: Radius.xxl,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: 2,
-    borderColor: "#00000017",
+    borderColor: Colors.border,
     height: 56,
-    boxShadow: "2px 6px 22px #FF1A1A",
+    boxShadow: `2px 6px 22px ${Colors.primary}`,
     elevation: 8,
   },
   containerIncognito: {
-    boxShadow: "2px 6px 15px #565A75",
+    boxShadow: `2px 6px 15px ${Colors.incognito}`,
   },
   plusButton: {
     width: 28,
@@ -1090,8 +1091,8 @@ const styles = StyleSheet.create({
 
   },
   input: {
-    color: "#fff",
-    fontSize: 16,
+    color: Colors.surface,
+    fontSize: FontSizes.md,
     paddingVertical: 8,
   },
   voiceIndicatorContainer: {
@@ -1106,7 +1107,7 @@ const styles = StyleSheet.create({
   voiceSquare: {
     width: 3,
     height: 6,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.surface,
   },
   sendButton: {
     width: 28,
@@ -1120,11 +1121,11 @@ const styles = StyleSheet.create({
 
   },
   filesContainerTop: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.surface,
     borderWidth: 2,
-    borderColor: '#00000017',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    borderColor: Colors.border,
+    borderTopLeftRadius: Radius.lg2,
+    borderTopRightRadius: Radius.lg2,
     borderBottomWidth: 0,
     overflow: 'hidden',
     paddingHorizontal: 4,
@@ -1134,8 +1135,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
   },
   filesContainerTopIncognito: {
-    backgroundColor: '#2A2A35',
-    borderColor: '#00000030',
+    backgroundColor: Colors.incognitoSurface,
+    borderColor: Colors.incognitoBorder,
   },
   fileChipsContainer: {
     flexDirection: 'row',
@@ -1151,34 +1152,34 @@ const styles = StyleSheet.create({
   filePreviewImageTop: {
     width: 44,
     height: 32,
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 6,
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
-    backgroundColor: '#888',
+    backgroundColor: Colors.textFaint,
   },
   filePreviewAudioTop: {
     width: 44,
     height: 32,
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 6,
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
-    backgroundColor: '#888',
+    backgroundColor: Colors.textFaint,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 2,
   },
   filePreviewAudioTextTop: {
     color: 'white',
-    fontSize: 8,
+    fontSize: FontSizes.xxs,
     textAlign: 'center',
   },
   removeFileBtnTop: {
     position: 'absolute',
     right: 4,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 8,
+    backgroundColor: Colors.overlayStrong,
+    borderRadius: Radius.xl,
     width: 16,
     height: 16,
     justifyContent: 'center',
@@ -1186,13 +1187,13 @@ const styles = StyleSheet.create({
   },
   removeFileBtnTextTop: {
     color: 'white',
-    fontSize: 10,
+    fontSize: FontSizes.labelSm,
     fontWeight: 'bold',
   },
   filesAddedText: {
-    fontFamily: "IBMPlexMono-Medium",
-    color: '#999',
-    fontSize: 14,
+    fontFamily: Fonts.mono,
+    color: Colors.textDisabled,
+    fontSize: FontSizes.bodyMd,
     marginLeft: 4,
   },
 });

@@ -4,6 +4,7 @@ import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 
 import { AIModule } from "../../services/ai/AIModule";
 import { getAICoreModelLabel } from "../../services/ai/AICoreProvider";
 import NotificationModal from "../ui/NotificationModal";
+import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const arrowDownIcon = require("../../../assets/icons/down_arrow.png");
@@ -178,7 +179,7 @@ export default function ModelDropdown({
         <View style={styles.shadowBlock} />
         <Pressable
           onPress={handleOpen}
-          style={({ pressed }) => [styles.trigger, pressed && { backgroundColor: "#eaeaea" }]}
+          style={({ pressed }) => [styles.trigger, pressed && { backgroundColor: Colors.surfacePressed }]}
         >
           <Animated.Image source={arrowDownIcon} style={[styles.icon, iconStyle]} />
           <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
@@ -207,12 +208,12 @@ export default function ModelDropdown({
             <ScrollView style={{ maxHeight: MAX_MODELS_HEIGHT }} showsVerticalScrollIndicator={false} nestedScrollEnabled={true}>
               {loading ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}>
-                  <Image source={thinkingIcon} style={{ width: 16, height: 16, tintColor: '#888888', opacity: 0.7 }} />
+                  <Image source={thinkingIcon} style={{ width: 16, height: 16, tintColor: Colors.textFaint, opacity: 0.7 }} />
                   <Text style={[styles.modelStatus, { paddingHorizontal: 0, paddingVertical: 0 }]}>Loading...</Text>
                 </View>
               ) : models.length === 0 ? (
                 <View>
-                  <Text style={{ color: '#ff4444', textAlign: 'center', marginBottom: 12, paddingHorizontal: 12, fontSize: 13 }}>
+                  <Text style={{ color: Colors.error, textAlign: 'center', marginBottom: 12, paddingHorizontal: 12, fontSize: FontSizes.caption }}>
                     {isAvailable ? "No models found" : "Unable to fetch models / Ollama URL undefined"}
                   </Text>
                   {isAvailable && (
@@ -220,7 +221,7 @@ export default function ModelDropdown({
                       onPress={() => {
                         handleClose(() => setDownloadModalVisible(true));
                       }}
-                      style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: "#eaeaea" }]}
+                      style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: Colors.surfacePressed }]}
                     >
                       <Image source={downloadIcon} style={styles.downloadIcon} />
                       <Text style={styles.downloadText}>
@@ -243,8 +244,8 @@ export default function ModelDropdown({
                     }}
                     style={({ pressed }) => [
                       styles.option,
-                      model === selectedModel ? styles.optionSelected : pressed && { backgroundColor: "rgba(0, 0, 0, 0.05)" },
-                      model === selectedModel && pressed && { backgroundColor: "#cc1414" }
+                      model === selectedModel ? styles.optionSelected : pressed && { backgroundColor: Colors.overlaySubtle },
+                      model === selectedModel && pressed && { backgroundColor: Colors.primaryActive }
                     ]}
                   >
                     <Text
@@ -270,8 +271,8 @@ export default function ModelDropdown({
                     }}
                     style={({ pressed }) => [
                       styles.option,
-                      item.id === selectedReflection ? styles.optionSelected : pressed && { backgroundColor: "rgba(0, 0, 0, 0.05)" },
-                      item.id === selectedReflection && pressed && { backgroundColor: "#cc1414" }
+                      item.id === selectedReflection ? styles.optionSelected : pressed && { backgroundColor: Colors.overlaySubtle },
+                      item.id === selectedReflection && pressed && { backgroundColor: Colors.primaryActive }
                     ]}
                   >
                     <Text
@@ -319,19 +320,19 @@ const styles = StyleSheet.create({
     left: -4,
     right: 4,
     height: 44,
-    backgroundColor: "#00000013",
-    borderRadius: 10,
+    backgroundColor: Colors.shadowInk,
+    borderRadius: Radius.xxl,
   },
   trigger: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#00000017",
+    borderColor: Colors.border,
     paddingHorizontal: 12,
     height: 44,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.surface,
     gap: 8,
-    borderRadius: 10,
+    borderRadius: Radius.xxl,
     maxWidth: 180,
     overflow: "hidden",
     position: "relative",
@@ -342,32 +343,32 @@ const styles = StyleSheet.create({
     height: 18,
   },
   label: {
-    fontSize: 15,
-    color: "#000",
-    fontFamily: "IBMPlexMono-Medium",
+    fontSize: FontSizes.body,
+    color: Colors.textPrimary,
+    fontFamily: Fonts.mono,
     flexShrink: 1,
   },
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.15)",
+    backgroundColor: Colors.overlay,
   },
   menu: {
     position: "absolute",
-    backgroundColor: "#fff",
-    borderRadius: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl,
     borderWidth: 2,
-    borderColor: "#00000017",
+    borderColor: Colors.border,
     padding: 12,
     width: 220,
-    boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.15)",
+    boxShadow: `0px 4px 12px ${Colors.overlay}`,
     elevation: 8,
   },
   sectionTitle: {
-    fontSize: 12,
-    color: "#888",
+    fontSize: FontSizes.label,
+    color: Colors.textFaint,
     marginBottom: 8,
     marginTop: 4,
-    fontFamily: "Jakarta",
+    fontFamily: Fonts.body,
     textTransform: "uppercase",
     letterSpacing: 1,
   },
@@ -375,8 +376,8 @@ const styles = StyleSheet.create({
     height: 16,
   },
   modelStatus: {
-    fontSize: 12,
-    color: "#888",
+    fontSize: FontSizes.label,
+    color: Colors.textFaint,
     fontStyle: "italic",
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -384,30 +385,30 @@ const styles = StyleSheet.create({
   option: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: Radius.xl,
     marginBottom: 4,
   },
   optionSelected: {
-    backgroundColor: "#FF1A1A",
+    backgroundColor: Colors.primary,
     borderWidth: 2,
-    borderColor: "#ffffff52",
+    borderColor: Colors.borderOnPrimary,
   },
   optionText: {
-    fontSize: 15,
-    color: "#000",
-    fontFamily: "IBMPlexMono-Medium",
+    fontSize: FontSizes.body,
+    color: Colors.textPrimary,
+    fontFamily: Fonts.mono,
   },
   optionTextSelected: {
-    color: "#FFF",
+    color: Colors.surface,
   },
   downloadOption: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f5f5f5",
+    backgroundColor: Colors.surfaceSubtle,
     padding: 10,
-    borderRadius: 8,
+    borderRadius: Radius.xl,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: Colors.codeBlockText,
     borderStyle: "dashed",
     gap: 8,
     marginVertical: 4,
@@ -418,8 +419,8 @@ const styles = StyleSheet.create({
     
   },
   downloadText: {
-    fontSize: 13,
-    color: "#0066cc",
-    fontFamily: "IBMPlexMono-Medium",
+    fontSize: FontSizes.caption,
+    color: Colors.linkAlt,
+    fontFamily: Fonts.mono,
   },
 });

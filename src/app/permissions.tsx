@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useResponsive } from "../hooks/useResponsive";
 import { STT } from "../services/speech/STTService";
+import { Colors, Fonts, FontSizes, Radius } from "../../constants/theme";
 
 const texture2 = require("../../assets/images/texture2.png");
 const micIcon = require("../../assets/icons/microphone.png");
@@ -163,7 +164,7 @@ export default function PermissionsPage() {
                   <Image
                     source={perm.icon}
                     style={styles.icon}
-                    tintColor="#222"
+                    tintColor={Colors.textSecondary}
                   />
                 </View>
                 <View style={styles.permissionText}>
@@ -213,7 +214,7 @@ export default function PermissionsPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFF5EC",
+    backgroundColor: Colors.background,
   },
   backgroundTexture: {
     opacity: 0.02,
@@ -232,15 +233,15 @@ const styles = StyleSheet.create({
     marginBottom: 36,
   },
   title: {
-    fontFamily: "Petrona",
-    fontSize: 36,
-    color: "#222",
+    fontFamily: Fonts.display,
+    fontSize: FontSizes.displayLg,
+    color: Colors.textSecondary,
     marginBottom: 12,
   },
   subtitle: {
-    fontFamily: "Jakarta",
-    fontSize: 14,
-    color: "#666",
+    fontFamily: Fonts.body,
+    fontSize: FontSizes.bodyMd,
+    color: Colors.textBody,
     lineHeight: 22,
   },
   list: {
@@ -249,10 +250,10 @@ const styles = StyleSheet.create({
   permissionRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl,
     borderWidth: 2,
-    borderColor: "#00000017",
+    borderColor: Colors.border,
     padding: 16,
     gap: 14,
     flexWrap: "wrap",
@@ -260,8 +261,8 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 40,
     height: 40,
-    borderRadius: 10,
-    backgroundColor: "#fff",
+    borderRadius: Radius.xxl,
+    backgroundColor: Colors.surface,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -274,46 +275,46 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   permissionLabel: {
-    fontFamily: "IBMPlexMono-Medium",
-    fontSize: 14,
-    color: "#222",
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.bodyMd,
+    color: Colors.textSecondary,
   },
   permissionDesc: {
-    fontFamily: "Jakarta",
-    fontSize: 12,
-    color: "#888",
+    fontFamily: Fonts.body,
+    fontSize: FontSizes.label,
+    color: Colors.textFaint,
     lineHeight: 16,
   },
   settingsLink: {
-    color: "#FF1A1A",
+    color: Colors.primary,
     textDecorationLine: "underline",
   },
   permissionBtn: {
     paddingVertical: 6,
     paddingHorizontal: 12,
-    borderRadius: 5,
+    borderRadius: Radius.md,
     borderWidth: 2,
-    borderColor: "#00000017",
-    backgroundColor: "#fff",
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
   },
   permissionBtnGranted: {
-    backgroundColor: "#FF1A1A",
-    borderColor: "#FF1A1A",
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
   permissionBtnDenied: {
-    backgroundColor: "#bbb",
-    borderColor: "#bbb",
+    backgroundColor: Colors.textDisabledStrong,
+    borderColor: Colors.textDisabledStrong,
   },
   permissionBtnText: {
-    fontFamily: "IBMPlexMono-Medium",
-    fontSize: 12,
-    color: "#222",
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.label,
+    color: Colors.textSecondary,
   },
   permissionBtnTextGranted: {
-    color: "#fff",
+    color: Colors.surface,
   },
   permissionBtnTextDenied: {
-    color: "#fff",
+    color: Colors.surface,
   },
   footer: {
     padding: 28,
@@ -321,29 +322,29 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   button: {
-    backgroundColor: "#FF1A1A",
+    backgroundColor: Colors.primary,
     paddingVertical: 10,
     paddingHorizontal: 20,
-    borderRadius: 10,
+    borderRadius: Radius.xxl,
     borderWidth: 2,
-    borderColor: "#ffffff52",
+    borderColor: Colors.borderOnPrimary,
     alignItems: "center",
     width: "100%",
   },
   buttonPressed: {
-    backgroundColor: "#D61515",
+    backgroundColor: Colors.primaryPressed,
   },
   buttonLarge: {
     maxWidth: 420,
   },
   buttonText: {
-    fontFamily: "IBMPlexMono-Medium",
-    fontSize: 14,
-    color: "#fff",
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.bodyMd,
+    color: Colors.surface,
   },
   skipText: {
-    fontFamily: "Jakarta",
-    fontSize: 13,
-    color: "#999",
+    fontFamily: Fonts.body,
+    fontSize: FontSizes.caption,
+    color: Colors.textDisabled,
   },
 });

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { Colors } from "../../../constants/theme";
 
 export default function OAuthRedirect() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function OAuthRedirect() {
 
   return (
     <View style={styles.container}>
-      <ActivityIndicator size="large" color="#FF1A1A" />
+      <ActivityIndicator size="large" color={Colors.primary} />
     </View>
   );
 }
@@ -30,6 +31,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: Colors.surface,
   }
 });

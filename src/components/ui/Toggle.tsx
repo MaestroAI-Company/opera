@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet } from "react-native";
 import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
+import { Colors, Radius } from "../../../constants/theme";
 
 type ToggleProps = {
   checked: boolean;
@@ -16,7 +17,7 @@ export default function Toggle({ checked, onToggle, disabled = false }: TogglePr
           translateX: withTiming(checked ? 16 : 0, { duration: 200 }),
         },
       ],
-      backgroundColor: checked ? "#FFFFFF" : "#FF1A1A",
+      backgroundColor: checked ? Colors.surface : Colors.primary,
     };
   });
 
@@ -40,22 +41,22 @@ const styles = StyleSheet.create({
   track: {
     width: 40,
     height: 24,
-    borderRadius: 14,
+    borderRadius: Radius.xl2,
     padding: 2,
     justifyContent: "center",
     borderWidth: 2,
   },
   trackChecked: {
-    backgroundColor: "#FF1A1A",
-    borderColor: "#ffffff52",
+    backgroundColor: Colors.primary,
+    borderColor: Colors.borderOnPrimary,
   },
   trackUnchecked: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E5E5E5",
+    backgroundColor: Colors.surface,
+    borderColor: Colors.surfaceCode,
   },
   thumb: {
     width: 16,
     height: 16,
-    borderRadius: 10,
+    borderRadius: Radius.xxl,
   },
 });

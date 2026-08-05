@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useResponsive } from "../hooks/useResponsive";
+import { Colors, Fonts, FontSizes, Radius } from "../../constants/theme";
 
 const butterflyImage = require("../../assets/images/butterfly2.png");
 const texture2 = require("../../assets/images/texture2.png");
@@ -129,7 +130,7 @@ export default function StartingPage() {
           },
         ]}
       >
-        <Image source={logoImage} style={styles.logo} tintColor="#fff" resizeMode="contain" />
+        <Image source={logoImage} style={styles.logo} tintColor={Colors.surface} resizeMode="contain" />
       </Animated.View>
 
       {/* Content */}
@@ -182,7 +183,7 @@ export default function StartingPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FF1A1A",
+    backgroundColor: Colors.primary,
   },
   backgroundTexture: {
     opacity: 0.05,
@@ -222,14 +223,14 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   title: {
-    fontFamily: "Petrona",
-    fontSize: 48,
-    color: "#fff",
+    fontFamily: Fonts.display,
+    fontSize: FontSizes.displayHero,
+    color: Colors.surface,
     textAlign: "left",
     lineHeight: 52,
   },
   titleLarge: {
-    fontSize: 64,
+    fontSize: FontSizes.displayHuge,
     lineHeight: 72,
   },
   titleOverlay: {
@@ -244,24 +245,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   button: {
-    backgroundColor: "#fff",
+    backgroundColor: Colors.surface,
     paddingVertical: 10,
     paddingHorizontal: 20,
-    borderRadius: 10,
+    borderRadius: Radius.xxl,
     borderWidth: 2,
-    borderColor: "#00000017",
+    borderColor: Colors.border,
     alignItems: "center",
     width: "100%",
   },
   buttonPressed: {
-    backgroundColor: "#eaeaea",
+    backgroundColor: Colors.surfacePressed,
   },
   buttonLarge: {
     maxWidth: 420,
   },
   buttonText: {
-    fontFamily: "IBMPlexMono-Medium",
-    fontSize: 14,
-    color: "#222",
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.bodyMd,
+    color: Colors.textSecondary,
   },
 });

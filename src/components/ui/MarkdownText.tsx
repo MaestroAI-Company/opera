@@ -4,38 +4,39 @@ import MathText from "react-native-math";
 import AutoHeightWebView from "react-native-autoheight-webview";
 import CodeHighlighter from "react-native-code-highlighter";
 import { vs2015 } from "react-syntax-highlighter/dist/esm/styles/hljs";
+import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 
 const s = StyleSheet.create({
-  base: { fontSize: 18, lineHeight: 26, color: "#000", fontFamily: "Jakarta" },
+  base: { fontSize: FontSizes.lg, lineHeight: 26, color: Colors.textPrimary, fontFamily: Fonts.body },
   bold: { fontWeight: "bold" },
   italic: { fontStyle: "italic" },
   code: {
-    fontFamily: "IBMPlexMono-Medium",
-    backgroundColor: "#f0f0f0",
-    color: "#d63384",
+    fontFamily: Fonts.mono,
+    backgroundColor: Colors.surfaceCode,
+    color: Colors.codeInlineText,
     paddingHorizontal: 4,
-    borderRadius: 4,
-    fontSize: 13,
+    borderRadius: Radius.sm,
+    fontSize: FontSizes.caption,
   },
   codeBlock: {
-    fontFamily: "IBMPlexMono-Medium",
-    backgroundColor: "#1e1e1e",
-    color: "#d4d4d4",
+    fontFamily: Fonts.mono,
+    backgroundColor: Colors.codeBlockBg,
+    color: Colors.codeBlockText,
     padding: 8,
-    borderRadius: 6,
-    fontSize: 13,
+    borderRadius: Radius.lg,
+    fontSize: FontSizes.caption,
     lineHeight: 18,
     marginVertical: 4,
   },
-  h1: { fontSize: 22, fontWeight: "bold", marginTop: 8, marginBottom: 4, color: "#000" },
-  h2: { fontSize: 19, fontWeight: "bold", marginTop: 7, marginBottom: 3, color: "#000" },
-  h3: { fontSize: 17, fontWeight: "bold", marginTop: 6, marginBottom: 3, color: "#000" },
-  h4: { fontSize: 15, fontWeight: "bold", marginTop: 5, marginBottom: 3, color: "#000" },
+  h1: { fontSize: FontSizes.displaySm, fontWeight: "bold", marginTop: 8, marginBottom: 4, color: Colors.textPrimary },
+  h2: { fontSize: FontSizes.xl, fontWeight: "bold", marginTop: 7, marginBottom: 3, color: Colors.textPrimary },
+  h3: { fontSize: FontSizes.title, fontWeight: "bold", marginTop: 6, marginBottom: 3, color: Colors.textPrimary },
+  h4: { fontSize: FontSizes.body, fontWeight: "bold", marginTop: 5, marginBottom: 3, color: Colors.textPrimary },
   paragraph: { marginVertical: 2 },
   spacing: { height: 8 },
   strike: { textDecorationLine: "line-through" },
-  link: { color: "#3B82F6", textDecorationLine: "underline" },
-  tableCell: { fontSize: 15, lineHeight: 20, color: "#000", fontFamily: "Jakarta" },
+  link: { color: Colors.link, textDecorationLine: "underline" },
+  tableCell: { fontSize: FontSizes.body, lineHeight: 20, color: Colors.textPrimary, fontFamily: Fonts.body },
   tableCellBox: { flex: 1, paddingHorizontal: 8, paddingVertical: 6 },
   inlineRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },
 });
@@ -201,7 +202,7 @@ function MathInline({ content, estWidth, incognito }: { content: string; estWidt
       onSizeUpdated={(size) => {
         if (size.height > 0) setHeight(size.height + 2);
       }}
-      source={{ html: KATEX_HTML(`$${content}$`, 18, incognito ? "#E0E0E0" : "#333333") }}
+      source={{ html: KATEX_HTML(`$${content}$`, FontSizes.lg, incognito ? Colors.codeBlockText : Colors.textTertiary) }}
       scalesPageToFit={false}
       viewportContent={"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"}
       scrollEnabled={false}
@@ -257,7 +258,7 @@ const LANG_ALIASES: Record<string, string> = {
 
 function CodeBlock({ code, language }: { code: string; language?: string }) {
   const lang = language ? LANG_ALIASES[language] ?? language : undefined;
-  const textStyle = { fontFamily: "IBMPlexMono-Medium", fontSize: 13, lineHeight: 18 } as const;
+  const textStyle = { fontFamily: Fonts.mono, fontSize: FontSizes.code, lineHeight: 18 } as const;
   if (!lang) {
     return (
       <Text style={[s.base, s.codeBlock]} selectable={true}>
@@ -266,7 +267,7 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
     );
   }
   return (
-    <View style={[s.codeBlock, { backgroundColor: "#1E1E1E" }]}>
+    <View style={[s.codeBlock, { backgroundColor: Colors.codeBlockBg }]}>
       <CodeHighlighter
         language={lang}
         hljsStyle={vs2015}
@@ -280,7 +281,7 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
 }
 
 export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode[] {
-  const selColor = incognito ? "rgba(86, 90, 117, 0.4)" : "rgba(255, 26, 26, 0.4)";
+  const selColor = incognito ? Colors.incognitoSelection : Colors.primarySelection;
   const lines = md.split("\n");
   const elements: React.ReactNode[] = [];
   let i = 0;
@@ -316,8 +317,8 @@ export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode
           <View key={`math-${i}`} style={{ width: "100%", marginVertical: 8, minHeight: 40, alignSelf: "center", overflow: "hidden", backgroundColor: "transparent" }}>
             <MathText
               content={mathContent}
-              textSize={16}
-              textColor={incognito ? "#E0E0E0" : "#333333"}
+              textSize={FontSizes.md}
+              textColor={incognito ? Colors.codeBlockText : Colors.textTertiary}
               style={{ flex: 1, backgroundColor: "transparent" }}
             />
           </View>
@@ -343,8 +344,8 @@ export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode
         <View key={`math-${i}`} style={{ width: "100%", marginVertical: 8, minHeight: Math.max(40, mathLines.length * 25), alignSelf: "center", overflow: "hidden", backgroundColor: "transparent" }}>
           <MathText
             content={mathLines.join("\n")}
-            textSize={16}
-            textColor={incognito ? "#E0E0E0" : "#333333"}
+            textSize={FontSizes.md}
+            textColor={incognito ? Colors.codeBlockText : Colors.textTertiary}
             style={{ flex: 1, backgroundColor: "transparent" }}
           />
         </View>
@@ -355,7 +356,7 @@ export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode
     // horizontal rule
     if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
       elements.push(
-        <View key={`hr-${i}`} style={{ height: 1, backgroundColor: incognito ? "#565A75" : "#e0e0e0", marginVertical: 10 }} />
+        <View key={`hr-${i}`} style={{ height: 1, backgroundColor: incognito ? Colors.incognito : Colors.codeBlockText, marginVertical: 10 }} />
       );
       i++;
       continue;
@@ -385,11 +386,11 @@ export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode
         while (out.length < colCount) out.push("");
         return out;
       };
-      const borderColor = incognito ? "#565A75" : "#e0e0e0";
-      const headerBg = incognito ? "rgba(86, 90, 117, 0.25)" : "rgba(255, 26, 26, 0.07)";
+      const borderColor = incognito ? Colors.incognito : Colors.codeBlockText;
+      const headerBg = incognito ? Colors.incognitoHeader : Colors.primaryHeader;
 
       elements.push(
-        <View key={`table-${i}`} style={{ borderWidth: 1, borderColor, borderRadius: 6, overflow: "hidden", marginVertical: 6 }}>
+        <View key={`table-${i}`} style={{ borderWidth: 1, borderColor, borderRadius: Radius.lg, overflow: "hidden", marginVertical: 6 }}>
           {headerCells && (
             <View style={{ flexDirection: "row", backgroundColor: headerBg }}>
               {padCell(headerCells).map((c, ci) => (
@@ -400,7 +401,7 @@ export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode
             </View>
           )}
           {bodyRows.map((row, ri) => (
-            <View key={`r-${ri}`} style={{ flexDirection: "row", backgroundColor: ri % 2 === 1 ? (incognito ? "rgba(86, 90, 117, 0.1)" : "rgba(0,0,0,0.03)") : "transparent" }}>
+            <View key={`r-${ri}`} style={{ flexDirection: "row", backgroundColor: ri % 2 === 1 ? (incognito ? Colors.incognitoStripe : Colors.overlayFaint) : "transparent" }}>
               {padCell(row).map((c, ci) => (
                 <View key={`b-${ri}-${ci}`} style={[s.tableCellBox, ci < colCount - 1 && { borderRightWidth: 1, borderRightColor: borderColor }, { borderTopWidth: 1, borderTopColor: borderColor }]}>
                   {wrapContent(c, `bc-${ri}-${ci}`, s.tableCell, ci, incognito, selColor)}
@@ -466,7 +467,7 @@ export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode
     if (line.trimStart().startsWith("> ")) {
       const quoteText = line.replace(/^[\s]*>\s?/, "");
       elements.push(
-        wrapContent(quoteText, `quote-${i}`, [s.base, { borderLeftColor: incognito ? "#565A75" : "#FF1A1A", borderLeftWidth: 3, paddingLeft: 10, marginVertical: 4 }], i, incognito, selColor)
+        wrapContent(quoteText, `quote-${i}`, [s.base, { borderLeftColor: incognito ? Colors.incognito : Colors.primary, borderLeftWidth: 3, paddingLeft: 10, marginVertical: 4 }], i, incognito, selColor)
       );
       i++;
       continue;
@@ -475,7 +476,7 @@ export function renderMarkdown(md: string, incognito?: boolean): React.ReactNode
     // custom interrupted line
     if (line.trim() === "_The user interrupted the response_") {
       elements.push(
-        <Text key={`interrupted-${i}`} style={[s.base, s.italic, { color: "gray", marginTop: 4 }]} selectable={true} selectionColor={selColor}>
+        <Text key={`interrupted-${i}`} style={[s.base, s.italic, { color: Colors.textFaint, marginTop: 4 }]} selectable={true} selectionColor={selColor}>
           The user interrupted the response
         </Text>
       );

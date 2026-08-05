@@ -1,3 +1,4 @@
+import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { Image, ImageSourcePropType, StyleProp, StyleSheet, TextInput, TextInputProps, View, ViewStyle } from "react-native";
 
 interface TextInputFieldProps extends TextInputProps {
@@ -11,7 +12,7 @@ export default function TextInputField({ icon, style, containerStyle, ...props }
       {icon && <Image source={icon} style={styles.icon} />}
       <TextInput
         style={[styles.input, icon ? { paddingLeft: 10 } : undefined, style]}
-        placeholderTextColor="#aaa"
+        placeholderTextColor={Colors.textPlaceholder}
         {...props}
       />
     </View>
@@ -23,11 +24,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#00000017",
-    borderRadius: 10,
+    borderColor: Colors.border,
+    borderRadius: Radius.xxl,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.surface,
   },
   icon: {
     width: 18,
@@ -36,9 +37,9 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 14,
-    color: "#222",
-    fontFamily: "IBMPlexMono-Medium",
+    fontSize: FontSizes.bodyMd,
+    color: Colors.textSecondary,
+    fontFamily: Fonts.mono,
     padding: 0,
   },
 });

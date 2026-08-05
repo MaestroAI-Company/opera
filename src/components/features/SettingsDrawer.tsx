@@ -3,7 +3,16 @@ import { Animated, DeviceEventEmitter, Image, Keyboard, Platform, Pressable, Scr
 import { AIModule } from "../../services/ai/AIModule";
 import { BackupService } from "../../services/BackupService";
 import { Settings } from "../../services/settings/SettingsService";
-import { Whisper } from "../../services/whisper/WhisperService";
+import { STT } from "../../services/speech/STTService";
+
+//web whisper surface, only used in browser flows
+const WebSTT = STT as unknown as {
+  isModelInstalled(modelName: string): Promise<boolean>;
+  init(modelName: string): Promise<boolean>;
+  setLanguage(lang: string): void;
+  deleteModel(modelName: string): Promise<void>;
+  downloadModel(modelName: string, onProgress?: (progress: number, etaSeconds: number, speedStr: string, sizeStr: string) => void): Promise<void>;
+};
 import DownloadProgress from "../ui/DownloadProgress";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import Selector from "../ui/Selector";
@@ -101,6 +110,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [instruction, setInstructionState] = useState("");
   const [username, setUsernameState] = useState("");
   const [alwaysWhisper, setAlwaysWhisperState] = useState(true);
+  const [speaker, setSpeakerState] = useState(true);
+  const [autoSpeak, setAutoSpeakState] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(true);
   const [usageAnalytics, setUsageAnalyticsState] = useState(true);
   const [useWebsearch, setUseWebsearchState] = useState(true);
@@ -204,7 +215,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           onPress: async () => {
             setAlertModalVisible(false);
             try {
-              await Whisper.deleteModel(whisperModel);
+              await WebSTT.deleteModel(whisperModel);
               setWhisperInstalled(false);
               setInstalledWhisperModels(prev => ({ ...prev, [whisperModel]: false }));
             } catch (e) {
@@ -269,10 +280,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setUsernameState(s.username || "");
         setIncludeDateTimeState(s.includeDateTime ?? true);
         setAlwaysWhisperState(s.alwaysWhisper);
+        setSpeakerState(s.speaker);
+        setAutoSpeakState(s.autoSpeak);
         //apply to services
         AIModule.configure(s.ollamaUrl);
         AIModule.setMode(s.aiService);
-        Whisper.setLanguage(s.whisperLanguage);
+        WebSTT.setLanguage(s.whisperLanguage);
       } catch (e) {
         console.warn("Failed to load settings", e);
       }
@@ -326,11 +339,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     setWhisperModelState(v);
     Settings.set("whisperModel", v);
     if (v && v !== "none") {
-      Whisper.isModelInstalled(v).then((installed) => {
+      WebSTT.isModelInstalled(v).then((installed) => {
         setWhisperInstalled(installed);
         setInstalledWhisperModels(prev => ({ ...prev, [v]: installed }));
         if (installed) {
-          Whisper.init(v).then((success) => {
+          WebSTT.init(v).then((success) => {
             if (!success) {
               showAlert("Error", `Failed to load Whisper model ${v}. It might be corrupted.`);
               setWhisperInstalled(false);
@@ -362,6 +375,16 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const setAlwaysWhisper = (v: boolean) => {
     setAlwaysWhisperState(v);
     Settings.set("alwaysWhisper", v);
+  };
+
+  const setSpeaker = (v: boolean) => {
+    setSpeakerState(v);
+    Settings.set("speaker", v);
+  };
+
+  const setAutoSpeak = (v: boolean) => {
+    setAutoSpeakState(v);
+    Settings.set("autoSpeak", v);
   };
 
   const completeCloudConnect = async (v: string) => {
@@ -560,13 +583,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     if (visible) {
       setTimeout(() => {
         fetchOllamaModels();
-        ["tiny", "base", "small"].forEach(m => {
-          Whisper.isModelInstalled(m).then(installed => {
-            setInstalledWhisperModels(prev => ({ ...prev, [m]: installed }));
+        if (Platform.OS === "web") {
+          ["tiny", "base", "small"].forEach(m => {
+            WebSTT.isModelInstalled(m).then(installed => {
+              setInstalledWhisperModels(prev => ({ ...prev, [m]: installed }));
+            });
           });
-        });
-        if (whisperModel && whisperModel !== "none") {
-          Whisper.isModelInstalled(whisperModel).then(setWhisperInstalled);
+          if (whisperModel && whisperModel !== "none") {
+            WebSTT.isModelInstalled(whisperModel).then(setWhisperInstalled);
+          }
         }
       }, 300);
     }
@@ -603,7 +628,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     setIsDownloadingWhisper(true);
     setWhisperDownloadProgress(null);
     try {
-      await Whisper.downloadModel(model, (progress, etaSeconds, speedStr, sizeStr) => {
+      await WebSTT.downloadModel(model, (progress, etaSeconds, speedStr, sizeStr) => {
         setWhisperDownloadProgress({ progress, etaSeconds, speedStr, sizeStr });
       });
       setWhisperInstalled(true);
@@ -922,36 +947,58 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       )}
       {aiService === "ollama" && ollamaError ? <Text style={styles.errorText}>{ollamaError}</Text> : null}
 
-      <View style={[styles.settingRowVertical, { zIndex: 9 }]}>
-        <Text style={styles.settingLabel}>Whisper Model</Text>
-        <Text style={[styles.helpText, { marginBottom: 10 }]}>The larger size, the longer the processing will take.</Text>
-        <Selector
-          options={whisperModelOptions}
-          selectedValue={whisperModel}
-          onSelect={handleSelectWhisperModel}
-          title="Select Whisper Model"
-          fullWidth
-        />
-        {isDownloadingWhisper && (
-          <View style={{ marginTop: 10 }}>
-            <DownloadProgress
-              title={`Downloading Whisper ${whisperModel}...`}
-              progress={whisperDownloadProgress?.progress || 0}
-              sizeStr={whisperDownloadProgress?.sizeStr}
-              etaSeconds={whisperDownloadProgress?.etaSeconds}
+      {Platform.OS === "web" && (
+        <>
+          <View style={[styles.settingRowVertical, { zIndex: 9 }]}>
+            <Text style={styles.settingLabel}>Whisper Model</Text>
+            <Text style={[styles.helpText, { marginBottom: 10 }]}>The larger size, the longer the processing will take.</Text>
+            <Selector
+              options={whisperModelOptions}
+              selectedValue={whisperModel}
+              onSelect={handleSelectWhisperModel}
+              title="Select Whisper Model"
+              fullWidth
+            />
+            {isDownloadingWhisper && (
+              <View style={{ marginTop: 10 }}>
+                <DownloadProgress
+                  title={`Downloading Whisper ${whisperModel}...`}
+                  progress={whisperDownloadProgress?.progress || 0}
+                  sizeStr={whisperDownloadProgress?.sizeStr}
+                  etaSeconds={whisperDownloadProgress?.etaSeconds}
+                />
+              </View>
+            )}
+          </View>
+
+          <View style={[styles.toggleRow, { marginTop: 10 }]}>
+            <Text style={styles.settingLabel}>Transcribe-On-Device</Text>
+            <Toggle
+              checked={alwaysWhisper}
+              onToggle={setAlwaysWhisper}
             />
           </View>
-        )}
-      </View>
+          <Text style={styles.helpText}>Process audio transcriptions locally on your device</Text>
+        </>
+      )}
 
-      <View style={[styles.toggleRow, { marginTop: 10 }]}>
-        <Text style={styles.settingLabel}>Transcribe-On-Device</Text>
+      <View style={styles.toggleRow}>
+        <Text style={styles.settingLabel}>Speaker</Text>
         <Toggle
-          checked={alwaysWhisper}
-          onToggle={setAlwaysWhisper}
+          checked={speaker}
+          onToggle={setSpeaker}
         />
       </View>
-      <Text style={styles.helpText}>Process audio transcriptions locally on your device</Text>
+      <Text style={styles.helpText}>Show a speaker button on each message to read it aloud</Text>
+
+      <View style={styles.toggleRow}>
+        <Text style={styles.settingLabel}>Auto-read replies</Text>
+        <Toggle
+          checked={autoSpeak}
+          onToggle={setAutoSpeak}
+        />
+      </View>
+      <Text style={styles.helpText}>Speak the answer aloud when you ask by voice</Text>
     </View>
   );
 

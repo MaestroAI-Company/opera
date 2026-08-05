@@ -1,10 +1,10 @@
-class WhisperService {
+class SpeechToTextService {
   private transcriber: any = null;
   private currentLang: string = 'en';
 
   private async getTransformers() {
     if (typeof self === 'undefined') {
-      (global as any).self = global;
+      (globalThis as any).self = globalThis;
     }
     //@ts-ignore
     const { pipeline, env } = await import('@xenova/transformers/dist/transformers.js');
@@ -61,7 +61,7 @@ class WhisperService {
         await this.release();
       }
     } catch (e) {
-      console.error("[Whisper Web] Failed to delete model cache", e);
+      console.error("[SpeechToText] Failed to delete model cache", e);
     }
   }
 
@@ -72,7 +72,7 @@ class WhisperService {
       if (modelName === 'tiny') repo = 'Xenova/whisper-tiny';
       if (modelName === 'small') repo = 'Xenova/whisper-small';
       
-      console.log(`[Whisper Web] Initializing model ${repo}...`);
+      console.log(`[SpeechToText] Initializing model ${repo}...`);
       const { pipeline } = await this.getTransformers();
       
       const downloadStats = new Map<string, { loaded: number, total: number }>();
@@ -114,10 +114,10 @@ class WhisperService {
           }
         }
       });
-      console.log(`[Whisper Web] Context initialized.`);
+      console.log(`[SpeechToText] Context initialized.`);
       return true;
     } catch (e) {
-      console.error("[Whisper Web] init failed:", e);
+      console.error("[SpeechToText] init failed:", e);
       return false;
     }
   }
@@ -137,17 +137,17 @@ class WhisperService {
     if (!this.transcriber) throw new Error("whisper not initialized");
     
     try {
-      console.log(`[Whisper Web] Transcribing file ${audioPath}...`);
+      console.log(`[SpeechToText] Transcribing file ${audioPath}...`);
       const startTime = Date.now();
       const response = await fetch(audioPath);
       const blob = await response.blob();
       const arrayBuffer = await blob.arrayBuffer();
       
       const text = await this.transcribeData(arrayBuffer);
-      console.log(`[Whisper Web] File transcription completed in ${Date.now() - startTime}ms: "${text.trim()}"`);
+      console.log(`[SpeechToText] File transcription completed in ${Date.now() - startTime}ms: "${text.trim()}"`);
       return text;
     } catch (e) {
-      console.error("[Whisper Web] Transcription error:", e);
+      console.error("[SpeechToText] Transcription error:", e);
       throw e;
     }
   }
@@ -156,7 +156,7 @@ class WhisperService {
   async transcribeData(buffer: ArrayBuffer): Promise<string> {
     if (!this.transcriber) throw new Error("whisper not initialized");
     
-    console.log(`[Whisper Web] Transcribing buffer of ${buffer.byteLength} bytes...`);
+    console.log(`[SpeechToText] Transcribing buffer of ${buffer.byteLength} bytes...`);
     const startTime = Date.now();
     
     //convert buffer to float32 at 16000hz
@@ -183,10 +183,10 @@ class WhisperService {
       });
       
       const text = output.text;
-      console.log(`[Whisper Web] Buffer transcription completed in ${Date.now() - startTime}ms: "${text.trim()}"`);
+      console.log(`[SpeechToText] Buffer transcription completed in ${Date.now() - startTime}ms: "${text.trim()}"`);
       return text;
     } catch (e) {
-      console.error("[Whisper Web] Transcription error:", e);
+      console.error("[SpeechToText] Transcription error:", e);
       throw e;
     } finally {
       if (audioContext.state !== 'closed') {
@@ -207,4 +207,4 @@ class WhisperService {
 }
 
 // export whisper instance
-export const Whisper = new WhisperService();
+export const STT = new SpeechToTextService();

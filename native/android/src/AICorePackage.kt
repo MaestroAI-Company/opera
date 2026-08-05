@@ -7,7 +7,7 @@ import com.facebook.react.uimanager.ViewManager
 
 class AICorePackage : ReactPackage {
   override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> =
-    listOf(AICoreModule(reactContext), AICoreSpeechModule(reactContext))
+    listOf(AICoreModule(reactContext))
 
   override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> =
     emptyList()

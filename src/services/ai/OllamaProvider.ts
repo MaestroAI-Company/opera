@@ -1,6 +1,7 @@
 import { fetch as expoFetch } from 'expo/fetch';
 import { IAIProvider } from './IAIProvider';
 import { NotificationService } from '../notifications/NotificationService';
+import { MessageMetrics } from '../db/DatabaseService';
 
 async function universalFetch(input: string | URL | Request, init?: any): Promise<Response> {
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -212,7 +213,8 @@ export class OllamaProvider implements IAIProvider {
     messages: { role: string; content: string; images?: string[] }[],
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
-    options?: { think?: boolean | string }
+    options?: { think?: boolean | string },
+    onMetrics?: (metrics: MessageMetrics) => void
   ): Promise<void> {
     if (!this.isConfigured()) throw new Error('AI server not configured');
     try {
@@ -289,6 +291,19 @@ export class OllamaProvider implements IAIProvider {
                 }
                 onChunk(parsed.message.content);
               }
+            }
+            
+            //read stats from final chunk
+            if (parsed.done && onMetrics) {
+              const evalNs = parsed.eval_duration || 0;
+              const timeSec = evalNs > 0 ? evalNs / 1e9 : (parsed.total_duration || 0) / 1e9;
+              const tokens = parsed.eval_count;
+              onMetrics({
+                model: modelName,
+                timeSec,
+                tokens: tokens || undefined,
+                tokensPerSec: timeSec > 0 && tokens ? tokens / timeSec : undefined
+              });
             }
           } catch (e) {
             //ignore incomplete json

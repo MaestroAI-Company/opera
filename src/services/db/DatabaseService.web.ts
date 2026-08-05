@@ -9,6 +9,13 @@ export type Conversation = {
   pinned?: number;
 };
 
+export type MessageMetrics = {
+  model?: string;
+  timeSec?: number;
+  tokens?: number;
+  tokensPerSec?: number;
+};
+
 export type Message = {
   id: string;
   conversationId: string;
@@ -16,6 +23,7 @@ export type Message = {
   content: string;
   createdAt: number;
   images?: string[];
+  metrics?: MessageMetrics;
 };
 
 export type SyncTombstone = {
@@ -188,6 +196,14 @@ class DatabaseService {
     );
     this.saveMessages();
     DeviceEventEmitter.emit('DATA_CHANGED');
+  }
+
+  //store generation metrics for a message
+  async updateMessageMetrics(id: string, metrics: MessageMetrics): Promise<void> {
+    this.messages = this.messages.map(m => 
+      m.id === id ? { ...m, metrics } : m
+    );
+    this.saveMessages();
   }
 
   // get messages for conversation

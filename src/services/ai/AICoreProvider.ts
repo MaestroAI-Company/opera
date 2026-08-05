@@ -1,5 +1,6 @@
 import { DeviceEventEmitter, NativeModules, Platform } from 'react-native';
 import { IAIProvider } from './IAIProvider';
+import { MessageMetrics } from '../db/DatabaseService';
 
 const MODULE = Platform.OS === 'android' ? (NativeModules.AICoreModule as any) : null;
 
@@ -67,10 +68,12 @@ export class AICoreProvider implements IAIProvider {
     messages: { role: string; content: string; images?: string[] }[],
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
-    options?: { think?: boolean | string }
+    options?: { think?: boolean | string },
+    onMetrics?: (metrics: MessageMetrics) => void
   ): Promise<void> {
     if (!this.supported()) throw new Error('AICore not available on this device');
     const requestId = `aicore_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const startTime = Date.now();
 
     const prompt = messages.map(m => m.content)
       .filter(s => s && s.trim().length > 0)
@@ -103,6 +106,7 @@ export class AICoreProvider implements IAIProvider {
         MODULE.generateContentStream(modelName, systemPrompt, prompt, firstImage, !!options?.think, requestId)
           .then(() => {
             cleanup();
+            onMetrics?.({ model: modelName, timeSec: (Date.now() - startTime) / 1000 });
             resolve();
           })
           .catch((e: any) => {

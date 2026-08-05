@@ -3,6 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { IAIProvider } from './IAIProvider';
 import { OllamaProvider } from './OllamaProvider';
 import { AICoreProvider } from './AICoreProvider';
+import { MessageMetrics } from '../db/DatabaseService';
 
 const DEFAULT_URL = Platform.OS === 'android' ? 'http://10.0.2.2:11434' : 'http://127.0.0.1:11434';
 
@@ -91,7 +92,8 @@ class CentralAIModule {
     messages: { role: string; content: string; images?: string[] }[],
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
-    options?: { think?: boolean | string }
+    options?: { think?: boolean | string },
+    onMetrics?: (metrics: MessageMetrics) => void
   ): Promise<void> {
     const provider = this.getActiveProvider();
     
@@ -119,7 +121,7 @@ class CentralAIModule {
       })
     );
 
-    return provider.sendMessage(modelName, systemPrompt, processedMessages, onChunk, signal, options);
+    return provider.sendMessage(modelName, systemPrompt, processedMessages, onChunk, signal, options, onMetrics);
   }
 }
 

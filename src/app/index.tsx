@@ -26,13 +26,22 @@ import SearchWebView from "../../components/SearchWebView";
 import TopBar from "../components/features/TopBar";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { useResponsive } from "../hooks/useResponsive";
-import { AICoreSTT } from "../services/ai/AICoreSpeechService";
 import { AIModule } from "../services/ai/AIModule";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
 import { Settings } from "../services/settings/SettingsService";
-import { Whisper } from "../services/whisper/WhisperService";
 import { WidgetManager } from "../services/widgets/WidgetManager";
 import { PluginRegistry } from "../services/plugins/PluginRegistry";
+import { STT } from "../services/speech/STTService";
+import { TTS } from "../services/speech/TTSService";
+
+//web whisper surface, only used in browser flows
+const WebSTT = STT as unknown as {
+  isAvailable(): boolean;
+  isModelInstalled(modelName: string): Promise<boolean>;
+  init(modelName: string): Promise<boolean>;
+  setLanguage(lang: string): void;
+  transcribeData(buffer: ArrayBuffer): Promise<string>;
+};
 
 
 const butterflyImage = require("../../assets/images/butterfly5.png");
@@ -60,7 +69,6 @@ export default function Index() {
   const [modelCapabilities, setModelCapabilities] = useState<string[]>([]);
   const [alwaysWhisper, setAlwaysWhisper] = useState(false);
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
-  const [aicoreSTTReady, setAicoreSTTReady] = useState(false);
 
   //conversation state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -212,7 +220,7 @@ export default function Index() {
         setAlwaysWhisper(s.alwaysWhisper);
         AIModule.configure(s.ollamaUrl);
         AIModule.setMode(s.aiService);
-        Whisper.setLanguage(s.whisperLanguage);
+        STT.setLanguage(s.whisperLanguage);
       } catch (e) {
         console.warn("Failed to load settings at boot", e);
       }
@@ -234,22 +242,6 @@ export default function Index() {
     };
     fetchCapabilities();
   }, [selectedModel, aiService, ollamaUrl]);
-
-  //check gemini stt model when aicore mode active
-  useEffect(() => {
-    let cancelled = false;
-    const check = async () => {
-      if (aiService !== "aicore" || Platform.OS !== "android") {
-        setAicoreSTTReady(false);
-        return;
-      }
-      const locale = Settings.getCached().whisperLanguage || "en-US";
-      const ready = await AICoreSTT.ensureReady(locale);
-      if (!cancelled) setAicoreSTTReady(ready);
-    };
-    check();
-    return () => { cancelled = true; };
-  }, [aiService]);
 
   const loadConversations = async () => {
     const convs = await DB.getConversations();
@@ -389,7 +381,7 @@ export default function Index() {
 
   //send a message — creates conversation on first send
   const handleSend = useCallback(
-    async (text: string, images?: string[]) => {
+    async (text: string, images?: string[], viaVoice?: boolean) => {
       if (!dbReady && !incognitoMode) return;
 
       let conv = activeConversation;
@@ -560,6 +552,11 @@ export default function Index() {
         if (isFirstMessage && !isIncognitoTask && !isError) {
           generateTitle(taskConv.id, text, images);
         }
+
+        //auto-read the reply aloud when it was requested via voice
+        if (viaVoice && !isError && Settings.getCached().autoSpeak) {
+          TTS.speak(streamingContentRef.current, { language: Settings.getCached().language });
+        }
       };
 
       requestQueueRef.current.push({
@@ -598,14 +595,14 @@ export default function Index() {
     const useRemote = !alwaysWhisper && modelCapabilities.includes("audio") && selectedModel;
 
     const transcribeWithWhisper = async () => {
-      if (!Whisper.isAvailable()) {
+      if (!WebSTT.isAvailable()) {
         const modelName = Settings.getCached().whisperModel || "base";
-        if (modelName !== "none" && await Whisper.isModelInstalled(modelName)) {
-          await Whisper.init(modelName);
+        if (modelName !== "none" && await WebSTT.isModelInstalled(modelName)) {
+          await WebSTT.init(modelName);
         }
       }
-      if (Whisper.isAvailable()) {
-        return Whisper.transcribeData(wavBuffer);
+      if (WebSTT.isAvailable()) {
+        return WebSTT.transcribeData(wavBuffer);
       }
       console.error('Whisper fallback failed because Whisper is not initialized or installed.');
       return null;
@@ -953,7 +950,6 @@ export default function Index() {
                 onTranscribe={handleTranscribe}
                 canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes("audio") && !!selectedModel}
                 supportsFiles={modelCapabilities.includes("vision") || modelCapabilities.includes("audio")}
-                aicoreSTT={aiService === "aicore" && aicoreSTTReady}
                 onOpenSettings={() => {
                   openDrawerSafely(() => {
                     setSettingsInitialSubPage("main");

@@ -11,6 +11,7 @@ export type AppSettings = {
   whisperLanguage: string;
   instruction: string;
   speaker: boolean;
+  autoSpeak: boolean;
   alwaysWhisper: boolean;
   autoStartMic: boolean;
   hasSeenOnboarding: boolean;
@@ -33,7 +34,8 @@ const DEFAULTS: AppSettings = {
     }
   })(),
   instruction: '',
-  speaker: false,
+  speaker: true,
+  autoSpeak: true,
   alwaysWhisper: false,
   autoStartMic: true,
   hasSeenOnboarding: false,
@@ -88,6 +90,7 @@ class SettingsService {
       whisperLanguage: map['whisperLanguage'] ?? DEFAULTS.whisperLanguage,
       instruction: map['instruction'] ?? DEFAULTS.instruction,
       speaker: map['speaker'] === 'true' ? true : (map['speaker'] === 'false' ? false : DEFAULTS.speaker),
+      autoSpeak: map['autoSpeak'] === 'true' ? true : (map['autoSpeak'] === 'false' ? false : DEFAULTS.autoSpeak),
       alwaysWhisper: map['alwaysWhisper'] === 'true' ? true : (map['alwaysWhisper'] === 'false' ? false : DEFAULTS.alwaysWhisper),
       autoStartMic: map['autoStartMic'] === 'true' ? true : (map['autoStartMic'] === 'false' ? false : DEFAULTS.autoStartMic),
       hasSeenOnboarding: map['hasSeenOnboarding'] === 'true' ? true : DEFAULTS.hasSeenOnboarding,

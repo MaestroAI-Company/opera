@@ -24,10 +24,8 @@ import {
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const { AudioModule, useAudioStream } = Platform.OS === 'web' ? { AudioModule: null, useAudioStream: () => ({ stream: null }) } : require("expo-audio");
-import { AICoreSTT } from "../../services/ai/AICoreSpeechService";
 import { Settings } from "../../services/settings/SettingsService";
-import { Whisper } from "../../services/whisper/WhisperService";
+import { STT } from "../../services/speech/STTService";
 import AttachmentSheet, { SelectedFile } from "./AttachmentSheet";
 import NotificationModal from "../ui/NotificationModal";
 
@@ -62,7 +60,7 @@ const compressImageToDataUri = async (uri: string): Promise<string> => {
 };
 
 type ChatInputBarProps = {
-  onSend?: (message: string, images?: string[]) => void;
+  onSend?: (message: string, images?: string[], viaVoice?: boolean) => void;
   onPlusPress?: () => void;
   onStop?: () => void;
   onTranscribe?: (wavBuffer: ArrayBuffer) => Promise<string | null>;
@@ -76,7 +74,6 @@ type ChatInputBarProps = {
   onAttachmentSheetVisibilityChange?: (visible: boolean) => void;
   enabled?: boolean;
   autoStartMic?: boolean;
-  aicoreSTT?: boolean;
 };
 
 export type ChatBarHandle = {
@@ -176,7 +173,6 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   onAttachmentSheetVisibilityChange,
   enabled = true,
   autoStartMic = false,
-  aicoreSTT = false,
 }, ref) {
   useImperativeHandle(ref, () => ({
     stopRecording: () => {
@@ -200,6 +196,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const [recentPhotos, setRecentPhotos] = useState<any[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const autoStartedRef = useRef(false);
+  const transcribeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sheetHeightAnim = useRef(new Animated.Value(0)).current;
   const spacerHeightAnim = useRef(new Animated.Value(insets.bottom)).current;
@@ -261,66 +258,86 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const pressAnim = useRef(new Animated.Value(0)).current;
 
-  const aicoreFinalTextRef = useRef<string>("");
-  const aicorePartialTextRef = useRef<string>("");
-  const aicoreStartTimeRef = useRef(0);
-  const sttModeRef = useRef<'aicore' | 'whisper'>('whisper');
+  const liveTextRef = useRef<string>("");
+  const sttModeRef = useRef<'stt' | 'whisper'>('whisper');
 
-  const stopAICoreVolume = () => {
+  const stopSTTVolume = () => {
     currentAudioVolume = 0;
   };
 
-  //native stt, partials fill input, rms drives volume
-  const startAICoreSTT = async () => {
+  //web-only whisper surface (stt resolves to the whisper implementation there)
+  const webSTT = STT as unknown as {
+    isModelInstalled(modelName: string): Promise<boolean>;
+    init(modelName: string): Promise<boolean>;
+    isAvailable(): boolean;
+    transcribeData(buffer: ArrayBuffer): Promise<string>;
+  };
+
+  //native stt, partials fill input, volume drives the indicator
+  const startExpoSTT = async () => {
     try {
-      sttModeRef.current = 'aicore';
-      aicoreFinalTextRef.current = "";
-      aicorePartialTextRef.current = "";
-      aicoreStartTimeRef.current = Date.now();
+      sttModeRef.current = 'stt';
+      liveTextRef.current = "";
       setText("");
+      clearTimeout(transcribeTimerRef.current);
+      setIsTranscribing(false);
       setIsRecording(true);
+      const granted = await STT.requestPermissions();
+      if (!granted) {
+        setIsRecording(false);
+        setModalConfig({
+          title: "Microphone Permission",
+          message: "Microphone access is required for voice input. Please enable it in your device settings.",
+          buttons: [{ text: "OK", onPress: () => setModalVisible(false), style: "primary" }]
+        });
+        setModalVisible(true);
+        onTranscribeError?.();
+        return;
+      }
       let locale = Settings.getCached().whisperLanguage || "en-US";
       if (locale === "auto" || locale.length > 5) locale = "en-US";
-      console.log(`[AICore STT] Starting native speech recognition (locale: ${locale}, featureStatus: ${await AICoreSTT.checkStatus(locale)})`);
-      await AICoreSTT.start(locale, {
-        onPartial: (t) => { if (t) { aicorePartialTextRef.current = t; setText(t); } },
-        onFinal: (t) => { aicoreFinalTextRef.current = t; },
-        onVolume: (v) => { currentAudioVolume = v; },
-        onError: async (msg) => {
-          console.error("AICore STT error, falling back to Whisper:", msg);
-          stopAICoreVolume();
-          await AICoreSTT.stop().catch(() => {});
-          await startWhisperRecording();
+      STT.start(locale, {
+        onPartial: (t) => { if (t) { liveTextRef.current = t; setText(t); } },
+        onFinal: (t) => { if (t) liveTextRef.current = t; },
+        onVolume: (v) => { currentAudioVolume = v > 0 ? v / 10 : 0; },
+        onError: (msg) => {
+          console.error("STT error:", msg);
+          stopSTTVolume();
+          setIsRecording(false);
+          onTranscribeError?.();
         },
         onDone: () => {},
       });
     } catch (e) {
-      console.error("failed to start AICore STT, falling back to Whisper:", e);
-      stopAICoreVolume();
-      await AICoreSTT.stop().catch(() => {});
-      await startWhisperRecording();
+      console.error("failed to start expo STT:", e);
+      stopSTTVolume();
+      setIsRecording(false);
+      onTranscribeError?.();
     }
   };
 
-  //stop stt, send final text or fill input
-  const stopAICoreSTT = async (send: boolean) => {
-    stopAICoreVolume();
+  //stop stt, keep the transcribe state 1s so the final result lands, then send or fill input
+  const stopExpoSTT = (send: boolean) => {
+    stopSTTVolume();
     setIsRecording(false);
-    await AICoreSTT.stop();
-    const finalText = aicoreFinalTextRef.current.trim();
-    aicoreFinalTextRef.current = "";
-    aicorePartialTextRef.current = "";
-    console.log(`[AICore STT] Session completed in ${Date.now() - aicoreStartTimeRef.current}ms`);
-    if (finalText.length > 0) {
-      if (send) {
-        onSend?.(finalText);
-        setText("");
-      } else {
-        setText(finalText);
+    setIsTranscribing(true);
+    STT.stop();
+    clearTimeout(transcribeTimerRef.current);
+    transcribeTimerRef.current = setTimeout(() => {
+      setIsTranscribing(false);
+      const finalText = liveTextRef.current.trim();
+      liveTextRef.current = "";
+      if (finalText.length > 0) {
+        if (send) {
+          onSend?.(finalText, undefined, true);
+          setText("");
+        } else {
+          setText(finalText);
+        }
+      } else if (autoStartMic) {
+        onTranscribeError?.();
       }
-    } else if (autoStartMic) {
-      onTranscribeError?.();
-    }
+    }, 1000);
   };
 
   const webAudioContextRef = useRef<AudioContext | null>(null);
@@ -329,29 +346,15 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
   const isRecordingRef = useRef(false);
 
-  const { stream } = useAudioStream({
-    sampleRate: 16000,
-    channels: 1,
-    encoding: "float32",
-    onBuffer: (buffer) => {
-      // process audio buffer
-      if (isRecordingRef.current) {
-        pcmChunksRef.current.push(buffer.data);
-        sampleRateRef.current = buffer.sampleRate;
-        const f32 = new Float32Array(buffer.data);
-        let sum = 0;
-        for (let i = 0; i < f32.length; i++) {
-          sum += f32[i] * f32[i];
-        }
-        currentAudioVolume = Math.sqrt(sum / f32.length);
-      }
-    },
-  });
-
   useEffect(() => {
     const handleBackButton = () => {
       if (isAttachmentSheetVisible) {
         closeSheet();
+        return true;
+      }
+      if (isTranscribing) {
+        clearTimeout(transcribeTimerRef.current);
+        setIsTranscribing(false);
         return true;
       }
       if (isRecording) {
@@ -359,11 +362,9 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
           if (webAudioProcessorRef.current) webAudioProcessorRef.current.disconnect();
           if (webAudioContextRef.current) webAudioContextRef.current.close();
           if (webAudioStreamRef.current) webAudioStreamRef.current.getTracks().forEach(t => t.stop());
-        } else if (sttModeRef.current === 'aicore') {
-          stopAICoreVolume();
-          AICoreSTT.stop().catch(() => {});
         } else {
-          stream?.stop();
+          stopSTTVolume();
+          STT.abort();
         }
         setIsRecording(false);
         pcmChunksRef.current = [];
@@ -378,7 +379,15 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     );
 
     return () => backHandler.remove();
-  }, [isAttachmentSheetVisible, isRecording, stream, aicoreSTT]);
+  }, [isAttachmentSheetVisible, isRecording, isTranscribing]);
+
+  //cleanup pending transcribe timer on unmount
+  useEffect(() => {
+    return () => {
+      clearTimeout(transcribeTimerRef.current);
+      if (Platform.OS !== 'web') STT.abort();
+    };
+  }, []);
 
   useEffect(() => {
     if (selectedFiles.length === 0 && isSelectionMode) {
@@ -390,9 +399,9 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     if (autoStartMic && !autoStartedRef.current) {
       autoStartedRef.current = true;
       // skip whisper checks, parent handles transcription
-      setTimeout(() => (aicoreSTT ? startAICoreSTT() : startRecording()), 800);
+      setTimeout(() => (Platform.OS === 'web' ? startRecording() : startExpoSTT()), 800);
     }
-  }, [autoStartMic, aicoreSTT]);
+  }, [autoStartMic]);
 
   const toggleAttachmentSheet = async () => {
     if (isAttachmentSheetVisible) {
@@ -520,14 +529,12 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
 
   useEffect(() => {
-    if (AudioModule) {
-      AudioModule.requestRecordingPermissionsAsync().catch(() => { });
-    }
+    if (Platform.OS !== 'web') return;
     const checkWhisper = async () => {
       const modelName = Settings.getCached().whisperModel || "base";
-      const isInstalled = await Whisper.isModelInstalled(modelName);
+      const isInstalled = await webSTT.isModelInstalled(modelName);
       if (isInstalled) {
-        Whisper.init(modelName).then((ok) => setWhisperAvailable(ok));
+        webSTT.init(modelName).then((ok) => setWhisperAvailable(ok));
       }
     };
     checkWhisper();
@@ -579,34 +586,30 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       sttModeRef.current = 'whisper';
       pcmChunksRef.current = [];
       setIsRecording(true);
-      if (Platform.OS === 'web') {
-        const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
-        webAudioStreamRef.current = ms;
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        const context = new AudioCtx({ sampleRate: 16000 });
-        webAudioContextRef.current = context;
-        const source = context.createMediaStreamSource(ms);
-        const processor = context.createScriptProcessor(4096, 1, 1);
-        processor.onaudioprocess = (e) => {
-          if (isRecordingRef.current) {
-            const inputData = e.inputBuffer.getChannelData(0);
-            const chunk = new Float32Array(inputData);
-            pcmChunksRef.current.push(chunk.buffer);
-            sampleRateRef.current = context.sampleRate;
+      const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
+      webAudioStreamRef.current = ms;
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const context = new AudioCtx({ sampleRate: 16000 });
+      webAudioContextRef.current = context;
+      const source = context.createMediaStreamSource(ms);
+      const processor = context.createScriptProcessor(4096, 1, 1);
+      processor.onaudioprocess = (e) => {
+        if (isRecordingRef.current) {
+          const inputData = e.inputBuffer.getChannelData(0);
+          const chunk = new Float32Array(inputData);
+          pcmChunksRef.current.push(chunk.buffer);
+          sampleRateRef.current = context.sampleRate;
 
-            let sum = 0;
-            for (let i = 0; i < chunk.length; i++) {
-              sum += chunk[i] * chunk[i];
-            }
-            currentAudioVolume = Math.sqrt(sum / chunk.length);
+          let sum = 0;
+          for (let i = 0; i < chunk.length; i++) {
+            sum += chunk[i] * chunk[i];
           }
-        };
-        source.connect(processor);
-        processor.connect(context.destination);
-        webAudioProcessorRef.current = processor;
-      } else {
-        await stream?.start();
-      }
+          currentAudioVolume = Math.sqrt(sum / chunk.length);
+        }
+      };
+      source.connect(processor);
+      processor.connect(context.destination);
+      webAudioProcessorRef.current = processor;
     } catch (e) {
       console.error("failed to start audio stream:", e);
       setIsRecording(false);
@@ -615,21 +618,17 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
   const stopAndTranscribe = async (): Promise<string | null> => {
     try {
-      if (Platform.OS === 'web') {
-        if (webAudioProcessorRef.current) {
-          webAudioProcessorRef.current.disconnect();
-          webAudioProcessorRef.current = null;
-        }
-        if (webAudioContextRef.current) {
-          webAudioContextRef.current.close();
-          webAudioContextRef.current = null;
-        }
-        if (webAudioStreamRef.current) {
-          webAudioStreamRef.current.getTracks().forEach(track => track.stop());
-          webAudioStreamRef.current = null;
-        }
-      } else {
-        stream?.stop();
+      if (webAudioProcessorRef.current) {
+        webAudioProcessorRef.current.disconnect();
+        webAudioProcessorRef.current = null;
+      }
+      if (webAudioContextRef.current) {
+        webAudioContextRef.current.close();
+        webAudioContextRef.current = null;
+      }
+      if (webAudioStreamRef.current) {
+        webAudioStreamRef.current.getTracks().forEach(track => track.stop());
+        webAudioStreamRef.current = null;
       }
       setIsRecording(false);
       const chunks = pcmChunksRef.current;
@@ -640,7 +639,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       //delegate to parent if provided, otherwise use whisper directly
       const transcribed = onTranscribe
         ? await onTranscribe(wavBuffer)
-        : await Whisper.transcribeData(wavBuffer);
+        : await webSTT.transcribeData(wavBuffer);
       setIsTranscribing(false);
       return transcribed;
     } catch (e) {
@@ -717,7 +716,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         return;
       }
 
-      const isInstalled = await Whisper.isModelInstalled(modelName);
+      const isInstalled = await webSTT.isModelInstalled(modelName);
       if (!isInstalled) {
         setModalConfig({
           title: "Whisper Not Installed",
@@ -737,7 +736,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         return;
       }
 
-      const initialized = await Whisper.init(modelName);
+      const initialized = await webSTT.init(modelName);
       if (!initialized) {
         setModalConfig({
           title: "Initialization Error",
@@ -762,41 +761,33 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
   const handleMicPress = async () => {
     if (isRecording) {
-      if (sttModeRef.current === 'aicore') {
-        await stopAICoreSTT(true);
+      if (sttModeRef.current === 'stt') {
+        stopExpoSTT(true);
       } else {
-        if (Platform.OS === 'web') {
-          if (webAudioProcessorRef.current) webAudioProcessorRef.current.disconnect();
-          if (webAudioContextRef.current) webAudioContextRef.current.close();
-          if (webAudioStreamRef.current) webAudioStreamRef.current.getTracks().forEach(t => t.stop());
-        } else {
-          stream?.stop();
-        }
+        if (webAudioProcessorRef.current) webAudioProcessorRef.current.disconnect();
+        if (webAudioContextRef.current) webAudioContextRef.current.close();
+        if (webAudioStreamRef.current) webAudioStreamRef.current.getTracks().forEach(t => t.stop());
         setIsRecording(false);
         pcmChunksRef.current = [];
       }
     } else {
-      if (aicoreSTT) {
-        await startAICoreSTT();
-        return;
+      if (Platform.OS === 'web') {
+        await startWhisperRecording();
+      } else {
+        await startExpoSTT();
       }
-      await startWhisperRecording();
     }
   };
 
   const handleSend = async () => {
     if (isRecording) {
-      if (sttModeRef.current === 'aicore') {
-        await stopAICoreSTT(true);
+      if (sttModeRef.current === 'stt') {
+        stopExpoSTT(true);
         return;
       }
       const transcribed = await stopAndTranscribe();
-      const partial = aicorePartialTextRef.current.trim();
-      aicorePartialTextRef.current = "";
       if (transcribed && transcribed.length > 0) {
-        setText(partial ? `${partial} ${transcribed}` : transcribed);
-      } else if (partial) {
-        setText(partial);
+        setText(transcribed);
       } else if (autoStartMic && !transcribed) {
         onTranscribeError?.();
       }
@@ -935,7 +926,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                   </Pressable>
                 )}
 
-                {((Settings.getCached().whisperModel !== 'none') || canTranscribeRemotely || aicoreSTT) && !isGenerating && (
+                {(Platform.OS !== 'web' || Settings.getCached().whisperModel !== 'none' || canTranscribeRemotely) && !isGenerating && (
                   <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.micButton}>
                     <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
                       <Image source={isRecording ? stopIcon : micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} tintColor="#fff" />

@@ -132,7 +132,7 @@ export class OllamaProvider implements IAIProvider {
               const now = Date.now();
 
               if (lastCompleted === -1 || parsed.completed < lastCompleted) {
-                // First chunk or switched to a new layer
+                //first chunk or new layer
                 lastCompleted = parsed.completed;
                 lastTime = now;
                 smoothedSpeed = 0;

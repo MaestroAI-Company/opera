@@ -39,7 +39,7 @@ export class FetchPagesTool implements ITool {
       return 'Error: missing or invalid urls parameter.';
     }
 
-    const targetUrls = urls.slice(0, 2); // Max 2 URLs
+    const targetUrls = urls.slice(0, 2); //max 2 urls
 
     try {
       let results: any[] = [];

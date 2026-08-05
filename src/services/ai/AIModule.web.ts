@@ -180,7 +180,7 @@ class CentralAIModule {
       return summary;
     };
 
-    //one model round: stream, parse tool calls, execute them. returns true if tools ran
+    //one model round: stream, parse, execute tools. true if any ran
     const runToolRound = async (): Promise<boolean> => {
       //use native tool calling or fallback to prompt injection (aicore method)
       const result = supportsTools
@@ -222,8 +222,8 @@ class CentralAIModule {
       if (!(await runToolRound())) return;
     }
 
-    //cap reached while the model kept requesting tools: force one final generation
-    //round so the answer is never lost after the last tool call
+    //cap reached while model kept requesting tools: force one final generation
+    //round so the answer survives the last tool call
     await runToolRound();
   }
 }

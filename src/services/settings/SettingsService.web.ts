@@ -12,7 +12,7 @@ export type AppSettings = {
   alwaysWhisper: boolean;
   autoStartMic: boolean;
   hasSeenOnboarding: boolean;
-  username: string;
+  name: string;
   includeDateTime: boolean;
 };
 
@@ -36,7 +36,7 @@ const DEFAULTS: AppSettings = {
   alwaysWhisper: false,
   autoStartMic: true,
   hasSeenOnboarding: false,
-  username: '',
+  name: '',
   includeDateTime: true,
 };
 
@@ -72,7 +72,7 @@ class SettingsService {
         alwaysWhisper: typeof parsed.alwaysWhisper === 'boolean' ? parsed.alwaysWhisper : DEFAULTS.alwaysWhisper,
         autoStartMic: typeof parsed.autoStartMic === 'boolean' ? parsed.autoStartMic : DEFAULTS.autoStartMic,
         hasSeenOnboarding: typeof parsed.hasSeenOnboarding === 'boolean' ? parsed.hasSeenOnboarding : DEFAULTS.hasSeenOnboarding,
-        username: parsed.username ?? DEFAULTS.username,
+        name: parsed.name ?? DEFAULTS.name,
         includeDateTime: typeof parsed.includeDateTime === 'boolean' ? parsed.includeDateTime : DEFAULTS.includeDateTime,
       };
       

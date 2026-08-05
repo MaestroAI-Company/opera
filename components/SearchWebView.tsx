@@ -76,7 +76,7 @@ const EXTRACT_CONTENT_JS = `
       var text = walk(main);
       text = text.replace(/\\n{3,}/g, '\\n\\n').trim();
       
-      // If we found enough text OR if we are forced to send whatever we have
+      //send if enough text or forced
       if (text.length > 300 || force) {
         if (text.length > 5000) text = text.substring(0, 5000) + '...';
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'page_content', content: text }));
@@ -93,9 +93,9 @@ const EXTRACT_CONTENT_JS = `
 
   var attempts = 0;
   var interval = setInterval(function() {
-    if (extract(false) || attempts > 50) { // Poll every 100ms for up to 5 seconds
+    if (extract(false) || attempts > 50) { //poll every 100ms up to 5s
       clearInterval(interval);
-      if (attempts > 50) extract(true); // Force extract
+      if (attempts > 50) extract(true); //force extract on timeout
     }
     attempts++;
   }, 100);
@@ -144,7 +144,7 @@ export default function SearchWebView() {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'search_results') {
-        const results = (data.results || []).slice(0, 5); // Max 5 sources
+        const results = (data.results || []).slice(0, 5); //max 5 sources
         SearchBridge.resolveSearch(results);
         setQueryUrl('about:blank');
       }

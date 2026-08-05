@@ -15,7 +15,7 @@ export type AppSettings = {
   alwaysWhisper: boolean;
   autoStartMic: boolean;
   hasSeenOnboarding: boolean;
-  username: string;
+  name: string;
   includeDateTime: boolean;
   showTechnicalDetails: boolean;
 };
@@ -40,7 +40,7 @@ const DEFAULTS: AppSettings = {
   alwaysWhisper: false,
   autoStartMic: true,
   hasSeenOnboarding: false,
-  username: '',
+  name: '',
   includeDateTime: true,
   showTechnicalDetails: false,
 };
@@ -96,7 +96,7 @@ class SettingsService {
       alwaysWhisper: map['alwaysWhisper'] === 'true' ? true : (map['alwaysWhisper'] === 'false' ? false : DEFAULTS.alwaysWhisper),
       autoStartMic: map['autoStartMic'] === 'true' ? true : (map['autoStartMic'] === 'false' ? false : DEFAULTS.autoStartMic),
       hasSeenOnboarding: map['hasSeenOnboarding'] === 'true' ? true : DEFAULTS.hasSeenOnboarding,
-      username: map['username'] ?? DEFAULTS.username,
+      name: map['name'] ?? DEFAULTS.name,
       includeDateTime: map['includeDateTime'] === 'true' ? true : (map['includeDateTime'] === 'false' ? false : DEFAULTS.includeDateTime),
       showTechnicalDetails: map['showTechnicalDetails'] === 'true' ? true : (map['showTechnicalDetails'] === 'false' ? false : DEFAULTS.showTechnicalDetails),
     };

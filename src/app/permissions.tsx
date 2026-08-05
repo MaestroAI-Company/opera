@@ -127,7 +127,7 @@ export default function PermissionsPage() {
   };
 
   const handleContinue = () => {
-    router.push("/username");
+    router.push("/name");
   };
 
   return (

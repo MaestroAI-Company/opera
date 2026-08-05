@@ -176,7 +176,7 @@ class CentralAIModule {
       return summary;
     };
 
-    //one model round: stream, parse tool calls, execute them. returns true if tools ran
+    //one model round: stream, parse, execute tools. true if any ran
     const runToolRound = async (): Promise<boolean> => {
       //use native tool calling or fallback to prompt injection (aicore method)
       const beforeLen = accumulated.length;
@@ -189,8 +189,8 @@ class CentralAIModule {
 
       if (!result?.toolCalls || result.toolCalls.length === 0) return false;
 
-      //native tool calling streams tool_calls outside the content, inject the raw json
-      //so the ui shows a bubble and the tool call stays visible in history
+      //native tool calling streams tool_calls outside content, inject raw json
+      //show ui bubble, keep tool call in history
       const roundChunk = accumulated.substring(beforeLen);
       if (!roundChunk.includes('"tool_calls"')) {
         for (const tc of result.toolCalls) {
@@ -232,8 +232,8 @@ class CentralAIModule {
       if (!(await runToolRound())) return;
     }
 
-    //cap reached while the model kept requesting tools: force one final generation
-    //round so the answer is never lost after the last tool call
+    //cap reached while model kept requesting tools: force one final generation
+    //round so the answer survives the last tool call
     await runToolRound();
   }
 }

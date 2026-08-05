@@ -344,7 +344,7 @@ class CloudSyncServiceImpl {
         language: cloudBackup.settings.language,
         theme: cloudBackup.settings.theme,
         instruction: cloudBackup.settings.instruction,
-        username: cloudBackup.settings.username,
+        name: cloudBackup.settings.name,
         includeDateTime: cloudBackup.settings.includeDateTime,
         hasSeenOnboarding: cloudBackup.settings.hasSeenOnboarding,
       };

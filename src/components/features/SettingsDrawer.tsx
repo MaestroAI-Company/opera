@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Animated, DeviceEventEmitter, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, BackHandler, DeviceEventEmitter, Image, Keyboard, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AIModule } from "../../services/ai/AIModule";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { ITool } from "../../services/ai/tools/ITool";
@@ -61,6 +61,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const translateX = useRef(new Animated.Value(drawerWidth)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return gestureState.dx > 20 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx > 50) {
+          onClose();
+        }
+      },
+    })
+  ).current;
+
   const [activeSubPage, setActiveSubPage] = useState<SubPage>(initialSubPage ?? "main");
 
   useEffect(() => {
@@ -70,6 +83,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       refreshLastSync();
     }
   }, [visible, initialSubPage]);
+
+  //native back navigates back in the menu, then lets parent close the drawer
+  useEffect(() => {
+    if (!visible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (activeSubPage !== "main") {
+        setActiveSubPage("main");
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [visible, activeSubPage]);
 
   const [language, setLanguageState] = useState("en");
   const [theme, setThemeState] = useState("system");
@@ -84,6 +110,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [lastSyncSize, setLastSyncSize] = useState<number | null>(null);
 
   const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [exportScopeVisible, setExportScopeVisible] = useState(false);
+  const [importScopeVisible, setImportScopeVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{ 
     title: string, 
     message: string, 
@@ -113,7 +141,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     }
   });
   const [instruction, setInstructionState] = useState("");
-  const [username, setUsernameState] = useState("");
+  const [name, setNameState] = useState("");
   const [alwaysWhisper, setAlwaysWhisperState] = useState(true);
   const [speaker, setSpeakerState] = useState(true);
   const [autoSpeak, setAutoSpeakState] = useState(true);
@@ -155,39 +183,36 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       : []),
   ];
 
-  const handleExportData = async () => {
+  const handleExportData = () => {
+    setExportScopeVisible(true);
+  };
+
+  const runExport = async (includeSettings: boolean, includeConversations: boolean) => {
+    setExportScopeVisible(false);
     try {
-      const ok = await BackupService.exportData();
+      const ok = await BackupService.exportData({ includeSettings, includeConversations });
       if (ok) showAlert("Export", "Data exported successfully.");
     } catch {
       showAlert("Error", "Failed to export data.");
     }
   };
 
-  const handleImportData = async () => {
-    showAlert(
-      "Import Data",
-      "This will replace all your current conversations and settings. Are you sure?",
-      [
-        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
-        {
-          text: "Import",
-          style: "primary",
-          onPress: async () => {
-            setAlertModalVisible(false);
-            try {
-              const ok = await BackupService.importData();
-              if (ok) {
-                showAlert("Import", "Data imported successfully.");
-                onDataChanged?.();
-              }
-            } catch {
-              showAlert("Error", "Failed to import data.");
-            }
-          },
-        },
-      ]
-    );
+  const handleImportData = () => {
+    setImportScopeVisible(true);
+  };
+
+  const runImport = async (includeSettings: boolean, includeConversations: boolean) => {
+    setImportScopeVisible(false);
+    try {
+      const result = await BackupService.importData({ includeSettings, includeConversations });
+      if (result.success) {
+        onDataChanged?.();
+        showAlert("Import", result.warning ?? "Data imported successfully.");
+      }
+    } catch (e) {
+      const message = e instanceof Error && e.message ? e.message : "Failed to import data.";
+      showAlert("Error", message);
+    }
   };
 
   const handleDeleteAllConversations = () => {
@@ -289,7 +314,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setWhisperModelState(s.whisperModel);
         setWhisperLanguageState(s.whisperLanguage);
         setInstructionState(s.instruction);
-        setUsernameState(s.username || "");
+        setNameState(s.name || "");
         setIncludeDateTimeState(s.includeDateTime ?? true);
         setAlwaysWhisperState(s.alwaysWhisper);
         setSpeakerState(s.speaker);
@@ -389,9 +414,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     Settings.set("instruction", v);
   };
 
-  const setUsername = (v: string) => {
-    setUsernameState(v);
-    Settings.set("username", v);
+  const setName = (v: string) => {
+    setNameState(v);
+    Settings.set("name", v);
   };
 
   const setIncludeDateTime = (v: boolean) => {
@@ -775,8 +800,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       >
         <Image source={profilIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
         <View style={styles.navTextContainer}>
-          <Text style={styles.navTitle}>{username || "Set your username"}</Text>
-          <Text style={styles.navSubtitle}>Username, AI Instructions</Text>
+          <Text style={styles.navTitle}>{name || "Set your name"}</Text>
+          <Text style={styles.navSubtitle}>Name, AI Instructions</Text>
         </View>
       </Pressable>
 
@@ -848,12 +873,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {renderSubPageHeader("Profile")}
 
       <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Username</Text>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Name</Text>
         <TextInputField
           icon={penPlaceholderIcon}
-          placeholder="Enter your username"
-          value={username}
-          onChangeText={setUsername}
+          placeholder="Enter your name"
+          value={name}
+          onChangeText={setName}
         />
       </View>
 
@@ -1077,53 +1102,47 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       {/* tools section */}
       <Text style={styles.sectionTitle}>Tools</Text>
-      {allTools.map((tool, i) => {
+      {allTools.map((tool) => {
         const name = tool.definition.function.name;
         const key = `tool:${name}`;
         const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
         return (
-          <View key={name}>
-            <View style={styles.toggleRow}>
-              <View style={styles.pluginTextContainer}>
-                <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
-                {tool.displayDescription ? (
-                  <Text style={styles.helpText}>{tool.displayDescription}</Text>
-                ) : null}
-              </View>
-              <Toggle
-                checked={enabled}
-                onToggle={async (v) => {
-                  setPluginStates(prev => ({ ...prev, [key]: v }));
-                  await PluginRegistry.setEnabled('tool', name, v);
-                }}
-              />
+          <View key={name} style={styles.toggleRow}>
+            <View style={styles.pluginTextContainer}>
+              <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
+              {tool.displayDescription ? (
+                <Text style={styles.helpText}>{tool.displayDescription}</Text>
+              ) : null}
             </View>
-            {i < allTools.length - 1 && <View style={styles.separator} />}
+            <Toggle
+              checked={enabled}
+              onToggle={async (v) => {
+                setPluginStates(prev => ({ ...prev, [key]: v }));
+                await PluginRegistry.setEnabled('tool', name, v);
+              }}
+            />
           </View>
         );
       })}
 
       {/* widgets section */}
       <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Widgets</Text>
-      {allWidgets.map((widget, i) => {
+      {allWidgets.map((widget) => {
         const key = `widget:${widget.id}`;
         const enabled = pluginStates[key] ?? (widget.enabledByDefault ?? false);
         return (
-          <View key={widget.id}>
-            <View style={styles.toggleRow}>
-              <View style={styles.pluginTextContainer}>
-                <Text style={styles.settingLabel}>{widget.name}</Text>
-                <Text style={styles.helpText}>{widget.description.split('.')[0]}.</Text>
-              </View>
-              <Toggle
-                checked={enabled}
-                onToggle={async (v) => {
-                  setPluginStates(prev => ({ ...prev, [key]: v }));
-                  await PluginRegistry.setEnabled('widget', widget.id, v);
-                }}
-              />
+          <View key={widget.id} style={styles.toggleRow}>
+            <View style={styles.pluginTextContainer}>
+              <Text style={styles.settingLabel}>{widget.name}</Text>
+              <Text style={styles.helpText}>{widget.description.split('.')[0]}.</Text>
             </View>
-            {i < allWidgets.length - 1 && <View style={styles.separator} />}
+            <Toggle
+              checked={enabled}
+              onToggle={async (v) => {
+                setPluginStates(prev => ({ ...prev, [key]: v }));
+                await PluginRegistry.setEnabled('widget', widget.id, v);
+              }}
+            />
           </View>
         );
       })}
@@ -1180,6 +1199,30 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         inputSecureTextEntry={alertConfig.inputSecureTextEntry}
         inputKeyboardType={alertConfig.inputKeyboardType}
       />
+      <NotificationModal
+        visible={exportScopeVisible}
+        title="Export data"
+        message="What would you like to export?"
+        onClose={() => setExportScopeVisible(false)}
+        buttons={[
+          { text: "Conversations", style: "secondary", onPress: () => runExport(false, true) },
+          { text: "Settings", style: "secondary", onPress: () => runExport(true, false) },
+          { text: "Both", style: "primary", onPress: () => runExport(true, true) },
+          { text: "Cancel", style: "secondary", onPress: () => setExportScopeVisible(false) },
+        ]}
+      />
+      <NotificationModal
+        visible={importScopeVisible}
+        title="Import data"
+        message="What would you like to import? This will replace the selected data."
+        onClose={() => setImportScopeVisible(false)}
+        buttons={[
+          { text: "Conversations", style: "secondary", onPress: () => runImport(false, true) },
+          { text: "Settings", style: "secondary", onPress: () => runImport(true, false) },
+          { text: "Both", style: "primary", onPress: () => runImport(true, true) },
+          { text: "Cancel", style: "secondary", onPress: () => setImportScopeVisible(false) },
+        ]}
+      />
     </>
   );
 
@@ -1225,7 +1268,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      <Animated.View style={[styles.content, { width: drawerWidth }, { transform: [{ translateX }] }]}>
+      <Animated.View style={[styles.content, { width: drawerWidth }, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
         {innerContent}
       </Animated.View>
 
@@ -1457,10 +1500,5 @@ const styles = StyleSheet.create({
   pluginTextContainer: {
     flex: 1,
     marginRight: 12,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: "#00000010",
-    marginVertical: 8,
   },
 });

@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useResponsive } from "../hooks/useResponsive";
+import { STT } from "../services/speech/STTService";
 
 const texture2 = require("../../assets/images/texture2.png");
 const micIcon = require("../../assets/icons/microphone.png");
@@ -76,9 +77,7 @@ const NATIVE_PERMISSIONS: Permission[] = [
     description: "To dictate your messages by voice.",
     status: "idle",
     request: async () => {
-      const { AudioModule } = require("expo-audio");
-      const { granted } = await AudioModule.requestRecordingPermissionsAsync();
-      return granted;
+      return await STT.requestPermissions();
     },
   },
   {

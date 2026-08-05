@@ -138,7 +138,6 @@ function withNativeAndroid(config) {
       // AICore (ML Kit GenAI) modules
       copyTemplate('src/AICorePackage.kt', path.join(javaDir, 'AICorePackage.kt'), packageName);
       copyTemplate('src/AICoreModule.kt', path.join(javaDir, 'AICoreModule.kt'), packageName);
-      copyTemplate('src/AICoreSpeechModule.kt', path.join(javaDir, 'AICoreSpeechModule.kt'), packageName);
       // useless modules removed
 
       // YOLO model removed

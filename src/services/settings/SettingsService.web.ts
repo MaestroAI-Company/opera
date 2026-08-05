@@ -8,6 +8,7 @@ export type AppSettings = {
   whisperLanguage: string;
   instruction: string;
   speaker: boolean;
+  autoSpeak: boolean;
   alwaysWhisper: boolean;
   autoStartMic: boolean;
   hasSeenOnboarding: boolean;
@@ -30,7 +31,8 @@ const DEFAULTS: AppSettings = {
     }
   })(),
   instruction: '',
-  speaker: false,
+  speaker: true,
+  autoSpeak: true,
   alwaysWhisper: false,
   autoStartMic: true,
   hasSeenOnboarding: false,
@@ -66,6 +68,7 @@ class SettingsService {
         whisperLanguage: parsed.whisperLanguage ?? DEFAULTS.whisperLanguage,
         instruction: parsed.instruction ?? DEFAULTS.instruction,
         speaker: typeof parsed.speaker === 'boolean' ? parsed.speaker : DEFAULTS.speaker,
+        autoSpeak: typeof parsed.autoSpeak === 'boolean' ? parsed.autoSpeak : DEFAULTS.autoSpeak,
         alwaysWhisper: typeof parsed.alwaysWhisper === 'boolean' ? parsed.alwaysWhisper : DEFAULTS.alwaysWhisper,
         autoStartMic: typeof parsed.autoStartMic === 'boolean' ? parsed.autoStartMic : DEFAULTS.autoStartMic,
         hasSeenOnboarding: typeof parsed.hasSeenOnboarding === 'boolean' ? parsed.hasSeenOnboarding : DEFAULTS.hasSeenOnboarding,

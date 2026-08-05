@@ -1,5 +1,8 @@
 import { IAIProvider } from './IAIProvider';
 import { OllamaProvider } from './OllamaProvider';
+import { ToolManager } from './tools/ToolManager';
+import { sendMessageWithToolPrompt } from './tools/fallbackToolCall';
+import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { AICoreProvider } from './AICoreProvider';
 
 const DEFAULT_URL = 'http://127.0.0.1:11434';
@@ -8,10 +11,13 @@ class CentralAIModule {
   public SharedGenerationState = {
     activeConvId: null as string | null,
     activeMsgId: null as string | null,
+    activeToolName: null as string | null,
+    activeToolArgs: null as any | null,
     content: '',
     abort: () => {},
     listeners: new Set<() => void>(),
     subscribe(cb: () => void) {
+      // add listener for shared state
       this.listeners.add(cb);
       return () => { this.listeners.delete(cb); };
     },
@@ -86,29 +92,15 @@ class CentralAIModule {
     return [];
   }
 
-  // send message
-  async sendMessage(
-    modelName: string,
-    systemPrompt: string,
-    messages: { role: string; content: string; images?: string[] }[],
-    onChunk: (chunk: string) => void,
-    signal?: AbortSignal,
-    options?: { think?: boolean | string }
-  ): Promise<void> {
-    const provider = this.getActiveProvider();
-    
-    // convert images to base64
-    const processedMessages = await Promise.all(
+  //convert images to base64
+  private async processImages(messages: { role: string; content: string; images?: string[]; tool_calls?: any[] }[]): Promise<{ role: string; content: string; images?: string[]; tool_calls?: any[] }[]> {
+    return Promise.all(
       messages.map(async (msg) => {
         if (!msg.images || msg.images.length === 0) return msg;
-        
         const base64Images = await Promise.all(
           msg.images.map(async (uri) => {
             try {
-              // return if already base64
               if (uri.startsWith('data:')) return uri.split(',')[1];
-              
-              // fetch local file and convert to base64
               const response = await fetch(uri);
               const blob = await response.blob();
               return new Promise<string>((resolve, reject) => {
@@ -126,12 +118,113 @@ class CentralAIModule {
             }
           })
         );
-        
         return { ...msg, images: base64Images };
       })
     );
+  }
 
-    return provider.sendMessage(modelName, systemPrompt, processedMessages, onChunk, signal, options);
+  //send message
+  async sendMessage(
+    modelName: string,
+    systemPrompt: string,
+    messages: { role: string; content: string; images?: string[] }[],
+    onChunk: (chunk: string) => void,
+    signal?: AbortSignal,
+    options?: { think?: boolean | string }
+  ): Promise<void> {
+    const provider = this.getActiveProvider();
+    const processedMessages = await this.processImages(messages);
+    const enhancedPrompt = systemPrompt + `\n\n[System Context]\nCurrent Date and Time: ${new Date().toLocaleString()}`;
+    await provider.sendMessage(modelName, enhancedPrompt, processedMessages, onChunk, signal, options);
+  }
+
+  //send message with tool support (checks model capabilities)
+  async sendMessageWithTools(
+    modelName: string,
+    systemPrompt: string,
+    messages: { role: string; content: string; images?: string[]; tool_calls?: any[] }[],
+    onChunk: (chunk: string) => void,
+    signal?: AbortSignal,
+    options?: { think?: boolean | string }
+  ): Promise<void> {
+    const provider = this.getActiveProvider();
+
+    //check if model supports tools
+    let supportsTools = false;
+    try {
+      const caps = await this.getModelCapabilities(modelName);
+      supportsTools = caps.includes('tools');
+    } catch {}
+
+    const tools = ToolManager.getDefinitions();
+    const processedMessages = await this.processImages(messages);
+    const enhancedPrompt = systemPrompt + `\n\n[System Context]\nCurrent Date and Time: ${new Date().toLocaleString()}`;
+
+    if (tools.length === 0) {
+      await provider.sendMessage(modelName, enhancedPrompt, processedMessages, onChunk, signal, options);
+      return;
+    }
+
+    //tool call loop: keep calling tools until the model answers (max 5 rounds)
+    let currentMessages = [...processedMessages];
+
+    const summarize = async (text: string): Promise<string> => {
+      let summary = '';
+      await provider.sendMessage(
+        modelName, SYSTEM_PROMPTS.SEARCH_SUMMARIZE,
+        [{ role: 'user', content: text }],
+        chunk => { summary += chunk; },
+        signal,
+        { think: false }
+      );
+      return summary;
+    };
+
+    //one model round: stream, parse tool calls, execute them. returns true if tools ran
+    const runToolRound = async (): Promise<boolean> => {
+      //use native tool calling or fallback to prompt injection (aicore method)
+      const result = supportsTools
+        ? await provider.sendMessage(
+            modelName, enhancedPrompt, currentMessages, onChunk, signal,
+            { ...options, tools }
+          )
+        : await sendMessageWithToolPrompt(provider, modelName, enhancedPrompt, currentMessages, onChunk, signal, options, tools);
+
+      if (!result?.toolCalls || result.toolCalls.length === 0) return false;
+
+      //add assistant message with tool_calls to history (keep only visible text)
+      currentMessages.push({
+        role: 'assistant',
+        content: (result.content || '').replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim(),
+        tool_calls: result.toolCalls,
+      });
+
+      //execute each tool and add results
+      for (const tc of result.toolCalls) {
+        const toolName = tc.function.name;
+        this.SharedGenerationState.activeToolName = toolName;
+        this.SharedGenerationState.activeToolArgs = tc.function.arguments;
+        this.SharedGenerationState.notify();
+
+        const toolResult = await ToolManager.execute(tc.function.name, tc.function.arguments, summarize);
+
+        this.SharedGenerationState.activeToolName = null;
+        this.SharedGenerationState.activeToolArgs = null;
+        this.SharedGenerationState.notify();
+
+        currentMessages.push({ role: 'tool', content: toolResult });
+      }
+      return true;
+    };
+
+    const MAX_TOOL_ROUNDS = 5;
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      if (!(await runToolRound())) return;
+    }
+
+    //cap reached while the model kept requesting tools: force one final generation
+    //round so the answer is never lost after the last tool call
+    await runToolRound();
   }
 }
 

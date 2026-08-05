@@ -22,12 +22,15 @@ import ChatView from "../components/features/ChatView";
 import ConversationsDrawer from "../components/features/ConversationsDrawer";
 import ModelDropdown from "../components/features/ModelDropdown";
 import SettingsDrawer from "../components/features/SettingsDrawer";
+import SearchWebView from "../../components/SearchWebView";
 import TopBar from "../components/features/TopBar";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { useResponsive } from "../hooks/useResponsive";
 import { AIModule } from "../services/ai/AIModule";
 import { Conversation, DB, Message, MessageMetrics } from "../services/db/DatabaseService";
 import { Settings } from "../services/settings/SettingsService";
+import { WidgetManager } from "../services/widgets/WidgetManager";
+import { PluginRegistry } from "../services/plugins/PluginRegistry";
 import { STT } from "../services/speech/STTService";
 import { TTS } from "../services/speech/TTSService";
 import { Colors, Fonts, FontSizes, Radius } from "../../constants/theme";
@@ -201,6 +204,8 @@ export default function Index() {
       try {
         await Settings.init();
         const s = await Settings.load();
+        await PluginRegistry.init();
+        await PluginRegistry.loadAll();
 
         if (!s.hasSeenOnboarding) {
           router.replace("/starting");
@@ -437,9 +442,9 @@ export default function Index() {
       const taskSelectedModel = selectedModel;
       const taskOllamaUrl = ollamaUrl;
       const taskAiService = aiService;
-      const taskSystemPrompt = userInstruction.trim().length > 0
+      const taskSystemPrompt = (userInstruction.trim().length > 0
         ? `${userInstruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
-        : SYSTEM_PROMPTS.DEFAULT;
+        : SYSTEM_PROMPTS.DEFAULT) + WidgetManager.getSystemPromptSegment();
       const taskReflection = selectedReflection;
       const taskConv = conv;
 
@@ -483,7 +488,7 @@ export default function Index() {
           abortControllerRef.current = null;
         } else {
           try {
-            await AIModule.sendMessage(
+            await AIModule.sendMessageWithTools(
               taskSelectedModel,
               taskSystemPrompt,
               taskHistory,
@@ -656,17 +661,21 @@ export default function Index() {
       .filter((m) => m.content !== "…")
       .map((m) => ({ role: m.role, content: m.content, images: m.images }));
 
+    const messagesToDelete = messagesRef.current.slice(msgIndex);
+
     if (!incognitoMode) {
-      await DB.deleteMessage(aiMessageId);
+      for (const m of messagesToDelete) {
+        await DB.deleteMessage(m.id);
+      }
     }
-    setMessages(prev => prev.filter(m => m.id !== aiMessageId));
+    setMessages([...historyUpToHere]);
 
     const taskSelectedModel = selectedModel;
     const taskOllamaUrl = ollamaUrl;
     const taskAiService = aiService;
-    const taskSystemPrompt = userInstruction.trim().length > 0
+    const taskSystemPrompt = (userInstruction.trim().length > 0
       ? `${userInstruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
-      : SYSTEM_PROMPTS.DEFAULT;
+      : SYSTEM_PROMPTS.DEFAULT) + WidgetManager.getSystemPromptSegment();
     const taskReflection = selectedReflection;
     const taskConv = activeConversation;
     const isIncognitoTask = taskConv.id.startsWith("incognito_");
@@ -704,7 +713,7 @@ export default function Index() {
         abortControllerRef.current = null;
       } else {
         try {
-          await AIModule.sendMessage(
+          await AIModule.sendMessageWithTools(
             taskSelectedModel,
             taskSystemPrompt,
             taskHistory,
@@ -880,6 +889,7 @@ export default function Index() {
                   setSettingsInitialSubPage("confidentiality");
                   setSettingsDrawerVisible(true);
                 }}
+                canThink={modelCapabilities.includes("thinking") && selectedReflection !== "none"}
               />
             )}
 
@@ -1002,6 +1012,8 @@ export default function Index() {
           />
         </View>
       </KeyboardAvoidingView>
+
+      <SearchWebView />
     </View>
   );
 }

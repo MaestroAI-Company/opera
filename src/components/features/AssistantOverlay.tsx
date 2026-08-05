@@ -16,7 +16,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import ChatBar, { ChatBarHandle } from './ChatBar';
 import NotificationModal from '../ui/NotificationModal';
-import { renderMarkdown } from '../ui/MarkdownText';
+import { renderMarkdown, deriveChatDisplay, ChatDisplay } from '../ui/MarkdownText';
 import { Conversation, DB, Message } from '../../services/db/DatabaseService';
 import { Settings } from '../../services/settings/SettingsService';
 import { AIModule } from '../../services/ai/AIModule';
@@ -37,6 +37,9 @@ const WebSTT = STT as unknown as {
   setLanguage(lang: string): void;
   transcribeData(buffer: ArrayBuffer): Promise<string>;
 };
+import SearchWebView from '../../../components/SearchWebView';
+import { WidgetManager } from '../../services/widgets/WidgetManager';
+import { PluginRegistry } from '../../services/plugins/PluginRegistry';
 
 export default function AssistantOverlayWrapper() {
   return (
@@ -70,17 +73,6 @@ const FlashingText = React.memo(({ text }: { text: string }) => {
   );
 });
 
-function extractThinkStep(thinkingText: string): string {
-  const stepRegex = /^\s*(?:(?:\d+[.)!]|[-*])\s*)?\*\*(.*?)\*\*/gm;
-  const steps: string[] = [];
-  let match: RegExpExecArray | null;
-  while ((match = stepRegex.exec(thinkingText)) !== null) {
-    steps.push(match[1].replace(/:$/, '').trim());
-  }
-  if (steps.length > 0) return `${steps.length}. ${steps[steps.length - 1]}`;
-  const lines = thinkingText.split('\n').filter(l => l.trim().length > 0);
-  return lines.length > 0 ? lines[lines.length - 1] : 'Thinking...';
-}
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -150,6 +142,17 @@ function AssistantOverlay() {
   // modal state for whisper errors
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState<{ title: string, message: string, buttons?: any[] }>({ title: '', message: '' });
+
+  const [activeTool, setActiveTool] = useState<{name: string | null, args: any | null}>({ name: null, args: null });
+  useEffect(() => {
+    const unsub = AIModule.SharedGenerationState.subscribe(() => {
+      setActiveTool({ 
+        name: AIModule.SharedGenerationState.activeToolName, 
+        args: AIModule.SharedGenerationState.activeToolArgs 
+      });
+    });
+    return unsub;
+  }, []);
 
   // raf-throttle streaming updates to ~60fps
   const rafPendingRef = useRef(false);
@@ -244,6 +247,8 @@ function AssistantOverlay() {
       try {
         await Settings.init();
         const s = await Settings.load();
+        await PluginRegistry.init();
+        await PluginRegistry.loadAll();
         setUserInstruction(s.instruction);
         if (s.ollamaModel) {
           setSelectedModel(s.ollamaModel);
@@ -347,9 +352,9 @@ function AssistantOverlay() {
       .map(m => ({ role: m.role, content: m.content, images: m.images }));
     taskHistory.push({ role: 'user', content: text, images });
 
-    const taskSystemPrompt = instruction.trim().length > 0
+    const taskSystemPrompt = (instruction.trim().length > 0
       ? `${instruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
-      : SYSTEM_PROMPTS.DEFAULT;
+      : SYSTEM_PROMPTS.DEFAULT) + WidgetManager.getSystemPromptSegment();
 
     const assistantMsg = await DB.addMessage(conv.id, 'assistant', '…');
     setMessages(prev => [...prev, assistantMsg]);
@@ -375,7 +380,7 @@ function AssistantOverlay() {
       abortControllerRef.current = null;
     } else {
       try {
-        await AIModule.sendMessage(
+        await AIModule.sendMessageWithTools(
           model,
           taskSystemPrompt,
           taskHistory,
@@ -520,26 +525,22 @@ function AssistantOverlay() {
     ? [...messages].reverse().find(m => m.role === 'assistant') ?? null
     : null;
 
-  let isThinking = false;
-  let hasThinkingText = false;
-  let currentThought = 'Thinking...';
-  let finalContent = '…';
+  let isGenerating = false;
+  let disp: ChatDisplay = {
+    thinkingText: '', toolNames: [], finalContent: '',
+    showThinkingRow: false, showMarkdown: false, currentThought: '',
+  };
 
   if (lastMsg) {
-    const isGenerating = generatingConvId === activeConversation?.id
+    isGenerating = generatingConvId === activeConversation?.id
       && streamingMsgIdRef.current === lastMsg.id;
-    const thinkMatch = lastMsg.content.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
-    const thinkDone = lastMsg.content.includes('</think>');
-    hasThinkingText = thinkMatch !== null;
-    const thinkingText = thinkMatch ? thinkMatch[1].trim() : '';
-    isThinking = lastMsg.content === '…' || (isGenerating && hasThinkingText && !thinkDone);
-
-    if (hasThinkingText) currentThought = extractThinkStep(thinkingText);
-
-    const stripped = lastMsg.content === '…'
-      ? '…'
-      : lastMsg.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
-    finalContent = stripped.length > 0 ? stripped : '…';
+    const streamText = isGenerating ? streamingContentRef.current : lastMsg.content;
+    disp = deriveChatDisplay(
+      streamText,
+      isGenerating,
+      activeTool,
+      modelCapabilities.includes('thinking') && selectedReflection !== 'none'
+    );
   }
 
   return (
@@ -583,13 +584,14 @@ function AssistantOverlay() {
               <Animated.View style={[styles.pullIndicator, { opacity: handleOpacity }]} />
 
               <ScrollView style={styles.bubbleScroll} showsVerticalScrollIndicator={false}>
-                {isThinking ? (
+                {disp.showThinkingRow && (
                   <View style={styles.thinkingContainer}>
                     <Image source={thinkingGif} style={styles.thinkingIcon} resizeMode="contain" />
-                    {hasThinkingText && <FlashingText text={currentThought} />}
+                    {!!disp.currentThought && <FlashingText text={disp.currentThought} />}
                   </View>
-                ) : (
-                  renderMarkdown(finalContent, false)
+                )}
+                {disp.showMarkdown && (
+                  renderMarkdown(disp.finalContent, false, isGenerating)
                 )}
               </ScrollView>
             </Animated.View>
@@ -621,6 +623,8 @@ function AssistantOverlay() {
         buttons={modalConfig.buttons}
         onClose={() => setModalVisible(false)}
       />
+
+      <SearchWebView />
     </KeyboardAvoidingView>
   );
 }

@@ -213,20 +213,23 @@ class DatabaseService {
     const db = this.getDb();
     if (!query.trim()) return [];
 
-    //format query for fts
-    const ftsQuery = query.replace(/"/g, '""') + '*';
+    //format fts query
+    const ftsQuery = '"' + query.replace(/"/g, '""') + '"*';
 
     const rows = await db.getAllAsync<Conversation>(
-      `SELECT DISTINCT c.* 
+      `SELECT DISTINCT c.*
        FROM conversations c
-       LEFT JOIN messages_fts m_fts ON c.id = m_fts.conversationId
-       WHERE c.name LIKE ? OR m_fts.content MATCH ?
+       WHERE c.name LIKE ?
+         OR c.id IN (
+           SELECT conversationId FROM messages_fts WHERE content MATCH ?
+         )
        ORDER BY c.updatedAt DESC
        LIMIT 50`,
        [`%${query}%`, ftsQuery]
     );
     return rows;
   }
+
 
   //delete a conversation and its messages
   async deleteConversation(id: string, opts?: { recordTombstone?: boolean }): Promise<void> {

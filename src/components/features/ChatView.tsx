@@ -15,6 +15,8 @@ import {
 import { Conversation, Message } from "../../services/db/DatabaseService";
 import { renderMarkdown, deriveChatDisplay } from "../ui/MarkdownText";
 import { AIModule } from "../../services/ai/AIModule";
+import { Settings } from "../../services/settings/SettingsService";
+import { TTS } from "../../services/speech/TTSService";
 
 const butterflyImage = require("../../../assets/images/butterfly2.png");
 const butterflyGreyImage = require("../../../assets/images/butterfly2_grey.png");
@@ -73,7 +75,7 @@ const FlashingText = ({ text }: { text: string }) => {
   );
 };
 
-const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, showSnackbar, isGenerating, isChatGenerating, canThink }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean; canThink?: boolean }) => {
+const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isChatGenerating, canThink }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean; canThink?: boolean }) => {
   const isUser = item.role === "user";
 
   const [activeTool, setActiveTool] = useState<{name: string | null, args: any | null}>({ name: null, args: null });
@@ -165,8 +167,11 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
           {!isUser && !isCurrentlyThinking && !isGenerating && (
             <View style={styles.aiToolbar}>
               {speakerEnabled && (
-                <Pressable style={({ pressed }) => [styles.toolbarIconContainer, pressed && { backgroundColor: "#eaeaea" }]}>
-                  <Image source={speakerIcon} style={{ width: 22, height: 22, tintColor: "#999" }} />
+                <Pressable
+                  onPress={() => onSpeak?.(item)}
+                  style={({ pressed }) => [styles.toolbarIconContainer, pressed && { backgroundColor: "#eaeaea" }]}
+                >
+                  <Image source={speakerIcon} style={{ width: 22, height: 22, tintColor: isSpeaking ? "#FF1A1A" : "#999" }} />
                 </Pressable>
               )}
               <Pressable
@@ -194,7 +199,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
       )}
     </View>
   );
-}, (prev, next) => prev.item.content === next.item.content && prev.incognito === next.incognito && prev.speakerEnabled === next.speakerEnabled && prev.isGenerating === next.isGenerating && prev.isChatGenerating === next.isChatGenerating && prev.canThink === next.canThink);
+}, (prev, next) => prev.item.content === next.item.content && prev.incognito === next.incognito && prev.speakerEnabled === next.speakerEnabled && prev.isGenerating === next.isGenerating && prev.isChatGenerating === next.isChatGenerating && prev.canThink === next.canThink && prev.isSpeaking === next.isSpeaking);
 MessageItem.displayName = "MessageItem";
 
 export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, generatingMessageId, hideHeader, hideGradients, onOpenConfidentiality, canThink }: ChatViewProps) {
@@ -202,6 +207,22 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   const [headerHeight, setHeaderHeight] = useState(0);
   const isAtBottomRef = useRef(true);
   const initialScrollDone = useRef(false);
+
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+
+  //manual speaker button: tap toggles speech for that message
+  const handleSpeak = (item: Message) => {
+    if (speakingMessageId === item.id) {
+      TTS.stop();
+      setSpeakingMessageId(null);
+    } else {
+      setSpeakingMessageId(item.id);
+      TTS.speak(item.content, {
+        language: Settings.getCached().language,
+        onDone: () => setSpeakingMessageId(cur => (cur === item.id ? null : cur)),
+      });
+    }
+  };
 
   const [snackbarMessage, setSnackbarMessage] = useState("");
   useEffect(() => {
@@ -236,7 +257,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   };
 
   const renderItem = ({ item }: { item: Message }) => {
-    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isChatGenerating={!!generatingMessageId} canThink={canThink} />;
+    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isChatGenerating={!!generatingMessageId} canThink={canThink} />;
   };
 
   return (

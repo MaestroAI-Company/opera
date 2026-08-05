@@ -20,9 +20,18 @@ import { renderMarkdown, deriveChatDisplay, ChatDisplay } from '../ui/MarkdownTe
 import { Conversation, DB, Message } from '../../services/db/DatabaseService';
 import { Settings } from '../../services/settings/SettingsService';
 import { AIModule } from '../../services/ai/AIModule';
-import { AICoreSTT } from '../../services/ai/AICoreSpeechService';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
-import { Whisper } from '../../services/whisper/WhisperService';
+import { STT } from '../../services/speech/STTService';
+import { TTS } from '../../services/speech/TTSService';
+
+//web whisper surface, only used in browser flows
+const WebSTT = STT as unknown as {
+  isAvailable(): boolean;
+  isModelInstalled(modelName: string): Promise<boolean>;
+  init(modelName: string): Promise<boolean>;
+  setLanguage(lang: string): void;
+  transcribeData(buffer: ArrayBuffer): Promise<string>;
+};
 import { NotificationService } from '../../services/notifications/NotificationService';
 import { CloudSync } from '../../services/CloudSyncService';
 import ModelDropdown from './ModelDropdown';
@@ -251,7 +260,7 @@ function AssistantOverlay() {
         autoStartMicSetting.current = s.autoStartMic ?? true;
         AIModule.configure(s.ollamaUrl);
         AIModule.setMode(s.aiService);
-        Whisper.setLanguage(s.whisperLanguage);
+        STT.setLanguage(s.whisperLanguage);
 
         // preload model into RAM so first response is fast
         if (s.ollamaModel) {
@@ -294,23 +303,6 @@ function AssistantOverlay() {
     return () => { cancelled = true; };
   }, [selectedModel, aiService, ollamaUrl]);
 
-  //check gemini stt model when aicore mode active
-  const [aicoreSTTReady, setAicoreSTTReady] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    const check = async () => {
-      if (aiService !== 'aicore' || Platform.OS !== 'android') {
-        setAicoreSTTReady(false);
-        return;
-      }
-      const locale = Settings.getCached().whisperLanguage || 'en-US';
-      const ready = await AICoreSTT.ensureReady(locale);
-      if (!cancelled) setAicoreSTTReady(ready);
-    };
-    check();
-    return () => { cancelled = true; };
-  }, [aiService]);
-
   const generateTitle = useCallback(async (convId: string, userMessage: string, images?: string[]) => {
     try {
       let title = '';
@@ -334,7 +326,7 @@ function AssistantOverlay() {
     }
   }, []);
 
-  const handleSend = useCallback(async (text: string, images?: string[]) => {
+  const handleSend = useCallback(async (text: string, images?: string[], viaVoice?: boolean) => {
     const model = selectedModelRef.current;
     const instruction = userInstructionRef.current;
     const reflection = selectedReflectionRef.current; // always fresh
@@ -436,6 +428,11 @@ function AssistantOverlay() {
 
     if (isFirstMessage && !isError) generateTitle(conv.id, text, images);
 
+    //auto-read the reply aloud when it was requested via voice
+    if (viaVoice && !isError && Settings.getCached().autoSpeak) {
+      TTS.speak(streamingContentRef.current, { language: Settings.getCached().language });
+    }
+
     setGeneratingConvId(null);
     streamingMsgIdRef.current = null;
     
@@ -484,7 +481,7 @@ function AssistantOverlay() {
         return null;
       }
 
-      const isInstalled = await Whisper.isModelInstalled(whisperModelName);
+      const isInstalled = await WebSTT.isModelInstalled(whisperModelName);
       if (!isInstalled) {
         setModalConfig({
           title: "Whisper Not Installed",
@@ -495,7 +492,7 @@ function AssistantOverlay() {
         return null;
       }
 
-      const initialized = await Whisper.init(whisperModelName);
+      const initialized = await WebSTT.init(whisperModelName);
       if (!initialized) {
         setModalConfig({
           title: "Initialization Error",
@@ -506,7 +503,7 @@ function AssistantOverlay() {
         return null;
       }
 
-      return await Whisper.transcribeData(wavBuffer);
+      return await WebSTT.transcribeData(wavBuffer);
     } catch (e) {
       console.error("Whisper transcription failed:", e);
       return null;
@@ -611,7 +608,6 @@ function AssistantOverlay() {
             onTranscribe={handleTranscribe}
             canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes('audio') && !!selectedModel}
             supportsFiles={modelCapabilities.includes('vision') || modelCapabilities.includes('audio')}
-            aicoreSTT={aiService === 'aicore' && aicoreSTTReady}
             onOpenSettings={() => {}}
             enabled={true}
             autoStartMic={capabilitiesReady && autoStartMicSetting.current}

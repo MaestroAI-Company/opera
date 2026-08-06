@@ -902,7 +902,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                             <Text style={styles.filePreviewAudioTextTop} numberOfLines={1}>{file.name}</Text>
                           </View>
                         )}
-                        <Pressable style={styles.removeFileBtnTop} onPress={() => setSelectedFiles(prev => prev.filter((_, idx) => idx !== i))}>
+                        <Pressable style={({ pressed, hovered }) => [styles.removeFileBtnTop, (pressed || hovered) && { opacity: 0.8 }]} onPress={() => setSelectedFiles(prev => prev.filter((_, idx) => idx !== i))}>
                           <Text style={styles.removeFileBtnTextTop}>✕</Text>
                         </Pressable>
                       </View>
@@ -922,13 +922,13 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 ]}
               >
                 {supportsFiles && (
-                  <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.plusButton}>
+                  <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} style={({ pressed, hovered }) => [styles.plusButton, (pressed || hovered) && { opacity: 0.8 }]}>
                     <Image source={addIcon} style={styles.plusIcon} tintColor={Colors.surface} />
                   </Pressable>
                 )}
 
                 {(Platform.OS !== 'web' || Settings.getCached().whisperModel !== 'none' || canTranscribeRemotely) && !isGenerating && (
-                  <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.micButton}>
+                  <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={({ pressed, hovered }) => [styles.micButton, (pressed || hovered) && { opacity: 0.8 }]}>
                     <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
                       <Image source={isRecording ? stopIcon : micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} tintColor={Colors.surface} />
                     </Animated.View>
@@ -973,11 +973,11 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 )}
 
                 {isGenerating ? (
-                  <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.sendButton}>
+                  <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} style={({ pressed, hovered }) => [styles.sendButton, (pressed || hovered) && { opacity: 0.8 }]}>
                     <Image source={stopIcon} style={styles.sendIcon} tintColor={Colors.surface} />
                   </Pressable>
                 ) : (
-                  <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.sendButton}>
+                  <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} style={({ pressed, hovered }) => [styles.sendButton, (pressed || hovered) && { opacity: 0.8 }]}>
                     <Image source={nextWhiteIcon} style={styles.sendIcon} tintColor={Colors.surface} />
                   </Pressable>
                 )}

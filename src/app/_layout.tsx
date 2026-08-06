@@ -15,6 +15,7 @@ import { WidgetManager } from "../services/widgets/WidgetManager";
 import { MapsWidget } from "../components/widgets/MapsWidget";
 import { HtmlWidget } from "../components/widgets/HtmlWidget";
 import { MermaidWidget } from "../components/widgets/MermaidWidget";
+import { setupQuickActions } from "../services/quickActions/QuickActionsService";
 
 import * as WebBrowser from "expo-web-browser";
 
@@ -27,8 +28,10 @@ WidgetManager.registerWidget(MermaidWidget);
 WebBrowser.maybeCompleteAuthSession();
 SplashScreen.preventAutoHideAsync();
 
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
 export default function RootLayout() {
-  const [showLottie, setShowLottie] = useState(Platform.OS !== "web");
+  const [showLottie, setShowLottie] = useState(Platform.OS !== "web" || isTauri);
   const [fontsLoaded, fontError] = useFonts({
     Petrona: require("../../assets/fonts/Petrona-Medium.ttf"),
     Jakarta: require("../../assets/fonts/PlusJakartaSans-VariableFont_wght.ttf"),
@@ -62,6 +65,10 @@ export default function RootLayout() {
       document.addEventListener("contextmenu", handleContextMenu);
       return () => document.removeEventListener("contextmenu", handleContextMenu);
     }
+  }, []);
+
+  useEffect(() => {
+    setupQuickActions();
   }, []);
 
   if (showLottie || (!fontsLoaded && !fontError)) {

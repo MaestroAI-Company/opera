@@ -170,7 +170,7 @@ export default function StartingPage() {
         ]}
       >
         <Pressable
-          style={({ pressed }) => [styles.button, isLargeScreen && styles.buttonLarge, pressed && styles.buttonPressed]}
+          style={({ pressed, hovered }) => [styles.button, isLargeScreen && styles.buttonLarge, (pressed || hovered) && styles.buttonPressed]}
           onPress={handleContinue}
         >
           <Text style={styles.buttonText}>Get started</Text>

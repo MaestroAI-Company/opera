@@ -63,12 +63,12 @@ export default function NamePage() {
 
       <View style={styles.footer}>
         <Pressable
-          style={({ pressed }) => [styles.button, isLargeScreen && styles.buttonLarge, pressed && styles.buttonPressed]}
+          style={({ pressed, hovered }) => [styles.button, isLargeScreen && styles.buttonLarge, (pressed || hovered) && styles.buttonPressed]}
           onPress={handleFinish}
         >
           <Text style={styles.buttonText}>Continue</Text>
         </Pressable>
-        <Pressable onPress={handleFinish} style={({ pressed }) => [pressed && { opacity: 0.5 }]}>
+        <Pressable onPress={handleFinish} style={({ pressed, hovered }) => [(pressed || hovered) && { opacity: 0.5 }]}>
           <Text style={styles.skipText}>Skip this step</Text>
         </Pressable>
       </View>

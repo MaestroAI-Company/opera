@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Dimensions, Image, Keyboard, LayoutRectangle, Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from "react-native";
+import { Image, Keyboard, LayoutRectangle, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, Vibration, View } from "react-native";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { AIModule } from "../../services/ai/AIModule";
 import { getAICoreModelLabel } from "../../services/ai/AICoreProvider";
@@ -10,7 +10,6 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const arrowDownIcon = require("../../../assets/icons/down_arrow.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 const thinkingIcon = require("../../../assets/icons/thinking.gif");
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const REFLECTIONS = [
   { id: "none", label: "Quick" },
@@ -34,6 +33,7 @@ export default function ModelDropdown({
   onReflectionChange,
 }: ModelDropdownProps) {
   const [visible, setVisible] = useState(false);
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [models, setModels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
@@ -126,6 +126,14 @@ export default function ModelDropdown({
     });
   };
 
+  //reposition menu on window resize while open
+  useEffect(() => {
+    if (!visible) return;
+    triggerRef.current?.measureInWindow((x, y, width, height) => {
+      setTriggerLayout({ x, y, width, height } as LayoutRectangle);
+    });
+  }, [visible, windowWidth, windowHeight]);
+
   const MAX_MODELS_HEIGHT = 200;
   const modelsHeight = models.length === 0 ? 80 : Math.min(models.length * 40, MAX_MODELS_HEIGHT);
   let finalMenuHeight = 30 + modelsHeight + 16 + 30 + REFLECTIONS.length * 40 + 24;
@@ -137,14 +145,14 @@ export default function ModelDropdown({
 
   if (triggerLayout) {
     menuLeft = triggerLayout.x + (triggerLayout.width / 2) - (menuWidth / 2);
-    if (menuLeft + menuWidth > SCREEN_WIDTH - 16) {
-      menuLeft = SCREEN_WIDTH - menuWidth - 16;
+    if (menuLeft + menuWidth > windowWidth - 16) {
+      menuLeft = windowWidth - menuWidth - 16;
     }
     if (menuLeft < 16) {
       menuLeft = 16;
     }
 
-    const spaceBelow = SCREEN_HEIGHT - (triggerLayout.y + triggerLayout.height) - 16;
+    const spaceBelow = windowHeight - (triggerLayout.y + triggerLayout.height) - 16;
     const spaceAbove = triggerLayout.y - 16;
 
     if (finalMenuHeight <= spaceBelow) {
@@ -157,7 +165,7 @@ export default function ModelDropdown({
         finalMenuHeight = spaceAbove;
       }
       menuTop = undefined;
-      menuBottom = SCREEN_HEIGHT - triggerLayout.y + 4;
+      menuBottom = windowHeight - triggerLayout.y + 4;
     }
   }
 
@@ -179,7 +187,7 @@ export default function ModelDropdown({
         <View style={styles.shadowBlock} />
         <Pressable
           onPress={handleOpen}
-          style={({ pressed }) => [styles.trigger, pressed && { backgroundColor: Colors.surfacePressed }]}
+          style={({ pressed, hovered }) => [styles.trigger, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
         >
           <Animated.Image source={arrowDownIcon} style={[styles.icon, iconStyle]} />
           <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
@@ -221,7 +229,7 @@ export default function ModelDropdown({
                       onPress={() => {
                         handleClose(() => setDownloadModalVisible(true));
                       }}
-                      style={({ pressed }) => [styles.downloadOption, pressed && { backgroundColor: Colors.surfacePressed }]}
+                      style={({ pressed, hovered }) => [styles.downloadOption, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
                     >
                       <Image source={downloadIcon} style={styles.downloadIcon} />
                       <Text style={styles.downloadText}>
@@ -242,10 +250,10 @@ export default function ModelDropdown({
                       Vibration.vibrate(10);
                       handleClose(() => onModelChange(model));
                     }}
-                    style={({ pressed }) => [
+                    style={({ pressed, hovered }) => [
                       styles.option,
-                      model === selectedModel ? styles.optionSelected : pressed && { backgroundColor: Colors.overlaySubtle },
-                      model === selectedModel && pressed && { backgroundColor: Colors.primaryActive }
+                      model === selectedModel ? styles.optionSelected : (pressed || hovered) && { backgroundColor: Colors.overlaySubtle },
+                      model === selectedModel && (pressed || hovered) && { backgroundColor: Colors.primaryActive }
                     ]}
                   >
                     <Text
@@ -269,10 +277,10 @@ export default function ModelDropdown({
                       Vibration.vibrate(10);
                       handleClose(() => onReflectionChange(item.id));
                     }}
-                    style={({ pressed }) => [
+                    style={({ pressed, hovered }) => [
                       styles.option,
-                      item.id === selectedReflection ? styles.optionSelected : pressed && { backgroundColor: Colors.overlaySubtle },
-                      item.id === selectedReflection && pressed && { backgroundColor: Colors.primaryActive }
+                      item.id === selectedReflection ? styles.optionSelected : (pressed || hovered) && { backgroundColor: Colors.overlaySubtle },
+                      item.id === selectedReflection && (pressed || hovered) && { backgroundColor: Colors.primaryActive }
                     ]}
                   >
                     <Text

@@ -1,4 +1,5 @@
 import { Image, ImageSourcePropType, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import Checkbox from "./Checkbox";
 import TextInputField from "./TextInputField";
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 
@@ -6,6 +7,14 @@ export type ModalButton = {
   text: string;
   onPress: () => void;
   style?: "primary" | "secondary" | "danger";
+  disabled?: boolean;
+};
+
+export type ModalOption = {
+  label: string;
+  checked: boolean;
+  onToggle: (checked: boolean) => void;
+  disabled?: boolean;
 };
 
 export type NotificationModalProps = {
@@ -25,6 +34,9 @@ export type NotificationModalProps = {
   //custom buttons (up to 4)
   buttons?: ModalButton[];
 
+  //checkable option rows (label left, checkbox right)
+  options?: ModalOption[];
+
   onClose: () => void;
 };
 
@@ -40,6 +52,7 @@ export default function NotificationModal({
   inputSecureTextEntry,
   inputKeyboardType,
   buttons,
+  options,
   onClose,
 }: NotificationModalProps) {
 
@@ -56,7 +69,7 @@ export default function NotificationModal({
       onRequestClose={onClose}
     >
       <Pressable style={styles.overlay} onPress={onClose}>
-        <View style={styles.container}>
+        <Pressable style={styles.container} onPress={() => {}}>
 
           {(title || icon) && (
             <View style={styles.header}>
@@ -79,6 +92,21 @@ export default function NotificationModal({
             </View>
           )}
 
+          {options && options.length > 0 && (
+            <View style={styles.optionsContainer}>
+              {options.map((option, index) => (
+                <Checkbox
+                  key={index}
+                  label={option.label}
+                  checked={option.checked}
+                  onToggle={option.onToggle}
+                  disabled={option.disabled}
+                  labelFirst
+                />
+              ))}
+            </View>
+          )}
+
           <View style={styles.buttonContainer}>
             {activeButtons.map((btn, index) => {
               const isPrimary = btn.style === "primary" || !btn.style;
@@ -87,12 +115,13 @@ export default function NotificationModal({
               return (
                 <Pressable
                   key={index}
-                  style={({ pressed }) => [
+                  style={({ pressed, hovered }) => [
                     styles.button,
                     isPrimary && styles.buttonPrimary,
                     isDanger && styles.buttonDanger,
                     !isPrimary && !isDanger && styles.buttonSecondary,
-                    pressed && (
+                    btn.disabled && styles.buttonDisabled,
+                    !btn.disabled && (pressed || hovered) && (
                       isPrimary
                         ? { backgroundColor: Colors.primaryPressed, borderColor: Colors.primaryPressed }
                         : isDanger
@@ -100,11 +129,12 @@ export default function NotificationModal({
                           : { backgroundColor: Colors.surfacePressed }
                     )
                   ]}
-                  onPress={btn.onPress}
+                  onPress={() => !btn.disabled && btn.onPress()}
                 >
                   <Text style={[
                     styles.buttonText,
-                    !isPrimary && !isDanger && styles.buttonTextSecondary
+                    !isPrimary && !isDanger && styles.buttonTextSecondary,
+                    btn.disabled && styles.buttonTextDisabled
                   ]}>
                     {btn.text}
                   </Text>
@@ -112,7 +142,7 @@ export default function NotificationModal({
               );
             })}
           </View>
-        </View>
+        </Pressable>
       </Pressable>
     </Modal>
   );
@@ -167,6 +197,10 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: 24,
   },
+  optionsContainer: {
+    marginBottom: 20,
+    gap: 12,
+  },
   buttonContainer: {
     flexDirection: "row",
     justifyContent: "center",
@@ -181,6 +215,10 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
     minWidth: 80,
     alignItems: "center",
+  },
+  buttonDisabled: {
+    backgroundColor: Colors.textDisabled,
+    borderColor: Colors.textDisabled,
   },
   buttonPrimary: {
     backgroundColor: Colors.primary,
@@ -201,5 +239,8 @@ const styles = StyleSheet.create({
   },
   buttonTextSecondary: {
     color: Colors.textSecondary,
+  },
+  buttonTextDisabled: {
+    color: Colors.textDisabledStrong,
   },
 });

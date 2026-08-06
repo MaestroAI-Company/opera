@@ -55,15 +55,15 @@ export default function AttachmentSheet({
       </View>
 
       <View style={styles.sheetButtonsRow}>
-        <Pressable style={[styles.sheetIconButton, incognito && styles.sheetIconButtonIncognito]} onPress={onCamera}>
+        <Pressable style={({ pressed, hovered }) => [styles.sheetIconButton, incognito && styles.sheetIconButtonIncognito, (pressed || hovered) && { backgroundColor: incognito ? Colors.incognito : Colors.surfacePressed }]} onPress={onCamera}>
           <Image source={cameraIcon} style={[styles.sheetIcon, incognito && styles.sheetIconIncognito]} />
           <Text style={[styles.sheetIconText, incognito && styles.sheetTextIncognito]}>Camera</Text>
         </Pressable>
-        <Pressable style={[styles.sheetIconButton, incognito && styles.sheetIconButtonIncognito]} onPress={onPickFiles}>
+        <Pressable style={({ pressed, hovered }) => [styles.sheetIconButton, incognito && styles.sheetIconButtonIncognito, (pressed || hovered) && { backgroundColor: incognito ? Colors.incognito : Colors.surfacePressed }]} onPress={onPickFiles}>
           <Image source={fileIcon} style={[styles.sheetIcon, incognito && styles.sheetIconIncognito]} />
           <Text style={[styles.sheetIconText, incognito && styles.sheetTextIncognito]}>File</Text>
         </Pressable>
-        <Pressable style={[styles.sheetIconButton, incognito && styles.sheetIconButtonIncognito]} onPress={onPhotos}>
+        <Pressable style={({ pressed, hovered }) => [styles.sheetIconButton, incognito && styles.sheetIconButtonIncognito, (pressed || hovered) && { backgroundColor: incognito ? Colors.incognito : Colors.surfacePressed }]} onPress={onPhotos}>
           <Image source={photoIcon} style={[styles.sheetIcon, incognito && styles.sheetIconIncognito]} />
           <Text style={[styles.sheetIconText, incognito && styles.sheetTextIncognito]}>Photos</Text>
         </Pressable>

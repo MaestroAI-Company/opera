@@ -33,6 +33,12 @@ export type ImportResult = {
   warning?: string;
 };
 
+export type ImportInspection = {
+  backup: BackupFile;
+  hasSettings: boolean;
+  hasConversations: boolean;
+};
+
 class BackupServiceImpl {
   async exportData(scope?: BackupScope): Promise<boolean> {
     try {
@@ -83,26 +89,42 @@ class BackupServiceImpl {
     }
   }
 
-  async importData(scope?: BackupScope): Promise<ImportResult> {
+  //pick a backup file and detect which parts it contains
+  async pickAndReadBackup(): Promise<ImportInspection | null> {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: 'application/json',
+      copyToCacheDirectory: true,
+    });
+
+    if (result.canceled || !result.assets || result.assets.length === 0) {
+      return null;
+    }
+
+    const fileUri = result.assets[0].uri;
+    const jsonStr = await FileSystem.readAsStringAsync(fileUri, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+
+    const backup: BackupFile = JSON.parse(jsonStr);
+    return {
+      backup,
+      hasSettings: !!backup.settings,
+      hasConversations: !!(backup.conversations && backup.messages),
+    };
+  }
+
+  async importData(scope?: BackupScope, backup?: BackupFile): Promise<ImportResult> {
     try {
       const includeSettings = scope?.includeSettings ?? true;
       const includeConversations = scope?.includeConversations ?? true;
 
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/json',
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled || !result.assets || result.assets.length === 0) {
-        return { success: false };
+      if (!backup) {
+        const inspection = await this.pickAndReadBackup();
+        if (!inspection) {
+          return { success: false };
+        }
+        backup = inspection.backup;
       }
-
-      const fileUri = result.assets[0].uri;
-      const jsonStr = await FileSystem.readAsStringAsync(fileUri, {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
-
-      const backup: BackupFile = JSON.parse(jsonStr);
 
       if (includeSettings && !backup.settings) {
         throw new Error('Backup file contains no settings');

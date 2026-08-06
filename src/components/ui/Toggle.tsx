@@ -23,10 +23,10 @@ export default function Toggle({ checked, onToggle, disabled = false }: TogglePr
 
   return (
     <Pressable
-      style={({ pressed }) => [
+      style={({ pressed, hovered }) => [
         styles.track,
         checked ? styles.trackChecked : styles.trackUnchecked,
-        pressed && !disabled && { opacity: 0.8 },
+        (pressed || hovered) && !disabled && { opacity: 0.8 },
         disabled && { opacity: 0.5 },
       ]}
       onPress={() => !disabled && onToggle(!checked)}

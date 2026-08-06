@@ -15,6 +15,7 @@
         "title": "Opera",
         "width": 800,
         "height": 600,
+        "backgroundColor": "#FDF8F1",
         "resizable": true,
         "fullscreen": false,
         "decorations": true,
@@ -39,5 +40,13 @@
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["opera"]
+      }
+    },
+    "oauth": "<html><head><script>window.addEventListener('load',function(){setTimeout(function(){window.location.replace('opera://oauth2redirect')},500)})</script></head><body>Retour à Opera... <a href=\"opera://oauth2redirect\">Ouvrir Opera</a></body></html>"
   }
 }

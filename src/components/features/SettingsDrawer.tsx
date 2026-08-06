@@ -3,7 +3,7 @@ import { Animated, BackHandler, DeviceEventEmitter, Image, Keyboard, PanResponde
 import { AIModule } from "../../services/ai/AIModule";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { ITool } from "../../services/ai/tools/ITool";
-import { BackupService } from "../../services/BackupService";
+import { BackupService, ImportInspection } from "../../services/BackupService";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { Settings } from "../../services/settings/SettingsService";
 import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
@@ -36,6 +36,7 @@ const downloadIcon = require("../../../assets/icons/download.png");
 const deleteIcon = require("../../../assets/icons/delete.png");
 const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
 const profilIcon = require("../../../assets/icons/profil.png");
+const cloudIcon = require("../../../assets/icons/cloud.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
 const generalIcon = require("../../../assets/icons/general.png");
 const serverIcon = require("../../../assets/icons/server.png");
@@ -52,7 +53,7 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "models" | "confidentiality" | "tools" | "profile";
+type SubPage = "main" | "general" | "models" | "confidentiality" | "tools" | "profile" | "cloud";
 
 export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
   const { width } = useResponsive();
@@ -112,6 +113,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [exportScopeVisible, setExportScopeVisible] = useState(false);
   const [importScopeVisible, setImportScopeVisible] = useState(false);
+  const [exportSelection, setExportSelection] = useState({ settings: true, conversations: true });
+  const [importSelection, setImportSelection] = useState({ settings: true, conversations: true });
+  const [importInspection, setImportInspection] = useState<ImportInspection | null>(null);
   const [alertConfig, setAlertConfig] = useState<{ 
     title: string, 
     message: string, 
@@ -143,7 +147,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [instruction, setInstructionState] = useState("");
   const [name, setNameState] = useState("");
   const [alwaysWhisper, setAlwaysWhisperState] = useState(true);
-  const [speaker, setSpeakerState] = useState(true);
   const [autoSpeak, setAutoSpeakState] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(false);
   const [usageAnalytics, setUsageAnalyticsState] = useState(true);
@@ -156,7 +159,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const allWidgets: IWidget[] = WidgetManager.getAllWidgets();
 
   const [useWebsearch, setUseWebsearchState] = useState(true);
-  const [includeDateTime, setIncludeDateTimeState] = useState(true);
 
   const [cloudProvider, setCloudProvider] = useState<string>("none");
   const [cloudUserInfo, setCloudUserInfo] = useState<CloudUserInfo | null>(null);
@@ -184,6 +186,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   ];
 
   const handleExportData = () => {
+    setExportSelection({ settings: true, conversations: true });
     setExportScopeVisible(true);
   };
 
@@ -197,14 +200,29 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     }
   };
 
-  const handleImportData = () => {
-    setImportScopeVisible(true);
+  const handleImportData = async () => {
+    setImportInspection(null);
+    try {
+      const inspection = await BackupService.pickAndReadBackup();
+      if (!inspection) return;
+      setImportInspection(inspection);
+      setImportSelection({
+        settings: inspection.hasSettings,
+        conversations: inspection.hasConversations,
+      });
+      setImportScopeVisible(true);
+    } catch {
+      showAlert("Error", "Failed to read the backup file.");
+    }
   };
 
   const runImport = async (includeSettings: boolean, includeConversations: boolean) => {
     setImportScopeVisible(false);
     try {
-      const result = await BackupService.importData({ includeSettings, includeConversations });
+      const result = await BackupService.importData(
+        { includeSettings, includeConversations },
+        importInspection?.backup
+      );
       if (result.success) {
         onDataChanged?.();
         showAlert("Import", result.warning ?? "Data imported successfully.");
@@ -315,9 +333,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setWhisperLanguageState(s.whisperLanguage);
         setInstructionState(s.instruction);
         setNameState(s.name || "");
-        setIncludeDateTimeState(s.includeDateTime ?? true);
         setAlwaysWhisperState(s.alwaysWhisper);
-        setSpeakerState(s.speaker);
         setAutoSpeakState(s.autoSpeak);
         setShowTechnicalDetailsState(s.showTechnicalDetails);
         //apply to services
@@ -419,19 +435,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     Settings.set("name", v);
   };
 
-  const setIncludeDateTime = (v: boolean) => {
-    setIncludeDateTimeState(v);
-    Settings.set("includeDateTime", v);
-  };
-
   const setAlwaysWhisper = (v: boolean) => {
     setAlwaysWhisperState(v);
     Settings.set("alwaysWhisper", v);
-  };
-
-  const setSpeaker = (v: boolean) => {
-    setSpeakerState(v);
-    Settings.set("speaker", v);
   };
 
   const setAutoSpeak = (v: boolean) => {
@@ -781,7 +787,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <Text style={[styles.title, { marginBottom: 12 }]}>{title}</Text>
       <Pressable
         onPress={() => setActiveSubPage("main")}
-        style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.6 }]}
+        style={({ pressed, hovered }) => [styles.backButton, (pressed || hovered) && { opacity: 0.6 }]}
       >
         <Image source={arrowIcon} style={styles.backIcon} tintColor={Colors.textPrimary} />
       </Pressable>
@@ -794,32 +800,47 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <Text style={styles.title}>Settings</Text>
 
       {/* profile section */}
-      <Pressable
-        style={({ pressed }) => [styles.profileCard, pressed && styles.navItemPressed]}
-        onPress={() => setActiveSubPage("profile")}
-      >
-        <Image source={profilIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-        <View style={styles.navTextContainer}>
-          <Text style={styles.navTitle}>{name || "Set your name"}</Text>
-          <Text style={styles.navSubtitle}>Name, AI Instructions</Text>
+      <View style={styles.groupShadowLayer}>
+        <View style={styles.groupBox}>
+          <Pressable
+            style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("profile")}
+          >
+            <Image source={profilIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>{name || "Profil"}</Text>
+              <Text style={styles.navSubtitle}>Name, AI Instructions</Text>
+            </View>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("cloud")}
+          >
+            <Image source={cloudIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>Cloud</Text>
+              <Text style={styles.navSubtitle}>Cloud storage, Backup</Text>
+            </View>
+          </Pressable>
         </View>
-      </Pressable>
+      </View>
 
       <View style={styles.groupShadowLayer}>
         <View style={styles.groupBox}>
           <Pressable
-            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
+            style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
             onPress={() => setActiveSubPage("general")}
           >
             <Image source={generalIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>General</Text>
-              <Text style={styles.navSubtitle}>Language, Theme, Cloud Storage</Text>
+              <Text style={styles.navSubtitle}>Language, Theme</Text>
             </View>
           </Pressable>
 
           <Pressable
-            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
+            style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
             onPress={() => setActiveSubPage("models")}
           >
             <Image source={serverIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
@@ -830,7 +851,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           </Pressable>
 
           <Pressable
-            style={({ pressed }) => [styles.navItem, styles.navItemLast, pressed && styles.navItemPressed]}
+            style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
             onPress={() => setActiveSubPage("tools")}
           >
             <Image source={toolIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
@@ -845,7 +866,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <View style={styles.groupShadowLayer}>
         <View style={styles.groupBox}>
           <Pressable
-            style={({ pressed }) => [styles.navItem, pressed && styles.navItemPressed]}
+            style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
             onPress={() => setActiveSubPage("confidentiality")}
           >
             <Image source={confidentialityIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
@@ -891,15 +912,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           onChangeText={setInstruction}
         />
       </View>
-
-      <View style={[styles.toggleRow, { marginTop: 16 }]}>
-        <Text style={styles.settingLabel}>Date and time in context</Text>
-        <Toggle
-          checked={includeDateTime}
-          onToggle={setIncludeDateTime}
-        />
-      </View>
-      <Text style={styles.helpText}>Provide the current date and time to the AI context</Text>
     </View>
   );
 
@@ -927,7 +939,32 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         />
       </View>
 
-      <View style={styles.settingRowVertical}>
+      <View style={styles.toggleRow}>
+        <Text style={styles.settingLabel}>Show technical details</Text>
+        <Toggle
+          checked={showTechnicalDetails}
+          onToggle={setShowTechnicalDetails}
+        />
+      </View>
+      <Text style={styles.helpText}>Include technical data in AI responses</Text>
+
+      <View style={styles.toggleRow}>
+        <Text style={styles.settingLabel}>Auto-read replies</Text>
+        <Toggle
+          checked={autoSpeak}
+          onToggle={setAutoSpeak}
+        />
+      </View>
+      <Text style={styles.helpText}>Speak the answer aloud when you ask by voice</Text>
+    </View>
+  );
+
+  // cloud subpage
+  const cloudSubPageContent = (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("Cloud")}
+
+      <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
         <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Cloud storage</Text>
         <Selector
           options={cloudStorageOptions}
@@ -957,15 +994,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           />
         )}
       </View>
-
-      <View style={styles.toggleRow}>
-        <Text style={styles.settingLabel}>Show technical details</Text>
-        <Toggle
-          checked={showTechnicalDetails}
-          onToggle={setShowTechnicalDetails}
-        />
-      </View>
-      <Text style={styles.helpText}>Include technical data in AI responses</Text>
     </View>
   );
 
@@ -1038,24 +1066,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           <Text style={styles.helpText}>Process audio transcriptions locally on your device</Text>
         </>
       )}
-
-      <View style={styles.toggleRow}>
-        <Text style={styles.settingLabel}>Speaker</Text>
-        <Toggle
-          checked={speaker}
-          onToggle={setSpeaker}
-        />
-      </View>
-      <Text style={styles.helpText}>Show a speaker button on each message to read it aloud</Text>
-
-      <View style={styles.toggleRow}>
-        <Text style={styles.settingLabel}>Auto-read replies</Text>
-        <Toggle
-          checked={autoSpeak}
-          onToggle={setAutoSpeak}
-        />
-      </View>
-      <Text style={styles.helpText}>Speak the answer aloud when you ask by voice</Text>
     </View>
   );
 
@@ -1069,6 +1079,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <Text style={styles.helpText}>Datausage</Text>
       </View>
 
+      {/* usage analytics hidden
       <View style={styles.toggleRow}>
         <Text style={styles.settingLabel}>Usage analytics</Text>
         <Toggle
@@ -1077,18 +1088,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         />
       </View>
       <Text style={styles.helpText}>Help improve the app by sharing daily active counts without exposing your chats</Text>
+      */}
 
       <View style={{ marginTop: 28, gap: 8 }}>
         <Text style={styles.settingLabel}>Data management</Text>
         <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
-          <Pressable style={({ pressed }) => [styles.dataBtn, pressed && styles.dataBtnPressed]} onPress={handleExportData}>
+          <Pressable style={({ pressed, hovered }) => [styles.dataBtn, (pressed || hovered) && styles.dataBtnPressed]} onPress={handleExportData}>
             <Text style={styles.dataBtnText}>Export</Text>
           </Pressable>
-          <Pressable style={({ pressed }) => [styles.dataBtn, pressed && styles.dataBtnPressed]} onPress={handleImportData}>
+          <Pressable style={({ pressed, hovered }) => [styles.dataBtn, (pressed || hovered) && styles.dataBtnPressed]} onPress={handleImportData}>
             <Text style={styles.dataBtnText}>Import</Text>
           </Pressable>
         </View>
-        <Pressable style={({ pressed }) => [styles.dataBtn, styles.dataBtnDanger, pressed && styles.dataBtnDangerPressed]} onPress={handleDeleteAllConversations}>
+        <Pressable style={({ pressed, hovered }) => [styles.dataBtn, styles.dataBtnDanger, (pressed || hovered) && styles.dataBtnDangerPressed]} onPress={handleDeleteAllConversations}>
           <Text style={styles.dataBtnTextDanger}>Delete all conversations</Text>
         </Pressable>
       </View>
@@ -1153,6 +1165,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     switch (activeSubPage) {
       case "profile":
         return profileSubPageContent;
+      case "cloud":
+        return cloudSubPageContent;
       case "general":
         return generalSubPageContent;
       case "models":
@@ -1202,24 +1216,56 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <NotificationModal
         visible={exportScopeVisible}
         title="Export data"
-        message="What would you like to export?"
+        message="Select what would you like to export."
         onClose={() => setExportScopeVisible(false)}
+        options={[
+          {
+            label: "Conversations",
+            checked: exportSelection.conversations,
+            onToggle: (checked) => setExportSelection(prev => ({ ...prev, conversations: checked })),
+          },
+          {
+            label: "Settings",
+            checked: exportSelection.settings,
+            onToggle: (checked) => setExportSelection(prev => ({ ...prev, settings: checked })),
+          },
+        ]}
         buttons={[
-          { text: "Conversations", style: "secondary", onPress: () => runExport(false, true) },
-          { text: "Settings", style: "secondary", onPress: () => runExport(true, false) },
-          { text: "Both", style: "primary", onPress: () => runExport(true, true) },
+          {
+            text: "Export",
+            style: "primary",
+            disabled: !exportSelection.settings && !exportSelection.conversations,
+            onPress: () => runExport(exportSelection.settings, exportSelection.conversations),
+          },
           { text: "Cancel", style: "secondary", onPress: () => setExportScopeVisible(false) },
         ]}
       />
       <NotificationModal
         visible={importScopeVisible}
         title="Import data"
-        message="What would you like to import? This will replace the selected data."
+        message="Select what would you like to import. This will replace the selected data."
         onClose={() => setImportScopeVisible(false)}
+        options={[
+          {
+            label: "Conversations",
+            checked: importSelection.conversations,
+            disabled: !(importInspection?.hasConversations ?? true),
+            onToggle: (checked) => setImportSelection(prev => ({ ...prev, conversations: checked })),
+          },
+          {
+            label: "Settings",
+            checked: importSelection.settings,
+            disabled: !(importInspection?.hasSettings ?? true),
+            onToggle: (checked) => setImportSelection(prev => ({ ...prev, settings: checked })),
+          },
+        ]}
         buttons={[
-          { text: "Conversations", style: "secondary", onPress: () => runImport(false, true) },
-          { text: "Settings", style: "secondary", onPress: () => runImport(true, false) },
-          { text: "Both", style: "primary", onPress: () => runImport(true, true) },
+          {
+            text: "Import",
+            style: "primary",
+            disabled: !importSelection.settings && !importSelection.conversations,
+            onPress: () => runImport(importSelection.settings, importSelection.conversations),
+          },
           { text: "Cancel", style: "secondary", onPress: () => setImportScopeVisible(false) },
         ]}
       />
@@ -1335,18 +1381,6 @@ const styles = StyleSheet.create({
   menuContainer: {
     flex: 1,
   },
-  profileCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg2,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    padding: 14,
-    marginBottom: 20,
-    gap: 12,
-  },
-
   subPageContainer: {
     flex: 1,
   },

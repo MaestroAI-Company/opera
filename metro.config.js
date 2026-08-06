@@ -14,6 +14,20 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
       type: "sourceFile",
     };
   }
+  //expo-quick-actions exports map disabled for whisper.rn
+  if (moduleName === "expo-quick-actions" || moduleName === "expo-quick-actions/hooks") {
+    const buildDir = path.resolve(__dirname, "node_modules/expo-quick-actions/build");
+    const file =
+      moduleName === "expo-quick-actions"
+        ? platform === "web"
+          ? "index.web.js"
+          : "index.js"
+        : "hooks.js";
+    return {
+      filePath: path.join(buildDir, file),
+      type: "sourceFile",
+    };
+  }
   return context.resolveRequest(context, moduleName, platform);
 };
 

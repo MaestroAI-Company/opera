@@ -172,11 +172,11 @@ export default function PermissionsPage() {
                   <Text style={styles.permissionDesc}>{perm.description}</Text>
                 </View>
                 <Pressable
-                  style={({ pressed }) => [
+                  style={({ pressed, hovered }) => [
                     styles.permissionBtn,
                     isGranted && styles.permissionBtnGranted,
                     isDenied && styles.permissionBtnDenied,
-                    pressed && !isGranted && !isDenied && { opacity: 0.7 },
+                    (pressed || hovered) && !isGranted && !isDenied && { opacity: 0.7 },
                   ]}
                   onPress={() => requestPermission(perm.id)}
                   disabled={isGranted || isDenied}

@@ -14,6 +14,7 @@ export type AppSettings = {
   hasSeenOnboarding: boolean;
   name: string;
   includeDateTime: boolean;
+  dataWarningDismissed: boolean;
 };
 
 const DEFAULTS: AppSettings = {
@@ -38,6 +39,7 @@ const DEFAULTS: AppSettings = {
   hasSeenOnboarding: false,
   name: '',
   includeDateTime: true,
+  dataWarningDismissed: false,
 };
 
 class SettingsService {
@@ -74,6 +76,7 @@ class SettingsService {
         hasSeenOnboarding: typeof parsed.hasSeenOnboarding === 'boolean' ? parsed.hasSeenOnboarding : DEFAULTS.hasSeenOnboarding,
         name: parsed.name ?? DEFAULTS.name,
         includeDateTime: typeof parsed.includeDateTime === 'boolean' ? parsed.includeDateTime : DEFAULTS.includeDateTime,
+        dataWarningDismissed: typeof parsed.dataWarningDismissed === 'boolean' ? parsed.dataWarningDismissed : DEFAULTS.dataWarningDismissed,
       };
       
       this.cache = settings;

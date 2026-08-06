@@ -66,22 +66,22 @@ export default function CloudSyncBox({
       <View style={styles.actionsRow}>
         {locked ? (
           hasBackup ? (
-            <Pressable style={styles.actionBtn} onPress={onEnterPin}>
+            <Pressable style={({ pressed, hovered }) => [styles.actionBtn, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]} onPress={onEnterPin}>
               <Text style={styles.actionBtnText}>Enter PIN</Text>
             </Pressable>
           ) : (
-            <Pressable style={styles.actionBtn} onPress={onCreatePin}>
+            <Pressable style={({ pressed, hovered }) => [styles.actionBtn, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]} onPress={onCreatePin}>
               <Text style={styles.actionBtnText}>Create PIN</Text>
             </Pressable>
           )
         ) : (
           <>
-            <Pressable style={[styles.actionBtn, styles.syncBtn]} onPress={onSync} disabled={isSyncing}>
+            <Pressable style={({ pressed, hovered }) => [styles.actionBtn, styles.syncBtn, (pressed || hovered) && { backgroundColor: Colors.primaryPressed }]} onPress={onSync} disabled={isSyncing}>
               <Text style={[styles.actionBtnText, { color: Colors.surface }]}>
                 {isSyncing ? "Syncing..." : "Sync Now"}
               </Text>
             </Pressable>
-            <Pressable style={styles.actionBtnDanger} onPress={onDisconnect}>
+            <Pressable style={({ pressed, hovered }) => [styles.actionBtnDanger, (pressed || hovered) && { backgroundColor: Colors.dangerBg }]} onPress={onDisconnect}>
               <Text style={styles.actionBtnTextDanger}>Disconnect</Text>
             </Pressable>
           </>

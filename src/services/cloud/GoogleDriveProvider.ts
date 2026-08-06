@@ -18,6 +18,9 @@ const ACCESS_TOKEN_KEY = 'gdrive_access_token';
 const REFRESH_TOKEN_KEY = 'gdrive_refresh_token';
 const TOKEN_EXPIRY_KEY = 'gdrive_token_expiry';
 
+//fixed loopback port, must be registered in google console as authorized redirect uri
+const OAUTH_LOOPBACK_PORT = 46357;
+
 export class GoogleDriveProvider implements CloudProvider {
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
@@ -35,7 +38,7 @@ export class GoogleDriveProvider implements CloudProvider {
 
   private getRedirectUri(): string {
     if (Platform.OS === 'web') {
-      return AuthSession.makeRedirectUri({ preferLocalhost: true });
+      return AuthSession.makeRedirectUri({ preferLocalhost: true, path: 'oauth2redirect/google' });
     }
     const clientId = this.getClientId();
     const reversedClientId = clientId.split('.').reverse().join('.');
@@ -84,6 +87,12 @@ export class GoogleDriveProvider implements CloudProvider {
       if (!forcePrompt) return false;
 
       const isWeb = Platform.OS === 'web';
+      const isTauri = isWeb && typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+      //tauri: open oauth in the default browser via a loopback server
+      if (isTauri) {
+        return this.authenticateInBrowser(forcePrompt);
+      }
 
       this.currentRequest = new AuthSession.AuthRequest({
         clientId: this.getClientId(),
@@ -101,6 +110,13 @@ export class GoogleDriveProvider implements CloudProvider {
         authorizationEndpoint: GOOGLE_AUTH_URL,
         tokenEndpoint: GOOGLE_TOKEN_URL,
       };
+
+      if (isWeb) {
+        //full-page redirect on web (popups are blocked in tauri/webviews)
+        const authUrl = await this.currentRequest.makeAuthUrlAsync(discovery);
+        window.location.href = authUrl;
+        return new Promise<boolean>(() => {});
+      }
 
       const result = await this.currentRequest.promptAsync(discovery);
 
@@ -126,6 +142,61 @@ export class GoogleDriveProvider implements CloudProvider {
     }
   }
 
+  private async authenticateInBrowser(forcePrompt: boolean): Promise<boolean> {
+    try {
+      const oauth = await import('@fabianlars/tauri-plugin-oauth');
+      const { openUrl } = await import('@tauri-apps/plugin-opener');
+
+      const port = await oauth.start({ ports: [OAUTH_LOOPBACK_PORT] });
+      const redirectUri = `http://localhost:${port}/oauth2redirect/google`;
+
+      const params = new URLSearchParams({
+        client_id: this.getClientId(),
+        redirect_uri: redirectUri,
+        response_type: 'token',
+        scope: 'https://www.googleapis.com/auth/drive.appdata email profile',
+      });
+      if (forcePrompt) params.set('prompt', 'select_account');
+
+      const callbackPromise = new Promise<string>((resolve, reject) => {
+        let settled = false;
+        const timeout = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          oauth.cancel(port).catch(() => {});
+          reject(new Error('OAuth timed out'));
+        }, 3 * 60 * 1000);
+
+        oauth.onUrl((url) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          oauth.cancel(port).catch(() => {});
+          resolve(url);
+        }).catch((e) => {
+          clearTimeout(timeout);
+          reject(e);
+        });
+      });
+
+      await openUrl(`${GOOGLE_AUTH_URL}?${params.toString()}`);
+
+      const callbackUrl = await callbackPromise;
+
+      const redirect = new URL(callbackUrl);
+      const redirectParams = new URLSearchParams(redirect.hash.slice(1));
+      const accessToken = redirectParams.get('access_token');
+      if (!accessToken) return false;
+
+      const expiresIn = parseInt(redirectParams.get('expires_in') || '3600', 10);
+      await this.saveTokens(accessToken, undefined, expiresIn);
+      return true;
+    } catch (e) {
+      console.error('GoogleDriveProvider browser auth error:', e);
+      return false;
+    }
+  }
+
   async logout(): Promise<void> {
     this.accessToken = null;
     this.refreshToken = null;
@@ -133,6 +204,10 @@ export class GoogleDriveProvider implements CloudProvider {
     await this.setStorageItem(ACCESS_TOKEN_KEY, null);
     await this.setStorageItem(REFRESH_TOKEN_KEY, null);
     await this.setStorageItem(TOKEN_EXPIRY_KEY, null);
+  }
+
+  async persistRedirectTokens(accessToken: string, expiresIn: number): Promise<void> {
+    await this.saveTokens(accessToken, undefined, expiresIn);
   }
 
   async getUserInfo(): Promise<CloudUserInfo | null> {

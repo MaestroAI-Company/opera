@@ -1,4 +1,5 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
+import { useQuickActionCallback } from "expo-quick-actions/hooks";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AppState,
@@ -6,8 +7,6 @@ import {
   DeviceEventEmitter,
   Image,
   ImageBackground,
-  Keyboard,
-  Linking,
   PanResponder,
   Platform,
   Pressable,
@@ -15,7 +14,7 @@ import {
   Text,
   View
 } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { KeyboardAvoidingView, KeyboardController } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ChatBar from "../components/features/ChatBar";
 import ChatView from "../components/features/ChatView";
@@ -34,6 +33,12 @@ import { WidgetManager } from "../services/widgets/WidgetManager";
 import { PluginRegistry } from "../services/plugins/PluginRegistry";
 import { STT } from "../services/speech/STTService";
 import { TTS } from "../services/speech/TTSService";
+import {
+  getInitialDeepLink,
+  subscribeToDeepLinks,
+  type DeepLinkRoute,
+} from "../services/deeplinks/DeepLinkService";
+import { NEW_CHAT_ACTION_ID } from "../services/quickActions/QuickActionsService";
 import { Colors, Fonts, FontSizes, Radius } from "../../constants/theme";
 
 //web whisper surface, only used in browser flows
@@ -73,7 +78,6 @@ export default function Index() {
     settingsDrawerVisibleRef.current = settingsDrawerVisible;
   }, [settingsDrawerVisible]);
 
-  const { convId } = useLocalSearchParams<{ convId?: string }>();
   const [incognitoMode, setIncognitoMode] = useState(false);
   const [userInstruction, setUserInstruction] = useState("");
   const [aiService, setAiService] = useState("ollama");
@@ -125,13 +129,19 @@ export default function Index() {
   }, []);
 
   const openDrawerSafely = useCallback((openFn: () => void) => {
-    const wasKeyboardOpen = typeof Keyboard.metrics === 'function' ? !!Keyboard.metrics() : false;
-    Keyboard.dismiss();
-    if (wasKeyboardOpen) {
-      setTimeout(openFn, 50);
-    } else {
+    //wait for keyboard retract so drawer opens at full height
+    let opened = false;
+    const fallback = setTimeout(() => {
+      if (opened) return;
+      opened = true;
       openFn();
-    }
+    }, 600);
+    KeyboardController.dismiss().then(() => {
+      if (opened) return;
+      opened = true;
+      clearTimeout(fallback);
+      openFn();
+    });
   }, []);
 
   const [pendingConvIds, setPendingConvIds] = useState<string[]>([]);
@@ -157,18 +167,85 @@ export default function Index() {
           if (settingsDrawerVisibleRef.current) {
             setSettingsDrawerVisible(false);
           } else {
-            setDrawerVisible(true);
+            openDrawerSafely(() => setDrawerVisible(true));
           }
         } else if (gestureState.dx < -40) {
           if (drawerVisibleRef.current) {
             setDrawerVisible(false);
           } else {
-            setSettingsDrawerVisible(true);
+            openDrawerSafely(() => setSettingsDrawerVisible(true));
           }
         }
       },
     })
   ).current;
+
+  //trackpad two-finger horizontal swipe like mobile gesture
+  useEffect(() => {
+    if (Platform.OS !== "web" && Platform.OS !== "windows" && Platform.OS !== "macos") return;
+
+    const SWIPE_THRESHOLD = 40;
+    const RESET_DELAY = 500;
+    let accumulator = 0;
+    let handled = false;
+    let resetTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const resetGesture = () => {
+      accumulator = 0;
+      handled = false;
+    };
+
+    const commitSwipe = (total: number) => {
+      handled = true;
+      if (total >= SWIPE_THRESHOLD) {
+        if (settingsDrawerVisibleRef.current) {
+          setSettingsDrawerVisible(false);
+        } else {
+          openDrawerSafely(() => setDrawerVisible(true));
+        }
+      } else if (total <= -SWIPE_THRESHOLD) {
+        if (drawerVisibleRef.current) {
+          setDrawerVisible(false);
+        } else {
+          openDrawerSafely(() => setSettingsDrawerVisible(true));
+        }
+      }
+    };
+
+    const isOverHorizontalScroll = (target: EventTarget | null): boolean => {
+      let node = target instanceof Element ? target : null;
+      while (node && node !== document.documentElement && node !== document.body) {
+        const overflowX = window.getComputedStyle(node).overflowX;
+        if ((overflowX === "auto" || overflowX === "scroll") && node.scrollWidth > node.clientWidth) {
+          return true;
+        }
+        node = node.parentElement;
+      }
+      return false;
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      const factor = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1;
+      const deltaX = e.deltaX * factor;
+      if (Math.abs(deltaX) <= Math.abs(e.deltaY * factor)) return;
+      if (isOverHorizontalScroll(e.target)) return;
+      e.preventDefault();
+      if (handled) return;
+      accumulator += deltaX;
+      if (Math.abs(accumulator) >= SWIPE_THRESHOLD) {
+        commitSwipe(accumulator);
+        accumulator = 0;
+      }
+      if (resetTimer) clearTimeout(resetTimer);
+      resetTimer = setTimeout(resetGesture, RESET_DELAY);
+    };
+
+    window.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      window.removeEventListener("wheel", handleWheel);
+      if (resetTimer) clearTimeout(resetTimer);
+    };
+  }, [openDrawerSafely]);
 
   const processQueue = async () => {
     if (isProcessingRef.current) return;
@@ -227,14 +304,14 @@ export default function Index() {
   useEffect(() => {
     const init = async () => {
       await DB.init();
-      if (await DB.detectDataIssues()) {
-        setShowDataWarning(true);
-      }
       loadConversations();
       //load and apply settings
       try {
         await Settings.init();
         const s = await Settings.load();
+        if ((await DB.detectDataIssues()) && !s.dataWarningDismissed) {
+          setShowDataWarning(true);
+        }
         await PluginRegistry.init();
         await PluginRegistry.loadAll();
 
@@ -327,41 +404,60 @@ export default function Index() {
     }
   }, []);
 
-  //select conversation from cold start deep link
-  useEffect(() => {
-    if (convId && conversations.length > 0 && dbReady) {
-      const target = conversations.find(c => c.id === convId);
-      if (target && target.id !== activeConversationRef.current?.id) {
-        selectConversation(target);
-      }
-    }
-  }, [convId, conversations, dbReady, selectConversation]);
-
-  //select conversation from warm start deep link
-  useEffect(() => {
-    if (!dbReady) return;
-    const handleUrl = ({ url }: { url: string }) => {
-      try {
-        const parsed = new URL(url);
-        const id = parsed.searchParams.get('convId');
-        if (id) {
-          // load conversations first
-          DB.getConversations().then(convs => {
-            const target = convs.find(c => c.id === id);
-            if (target) selectConversation(target);
-          });
-        }
-      } catch { }
-    };
-    const sub = Linking.addEventListener('url', handleUrl);
-    return () => sub.remove();
-  }, [dbReady, selectConversation]);
-
   //start new empty conversation
   const startNewConversation = useCallback(() => {
     setActiveConversation(null);
     setMessages([]);
   }, []);
+
+  //handle deeplinks (cold + warm start, mobile + tauri)
+  const pendingDeepLinkRef = useRef<DeepLinkRoute | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const apply = (route: DeepLinkRoute) => {
+      if (route.type === "new-chat") {
+        startNewConversation();
+      } else if (route.type === "conversation") {
+        if (!dbReady) {
+          pendingDeepLinkRef.current = route;
+          return;
+        }
+        DB.getConversations().then((convs) => {
+          if (cancelled) return;
+          const target = convs.find((c) => c.id === route.convId);
+          if (target) selectConversation(target);
+        });
+      }
+    };
+    getInitialDeepLink().then((route) => {
+      if (!cancelled && route) apply(route);
+    });
+    const unsubscribe = subscribeToDeepLinks(apply);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [dbReady, selectConversation, startNewConversation]);
+
+  //apply pending conversation deeplink once the db is ready
+  useEffect(() => {
+    if (!dbReady) return;
+    const route = pendingDeepLinkRef.current;
+    if (route?.type === "conversation") {
+      pendingDeepLinkRef.current = null;
+      DB.getConversations().then((convs) => {
+        const target = convs.find((c) => c.id === route.convId);
+        if (target) selectConversation(target);
+      });
+    }
+  }, [dbReady, selectConversation]);
+
+  //open a new chat when the home screen shortcut is pressed
+  useQuickActionCallback((action) => {
+    if (action.id === NEW_CHAT_ACTION_ID) {
+      startNewConversation();
+    }
+  });
 
   //toggle pin conversation
   const togglePinConversation = useCallback(async (convId: string, pinned: boolean) => {
@@ -878,10 +974,10 @@ export default function Index() {
                 <Text style={styles.welcomeText}>Welcome</Text>
                 <Pressable
                   onPress={() => setIncognitoMode((prev) => !prev)}
-                  style={({ pressed }) => [
+                  style={({ pressed, hovered }) => [
                     styles.incognitoBox,
                     incognitoMode && styles.incognitoBoxActive,
-                    pressed && (incognitoMode ? { backgroundColor: Colors.incognitoPressed } : { backgroundColor: Colors.surfacePressed })
+                    (pressed || hovered) && (incognitoMode ? { backgroundColor: Colors.incognitoPressed } : { backgroundColor: Colors.surfacePressed })
                   ]}
                 >
                   <Text
@@ -918,8 +1014,10 @@ export default function Index() {
                 showMetrics={showTechnicalDetails}
                 generatingMessageId={generatingConvId === activeConversation.id ? streamingMsgIdRef.current : null}
                 onOpenConfidentiality={() => {
-                  setSettingsInitialSubPage("confidentiality");
-                  setSettingsDrawerVisible(true);
+                  openDrawerSafely(() => {
+                    setSettingsInitialSubPage("confidentiality");
+                    setSettingsDrawerVisible(true);
+                  });
                 }}
                 canThink={modelCapabilities.includes("thinking") && selectedReflection !== "none"}
               />
@@ -935,7 +1033,7 @@ export default function Index() {
             }]} pointerEvents="box-none">
               <TopBar
                 onMenuPress={() => {
-                  if (settingsDrawerVisible) return;
+                  if (!isDesktop && settingsDrawerVisible) return;
                   openDrawerSafely(() => setDrawerVisible(prev => !prev));
                 }}
                 onNewPress={startNewConversation}
@@ -959,16 +1057,16 @@ export default function Index() {
                   <View style={styles.settingsShadowLayer}>
                     <View style={styles.settingsShadowBlock} />
                     <Pressable
-                      style={({ pressed }) => {
+                      style={({ pressed, hovered }) => {
                         const showText = isDesktop;
                         return [
                           styles.settingsButton,
-                          pressed && { backgroundColor: Colors.surfacePressed },
+                          (pressed || hovered) && { backgroundColor: Colors.surfacePressed },
                           !showText && { paddingHorizontal: 0, width: 44 }
                         ];
                       }}
                       onPress={() => {
-                        if (drawerVisible) return;
+                        if (!isDesktop && drawerVisible) return;
                         openDrawerSafely(() => {
                           if (settingsDrawerVisible) {
                             const cached = Settings.getCached();
@@ -1060,11 +1158,16 @@ export default function Index() {
             style: "primary",
             onPress: () => {
               setShowDataWarning(false);
-              setSettingsInitialSubPage("confidentiality");
-              setSettingsDrawerVisible(true);
+              openDrawerSafely(() => {
+                setSettingsInitialSubPage("confidentiality");
+                setSettingsDrawerVisible(true);
+              });
             },
           },
-          { text: "Later", style: "secondary", onPress: () => setShowDataWarning(false) },
+          { text: "Later", style: "secondary", onPress: () => {
+            Settings.set("dataWarningDismissed", true);
+            setShowDataWarning(false);
+          } },
         ]}
       />
     </View>

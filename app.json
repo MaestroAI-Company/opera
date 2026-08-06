@@ -94,7 +94,29 @@
       ],
       "./plugins/withNotifeeRepo.js",
       "./plugins/withNativeAndroid",
-      "expo-speech-recognition"
+      "expo-speech-recognition",
+      [
+        "expo-quick-actions",
+        {
+          "androidIcons": {
+            "new_chat": "./assets/icons/add.png"
+          },
+          "iosIcons": {
+            "new_chat": "./assets/icons/add.png"
+          },
+          "iosActions": [
+            {
+              "id": "new-chat",
+              "title": "New Chat",
+              "subtitle": "Start a new conversation",
+              "icon": "new_chat",
+              "params": {
+                "action": "new-chat"
+              }
+            }
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

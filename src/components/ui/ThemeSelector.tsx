@@ -42,9 +42,10 @@ export default function ThemeSelector({ selectedValue, onSelect }: ThemeSelector
             <Pressable
               key={option.id}
               onPress={() => onSelect(option.id)}
-              style={[
+              style={({ pressed, hovered }) => [
                 styles.optionButton,
                 isSelected && styles.optionButtonActive,
+                (pressed || hovered) && (isSelected ? { backgroundColor: Colors.primaryPressed } : { backgroundColor: Colors.surfacePressed }),
               ]}
             >
               <Text

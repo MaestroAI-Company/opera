@@ -194,7 +194,7 @@ export default function ConversationsDrawer({
     return (
       <View key={conv.id} style={[styles.discussionRow, isSelected && styles.discussionRowSelected]}>
         <Pressable
-          style={({ pressed }) => [styles.discussionTextContainer, pressed && { opacity: 0.6 }]}
+          style={({ pressed, hovered }) => [styles.discussionTextContainer, (pressed || hovered) && { opacity: 0.6 }]}
           onPress={() => {
             onSelectConversation(conv);
             onClose();
@@ -213,13 +213,13 @@ export default function ConversationsDrawer({
             <>
               <Pressable
                 onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
-                style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: Colors.overlay }]}
+                style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlay }]}
               >
                 <Image source={conv.pinned ? unpinIcon : pinIcon} style={styles.actionIcon} tintColor={Colors.surface} />
               </Pressable>
               <Pressable
                 onPress={() => setDeleteConfirmId(conv.id)}
-                style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: Colors.overlay }]}
+                style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlay }]}
               >
                 <Image source={deleteIcon} style={styles.actionIcon} tintColor={Colors.surface} />
               </Pressable>
@@ -243,7 +243,7 @@ export default function ConversationsDrawer({
       </View>
 
       <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24, gap: 12 }}>
-        <Pressable onPress={() => { Keyboard.dismiss(); setIsSearching(false); setSearchQuery(""); setSelectedSearchId(null); }} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
+        <Pressable onPress={() => { Keyboard.dismiss(); setIsSearching(false); setSearchQuery(""); setSelectedSearchId(null); }} style={({ pressed, hovered }) => [(pressed || hovered) && { opacity: 0.6 }]}>
           <Image source={arrowIcon} style={{ width: 18, height: 18, transform: [{ rotate: '-180deg' }] }} tintColor={Colors.textPrimary} />
         </Pressable>
 
@@ -272,7 +272,7 @@ export default function ConversationsDrawer({
             return (
               <View key={conv.id} style={[styles.discussionRow, isSelected && styles.discussionRowSelected]}>
                 <Pressable
-                  style={({ pressed }) => [styles.discussionTextContainer, pressed && { opacity: 0.6 }]}
+                  style={({ pressed, hovered }) => [styles.discussionTextContainer, (pressed || hovered) && { opacity: 0.6 }]}
                   onPress={() => {
                     Keyboard.dismiss();
                     setSelectedSearchId(conv.id);
@@ -290,13 +290,13 @@ export default function ConversationsDrawer({
                     <>
                       <Pressable
                         onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
-                        style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: Colors.overlay }]}
+                        style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlay }]}
                       >
                         <Image source={conv.pinned ? unpinIcon : pinIcon} style={styles.actionIcon} tintColor={Colors.surface} />
                       </Pressable>
                       <Pressable
                         onPress={() => setDeleteConfirmId(conv.id)}
-                        style={({ pressed }) => [styles.actionIconButton, pressed && { backgroundColor: Colors.overlay }]}
+                        style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlay }]}
                       >
                         <Image source={deleteIcon} style={styles.actionIcon} tintColor={Colors.surface} />
                       </Pressable>
@@ -326,14 +326,14 @@ export default function ConversationsDrawer({
               onNewConversation();
               if (!isDesktop) onClose();
             }}
-            style={({ pressed }) => [styles.quickActionItem, pressed && { backgroundColor: Colors.surfacePressed }]}
+            style={({ pressed, hovered }) => [styles.quickActionItem, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
           >
             <Image source={newIcon} style={styles.quickActionIcon} />
             <Text style={styles.quickActionLabel}>New discussion</Text>
           </Pressable>
           <Pressable
             onPress={() => setIsSearching(true)}
-            style={({ pressed }) => [styles.quickActionItem, pressed && { backgroundColor: Colors.surfacePressed }]}
+            style={({ pressed, hovered }) => [styles.quickActionItem, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
           >
             <Image source={searchIcon} style={styles.quickActionIcon} />
             <Text style={styles.quickActionLabel}>Search</Text>

@@ -180,7 +180,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               {speakerEnabled && (
                 <Pressable
                   onPress={() => onSpeak?.(item)}
-                  style={({ pressed }) => [styles.toolbarIconContainer, pressed && { backgroundColor: Colors.surfacePressed }]}
+                  style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
                 >
                   <Image source={speakerIcon} style={{ width: 22, height: 22, tintColor: isSpeaking ? Colors.primary : Colors.textDisabled }} />
                 </Pressable>
@@ -188,9 +188,9 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               <Pressable
                 onPress={() => onRegenerate?.(item.id)}
                 disabled={isChatGenerating}
-                style={({ pressed }) => [
+                style={({ pressed, hovered }) => [
                   styles.toolbarIconContainer,
-                  pressed && { backgroundColor: Colors.surfacePressed },
+                  (pressed || hovered) && { backgroundColor: Colors.surfacePressed },
                   isChatGenerating && { opacity: 0.3 }
                 ]}
               >
@@ -200,14 +200,14 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                 onPress={() => copyToClipboard(item.content, false)}
                 onLongPress={() => copyToClipboard(item.content, true)}
                 delayLongPress={500}
-                style={({ pressed }) => [styles.toolbarIconContainer, pressed && { backgroundColor: Colors.surfacePressed }]}
+                style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
               >
                 <Image source={copyIcon} style={{ width: 22, height: 22, tintColor: Colors.textDisabled }} />
               </Pressable>
               {showMetrics && (
                 <Pressable
                   onPress={() => setShowDetails(prev => !prev)}
-                  style={({ pressed }) => [styles.toolbarIconContainer, pressed && { backgroundColor: Colors.surfacePressed }]}
+                  style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
                 >
                   <Image source={infoIcon} style={{ width: 22, height: 22, tintColor: showDetails ? (incognito ? Colors.incognito : Colors.primary) : Colors.textDisabled }} />
                 </Pressable>
@@ -322,7 +322,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
                 <Pressable
                   onPress={() => onOpenConfidentiality?.()}
                   hitSlop={8}
-                  style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                  style={({ pressed, hovered }) => [(pressed || hovered) && { opacity: 0.6 }]}
                 >
                   <Text style={[styles.disclaimerLink, incognito && styles.disclaimerLinkIncognito]}>
                     Confidentiality

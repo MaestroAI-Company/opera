@@ -1,12 +1,11 @@
-import { useRef, useState } from "react";
-import { Dimensions, LayoutRectangle, Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { LayoutRectangle, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, Vibration, View } from "react-native";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const arrowDownIcon = require("../../../assets/icons/down_arrow.png");
 const downloadIcon = require("../../../assets/icons/download.png");
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export type SelectorOption = {
   id: string;
@@ -35,6 +34,7 @@ export default function Selector({
   fullWidth = false,
 }: SelectorProps) {
   const [visible, setVisible] = useState(false);
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const progress = useSharedValue(0);
   const triggerRef = useRef<View>(null);
   const [triggerLayout, setTriggerLayout] = useState<LayoutRectangle | null>(null);
@@ -59,6 +59,14 @@ export default function Selector({
     });
   };
 
+  //reposition menu on window resize while open
+  useEffect(() => {
+    if (!visible) return;
+    triggerRef.current?.measureInWindow((x, y, width, height) => {
+      setTriggerLayout({ x, y, width, height } as LayoutRectangle);
+    });
+  }, [visible, windowWidth, windowHeight]);
+
   const handleClose = (callback?: () => void) => {
     progress.value = withTiming(0, { duration: 200 }, (finished) => {
       if (finished) {
@@ -80,14 +88,14 @@ export default function Selector({
 
   if (triggerLayout) {
     menuLeft = triggerLayout.x;
-    if (menuLeft + menuWidth > SCREEN_WIDTH - 16) {
-      menuLeft = SCREEN_WIDTH - menuWidth - 16;
+    if (menuLeft + menuWidth > windowWidth - 16) {
+      menuLeft = windowWidth - menuWidth - 16;
     }
     if (menuLeft < 16) {
       menuLeft = 16;
     }
 
-    const spaceBelow = SCREEN_HEIGHT - (triggerLayout.y + triggerLayout.height) - 16;
+    const spaceBelow = windowHeight - (triggerLayout.y + triggerLayout.height) - 16;
     const spaceAbove = triggerLayout.y - 16;
 
     if (finalMenuHeight <= spaceBelow) {
@@ -100,7 +108,7 @@ export default function Selector({
         finalMenuHeight = spaceAbove;
       }
       menuTop = undefined;
-      menuBottom = SCREEN_HEIGHT - triggerLayout.y + 4;
+      menuBottom = windowHeight - triggerLayout.y + 4;
     }
   }
 
@@ -116,10 +124,10 @@ export default function Selector({
     <View style={[styles.container, fullWidth && styles.containerFullWidth]}>
       <Pressable
         onPress={handleOpen}
-        style={({ pressed }) => [
+        style={({ pressed, hovered }) => [
           styles.trigger,
           fullWidth && styles.triggerFullWidth,
-          pressed && { backgroundColor: Colors.surfacePressed }
+          (pressed || hovered) && { backgroundColor: Colors.surfacePressed }
         ]}
         ref={triggerRef}
       >
@@ -154,11 +162,11 @@ export default function Selector({
                     Vibration.vibrate(10);
                     handleClose(() => onSelect(option.id));
                   }}
-                  style={({ pressed }) => [
+                  style={({ pressed, hovered }) => [
                     option.isDownload ? styles.downloadOption : styles.option,
-                    option.id === selectedValue && !option.isDownload ? styles.optionSelected : pressed && !option.isDownload && { backgroundColor: Colors.overlaySubtle },
-                    option.id === selectedValue && !option.isDownload && pressed && { backgroundColor: Colors.primaryActive },
-                    option.isDownload && pressed && { backgroundColor: Colors.surfacePressed }
+                    option.id === selectedValue && !option.isDownload ? styles.optionSelected : (pressed || hovered) && !option.isDownload && { backgroundColor: Colors.overlaySubtle },
+                    option.id === selectedValue && !option.isDownload && (pressed || hovered) && { backgroundColor: Colors.primaryActive },
+                    option.isDownload && (pressed || hovered) && { backgroundColor: Colors.surfacePressed }
                   ]}
                 >
                   {option.isDownload && (
@@ -182,7 +190,7 @@ export default function Selector({
                           handleClose(() => option.onRightIconPress?.());
                         }}
                         hitSlop={8}
-                        style={styles.rightIconPressable}
+                        style={({ pressed, hovered }) => [styles.rightIconPressable, (pressed || hovered) && { backgroundColor: Colors.overlaySubtle }]}
                       >
                         <Animated.Image
                           source={option.rightIcon}

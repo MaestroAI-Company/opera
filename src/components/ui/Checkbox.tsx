@@ -6,23 +6,35 @@ type CheckboxProps = {
   checked: boolean;
   onToggle: (value: boolean) => void;
   disabled?: boolean;
+  labelFirst?: boolean;
 };
 
-export default function Checkbox({ label, checked, onToggle, disabled = false }: CheckboxProps) {
+export default function Checkbox({ label, checked, onToggle, disabled = false, labelFirst = false }: CheckboxProps) {
   return (
     <Pressable
-      style={({ pressed }) => [
+      style={({ pressed, hovered }) => [
         styles.container,
-        pressed && !disabled && { opacity: 0.7 },
+        (pressed || hovered) && !disabled && { opacity: 0.7 },
         disabled && { opacity: 0.5 },
       ]}
       onPress={() => !disabled && onToggle(!checked)}
       disabled={disabled}
     >
-      <View style={[styles.box, checked && styles.boxChecked]}>
-        {checked}
-      </View>
-      <Text style={styles.label}>{label}</Text>
+      {labelFirst ? (
+        <>
+          <Text style={styles.label}>{label}</Text>
+          <View style={[styles.box, checked && styles.boxChecked]}>
+            {checked}
+          </View>
+        </>
+      ) : (
+        <>
+          <View style={[styles.box, checked && styles.boxChecked]}>
+            {checked}
+          </View>
+          <Text style={styles.label}>{label}</Text>
+        </>
+      )}
     </Pressable>
   );
 }

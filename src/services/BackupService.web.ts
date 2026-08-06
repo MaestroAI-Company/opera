@@ -30,6 +30,12 @@ export type ImportResult = {
   warning?: string;
 };
 
+export type ImportInspection = {
+  backup: BackupFile;
+  hasSettings: boolean;
+  hasConversations: boolean;
+};
+
 class BackupServiceImpl {
   // export data to json file download
   async exportData(scope?: BackupScope): Promise<boolean> {
@@ -93,68 +99,84 @@ class BackupServiceImpl {
     }
   }
 
+  // pick a backup file and detect which parts it contains
+  async pickAndReadBackup(): Promise<ImportInspection | null> {
+    return new Promise<ImportInspection | null>((resolve, reject) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = async (event: any) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+          resolve(null);
+          return;
+        }
+        try {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              const jsonStr = e.target?.result as string;
+              const backup: BackupFile = JSON.parse(jsonStr);
+              resolve({
+                backup,
+                hasSettings: !!backup.settings,
+                hasConversations: !!(backup.conversations && backup.messages),
+              });
+            } catch (err) {
+              reject(err);
+            }
+          };
+          reader.readAsText(file);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      input.click();
+    });
+  }
+
   // import data from local json file
-  async importData(scope?: BackupScope): Promise<ImportResult> {
+  async importData(scope?: BackupScope, backup?: BackupFile): Promise<ImportResult> {
     try {
       const includeSettings = scope?.includeSettings ?? true;
       const includeConversations = scope?.includeConversations ?? true;
 
-      return new Promise<ImportResult>((resolve, reject) => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.json';
-        input.onchange = async (event: any) => {
-          const file = event.target.files?.[0];
-          if (!file) {
-            resolve({ success: false });
-            return;
-          }
-          try {
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-              try {
-                const jsonStr = e.target?.result as string;
-                const backup: BackupFile = JSON.parse(jsonStr);
+      if (!backup) {
+        const inspection = await this.pickAndReadBackup();
+        if (!inspection) {
+          return { success: false };
+        }
+        backup = inspection.backup;
+      }
 
-                if (includeSettings && !backup.settings) {
-                  throw new Error('Backup file contains no settings');
-                }
-                if (includeConversations && (!backup.conversations || !backup.messages)) {
-                  throw new Error('Backup file contains no conversations');
-                }
+      if (includeSettings && !backup.settings) {
+        throw new Error('Backup file contains no settings');
+      }
+      if (includeConversations && (!backup.conversations || !backup.messages)) {
+        throw new Error('Backup file contains no conversations');
+      }
 
-                //check internal consistency of imported json (warn but still import)
-                let warning: string | undefined;
-                if (includeConversations && backup.conversations && backup.messages) {
-                  const convIds = new Set(backup.conversations.map(c => c.id));
-                  const orphans = backup.messages.filter(m => !convIds.has(m.conversationId));
-                  if (orphans.length > 0) {
-                    warning = `Data imported, but the backup file is inconsistent: ${orphans.length} message(s) reference a missing conversation.`;
-                  }
-                }
+      //check internal consistency of imported json (warn but still import)
+      let warning: string | undefined;
+      if (includeConversations && backup.conversations && backup.messages) {
+        const convIds = new Set(backup.conversations.map(c => c.id));
+        const orphans = backup.messages.filter(m => !convIds.has(m.conversationId));
+        if (orphans.length > 0) {
+          warning = `Data imported, but the backup file is inconsistent: ${orphans.length} message(s) reference a missing conversation.`;
+        }
+      }
 
-                // restore settings
-                if (includeSettings && backup.settings) {
-                  await Settings.setMany(backup.settings);
-                }
+      // restore settings
+      if (includeSettings && backup.settings) {
+        await Settings.setMany(backup.settings);
+      }
 
-                // restore database
-                if (includeConversations && backup.conversations && backup.messages) {
-                  await DB.importBackup(backup.conversations, backup.messages, backup.tombstones ?? []);
-                }
+      // restore database
+      if (includeConversations && backup.conversations && backup.messages) {
+        await DB.importBackup(backup.conversations, backup.messages, backup.tombstones ?? []);
+      }
 
-                resolve({ success: true, warning });
-              } catch (err) {
-                reject(err);
-              }
-            };
-            reader.readAsText(file);
-          } catch (err) {
-            reject(err);
-          }
-        };
-        input.click();
-      });
+      return { success: true, warning };
     } catch (e) {
       console.error('failed to import data', e);
       throw e;

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, BackHandler, DeviceEventEmitter, Image, Keyboard, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AIModule } from "../../services/ai/AIModule";
+import { getLocalProviderLabel } from "../../services/ai/LocalProvider";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { ITool } from "../../services/ai/tools/ITool";
 import { BackupService, ImportInspection } from "../../services/BackupService";
@@ -101,6 +102,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [language, setLanguageState] = useState("en");
   const [theme, setThemeState] = useState("system");
   const [aiService, setAiServiceState] = useState("ollama");
+  const [localAvailable, setLocalAvailable] = useState(false);
   const [ollamaUrl, setOllamaUrlState] = useState("");
   const [ollamaError, setOllamaError] = useState("");
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
@@ -180,8 +182,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const aiServiceOptions = [
     { id: "ollama", label: "Ollama" },
-    ...(Platform.OS === "android"
-      ? [{ id: "aicore", label: "Gemini Nano (On-Device)" }]
+    ...(localAvailable
+      ? [{ id: "local", label: getLocalProviderLabel() }]
       : []),
   ];
 
@@ -339,6 +341,14 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         //apply to services
         AIModule.configure(s.ollamaUrl);
         AIModule.setMode(s.aiService);
+        const localModeAvailable = await AIModule.isModeAvailable("local");
+        setLocalAvailable(localModeAvailable);
+        //preselect on-device provider if available and no explicit choice saved
+        if (localModeAvailable && !(await Settings.has("aiService"))) {
+          setAiServiceState("local");
+          Settings.set("aiService", "local");
+          AIModule.setMode("local");
+        }
         WebSTT.setLanguage(s.whisperLanguage);
       } catch (e) {
         console.warn("Failed to load settings", e);
@@ -1014,7 +1024,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       </View>
       {aiService !== "ollama" && (
         <Text style={[styles.helpText, { marginBottom: 20 }]}>
-          Uses Gemini Nano directly on this device. No server needed.
+          Runs the local model directly on this device. No server needed.
         </Text>
       )}
 

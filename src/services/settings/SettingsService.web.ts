@@ -88,6 +88,13 @@ class SettingsService {
     }
   }
 
+  // check if a setting key was explicitly saved
+  async has(key: string): Promise<boolean> {
+    const stored = localStorage.getItem('opera_settings');
+    const parsed = stored ? JSON.parse(stored) : {};
+    return Object.prototype.hasOwnProperty.call(parsed, key);
+  }
+
   // save to localstorage
   private save(): void {
     if (this.cache) {

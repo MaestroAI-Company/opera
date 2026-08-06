@@ -3,7 +3,7 @@ import { OllamaProvider } from './OllamaProvider';
 import { ToolManager } from './tools/ToolManager';
 import { sendMessageWithToolPrompt } from './tools/fallbackToolCall';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
-import { AICoreProvider } from './AICoreProvider';
+import { LocalProvider } from './LocalProvider';
 
 const DEFAULT_URL = 'http://127.0.0.1:11434';
 
@@ -33,12 +33,13 @@ class CentralAIModule {
     this.providers = new Map();
     // initialize providers
     this.providers.set('OLLAMA', new OllamaProvider(DEFAULT_URL));
-    this.providers.set('AICORE', new AICoreProvider());
+    this.providers.set('LOCAL', new LocalProvider());
   }
 
   // switch active provider from settings
   setMode(mode: string): void {
-    this.activeMode = (mode || 'ollama').toUpperCase();
+    //old 'aicore' setting maps to the universal local provider
+    this.activeMode = (mode || 'ollama').toUpperCase() === 'AICORE' ? 'LOCAL' : (mode || 'ollama').toUpperCase();
   }
 
   // configure ollama url
@@ -60,6 +61,17 @@ class CentralAIModule {
   async isAvailable(): Promise<boolean> {
     const provider = this.getActiveProvider();
     return provider.isAvailable();
+  }
+
+  // check if a provider mode is available without switching active mode
+  async isModeAvailable(mode: string): Promise<boolean> {
+    const provider = this.providers.get((mode || 'ollama').toUpperCase());
+    if (!provider) return false;
+    try {
+      return await provider.isAvailable();
+    } catch (e) {
+      return false;
+    }
   }
 
   // get available models

@@ -556,6 +556,7 @@ function AssistantOverlay() {
           selectedModel={selectedModel}
           selectedReflection={selectedReflection}
           showReflection={modelCapabilities.includes('thinking')}
+          aiService={aiService}
           onModelChange={model => {
             setSelectedModel(model);
             selectedModelRef.current = model;

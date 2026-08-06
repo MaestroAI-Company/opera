@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Image, Keyboard, LayoutRectangle, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, Vibration, View } from "react-native";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { AIModule } from "../../services/ai/AIModule";
@@ -23,6 +23,7 @@ type ModelDropdownProps = {
   showReflection: boolean;
   onModelChange: (model: string) => void;
   onReflectionChange: (reflection: string) => void;
+  aiService: string;
 };
 
 export default function ModelDropdown({
@@ -31,6 +32,7 @@ export default function ModelDropdown({
   showReflection,
   onModelChange,
   onReflectionChange,
+  aiService,
 }: ModelDropdownProps) {
   const [visible, setVisible] = useState(false);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -68,7 +70,7 @@ export default function ModelDropdown({
 
   const [isAvailable, setIsAvailable] = useState(true);
 
-  const fetchModels = async () => {
+  const fetchModels = useCallback(async () => {
     setLoading(true);
     try {
       const available = await AIModule.isAvailable();
@@ -85,7 +87,7 @@ export default function ModelDropdown({
       setLoading(false);
       setHasFetched(true);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (models.length > 0) {
@@ -98,8 +100,9 @@ export default function ModelDropdown({
   }, [models, selectedModel, loading, hasFetched, onModelChange]);
 
   useEffect(() => {
+    //refetch when ai service changes so the list follows the active provider
     fetchModels();
-  }, []);
+  }, [fetchModels, aiService]);
 
   useEffect(() => {
     if (selectedModel) {

@@ -107,6 +107,13 @@ class SettingsService {
     return settings;
   }
 
+  //check if a setting key was explicitly saved
+  async has(key: string): Promise<boolean> {
+    const db = this.getDb();
+    const row = await db.getFirstAsync<{ key: string }>('SELECT key FROM settings WHERE key = ?', [key]);
+    return !!row;
+  }
+
   //save a single setting key-value
   async set<K extends keyof AppSettings>(key: K, value: AppSettings[K]): Promise<void> {
     const db = this.getDb();

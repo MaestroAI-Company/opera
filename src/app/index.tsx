@@ -387,6 +387,8 @@ export default function Index() {
     if (!dbReady) return;
     const sub = DeviceEventEmitter.addListener("DATA_CHANGED", () => {
       loadConversations();
+      //live sync ai service when changed in the settings drawer
+      setAiService(Settings.getCached().aiService);
     });
     return () => sub.remove();
   }, [dbReady]);
@@ -1040,11 +1042,12 @@ export default function Index() {
                 isLargeScreen={isLargeScreen}
                 isDesktop={isDesktop}
                 centerElement={
-                  (aiService === "ollama" || aiService === "aicore") ? (
+                  (aiService === "ollama" || aiService === "aicore" || aiService === "local") ? (
                     <ModelDropdown
                       selectedModel={selectedModel}
                       selectedReflection={selectedReflection}
                       showReflection={modelCapabilities.includes("thinking")}
+                      aiService={aiService}
                       onModelChange={(model) => {
                         setSelectedModel(model);
                         Settings.set("ollamaModel", model);

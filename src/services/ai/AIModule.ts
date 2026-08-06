@@ -5,7 +5,7 @@ import { OllamaProvider } from './OllamaProvider';
 import { ToolManager } from './tools/ToolManager';
 import { sendMessageWithToolPrompt } from './tools/fallbackToolCall';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
-import { AICoreProvider } from './AICoreProvider';
+import { LocalProvider } from './LocalProvider';
 import { MessageMetrics } from '../db/DatabaseService';
 
 const DEFAULT_URL = Platform.OS === 'android' ? 'http://10.0.2.2:11434' : 'http://127.0.0.1:11434';
@@ -36,13 +36,14 @@ class CentralAIModule {
     this.providers = new Map();
     //initialize providers with defaults
     this.providers.set('OLLAMA', new OllamaProvider(DEFAULT_URL));
-    //gemini nano via ml kit genai, only usable on android
-    this.providers.set('AICORE', new AICoreProvider());
+    //universal on-device provider (routes to the platform local backend)
+    this.providers.set('LOCAL', new LocalProvider());
   }
 
   //switch active provider from settings
   setMode(mode: string): void {
-    this.activeMode = (mode || 'ollama').toUpperCase();
+    //old 'aicore' setting maps to the universal local provider
+    this.activeMode = (mode || 'ollama').toUpperCase() === 'AICORE' ? 'LOCAL' : (mode || 'ollama').toUpperCase();
   }
 
   //reconfigure ollama provider with url from settings
@@ -63,6 +64,17 @@ class CentralAIModule {
   async isAvailable(): Promise<boolean> {
     const provider = this.getActiveProvider();
     return provider.isAvailable();
+  }
+
+  //check if a provider mode is available without switching active mode
+  async isModeAvailable(mode: string): Promise<boolean> {
+    const provider = this.providers.get((mode || 'ollama').toUpperCase());
+    if (!provider) return false;
+    try {
+      return await provider.isAvailable();
+    } catch (e) {
+      return false;
+    }
   }
 
   async getAvailableModels(): Promise<string[]> {

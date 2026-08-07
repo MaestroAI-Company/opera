@@ -1,15 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, BackHandler, DeviceEventEmitter, Image, Keyboard, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import { getLocalProviderLabel } from "../../services/ai/LocalProvider";
-import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { ITool } from "../../services/ai/tools/ITool";
+import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { BackupService, ImportInspection } from "../../services/BackupService";
+import { CloudUserInfo } from "../../services/cloud/CloudProvider";
+import { CLOUD_PROVIDERS, getCloudProviderDefinition } from "../../services/cloud/registry";
+import { CloudSync } from "../../services/CloudSyncService";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { Settings } from "../../services/settings/SettingsService";
-import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
 import { STT } from "../../services/speech/STTService";
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
+import DownloadProgress from "../ui/DownloadProgress";
+import NotificationModal, { ModalButton } from "../ui/NotificationModal";
+import Selector from "../ui/Selector";
+import TextInputField from "../ui/TextInputField";
+import ThemeSelector from "../ui/ThemeSelector";
+import Toggle from "../ui/Toggle";
+import CloudSyncBox from "./CloudSyncBox";
 
 //web whisper surface, only used in browser flows
 const WebSTT = STT as unknown as {
@@ -19,16 +29,6 @@ const WebSTT = STT as unknown as {
   deleteModel(modelName: string): Promise<void>;
   downloadModel(modelName: string, onProgress?: (progress: number, etaSeconds: number, speedStr: string, sizeStr: string) => void): Promise<void>;
 };
-import DownloadProgress from "../ui/DownloadProgress";
-import NotificationModal, { ModalButton } from "../ui/NotificationModal";
-import Selector from "../ui/Selector";
-import TextInputField from "../ui/TextInputField";
-import ThemeSelector from "../ui/ThemeSelector";
-import Toggle from "../ui/Toggle";
-import CloudSyncBox from "./CloudSyncBox";
-import { CloudSync } from "../../services/CloudSyncService";
-import { CloudUserInfo } from "../../services/cloud/CloudProvider";
-import { CLOUD_PROVIDERS, getCloudProviderDefinition } from "../../services/cloud/registry";
 
 import { useResponsive } from "../../hooks/useResponsive";
 
@@ -118,12 +118,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [exportSelection, setExportSelection] = useState({ settings: true, conversations: true });
   const [importSelection, setImportSelection] = useState({ settings: true, conversations: true });
   const [importInspection, setImportInspection] = useState<ImportInspection | null>(null);
-  const [alertConfig, setAlertConfig] = useState<{ 
-    title: string, 
-    message: string, 
-    buttons?: ModalButton[], 
-    showInput?: boolean, 
-    inputValue?: string, 
+  const [alertConfig, setAlertConfig] = useState<{
+    title: string,
+    message: string,
+    buttons?: ModalButton[],
+    showInput?: boolean,
+    inputValue?: string,
     onInputChange?: (text: string) => void,
     inputPlaceholder?: string,
     inputSecureTextEntry?: boolean,
@@ -527,24 +527,26 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     let currentInput = "";
     showAlert("Create Sync PIN", "No cloud backup found. Create a 4 to 6 digit PIN. If you forget this PIN, you will lose access to your cloud backups.", [
       { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
-      { text: "Create", style: "primary", onPress: async () => {
-        if (currentInput.length >= 4 && currentInput.length <= 6) {
-          await CloudSync.setPin(currentInput);
-          setHasSyncPin(true);
-          setAlertModalVisible(false);
-          handleSyncNow();
-        } else {
-          setAlertModalVisible(false);
-          setTimeout(() => showAlert("Error", "PIN must be 4 to 6 digits."), 300);
+      {
+        text: "Create", style: "primary", onPress: async () => {
+          if (currentInput.length >= 4 && currentInput.length <= 6) {
+            await CloudSync.setPin(currentInput);
+            setHasSyncPin(true);
+            setAlertModalVisible(false);
+            handleSyncNow();
+          } else {
+            setAlertModalVisible(false);
+            setTimeout(() => showAlert("Error", "PIN must be 4 to 6 digits."), 300);
+          }
         }
-      }}
+      }
     ], {
       showInput: true,
       inputPlaceholder: "Enter 4-6 digits",
       inputSecureTextEntry: true,
       inputKeyboardType: "numeric",
-      onInputChange: (text: string) => { 
-        currentInput = text; 
+      onInputChange: (text: string) => {
+        currentInput = text;
         setAlertConfig(prev => ({ ...prev, inputValue: text }));
       }
     });
@@ -554,26 +556,28 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     let currentInput = "";
     showAlert("Unlock Cloud Backup", "A cloud backup was found. Enter your PIN to unlock it and resume sync.", [
       { text: "Forgot Code", onPress: handleForgetSyncPin, style: "danger" },
-      { text: "Unlock", style: "primary", onPress: async () => {
-        setAlertModalVisible(false);
-        const success = await CloudSync.verifyAndSetPin(currentInput);
-        if (success) {
-          setHasSyncPin(true);
-          setTimeout(() => showAlert("Success", "Backup unlocked successfully!"), 300);
-        } else {
-          setTimeout(() => showAlert("Error", "Incorrect PIN. Could not decrypt backup.", [
-             { text: "Try Again", onPress: handleUnlockSyncPin, style: "primary" },
-             { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" }
-          ]), 300);
+      {
+        text: "Unlock", style: "primary", onPress: async () => {
+          setAlertModalVisible(false);
+          const success = await CloudSync.verifyAndSetPin(currentInput);
+          if (success) {
+            setHasSyncPin(true);
+            setTimeout(() => showAlert("Success", "Backup unlocked successfully!"), 300);
+          } else {
+            setTimeout(() => showAlert("Error", "Incorrect PIN. Could not decrypt backup.", [
+              { text: "Try Again", onPress: handleUnlockSyncPin, style: "primary" },
+              { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" }
+            ]), 300);
+          }
         }
-      }}
+      }
     ], {
       showInput: true,
       inputPlaceholder: "Enter 4-6 digits",
       inputSecureTextEntry: true,
       inputKeyboardType: "numeric",
-      onInputChange: (text: string) => { 
-        currentInput = text; 
+      onInputChange: (text: string) => {
+        currentInput = text;
         setAlertConfig(prev => ({ ...prev, inputValue: text }));
       }
     });
@@ -582,12 +586,14 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const handleForgetSyncPin = () => {
     showAlert("Reset Backup?", "This will permanently delete your existing cloud backup so you can create a new PIN. Are you sure?", [
       { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
-      { text: "Delete & Reset", style: "danger", onPress: async () => {
-        await CloudSync.forgetCode();
-        setHasSyncPin(false);
-        setAlertModalVisible(false);
-        setTimeout(() => handleCreateSyncPin(), 400);
-      }}
+      {
+        text: "Delete & Reset", style: "danger", onPress: async () => {
+          await CloudSync.forgetCode();
+          setHasSyncPin(false);
+          setAlertModalVisible(false);
+          setTimeout(() => handleCreateSyncPin(), 400);
+        }
+      }
     ]);
   };
 
@@ -913,7 +919,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         />
       </View>
 
-      <View style={[styles.settingRowVertical, { marginTop: 16 }]}>
+      <View style={styles.settingRowVertical}>
         <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Write your instructions to AI</Text>
         <TextInputField
           icon={penPlaceholderIcon}
@@ -949,23 +955,27 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         />
       </View>
 
-      <View style={styles.toggleRow}>
-        <Text style={styles.settingLabel}>Show technical details</Text>
-        <Toggle
-          checked={showTechnicalDetails}
-          onToggle={setShowTechnicalDetails}
-        />
+      <View style={styles.settingRowVertical}>
+        <View style={styles.toggleRow}>
+          <Text style={styles.settingLabel}>Show technical details</Text>
+          <Toggle
+            checked={showTechnicalDetails}
+            onToggle={setShowTechnicalDetails}
+          />
+        </View>
+        <Text style={styles.helpText}>Include technical data in AI responses</Text>
       </View>
-      <Text style={styles.helpText}>Include technical data in AI responses</Text>
 
-      <View style={styles.toggleRow}>
-        <Text style={styles.settingLabel}>Auto-read replies</Text>
-        <Toggle
-          checked={autoSpeak}
-          onToggle={setAutoSpeak}
-        />
+      <View style={styles.settingRowVertical}>
+        <View style={styles.toggleRow}>
+          <Text style={styles.settingLabel}>Auto-read replies</Text>
+          <Toggle
+            checked={autoSpeak}
+            onToggle={setAutoSpeak}
+          />
+        </View>
+        <Text style={styles.helpText}>Speak the answer aloud when you ask by voice</Text>
       </View>
-      <Text style={styles.helpText}>Speak the answer aloud when you ask by voice</Text>
     </View>
   );
 
@@ -1038,9 +1048,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             onChangeText={setOllamaUrl}
             onBlur={fetchOllamaModels}
           />
+          {ollamaError ? <Text style={styles.errorText}>{ollamaError}</Text> : null}
         </View>
       )}
-      {aiService === "ollama" && ollamaError ? <Text style={styles.errorText}>{ollamaError}</Text> : null}
 
       {Platform.OS === "web" && (
         <>
@@ -1084,25 +1094,14 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("Confidentiality")}
 
-      <View style={{ marginBottom: 24 }}>
+      <View style={styles.settingRowVertical}>
         <Text style={styles.settingLabel}>Data privacy</Text>
-        <Text style={styles.helpText}>Datausage</Text>
+        <Text style={styles.helpText}>Designed for privacy, this app operates entirely on-device. All your data, searches, and settings remain strictly local—no personal info, analytics, or crash data are ever transmitted to external servers.</Text>
       </View>
 
-      {/* usage analytics hidden
-      <View style={styles.toggleRow}>
-        <Text style={styles.settingLabel}>Usage analytics</Text>
-        <Toggle
-          checked={usageAnalytics}
-          onToggle={setUsageAnalyticsState}
-        />
-      </View>
-      <Text style={styles.helpText}>Help improve the app by sharing daily active counts without exposing your chats</Text>
-      */}
-
-      <View style={{ marginTop: 28, gap: 8 }}>
+      <View style={styles.settingRowVertical}>
         <Text style={styles.settingLabel}>Data management</Text>
-        <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
           <Pressable style={({ pressed, hovered }) => [styles.dataBtn, (pressed || hovered) && styles.dataBtnPressed]} onPress={handleExportData}>
             <Text style={styles.dataBtnText}>Export</Text>
           </Pressable>
@@ -1110,7 +1109,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             <Text style={styles.dataBtnText}>Import</Text>
           </Pressable>
         </View>
-        <Pressable style={({ pressed, hovered }) => [styles.dataBtn, styles.dataBtnDanger, (pressed || hovered) && styles.dataBtnDangerPressed]} onPress={handleDeleteAllConversations}>
+        <Pressable style={({ pressed, hovered }) => [{ marginTop: 8 }, styles.dataBtn, styles.dataBtnDanger, (pressed || hovered) && styles.dataBtnDangerPressed]} onPress={handleDeleteAllConversations}>
           <Text style={styles.dataBtnTextDanger}>Delete all conversations</Text>
         </Pressable>
       </View>
@@ -1129,42 +1128,46 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         const key = `tool:${name}`;
         const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
         return (
-          <View key={name} style={styles.toggleRow}>
-            <View style={styles.pluginTextContainer}>
-              <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
-              {tool.displayDescription ? (
-                <Text style={styles.helpText}>{tool.displayDescription}</Text>
-              ) : null}
+          <View key={name} style={styles.settingRowVertical}>
+            <View style={styles.toggleRow}>
+              <View style={styles.pluginTextContainer}>
+                <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
+                {tool.displayDescription ? (
+                  <Text style={styles.helpText}>{tool.displayDescription}</Text>
+                ) : null}
+              </View>
+              <Toggle
+                checked={enabled}
+                onToggle={async (v) => {
+                  setPluginStates(prev => ({ ...prev, [key]: v }));
+                  await PluginRegistry.setEnabled('tool', name, v);
+                }}
+              />
             </View>
-            <Toggle
-              checked={enabled}
-              onToggle={async (v) => {
-                setPluginStates(prev => ({ ...prev, [key]: v }));
-                await PluginRegistry.setEnabled('tool', name, v);
-              }}
-            />
           </View>
         );
       })}
 
       {/* widgets section */}
-      <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Widgets</Text>
+      <Text style={styles.sectionTitle}>Widgets</Text>
       {allWidgets.map((widget) => {
         const key = `widget:${widget.id}`;
         const enabled = pluginStates[key] ?? (widget.enabledByDefault ?? false);
         return (
-          <View key={widget.id} style={styles.toggleRow}>
-            <View style={styles.pluginTextContainer}>
-              <Text style={styles.settingLabel}>{widget.name}</Text>
-              <Text style={styles.helpText}>{widget.description.split('.')[0]}.</Text>
+          <View key={widget.id} style={styles.settingRowVertical}>
+            <View style={styles.toggleRow}>
+              <View style={styles.pluginTextContainer}>
+                <Text style={styles.settingLabel}>{widget.name}</Text>
+                <Text style={styles.helpText}>{widget.description.split('.')[0]}.</Text>
+              </View>
+              <Toggle
+                checked={enabled}
+                onToggle={async (v) => {
+                  setPluginStates(prev => ({ ...prev, [key]: v }));
+                  await PluginRegistry.setEnabled('widget', widget.id, v);
+                }}
+              />
             </View>
-            <Toggle
-              checked={enabled}
-              onToggle={async (v) => {
-                setPluginStates(prev => ({ ...prev, [key]: v }));
-                await PluginRegistry.setEnabled('widget', widget.id, v);
-              }}
-            />
           </View>
         );
       })}
@@ -1453,7 +1456,7 @@ const styles = StyleSheet.create({
     color: Colors.textFaint,
   },
   settingRowVertical: {
-    marginBottom: 20,
+    marginBottom: 30,
     zIndex: 10,
   },
   settingLabel: {
@@ -1471,8 +1474,8 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.caption,
     color: Colors.primary,
     fontFamily: Fonts.body,
-    marginTop: -10,
-    marginBottom: 20,
+    marginTop: 8,
+    marginBottom: 0,
   },
   downloadOption: {
     flexDirection: "row",

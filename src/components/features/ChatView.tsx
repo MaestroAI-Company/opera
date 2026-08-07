@@ -12,14 +12,14 @@ import {
   Text,
   View,
 } from "react-native";
-import { Conversation, Message } from "../../services/db/DatabaseService";
-import { renderMarkdown, deriveChatDisplay } from "../ui/MarkdownText";
+import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
+import { Conversation, Message } from "../../services/db/DatabaseService";
 import { Settings } from "../../services/settings/SettingsService";
 import { TTS } from "../../services/speech/TTSService";
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { deriveChatDisplay, renderMarkdown } from "../ui/MarkdownText";
 
-const butterflyImage = require("../../../assets/images/butterfly2.png");
+const butterflyImage = require("../../../assets/images/butterfly5.png");
 const butterflyGreyImage = require("../../../assets/images/butterfly2_grey.png");
 const thinkingGif = require("../../../assets/icons/thinking.gif");
 const speakerIcon = require("../../../assets/icons/speaker.png");
@@ -82,18 +82,18 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   const isUser = item.role === "user";
   const [showDetails, setShowDetails] = useState(false);
 
-  const [activeTool, setActiveTool] = useState<{name: string | null, args: any | null}>({ name: null, args: null });
+  const [activeTool, setActiveTool] = useState<{ name: string | null, args: any | null }>({ name: null, args: null });
   useEffect(() => {
     if (!isGenerating) return;
     const unsub = AIModule.SharedGenerationState.subscribe(() => {
-      setActiveTool({ 
-        name: AIModule.SharedGenerationState.activeToolName, 
-        args: AIModule.SharedGenerationState.activeToolArgs 
+      setActiveTool({
+        name: AIModule.SharedGenerationState.activeToolName,
+        args: AIModule.SharedGenerationState.activeToolArgs
       });
     });
-    setActiveTool({ 
-      name: AIModule.SharedGenerationState.activeToolName, 
-      args: AIModule.SharedGenerationState.activeToolArgs 
+    setActiveTool({
+      name: AIModule.SharedGenerationState.activeToolName,
+      args: AIModule.SharedGenerationState.activeToolArgs
     });
     return unsub;
   }, [isGenerating]);

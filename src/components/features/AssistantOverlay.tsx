@@ -8,6 +8,7 @@ import {
   Animated,
   BackHandler,
   Vibration,
+  InteractionManager,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
@@ -62,6 +63,11 @@ export default function AssistantOverlayWrapper() {
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  //prefer node-style Buffer when polyfilled (react-native ships it in most templates)
+  const G = globalThis as any;
+  if (G.Buffer?.from) {
+    return G.Buffer.from(buffer).toString('base64');
+  }
   const bytes = new Uint8Array(buffer);
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   const parts: string[] = [];
@@ -83,7 +89,6 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 function AssistantOverlay() {
   const insets = useSafeAreaInsets();
   const { isLargeScreen } = useResponsive();
-  const [ready, setReady] = useState(false);
 
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -146,6 +151,9 @@ function AssistantOverlay() {
     requestAnimationFrame(() => {
       rafPendingRef.current = false;
       const content = streamingContentRef.current;
+      //batch shared-state notify with the render flush instead of once per token
+      AIModule.SharedGenerationState.content = content;
+      AIModule.SharedGenerationState.notify();
       setMessages(prev => prev.map(m => (m.id === msgId ? { ...m, content } : m)));
     });
   }, []);
@@ -156,6 +164,10 @@ function AssistantOverlay() {
   const [screenshotSize, setScreenshotSize] = useState<{ width: number; height: number } | null>(null);
   const [selection, setSelection] = useState<SelectionState>({ kind: 'none' });
   const [selectionImage, setSelectionImage] = useState<{ uri: string, label: string } | null>(null);
+  //pre-cached full-screen crop so a single tap feels instant
+  const fullScreenCropRef = useRef<string | null>(null);
+  //hide chrome (top bar, bottom bar, selection UI) while actively drawing a lasso
+  const [isDrawingSelection, setIsDrawingSelection] = useState(false);
   //bump on each overlay session to force a fresh screenshot analysis
   const [session, setSession] = useState(0);
 
@@ -184,24 +196,41 @@ function AssistantOverlay() {
   //on-device yolo screen parser
   const { isReady: parserReady, error: parserError, detect } = useObjectDetector(OBJECT_DETECTOR_CONFIG);
 
-  //analyze screenshot when model loaded
+  //warm the full-screen crop so a single tap uses a cached uri
+  //deferred so the overlay paints before we hit the native encoder
+  useEffect(() => {
+    let cancelled = false;
+    fullScreenCropRef.current = null;
+    const handle = InteractionManager.runAfterInteractions(() => {
+      if (cancelled) return;
+      OverlayNative.cropRegion({ x: 0, y: 0, w: 1, h: 1 })
+        .then(uri => { if (!cancelled && uri) fullScreenCropRef.current = uri; })
+        .catch(() => {});
+    });
+    return () => { cancelled = true; handle.cancel(); };
+  }, [session]);
+
+  //fetch screenshot size independently so selection layout doesn't wait for yolo
+  useEffect(() => {
+    let cancelled = false;
+    OverlayNative.getScreenshotInfo()
+      .then(info => { if (!cancelled && info) setScreenshotSize(info); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [session]);
+
+  //run yolo in the background once the model is ready — detections are optional enhancement
+  //deferred so the initial paint + entry animation are not blocked by tensor io + inference
   useEffect(() => {
     if (!parserReady || parserError) return;
     let cancelled = false;
-    (async () => {
-      try {
-        const [ds, info] = await Promise.all([
-          detect(),
-          OverlayNative.getScreenshotInfo(),
-        ]);
-        if (cancelled) return;
-        setDetections(ds);
-        if (info) setScreenshotSize(info);
-      } catch (e) {
-        if (!cancelled) console.warn('[ObjectDetector] analysis failed', e);
-      }
-    })();
-    return () => { cancelled = true; };
+    const handle = InteractionManager.runAfterInteractions(() => {
+      if (cancelled) return;
+      detect()
+        .then(ds => { if (!cancelled) setDetections(ds); })
+        .catch(e => { if (!cancelled) console.warn('[ObjectDetector] analysis failed', e); });
+    });
+    return () => { cancelled = true; handle.cancel(); };
   }, [parserReady, parserError, detect, session]);
 
   const activeConversationRef = useRef<Conversation | null>(null);
@@ -219,19 +248,31 @@ function AssistantOverlay() {
     });
   }, [responseOpacity]);
 
+  //bump on every request, only the latest crop is applied to state
+  const cropGenRef = useRef(0);
   const handleSelectionChange = useCallback((s: SelectionState) => {
     setSelection(s);
     if (s.kind === 'none') {
+      cropGenRef.current++;
       setSelectionImage(null);
       return;
     }
-    const region = s.kind === 'box'
-      ? s.region
-      : { x: 0, y: 0, w: 1, h: 1 };
-    OverlayNative.cropRegion(region)
+    const isFull = s.region.x <= 0.001 && s.region.y <= 0.001 && s.region.w >= 0.999 && s.region.h >= 0.999;
+    const label = isFull ? 'Full screen' : 'Selection';
+    //full screen uses the pre-warmed crop for instant feedback
+    if (isFull && fullScreenCropRef.current) {
+      cropGenRef.current++;
+      setSelectionImage({ uri: fullScreenCropRef.current, label });
+      return;
+    }
+    const gen = ++cropGenRef.current;
+    OverlayNative.cropRegion(s.region)
       .then(uri => {
+        //drop the response if a newer request was fired
+        if (gen !== cropGenRef.current) return;
         if (uri && uri.length > 0) {
-          setSelectionImage({ uri, label: s.kind === 'box' ? 'Selection' : 'Full screen' });
+          if (isFull) fullScreenCropRef.current = uri;
+          setSelectionImage({ uri, label });
         }
       })
       .catch(() => {});
@@ -259,12 +300,10 @@ function AssistantOverlay() {
   //init db, settings, preload model
   useEffect(() => {
     const init = async () => {
-      await DB.init();
       try {
-        await Settings.init();
+        //db and settings live in the same sqlite file but open independent connections, load in parallel
+        await Promise.all([DB.init(), Settings.init()]);
         const s = await Settings.load();
-        await PluginRegistry.init();
-        await PluginRegistry.loadAll();
         setUserInstruction(s.instruction);
         if (s.ollamaModel) {
           setSelectedModel(s.ollamaModel);
@@ -286,7 +325,8 @@ function AssistantOverlay() {
       } catch (e) {
         console.warn('Failed to load settings in AssistantOverlay', e);
       }
-      setReady(true);
+      //not needed for the select screen, only once a message with tools is sent
+      PluginRegistry.init().then(() => PluginRegistry.loadAll()).catch(() => {});
     };
     init();
   }, []);
@@ -446,8 +486,6 @@ function AssistantOverlay() {
           taskHistory,
           chunk => {
             streamingContentRef.current += chunk;
-            AIModule.SharedGenerationState.content = streamingContentRef.current;
-            AIModule.SharedGenerationState.notify();
             scheduleFlush(assistantMsg.id);
           },
           abortControllerRef.current.signal,
@@ -571,12 +609,11 @@ function AssistantOverlay() {
     }
   }, [alwaysWhisper, modelCapabilities]);
 
-  if (!ready) return null;
-
-  //derive display state from messages
-  const lastMsg = messages.length > 0
-    ? [...messages].reverse().find(m => m.role === 'assistant') ?? null
-    : null;
+  //latest assistant message via reverse scan, no array copy
+  let lastMsg: Message | null = null;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'assistant') { lastMsg = messages[i]; break; }
+  }
 
   let isGenerating = false;
   if (lastMsg) {
@@ -600,6 +637,7 @@ function AssistantOverlay() {
             selection={selection}
             onChange={handleSelectionChange}
             onVibrate={() => Vibration.vibrate(10)}
+            onDrawingChange={setIsDrawingSelection}
           />
         ) : (
           <Animated.View style={[styles.phaseContainer, { opacity: responseOpacity }]} pointerEvents="box-none">
@@ -626,8 +664,11 @@ function AssistantOverlay() {
           </Animated.View>
         )}
 
-        {/* model selector — top center */}
-        <View style={[styles.topBar, { paddingTop: insets.top + 16 }]} pointerEvents="box-none">
+        {/* model selector — top center, hidden while drawing a lasso selection */}
+        <View
+          style={[styles.topBar, { paddingTop: insets.top + 16 }, isDrawingSelection && styles.hiddenBar]}
+          pointerEvents={isDrawingSelection ? 'none' : 'box-none'}
+        >
           <ModelDropdown
             selectedModel={selectedModel}
             selectedReflection={selectedReflection}
@@ -644,7 +685,10 @@ function AssistantOverlay() {
           />
         </View>
 
-        <Reanimated.View style={[styles.bottomBarOverlay, isLargeScreen && styles.bottomBarOverlayLarge, bottomBarStyle]} pointerEvents="box-none">
+        <Reanimated.View
+          style={[styles.bottomBarOverlay, isLargeScreen && styles.bottomBarOverlayLarge, bottomBarStyle, isDrawingSelection && styles.hiddenBar]}
+          pointerEvents={isDrawingSelection ? 'none' : 'box-none'}
+        >
           <ChatBar
             ref={chatBarRef}
             onSend={handleSend}
@@ -692,6 +736,9 @@ const styles = StyleSheet.create({
   chatViewWrapper: {
     flex: 1,
     backgroundColor: 'transparent',
+  },
+  hiddenBar: {
+    opacity: 0,
   },
   topBar: {
     position: 'absolute',

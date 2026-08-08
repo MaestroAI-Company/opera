@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, Text, View } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Svg, { Defs, Path, RadialGradient, Stop, Circle } from 'react-native-svg';
 import { Colors, Fonts, FontSizes, Radius } from '../../../constants/theme';
 import { snapToDetection, YoloDetection } from '../../services/overlay/yoloPostprocess';
 
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
 const DEV = false; //draw yolo boxes for debug
 
-const DOUBLE_TAP_MS = 300;
+const DOUBLE_TAP_MS = 220;
 const DRAG_TOL = 10;
 const HANDLE_HIT = 32;
 const HANDLE_SIZE = 22;
@@ -15,12 +18,33 @@ const MIN_BOX = 40;
 const DEFAULT_BOX = 120;
 const ZONE_INFLATE = 1.1;
 const SNAP_DIST = 80;
+const MIN_DRAW_DIST = 4;
+const PATH_INFLATE = 1.15;
+const STROKE_WIDTH = 7;
+const GLOW_RADIUS = 55;
+
+type Point = { x: number; y: number };
+
+//smooth a raw point list into a quadratic-bezier path through the midpoints
+function smoothPathD(points: Point[]): string {
+  if (points.length < 2) return '';
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 1; i < points.length - 1; i++) {
+    const curr = points[i];
+    const next = points[i + 1];
+    const mx = (curr.x + next.x) / 2;
+    const my = (curr.y + next.y) / 2;
+    d += ` Q ${curr.x} ${curr.y} ${mx} ${my}`;
+  }
+  const last = points[points.length - 1];
+  d += ` L ${last.x} ${last.y}`;
+  return d;
+}
 
 export type SelectionRegion = { x: number; y: number; w: number; h: number };
 
 export type SelectionState =
   | { kind: 'none' }
-  | { kind: 'full' }
   | { kind: 'box'; region: SelectionRegion };
 
 type Rect = { x1: number; y1: number; x2: number; y2: number };
@@ -31,6 +55,7 @@ type Props = {
   selection: SelectionState;
   onChange: (s: SelectionState) => void;
   onVibrate?: () => void;
+  onDrawingChange?: (drawing: boolean) => void;
 };
 
 function inflateRect(r: Rect, f: number): Rect {
@@ -44,11 +69,10 @@ function inflateRect(r: Rect, f: number): Rect {
   };
 }
 
-function hitZone(dets: YoloDetection[], x: number, y: number): YoloDetection | null {
-  const sorted = [...dets].sort(
-    (a, b) => ((a.x2 - a.x1) * (a.y2 - a.y1)) - ((b.x2 - b.x1) * (b.y2 - b.y1))
-  );
-  for (const d of sorted) {
+//assumes `sorted` is already ordered by area asc
+function hitZone(sorted: YoloDetection[], x: number, y: number): YoloDetection | null {
+  for (let i = 0; i < sorted.length; i++) {
+    const d = sorted[i];
     const z = inflateRect(d, ZONE_INFLATE);
     if (x >= z.x1 && x <= z.x2 && y >= z.y1 && y <= z.y2) return d;
   }
@@ -87,30 +111,38 @@ function useReanimatedRect(targetRect: Rect | null, isDragging: boolean) {
   const x2 = useSharedValue(targetRect?.x2 || 0);
   const y2 = useSharedValue(targetRect?.y2 || 0);
 
-  const prevTargetRef = useRef(targetRect);
+  const prevTargetRef = useRef<Rect | null>(targetRect);
+
+  //depend on numeric values so a new Rect object with equal coords is a no-op
+  const tx1 = targetRect?.x1 ?? null;
+  const ty1 = targetRect?.y1 ?? null;
+  const tx2 = targetRect?.x2 ?? null;
+  const ty2 = targetRect?.y2 ?? null;
 
   useEffect(() => {
-    if (targetRect) {
-      if (!prevTargetRef.current || isDragging) {
-        x1.value = targetRect.x1;
-        y1.value = targetRect.y1;
-        x2.value = targetRect.x2;
-        y2.value = targetRect.y2;
-      } else {
-        const config = { duration: 300, easing: Easing.out(Easing.cubic) };
-        x1.value = withTiming(targetRect.x1, config);
-        y1.value = withTiming(targetRect.y1, config);
-        x2.value = withTiming(targetRect.x2, config);
-        y2.value = withTiming(targetRect.y2, config);
-      }
+    if (tx1 == null || ty1 == null || tx2 == null || ty2 == null) {
+      prevTargetRef.current = null;
+      return;
     }
-    prevTargetRef.current = targetRect;
-  }, [targetRect, isDragging, x1, y1, x2, y2]);
+    if (!prevTargetRef.current || isDragging) {
+      x1.value = tx1;
+      y1.value = ty1;
+      x2.value = tx2;
+      y2.value = ty2;
+    } else {
+      const config = { duration: 300, easing: Easing.out(Easing.cubic) };
+      x1.value = withTiming(tx1, config);
+      y1.value = withTiming(ty1, config);
+      x2.value = withTiming(tx2, config);
+      y2.value = withTiming(ty2, config);
+    }
+    prevTargetRef.current = { x1: tx1, y1: ty1, x2: tx2, y2: ty2 };
+  }, [tx1, ty1, tx2, ty2, isDragging, x1, y1, x2, y2]);
 
   return { x1, y1, x2, y2 };
 }
 
-export default function SelectionLayer({ detections, screenshotSize, selection, onChange, onVibrate }: Props) {
+export default function SelectionLayer({ detections, screenshotSize, selection, onChange, onVibrate, onDrawingChange }: Props) {
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 1, h: 1 });
   const [isDraggingHandle, setIsDraggingHandle] = useState(false);
 
@@ -122,15 +154,46 @@ export default function SelectionLayer({ detections, screenshotSize, selection, 
     return detections.map(d => ({ ...d, x1: d.x1 * sx, y1: d.y1 * sy, x2: d.x2 * sx, y2: d.y2 * sy }));
   }, [detections, screenshotSize, size]);
 
+  //smallest-first so hitZone returns the tightest matching zone
+  const sortedByArea = useMemo(() => {
+    const arr = scaledDetections.slice();
+    arr.sort((a, b) => ((a.x2 - a.x1) * (a.y2 - a.y1)) - ((b.x2 - b.x1) * (b.y2 - b.y1)));
+    return arr;
+  }, [scaledDetections]);
+
   //latest props for once-created pan responders
-  const stateRef = useRef({ size, scaledDetections, selection, onChange, onVibrate });
+  const stateRef = useRef({ size, scaledDetections, sortedByArea, selection, onChange, onVibrate, onDrawingChange });
   useEffect(() => {
-    stateRef.current = { size, scaledDetections, selection, onChange, onVibrate };
-  }, [size, scaledDetections, selection, onChange, onVibrate]);
+    stateRef.current = { size, scaledDetections, sortedByArea, selection, onChange, onVibrate, onDrawingChange };
+  }, [size, scaledDetections, sortedByArea, selection, onChange, onVibrate, onDrawingChange]);
 
   const pendingTapRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragStartRectRef = useRef<Rect | null>(null);
   const latestDragRectRef = useRef<Rect | null>(null);
+
+  //freehand "circle to search" style draw, resolved into a box on release
+  const [livePath, setLivePath] = useState<Point[] | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const drawPointsRef = useRef<Point[]>([]);
+  const isDrawingRef = useRef(false);
+  const drawRafPendingRef = useRef(false);
+
+  //primary-colored glow that tracks the finger, mutated directly to skip react renders
+  const glowX = useSharedValue(0);
+  const glowY = useSharedValue(0);
+  const glowAnimatedProps = useAnimatedProps(() => ({
+    cx: glowX.value,
+    cy: glowY.value,
+  }));
+
+  const flushLivePath = () => {
+    if (drawRafPendingRef.current) return;
+    drawRafPendingRef.current = true;
+    requestAnimationFrame(() => {
+      drawRafPendingRef.current = false;
+      setLivePath([...drawPointsRef.current]);
+    });
+  };
 
   const px = (reg: SelectionRegion, s: { w: number; h: number }): Rect => ({
     x1: reg.x * s.w,
@@ -153,19 +216,25 @@ export default function SelectionLayer({ detections, screenshotSize, selection, 
     return { x1: 0, y1: 0, x2: s.size.w, y2: s.size.h };
   };
 
+  const isFullScreenBox = (sel: SelectionState): boolean => {
+    if (sel.kind !== 'box') return false;
+    const r = sel.region;
+    return r.x <= 0.001 && r.y <= 0.001 && r.w >= 0.999 && r.h >= 0.999;
+  };
+
   const onTap = (x: number, y: number) => {
     const s = stateRef.current;
-    if (s.selection.kind === 'full') {
+    if (isFullScreenBox(s.selection)) {
       s.onChange({ kind: 'none' });
     } else {
-      s.onChange({ kind: 'full' });
+      s.onChange({ kind: 'box', region: { x: 0, y: 0, w: 1, h: 1 } });
     }
     s.onVibrate?.();
   };
 
   const onDoubleTap = (x: number, y: number) => {
     const s = stateRef.current;
-    const zone = hitZone(s.scaledDetections, x, y);
+    const zone = hitZone(s.sortedByArea, x, y);
     let rect: Rect;
     if (zone) {
       rect = inflateRect(zone, ZONE_INFLATE);
@@ -184,11 +253,43 @@ export default function SelectionLayer({ detections, screenshotSize, selection, 
     s.onVibrate?.();
   };
 
+  const finishDraw = () => {
+    const pts = drawPointsRef.current;
+    drawPointsRef.current = [];
+    setLivePath(null);
+    if (!isDrawingRef.current) return;
+    isDrawingRef.current = false;
+    setIsDrawing(false);
+    stateRef.current.onDrawingChange?.(false);
+    if (pts.length < 2) return;
+
+    const s = stateRef.current;
+    let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    for (const p of pts) {
+      x1 = Math.min(x1, p.x); y1 = Math.min(y1, p.y);
+      x2 = Math.max(x2, p.x); y2 = Math.max(y2, p.y);
+    }
+    const inflated = inflateRect({ x1, y1, x2, y2 }, PATH_INFLATE);
+    const clamped = {
+      x1: Math.max(0, inflated.x1),
+      y1: Math.max(0, inflated.y1),
+      x2: Math.min(s.size.w, inflated.x2),
+      y2: Math.min(s.size.h, inflated.y2),
+    };
+    const snapped = snapRect(clamped, s.scaledDetections, s.size.w, s.size.h);
+    s.onChange({ kind: 'box', region: region(snapped, s.size) });
+    s.onVibrate?.();
+  };
+
   const backdrop = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt) => {
         const { locationX, locationY } = evt.nativeEvent;
+        drawPointsRef.current = [{ x: locationX, y: locationY }];
+        isDrawingRef.current = false;
+        glowX.value = locationX;
+        glowY.value = locationY;
         if (pendingTapRef.current) {
           clearTimeout(pendingTapRef.current);
           pendingTapRef.current = null;
@@ -200,14 +301,30 @@ export default function SelectionLayer({ detections, screenshotSize, selection, 
           }, DOUBLE_TAP_MS);
         }
       },
-      onPanResponderMove: (_evt, g) => {
+      onPanResponderMove: (evt, g) => {
         if (Math.abs(g.dx) > DRAG_TOL || Math.abs(g.dy) > DRAG_TOL) {
           if (pendingTapRef.current) {
             clearTimeout(pendingTapRef.current);
             pendingTapRef.current = null;
           }
+          if (!isDrawingRef.current) {
+            isDrawingRef.current = true;
+            setIsDrawing(true);
+            stateRef.current.onDrawingChange?.(true);
+          }
+          const { locationX, locationY } = evt.nativeEvent;
+          glowX.value = locationX;
+          glowY.value = locationY;
+          const pts = drawPointsRef.current;
+          const last = pts[pts.length - 1];
+          if (!last || Math.hypot(locationX - last.x, locationY - last.y) >= MIN_DRAW_DIST) {
+            pts.push({ x: locationX, y: locationY });
+            flushLivePath();
+          }
         }
       },
+      onPanResponderRelease: finishDraw,
+      onPanResponderTerminate: finishDraw,
     })
   ).current;
 
@@ -292,7 +409,7 @@ export default function SelectionLayer({ detections, screenshotSize, selection, 
       style={StyleSheet.absoluteFill}
       onLayout={(e) => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
     >
-      {DEV && scaledDetections.length > 0 && (
+      {!isDrawing && DEV && scaledDetections.length > 0 && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           {scaledDetections.map((d, i) => (
             <View
@@ -310,22 +427,45 @@ export default function SelectionLayer({ detections, screenshotSize, selection, 
         </View>
       )}
 
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        {selection.kind === 'full' && <View style={[styles.fullFill, styles.overlayBorder]} />}
-        {selection.kind === 'box' && (rect || isDraggingHandle) && (
-          <>
-            <Animated.View style={[styles.dim, { top: 0, left: 0, right: 0 }, topDimStyle]} />
-            <Animated.View style={[styles.dim, { left: 0, right: 0, bottom: 0 }, bottomDimStyle]} />
-            <Animated.View style={[styles.dim, { left: 0 }, leftDimStyle]} />
-            <Animated.View style={[styles.dim, { right: 0 }, rightDimStyle]} />
-            <Animated.View style={[styles.box, boxStyle]} />
-          </>
-        )}
-      </View>
+      {!isDrawing && (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          {selection.kind === 'box' && (rect || isDraggingHandle) && (
+            <>
+              <Animated.View style={[styles.dim, { top: 0, left: 0, right: 0 }, topDimStyle]} />
+              <Animated.View style={[styles.dim, { left: 0, right: 0, bottom: 0 }, bottomDimStyle]} />
+              <Animated.View style={[styles.dim, { left: 0 }, leftDimStyle]} />
+              <Animated.View style={[styles.dim, { right: 0 }, rightDimStyle]} />
+              <Animated.View style={[styles.box, boxStyle]} />
+            </>
+          )}
+        </View>
+      )}
 
       <View style={StyleSheet.absoluteFill} {...backdrop.panHandlers} />
 
-      {(rect || isDraggingHandle) &&
+      {isDrawing && (
+        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Defs>
+            <RadialGradient id="fingerGlow" cx="50%" cy="50%" r="50%">
+              <Stop offset="0%" stopColor={Colors.primary} stopOpacity={0.55} />
+              <Stop offset="100%" stopColor={Colors.primary} stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          {livePath && livePath.length > 1 && (
+            <Path
+              d={smoothPathD(livePath)}
+              stroke={Colors.selectionOutline}
+              strokeWidth={STROKE_WIDTH}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+          )}
+          <AnimatedCircle r={GLOW_RADIUS} fill="url(#fingerGlow)" animatedProps={glowAnimatedProps} />
+        </Svg>
+      )}
+
+      {!isDrawing && (rect || isDraggingHandle) &&
         handlesAnimated.map(h => (
           <Animated.View
             key={h.id}
@@ -340,18 +480,6 @@ export default function SelectionLayer({ detections, screenshotSize, selection, 
 }
 
 const styles = StyleSheet.create({
-  fullFill: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.selectionFullFill,
-  },
-  overlayBorder: {
-    borderWidth: 2,
-    borderColor: Colors.selectionOutline,
-  },
   dim: {
     position: 'absolute',
     backgroundColor: Colors.selectionDim,

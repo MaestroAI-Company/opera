@@ -73,7 +73,7 @@ export default function NotificationModal({
 
           {(title || icon) && (
             <View style={styles.header}>
-              {icon && <Image source={icon} style={styles.icon} tintColor={Colors.textSecondary} />}
+              {icon && <Image source={icon} style={styles.icon} tintColor={Colors.textPrimary} />}
               {title && <Text style={styles.title}>{title}</Text>}
             </View>
           )}
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     title: {
     fontSize: FontSizes.lg,
     fontWeight: "bold",
-    color: Colors.textSecondary,
+    color: Colors.textPrimary,
     fontFamily: Fonts.mono,
       textAlign: "center",
     },

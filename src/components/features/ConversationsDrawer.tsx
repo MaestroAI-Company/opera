@@ -227,7 +227,7 @@ export default function ConversationsDrawer({
           ) : (
             conv.pinned ? (
               <View style={styles.actionIconButton}>
-                <Image source={pinIcon} style={[styles.actionIcon, { opacity: 0.5 }]} tintColor={Colors.textPlaceholder} />
+                <Image source={pinIcon} style={[styles.actionIcon, { opacity: 0.5 }]} tintColor={Colors.textMuted} />
               </View>
             ) : null
           )}
@@ -255,7 +255,7 @@ export default function ConversationsDrawer({
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoFocus
-            placeholderTextColor={Colors.textDisabled}
+            placeholderTextColor={Colors.textMuted}
           />
         </View>
       </View>
@@ -302,7 +302,7 @@ export default function ConversationsDrawer({
                       </Pressable>
                     </>
                   ) : (
-                    <Text style={{ fontSize: FontSizes.label, color: Colors.textFaint, fontFamily: Fonts.mono }}>
+                    <Text style={{ fontSize: FontSizes.label, color: Colors.textMuted, fontFamily: Fonts.mono }}>
                       {formattedDate}
                     </Text>
                   )}
@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: FontSizes.label,
-    color: Colors.textFaint,
+    color: Colors.textMuted,
     fontFamily: Fonts.body,
     textTransform: "uppercase",
     letterSpacing: 1,
@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: FontSizes.bodyMd,
-    color: Colors.textPlaceholder,
+    color: Colors.textMuted,
     fontFamily: Fonts.body,
     textAlign: "center",
     marginTop: 20,

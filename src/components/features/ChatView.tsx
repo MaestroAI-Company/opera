@@ -182,7 +182,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                   onPress={() => onSpeak?.(item)}
                   style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
                 >
-                  <Image source={speakerIcon} style={{ width: 22, height: 22, tintColor: isSpeaking ? Colors.primary : Colors.textDisabled }} />
+                  <Image source={speakerIcon} style={{ width: 22, height: 22, tintColor: isSpeaking ? Colors.primary : Colors.textMuted }} />
                 </Pressable>
               )}
               <Pressable
@@ -194,7 +194,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                   isChatGenerating && { opacity: 0.3 }
                 ]}
               >
-                <Image source={reloadIcon} style={{ width: 22, height: 22, tintColor: Colors.textDisabled }} />
+                <Image source={reloadIcon} style={{ width: 22, height: 22, tintColor: Colors.textMuted }} />
               </Pressable>
               <Pressable
                 onPress={() => copyToClipboard(item.content, false)}
@@ -202,14 +202,14 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                 delayLongPress={500}
                 style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
               >
-                <Image source={copyIcon} style={{ width: 22, height: 22, tintColor: Colors.textDisabled }} />
+                <Image source={copyIcon} style={{ width: 22, height: 22, tintColor: Colors.textMuted }} />
               </Pressable>
               {showMetrics && (
                 <Pressable
                   onPress={() => setShowDetails(prev => !prev)}
                   style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
                 >
-                  <Image source={infoIcon} style={{ width: 22, height: 22, tintColor: showDetails ? (incognito ? Colors.incognito : Colors.primary) : Colors.textDisabled }} />
+                  <Image source={infoIcon} style={{ width: 22, height: 22, tintColor: showDetails ? (incognito ? Colors.incognito : Colors.primary) : Colors.textMuted }} />
                 </Pressable>
               )}
             </View>
@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: FontSizes.displayMd,
-    color: Colors.textTertiary,
+    color: Colors.textSecondary,
     textAlign: "center",
     letterSpacing: 0.5,
     marginBottom: 8,
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
   },
   headerDate: {
     fontSize: FontSizes.bodyMd,
-    color: Colors.textDisabled,
+    color: Colors.textMuted,
     fontFamily: Fonts.body,
     marginBottom: 12,
   },
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
     width: 70,
   },
   flashingText: {
-    color: Colors.textBody,
+    color: Colors.textSecondary,
     fontSize: FontSizes.bodyMd,
     fontFamily: Fonts.mono,
     flexShrink: 1,
@@ -498,13 +498,13 @@ const styles = StyleSheet.create({
   metricsLabel: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.label,
-    color: Colors.textFaint,
+    color: Colors.textMuted,
     minWidth: 110,
   },
   metricsSeparator: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.label,
-    color: Colors.textFaint,
+    color: Colors.textMuted,
   },
   metricsValue: {
     fontFamily: Fonts.mono,
@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   snackbar: {
-    backgroundColor: Colors.textTertiary,
+    backgroundColor: Colors.textSecondary,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: Radius.pill,
@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
   },
   disclaimerText: {
     fontSize: FontSizes.bodyMd,
-    color: Colors.textPlaceholder,
+    color: Colors.textMuted,
     textAlign: 'center',
     fontFamily: Fonts.body,
   },

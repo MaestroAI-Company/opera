@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: Radius.xxl,
-    backgroundColor: Colors.textDisabledStrong,
+    backgroundColor: Colors.textMuted,
   },
   sheetHandleIncognito: {
     backgroundColor: Colors.incognito,

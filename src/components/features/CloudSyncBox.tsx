@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.textDisabledStrong,
+    backgroundColor: Colors.textMuted,
     marginRight: 12,
   },
   userInfoText: {
@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
   email: {
     fontSize: FontSizes.bodyMd,
     fontFamily: Fonts.body,
-    color: Colors.textBody,
+    color: Colors.textSecondary,
   },
   statusRow: {
     marginBottom: 16,
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: FontSizes.label,
     fontFamily: Fonts.body,
-    color: Colors.textStrong,
+    color: Colors.textSecondary,
     fontStyle: 'italic',
   },
   actionsRow: {
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: Radius.lg,
     borderWidth: 1,
-    borderColor: Colors.textDisabledStrong,
+    borderColor: Colors.textMuted,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.surface,

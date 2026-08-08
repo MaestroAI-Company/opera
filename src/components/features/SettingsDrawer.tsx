@@ -1508,7 +1508,7 @@ const styles = StyleSheet.create({
   navSubtitle: {
     fontSize: FontSizes.label,
     fontFamily: Fonts.body,
-    color: Colors.textFaint,
+    color: Colors.textMuted,
   },
   settingRowVertical: {
     marginBottom: 30,
@@ -1555,7 +1555,7 @@ const styles = StyleSheet.create({
   },
   helpText: {
     fontSize: FontSizes.label,
-    color: Colors.textFaint,
+    color: Colors.textMuted,
     fontFamily: Fonts.body,
     marginTop: 4,
   },

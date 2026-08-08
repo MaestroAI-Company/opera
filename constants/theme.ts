@@ -7,8 +7,7 @@ export const Colors = {
   primaryBright: "#FF4D4D",
 
   //canvas & surfaces
-  background: "#FFF5EC",
-  backgroundSplash: "#FDF8F1",
+  background: "#FDF8F1",
   surface: "#FFFFFF",
   surfaceMuted: "#F9F9F9",
   surfaceSubtle: "#F5F5F5",
@@ -19,19 +18,11 @@ export const Colors = {
   border: "#00000017",
   borderOnPrimary: "#FFFFFF52",
   shadowInk: "#00000013",
-  incognitoBorder: "#00000030",
 
   //text ramp
   textPrimary: "#000000",
-  textSecondary: "#222222",
-  textTertiary: "#333333",
-  textStrong: "#444444",
-  textMuted: "#555555",
-  textBody: "#666666",
-  textFaint: "#888888",
-  textDisabled: "#999999",
-  textPlaceholder: "#AAAAAA",
-  textDisabledStrong: "#BBBBBB",
+  textSecondary: "#444444",
+  textMuted: "#888888",
   textOnPrimary: "#FFFFFF",
 
   //links & errors

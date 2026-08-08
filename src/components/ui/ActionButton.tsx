@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   description: {
     fontFamily: Fonts.body,
     fontSize: FontSizes.label,
-    color: Colors.textFaint,
+    color: Colors.textMuted,
     lineHeight: 16,
   },
 });

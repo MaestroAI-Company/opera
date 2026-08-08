@@ -47,7 +47,8 @@ const socialIcon = require("../../../assets/icons/social.png");
 const micIcon = require("../../../assets/icons/microphone.png");
 const cameraIcon = require("../../../assets/icons/camera.png");
 const photoIcon = require("../../../assets/icons/photo.png");
-const locationIcon = require("../../../assets/icons/pin.png");
+const locationIcon = require("../../../assets/icons/location.png");
+const binIcon = require("../../../assets/icons/bin.png");
 const exportIcon = require("../../../assets/icons/export.png");
 
 import ActionButton from "../ui/ActionButton";
@@ -1181,26 +1182,26 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           <ActionButton
             icon={micIcon}
             title="Microphone"
-            description="To dictate your messages by voice. ↗"
+            description="To dictate your messages by voice."
             onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
           />
           <ActionButton
             icon={cameraIcon}
             title="Camera"
-            description="To photograph and analyze documents. ↗"
+            description="To photograph and analyze documents."
             onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
           />
           <ActionButton
             icon={locationIcon}
             title="Location"
-            description="To give the assistant local context for more relevant answers. ↗"
+            description="To give the assistant local context for more relevant answers."
             onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
           />
           {Platform.OS !== "web" && (
             <ActionButton
               icon={photoIcon}
               title="Photos"
-              description="To share images from your gallery. ↗"
+              description="To share images from your gallery."
               onPress={() => Linking.openSettings()}
             />
           )}
@@ -1227,7 +1228,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             onPress={handleImportData}
           />
           <ActionButton
-            icon={deleteIcon}
+            icon={binIcon}
             title="Delete all conversations"
             description="Clear all chat history from this device."
             onPress={handleDeleteAllConversations}

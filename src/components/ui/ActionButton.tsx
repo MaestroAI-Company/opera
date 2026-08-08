@@ -27,7 +27,7 @@ export default function ActionButton({
         <Image
           source={icon}
           style={styles.icon}
-          tintColor={Colors.textSecondary}
+          tintColor={Colors.textPrimary}
         />
       </View>
       <View style={styles.textContainer}>
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.bodyMd,
-    color: Colors.textSecondary,
+    color: Colors.textPrimary,
   },
   description: {
     fontFamily: Fonts.body,

@@ -61,7 +61,7 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "models" | "confidentiality" | "tools" | "profile" | "cloud";
+type SubPage = "main" | "general" | "assistantoverlay" | "models" | "confidentiality" | "tools" | "profile" | "cloud";
 
 export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
   const { width } = useResponsive();
@@ -159,6 +159,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [autoSpeak, setAutoSpeakState] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(false);
   const [useAppContext, setUseAppContextState] = useState(true);
+  const [autoStartMic, setAutoStartMicState] = useState(true);
   const [usageAnalytics, setUsageAnalyticsState] = useState(true);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
@@ -472,6 +473,10 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const setUseAppContext = (v: boolean) => {
     setUseAppContextState(v);
     Settings.set("useAppContext", v);
+  };
+
+  const setAutoStartMic = (v: boolean) => {
+    setAutoStartMicState(v);
   };
 
   const completeCloudConnect = async (v: string) => {
@@ -817,6 +822,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <Text style={[styles.title, { marginBottom: 12 }]}>{title}</Text>
       <Pressable
         onPress={() => setActiveSubPage("main")}
+        hitSlop={12}
         style={({ pressed, hovered }) => [styles.backButton, (pressed || hovered) && { opacity: 0.6 }]}
       >
         <Image source={arrowIcon} style={styles.backIcon} tintColor={Colors.textPrimary} />
@@ -868,6 +874,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               <Text style={styles.navSubtitle}>Language, Theme</Text>
             </View>
           </Pressable>
+
+          {!isDesktop && (
+            <Pressable
+              style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+              onPress={() => setActiveSubPage("assistantoverlay")}
+            >
+              <Image source={micIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <View style={styles.navTextContainer}>
+                <Text style={styles.navTitle}>Assistant Overlay</Text>
+                <Text style={styles.navSubtitle}>Voice, Screen context</Text>
+              </View>
+            </Pressable>
+          )}
 
           <Pressable
             style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
@@ -1002,6 +1021,24 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           />
         </View>
         <Text style={styles.helpText}>Speak the answer aloud when you ask by voice.</Text>
+      </View>
+    </View>
+  );
+
+  // assistant overlay subpage
+  const assistantOverlaySubPageContent = (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("Assistant Overlay")}
+
+      <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
+        <View style={styles.toggleRow}>
+          <Text style={styles.settingLabel}>Auto-start Voice Input</Text>
+          <Toggle
+            checked={autoStartMic}
+            onToggle={setAutoStartMic}
+          />
+        </View>
+        <Text style={styles.helpText}>Automatically activate the microphone as soon as the assistant opens.</Text>
       </View>
     </View>
   );
@@ -1264,6 +1301,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return cloudSubPageContent;
       case "general":
         return generalSubPageContent;
+      case "assistantoverlay":
+        return assistantOverlaySubPageContent;
       case "models":
         return modelsSubPageContent;
       case "confidentiality":
@@ -1469,7 +1508,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: FontSizes.xxxl,
-    color: Colors.textSecondary,
+    color: Colors.textPrimary,
     marginBottom: 24,
     fontFamily: Fonts.display,
   },
@@ -1543,7 +1582,7 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     fontSize: FontSizes.body,
-    color: Colors.textSecondary,
+    color: Colors.textPrimary,
     fontFamily: Fonts.mono,
   },
   toggleRow: {
@@ -1589,7 +1628,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontFamily: "IBMPlexMono-Medium",
-    color: "#888",
+    color: Colors.textMuted,
     textTransform: "uppercase",
     letterSpacing: 1,
     marginBottom: 10,

@@ -1,7 +1,6 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
-import { CloudUserInfo } from '../../services/cloud/CloudProvider';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { CloudUserInfo } from '../../services/cloud/CloudProvider';
 
 type CloudSyncBoxProps = {
   userInfo: CloudUserInfo | null;

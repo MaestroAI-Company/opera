@@ -1,585 +1,1242 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Opera — Design System</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Petrona:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-  /* ===== tokens (constants/theme.ts) ===== */
-  :root {
-    /* brand */
-    --primary: #FF1A1A;
-    --primary-pressed: #D61515;
-    --primary-active: #CC1414;
-    --primary-bright: #FF4D4D;
-    /* backgrounds */
-    --background: #FFF5EC;
-    --background-splash: #FDF8F1;
-    /* incognito */
-    --incognito: #565A75;
-    --incognito-pressed: #3E4157;
-    --incognito-bright: #70748E;
-    --incognito-surface: #2A2A35;
-    /* surfaces */
-    --surface: #FFFFFF;
-    --surface-muted: #F9F9F9;
-    --surface-subtle: #F5F5F5;
-    --surface-pressed: #EAEAEA;
-    --surface-code: #F0F0F0;
-    /* borders */
-    --border: #00000017;
-    --border-shadow: #00000013;
-    --border-light: #E5E5E5;
-    --border-strong: #E0E0E0;
-    --border-dark: #CCCCCC;
-    --border-on-primary: #FFFFFF52;
-    /* text */
-    --text-primary: #000000;
-    --text-secondary: #222222;
-    --text-tertiary: #333333;
-    --text-strong: #444444;
-    --text-muted: #555555;
-    --text-body: #666666;
-    --text-faint: #888888;
-    --text-disabled: #999999;
-    --text-placeholder: #AAAAAA;
-    --text-on-primary: #FFFFFF;
-    /* links */
-    --link: #3B82F6;
-    --link-alt: #0066CC;
-    /* code */
-    --code-block-bg: #1E1E1E;
-    --code-block-text: #D4D4D4;
-    --code-inline-text: #D63384;
-    /* fonts */
-    --font-display: 'Petrona', serif;
-    --font-body: 'Plus Jakarta Sans', sans-serif;
-    --font-mono: 'IBM Plex Mono', monospace;
-    /* spacing */
-    --sp-xs2: 2px; --sp-xs: 4px; --sp-sm: 6px; --sp-md: 8px; --sp-lg: 10px;
-    --sp-lg2: 12px; --sp-xl: 14px; --sp-xl2: 16px; --sp-xxl: 20px; --sp-xxl2: 24px; --sp-xxxl: 32px;
-    /* radius */
-    --r-sm: 4px; --r-md: 5px; --r-lg: 6px; --r-xl: 8px; --r-xxl: 10px; --r-huge: 16px; --r-pill: 20px;
-    /* elevation */
-    --shadow-sticker: -6px 6px 0px #00000013;
-    --shadow-floating: 0px 4px 12px rgba(0,0,0,0.15);
-    --shadow-glow: 2px 6px 22px #FF1A1A;
-    --shadow-glow-incognito: 2px 6px 15px #565A75;
-  }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Opera — Design System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Petrona:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <style>
+    /* ===== tokens (constants/theme.ts) ===== */
+    :root {
+      /* brand */
+      --primary: #FF1A1A;
+      --primary-pressed: #D61515;
+      --primary-active: #CC1414;
+      --primary-bright: #FF4D4D;
+      /* backgrounds */
+      --background: #FFF5EC;
+      --background-splash: #FDF8F1;
+      /* incognito */
+      --incognito: #565A75;
+      --incognito-pressed: #3E4157;
+      --incognito-bright: #70748E;
+      --incognito-surface: #2A2A35;
+      /* surfaces */
+      --surface: #FFFFFF;
+      --surface-muted: #F9F9F9;
+      --surface-subtle: #F5F5F5;
+      --surface-pressed: #EAEAEA;
+      --surface-code: #F0F0F0;
+      /* borders */
+      --border: #00000017;
+      --border-shadow: #00000013;
+      --border-light: #E5E5E5;
+      --border-strong: #E0E0E0;
+      --border-dark: #CCCCCC;
+      --border-on-primary: #FFFFFF52;
+      /* text */
+      --text-primary: #000000;
+      --text-secondary: #222222;
+      --text-tertiary: #333333;
+      --text-strong: #444444;
+      --text-muted: #555555;
+      --text-body: #666666;
+      --text-faint: #888888;
+      --text-disabled: #999999;
+      --text-placeholder: #AAAAAA;
+      --text-on-primary: #FFFFFF;
+      /* links */
+      --link: #3B82F6;
+      --link-alt: #0066CC;
+      /* code */
+      --code-block-bg: #1E1E1E;
+      --code-block-text: #D4D4D4;
+      --code-inline-text: #D63384;
+      /* fonts */
+      --font-display: 'Petrona', serif;
+      --font-body: 'Plus Jakarta Sans', sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+      /* spacing */
+      --sp-xs2: 2px;
+      --sp-xs: 4px;
+      --sp-sm: 6px;
+      --sp-md: 8px;
+      --sp-lg: 10px;
+      --sp-lg2: 12px;
+      --sp-xl: 14px;
+      --sp-xl2: 16px;
+      --sp-xxl: 20px;
+      --sp-xxl2: 24px;
+      --sp-xxxl: 32px;
+      /* radius */
+      --r-sm: 4px;
+      --r-md: 5px;
+      --r-lg: 6px;
+      --r-xl: 8px;
+      --r-xxl: 10px;
+      --r-huge: 16px;
+      --r-pill: 20px;
+      /* elevation */
+      --shadow-sticker: -6px 6px 0px #00000013;
+      --shadow-floating: 0px 4px 12px rgba(0, 0, 0, 0.15);
+      --shadow-glow: 2px 6px 22px #FF1A1A;
+      --shadow-glow-incognito: 2px 6px 15px #565A75;
+    }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-  body {
-    background: var(--background);
-    color: var(--text-primary);
-    font-family: var(--font-body);
-    font-size: 14px;
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-  }
+    body {
+      background: var(--background);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
 
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px 80px; }
+    .wrap {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 24px 80px;
+    }
 
-  /* ===== header ===== */
-  header.hero {
-    background: var(--surface);
-    border: 2px solid var(--border);
-    border-radius: var(--r-xxl);
-    margin-top: 32px;
-    padding: 40px 32px;
-    display: flex;
-    align-items: center;
-    gap: 28px;
-  }
-  .hero img { width: 96px; height: auto; }
-  .hero h1 {
-    font-family: var(--font-display);
-    font-size: 36px;
-    line-height: 1.15;
-    letter-spacing: 0.5px;
-  }
-  .hero .tagline { color: var(--text-body); margin-top: 4px; }
-  .hero .badges { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
-  .badge {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    padding: 4px 12px;
-    border: 2px solid var(--border);
-    border-radius: var(--r-pill);
-    background: var(--surface-muted);
-    color: var(--text-muted);
-  }
-  .badge.red { background: var(--primary); color: var(--text-on-primary); border-color: var(--border-on-primary); }
+    /* ===== header ===== */
+    header.hero {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--r-xxl);
+      margin-top: 32px;
+      padding: 40px 32px;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
 
-  /* ===== sections ===== */
-  section { margin-top: 48px; }
-  section h2 {
-    font-family: var(--font-display);
-    font-size: 26px;
-    letter-spacing: 0.5px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid var(--border);
-    margin-bottom: 20px;
-  }
-  section h3 {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    margin: 28px 0 12px;
-  }
-  .sub { color: var(--text-body); margin-bottom: 16px; max-width: 720px; }
+    .hero img {
+      width: 96px;
+      height: auto;
+    }
 
-  .grid { display: grid; gap: 12px; }
-  .grid.cols-2 { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
-  .grid.cols-3 { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+    .hero h1 {
+      font-family: var(--font-display);
+      font-size: 36px;
+      line-height: 1.15;
+      letter-spacing: 0.5px;
+    }
 
-  .card {
-    background: var(--surface);
-    border: 2px solid var(--border);
-    border-radius: var(--r-xxl);
-    padding: 16px;
-  }
+    .hero .tagline {
+      color: var(--text-body);
+      margin-top: 4px;
+    }
 
-  /* ===== colors ===== */
-  .swatch { border-radius: var(--r-xxl); overflow: hidden; border: 2px solid var(--border); background: var(--surface); }
-  .swatch .chip { height: 56px; }
-  .swatch .meta { padding: 10px 12px; }
-  .swatch .name { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
-  .swatch .hex { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); }
-  .swatch .use { font-size: 12px; color: var(--text-body); margin-top: 2px; }
-  .chip-bordered { border-bottom: 2px solid var(--border); }
+    .hero .badges {
+      margin-top: 14px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
 
-  /* ===== typography ===== */
-  .type-row { display: flex; align-items: baseline; gap: 20px; padding: 10px 0; border-bottom: 1px dashed var(--border-light); }
-  .type-row .demo { flex: 1; }
-  .type-row .spec { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); text-align: right; white-space: nowrap; }
+    .badge {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 4px 12px;
+      border: 2px solid var(--border);
+      border-radius: var(--r-pill);
+      background: var(--surface-muted);
+      color: var(--text-muted);
+    }
 
-  /* ===== spacing/radius ===== */
-  .sp-line { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-  .sp-line .bar { height: 22px; background: var(--primary); border-radius: var(--r-sm); flex: none; }
-  .sp-line .label { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
-  .radius-cell { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-  .radius-demo { width: 72px; height: 72px; background: var(--surface); border: 2px solid var(--primary); }
+    .badge.red {
+      background: var(--primary);
+      color: var(--text-on-primary);
+      border-color: var(--border-on-primary);
+    }
 
-  /* ===== components: buttons ===== */
-  .btn {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    font-weight: 500;
-    border: 2px solid var(--border);
-    border-radius: var(--r-xxl);
-    padding: 10px 20px;
-    cursor: pointer;
-    transition: background-color 0.12s;
-  }
-  .btn:active { transform: translateY(1px); }
-  .btn-primary { background: var(--primary); color: var(--text-on-primary); border-color: var(--border-on-primary); }
-  .btn-primary:active { background: var(--primary-pressed); }
-  .btn-ghost { background: var(--surface); color: var(--text-secondary); }
-  .btn-ghost:active { background: var(--surface-pressed); }
-  .btn-danger { background: var(--surface); color: var(--primary); border-color: var(--border); }
-  .btn-danger:active { background: #FFF0F0; }
-  .btn-group { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    /* ===== sections ===== */
+    section {
+      margin-top: 48px;
+    }
 
-  /* ===== components: inputs ===== */
-  .input-wrap {
-    display: flex;
-    align-items: center;
-    background: var(--surface);
-    border: 2px solid var(--border);
-    border-radius: var(--r-xxl);
-    padding: 10px 16px;
-  }
-  .input-wrap .input-icon { width: 18px; height: 18px; margin-right: 10px; flex: none; }
-  .input-field {
-    width: 100%;
-    background: transparent;
-    border: none;
-    padding: 0;
-    font-family: var(--font-mono);
-    font-size: 14px;
-    color: var(--text-secondary);
-  }
-  .input-field::placeholder { color: var(--text-placeholder); }
-  .input-field:focus { outline: none; }
+    section h2 {
+      font-family: var(--font-display);
+      font-size: 26px;
+      letter-spacing: 0.5px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 20px;
+    }
 
-  /* ===== chat ===== */
-  .chat-demo {
-    background: var(--surface);
-    border: 2px solid var(--border);
-    border-radius: var(--r-xxl);
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-  .msg-ai { max-width: 100%; color: var(--text-primary); }
-  .msg-user {
-    align-self: flex-end;
-    max-width: 80%;
-    background: var(--primary);
-    color: var(--text-on-primary);
-    border: 2px solid var(--border-on-primary);
-    border-radius: var(--r-xxl);
-    padding: 10px 14px;
-  }
-  .msg-user.incognito { background: var(--incognito); }
-  .composer-shell { max-width: 800px; margin: 0 auto; }
-  .composer {
-    display: flex;
-    align-items: center;
-    background: var(--primary);
-    border: 2px solid var(--border);
-    border-radius: var(--r-xxl);
-    height: 56px;
-    padding: 0 12px;
-    margin: 0 16px 16px;
-    box-shadow: var(--shadow-glow);
-    transition: background-color 0.15s, transform 0.15s;
-  }
-  .composer:active { background: var(--primary-bright); transform: scale(1.05); }
-  .composer.incognito { background: var(--incognito); box-shadow: var(--shadow-glow-incognito); }
-  .composer.incognito:active { background: var(--incognito-bright); }
-  .composer input {
-    flex: 1;
-    min-height: 36px;
-    margin-left: 8px;
-    background: transparent;
-    border: none;
-    color: var(--text-on-primary);
-    font-family: var(--font-body);
-    font-size: 16px;
-    line-height: 20px;
-    outline: none;
-  }
-  .composer input::placeholder { color: rgba(255,255,255,0.6); }
-  .composer .icon-btn {
-    width: 28px; height: 28px;
-    border-radius: var(--r-pill);
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    display: grid; place-items: center;
-    flex: none;
-  }
-  .composer .icon-btn img { width: 18px; height: 18px; filter: brightness(0) invert(1); }
-  .composer .icon-btn.mic { margin-left: 6px; }
+    section h3 {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin: 28px 0 12px;
+    }
 
-  /* ===== code block ===== */
-  .code-block {
-    background: var(--code-block-bg);
-    color: var(--code-block-text);
-    font-family: var(--font-mono);
-    font-size: 13px;
-    line-height: 1.4;
-    border-radius: var(--r-lg);
-    padding: 16px;
-    overflow-x: auto;
-  }
-  .code-block .kw { color: #569CD6; }
-  .code-block .fn { color: #DCDCAA; }
-  .code-block .str { color: #CE9178; }
-  .code-inline { background: var(--surface-code); color: var(--code-inline-text); border-radius: var(--r-sm); padding: 0 6px; font-family: var(--font-mono); font-size: 13px; }
+    .sub {
+      color: var(--text-body);
+      margin-bottom: 16px;
+      max-width: 720px;
+    }
 
-  /* ===== controls ===== */
-  .toggle { width: 44px; height: 26px; background: var(--surface-subtle); border: 2px solid var(--border); border-radius: var(--r-pill); position: relative; cursor: pointer; transition: background 0.2s; }
-  .toggle.on { background: var(--primary); }
-  .toggle .thumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left 0.2s; }
-  .toggle.on .thumb { left: 20px; }
-  .checkbox { width: 18px; height: 18px; border: 2px solid var(--border-dark); border-radius: var(--r-sm); background: var(--surface); display: inline-block; position: relative; }
-  .checkbox.checked { background: var(--primary); border-color: var(--primary); }
-  .checkbox.checked::after { content: '✓'; color: #fff; font-size: 12px; position: absolute; inset: 0; display: grid; place-items: center; }
+    .grid {
+      display: grid;
+      gap: 12px;
+    }
 
-  /* ===== elevation ===== */
-  .elev-demo { padding: 20px; background: var(--surface); border-radius: var(--r-xxl); }
-  .elev-sticker { box-shadow: var(--shadow-sticker); border: 2px solid var(--border); }
-  .elev-float { box-shadow: var(--shadow-floating); border: 1px solid var(--border-light); }
-  .elev-glow { box-shadow: var(--shadow-glow); border: 2px solid var(--border-on-primary); background: var(--primary); color: #fff; }
+    .grid.cols-2 {
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    }
 
-  /* ===== do/don't ===== */
-  .dd { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  .dd .col { border-radius: var(--r-xxl); padding: 20px; border: 2px solid var(--border); }
-  .dd .col.do { background: var(--surface); }
-  .dd .col.dont { background: #FFF0F0; }
-  .dd ul { list-style: none; }
-  .dd li { padding: 6px 0 6px 26px; position: relative; font-size: 14px; }
-  .dd li::before { position: absolute; left: 0; top: 6px; font-family: var(--font-mono); }
-  .dd .do li::before { content: '✓'; color: var(--primary); }
-  .dd .dont li::before { content: '✗'; color: var(--primary); }
+    .grid.cols-3 {
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
 
-  footer { margin-top: 64px; text-align: center; color: var(--text-faint); font-family: var(--font-mono); font-size: 12px; }
+    .card {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--r-xxl);
+      padding: 16px;
+    }
 
-  @media (max-width: 700px) {
-    .dd { grid-template-columns: 1fr; }
-    .type-row { flex-direction: column; gap: 2px; }
-    .type-row .spec { text-align: left; }
-  }
-</style>
+    /* ===== colors ===== */
+    .swatch {
+      border-radius: var(--r-xxl);
+      overflow: hidden;
+      border: 2px solid var(--border);
+      background: var(--surface);
+    }
+
+    .swatch .chip {
+      height: 56px;
+    }
+
+    .swatch .meta {
+      padding: 10px 12px;
+    }
+
+    .swatch .name {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .swatch .hex {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+
+    .swatch .use {
+      font-size: 12px;
+      color: var(--text-body);
+      margin-top: 2px;
+    }
+
+    .chip-bordered {
+      border-bottom: 2px solid var(--border);
+    }
+
+    /* ===== typography ===== */
+    .type-row {
+      display: flex;
+      align-items: baseline;
+      gap: 20px;
+      padding: 10px 0;
+      border-bottom: 1px dashed var(--border-light);
+    }
+
+    .type-row .demo {
+      flex: 1;
+    }
+
+    .type-row .spec {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    /* ===== spacing/radius ===== */
+    .sp-line {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .sp-line .bar {
+      height: 22px;
+      background: var(--primary);
+      border-radius: var(--r-sm);
+      flex: none;
+    }
+
+    .sp-line .label {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .radius-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .radius-demo {
+      width: 72px;
+      height: 72px;
+      background: var(--surface);
+      border: 2px solid var(--primary);
+    }
+
+    /* ===== components: buttons ===== */
+    .btn {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      border: 2px solid var(--border);
+      border-radius: var(--r-xxl);
+      padding: 10px 20px;
+      cursor: pointer;
+      transition: background-color 0.12s;
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: var(--text-on-primary);
+      border-color: var(--border-on-primary);
+    }
+
+    .btn-primary:active {
+      background: var(--primary-pressed);
+    }
+
+    .btn-ghost {
+      background: var(--surface);
+      color: var(--text-secondary);
+    }
+
+    .btn-ghost:active {
+      background: var(--surface-pressed);
+    }
+
+    .btn-danger {
+      background: var(--surface);
+      color: var(--primary);
+      border-color: var(--border);
+    }
+
+    .btn-danger:active {
+      background: #FFF0F0;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    /* ===== components: inputs ===== */
+    .input-wrap {
+      display: flex;
+      align-items: center;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--r-xxl);
+      padding: 10px 16px;
+    }
+
+    .input-wrap .input-icon {
+      width: 18px;
+      height: 18px;
+      margin-right: 10px;
+      flex: none;
+    }
+
+    .input-field {
+      width: 100%;
+      background: transparent;
+      border: none;
+      padding: 0;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .input-field::placeholder {
+      color: var(--text-placeholder);
+    }
+
+    .input-field:focus {
+      outline: none;
+    }
+
+    /* ===== chat ===== */
+    .chat-demo {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--r-xxl);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .msg-ai {
+      max-width: 100%;
+      color: var(--text-primary);
+    }
+
+    .msg-user {
+      align-self: flex-end;
+      max-width: 80%;
+      background: var(--primary);
+      color: var(--text-on-primary);
+      border: 2px solid var(--border-on-primary);
+      border-radius: var(--r-xxl);
+      padding: 10px 14px;
+    }
+
+    .msg-user.incognito {
+      background: var(--incognito);
+    }
+
+    .composer-shell {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .composer {
+      display: flex;
+      align-items: center;
+      background: var(--primary);
+      border: 2px solid var(--border);
+      border-radius: var(--r-xxl);
+      height: 56px;
+      padding: 0 12px;
+      margin: 0 16px 16px;
+      box-shadow: var(--shadow-glow);
+      transition: background-color 0.15s, transform 0.15s;
+    }
+
+    .composer:active {
+      background: var(--primary-bright);
+      transform: scale(1.05);
+    }
+
+    .composer.incognito {
+      background: var(--incognito);
+      box-shadow: var(--shadow-glow-incognito);
+    }
+
+    .composer.incognito:active {
+      background: var(--incognito-bright);
+    }
+
+    .composer input {
+      flex: 1;
+      min-height: 36px;
+      margin-left: 8px;
+      background: transparent;
+      border: none;
+      color: var(--text-on-primary);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 20px;
+      outline: none;
+    }
+
+    .composer input::placeholder {
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .composer .icon-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--r-pill);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      flex: none;
+    }
+
+    .composer .icon-btn img {
+      width: 18px;
+      height: 18px;
+      filter: brightness(0) invert(1);
+    }
+
+    .composer .icon-btn.mic {
+      margin-left: 6px;
+    }
+
+    /* ===== code block ===== */
+    .code-block {
+      background: var(--code-block-bg);
+      color: var(--code-block-text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.4;
+      border-radius: var(--r-lg);
+      padding: 16px;
+      overflow-x: auto;
+    }
+
+    .code-block .kw {
+      color: #569CD6;
+    }
+
+    .code-block .fn {
+      color: #DCDCAA;
+    }
+
+    .code-block .str {
+      color: #CE9178;
+    }
+
+    .code-inline {
+      background: var(--surface-code);
+      color: var(--code-inline-text);
+      border-radius: var(--r-sm);
+      padding: 0 6px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+    }
+
+    /* ===== controls ===== */
+    .toggle {
+      width: 44px;
+      height: 26px;
+      background: var(--surface-subtle);
+      border: 2px solid var(--border);
+      border-radius: var(--r-pill);
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .toggle.on {
+      background: var(--primary);
+    }
+
+    .toggle .thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      transition: left 0.2s;
+    }
+
+    .toggle.on .thumb {
+      left: 20px;
+    }
+
+    .checkbox {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border-dark);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      display: inline-block;
+      position: relative;
+    }
+
+    .checkbox.checked {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .checkbox.checked::after {
+      content: '✓';
+      color: #fff;
+      font-size: 12px;
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+    }
+
+    /* ===== elevation ===== */
+    .elev-demo {
+      padding: 20px;
+      background: var(--surface);
+      border-radius: var(--r-xxl);
+    }
+
+    .elev-sticker {
+      box-shadow: var(--shadow-sticker);
+      border: 2px solid var(--border);
+    }
+
+    .elev-float {
+      box-shadow: var(--shadow-floating);
+      border: 1px solid var(--border-light);
+    }
+
+    .elev-glow {
+      box-shadow: var(--shadow-glow);
+      border: 2px solid var(--border-on-primary);
+      background: var(--primary);
+      color: #fff;
+    }
+
+    /* ===== do/don't ===== */
+    .dd {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .dd .col {
+      border-radius: var(--r-xxl);
+      padding: 20px;
+      border: 2px solid var(--border);
+    }
+
+    .dd .col.do {
+      background: var(--surface);
+    }
+
+    .dd .col.dont {
+      background: #FFF0F0;
+    }
+
+    .dd ul {
+      list-style: none;
+    }
+
+    .dd li {
+      padding: 6px 0 6px 26px;
+      position: relative;
+      font-size: 14px;
+    }
+
+    .dd li::before {
+      position: absolute;
+      left: 0;
+      top: 6px;
+      font-family: var(--font-mono);
+    }
+
+    .dd .do li::before {
+      content: '✓';
+      color: var(--primary);
+    }
+
+    .dd .dont li::before {
+      content: '✗';
+      color: var(--primary);
+    }
+
+    footer {
+      margin-top: 64px;
+      text-align: center;
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    @media (max-width: 700px) {
+      .dd {
+        grid-template-columns: 1fr;
+      }
+
+      .type-row {
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .type-row .spec {
+        text-align: left;
+      }
+    }
+  </style>
 </head>
+
 <body>
-<div class="wrap">
+  <div class="wrap">
 
-  <header class="hero">
-    <img src="../assets/images/butterfly2.png" alt="Opera butterfly">
-    <div>
-      <h1>Opera — Design System</h1>
-      <p class="tagline">AI for all, privacy for freedom.</p>
-      <div class="badges">
-        <span class="badge red">App : Opera</span>
-        <span class="badge">IA : Maestro</span>
-        <span class="badge">Local & privé</span>
-      </div>
-    </div>
-  </header>
-
-  <!-- ============ OVERVIEW ============ -->
-  <section>
-    <h2>Vue d'ensemble</h2>
-    <p class="sub">
-      Warm, éditorial et légèrement technique : un fond crème <b>#FFF5EC</b>, un unique accent rouge
-      <b>#FF1A1A</b>, des titres serif <b>Petrona</b> et un chrome UI monospace <b>IBM Plex Mono</b> qui
-      évoque un terminal. Tout tourne en local (Ollama, Whisper, Gemini Nano). Un mode
-      <b>incognito</b> violet-gris remplace entièrement l'identité rouge.
-    </p>
-    <p class="sub">
-      Règles d'or : le rouge est la <b>seule</b> couleur d'interaction, réservée à l'action la plus
-      importante de l'écran. Bordure "sticker" de 2px, rayon par défaut <b>10px</b>, ombres dures sans blur.
-    </p>
-  </section>
-
-  <!-- ============ COLORS ============ -->
-  <section>
-    <h2>Couleurs</h2>
-
-    <h3>Marque</h3>
-    <div class="grid cols-3">
-      <div class="swatch"><div class="chip" style="background:#FF1A1A"></div><div class="meta"><div class="name">primary</div><div class="hex">#FF1A1A</div><div class="use">Unique couleur d'action / bulles utilisateur / composer</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#D61515"></div><div class="meta"><div class="name">primary-pressed</div><div class="hex">#D61515</div><div class="use">État pressé des surfaces rouges</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#CC1414"></div><div class="meta"><div class="name">primary-active</div><div class="hex">#CC1414</div><div class="use">État actif</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#FF4D4D"></div><div class="meta"><div class="name">primary-bright</div><div class="hex">#FF4D4D</div><div class="use">Variante lumineuse</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#FFF5EC"></div><div class="meta"><div class="name">background</div><div class="hex">#FFF5EC</div><div class="use">Toile crème de toutes les écrans</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#FDF8F1"></div><div class="meta"><div class="name">background-splash</div><div class="hex">#FDF8F1</div><div class="use">Splash screen</div></div></div>
-    </div>
-
-    <h3>Surfaces & bordures</h3>
-    <div class="grid cols-3">
-      <div class="swatch"><div class="chip" style="background:#FFFFFF;border-bottom:2px solid var(--border)"></div><div class="meta"><div class="name">surface</div><div class="hex">#FFFFFF</div><div class="use">Cartes, champs, modales</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#F9F9F9"></div><div class="meta"><div class="name">surface-muted</div><div class="hex">#F9F9F9</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#F5F5F5"></div><div class="meta"><div class="name">surface-subtle</div><div class="hex">#F5F5F5</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#EAEAEA"></div><div class="meta"><div class="name">surface-pressed</div><div class="hex">#EAEAEA</div><div class="use">Lignes pressées</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#F0F0F0"></div><div class="meta"><div class="name">surface-code</div><div class="hex">#F0F0F0</div><div class="use">Code inline</div></div></div>
-      <div class="swatch"><div class="chip chip-bordered" style="background:#00000017"></div><div class="meta"><div class="name">border</div><div class="hex">#00000017</div><div class="use">Bordure sticker 2px</div></div></div>
-    </div>
-
-    <h3>Texte (rampe neutre)</h3>
-    <div class="grid cols-3">
-      <div class="swatch"><div class="chip" style="background:#000000"></div><div class="meta"><div class="name">text-primary</div><div class="hex">#000000</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#222222"></div><div class="meta"><div class="name">text-secondary</div><div class="hex">#222222</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#333333"></div><div class="meta"><div class="name">text-tertiary</div><div class="hex">#333333</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#444444"></div><div class="meta"><div class="name">text-strong</div><div class="hex">#444444</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#555555"></div><div class="meta"><div class="name">text-muted</div><div class="hex">#555555</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#666666"></div><div class="meta"><div class="name">text-body</div><div class="hex">#666666</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#888888"></div><div class="meta"><div class="name">text-faint</div><div class="hex">#888888</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#999999"></div><div class="meta"><div class="name">text-disabled</div><div class="hex">#999999</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#AAAAAA"></div><div class="meta"><div class="name">text-placeholder</div><div class="hex">#AAAAAA</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#FFFFFF;border-bottom:2px solid var(--border)"></div><div class="meta"><div class="name">text-on-primary</div><div class="hex">#FFFFFF</div><div class="use">Texte sur rouge</div></div></div>
-    </div>
-
-    <h3>Incognito (mode éphémère)</h3>
-    <div class="grid cols-3">
-      <div class="swatch"><div class="chip" style="background:#565A75"></div><div class="meta"><div class="name">incognito</div><div class="hex">#565A75</div><div class="use">Remplaçant du rouge</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#3E4157"></div><div class="meta"><div class="name">incognito-pressed</div><div class="hex">#3E4157</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#70748E"></div><div class="meta"><div class="name">incognito-bright</div><div class="hex">#70748E</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#2A2A35"></div><div class="meta"><div class="name">incognito-surface</div><div class="hex">#2A2A35</div><div class="use">Surface sombre du composer</div></div></div>
-    </div>
-
-    <h3>Divers</h3>
-    <div class="grid cols-3">
-      <div class="swatch"><div class="chip" style="background:#3B82F6"></div><div class="meta"><div class="name">link</div><div class="hex">#3B82F6</div><div class="use">Liens / Confidentialité</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#FF4444"></div><div class="meta"><div class="name">error</div><div class="hex">#FF4444</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#1E1E1E"></div><div class="meta"><div class="name">code-block-bg</div><div class="hex">#1E1E1E</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#D4D4D4"></div><div class="meta"><div class="name">code-block-text</div><div class="hex">#D4D4D4</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#D63384"></div><div class="meta"><div class="name">code-inline-text</div><div class="hex">#D63384</div></div></div>
-      <div class="swatch"><div class="chip" style="background:#E81123"></div><div class="meta"><div class="name">window-close</div><div class="hex">#E81123</div><div class="use">Fermeture fenêtre Tauri</div></div></div>
-    </div>
-  </section>
-
-  <!-- ============ TYPOGRAPHY ============ -->
-  <section>
-    <h2>Typographie</h2>
-    <p class="sub">Trois polices, rôles stricts — ne jamais les échanger.</p>
-
-    <h3>Petrona — serif, réservée aux displays</h3>
-    <div class="type-row"><div class="demo" style="font-family:var(--font-display);font-size:48px">Titres hero — 48</div><div class="spec">display-hero · 48px</div></div>
-    <div class="type-row"><div class="demo" style="font-family:var(--font-display);font-size:36px">Bienvenue dans Opera — 36</div><div class="spec">display-lg · 36px</div></div>
-    <div class="type-row"><div class="demo" style="font-family:var(--font-display);font-size:26px">Paramètres — 26</div><div class="spec">display-md · 26px</div></div>
-    <div class="type-row"><div class="demo" style="font-family:var(--font-display);font-size:22px">En-tête de conversation — 22</div><div class="spec">display-sm · 22px</div></div>
-
-    <h3>IBM Plex Mono — chrome UI (boutons, labels, timestamps)</h3>
-    <div class="type-row"><div class="demo" style="font-family:var(--font-mono);font-weight:500;font-size:17px">Titres de contrôle — 17</div><div class="spec">title · 17px / 500</div></div>
-    <div class="type-row"><div class="demo" style="font-family:var(--font-mono);font-weight:500;font-size:12px">LABEL — BOUTONS · NAV · SETTINGS — 12</div><div class="spec">label · 12px / 500</div></div>
-    <div class="type-row"><div class="demo" style="font-family:var(--font-mono);font-weight:500;font-size:10px">Timestamps & micro — 10</div><div class="spec">label-sm · 10px / 500</div></div>
-
-    <h3>Plus Jakarta Sans — lecture (chat, markdown, aide)</h3>
-    <div class="type-row"><div class="demo" style="font-family:var(--font-body);font-size:15px">Corps de message — 15px, interligne 21px</div><div class="spec">body · 15px / 21px</div></div>
-    <div class="type-row"><div class="demo" style="font-family:var(--font-body);font-size:14px">Corps secondaire — 14px</div><div class="spec">body-md · 14px</div></div>
-    <div class="type-row"><div class="demo" style="font-family:var(--font-body);font-size:13px;color:var(--text-body)">Sous-titres et descriptions — 13px</div><div class="spec">caption · 13px</div></div>
-  </section>
-
-  <!-- ============ LAYOUT / SPACING ============ -->
-  <section>
-    <h2>Layout & espacements</h2>
-    <p class="sub">
-      Échelle basée sur 8px avec pas de 2px. Le chat est centré dans une colonne plafonnée à <b>840px</b>.
-      Drawers desktop : panneaux flottants de <b>320px</b>. Mobile &lt;768px, desktop ≥1024px. Composer : pilule pleine largeur de 56px. Téléphones verrouillés en portrait.
-    </p>
-    <div class="sp-line"><div class="bar" style="width:2px"></div><span class="label">xs2 · 2px</span></div>
-    <div class="sp-line"><div class="bar" style="width:4px"></div><span class="label">xs · 4px</span></div>
-    <div class="sp-line"><div class="bar" style="width:6px"></div><span class="label">sm · 6px</span></div>
-    <div class="sp-line"><div class="bar" style="width:8px"></div><span class="label">md · 8px</span></div>
-    <div class="sp-line"><div class="bar" style="width:10px"></div><span class="label">lg · 10px</span></div>
-    <div class="sp-line"><div class="bar" style="width:16px"></div><span class="label">xl2 · 16px</span></div>
-    <div class="sp-line"><div class="bar" style="width:20px"></div><span class="label">xxl · 20px</span></div>
-    <div class="sp-line"><div class="bar" style="width:32px"></div><span class="label">xxxl · 32px</span></div>
-  </section>
-
-  <!-- ============ SHAPES ============ -->
-  <section>
-    <h2>Formes</h2>
-    <p class="sub">Bordure sticker de 2px sur presque tous les éléments interactifs, rayon par défaut <b>10px</b>.</p>
-    <div class="grid cols-3">
-      <div class="radius-cell"><div class="radius-demo" style="border-radius:var(--r-sm)"></div><span class="label">sm · 4px — checkboxes, code inline</span></div>
-      <div class="radius-cell"><div class="radius-demo" style="border-radius:var(--r-lg)"></div><span class="label">lg · 6px — blocs de code</span></div>
-      <div class="radius-cell"><div class="radius-demo" style="border-radius:var(--r-xl)"></div><span class="label">xl · 8px — images, options dropdown</span></div>
-      <div class="radius-cell"><div class="radius-demo" style="border-radius:var(--r-xxl)"></div><span class="label">xxl · 10px — défaut (cartes, inputs, bulles)</span></div>
-      <div class="radius-cell"><div class="radius-demo" style="border-radius:var(--r-huge)"></div><span class="label">huge · 16px — icônes 32×32</span></div>
-      <div class="radius-cell"><div class="radius-demo" style="border-radius:var(--r-pill)"></div><span class="label">pill · 20px — toggles, snackbars, avatars</span></div>
-    </div>
-  </section>
-
-  <!-- ============ COMPONENTS ============ -->
-  <section>
-    <h2>Composants</h2>
-
-    <h3>Boutons</h3>
-    <div class="btn-group">
-      <button class="btn btn-primary">Action principale</button>
-      <button class="btn btn-ghost">Secondaire</button>
-      <button class="btn btn-danger">Supprimer</button>
-    </div>
-    <p class="sub" style="margin-top:8px">Appuyez sur un bouton pour voir l'état pressé. Primary = rouge #FF1A1A → #D61515 · Ghost = blanc 2px · Danger = rouge sur fond clair.</p>
-
-    <h3>Champs de saisie</h3>
-    <div class="input-wrap">
-      <img class="input-icon" src="../assets/icons/link.png" alt="link">
-      <input class="input-field" type="text" placeholder="server link" value="http://localhost:11434">
-    </div>
-    <p class="sub" style="margin-top:8px">Pilule blanche bordée 2px, rayon 10px, texte mono 14px, placeholder #AAAAAA, focus rouge. Icône 18×18 en tête de champ (comme le champ « Ollama server »).</p>
-
-    <h3>Chat</h3>
-    <div class="chat-demo">
-      <div class="msg-ai">Bonjour ! Je suis <b>Maestro</b>. Posez-moi une question, je réponds localement, sans envoyer vos données.</div>
-      <div class="msg-user">Explique-moi comment chiffrer mes notes.</div>
-      <div class="msg-user incognito">Cette conversation disparaît pour toujours.</div>
-
-      <div class="composer-shell">
-        <div class="composer">
-          <button class="icon-btn" title="Ajouter"><img src="../assets/icons/add.png" alt="+"></button>
-          <button class="icon-btn mic" title="Micro"><img src="../assets/icons/microphone.png" alt="mic"></button>
-          <input type="text" placeholder="Ask" value="">
-          <button class="icon-btn" title="Envoyer"><img src="../assets/icons/arrow.png" alt="send"></button>
-        </div>
-        <div class="composer incognito">
-          <button class="icon-btn" title="Ajouter"><img src="../assets/icons/add.png" alt="+"></button>
-          <button class="icon-btn mic" title="Micro"><img src="../assets/icons/microphone.png" alt="mic"></button>
-          <input type="text" placeholder="Ask" value="Conversation éphémère">
-          <button class="icon-btn" title="Envoyer"><img src="../assets/icons/arrow.png" alt="send"></button>
+    <header class="hero">
+      <img src="../assets/images/butterfly2.png" alt="Opera butterfly">
+      <div>
+        <h1>Opera — Design System</h1>
+        <p class="tagline">AI for all, privacy for freedom.</p>
+        <div class="badges">
+          <span class="badge red">App : Opera</span>
+          <span class="badge">IA : Maestro</span>
+          <span class="badge">Local & privé</span>
         </div>
       </div>
-    </div>
-    <p class="sub" style="margin-top:8px">Bulles utilisateur : pilules rouges alignées à droite (max 80%), 10px, texte blanc. Messages IA : pleine largeur, markdown, sans bulle. Composer : pilule 56px, bordure 2px, glow coloré (rouge / #565A75 en incognito), icônes + / micro / envoi teintées en blanc. Appuyez pour l'état pressé (fond éclairci + scale 1.05).</p>
+    </header>
 
-    <h3>Code</h3>
-    <div class="code-block"><span class="kw">const</span> <span class="fn">chat</span> = <span class="kw">await</span> <span class="fn">maestro</span>(prompt, { local: <span class="kw">true</span>, model: <span class="str">'gemma3'</span> });</div>
-    <p class="sub" style="margin-top:8px">Blocs sombres #1E1E1E / #D4D4D4, rayon 6px, mono 13px. Code inline : <span class="code-inline">const x = 1</span> en rose #D63384 sur #F0F0F0.</p>
+    <!-- ============ OVERVIEW ============ -->
+    <section>
+      <h2>Vue d'ensemble</h2>
+      <p class="sub">
+        Warm, éditorial et légèrement technique : un fond crème <b>#FFF5EC</b>, un unique accent rouge
+        <b>#FF1A1A</b>, des titres serif <b>Petrona</b> et un chrome UI monospace <b>IBM Plex Mono</b> qui
+        évoque un terminal. Tout tourne en local (Ollama, Whisper, Gemini Nano). Un mode
+        <b>incognito</b> violet-gris remplace entièrement l'identité rouge.
+      </p>
+      <p class="sub">
+        Règles d'or : le rouge est la <b>seule</b> couleur d'interaction, réservée à l'action la plus
+        importante de l'écran. Bordure "sticker" de 2px, rayon par défaut <b>10px</b>, ombres dures sans blur.
+      </p>
+    </section>
 
-    <h3>Contrôles</h3>
-    <div class="grid cols-2">
-      <div class="card">
-        <span class="label">Toggle</span>
-        <div style="display:flex;gap:12px;margin-top:10px">
-          <div class="toggle" onclick="this.classList.toggle('on')"><span class="thumb"></span></div>
-          <div class="toggle on" onclick="this.classList.toggle('on')"><span class="thumb"></span></div>
+    <!-- ============ COLORS ============ -->
+    <section>
+      <h2>Couleurs</h2>
+
+      <h3>Marque</h3>
+      <div class="grid cols-3">
+        <div class="swatch">
+          <div class="chip" style="background:#FF1A1A"></div>
+          <div class="meta">
+            <div class="name">primary</div>
+            <div class="hex">#FF1A1A</div>
+            <div class="use">Unique couleur d'action / bulles utilisateur / composer</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#D61515"></div>
+          <div class="meta">
+            <div class="name">primary-pressed</div>
+            <div class="hex">#D61515</div>
+            <div class="use">État pressé des surfaces rouges</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#CC1414"></div>
+          <div class="meta">
+            <div class="name">primary-active</div>
+            <div class="hex">#CC1414</div>
+            <div class="use">État actif</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#FF4D4D"></div>
+          <div class="meta">
+            <div class="name">primary-bright</div>
+            <div class="hex">#FF4D4D</div>
+            <div class="use">Variante lumineuse</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#FDF8F1"></div>
+          <div class="meta">
+            <div class="name">background</div>
+            <div class="hex">#FFF5EC</div>
+            <div class="use">Toile crème de toutes les écrans</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#FDF8F1"></div>
+          <div class="meta">
+            <div class="name">background-splash</div>
+            <div class="hex">#FDF8F1</div>
+            <div class="use">Splash screen</div>
+          </div>
         </div>
       </div>
-      <div class="card">
-        <span class="label">Checkbox</span>
-        <div style="display:flex;gap:12px;margin-top:10px">
-          <span class="checkbox" onclick="this.classList.toggle('checked')"></span>
-          <span class="checkbox checked" onclick="this.classList.toggle('checked')"></span>
+
+      <h3>Surfaces & bordures</h3>
+      <div class="grid cols-3">
+        <div class="swatch">
+          <div class="chip" style="background:#FFFFFF;border-bottom:2px solid var(--border)"></div>
+          <div class="meta">
+            <div class="name">surface</div>
+            <div class="hex">#FFFFFF</div>
+            <div class="use">Cartes, champs, modales</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#F9F9F9"></div>
+          <div class="meta">
+            <div class="name">surface-muted</div>
+            <div class="hex">#F9F9F9</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#F5F5F5"></div>
+          <div class="meta">
+            <div class="name">surface-subtle</div>
+            <div class="hex">#F5F5F5</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#EAEAEA"></div>
+          <div class="meta">
+            <div class="name">surface-pressed</div>
+            <div class="hex">#EAEAEA</div>
+            <div class="use">Lignes pressées</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#F0F0F0"></div>
+          <div class="meta">
+            <div class="name">surface-code</div>
+            <div class="hex">#F0F0F0</div>
+            <div class="use">Code inline</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip chip-bordered" style="background:#00000017"></div>
+          <div class="meta">
+            <div class="name">border</div>
+            <div class="hex">#00000017</div>
+            <div class="use">Bordure sticker 2px</div>
+          </div>
         </div>
       </div>
-      <div class="card">
-        <span class="label">Carte (card)</span>
-        <p style="margin-top:8px;color:var(--text-body);font-size:13px">Carte blanche sur fond crème, 2px, 10px, padding 16px.</p>
-      </div>
-      <div class="card" style="display:flex;align-items:center;gap:12px">
-        <img src="../assets/images/butterfly2.png" width="44" height="44" style="border-radius:var(--r-pill)" alt="">
-        <div>
-          <div class="label" style="font-family:var(--font-mono);font-size:12px">Avatar</div>
-          <div style="font-size:12px;color:var(--text-faint)">Pilule 20px</div>
+
+      <h3>Texte (rampe neutre)</h3>
+      <div class="grid cols-3">
+        <div class="swatch">
+          <div class="chip" style="background:#000000"></div>
+          <div class="meta">
+            <div class="name">text-primary</div>
+            <div class="hex">#000000</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#222222"></div>
+          <div class="meta">
+            <div class="name">text-secondary</div>
+            <div class="hex">#222222</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#333333"></div>
+          <div class="meta">
+            <div class="name">text-tertiary</div>
+            <div class="hex">#333333</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#444444"></div>
+          <div class="meta">
+            <div class="name">text-strong</div>
+            <div class="hex">#444444</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#555555"></div>
+          <div class="meta">
+            <div class="name">text-muted</div>
+            <div class="hex">#555555</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#666666"></div>
+          <div class="meta">
+            <div class="name">text-body</div>
+            <div class="hex">#666666</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#888888"></div>
+          <div class="meta">
+            <div class="name">text-faint</div>
+            <div class="hex">#888888</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#999999"></div>
+          <div class="meta">
+            <div class="name">text-disabled</div>
+            <div class="hex">#999999</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#AAAAAA"></div>
+          <div class="meta">
+            <div class="name">text-placeholder</div>
+            <div class="hex">#AAAAAA</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#FFFFFF;border-bottom:2px solid var(--border)"></div>
+          <div class="meta">
+            <div class="name">text-on-primary</div>
+            <div class="hex">#FFFFFF</div>
+            <div class="use">Texte sur rouge</div>
+          </div>
         </div>
       </div>
-    </div>
-  </section>
 
-  <!-- ============ ELEVATION ============ -->
-  <section>
-    <h2>Élévation & profondeur</h2>
-    <p class="sub">Pas de grosses ombres portées. Priorité aux contours sticker 2px et aux ombres dures sans flou.</p>
-    <div class="grid cols-3">
-      <div class="elev-demo elev-sticker"><div class="label" style="font-family:var(--font-mono);font-size:12px">Sticker shadow</div><p style="font-size:13px;color:var(--text-body);margin-top:4px">-6px 6px 0 #00000013 — drawers desktop</p></div>
-      <div class="elev-demo elev-float"><div class="label" style="font-family:var(--font-mono);font-size:12px">Flottant</div><p style="font-size:13px;color:var(--text-body);margin-top:4px">0 4px 12px rgba(0,0,0,.15) — menus, modales</p></div>
-      <div class="elev-demo elev-glow"><div class="label" style="font-family:var(--font-mono);font-size:12px">Glow du composer</div><p style="font-size:13px;color:rgba(255,255,255,.85);margin-top:4px">2px 6px 22px #FF1A1A — focal de l'écran</p></div>
-    </div>
-  </section>
-
-  <!-- ============ DO / DON'T ============ -->
-  <section>
-    <h2>À faire / à éviter</h2>
-    <div class="dd">
-      <div class="col do">
-        <h3 style="margin-top:0">À faire</h3>
-        <ul>
-          <li>Utiliser le rouge uniquement pour l'action la plus importante de l'écran</li>
-          <li>Toujours tirer les valeurs des tokens de <span class="code-inline">constants/theme.ts</span></li>
-          <li>Petrona pour les displays, Jakarta pour la lecture, Plex Mono pour le chrome UI</li>
-          <li>Garder un recolor incognito cohérent (remplacer chaque rouge par #565A75)</li>
-          <li>Préférer les ombres sticker et les contours 2px</li>
-          <li>Garder le texte du corps au-dessus de WCAG AA</li>
-        </ul>
+      <h3>Incognito (mode éphémère)</h3>
+      <div class="grid cols-3">
+        <div class="swatch">
+          <div class="chip" style="background:#565A75"></div>
+          <div class="meta">
+            <div class="name">incognito</div>
+            <div class="hex">#565A75</div>
+            <div class="use">Remplaçant du rouge</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#3E4157"></div>
+          <div class="meta">
+            <div class="name">incognito-pressed</div>
+            <div class="hex">#3E4157</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#70748E"></div>
+          <div class="meta">
+            <div class="name">incognito-bright</div>
+            <div class="hex">#70748E</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#2A2A35"></div>
+          <div class="meta">
+            <div class="name">incognito-surface</div>
+            <div class="hex">#2A2A35</div>
+            <div class="use">Surface sombre du composer</div>
+          </div>
+        </div>
       </div>
-      <div class="col dont">
-        <h3 style="margin-top:0">À éviter</h3>
-        <ul>
-          <li>Utiliser le rouge pour la décoration ou plusieurs actions simultanées</li>
-          <li>Hardcoder couleurs, polices ou rayons hors tokens</li>
-          <li>Mélanger serif et mono dans un même titre</li>
-          <li>Dépasser 10px de rayon sur des cartes denses en données</li>
-          <li>Ajouter de grosses ombres portées floues</li>
-          <li>Confondre <b>Opera</b> (l'app) et <b>Maestro</b> (l'IA)</li>
-        </ul>
+
+      <h3>Divers</h3>
+      <div class="grid cols-3">
+        <div class="swatch">
+          <div class="chip" style="background:#3B82F6"></div>
+          <div class="meta">
+            <div class="name">link</div>
+            <div class="hex">#3B82F6</div>
+            <div class="use">Liens / Confidentialité</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#FF4444"></div>
+          <div class="meta">
+            <div class="name">error</div>
+            <div class="hex">#FF4444</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#1E1E1E"></div>
+          <div class="meta">
+            <div class="name">code-block-bg</div>
+            <div class="hex">#1E1E1E</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#D4D4D4"></div>
+          <div class="meta">
+            <div class="name">code-block-text</div>
+            <div class="hex">#D4D4D4</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#D63384"></div>
+          <div class="meta">
+            <div class="name">code-inline-text</div>
+            <div class="hex">#D63384</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background:#E81123"></div>
+          <div class="meta">
+            <div class="name">window-close</div>
+            <div class="hex">#E81123</div>
+            <div class="use">Fermeture fenêtre Tauri</div>
+          </div>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <footer>Opera · design system — généré depuis DESIGN.md et constants/theme.ts</footer>
+    <!-- ============ TYPOGRAPHY ============ -->
+    <section>
+      <h2>Typographie</h2>
+      <p class="sub">Trois polices, rôles stricts — ne jamais les échanger.</p>
 
-</div>
+      <h3>Petrona — serif, réservée aux displays</h3>
+      <div class="type-row">
+        <div class="demo" style="font-family:var(--font-display);font-size:48px">Titres hero — 48</div>
+        <div class="spec">display-hero · 48px</div>
+      </div>
+      <div class="type-row">
+        <div class="demo" style="font-family:var(--font-display);font-size:36px">Bienvenue dans Opera — 36</div>
+        <div class="spec">display-lg · 36px</div>
+      </div>
+      <div class="type-row">
+        <div class="demo" style="font-family:var(--font-display);font-size:26px">Paramètres — 26</div>
+        <div class="spec">display-md · 26px</div>
+      </div>
+      <div class="type-row">
+        <div class="demo" style="font-family:var(--font-display);font-size:22px">En-tête de conversation — 22</div>
+        <div class="spec">display-sm · 22px</div>
+      </div>
+
+      <h3>IBM Plex Mono — chrome UI (boutons, labels, timestamps)</h3>
+      <div class="type-row">
+        <div class="demo" style="font-family:var(--font-mono);font-weight:500;font-size:17px">Titres de contrôle — 17
+        </div>
+        <div class="spec">title · 17px / 500</div>
+      </div>
+      <div class="type-row">
+        <div class="demo" style="font-family:var(--font-mono);font-weight:500;font-size:12px">LABEL — BOUTONS · NAV ·
+          SETTINGS — 12</div>
+        <div class="spec">label · 12px / 500</div>
+      </div>
+      <div class="type-row">
+        <div class="demo" style="font-family:var(--font-mono);font-weight:500;font-size:10px">Timestamps & micro — 10
+        </div>
+        <div class="spec">label-sm · 10px / 500</div>
+      </div>
+
+      <h3>Plus Jakarta Sans — lecture (chat, markdown, aide)</h3>
+      <div class="type-row">
+        <div class="demo" style="font-family:var(--font-body);font-size:15px">Corps de message — 15px, interligne 21px
+        </div>
+        <div class="spec">body · 15px / 21px</div>
+      </div>
+      <div class="type-row">
+        <div class="demo" style="font-family:var(--font-body);font-size:14px">Corps secondaire — 14px</div>
+        <div class="spec">body-md · 14px</div>
+      </div>
+      <div class="type-row">
+        <div class="demo" style="font-family:var(--font-body);font-size:13px;color:var(--text-body)">Sous-titres et
+          descriptions — 13px</div>
+        <div class="spec">caption · 13px</div>
+      </div>
+    </section>
+
+    <!-- ============ LAYOUT / SPACING ============ -->
+    <section>
+      <h2>Layout & espacements</h2>
+      <p class="sub">
+        Échelle basée sur 8px avec pas de 2px. Le chat est centré dans une colonne plafonnée à <b>840px</b>.
+        Drawers desktop : panneaux flottants de <b>320px</b>. Mobile &lt;768px, desktop ≥1024px. Composer : pilule
+        pleine largeur de 56px. Téléphones verrouillés en portrait.
+      </p>
+      <div class="sp-line">
+        <div class="bar" style="width:2px"></div><span class="label">xs2 · 2px</span>
+      </div>
+      <div class="sp-line">
+        <div class="bar" style="width:4px"></div><span class="label">xs · 4px</span>
+      </div>
+      <div class="sp-line">
+        <div class="bar" style="width:6px"></div><span class="label">sm · 6px</span>
+      </div>
+      <div class="sp-line">
+        <div class="bar" style="width:8px"></div><span class="label">md · 8px</span>
+      </div>
+      <div class="sp-line">
+        <div class="bar" style="width:10px"></div><span class="label">lg · 10px</span>
+      </div>
+      <div class="sp-line">
+        <div class="bar" style="width:16px"></div><span class="label">xl2 · 16px</span>
+      </div>
+      <div class="sp-line">
+        <div class="bar" style="width:20px"></div><span class="label">xxl · 20px</span>
+      </div>
+      <div class="sp-line">
+        <div class="bar" style="width:32px"></div><span class="label">xxxl · 32px</span>
+      </div>
+    </section>
+
+    <!-- ============ SHAPES ============ -->
+    <section>
+      <h2>Formes</h2>
+      <p class="sub">Bordure sticker de 2px sur presque tous les éléments interactifs, rayon par défaut <b>10px</b>.</p>
+      <div class="grid cols-3">
+        <div class="radius-cell">
+          <div class="radius-demo" style="border-radius:var(--r-sm)"></div><span class="label">sm · 4px — checkboxes,
+            code inline</span>
+        </div>
+        <div class="radius-cell">
+          <div class="radius-demo" style="border-radius:var(--r-lg)"></div><span class="label">lg · 6px — blocs de
+            code</span>
+        </div>
+        <div class="radius-cell">
+          <div class="radius-demo" style="border-radius:var(--r-xl)"></div><span class="label">xl · 8px — images,
+            options dropdown</span>
+        </div>
+        <div class="radius-cell">
+          <div class="radius-demo" style="border-radius:var(--r-xxl)"></div><span class="label">xxl · 10px — défaut
+            (cartes, inputs, bulles)</span>
+        </div>
+        <div class="radius-cell">
+          <div class="radius-demo" style="border-radius:var(--r-huge)"></div><span class="label">huge · 16px — icônes
+            32×32</span>
+        </div>
+        <div class="radius-cell">
+          <div class="radius-demo" style="border-radius:var(--r-pill)"></div><span class="label">pill · 20px — toggles,
+            snackbars, avatars</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ COMPONENTS ============ -->
+    <section>
+      <h2>Composants</h2>
+
+      <h3>Boutons</h3>
+      <div class="btn-group">
+        <button class="btn btn-primary">Action principale</button>
+        <button class="btn btn-ghost">Secondaire</button>
+        <button class="btn btn-danger">Supprimer</button>
+      </div>
+      <p class="sub" style="margin-top:8px">Appuyez sur un bouton pour voir l'état pressé. Primary = rouge #FF1A1A →
+        #D61515 · Ghost = blanc 2px · Danger = rouge sur fond clair.</p>
+
+      <h3>Champs de saisie</h3>
+      <div class="input-wrap">
+        <img class="input-icon" src="../assets/icons/link.png" alt="link">
+        <input class="input-field" type="text" placeholder="server link" value="http://localhost:11434">
+      </div>
+      <p class="sub" style="margin-top:8px">Pilule blanche bordée 2px, rayon 10px, texte mono 14px, placeholder #AAAAAA,
+        focus rouge. Icône 18×18 en tête de champ (comme le champ « Ollama server »).</p>
+
+      <h3>Chat</h3>
+      <div class="chat-demo">
+        <div class="msg-ai">Bonjour ! Je suis <b>Maestro</b>. Posez-moi une question, je réponds localement, sans
+          envoyer vos données.</div>
+        <div class="msg-user">Explique-moi comment chiffrer mes notes.</div>
+        <div class="msg-user incognito">Cette conversation disparaît pour toujours.</div>
+
+        <div class="composer-shell">
+          <div class="composer">
+            <button class="icon-btn" title="Ajouter"><img src="../assets/icons/add.png" alt="+"></button>
+            <button class="icon-btn mic" title="Micro"><img src="../assets/icons/microphone.png" alt="mic"></button>
+            <input type="text" placeholder="Ask" value="">
+            <button class="icon-btn" title="Envoyer"><img src="../assets/icons/arrow.png" alt="send"></button>
+          </div>
+          <div class="composer incognito">
+            <button class="icon-btn" title="Ajouter"><img src="../assets/icons/add.png" alt="+"></button>
+            <button class="icon-btn mic" title="Micro"><img src="../assets/icons/microphone.png" alt="mic"></button>
+            <input type="text" placeholder="Ask" value="Conversation éphémère">
+            <button class="icon-btn" title="Envoyer"><img src="../assets/icons/arrow.png" alt="send"></button>
+          </div>
+        </div>
+      </div>
+      <p class="sub" style="margin-top:8px">Bulles utilisateur : pilules rouges alignées à droite (max 80%), 10px, texte
+        blanc. Messages IA : pleine largeur, markdown, sans bulle. Composer : pilule 56px, bordure 2px, glow coloré
+        (rouge / #565A75 en incognito), icônes + / micro / envoi teintées en blanc. Appuyez pour l'état pressé (fond
+        éclairci + scale 1.05).</p>
+
+      <h3>Code</h3>
+      <div class="code-block"><span class="kw">const</span> <span class="fn">chat</span> = <span class="kw">await</span>
+        <span class="fn">maestro</span>(prompt, { local: <span class="kw">true</span>, model: <span
+          class="str">'gemma3'</span> });
+      </div>
+      <p class="sub" style="margin-top:8px">Blocs sombres #1E1E1E / #D4D4D4, rayon 6px, mono 13px. Code inline : <span
+          class="code-inline">const x = 1</span> en rose #D63384 sur #F0F0F0.</p>
+
+      <h3>Contrôles</h3>
+      <div class="grid cols-2">
+        <div class="card">
+          <span class="label">Toggle</span>
+          <div style="display:flex;gap:12px;margin-top:10px">
+            <div class="toggle" onclick="this.classList.toggle('on')"><span class="thumb"></span></div>
+            <div class="toggle on" onclick="this.classList.toggle('on')"><span class="thumb"></span></div>
+          </div>
+        </div>
+        <div class="card">
+          <span class="label">Checkbox</span>
+          <div style="display:flex;gap:12px;margin-top:10px">
+            <span class="checkbox" onclick="this.classList.toggle('checked')"></span>
+            <span class="checkbox checked" onclick="this.classList.toggle('checked')"></span>
+          </div>
+        </div>
+        <div class="card">
+          <span class="label">Carte (card)</span>
+          <p style="margin-top:8px;color:var(--text-body);font-size:13px">Carte blanche sur fond crème, 2px, 10px,
+            padding 16px.</p>
+        </div>
+        <div class="card" style="display:flex;align-items:center;gap:12px">
+          <img src="../assets/images/butterfly2.png" width="44" height="44" style="border-radius:var(--r-pill)" alt="">
+          <div>
+            <div class="label" style="font-family:var(--font-mono);font-size:12px">Avatar</div>
+            <div style="font-size:12px;color:var(--text-faint)">Pilule 20px</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ ELEVATION ============ -->
+    <section>
+      <h2>Élévation & profondeur</h2>
+      <p class="sub">Pas de grosses ombres portées. Priorité aux contours sticker 2px et aux ombres dures sans flou.</p>
+      <div class="grid cols-3">
+        <div class="elev-demo elev-sticker">
+          <div class="label" style="font-family:var(--font-mono);font-size:12px">Sticker shadow</div>
+          <p style="font-size:13px;color:var(--text-body);margin-top:4px">-6px 6px 0 #00000013 — drawers desktop</p>
+        </div>
+        <div class="elev-demo elev-float">
+          <div class="label" style="font-family:var(--font-mono);font-size:12px">Flottant</div>
+          <p style="font-size:13px;color:var(--text-body);margin-top:4px">0 4px 12px rgba(0,0,0,.15) — menus, modales
+          </p>
+        </div>
+        <div class="elev-demo elev-glow">
+          <div class="label" style="font-family:var(--font-mono);font-size:12px">Glow du composer</div>
+          <p style="font-size:13px;color:rgba(255,255,255,.85);margin-top:4px">2px 6px 22px #FF1A1A — focal de l'écran
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DO / DON'T ============ -->
+    <section>
+      <h2>À faire / à éviter</h2>
+      <div class="dd">
+        <div class="col do">
+          <h3 style="margin-top:0">À faire</h3>
+          <ul>
+            <li>Utiliser le rouge uniquement pour l'action la plus importante de l'écran</li>
+            <li>Toujours tirer les valeurs des tokens de <span class="code-inline">constants/theme.ts</span></li>
+            <li>Petrona pour les displays, Jakarta pour la lecture, Plex Mono pour le chrome UI</li>
+            <li>Garder un recolor incognito cohérent (remplacer chaque rouge par #565A75)</li>
+            <li>Préférer les ombres sticker et les contours 2px</li>
+            <li>Garder le texte du corps au-dessus de WCAG AA</li>
+          </ul>
+        </div>
+        <div class="col dont">
+          <h3 style="margin-top:0">À éviter</h3>
+          <ul>
+            <li>Utiliser le rouge pour la décoration ou plusieurs actions simultanées</li>
+            <li>Hardcoder couleurs, polices ou rayons hors tokens</li>
+            <li>Mélanger serif et mono dans un même titre</li>
+            <li>Dépasser 10px de rayon sur des cartes denses en données</li>
+            <li>Ajouter de grosses ombres portées floues</li>
+            <li>Confondre <b>Opera</b> (l'app) et <b>Maestro</b> (l'IA)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <footer>Opera · design system — généré depuis DESIGN.md et constants/theme.ts</footer>
+
+  </div>
 </body>
+
 </html>

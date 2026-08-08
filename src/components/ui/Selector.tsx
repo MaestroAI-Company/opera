@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: FontSizes.label,
-    color: Colors.textFaint,
+    color: Colors.textMuted,
     marginBottom: 8,
     marginTop: 4,
     fontFamily: Fonts.body,

@@ -8,7 +8,7 @@ const SUMMARIZE_THRESHOLD = 8000;
 
 export class FetchPagesTool implements ITool {
   displayName = 'Fetch Pages';
-  displayDescription = 'Allow the assistant to read the full content of web pages from search results';
+  displayDescription = 'Allow the assistant to read the full content of web pages from search results.';
   enabledByDefault = true;
 
   definition: ToolDefinition = {

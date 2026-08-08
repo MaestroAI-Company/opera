@@ -25,6 +25,8 @@ export type Message = {
   createdAt: number;
   images?: string[];
   metrics?: MessageMetrics;
+  //snapshot of the foreground app context captured at send time
+  screenContext?: { appPackage: string | null; hasScreenText: boolean; icon?: string | null; label?: string | null };
 };
 
 export type SyncTombstone = {
@@ -77,6 +79,12 @@ class DatabaseService {
 
       try {
         await this.db.runAsync('ALTER TABLE messages ADD COLUMN metrics TEXT');
+      } catch {
+        // ignore, column might already exist
+      }
+
+      try {
+        await this.db.runAsync('ALTER TABLE messages ADD COLUMN screenContext TEXT');
       } catch {
         // ignore, column might already exist
       }
@@ -142,8 +150,8 @@ class DatabaseService {
     );
     if (orphan && orphan.count > 0) return true;
     //malformed json in message columns
-    const rows = await db.getAllAsync<{ images?: string | null; metrics?: string | null }>(
-      'SELECT images, metrics FROM messages'
+    const rows = await db.getAllAsync<{ images?: string | null; metrics?: string | null; screenContext?: string | null }>(
+      'SELECT images, metrics, screenContext FROM messages'
     );
     for (const row of rows) {
       if (row.images) {
@@ -151,6 +159,9 @@ class DatabaseService {
       }
       if (row.metrics) {
         try { JSON.parse(row.metrics); } catch { return true; }
+      }
+      if (row.screenContext) {
+        try { JSON.parse(row.screenContext); } catch { return true; }
       }
     }
     return false;
@@ -276,20 +287,27 @@ class DatabaseService {
   }
 
   //add a message to a conversation
-  async addMessage(conversationId: string, role: 'user' | 'assistant', content: string, images?: string[]): Promise<Message> {
+  async addMessage(conversationId: string, role: 'user' | 'assistant', content: string, images?: string[], screenContext?: Message['screenContext']): Promise<Message> {
     const db = this.getDb();
     const now = Date.now();
     const id = `msg_${now}_${Math.random().toString(36).slice(2, 7)}`;
-    const msg: Message = { id, conversationId, role, content, createdAt: now, images };
+    const msg: Message = { id, conversationId, role, content, createdAt: now, images, screenContext };
     const imagesJson = images ? JSON.stringify(images) : null;
+    const screenContextJson = screenContext ? JSON.stringify(screenContext) : null;
     await db.runAsync(
-      'INSERT INTO messages (id, conversationId, role, content, createdAt, images) VALUES (?, ?, ?, ?, ?, ?)',
-      [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson]
+      'INSERT INTO messages (id, conversationId, role, content, createdAt, images, screenContext) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson, screenContextJson]
     );
     //update conversation timestamp
     await db.runAsync('UPDATE conversations SET updatedAt = ? WHERE id = ?', [now, conversationId]);
     DeviceEventEmitter.emit('DATA_CHANGED');
     return msg;
+  }
+
+  //patch the persisted screen context (used when it is resolved asynchronously)
+  async updateMessageScreenContext(id: string, screenContext: Message['screenContext']): Promise<void> {
+    const db = this.getDb();
+    await db.runAsync('UPDATE messages SET screenContext = ? WHERE id = ?', [screenContext ? JSON.stringify(screenContext) : null, id]);
   }
 
   //update last assistant message content (for streaming)
@@ -315,7 +333,8 @@ class DatabaseService {
     return rows.map(row => ({
       ...row,
       images: row.images ? JSON.parse(row.images) : undefined,
-      metrics: row.metrics ? JSON.parse(row.metrics) : undefined
+      metrics: row.metrics ? JSON.parse(row.metrics) : undefined,
+      screenContext: row.screenContext ? JSON.parse(row.screenContext) : undefined
     }));
   }
 
@@ -326,7 +345,8 @@ class DatabaseService {
     return rows.map(row => ({
       ...row,
       images: row.images ? JSON.parse(row.images) : undefined,
-      metrics: row.metrics ? JSON.parse(row.metrics) : undefined
+      metrics: row.metrics ? JSON.parse(row.metrics) : undefined,
+      screenContext: row.screenContext ? JSON.parse(row.screenContext) : undefined
     }));
   }
 
@@ -357,9 +377,10 @@ class DatabaseService {
       for (const msg of messages) {
         const imagesJson = msg.images ? JSON.stringify(msg.images) : null;
         const metricsJson = msg.metrics ? JSON.stringify(msg.metrics) : null;
+        const screenContextJson = msg.screenContext ? JSON.stringify(msg.screenContext) : null;
         await db.runAsync(
-          'INSERT INTO messages (id, conversationId, role, content, createdAt, images, metrics) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson, metricsJson]
+          'INSERT INTO messages (id, conversationId, role, content, createdAt, images, metrics, screenContext) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson, metricsJson, screenContextJson]
         );
       }
     });
@@ -380,9 +401,10 @@ class DatabaseService {
       for (const msg of messages) {
         const imagesJson = msg.images ? JSON.stringify(msg.images) : null;
         const metricsJson = msg.metrics ? JSON.stringify(msg.metrics) : null;
+        const screenContextJson = msg.screenContext ? JSON.stringify(msg.screenContext) : null;
         await db.runAsync(
-          'INSERT INTO messages (id, conversationId, role, content, createdAt, images, metrics) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson, metricsJson]
+          'INSERT INTO messages (id, conversationId, role, content, createdAt, images, metrics, screenContext) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson, metricsJson, screenContextJson]
         );
       }
     });

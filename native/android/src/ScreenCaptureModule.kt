@@ -1,6 +1,13 @@
 package __PACKAGE_NAME__
 
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapShader
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Shader
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.util.Base64
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -53,6 +60,64 @@ class ScreenCaptureModule(reactContext: ReactApplicationContext) : ReactContextB
   @ReactMethod
   fun hasScreenshot(promise: Promise) {
     promise.resolve(ScreenshotHolder.get() != null)
+  }
+
+  //resolve the launcher icon for a package name as a base64 png data uri
+  @ReactMethod
+  fun getAppIcon(pkg: String, promise: Promise) {
+    try {
+      val pm: PackageManager = reactApplicationContext.packageManager
+      val drawable: Drawable = pm.getApplicationIcon(pkg)
+      val label = try { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() } catch (e: Exception) { pkg }
+      val raw = drawableToBitmap(drawable, 128)
+      //circle-crop for a consistent launcher-style look across devices
+      val bmp = circleCrop(raw)
+      val out = ByteArrayOutputStream()
+      bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
+      val data = Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
+      promise.resolve(Arguments.createMap().apply {
+        putString("icon", "data:image/png;base64,$data")
+        putString("label", label)
+      })
+    } catch (e: Exception) {
+      promise.reject("NO_ICON", e.message ?: "no icon")
+    }
+  }
+
+  private fun drawableToBitmap(drawable: Drawable, size: Int): Bitmap {
+    if (drawable is BitmapDrawable && drawable.bitmap != null) {
+      return Bitmap.createScaledBitmap(drawable.bitmap, size, size, true)
+    }
+    val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bmp)
+    drawable.setBounds(0, 0, size, size)
+    drawable.draw(canvas)
+    return bmp
+  }
+
+  //mask a square bitmap into a circle so app icons look consistent regardless of the launcher's shape
+  private fun circleCrop(src: Bitmap): Bitmap {
+    val size = minOf(src.width, src.height)
+    val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(out)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    paint.shader = BitmapShader(src, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+    val r = size / 2f
+    canvas.drawCircle(r, r, r, paint)
+    return out
+  }
+
+  //foreground app package + flattened screen text captured by onHandleAssist
+  @ReactMethod
+  fun getAppContext(promise: Promise) {
+    val pkg = ScreenshotHolder.getAppPackage()
+    val rawText = ScreenshotHolder.getScreenText()
+    //cap to keep prompt budget reasonable
+    val text = if (rawText != null && rawText.length > 4000) rawText.substring(0, 4000) else rawText
+    promise.resolve(Arguments.createMap().apply {
+      if (pkg != null) putString("appPackage", pkg) else putNull("appPackage")
+      if (text != null) putString("screenText", text) else putNull("screenText")
+    })
   }
 
   @ReactMethod

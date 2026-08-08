@@ -29,18 +29,18 @@ import { CloudSync } from '../../services/CloudSyncService';
 import ModelDropdown from './ModelDropdown';
 import SelectionLayer, { SelectionState } from './SelectionLayer';
 
-import { useObjectDetector } from '../../services/overlay/useObjectDetector';
+import DeferredObjectDetector from '../../services/overlay/DeferredObjectDetector';
 import { YoloDetection } from '../../services/overlay/yoloPostprocess';
-import { OverlayNative } from '../../services/overlay/OverlayNative';
+import { OverlayNative, AppContext, AppIconInfo } from '../../services/overlay/OverlayNative';
 import { useResponsive } from '../../hooks/useResponsive';
 
-//on-device deki yolo model
+//on-device  yolo model
 const OBJECT_DETECTOR_CONFIG = {
   modelSource: require('../../../assets/models/deki-yolo.pte'),
   classes: ['View', 'ImageView', 'Text', 'Line'] as const,
 };
 
-//web whisper surface, only used in browser flows
+//web whisper surface
 const WebSTT = STT as unknown as {
   isAvailable(): boolean;
   isModelInstalled(modelName: string): Promise<boolean>;
@@ -63,7 +63,6 @@ export default function AssistantOverlayWrapper() {
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  //prefer node-style Buffer when polyfilled (react-native ships it in most templates)
   const G = globalThis as any;
   if (G.Buffer?.from) {
     return G.Buffer.from(buffer).toString('base64');
@@ -166,6 +165,12 @@ function AssistantOverlay() {
   const [selectionImage, setSelectionImage] = useState<{ uri: string, label: string } | null>(null);
   //pre-cached full-screen crop so a single tap feels instant
   const fullScreenCropRef = useRef<string | null>(null);
+  //foreground app + screen text captured via android assist api
+  const appContextRef = useRef<AppContext | null>(null);
+  //icon + label for the foreground-app chip (state so the ChatBar re-renders)
+  const [appIconInfo, setAppIconInfo] = useState<AppIconInfo | null>(null);
+  //user can dismiss the chip to strip screen context from the outgoing message
+  const [appContextDismissed, setAppContextDismissed] = useState(false);
   //hide chrome (top bar, bottom bar, selection UI) while actively drawing a lasso
   const [isDrawingSelection, setIsDrawingSelection] = useState(false);
   //bump on each overlay session to force a fresh screenshot analysis
@@ -193,8 +198,16 @@ function AssistantOverlay() {
     Animated.spring(mountTranslate, { toValue: 0, useNativeDriver: true, bounciness: 8, speed: 18 }).start();
   }, [mountOpacity, mountTranslate]);
 
-  //on-device yolo screen parser
-  const { isReady: parserReady, error: parserError, detect } = useObjectDetector(OBJECT_DETECTOR_CONFIG);
+  //mount the yolo detector only after the entry animation so its .pte load
+  //doesn't freeze the overlay pop-in. dedicated child + fresh mount guarantees
+  //the internal load useEffect actually fires (a preventLoad flip on the same
+  //instance was unreliable in this codepath)
+  const [detectorMounted, setDetectorMounted] = useState(false);
+  useEffect(() => {
+    setDetectorMounted(false);
+    const t = setTimeout(() => setDetectorMounted(true), 350);
+    return () => clearTimeout(t);
+  }, [session]);
 
   //warm the full-screen crop so a single tap uses a cached uri
   //deferred so the overlay paints before we hit the native encoder
@@ -211,27 +224,47 @@ function AssistantOverlay() {
   }, [session]);
 
   //fetch screenshot size independently so selection layout doesn't wait for yolo
+  //assist-api screenshot arrives async — retry until it lands or we give up
   useEffect(() => {
     let cancelled = false;
-    OverlayNative.getScreenshotInfo()
-      .then(info => { if (!cancelled && info) setScreenshotSize(info); })
-      .catch(() => {});
-    return () => { cancelled = true; };
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const attempt = (tries: number) => {
+      if (cancelled) return;
+      OverlayNative.getScreenshotInfo()
+        .then(info => {
+          if (cancelled) return;
+          if (info) setScreenshotSize(info);
+          else if (tries > 0) timer = setTimeout(() => attempt(tries - 1), 200);
+        })
+        .catch(() => {});
+    };
+    attempt(6);
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, [session]);
 
-  //run yolo in the background once the model is ready — detections are optional enhancement
-  //deferred so the initial paint + entry animation are not blocked by tensor io + inference
+  //capture foreground app context (package + on-screen text) for the ai
+  //deferred: assist-api read + launcher icon rasterization aren't needed for the first paint
   useEffect(() => {
-    if (!parserReady || parserError) return;
     let cancelled = false;
+    appContextRef.current = null;
+    setAppIconInfo(null);
+    setAppContextDismissed(false);
     const handle = InteractionManager.runAfterInteractions(() => {
       if (cancelled) return;
-      detect()
-        .then(ds => { if (!cancelled) setDetections(ds); })
-        .catch(e => { if (!cancelled) console.warn('[ObjectDetector] analysis failed', e); });
+      OverlayNative.getAppContext()
+        .then(async ctx => {
+          if (cancelled) return;
+          appContextRef.current = ctx;
+          if (ctx?.appPackage) {
+            const info = await OverlayNative.getAppIcon(ctx.appPackage);
+            if (!cancelled && info) setAppIconInfo(info);
+          }
+        })
+        .catch(() => {});
     });
     return () => { cancelled = true; handle.cancel(); };
-  }, [parserReady, parserError, detect, session]);
+  }, [session]);
+
 
   const activeConversationRef = useRef<Conversation | null>(null);
   useEffect(() => { activeConversationRef.current = activeConversation; }, [activeConversation]);
@@ -318,15 +351,19 @@ function AssistantOverlay() {
         AIModule.setMode(s.aiService);
         STT.setLanguage(s.whisperLanguage);
 
-        //preload model into ram
+        //preload model into ram — deferred so the native call doesn't race the entry animation
         if (s.ollamaModel) {
-          AIModule.preloadModel(s.ollamaModel).catch(() => {});
+          InteractionManager.runAfterInteractions(() => {
+            AIModule.preloadModel(s.ollamaModel!).catch(() => {});
+          });
         }
       } catch (e) {
         console.warn('Failed to load settings in AssistantOverlay', e);
       }
       //not needed for the select screen, only once a message with tools is sent
-      PluginRegistry.init().then(() => PluginRegistry.loadAll()).catch(() => {});
+      InteractionManager.runAfterInteractions(() => {
+        PluginRegistry.init().then(() => PluginRegistry.loadAll()).catch(() => {});
+      });
     };
     init();
   }, []);
@@ -349,6 +386,9 @@ function AssistantOverlay() {
     setGeneratingConvId(null);
     setDetections([]);
     setScreenshotSize(null);
+    appContextRef.current = null;
+    setAppIconInfo(null);
+    setAppContextDismissed(false);
     setSession(s => s + 1);
     AIModule.SharedGenerationState.activeConvId = null;
     AIModule.SharedGenerationState.activeMsgId = null;
@@ -420,7 +460,8 @@ function AssistantOverlay() {
         );
       }
     } catch (e) {
-      console.error('Failed to generate title:', e);
+      //title generation is best-effort: keep the truncated first-message name on failure
+      console.warn('Title generation skipped:', (e as any)?.message ?? e);
     }
   }, []);
 
@@ -452,9 +493,45 @@ function AssistantOverlay() {
       .map(m => ({ role: m.role, content: m.content, images: m.images }));
     taskHistory.push({ role: 'user', content: text, images });
 
+    //include the foreground app + screen text captured by the assist api so the model can reason about what the user is looking at
+    //re-fetch here in case onHandleAssist arrived after the initial useEffect
+    let screenContextSegment = '';
+    const appContextEnabled = Settings.getCached().useAppContext !== false;
+    let ctx = appContextDismissed || !appContextEnabled ? null : appContextRef.current;
+    if (appContextEnabled && !appContextDismissed && (!ctx || (!ctx.appPackage && !ctx.screenText))) {
+      ctx = await OverlayNative.getAppContext();
+      appContextRef.current = ctx;
+    }
+    if (ctx && (ctx.appPackage || ctx.screenText)) {
+      //reuse the icon+label already loaded for the ChatBar chip when available
+      let iconInfo = appIconInfo;
+      if (!iconInfo && ctx.appPackage) {
+        iconInfo = await OverlayNative.getAppIcon(ctx.appPackage);
+      }
+      const badge = {
+        appPackage: ctx.appPackage ?? null,
+        hasScreenText: !!(ctx.screenText && ctx.screenText.trim().length > 0),
+        icon: iconInfo?.icon ?? null,
+        label: iconInfo?.label ?? null,
+      };
+      userMsg.screenContext = badge;
+      //patch the already-rendered bubble so the badge appears
+      setMessages(prev => prev.map(m => m.id === userMsg.id ? { ...m, screenContext: badge } : m));
+      //persist the badge so it survives a conversation reload
+      DB.updateMessageScreenContext(userMsg.id, badge).catch(() => {});
+      const parts: string[] = ['\n\n---\n\n# Screen Context'];
+      if (ctx.appPackage) parts.push(`Foreground app: ${ctx.appPackage}`);
+      if (ctx.screenText && ctx.screenText.trim().length > 0) {
+        parts.push(`Visible text on screen:\n"""\n${ctx.screenText.trim()}\n"""`);
+      }
+      screenContextSegment = parts.join('\n');
+    }
+    //app context is a first-message attachment: dismiss the chip so it does not linger on follow-ups
+    setAppContextDismissed(true);
+
     const taskSystemPrompt = (instruction.trim().length > 0
       ? `${instruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
-      : SYSTEM_PROMPTS.DEFAULT) + WidgetManager.getSystemPromptSegment();
+      : SYSTEM_PROMPTS.DEFAULT) + WidgetManager.getSystemPromptSegment() + screenContextSegment;
 
     const assistantMsg = await DB.addMessage(conv.id, 'assistant', '…');
     setMessages(prev => [...prev, assistantMsg]);
@@ -704,6 +781,8 @@ function AssistantOverlay() {
             autoStartMic={capabilitiesReady && autoStartMicSetting.current}
             selection={selectionImage}
             onSelectionRemove={handleSelectionRemove}
+            appContextChip={Settings.getCached().useAppContext !== false && !appContextDismissed && appIconInfo ? { icon: appIconInfo.icon, label: appIconInfo.label } : null}
+            onAppContextRemove={() => setAppContextDismissed(true)}
           />
         </Reanimated.View>
       </Animated.View>
@@ -717,6 +796,14 @@ function AssistantOverlay() {
       />
 
       <SearchWebView />
+
+      {detectorMounted && (
+        <DeferredObjectDetector
+          config={OBJECT_DETECTOR_CONFIG}
+          session={session}
+          onDetections={setDetections}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }

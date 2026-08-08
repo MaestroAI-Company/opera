@@ -2,6 +2,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { useRouter } from "expo-router";
 import { useState } from "react";
+import { LocationService } from "../services/location/LocationService";
 import {
   Image,
   ImageBackground,
@@ -23,6 +24,7 @@ const micIcon = require("../../assets/icons/microphone.png");
 const cameraIcon = require("../../assets/icons/camera.png");
 const photoIcon = require("../../assets/icons/photo.png");
 const notifIcon = require("../../assets/icons/general.png");
+const locationIcon = require("../../assets/icons/pin.png");
 
 type Permission = {
   id: string;
@@ -68,6 +70,21 @@ const WEB_PERMISSIONS: Permission[] = [
       }
     },
   },
+  {
+    id: "location",
+    icon: locationIcon,
+    label: "Location",
+    description: "To give the assistant local context for more relevant answers.",
+    status: "idle",
+    request: async () => {
+      const granted = await LocationService.requestPermission();
+      if (granted) {
+        //warm up the cache so the first message has location context
+        LocationService.refresh().catch(() => {});
+      }
+      return granted;
+    },
+  },
 ];
 
 const NATIVE_PERMISSIONS: Permission[] = [
@@ -100,6 +117,21 @@ const NATIVE_PERMISSIONS: Permission[] = [
     status: "idle",
     request: async () => {
       const { granted } = await MediaLibrary.requestPermissionsAsync();
+      return granted;
+    },
+  },
+  {
+    id: "location",
+    icon: locationIcon,
+    label: "Location",
+    description: "To give the assistant local context for more relevant answers.",
+    status: "idle",
+    request: async () => {
+      const granted = await LocationService.requestPermission();
+      if (granted) {
+        //warm up the cache so the first message has location context
+        LocationService.refresh().catch(() => {});
+      }
       return granted;
     },
   },

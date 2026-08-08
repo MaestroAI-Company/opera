@@ -19,6 +19,7 @@ export type AppSettings = {
   includeDateTime: boolean;
   showTechnicalDetails: boolean;
   dataWarningDismissed: boolean;
+  useAppContext: boolean;
 };
 
 const DEFAULTS: AppSettings = {
@@ -45,6 +46,7 @@ const DEFAULTS: AppSettings = {
   includeDateTime: true,
   showTechnicalDetails: false,
   dataWarningDismissed: false,
+  useAppContext: true,
 };
 
 const SETTINGS_UPDATED_AT_KEY = '__settings_updated_at';
@@ -102,6 +104,7 @@ class SettingsService {
       includeDateTime: map['includeDateTime'] === 'true' ? true : (map['includeDateTime'] === 'false' ? false : DEFAULTS.includeDateTime),
       showTechnicalDetails: map['showTechnicalDetails'] === 'true' ? true : (map['showTechnicalDetails'] === 'false' ? false : DEFAULTS.showTechnicalDetails),
       dataWarningDismissed: map['dataWarningDismissed'] === 'true' ? true : DEFAULTS.dataWarningDismissed,
+      useAppContext: map['useAppContext'] === 'false' ? false : DEFAULTS.useAppContext,
     };
     this.cache = settings;
     return settings;

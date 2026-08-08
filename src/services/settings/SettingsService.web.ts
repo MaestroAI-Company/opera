@@ -15,6 +15,7 @@ export type AppSettings = {
   name: string;
   includeDateTime: boolean;
   dataWarningDismissed: boolean;
+  useAppContext: boolean;
 };
 
 const DEFAULTS: AppSettings = {
@@ -40,6 +41,7 @@ const DEFAULTS: AppSettings = {
   name: '',
   includeDateTime: true,
   dataWarningDismissed: false,
+  useAppContext: true,
 };
 
 class SettingsService {
@@ -77,6 +79,7 @@ class SettingsService {
         name: parsed.name ?? DEFAULTS.name,
         includeDateTime: typeof parsed.includeDateTime === 'boolean' ? parsed.includeDateTime : DEFAULTS.includeDateTime,
         dataWarningDismissed: typeof parsed.dataWarningDismissed === 'boolean' ? parsed.dataWarningDismissed : DEFAULTS.dataWarningDismissed,
+        useAppContext: typeof parsed.useAppContext === 'boolean' ? parsed.useAppContext : DEFAULTS.useAppContext,
       };
       
       this.cache = settings;

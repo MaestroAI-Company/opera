@@ -29,6 +29,7 @@ import { useResponsive } from "../hooks/useResponsive";
 import { AIModule } from "../services/ai/AIModule";
 import { Conversation, DB, Message, MessageMetrics } from "../services/db/DatabaseService";
 import { Settings } from "../services/settings/SettingsService";
+import { LocationService } from "../services/location/LocationService";
 import { WidgetManager } from "../services/widgets/WidgetManager";
 import { PluginRegistry } from "../services/plugins/PluginRegistry";
 import { STT } from "../services/speech/STTService";
@@ -305,6 +306,10 @@ export default function Index() {
     const init = async () => {
       await DB.init();
       loadConversations();
+      //warm up cached location if already granted
+      LocationService.hasPermission().then((granted) => {
+        if (granted) LocationService.refresh().catch(() => {});
+      });
       //load and apply settings
       try {
         await Settings.init();
@@ -505,7 +510,8 @@ export default function Index() {
           );
         }
       } catch (e) {
-        console.error("Failed to generate title:", e);
+        //title generation is best-effort: keep the truncated first-message name on failure
+        console.warn("Title generation skipped:", (e as any)?.message ?? e);
       }
     },
     [selectedModel]

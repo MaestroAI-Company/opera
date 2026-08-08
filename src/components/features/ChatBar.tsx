@@ -78,6 +78,9 @@ type ChatInputBarProps = {
   //screen-selection attachment owned by the parent overlay
   selection?: { uri: string; label: string } | null;
   onSelectionRemove?: () => void;
+  //foreground-app chip owned by the parent overlay (icon + label + package)
+  appContextChip?: { icon: string; label: string } | null;
+  onAppContextRemove?: () => void;
 };
 
 export type ChatBarHandle = {
@@ -179,6 +182,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   autoStartMic = false,
   selection = null,
   onSelectionRemove,
+  appContextChip = null,
+  onAppContextRemove,
 }, ref) {
   useImperativeHandle(ref, () => ({
     stopRecording: () => {
@@ -911,9 +916,19 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         <Animated.View style={{ width: '100%', maxWidth: 800, zIndex: 2, elevation: 9 }}>
           <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.pressableWrapper}>
             <Animated.View style={{ transform: [{ scale }] }}>
-              {selectedFiles.length > 0 || !!selection ? (
+              {selectedFiles.length > 0 || !!selection || !!appContextChip ? (
                 <View style={[styles.filesContainerTop, incognito && styles.filesContainerTopIncognito]}>
                   <View style={styles.fileChipsContainer}>
+                    {appContextChip && (
+                      <View style={styles.filePreviewContainerTop}>
+                        <Image source={{ uri: appContextChip.icon }} style={styles.appContextChipIcon} resizeMode="contain" />
+                        {onAppContextRemove && (
+                          <Pressable style={({ pressed, hovered }) => [styles.removeFileBtnTop, (pressed || hovered) && { opacity: 0.8 }]} onPress={onAppContextRemove}>
+                            <Text style={styles.removeFileBtnTextTop}>✕</Text>
+                          </Pressable>
+                        )}
+                      </View>
+                    )}
                     {selection && (
                       <View style={styles.filePreviewContainerTop}>
                         <Image source={{ uri: selection.uri }} style={styles.filePreviewImageTop} />
@@ -937,7 +952,14 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                       </View>
                     ))}
                     <Text style={[styles.filesAddedText, incognito && { color: Colors.textDisabledStrong }]}>
-                      {selectedFiles.length + (selection ? 1 : 0)} File{selectedFiles.length + (selection ? 1 : 0) !== 1 ? 's' : ''} Added
+                      {(() => {
+                        const fileCount = selectedFiles.length + (selection ? 1 : 0);
+                        const filesPart = fileCount > 0 ? `${fileCount} File${fileCount !== 1 ? 's' : ''}` : '';
+                        const appPart = appContextChip ? 'App context' : '';
+                        if (filesPart && appPart) return `${filesPart} and app context Added`;
+                        if (filesPart) return `${filesPart} Added`;
+                        return `${appPart} Added`;
+                      })()}
                     </Text>
                   </View>
                 </View>
@@ -1186,6 +1208,11 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     backgroundColor: Colors.textFaint,
+  },
+  appContextChipIcon: {
+    width: 32,
+    height: 32,
+    backgroundColor: 'transparent',
   },
   filePreviewAudioTop: {
     width: 44,

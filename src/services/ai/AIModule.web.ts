@@ -4,6 +4,7 @@ import { ToolManager } from './tools/ToolManager';
 import { sendMessageWithToolPrompt } from './tools/fallbackToolCall';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { LocalProvider } from './LocalProvider';
+import { LocationService } from '../location/LocationService';
 
 const DEFAULT_URL = 'http://127.0.0.1:11434';
 
@@ -135,6 +136,19 @@ class CentralAIModule {
     );
   }
 
+  //queue any available context lines, only append the block when at least one exists
+  private async buildContextBlock(): Promise<string> {
+    if (!LocationService.getCached() && (await LocationService.hasPermission())) {
+      await LocationService.refresh();
+    }
+    const lines: string[] = [];
+    lines.push(`Current Date and Time: ${new Date().toLocaleString()}`);
+    const locationContext = LocationService.getContextString();
+    if (locationContext) lines.push(`User Location: ${locationContext}`);
+    if (lines.length === 0) return '';
+    return `\n\n[System Context]\n- ${lines.join('\n- ')}`;
+  }
+
   //send message
   async sendMessage(
     modelName: string,
@@ -146,7 +160,7 @@ class CentralAIModule {
   ): Promise<void> {
     const provider = this.getActiveProvider();
     const processedMessages = await this.processImages(messages);
-    const enhancedPrompt = systemPrompt + `\n\n[System Context]\nCurrent Date and Time: ${new Date().toLocaleString()}`;
+    const enhancedPrompt = systemPrompt + (await this.buildContextBlock());
     await provider.sendMessage(modelName, enhancedPrompt, processedMessages, onChunk, signal, options);
   }
 
@@ -170,7 +184,7 @@ class CentralAIModule {
 
     const tools = ToolManager.getDefinitions();
     const processedMessages = await this.processImages(messages);
-    const enhancedPrompt = systemPrompt + `\n\n[System Context]\nCurrent Date and Time: ${new Date().toLocaleString()}`;
+    const enhancedPrompt = systemPrompt + (await this.buildContextBlock());
 
     if (tools.length === 0) {
       await provider.sendMessage(modelName, enhancedPrompt, processedMessages, onChunk, signal, options);

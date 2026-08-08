@@ -30,6 +30,7 @@
     "expo-image-picker": "~57.0.5",
     "expo-linear-gradient": "~57.0.0",
     "expo-linking": "~57.0.2",
+    "expo-location": "~57.0.8",
     "expo-media-library": "~57.0.3",
     "expo-paste-input": "^0.2.2",
     "expo-quick-actions": "^6.0.2",

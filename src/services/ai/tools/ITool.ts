@@ -25,7 +25,6 @@ export interface ITool {
   definition: ToolDefinition;
   displayName?: string;
   displayDescription?: string;
-  promptInstructions?: string; // extra ai instructions, hidden from ui
   enabledByDefault?: boolean;
   execute(args: Record<string, any>, summarize?: (text: string) => Promise<string>): Promise<string>;
 }

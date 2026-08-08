@@ -32,16 +32,7 @@ class ToolManagerService {
         const defaultEnabled = t.enabledByDefault ?? false;
         return PluginRegistry.isEnabled('tool', name, defaultEnabled);
       })
-      .map(t => {
-        if (!t.promptInstructions) return t.definition;
-        return {
-          ...t.definition,
-          function: {
-            ...t.definition.function,
-            description: `${t.definition.function.description}\n\nIMPORTANT: ${t.promptInstructions}`,
-          },
-        };
-      });
+      .map(t => t.definition);
   }
 
   //execute a tool by name

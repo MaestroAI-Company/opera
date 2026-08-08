@@ -403,6 +403,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     borderWidth: 2,
     borderColor: Colors.borderOnPrimary,
+    borderRadius: Radius.md,
   },
   optionText: {
     fontSize: FontSizes.body,

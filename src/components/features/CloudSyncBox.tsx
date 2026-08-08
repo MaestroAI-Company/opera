@@ -75,13 +75,13 @@ export default function CloudSyncBox({
           )
         ) : (
           <>
+            <Pressable style={({ pressed, hovered }) => [styles.actionBtn, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]} onPress={onDisconnect}>
+              <Text style={styles.actionBtnText}>Disconnect</Text>
+            </Pressable>
             <Pressable style={({ pressed, hovered }) => [styles.actionBtn, styles.syncBtn, (pressed || hovered) && { backgroundColor: Colors.primaryPressed }]} onPress={onSync} disabled={isSyncing}>
               <Text style={[styles.actionBtnText, { color: Colors.surface }]}>
                 {isSyncing ? "Syncing..." : "Sync Now"}
               </Text>
-            </Pressable>
-            <Pressable style={({ pressed, hovered }) => [styles.actionBtnDanger, (pressed || hovered) && { backgroundColor: Colors.dangerBg }]} onPress={onDisconnect}>
-              <Text style={styles.actionBtnTextDanger}>Disconnect</Text>
             </Pressable>
           </>
         )}
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   actionsRow: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 8,
   },
   actionBtn: {
@@ -158,25 +158,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     borderColor: Colors.borderOnPrimary,
   },
-  actionBtnDanger: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: Radius.md,
-    borderWidth: 2,
-    borderColor: Colors.dangerBorderSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.dangerBgSoft,
-  },
   actionBtnText: {
     fontSize: FontSizes.label,
     fontFamily: Fonts.mono,
     color: Colors.textSecondary,
-  },
-  actionBtnTextDanger: {
-    fontSize: FontSizes.label,
-    fontFamily: Fonts.mono,
-    color: Colors.primaryPressed,
   },
 });

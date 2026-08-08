@@ -108,7 +108,12 @@ export default function NotificationModal({
           )}
 
           <View style={styles.buttonContainer}>
-            {activeButtons.map((btn, index) => {
+            {[...activeButtons]
+              .sort((a, b) => {
+                const rank = (btn: ModalButton) => btn.style === "primary" || btn.style === "danger" ? 1 : 0;
+                return rank(a) - rank(b);
+              })
+              .map((btn, index) => {
               const isPrimary = btn.style === "primary" || !btn.style;
               const isDanger = btn.style === "danger";
 
@@ -181,7 +186,6 @@ const styles = StyleSheet.create({
   },
     title: {
     fontSize: FontSizes.lg,
-    fontWeight: "bold",
     color: Colors.textPrimary,
     fontFamily: Fonts.mono,
       textAlign: "center",
@@ -202,10 +206,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   buttonContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    flexWrap: "wrap",
-    gap: 12,
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 8,
   },
   button: {
     paddingVertical: 10,

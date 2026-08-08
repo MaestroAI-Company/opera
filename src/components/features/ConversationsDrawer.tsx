@@ -371,20 +371,20 @@ export default function ConversationsDrawer({
       onClose={() => setDeleteConfirmId(null)}
       buttons={[
         {
-          text: "Cancel",
-          style: "secondary",
-          onPress: () => setDeleteConfirmId(null)
-        },
-        {
           text: "Delete",
-          style: "danger",
+          style: "secondary",
           onPress: () => {
             if (deleteConfirmId) {
               onDeleteConversation?.(deleteConfirmId);
             }
             setDeleteConfirmId(null);
           }
-        }
+        },
+        {
+          text: "Cancel",
+          style: "danger",
+          onPress: () => setDeleteConfirmId(null)
+        },
       ]}
     />
   );

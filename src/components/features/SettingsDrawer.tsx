@@ -250,10 +250,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       "Delete All Conversations",
       "This will permanently delete all conversations. This action cannot be undone.",
       [
-        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
         {
           text: "Delete All",
-          style: "danger",
+          style: "secondary",
           onPress: async () => {
             setAlertModalVisible(false);
             try {
@@ -265,6 +264,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             }
           },
         },
+        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "danger" },
       ]
     );
   };

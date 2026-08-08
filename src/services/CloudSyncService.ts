@@ -346,6 +346,7 @@ class CloudSyncServiceImpl {
         instruction: cloudBackup.settings.instruction,
         name: cloudBackup.settings.name,
         includeDateTime: cloudBackup.settings.includeDateTime,
+        useAppContext: cloudBackup.settings.useAppContext,
         hasSeenOnboarding: cloudBackup.settings.hasSeenOnboarding,
       };
       await Settings.applyCloudSettings(mergedSettings);

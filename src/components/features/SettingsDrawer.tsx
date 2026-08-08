@@ -151,6 +151,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [alwaysWhisper, setAlwaysWhisperState] = useState(true);
   const [autoSpeak, setAutoSpeakState] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(false);
+  const [useAppContext, setUseAppContextState] = useState(true);
   const [usageAnalytics, setUsageAnalyticsState] = useState(true);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
@@ -338,6 +339,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setAlwaysWhisperState(s.alwaysWhisper);
         setAutoSpeakState(s.autoSpeak);
         setShowTechnicalDetailsState(s.showTechnicalDetails);
+        setUseAppContextState(s.useAppContext);
         //apply to services
         AIModule.configure(s.ollamaUrl);
         AIModule.setMode(s.aiService);
@@ -458,6 +460,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const setShowTechnicalDetails = (v: boolean) => {
     setShowTechnicalDetailsState(v);
     Settings.set("showTechnicalDetails", v);
+  };
+
+  const setUseAppContext = (v: boolean) => {
+    setUseAppContextState(v);
+    Settings.set("useAppContext", v);
   };
 
   const completeCloudConnect = async (v: string) => {
@@ -957,6 +964,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         />
       </View>
       <Text style={styles.helpText}>Include technical data in AI responses</Text>
+
+      {Platform.OS === 'android' && (
+        <>
+          <View style={styles.toggleRow}>
+            <Text style={styles.settingLabel}>Use app context</Text>
+            <Toggle
+              checked={useAppContext}
+              onToggle={setUseAppContext}
+            />
+          </View>
+          <Text style={styles.helpText}>Send the foreground app and on-screen text to the assistant when using the overlay</Text>
+        </>
+      )}
 
       <View style={styles.toggleRow}>
         <Text style={styles.settingLabel}>Auto-read replies</Text>

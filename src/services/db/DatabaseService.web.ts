@@ -24,6 +24,8 @@ export type Message = {
   createdAt: number;
   images?: string[];
   metrics?: MessageMetrics;
+  //snapshot of the foreground app context captured at send time
+  screenContext?: { appPackage: string | null; hasScreenText: boolean; icon?: string | null; label?: string | null };
 };
 
 export type SyncTombstone = {
@@ -179,20 +181,26 @@ class DatabaseService {
   }
 
   // add message to conversation
-  async addMessage(conversationId: string, role: 'user' | 'assistant', content: string, images?: string[]): Promise<Message> {
+  async addMessage(conversationId: string, role: 'user' | 'assistant', content: string, images?: string[], screenContext?: Message['screenContext']): Promise<Message> {
     const now = Date.now();
     const id = `msg_${now}_${Math.random().toString(36).slice(2, 7)}`;
-    const msg: Message = { id, conversationId, role, content, createdAt: now, images };
-    
+    const msg: Message = { id, conversationId, role, content, createdAt: now, images, screenContext };
+
     this.messages.push(msg);
-    this.conversations = this.conversations.map(c => 
+    this.conversations = this.conversations.map(c =>
       c.id === conversationId ? { ...c, updatedAt: now } : c
     );
-    
+
     this.saveConversations();
     this.saveMessages();
     DeviceEventEmitter.emit('DATA_CHANGED');
     return msg;
+  }
+
+  //patch the persisted screen context (used when it is resolved asynchronously)
+  async updateMessageScreenContext(id: string, screenContext: Message['screenContext']): Promise<void> {
+    this.messages = this.messages.map(m => m.id === id ? { ...m, screenContext } : m);
+    this.saveMessages();
   }
 
   // update message content

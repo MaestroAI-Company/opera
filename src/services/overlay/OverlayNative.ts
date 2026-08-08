@@ -8,6 +8,10 @@ export type ScreenshotInfo = { width: number; height: number };
 
 export type NormalizedRegion = { x: number; y: number; w: number; h: number };
 
+export type AppContext = { appPackage: string | null; screenText: string | null };
+
+export type AppIconInfo = { icon: string; label: string };
+
 export const OverlayNative = {
   supported(): boolean {
     return MODULE !== null;
@@ -27,7 +31,8 @@ export const OverlayNative = {
     if (!MODULE) return null;
     try {
       return (await MODULE.getScreenshotInfo()) as ScreenshotInfo;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.code === 'NO_SCREENSHOT' || /no screenshot available/i.test(e?.message || '')) return null;
       console.warn('ScreenCapture getScreenshotInfo error:', e);
       return null;
     }
@@ -38,7 +43,9 @@ export const OverlayNative = {
     if (!MODULE) return null;
     try {
       return (await MODULE.cropRegion(region.x, region.y, region.w, region.h)) as string;
-    } catch (e) {
+    } catch (e: any) {
+      //the screenshot arrives asynchronously from the assist api, so early calls can race
+      if (e?.code === 'NO_SCREENSHOT' || /no screenshot available/i.test(e?.message || '')) return null;
       console.warn('ScreenCapture cropRegion error:', e);
       return null;
     }
@@ -56,8 +63,35 @@ export const OverlayNative = {
       const aligned = new Uint8Array(bytes.byteLength);
       aligned.set(bytes);
       return new Float32Array(aligned.buffer);
-    } catch (e) {
+    } catch (e: any) {
+      //same race as cropRegion — the screenshot may not have landed yet
+      if (e?.code === 'NO_SCREENSHOT' || /no screenshot available/i.test(e?.message || '')) return null;
       console.warn('ScreenCapture getYoloInputTensor error:', e);
+      return null;
+    }
+  },
+
+  //foreground app package + flattened screen text from the android assist api
+  async getAppContext(): Promise<AppContext | null> {
+    if (!MODULE) return null;
+    //older native builds may not expose this method, skip quietly instead of throwing
+    if (typeof MODULE.getAppContext !== 'function') return null;
+    try {
+      return (await MODULE.getAppContext()) as AppContext;
+    } catch (e) {
+      console.warn('ScreenCapture getAppContext error:', e);
+      return null;
+    }
+  },
+
+  //resolve the launcher icon + label for a package name
+  async getAppIcon(pkg: string): Promise<AppIconInfo | null> {
+    if (!MODULE) return null;
+    if (typeof MODULE.getAppIcon !== 'function') return null;
+    try {
+      return (await MODULE.getAppIcon(pkg)) as AppIconInfo;
+    } catch (e) {
+      //most likely the package was uninstalled or is not queryable
       return null;
     }
   },

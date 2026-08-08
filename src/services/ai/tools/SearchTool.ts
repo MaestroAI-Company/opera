@@ -12,7 +12,7 @@ export class SearchTool implements ITool {
     type: 'function',
     function: {
       name: 'web_search',
-      description: 'Search the web for current information. Use this to find sources. This returns a list of web pages with a short snippet of their content.IMPORTANT: You MUST use the fetch_pages tool afterwards to read the full content of the most relevant sources.',
+      description: 'Search the web for current information. Use this whenever facts may have changed since your training (news, prices, releases, scores, weather, schedules, versions, laws, availability), when the answer needs a source, citation, URL, number, name, date, or quote, or when the topic depends on the user location (restaurants, shops, events, transit, weather, opening hours — include the city in the query). Do not ask permission or announce your intention; just call this tool. Returns a list of web pages with short snippets.IMPORTANT: You MUST use the fetch_pages tool afterwards to read the full content of the most relevant sources.',
       parameters: {
         type: 'object',
         properties: {

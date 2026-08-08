@@ -71,6 +71,13 @@ export class AICoreProvider implements IAIProvider {
     return caps;
   }
 
+  //aicore inference occasionally fails with a transient INFERENCE_ERROR
+  //(thermal state, memory pressure, model still warming). retry once.
+  private isTransientAICoreError(e: any): boolean {
+    const msg = String(e?.message ?? e ?? '');
+    return /INFERENCE_ERROR|ErrorCode 200|Inference failed/i.test(msg);
+  }
+
   async sendMessage(
     modelName: string,
     systemPrompt: string,
@@ -86,6 +93,31 @@ export class AICoreProvider implements IAIProvider {
     onMetrics?: (metrics: MessageMetrics) => void
   ): Promise<{ toolCalls?: ToolCall[], content?: string }> {
     if (!this.supported()) throw new Error('AICore not available on this device');
+    try {
+      return await this.sendMessageOnce(modelName, systemPrompt, messages, onChunk, signal, options, onMetrics);
+    } catch (e: any) {
+      if (signal?.aborted || !this.isTransientAICoreError(e)) throw e;
+      //back off briefly then try one more time
+      await new Promise(res => setTimeout(res, 300));
+      if (signal?.aborted) throw e;
+      return this.sendMessageOnce(modelName, systemPrompt, messages, onChunk, signal, options, onMetrics);
+    }
+  }
+
+  private async sendMessageOnce(
+    modelName: string,
+    systemPrompt: string,
+    messages: {
+      role: string;
+      content: string;
+      images?: string[];
+      tool_calls?: any[];
+    }[],
+    onChunk: (chunk: string) => void,
+    signal?: AbortSignal,
+    options?: { think?: boolean | string; tools?: ToolDefinition[] },
+    onMetrics?: (metrics: MessageMetrics) => void
+  ): Promise<{ toolCalls?: ToolCall[], content?: string }> {
     const requestId = `aicore_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const startTime = Date.now();
 

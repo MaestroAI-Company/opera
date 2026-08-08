@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import {
   initExecutorch,
@@ -11,7 +11,10 @@ import { OverlayNative } from './OverlayNative';
 import { decodeYoloOutput, YoloDetection } from './yoloPostprocess';
 
 export type ObjectDetectorConfig = {
+  //cpu-baked .pte (xnnpack) — always shipped, used as the last-resort fallback
   modelSource: number;
+  //optional gpu/npu-baked .pte (vulkan/qnn/...) — preferred when it loads successfully
+  acceleratedModelSource?: number;
   classes: readonly string[];
   targetSize?: number;
 };
@@ -26,11 +29,29 @@ function ensureInit() {
 }
 
 //loads a yolo .pte and runs detection on the current screenshot
+//tries the accelerated backend first (vulkan/qnn/...) and transparently falls back
+//to the cpu build (xnnpack) if init fails on this device
 export function useObjectDetector(config: ObjectDetectorConfig) {
   ensureInit();
   const targetSize = config.targetSize ?? 640;
+
+  //state-driven source so we can swap backends after an init failure
+  const [activeSource, setActiveSource] = useState<number>(
+    config.acceleratedModelSource ?? config.modelSource
+  );
+  const triedAccelRef = useRef(config.acceleratedModelSource == null);
+
   const { isReady, isGenerating, error, downloadProgress, forward } =
-    useExecutorchModule({ modelSource: config.modelSource });
+    useExecutorchModule({ modelSource: activeSource });
+
+  //if the accelerated backend refused to load, downgrade to the cpu build once
+  useEffect(() => {
+    if (error && !triedAccelRef.current && activeSource !== config.modelSource) {
+      triedAccelRef.current = true;
+      console.warn('[useObjectDetector] accelerated backend failed, falling back to cpu:', (error as any)?.message ?? error);
+      setActiveSource(config.modelSource);
+    }
+  }, [error, activeSource, config.modelSource]);
 
   //keep latest forward behind a ref so detect stays stable
   const isReadyRef = useRef(isReady);

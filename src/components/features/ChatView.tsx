@@ -122,6 +122,14 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
     <View style={[styles.bubble, isUser ? (incognito ? styles.userBubbleIncognito : styles.userBubble) : styles.aiBubble]}>
       {isUser ? (
         <View>
+          {item.screenContext && item.screenContext.icon && (
+            <View style={styles.screenContextChip}>
+              <Image source={{ uri: item.screenContext.icon }} style={styles.screenContextIcon} />
+              {!!item.screenContext.label && (
+                <Text style={styles.screenContextLabel} numberOfLines={1}>{item.screenContext.label}</Text>
+              )}
+            </View>
+          )}
           {item.images && item.images.length > 0 && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
               {item.images.map((uri, i) => {
@@ -547,6 +555,30 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: Radius.xl,
+  },
+  screenContextChip: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.whiteFaint,
+    paddingLeft: 4,
+    paddingRight: 10,
+    paddingVertical: 4,
+    borderRadius: Radius.huge,
+    marginBottom: 6,
+    gap: 6,
+    maxWidth: 220,
+  },
+  screenContextIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+  },
+  screenContextLabel: {
+    color: 'white',
+    fontFamily: Fonts.body,
+    fontSize: FontSizes.xxs,
+    flexShrink: 1,
   },
   audioAttachmentBubble: {
     backgroundColor: Colors.whiteFaint,

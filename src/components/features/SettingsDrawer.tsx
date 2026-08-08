@@ -47,6 +47,7 @@ const socialIcon = require("../../../assets/icons/social.png");
 const micIcon = require("../../../assets/icons/microphone.png");
 const cameraIcon = require("../../../assets/icons/camera.png");
 const photoIcon = require("../../../assets/icons/photo.png");
+const locationIcon = require("../../../assets/icons/pin.png");
 const exportIcon = require("../../../assets/icons/export.png");
 
 import ActionButton from "../ui/ActionButton";
@@ -1150,6 +1151,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             icon={cameraIcon}
             title="Camera"
             description="To photograph and analyze documents. ↗"
+            onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+          />
+          <ActionButton
+            icon={locationIcon}
+            title="Location"
+            description="To give the assistant local context for more relevant answers. ↗"
             onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
           />
           {Platform.OS !== "web" && (

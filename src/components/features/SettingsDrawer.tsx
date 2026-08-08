@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Animated, BackHandler, DeviceEventEmitter, Image, Keyboard, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, BackHandler, DeviceEventEmitter, Image, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import { getLocalProviderLabel } from "../../services/ai/LocalProvider";
@@ -44,6 +44,12 @@ const serverIcon = require("../../../assets/icons/server.png");
 const toolIcon = require("../../../assets/icons/tool.png");
 const confidentialityIcon = require("../../../assets/icons/confidentiality.png");
 const socialIcon = require("../../../assets/icons/social.png");
+const micIcon = require("../../../assets/icons/microphone.png");
+const cameraIcon = require("../../../assets/icons/camera.png");
+const photoIcon = require("../../../assets/icons/photo.png");
+const exportIcon = require("../../../assets/icons/export.png");
+
+import ActionButton from "../ui/ActionButton";
 
 type SettingsDrawerProps = {
   visible: boolean;
@@ -637,7 +643,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     try {
       const isAvailable = await AIModule.isAvailable();
       if (!isAvailable) {
-        setOllamaError("The Ollama URL is incorrect or the server is unreachable.");
+        setOllamaError("The Ollama URL is incorrect or the server is unreachable");
         setOllamaModelOptions([]);
         return;
       }
@@ -963,7 +969,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             onToggle={setShowTechnicalDetails}
           />
         </View>
-        <Text style={styles.helpText}>Include technical data in AI responses</Text>
+        <Text style={styles.helpText}>Add an info button below answers to inspect AI technical data.</Text>
       </View>
 
       <View style={styles.settingRowVertical}>
@@ -974,7 +980,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             onToggle={setAutoSpeak}
           />
         </View>
-        <Text style={styles.helpText}>Speak the answer aloud when you ask by voice</Text>
+        <Text style={styles.helpText}>Speak the answer aloud when you ask by voice.</Text>
       </View>
     </View>
   );
@@ -1040,7 +1046,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       {aiService === "ollama" && (
         <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Ollama server</Text>
+          {/* ollama server input section */}
+          <Text style={styles.settingLabel}>Ollama server</Text>
+          <Text style={[styles.helpText, { marginBottom: 10 }]}>URL of your local or remote Ollama instance.</Text>
           <TextInputField
             icon={linkIcon}
             placeholder="server link"
@@ -1083,7 +1091,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               onToggle={setAlwaysWhisper}
             />
           </View>
-          <Text style={styles.helpText}>Process audio transcriptions locally on your device</Text>
+          <Text style={styles.helpText}>Process audio transcriptions locally on your device.</Text>
         </>
       )}
     </View>
@@ -1096,22 +1104,71 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={styles.settingRowVertical}>
         <Text style={styles.settingLabel}>Data privacy</Text>
-        <Text style={styles.helpText}>Designed for privacy, this app operates entirely on-device. All your data, searches, and settings remain strictly local—no personal info, analytics, or crash data are ever transmitted to external servers.</Text>
+        <Text style={styles.helpText}>Designed for privacy, Opera operates entirely on-device. All your data, searches, and settings remain strictly local—no personal info, analytics, or crash data are ever transmitted to external servers.</Text>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Permissions</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          {Platform.OS === "web"
+            ? "Opera needs a few permissions to work at its best. You can manage them from your browser's site settings."
+            : <>Opera needs a few permissions to work at its best. You can change them in your device{" "}
+              <Text style={styles.settingsLink} onPress={() => Linking.openSettings()}>
+                settings ↗
+              </Text>
+              .</>}
+        </Text>
+
+        <View style={{ gap: 12 }}>
+          <ActionButton
+            icon={micIcon}
+            title="Microphone"
+            description="To dictate your messages by voice. ↗"
+            onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+          />
+          <ActionButton
+            icon={cameraIcon}
+            title="Camera"
+            description="To photograph and analyze documents. ↗"
+            onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+          />
+          {Platform.OS !== "web" && (
+            <ActionButton
+              icon={photoIcon}
+              title="Photos"
+              description="To share images from your gallery. ↗"
+              onPress={() => Linking.openSettings()}
+            />
+          )}
+        </View>
       </View>
 
       <View style={styles.settingRowVertical}>
         <Text style={styles.settingLabel}>Data management</Text>
-        <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
-          <Pressable style={({ pressed, hovered }) => [styles.dataBtn, (pressed || hovered) && styles.dataBtnPressed]} onPress={handleExportData}>
-            <Text style={styles.dataBtnText}>Export</Text>
-          </Pressable>
-          <Pressable style={({ pressed, hovered }) => [styles.dataBtn, (pressed || hovered) && styles.dataBtnPressed]} onPress={handleImportData}>
-            <Text style={styles.dataBtnText}>Import</Text>
-          </Pressable>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          Manage your conversations and settings data locally.
+        </Text>
+
+        <View style={{ gap: 12 }}>
+          <ActionButton
+            icon={exportIcon}
+            title="Export data"
+            description="Save your data to a json file."
+            onPress={handleExportData}
+          />
+          <ActionButton
+            icon={downloadIcon}
+            title="Import data"
+            description="Restore your data from a backup json file."
+            onPress={handleImportData}
+          />
+          <ActionButton
+            icon={deleteIcon}
+            title="Delete all conversations"
+            description="Clear all chat history from this device."
+            onPress={handleDeleteAllConversations}
+          />
         </View>
-        <Pressable style={({ pressed, hovered }) => [{ marginTop: 8 }, styles.dataBtn, styles.dataBtnDanger, (pressed || hovered) && styles.dataBtnDangerPressed]} onPress={handleDeleteAllConversations}>
-          <Text style={styles.dataBtnTextDanger}>Delete all conversations</Text>
-        </Pressable>
       </View>
     </View>
   );
@@ -1130,12 +1187,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return (
           <View key={name} style={styles.settingRowVertical}>
             <View style={styles.toggleRow}>
-              <View style={styles.pluginTextContainer}>
-                <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
-                {tool.displayDescription ? (
-                  <Text style={styles.helpText}>{tool.displayDescription}</Text>
-                ) : null}
-              </View>
+              <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
               <Toggle
                 checked={enabled}
                 onToggle={async (v) => {
@@ -1144,6 +1196,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 }}
               />
             </View>
+            {tool.displayDescription ? (
+              <Text style={styles.helpText}>
+                {tool.displayDescription.endsWith('.') ? tool.displayDescription : `${tool.displayDescription}.`}
+              </Text>
+            ) : null}
           </View>
         );
       })}
@@ -1156,10 +1213,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return (
           <View key={widget.id} style={styles.settingRowVertical}>
             <View style={styles.toggleRow}>
-              <View style={styles.pluginTextContainer}>
-                <Text style={styles.settingLabel}>{widget.name}</Text>
-                <Text style={styles.helpText}>{widget.description.split('.')[0]}.</Text>
-              </View>
+              <Text style={styles.settingLabel}>{widget.name}</Text>
               <Toggle
                 checked={enabled}
                 onToggle={async (v) => {
@@ -1168,6 +1222,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 }}
               />
             </View>
+            <Text style={styles.helpText}>{widget.description.split('.')[0]}.</Text>
           </View>
         );
       })}
@@ -1504,37 +1559,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     marginTop: 4,
   },
-  dataBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: Colors.surface,
-  },
-  dataBtnPressed: {
-    backgroundColor: Colors.surfacePressed,
-  },
-  dataBtnText: {
-    fontSize: FontSizes.caption,
-    fontFamily: Fonts.mono,
-    color: Colors.textSecondary,
-  },
-  dataBtnDanger: {
-    borderColor: Colors.dangerBorder,
-    backgroundColor: Colors.surface,
-  },
-  dataBtnDangerPressed: {
-    backgroundColor: Colors.dangerBg,
-  },
-  dataBtnTextDanger: {
-    fontSize: FontSizes.caption,
-    fontFamily: Fonts.mono,
-    color: Colors.primary,
-  },
   sectionTitle: {
     fontSize: 13,
     fontFamily: "IBMPlexMono-Medium",
@@ -1544,8 +1568,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginTop: 4,
   },
-  pluginTextContainer: {
-    flex: 1,
-    marginRight: 12,
+  settingsLink: {
+    color: Colors.primary,
+    textDecorationLine: "underline",
   },
 });

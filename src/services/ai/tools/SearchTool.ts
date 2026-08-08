@@ -5,7 +5,7 @@ import { universalFetch } from '../utils/universalFetch';
 
 export class SearchTool implements ITool {
   displayName = 'Web Search';
-  displayDescription = 'Allow the assistant to search the web for real-time information';
+  displayDescription = 'Allow the assistant to search the web for real-time information.';
   enabledByDefault = true;
 
   definition: ToolDefinition = {

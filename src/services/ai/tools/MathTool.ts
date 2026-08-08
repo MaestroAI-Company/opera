@@ -359,7 +359,7 @@ function formatResult(v: number): string {
 
 export class MathTool implements ITool {
   displayName = 'Math Calculator';
-  displayDescription = 'Allow the assistant to compute exact results of mathematical expressions';
+  displayDescription = 'Allow the assistant to compute exact results of mathematical expressions.';
   enabledByDefault = true;
 
   definition: ToolDefinition = {

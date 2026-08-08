@@ -9,6 +9,8 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +23,8 @@ class ScreenCaptureModule(reactContext: ReactApplicationContext) : ReactContextB
   companion object {
     private const val TAG = "ScreenCaptureModule"
     private const val YOLO_SIZE = 640
+    //chat attachment thumbnail cap, not a full-res export
+    private const val MAX_THUMB_DIM = 1280
     private var instance: ScreenCaptureModule? = null
 
     //notify js overlay of activity reuse
@@ -67,53 +71,59 @@ class ScreenCaptureModule(reactContext: ReactApplicationContext) : ReactContextB
   //crop normalized region (0..1) to a jpeg base64 data uri for chat attachment
   @ReactMethod
   fun cropRegion(x: Double, y: Double, w: Double, h: Double, promise: Promise) {
-    //snapshot copy to survive holder recycle
-    val snapshot = ScreenshotHolder.get()?.copy(Bitmap.Config.ARGB_8888, false)
-    if (snapshot == null) {
+    val bmp = ScreenshotHolder.get()
+    if (bmp == null || bmp.isRecycled) {
       promise.reject("NO_SCREENSHOT", "no screenshot available")
       return
     }
     scope.launch {
       try {
-        val bmp = snapshot
+        if (bmp.isRecycled) throw IllegalStateException("screenshot recycled")
         val sx = (x * bmp.width).toInt().coerceIn(0, bmp.width)
         val sy = (y * bmp.height).toInt().coerceIn(0, bmp.height)
         val sw = (w * bmp.width).toInt().coerceIn(0, bmp.width - sx)
         val sh = (h * bmp.height).toInt().coerceIn(0, bmp.height - sy)
         if (sw <= 0 || sh <= 0) throw IllegalStateException("empty region")
-        val crop = Bitmap.createBitmap(bmp, sx, sy, sw, sh)
+        var crop = Bitmap.createBitmap(bmp, sx, sy, sw, sh)
+        //downscale before encoding, a full-screen crop at full res is slow to compress and bridge over
+        val maxDim = maxOf(crop.width, crop.height)
+        if (maxDim > MAX_THUMB_DIM) {
+          val scale = MAX_THUMB_DIM.toFloat() / maxDim
+          val scaled = Bitmap.createScaledBitmap(crop, (crop.width * scale).toInt(), (crop.height * scale).toInt(), true)
+          crop.recycle()
+          crop = scaled
+        }
         val out = ByteArrayOutputStream()
-        crop.compress(Bitmap.CompressFormat.JPEG, 90, out)
+        crop.compress(Bitmap.CompressFormat.JPEG, 85, out)
         crop.recycle()
         val data = Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
         promise.resolve("data:image/jpeg;base64,$data")
       } catch (e: Exception) {
         promise.reject("ERROR", e.message ?: "error")
-      } finally {
-        snapshot.recycle()
       }
     }
   }
 
-  //letterboxed rgb chw float32 as base64
+  //letterboxed rgb chw float32 written to a cache file, returns the absolute path
+  //avoids sending ~6.5MB base64 across the bridge and doing a slow atob loop in js
   @ReactMethod
   fun getYoloInputTensor(promise: Promise) {
-    //snapshot copy to survive holder recycle
-    val snapshot = ScreenshotHolder.get()?.copy(Bitmap.Config.ARGB_8888, false)
-    if (snapshot == null) {
+    val bmp = ScreenshotHolder.get()
+    if (bmp == null || bmp.isRecycled) {
       promise.reject("NO_SCREENSHOT", "no screenshot available")
       return
     }
     scope.launch {
       try {
-        val tensor = preprocess(snapshot)
+        if (bmp.isRecycled) throw IllegalStateException("screenshot recycled")
+        val tensor = preprocess(bmp)
         val bytes = ByteBuffer.allocate(tensor.size * 4).order(ByteOrder.LITTLE_ENDIAN)
         bytes.asFloatBuffer().put(tensor)
-        promise.resolve(Base64.encodeToString(bytes.array(), Base64.NO_WRAP))
+        val file = File(reactApplicationContext.cacheDir, "yolo_tensor.bin")
+        FileOutputStream(file).use { it.write(bytes.array()) }
+        promise.resolve(file.absolutePath)
       } catch (e: Exception) {
         promise.reject("ERROR", e.message ?: "error")
-      } finally {
-        snapshot.recycle()
       }
     }
   }

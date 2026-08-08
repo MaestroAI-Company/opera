@@ -1,4 +1,5 @@
 import { NativeModules, Platform } from 'react-native';
+import { File } from 'expo-file-system';
 
 const MODULE =
   Platform.OS === 'android' ? (NativeModules.ScreenCaptureModule as any) : null;
@@ -6,13 +7,6 @@ const MODULE =
 export type ScreenshotInfo = { width: number; height: number };
 
 export type NormalizedRegion = { x: number; y: number; w: number; h: number };
-
-function decodeBase64Float32(b64: string): Float32Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return new Float32Array(bytes.buffer, 0, bytes.byteLength / 4);
-}
 
 export const OverlayNative = {
   supported(): boolean {
@@ -51,11 +45,17 @@ export const OverlayNative = {
   },
 
   //letterboxed [1,3,640,640] float32 tensor for the yolo model
+  //native writes the tensor to a cache file, js reads bytes directly (no base64)
   async getYoloInputTensor(): Promise<Float32Array | null> {
     if (!MODULE) return null;
     try {
-      const b64 = (await MODULE.getYoloInputTensor()) as string;
-      return decodeBase64Float32(b64);
+      const path = (await MODULE.getYoloInputTensor()) as string;
+      const file = new File(path.startsWith('file://') ? path : `file://${path}`);
+      const bytes = await file.bytes();
+      //aligned copy so the underlying buffer is 4-byte aligned for Float32Array
+      const aligned = new Uint8Array(bytes.byteLength);
+      aligned.set(bytes);
+      return new Float32Array(aligned.buffer);
     } catch (e) {
       console.warn('ScreenCapture getYoloInputTensor error:', e);
       return null;

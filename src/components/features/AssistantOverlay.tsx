@@ -711,7 +711,7 @@ const styles = StyleSheet.create({
     width: 60,
   },
   flashingText: {
-    color: Colors.textBody,
+    color: Colors.textSecondary,
     fontSize: FontSizes.bodyMd,
     fontFamily: Fonts.mono,
     flexShrink: 1,

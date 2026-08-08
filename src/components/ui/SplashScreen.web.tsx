@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: Colors.backgroundSplash,
+    backgroundColor: Colors.background,
     justifyContent: "center",
     alignItems: "center",
   },

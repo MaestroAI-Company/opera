@@ -415,7 +415,7 @@ function MathInline({ content, estWidth, incognito }: { content: string; estWidt
       onSizeUpdated={(size) => {
         if (size.height > 0) setHeight(size.height + 2);
       }}
-      source={{ html: KATEX_HTML(`$${content}$`, FontSizes.lg, incognito ? Colors.codeBlockText : Colors.textTertiary) }}
+      source={{ html: KATEX_HTML(`$${content}$`, FontSizes.lg, incognito ? Colors.codeBlockText : Colors.textSecondary) }}
       scalesPageToFit={false}
       viewportContent={"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"}
       scrollEnabled={false}
@@ -610,7 +610,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
             <MathText
               content={mathContent}
               textSize={FontSizes.md}
-              textColor={incognito ? Colors.codeBlockText : Colors.textTertiary}
+              textColor={incognito ? Colors.codeBlockText : Colors.textSecondary}
               style={{ flex: 1, backgroundColor: "transparent" }}
             />
           </View>
@@ -637,7 +637,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
           <MathText
             content={mathLines.join("\n")}
             textSize={FontSizes.md}
-            textColor={incognito ? Colors.codeBlockText : Colors.textTertiary}
+            textColor={incognito ? Colors.codeBlockText : Colors.textSecondary}
             style={{ flex: 1, backgroundColor: "transparent" }}
           />
         </View>
@@ -768,7 +768,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
     // custom interrupted line
     if (line.trim() === "_The user interrupted the response_") {
       elements.push(
-        <Text key={`interrupted-${i}`} style={[s.base, s.italic, { color: Colors.textFaint, marginTop: 4 }]} selectable={true} selectionColor={selColor}>
+        <Text key={`interrupted-${i}`} style={[s.base, s.italic, { color: Colors.textMuted, marginTop: 4 }]} selectable={true} selectionColor={selColor}>
           The user interrupted the response
         </Text>
       );

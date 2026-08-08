@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontFamily: Fonts.body,
     fontSize: FontSizes.bodyMd,
-    color: Colors.textBody,
+    color: Colors.textSecondary,
     lineHeight: 22,
   },
   inputWrapper: {
@@ -141,6 +141,6 @@ const styles = StyleSheet.create({
   skipText: {
     fontFamily: Fonts.body,
     fontSize: FontSizes.caption,
-    color: Colors.textDisabled,
+    color: Colors.textMuted,
   },
 });

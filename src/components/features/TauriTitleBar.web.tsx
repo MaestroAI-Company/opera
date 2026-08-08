@@ -64,7 +64,7 @@ export default function TauriTitleBar() {
             onPress={handleMinimize}>
             {({ pressed, hovered }: any) => (
               <Svg width="12" height="12" viewBox="0 0 10 10">
-                <Line x1="1" y1="5" x2="9" y2="5" stroke={Colors.textTertiary} strokeWidth="1" />
+                <Line x1="1" y1="5" x2="9" y2="5" stroke={Colors.textSecondary} strokeWidth="1" />
               </Svg>
             )}
           </Pressable>
@@ -75,11 +75,11 @@ export default function TauriTitleBar() {
               <Svg width="12" height="12" viewBox="0 0 10 10">
                 {isMaximized ? (
                   <>
-                    <Rect x="2.5" y="1.5" width="6" height="6" stroke={Colors.textTertiary} strokeWidth="1" fill="none" />
-                    <Path d="M 1.5 3.5 V 8.5 H 6.5" stroke={Colors.textTertiary} strokeWidth="1" fill="none" />
+                    <Rect x="2.5" y="1.5" width="6" height="6" stroke={Colors.textSecondary} strokeWidth="1" fill="none" />
+                    <Path d="M 1.5 3.5 V 8.5 H 6.5" stroke={Colors.textSecondary} strokeWidth="1" fill="none" />
                   </>
                 ) : (
-                  <Rect x="1.5" y="1.5" width="7" height="7" stroke={Colors.textTertiary} strokeWidth="1" fill="none" />
+                  <Rect x="1.5" y="1.5" width="7" height="7" stroke={Colors.textSecondary} strokeWidth="1" fill="none" />
                 )}
               </Svg>
             )}
@@ -89,7 +89,7 @@ export default function TauriTitleBar() {
             onPress={handleClose}>
             {({ pressed, hovered }: any) => (
               <Svg width="12" height="12" viewBox="0 0 10 10">
-                <Path d="M 1 1 L 9 9 M 9 1 L 1 9" stroke={(hovered || pressed) ? Colors.surface : Colors.textTertiary} strokeWidth="1" />
+                <Path d="M 1 1 L 9 9 M 9 1 L 1 9" stroke={(hovered || pressed) ? Colors.surface : Colors.textSecondary} strokeWidth="1" />
               </Svg>
             )}
           </Pressable>
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: FontSizes.label,
-    color: Colors.textTertiary,
+    color: Colors.textSecondary,
     fontFamily: Fonts.body,
   },
   controls: {
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceCode,
   },
   buttonPressed: {
-    backgroundColor: Colors.textDisabledStrong,
+    backgroundColor: Colors.textMuted,
   },
   closeButtonHovered: {
     backgroundColor: Colors.windowClose,
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   controlIcon: {
     width: 12,
     height: 12,
-    tintColor: Colors.textTertiary,
+    tintColor: Colors.textSecondary,
   },
   closeControlIconActive: {
     tintColor: Colors.surface,

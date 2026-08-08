@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontFamily: Fonts.body,
     fontSize: FontSizes.bodyMd,
-    color: Colors.textBody,
+    color: Colors.textSecondary,
     lineHeight: 22,
   },
   list: {
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
   permissionDesc: {
     fontFamily: Fonts.body,
     fontSize: FontSizes.label,
-    color: Colors.textFaint,
+    color: Colors.textMuted,
     lineHeight: 16,
   },
   settingsLink: {
@@ -302,8 +302,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   permissionBtnDenied: {
-    backgroundColor: Colors.textDisabledStrong,
-    borderColor: Colors.textDisabledStrong,
+    backgroundColor: Colors.textMuted,
+    borderColor: Colors.textMuted,
   },
   permissionBtnText: {
     fontFamily: Fonts.mono,
@@ -345,6 +345,6 @@ const styles = StyleSheet.create({
   skipText: {
     fontFamily: Fonts.body,
     fontSize: FontSizes.caption,
-    color: Colors.textDisabled,
+    color: Colors.textMuted,
   },
 });

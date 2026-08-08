@@ -1208,7 +1208,7 @@ const styles = StyleSheet.create({
   },
   welcomeText: {
     fontSize: FontSizes.displayXl,
-    color: Colors.textTertiary,
+    color: Colors.textSecondary,
     letterSpacing: 1,
     fontFamily: Fonts.display,
     marginVertical: 20,
@@ -1247,7 +1247,7 @@ const styles = StyleSheet.create({
   settingsButtonText: {
     fontSize: FontSizes.bodyMd,
     fontFamily: Fonts.mono,
-    color: Colors.textTertiary,
+    color: Colors.textSecondary,
   },
   incognitoBox: {
     position: "relative",
@@ -1276,7 +1276,7 @@ const styles = StyleSheet.create({
   incognitoDescription: {
     marginTop: 14,
     fontSize: FontSizes.label,
-    color: Colors.textDisabled,
+    color: Colors.textMuted,
     fontFamily: Fonts.body,
     textAlign: "center",
     lineHeight: 18,

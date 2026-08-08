@@ -22,6 +22,7 @@ import { Conversation, DB, Message } from '../../services/db/DatabaseService';
 import { Settings } from '../../services/settings/SettingsService';
 import { AIModule } from '../../services/ai/AIModule';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
+import { Colors, Fonts, FontSizes, Radius } from '../../../constants/theme';
 import { STT } from '../../services/speech/STTService';
 import { TTS } from '../../services/speech/TTSService';
 import { NotificationService } from '../../services/notifications/NotificationService';
@@ -846,5 +847,52 @@ const styles = StyleSheet.create({
     right: 24,
     left: 'auto',
     width: 450,
+  },
+  overlayBubbleWrapper: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingBottom: 110,
+  },
+  overlayBubble: {
+    alignSelf: 'center',
+    width: '90%',
+    backgroundColor: Colors.background,
+    borderWidth: 2,
+    borderColor: Colors.borderOnPrimary,
+    borderRadius: Radius.huge,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    shadowColor: Colors.textPrimary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    maxHeight: '80%',
+  },
+  bubbleScroll: {
+    flexShrink: 1,
+  },
+  pullIndicator: {
+    width: 36,
+    height: 4,
+    backgroundColor: Colors.scrimDrawer,
+    borderRadius: Radius.xs,
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  thinkingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  thinkingIcon: {
+    width: 60,
+  },
+  flashingText: {
+    color: Colors.textSecondary,
+    fontSize: FontSizes.bodyMd,
+    fontFamily: Fonts.mono,
+    flexShrink: 1,
   },
 });

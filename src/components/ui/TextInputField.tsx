@@ -12,7 +12,7 @@ export default function TextInputField({ icon, style, containerStyle, ...props }
       {icon && <Image source={icon} style={styles.icon} />}
       <TextInput
         style={[styles.input, icon ? { paddingLeft: 10 } : undefined, style]}
-        placeholderTextColor={Colors.textPlaceholder}
+        placeholderTextColor={Colors.textMuted}
         {...props}
       />
     </View>

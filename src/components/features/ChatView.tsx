@@ -12,14 +12,14 @@ import {
   Text,
   View,
 } from "react-native";
-import { Conversation, Message } from "../../services/db/DatabaseService";
-import { renderMarkdown, deriveChatDisplay } from "../ui/MarkdownText";
+import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
+import { Conversation, Message } from "../../services/db/DatabaseService";
 import { Settings } from "../../services/settings/SettingsService";
 import { TTS } from "../../services/speech/TTSService";
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { deriveChatDisplay, renderMarkdown } from "../ui/MarkdownText";
 
-const butterflyImage = require("../../../assets/images/butterfly2.png");
+const butterflyImage = require("../../../assets/images/butterfly5.png");
 const butterflyGreyImage = require("../../../assets/images/butterfly2_grey.png");
 const thinkingGif = require("../../../assets/icons/thinking.gif");
 const speakerIcon = require("../../../assets/icons/speaker.png");
@@ -86,18 +86,18 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   const isUser = item.role === "user";
   const [showDetails, setShowDetails] = useState(false);
 
-  const [activeTool, setActiveTool] = useState<{name: string | null, args: any | null}>({ name: null, args: null });
+  const [activeTool, setActiveTool] = useState<{ name: string | null, args: any | null }>({ name: null, args: null });
   useEffect(() => {
     if (!isGenerating) return;
     const unsub = AIModule.SharedGenerationState.subscribe(() => {
-      setActiveTool({ 
-        name: AIModule.SharedGenerationState.activeToolName, 
-        args: AIModule.SharedGenerationState.activeToolArgs 
+      setActiveTool({
+        name: AIModule.SharedGenerationState.activeToolName,
+        args: AIModule.SharedGenerationState.activeToolArgs
       });
     });
-    setActiveTool({ 
-      name: AIModule.SharedGenerationState.activeToolName, 
-      args: AIModule.SharedGenerationState.activeToolArgs 
+    setActiveTool({
+      name: AIModule.SharedGenerationState.activeToolName,
+      args: AIModule.SharedGenerationState.activeToolArgs
     });
     return unsub;
   }, [isGenerating]);
@@ -194,7 +194,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                   onPress={() => onSpeak?.(item)}
                   style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
                 >
-                  <Image source={speakerIcon} style={{ width: 22, height: 22, tintColor: isSpeaking ? Colors.primary : (dark ? Colors.surface : Colors.textDisabled) }} />
+                  <Image source={speakerIcon} style={{ width: 22, height: 22, tintColor: isSpeaking ? Colors.primary : (dark ? Colors.surface : Colors.textMuted) }} />
                 </Pressable>
               )}
               <Pressable
@@ -206,7 +206,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                   isChatGenerating && { opacity: 0.3 }
                 ]}
               >
-                <Image source={reloadIcon} style={{ width: 22, height: 22, tintColor: dark ? Colors.surface : Colors.textDisabled }} />
+                <Image source={reloadIcon} style={{ width: 22, height: 22, tintColor: dark ? Colors.surface : Colors.textMuted }} />
               </Pressable>
               <Pressable
                 onPress={() => copyToClipboard(item.content, false)}
@@ -214,14 +214,14 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                 delayLongPress={500}
                 style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
               >
-                <Image source={copyIcon} style={{ width: 22, height: 22, tintColor: dark ? Colors.surface : Colors.textDisabled }} />
+                <Image source={copyIcon} style={{ width: 22, height: 22, tintColor: dark ? Colors.surface : Colors.textMuted }} />
               </Pressable>
               {!!onOpenInApp && (
                 <Pressable
                   onPress={() => onOpenInApp(item)}
                   style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
                 >
-                  <Image source={chatIcon} style={{ width: 22, height: 22, tintColor: dark ? Colors.surface : Colors.textDisabled }} />
+                  <Image source={chatIcon} style={{ width: 22, height: 22, tintColor: dark ? Colors.surface : Colors.textMuted }} />
                 </Pressable>
               )}
               {showMetrics && (
@@ -229,7 +229,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                   onPress={() => setShowDetails(prev => !prev)}
                   style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
                 >
-                  <Image source={infoIcon} style={{ width: 22, height: 22, tintColor: showDetails ? (incognito ? Colors.incognito : Colors.primary) : (dark ? Colors.surface : Colors.textDisabled) }} />
+                  <Image source={infoIcon} style={{ width: 22, height: 22, tintColor: showDetails ? (incognito ? Colors.incognito : Colors.primary) : (dark ? Colors.surface : Colors.textMuted) }} />
                 </Pressable>
               )}
             </View>
@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: FontSizes.displayMd,
-    color: Colors.textTertiary,
+    color: Colors.textSecondary,
     textAlign: "center",
     letterSpacing: 0.5,
     marginBottom: 8,
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
   },
   headerDate: {
     fontSize: FontSizes.bodyMd,
-    color: Colors.textDisabled,
+    color: Colors.textMuted,
     fontFamily: Fonts.body,
     marginBottom: 12,
   },
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
     width: 70,
   },
   flashingText: {
-    color: Colors.textBody,
+    color: Colors.textSecondary,
     fontSize: FontSizes.bodyMd,
     fontFamily: Fonts.mono,
     flexShrink: 1,
@@ -518,13 +518,13 @@ const styles = StyleSheet.create({
   metricsLabel: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.label,
-    color: Colors.textFaint,
+    color: Colors.textMuted,
     minWidth: 110,
   },
   metricsSeparator: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.label,
-    color: Colors.textFaint,
+    color: Colors.textMuted,
   },
   metricsValue: {
     fontFamily: Fonts.mono,
@@ -540,7 +540,7 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   snackbar: {
-    backgroundColor: Colors.textTertiary,
+    backgroundColor: Colors.textSecondary,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: Radius.pill,
@@ -604,7 +604,7 @@ const styles = StyleSheet.create({
   },
   disclaimerText: {
     fontSize: FontSizes.bodyMd,
-    color: Colors.textPlaceholder,
+    color: Colors.textMuted,
     textAlign: 'center',
     fontFamily: Fonts.body,
   },

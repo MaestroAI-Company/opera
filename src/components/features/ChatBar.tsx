@@ -951,7 +951,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                         </Pressable>
                       </View>
                     ))}
-                    <Text style={[styles.filesAddedText, incognito && { color: Colors.textDisabledStrong }]}>
+                    <Text style={[styles.filesAddedText, incognito && { color: Colors.textMuted }]}>
                       {(() => {
                         const fileCount = selectedFiles.length + (selection ? 1 : 0);
                         const filesPart = fileCount > 0 ? `${fileCount} File${fileCount !== 1 ? 's' : ''}` : '';
@@ -1187,7 +1187,7 @@ const styles = StyleSheet.create({
   },
   filesContainerTopIncognito: {
     backgroundColor: Colors.incognitoSurface,
-    borderColor: Colors.incognitoBorder,
+    borderColor: Colors.border,
   },
   fileChipsContainer: {
     flexDirection: 'row',
@@ -1207,7 +1207,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: Radius.lg,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
-    backgroundColor: Colors.textFaint,
+    backgroundColor: Colors.textMuted,
   },
   appContextChipIcon: {
     width: 32,
@@ -1221,7 +1221,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: Radius.lg,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
-    backgroundColor: Colors.textFaint,
+    backgroundColor: Colors.textMuted,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 2,
@@ -1248,7 +1248,7 @@ const styles = StyleSheet.create({
   },
   filesAddedText: {
     fontFamily: Fonts.mono,
-    color: Colors.textDisabled,
+    color: Colors.textMuted,
     fontSize: FontSizes.bodyMd,
     marginLeft: 4,
   },

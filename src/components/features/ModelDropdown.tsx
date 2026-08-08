@@ -219,7 +219,7 @@ export default function ModelDropdown({
             <ScrollView style={{ maxHeight: MAX_MODELS_HEIGHT }} showsVerticalScrollIndicator={false} nestedScrollEnabled={true}>
               {loading ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}>
-                  <Image source={thinkingIcon} style={{ width: 16, height: 16, tintColor: Colors.textFaint, opacity: 0.7 }} />
+                  <Image source={thinkingIcon} style={{ width: 16, height: 16, tintColor: Colors.textMuted, opacity: 0.7 }} />
                   <Text style={[styles.modelStatus, { paddingHorizontal: 0, paddingVertical: 0 }]}>Loading...</Text>
                 </View>
               ) : models.length === 0 ? (
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: FontSizes.label,
-    color: Colors.textFaint,
+    color: Colors.textMuted,
     marginBottom: 8,
     marginTop: 4,
     fontFamily: Fonts.body,
@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
   },
   modelStatus: {
     fontSize: FontSizes.label,
-    color: Colors.textFaint,
+    color: Colors.textMuted,
     fontStyle: "italic",
     paddingHorizontal: 12,
     paddingVertical: 8,

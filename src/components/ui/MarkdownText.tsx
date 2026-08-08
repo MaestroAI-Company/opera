@@ -415,7 +415,7 @@ function MathInline({ content, estWidth, incognito }: { content: string; estWidt
       onSizeUpdated={(size) => {
         if (size.height > 0) setHeight(size.height + 2);
       }}
-      source={{ html: KATEX_HTML(`$${content}$`, FontSizes.lg, incognito ? Colors.codeBlockText : Colors.textTertiary) }}
+      source={{ html: KATEX_HTML(`$${content}$`, FontSizes.lg, incognito ? Colors.codeBlockText : Colors.textSecondary) }}
       scalesPageToFit={false}
       viewportContent={"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"}
       scrollEnabled={false}
@@ -498,7 +498,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
   //dark variant text colors
   const textColor = dark ? Colors.responseText : undefined;
   const headingColor = dark ? Colors.responseTextStrong : undefined;
-  const mutedColor = dark ? Colors.responseTextMuted : Colors.textFaint;
+  const mutedColor = dark ? Colors.responseTextMuted : Colors.textMuted;
   const borderColor = dark ? Colors.responseBorder : Colors.codeBlockText;
   
   //wrap toolcall blocks for bubble rendering
@@ -615,7 +615,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
             <MathText
               content={mathContent}
               textSize={FontSizes.md}
-              textColor={incognito ? Colors.codeBlockText : Colors.textTertiary}
+              textColor={incognito ? Colors.codeBlockText : Colors.textSecondary}
               style={{ flex: 1, backgroundColor: "transparent" }}
             />
           </View>
@@ -642,7 +642,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
           <MathText
             content={mathLines.join("\n")}
             textSize={FontSizes.md}
-            textColor={incognito ? Colors.codeBlockText : Colors.textTertiary}
+            textColor={incognito ? Colors.codeBlockText : Colors.textSecondary}
             style={{ flex: 1, backgroundColor: "transparent" }}
           />
         </View>

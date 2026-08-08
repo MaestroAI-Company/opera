@@ -217,8 +217,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonDisabled: {
-    backgroundColor: Colors.textDisabled,
-    borderColor: Colors.textDisabled,
+    backgroundColor: Colors.textMuted,
+    borderColor: Colors.textMuted,
   },
   buttonPrimary: {
     backgroundColor: Colors.primary,
@@ -241,6 +241,6 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   buttonTextDisabled: {
-    color: Colors.textDisabledStrong,
+    color: Colors.textMuted,
   },
 });

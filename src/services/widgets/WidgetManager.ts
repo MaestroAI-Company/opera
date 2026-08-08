@@ -8,6 +8,7 @@ export interface IWidget<T = any> {
   aiDefinesTitle: boolean; // allow custom title
   icon?: any; // asset path
   description: string; // system prompt description
+  promptInstructions?: string; // extra ai instructions, hidden from ui
   schema: string; // json schema definition
   enabledByDefault?: boolean; // default enabled state in settings
   component: React.ComponentType<{ data: T }>;
@@ -59,6 +60,9 @@ class CentralWidgetManager {
       prompt += `- Widget ID: **${widget.id}**\n`;
       prompt += `  - Name: ${widget.name}\n`;
       prompt += `  - Description: ${widget.description}\n`;
+      if (widget.promptInstructions) {
+        prompt += `  - Important: ${widget.promptInstructions}\n`;
+      }
       if (widget.aiDefinesTitle) {
         prompt += `  - Requires title: YES (Add title="YOUR_TITLE" to the block)\n`;
       }

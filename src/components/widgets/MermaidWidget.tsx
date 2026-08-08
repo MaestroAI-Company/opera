@@ -67,7 +67,8 @@ export const MermaidWidget: IWidget<MermaidWidgetData> = {
   hasBorder: false,
   aiDefinesTitle: false,
   enabledByDefault: true,
-  description: 'Displays a flowchart, sequence diagram, or mindmap using Mermaid.js syntax. CRITICAL: Do NOT use \\n for line breaks inside diagram nodes or messages. You MUST use <br/> instead. Output valid Mermaid syntax in the "mermaid" property. When you explain something, you can use it to illustrate.',
+  description: 'Displays a flowchart, sequence diagram, or mindmap using Mermaid.js syntax.',
+  promptInstructions: 'CRITICAL: Do NOT use \\n for line breaks inside diagram nodes or messages. You MUST use <br/> instead. Output valid Mermaid syntax in the "mermaid" property. When you explain something, you can use it to illustrate.',
   schema: `{
     "mermaid": "graph TD;\\nA-->B;"
   }`,

@@ -1,22 +1,22 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   StyleSheet,
   Platform,
-  KeyboardAvoidingView,
-  Pressable,
-  Animated,
-  Image,
-  PanResponder,
+  DeviceEventEmitter,
   Linking,
-  ScrollView,
+  Animated,
   BackHandler,
+  Vibration,
 } from 'react-native';
-import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Clipboard from 'expo-clipboard';
+import Reanimated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import { KeyboardAvoidingView, KeyboardProvider, useGenericKeyboardHandler } from 'react-native-keyboard-controller';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import ChatBar, { ChatBarHandle } from './ChatBar';
 import NotificationModal from '../ui/NotificationModal';
-import { renderMarkdown, deriveChatDisplay, ChatDisplay } from '../ui/MarkdownText';
+import ChatView from './ChatView';
 import { Conversation, DB, Message } from '../../services/db/DatabaseService';
 import { Settings } from '../../services/settings/SettingsService';
 import { AIModule } from '../../services/ai/AIModule';
@@ -26,8 +26,18 @@ import { TTS } from '../../services/speech/TTSService';
 import { NotificationService } from '../../services/notifications/NotificationService';
 import { CloudSync } from '../../services/CloudSyncService';
 import ModelDropdown from './ModelDropdown';
+import SelectionLayer, { SelectionState } from './SelectionLayer';
+
+import { useObjectDetector } from '../../services/overlay/useObjectDetector';
+import { YoloDetection } from '../../services/overlay/yoloPostprocess';
+import { OverlayNative } from '../../services/overlay/OverlayNative';
 import { useResponsive } from '../../hooks/useResponsive';
-import { Colors, Fonts, FontSizes, Radius } from '../../../constants/theme';
+
+//on-device deki yolo model
+const OBJECT_DETECTOR_CONFIG = {
+  modelSource: require('../../../assets/models/deki-yolo.pte'),
+  classes: ['View', 'ImageView', 'Text', 'Line'] as const,
+};
 
 //web whisper surface, only used in browser flows
 const WebSTT = STT as unknown as {
@@ -51,29 +61,6 @@ export default function AssistantOverlayWrapper() {
   );
 }
 
-const thinkingGif = require('../../../assets/icons/thinking.gif');
-
-// isolated flashing text — never causes parent re-renders
-const FlashingText = React.memo(({ text }: { text: string }) => {
-  const opacity = useRef(new Animated.Value(0.4)).current;
-  useEffect(() => {
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 1, duration: 600, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.4, duration: 600, useNativeDriver: true }),
-      ])
-    );
-    anim.start();
-    return () => anim.stop();
-  }, [opacity]);
-  return (
-    <Animated.Text style={[styles.flashingText, { opacity }]} numberOfLines={2}>
-      {text}
-    </Animated.Text>
-  );
-});
-
-
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -93,9 +80,6 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return parts.join('');
 }
 
-// bubble height as fraction of screen so it feels like a sheet
-const BUBBLE_HEIGHT_RATIO = 0.42;
-
 function AssistantOverlay() {
   const insets = useSafeAreaInsets();
   const { isLargeScreen } = useResponsive();
@@ -104,7 +88,7 @@ function AssistantOverlay() {
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
 
-  // ref mirror so callbacks never have stale messages
+  //ref mirror for fresh messages
   const messagesRef = useRef<Message[]>([]);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
 
@@ -113,13 +97,13 @@ function AssistantOverlay() {
   const [ollamaUrl, setOllamaUrl] = useState('');
   const [userInstruction, setUserInstruction] = useState('');
   const [alwaysWhisper, setAlwaysWhisper] = useState(false);
-  // autoStartMic setting from db — only passed to ChatBar once capabilities are resolved
+  //autoStartMic setting from db
   const autoStartMicSetting = useRef(false);
   const [modelCapabilities, setModelCapabilities] = useState<string[]>([]);
-  // true once getModelCapabilities has resolved — mic fires after this
+  //true once capabilities resolve
   const [capabilitiesReady, setCapabilitiesReady] = useState(false);
 
-  // reflection held in both state (for UI) and ref (for send handler — avoids stale closure)
+  //reflection in state and ref
   const [selectedReflection, setSelectedReflection] = useState('none');
   const selectedReflectionRef = useRef('none');
   const setReflection = useCallback((v: string) => {
@@ -127,7 +111,7 @@ function AssistantOverlay() {
     setSelectedReflection(v);
   }, []);
 
-  // other volatile settings as refs so handleSend is stable
+  //other settings as refs
   const selectedModelRef = useRef('');
   const userInstructionRef = useRef('');
   useEffect(() => { selectedModelRef.current = selectedModel; }, [selectedModel]);
@@ -139,7 +123,7 @@ function AssistantOverlay() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const chatBarRef = useRef<ChatBarHandle>(null);
 
-  // modal state for whisper errors
+  //modal state for whisper errors
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState<{ title: string, message: string, buttons?: any[] }>({ title: '', message: '' });
 
@@ -154,7 +138,7 @@ function AssistantOverlay() {
     return unsub;
   }, []);
 
-  // raf-throttle streaming updates to ~60fps
+  //raf-throttle streaming updates to ~60fps
   const rafPendingRef = useRef(false);
   const scheduleFlush = useCallback((msgId: string) => {
     if (rafPendingRef.current) return;
@@ -166,81 +150,113 @@ function AssistantOverlay() {
     });
   }, []);
 
-  // --- slide-up + fade animation (100% native driver) ---
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const bubbleOpacity = useRef(new Animated.Value(1)).current;
+  //overlay phases: select/respond
+  const [phase, setPhase] = useState<'select' | 'respond'>('select');
+  const [detections, setDetections] = useState<YoloDetection[]>([]);
+  const [screenshotSize, setScreenshotSize] = useState<{ width: number; height: number } | null>(null);
+  const [selection, setSelection] = useState<SelectionState>({ kind: 'none' });
+  const [selectionImage, setSelectionImage] = useState<{ uri: string, label: string } | null>(null);
+  //bump on each overlay session to force a fresh screenshot analysis
+  const [session, setSession] = useState(0);
+
+  //lift bottom bar above keyboard in select phase
+  const keyboardHeight = useSharedValue(0);
+  useGenericKeyboardHandler({
+    onMove: (e) => { 'worklet'; keyboardHeight.value = e.height; },
+    onEnd: (e) => { 'worklet'; keyboardHeight.value = e.height; },
+  }, []);
+  const liftBarInSelect = useSharedValue(1);
+  useEffect(() => { liftBarInSelect.value = phase === 'select' ? 1 : 0; }, [phase, liftBarInSelect]);
+  const bottomBarStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -keyboardHeight.value * liftBarInSelect.value }],
+  }));
+
+  // entry bounce (100% native driver)
+  const mountOpacity = useRef(new Animated.Value(0)).current;
+  const mountTranslate = useRef(new Animated.Value(-30)).current;
+  const responseOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(mountOpacity, { toValue: 1, useNativeDriver: true, bounciness: 8, speed: 18 }).start();
+    Animated.spring(mountTranslate, { toValue: 0, useNativeDriver: true, bounciness: 8, speed: 18 }).start();
+  }, [mountOpacity, mountTranslate]);
+
+  //on-device yolo screen parser
+  const { isReady: parserReady, error: parserError, detect } = useObjectDetector(OBJECT_DETECTOR_CONFIG);
+
+  //analyze screenshot when model loaded
+  useEffect(() => {
+    if (!parserReady || parserError) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [ds, info] = await Promise.all([
+          detect(),
+          OverlayNative.getScreenshotInfo(),
+        ]);
+        if (cancelled) return;
+        setDetections(ds);
+        if (info) setScreenshotSize(info);
+      } catch (e) {
+        if (!cancelled) console.warn('[ObjectDetector] analysis failed', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [parserReady, parserError, detect, session]);
 
   const activeConversationRef = useRef<Conversation | null>(null);
   useEffect(() => { activeConversationRef.current = activeConversation; }, [activeConversation]);
 
-  const openMainApp = useCallback(() => {
-    const url = activeConversationRef.current
-      ? `opera://?convId=${activeConversationRef.current.id}`
-      : 'opera://';
-    setActiveConversation(null);
-    setMessages([]);
-    slideAnim.setValue(0);
-    bubbleOpacity.setValue(1);
-    Linking.openURL(url);
-  }, [slideAnim, bubbleOpacity]);
+  const goToSelect = useCallback(() => {
+    Animated.timing(responseOpacity, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      setPhase('select');
+      setSelection({ kind: 'none' });
+      setSelectionImage(null);
+    });
+  }, [responseOpacity]);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 8 && g.dy < 0,
-      onPanResponderMove: (_, g) => {
-        if (g.dy < 0) {
-          slideAnim.setValue(g.dy);
-          // fade + scale out as user pulls up (0 at -200px)
-          const progress = Math.min(1, Math.abs(g.dy) / 200);
-          bubbleOpacity.setValue(1 - progress * 0.5);
+  const handleSelectionChange = useCallback((s: SelectionState) => {
+    setSelection(s);
+    if (s.kind === 'none') {
+      setSelectionImage(null);
+      return;
+    }
+    const region = s.kind === 'box'
+      ? s.region
+      : { x: 0, y: 0, w: 1, h: 1 };
+    OverlayNative.cropRegion(region)
+      .then(uri => {
+        if (uri && uri.length > 0) {
+          setSelectionImage({ uri, label: s.kind === 'box' ? 'Selection' : 'Full screen' });
         }
-      },
-      onPanResponderRelease: (_, g) => {
-        if (g.dy < -120 || g.vy < -0.9) {
-          // fly out: slide up + fade simultaneously
-          Animated.parallel([
-            Animated.timing(slideAnim, {
-              toValue: -700,
-              duration: 280,
-              useNativeDriver: true,
-            }),
-            Animated.timing(bubbleOpacity, {
-              toValue: 0,
-              duration: 200,
-              useNativeDriver: true,
-            }),
-          ]).start(openMainApp);
-        } else {
-          // spring back with restore
-          Animated.parallel([
-            Animated.spring(slideAnim, {
-              toValue: 0,
-              useNativeDriver: true,
-              bounciness: 8,
-              speed: 16,
-            }),
-            Animated.timing(bubbleOpacity, {
-              toValue: 1,
-              duration: 200,
-              useNativeDriver: true,
-            }),
-          ]).start();
-        }
-      },
-    })
-  ).current;
+      })
+      .catch(() => {});
+  }, []);
 
-  // pull indicator brightens as you pull
-  const handleOpacity = useMemo(() =>
-    slideAnim.interpolate({
-      inputRange: [-200, 0],
-      outputRange: [0.6, 0.22],
-      extrapolate: 'clamp',
-    }),
-    [slideAnim]
-  );
+  const handleSelectionRemove = useCallback(() => {
+    setSelection({ kind: 'none' });
+    setSelectionImage(null);
+  }, []);
 
-  // init db + settings + preload model
+  const goToRespond = useCallback(() => {
+    setPhase('respond');
+    setSelection({ kind: 'none' });
+    setSelectionImage(null);
+    responseOpacity.setValue(0);
+    Animated.timing(responseOpacity, {
+      toValue: 1,
+      duration: 350,
+      useNativeDriver: true,
+    }).start();
+  }, [responseOpacity]);
+
+
+
+  //init db, settings, preload model
   useEffect(() => {
     const init = async () => {
       await DB.init();
@@ -257,13 +273,13 @@ function AssistantOverlay() {
         setAiService(s.aiService);
         setOllamaUrl(s.ollamaUrl);
         setAlwaysWhisper(s.alwaysWhisper);
-        // store setting — passed to ChatBar only after capabilities resolve
+        //store setting for later
         autoStartMicSetting.current = s.autoStartMic ?? true;
         AIModule.configure(s.ollamaUrl);
         AIModule.setMode(s.aiService);
         STT.setLanguage(s.whisperLanguage);
 
-        // preload model into RAM so first response is fast
+        //preload model into ram
         if (s.ollamaModel) {
           AIModule.preloadModel(s.ollamaModel).catch(() => {});
         }
@@ -275,18 +291,59 @@ function AssistantOverlay() {
     init();
   }, []);
 
-  // hardware back
+  //full overlay reset on close/reopen
+  const resetOverlay = useCallback(() => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    streamingMsgIdRef.current = null;
+    streamingContentRef.current = '';
+    chatBarRef.current?.stopRecording();
+    chatBarRef.current?.clear();
+    if (Platform.OS !== 'web') STT.abort();
+    setActiveConversation(null);
+    activeConversationRef.current = null;
+    setMessages([]);
+    setSelection({ kind: 'none' });
+    setSelectionImage(null);
+    setPhase('select');
+    setGeneratingConvId(null);
+    setDetections([]);
+    setScreenshotSize(null);
+    setSession(s => s + 1);
+    AIModule.SharedGenerationState.activeConvId = null;
+    AIModule.SharedGenerationState.activeMsgId = null;
+    AIModule.SharedGenerationState.content = '';
+    AIModule.SharedGenerationState.abort = () => {};
+    AIModule.SharedGenerationState.notify();
+  }, []);
+
+  //hardware back
   useEffect(() => {
     const handler = BackHandler.addEventListener('hardwareBackPress', () => {
-      setActiveConversation(null);
-      setMessages([]);
+      resetOverlay();
       setTimeout(() => BackHandler.exitApp(), 100);
       return true;
     });
     return () => handler.remove();
-  }, []);
+  }, [resetOverlay]);
 
-  // model capabilities — mic auto-start fires once this resolves
+  //reopen via same activity instance
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('OVERLAY_REOPENED', () => {
+      resetOverlay();
+    });
+    return () => sub.remove();
+  }, [resetOverlay]);
+
+  //hand conversation to the full app then close overlay
+  const openConversationInApp = useCallback((convId: string) => {
+    Linking.openURL(`opera://?convId=${convId}`).catch(() => {});
+    resetOverlay();
+    //close overlay only, not the app
+    setTimeout(() => OverlayNative.closeOverlay(), 100);
+  }, [resetOverlay]);
+
+  //model capabilities for mic auto-start
   useEffect(() => {
     let cancelled = false;
     setCapabilitiesReady(false);
@@ -330,7 +387,10 @@ function AssistantOverlay() {
   const handleSend = useCallback(async (text: string, images?: string[], viaVoice?: boolean) => {
     const model = selectedModelRef.current;
     const instruction = userInstructionRef.current;
-    const reflection = selectedReflectionRef.current; // always fresh
+    const reflection = selectedReflectionRef.current; //always fresh
+
+    //switch to respond phase while streaming
+    goToRespond();
 
     let conv = activeConversationRef.current;
     let isFirstMessage = false;
@@ -440,7 +500,7 @@ function AssistantOverlay() {
     AIModule.SharedGenerationState.activeConvId = null;
     AIModule.SharedGenerationState.activeMsgId = null;
     AIModule.SharedGenerationState.notify();
-  }, [scheduleFlush, generateTitle]);
+  }, [scheduleFlush, generateTitle, goToRespond]);
 
   const handleStop = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -469,7 +529,7 @@ function AssistantOverlay() {
       }
     }
 
-    // fallback or alwaysWhisper = true
+    //fallback or alwaysWhisper = true
     try {
       const whisperModelName = Settings.getCached().whisperModel || "base";
       if (whisperModelName === "none") {
@@ -511,95 +571,80 @@ function AssistantOverlay() {
     }
   }, [alwaysWhisper, modelCapabilities]);
 
-  const closeOverlay = useCallback(() => {
-    setActiveConversation(null);
-    setMessages([]);
-    chatBarRef.current?.clear();
-    setTimeout(() => BackHandler.exitApp(), 100);
-  }, []);
-
   if (!ready) return null;
 
-  // derive display state — only runs when messages change
+  //derive display state from messages
   const lastMsg = messages.length > 0
     ? [...messages].reverse().find(m => m.role === 'assistant') ?? null
     : null;
 
   let isGenerating = false;
-  let disp: ChatDisplay = {
-    thinkingText: '', toolNames: [], finalContent: '',
-    showThinkingRow: false, showMarkdown: false, currentThought: '',
-  };
-
   if (lastMsg) {
     isGenerating = generatingConvId === activeConversation?.id
       && streamingMsgIdRef.current === lastMsg.id;
-    const streamText = isGenerating ? streamingContentRef.current : lastMsg.content;
-    disp = deriveChatDisplay(
-      streamText,
-      isGenerating,
-      activeTool,
-      modelCapabilities.includes('thinking') && selectedReflection !== 'none'
-    );
   }
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior="height"
+      enabled={phase === 'respond'}
     >
-      <Pressable style={styles.backdrop} onPress={closeOverlay} />
-
-      {/* model selector — top center */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 16 }]} pointerEvents="box-none">
-        <ModelDropdown
-          selectedModel={selectedModel}
-          selectedReflection={selectedReflection}
-          showReflection={modelCapabilities.includes('thinking')}
-          aiService={aiService}
-          onModelChange={model => {
-            setSelectedModel(model);
-            selectedModelRef.current = model;
-            Settings.set('ollamaModel', model);
-            // preload newly selected model
-            AIModule.preloadModel(model).catch(() => {});
-          }}
-          onReflectionChange={setReflection}
-        />
-      </View>
-
-      {/* chat area */}
-      <View style={styles.chatContainer}>
-        {lastMsg && (
-          <View style={styles.overlayBubbleWrapper} pointerEvents="box-none">
-            <Animated.View
-              style={[
-                styles.overlayBubble,
-                {
-                  transform: [{ translateY: slideAnim }],
-                  opacity: bubbleOpacity,
-                },
-              ]}
-              {...panResponder.panHandlers}
+      <Animated.View
+        style={[styles.phaseContainer, { opacity: mountOpacity, transform: [{ translateY: mountTranslate }] }]}
+      >
+        {phase === 'select' ? (
+          <SelectionLayer
+            detections={detections}
+            screenshotSize={screenshotSize}
+            selection={selection}
+            onChange={handleSelectionChange}
+            onVibrate={() => Vibration.vibrate(10)}
+          />
+        ) : (
+          <Animated.View style={[styles.phaseContainer, { opacity: responseOpacity }]} pointerEvents="box-none">
+            <LinearGradient
+              colors={['rgba(0,0,0,0.50)', 'rgba(0,0,0,0.95)']}
+              style={styles.chatViewWrapper}
+              pointerEvents="box-none"
             >
-              <Animated.View style={[styles.pullIndicator, { opacity: handleOpacity }]} />
-
-              <ScrollView style={styles.bubbleScroll} showsVerticalScrollIndicator={false}>
-                {disp.showThinkingRow && (
-                  <View style={styles.thinkingContainer}>
-                    <Image source={thinkingGif} style={styles.thinkingIcon} resizeMode="contain" />
-                    {!!disp.currentThought && <FlashingText text={disp.currentThought} />}
-                  </View>
-                )}
-                {disp.showMarkdown && (
-                  renderMarkdown(disp.finalContent, false, isGenerating)
-                )}
-              </ScrollView>
-            </Animated.View>
-          </View>
+              <ChatView
+                messages={lastMsg ? [lastMsg] : []}
+                conversation={activeConversation}
+                contentTopPadding={insets.top + 56}
+                contentBottomPadding={insets.bottom + 96}
+                hideHeader={true}
+                hideGradients={true}
+                generatingMessageId={streamingMsgIdRef.current}
+                speakerEnabled={true}
+                canThink={modelCapabilities.includes('thinking') && selectedReflection !== 'none'}
+                dark={true}
+                alignBottom={true}
+                onOpenInApp={(item) => openConversationInApp(item.conversationId)}
+              />
+            </LinearGradient>
+          </Animated.View>
         )}
 
-        <View style={[styles.bottomBarOverlay, isLargeScreen && styles.bottomBarOverlayLarge]} pointerEvents="box-none">
+        {/* model selector — top center */}
+        <View style={[styles.topBar, { paddingTop: insets.top + 16 }]} pointerEvents="box-none">
+          <ModelDropdown
+            selectedModel={selectedModel}
+            selectedReflection={selectedReflection}
+            showReflection={modelCapabilities.includes('thinking')}
+            aiService={aiService}
+            onModelChange={model => {
+              setSelectedModel(model);
+              selectedModelRef.current = model;
+              Settings.set('ollamaModel', model);
+              //preload newly selected model
+              AIModule.preloadModel(model).catch(() => {});
+            }}
+            onReflectionChange={setReflection}
+          />
+        </View>
+
+        <Reanimated.View style={[styles.bottomBarOverlay, isLargeScreen && styles.bottomBarOverlayLarge, bottomBarStyle]} pointerEvents="box-none">
           <ChatBar
             ref={chatBarRef}
             onSend={handleSend}
@@ -613,9 +658,11 @@ function AssistantOverlay() {
             onOpenSettings={() => {}}
             enabled={true}
             autoStartMic={capabilitiesReady && autoStartMicSetting.current}
+            selection={selectionImage}
+            onSelectionRemove={handleSelectionRemove}
           />
-        </View>
-      </View>
+        </Reanimated.View>
+      </Animated.View>
 
       <NotificationModal
         visible={modalVisible}
@@ -634,19 +681,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
-    justifyContent: 'flex-end',
   },
-  backdrop: {
-    // style backdrop background
+  phaseContainer: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: Colors.scrimModal,
   },
-  chatContainer: {
-    flex: 0.7,
+  chatViewWrapper: {
+    flex: 1,
     backgroundColor: 'transparent',
   },
   topBar: {
@@ -668,52 +712,5 @@ const styles = StyleSheet.create({
     right: 24,
     left: 'auto',
     width: 450,
-  },
-  overlayBubbleWrapper: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    paddingBottom: 110,
-  },
-  overlayBubble: {
-    alignSelf: 'center',
-    width: '90%',
-    backgroundColor: Colors.background,
-    borderWidth: 2,
-    borderColor: Colors.borderOnPrimary,
-    borderRadius: Radius.huge,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 16,
-    shadowColor: Colors.textPrimary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    maxHeight: '80%',
-  },
-  bubbleScroll: {
-    flexShrink: 1,
-  },
-  pullIndicator: {
-    width: 36,
-    height: 4,
-    backgroundColor: Colors.scrimDrawer,
-    borderRadius: Radius.xs,
-    alignSelf: 'center',
-    marginBottom: 12,
-  },
-  thinkingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  thinkingIcon: {
-    width: 60,
-  },
-  flashingText: {
-    color: Colors.textBody,
-    fontSize: FontSizes.bodyMd,
-    fontFamily: Fonts.mono,
-    flexShrink: 1,
   },
 });

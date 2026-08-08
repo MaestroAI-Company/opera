@@ -188,9 +188,9 @@ class CentralAIModule {
       return summary;
     };
 
-    //one model round: stream, parse, execute tools. true if any ran
+    //one model round, true if tools ran
     const runToolRound = async (): Promise<boolean> => {
-      //use native tool calling or fallback to prompt injection (aicore method)
+      //native tool calls or prompt injection fallback
       const beforeLen = accumulated.length;
       const result = supportsTools
         ? await provider.sendMessage(
@@ -201,7 +201,7 @@ class CentralAIModule {
 
       if (!result?.toolCalls || result.toolCalls.length === 0) return false;
 
-      //native tool calling streams tool_calls outside content, inject raw json
+      //inject raw tool_calls json into stream
       //show ui bubble, keep tool call in history
       const roundChunk = accumulated.substring(beforeLen);
       if (!roundChunk.includes('"tool_calls"')) {
@@ -213,7 +213,7 @@ class CentralAIModule {
         }
       }
 
-      //add assistant message with tool_calls to history (keep only visible text)
+      //add tool_calls message, visible text only
       currentMessages.push({
         role: 'assistant',
         content: (result.content || '').replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim(),
@@ -238,14 +238,14 @@ class CentralAIModule {
       return true;
     };
 
-    //tool call loop: keep calling tools until the model answers (max 5 rounds)
+    //loop tools until answer (max 5 rounds)
     const MAX_TOOL_ROUNDS = 5;
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       if (!(await runToolRound())) return;
     }
 
-    //cap reached while model kept requesting tools: force one final generation
-    //round so the answer survives the last tool call
+    //cap reached, force final generation
+    //so the answer survives the last tool call
     await runToolRound();
   }
 }

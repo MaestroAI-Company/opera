@@ -31,8 +31,8 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return context.resolveRequest(context, moduleName, platform);
 };
 
-//add .bin extension for whisper model bundling and .wasm for expo-sqlite web
-config.resolver.assetExts.push("bin", "wasm");
+//add .bin extension for whisper model bundling, .wasm for expo-sqlite web and .pte for executorch models
+config.resolver.assetExts.push("bin", "wasm", "pte");
 
 //polyfill for node core module "buffer" (used by safe-buffer in whisper.rn)
 config.resolver.extraNodeModules = {

@@ -87,7 +87,7 @@ function withNativeAndroid(config) {
           'android:theme': '@style/Theme.OverlayTranslucent',
           'android:exported': 'true',
           'android:screenOrientation': 'portrait',
-          'android:windowSoftInputMode': 'adjustResize',
+          'android:windowSoftInputMode': 'adjustNothing',
         },
         'intent-filter': [
           {
@@ -134,6 +134,8 @@ function withNativeAndroid(config) {
 
       // copy Kotlin sources
       copyTemplate('src/ScreenshotHolder.kt', path.join(javaDir, 'ScreenshotHolder.kt'), packageName);
+      copyTemplate('src/ScreenCaptureModule.kt', path.join(javaDir, 'ScreenCaptureModule.kt'), packageName);
+      copyTemplate('src/MaestroOverlayPackage.kt', path.join(javaDir, 'MaestroOverlayPackage.kt'), packageName);
 
       // AICore (ML Kit GenAI) modules
       copyTemplate('src/AICorePackage.kt', path.join(javaDir, 'AICorePackage.kt'), packageName);
@@ -150,7 +152,7 @@ function withNativeAndroid(config) {
           const tagRegex = new RegExp(`<activity[^>]*android:name="\\${overlayName}"[^>]*>`);
           const tagMatch = manifest.match(tagRegex);
           if (tagMatch && !tagMatch[0].includes('taskAffinity')) {
-            const newTag = tagMatch[0].replace('>', ' android:taskAffinity="" android:windowSoftInputMode="adjustResize">');
+            const newTag = tagMatch[0].replace('>', ' android:taskAffinity="" android:windowSoftInputMode="adjustNothing">');
             manifest = manifest.replace(tagMatch[0], newTag);
             fs.writeFileSync(manifestPath, manifest, 'utf-8');
           }
@@ -167,7 +169,7 @@ function withNativeAndroid(config) {
     let { contents } = config.modResults;
     const isKotlin = contents.includes('.packages.apply');
 
-    const packagesToRegister = ['AICorePackage'];
+    const packagesToRegister = ['AICorePackage', 'MaestroOverlayPackage'];
 
     for (const pkg of packagesToRegister) {
       const importLine = `import ${packageName}.${pkg}${isKotlin ? '' : ';'}`;

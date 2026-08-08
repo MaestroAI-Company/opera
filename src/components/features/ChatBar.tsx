@@ -75,6 +75,9 @@ type ChatInputBarProps = {
   onAttachmentSheetVisibilityChange?: (visible: boolean) => void;
   enabled?: boolean;
   autoStartMic?: boolean;
+  //screen-selection attachment owned by the parent overlay
+  selection?: { uri: string; label: string } | null;
+  onSelectionRemove?: () => void;
 };
 
 export type ChatBarHandle = {
@@ -174,6 +177,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   onAttachmentSheetVisibilityChange,
   enabled = true,
   autoStartMic = false,
+  selection = null,
+  onSelectionRemove,
 }, ref) {
   useImperativeHandle(ref, () => ({
     stopRecording: () => {
@@ -260,13 +265,14 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const pressAnim = useRef(new Animated.Value(0)).current;
 
   const liveTextRef = useRef<string>("");
-  const sttModeRef = useRef<'stt' | 'whisper'>('whisper');
+  const stopResolverRef = useRef<((text: string | null) => void) | null>(null);
+  const sendCancelledRef = useRef(false);
 
   const stopSTTVolume = () => {
     currentAudioVolume = 0;
   };
 
-  //web-only whisper surface (stt resolves to the whisper implementation there)
+  //web-only whisper surface
   const webSTT = STT as unknown as {
     isModelInstalled(modelName: string): Promise<boolean>;
     init(modelName: string): Promise<boolean>;
@@ -274,10 +280,25 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     transcribeData(buffer: ArrayBuffer): Promise<string>;
   };
 
-  //native stt, partials fill input, volume drives the indicator
-  const startExpoSTT = async () => {
+  //generic entry points, engine per platform
+  const startSTT = async () => {
+    if (Platform.OS === 'web') {
+      await startBatchSTT();
+    } else {
+      await startContinuousSTT();
+    }
+  };
+
+  const stopSTT = async (): Promise<string | null> => {
+    if (Platform.OS === 'web') {
+      return stopBatchSTT();
+    }
+    return stopContinuousSTT();
+  };
+
+  //native continuous stt
+  const startContinuousSTT = async () => {
     try {
-      sttModeRef.current = 'stt';
       liveTextRef.current = "";
       setText("");
       clearTimeout(transcribeTimerRef.current);
@@ -305,40 +326,46 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
           console.error("STT error:", msg);
           stopSTTVolume();
           setIsRecording(false);
+          setIsTranscribing(false);
+          stopResolverRef.current?.(null);
+          stopResolverRef.current = null;
           onTranscribeError?.();
         },
-        onDone: () => {},
+        onDone: () => {
+          const text = liveTextRef.current.trim() || null;
+          liveTextRef.current = "";
+          const resolver = stopResolverRef.current;
+          stopResolverRef.current = null;
+          setIsTranscribing(false);
+          resolver?.(text);
+        },
       });
     } catch (e) {
-      console.error("failed to start expo STT:", e);
+      console.error("failed to start continuous STT:", e);
       stopSTTVolume();
       setIsRecording(false);
+      setIsTranscribing(false);
       onTranscribeError?.();
     }
   };
 
-  //stop stt, keep the transcribe state 1s so the final result lands, then send or fill input
-  const stopExpoSTT = (send: boolean) => {
+  //stop stt, resolve with final transcript
+  const stopContinuousSTT = (): Promise<string | null> => {
     stopSTTVolume();
     setIsRecording(false);
     setIsTranscribing(true);
     STT.stop();
     clearTimeout(transcribeTimerRef.current);
-    transcribeTimerRef.current = setTimeout(() => {
-      setIsTranscribing(false);
-      const finalText = liveTextRef.current.trim();
-      liveTextRef.current = "";
-      if (finalText.length > 0) {
-        if (send) {
-          onSend?.(finalText, undefined, true);
-          setText("");
-        } else {
-          setText(finalText);
-        }
-      } else if (autoStartMic) {
-        onTranscribeError?.();
-      }
-    }, 1000);
+    return new Promise<string | null>((resolve) => {
+      stopResolverRef.current = resolve;
+      transcribeTimerRef.current = setTimeout(() => {
+        const resolver = stopResolverRef.current;
+        stopResolverRef.current = null;
+        setIsTranscribing(false);
+        resolver?.(liveTextRef.current.trim() || null);
+        liveTextRef.current = "";
+      }, 3000);
+    });
   };
 
   const webAudioContextRef = useRef<AudioContext | null>(null);
@@ -355,6 +382,9 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       }
       if (isTranscribing) {
         clearTimeout(transcribeTimerRef.current);
+        stopResolverRef.current?.(null);
+        stopResolverRef.current = null;
+        sendCancelledRef.current = true;
         setIsTranscribing(false);
         return true;
       }
@@ -399,8 +429,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   useEffect(() => {
     if (autoStartMic && !autoStartedRef.current) {
       autoStartedRef.current = true;
-      // skip whisper checks, parent handles transcription
-      setTimeout(() => (Platform.OS === 'web' ? startRecording() : startExpoSTT()), 800);
+      setTimeout(() => startSTT(), 800);
     }
   }, [autoStartMic]);
 
@@ -584,7 +613,6 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
   const startRecording = async () => {
     try {
-      sttModeRef.current = 'whisper';
       pcmChunksRef.current = [];
       setIsRecording(true);
       const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -617,7 +645,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     }
   };
 
-  const stopAndTranscribe = async (): Promise<string | null> => {
+  const stopBatchSTT = async (): Promise<string | null> => {
     try {
       if (webAudioProcessorRef.current) {
         webAudioProcessorRef.current.disconnect();
@@ -637,7 +665,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       if (chunks.length === 0) return null;
       setIsTranscribing(true);
       const wavBuffer = buildWavBuffer(chunks, sampleRateRef.current);
-      //delegate to parent if provided, otherwise use whisper directly
+      //delegate to parent, else whisper
       const transcribed = onTranscribe
         ? await onTranscribe(wavBuffer)
         : await webSTT.transcribeData(wavBuffer);
@@ -695,7 +723,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     }
   };
 
-  const startWhisperRecording = async () => {
+  const startBatchSTT = async () => {
     if (!canTranscribeRemotely) {
       const modelName = Settings.getCached().whisperModel || "base";
       if (modelName === "none") {
@@ -762,47 +790,40 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
   const handleMicPress = async () => {
     if (isRecording) {
-      if (sttModeRef.current === 'stt') {
-        stopExpoSTT(true);
-      } else {
-        if (webAudioProcessorRef.current) webAudioProcessorRef.current.disconnect();
-        if (webAudioContextRef.current) webAudioContextRef.current.close();
-        if (webAudioStreamRef.current) webAudioStreamRef.current.getTracks().forEach(t => t.stop());
-        setIsRecording(false);
-        pcmChunksRef.current = [];
-      }
+      const transcribed = await stopSTT();
+      if (transcribed) setText(transcribed);
     } else {
-      if (Platform.OS === 'web') {
-        await startWhisperRecording();
-      } else {
-        await startExpoSTT();
-      }
+      await startSTT();
     }
   };
 
+  const buildImages = async (): Promise<string[]> => {
+    const images = await Promise.all(
+      selectedFiles.map(f => f.type === 'image'
+        ? compressImageToDataUri(f.uri)
+        : Promise.resolve(`${f.uri}?name=${encodeURIComponent(f.name)}`))
+    );
+    if (selection?.uri) images.push(selection.uri);
+    return images;
+  };
+
   const handleSend = async () => {
-    if (isRecording) {
-      if (sttModeRef.current === 'stt') {
-        stopExpoSTT(true);
-        return;
-      }
-      const transcribed = await stopAndTranscribe();
-      if (transcribed && transcribed.length > 0) {
-        setText(transcribed);
-      } else if (autoStartMic && !transcribed) {
-        onTranscribeError?.();
-      }
-      return;
+    const wasRecording = isRecording;
+    let voiceText: string | null = null;
+    if (wasRecording) {
+      voiceText = await stopSTT();
+      const cancelled = sendCancelledRef.current;
+      sendCancelledRef.current = false;
+      if (cancelled) return;
     }
-    if ((text.trim() || selectedFiles.length > 0) && onSend) {
-      const images = await Promise.all(
-        selectedFiles.map(f => f.type === 'image'
-          ? compressImageToDataUri(f.uri)
-          : Promise.resolve(`${f.uri}?name=${encodeURIComponent(f.name)}`))
-      );
-      onSend(text.trim(), images);
+    const finalText = (voiceText ?? text).trim();
+    if ((finalText || selectedFiles.length > 0 || !!selection) && onSend) {
+      const images = await buildImages();
+      onSend(finalText, images, voiceText != null);
       setText("");
       setSelectedFiles([]);
+    } else if (voiceText === null && wasRecording && autoStartMic) {
+      onTranscribeError?.();
     }
   };
 
@@ -890,9 +911,17 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         <Animated.View style={{ width: '100%', maxWidth: 800, zIndex: 2, elevation: 9 }}>
           <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.pressableWrapper}>
             <Animated.View style={{ transform: [{ scale }] }}>
-              {selectedFiles.length > 0 && (
+              {selectedFiles.length > 0 || !!selection ? (
                 <View style={[styles.filesContainerTop, incognito && styles.filesContainerTopIncognito]}>
                   <View style={styles.fileChipsContainer}>
+                    {selection && (
+                      <View style={styles.filePreviewContainerTop}>
+                        <Image source={{ uri: selection.uri }} style={styles.filePreviewImageTop} />
+                        <Pressable style={({ pressed }) => [styles.removeFileBtnTop, pressed && { opacity: 0.8 }]} onPress={onSelectionRemove}>
+                          <Text style={styles.removeFileBtnTextTop}>✕</Text>
+                        </Pressable>
+                      </View>
+                    )}
                     {selectedFiles.map((file, i) => (
                       <View key={i} style={styles.filePreviewContainerTop}>
                         {file.type === 'image' ? (
@@ -908,11 +937,11 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                       </View>
                     ))}
                     <Text style={[styles.filesAddedText, incognito && { color: Colors.textDisabledStrong }]}>
-                      {selectedFiles.length} File{selectedFiles.length !== 1 ? 's' : ''} Added
+                      {selectedFiles.length + (selection ? 1 : 0)} File{selectedFiles.length + (selection ? 1 : 0) !== 1 ? 's' : ''} Added
                     </Text>
                   </View>
                 </View>
-              )}
+              ) : null}
 
               <Animated.View
                 style={[

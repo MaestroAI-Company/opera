@@ -18,7 +18,7 @@ public class MaestroVoiceService extends VoiceInteractionService {
     @Override
     public void onLaunchVoiceAssistFromKeyguard() {
         Intent intent = new Intent(this, OverlayActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
             startActivity(intent);
         } catch (Exception e) {

@@ -26,6 +26,7 @@ const speakerIcon = require("../../../assets/icons/speaker.png");
 const reloadIcon = require("../../../assets/icons/reload.png");
 const copyIcon = require("../../../assets/icons/copy.png");
 const infoIcon = require("../../../assets/icons/info.png");
+const chatIcon = require("../../../assets/icons/chat.png");
 
 type ChatViewProps = {
   messages: Message[];
@@ -41,6 +42,9 @@ type ChatViewProps = {
   hideGradients?: boolean;
   onOpenConfidentiality?: () => void;
   canThink?: boolean;
+  dark?: boolean;
+  alignBottom?: boolean;
+  onOpenInApp?: (item: Message) => void;
 };
 
 const stripMarkdown = (md: string) => {
@@ -78,7 +82,7 @@ const FlashingText = ({ text }: { text: string }) => {
   );
 };
 
-const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isChatGenerating, showMetrics, fallbackModel, canThink }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string; canThink?: boolean }) => {
+const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isChatGenerating, showMetrics, fallbackModel, canThink, dark, onOpenInApp }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string; canThink?: boolean; dark?: boolean; onOpenInApp?: (item: Message) => void }) => {
   const isUser = item.role === "user";
   const [showDetails, setShowDetails] = useState(false);
 
@@ -131,7 +135,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                     try {
                       return decodeURIComponent(path.split('?name=')[1]);
                     } catch (e) {
-                      // ignore
+                        //ignore
                     }
                   }
                   try {
@@ -173,7 +177,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
             </View>
           )}
           {disp.showMarkdown && (
-            renderMarkdown(disp.finalContent, incognito, isGenerating)
+            renderMarkdown(disp.finalContent, incognito, isGenerating, dark)
           )}
           {!isUser && !isCurrentlyThinking && !isGenerating && (
             <View style={styles.aiToolbar}>
@@ -182,7 +186,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                   onPress={() => onSpeak?.(item)}
                   style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
                 >
-                  <Image source={speakerIcon} style={{ width: 22, height: 22, tintColor: isSpeaking ? Colors.primary : Colors.textDisabled }} />
+                  <Image source={speakerIcon} style={{ width: 22, height: 22, tintColor: isSpeaking ? Colors.primary : (dark ? Colors.surface : Colors.textDisabled) }} />
                 </Pressable>
               )}
               <Pressable
@@ -194,7 +198,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                   isChatGenerating && { opacity: 0.3 }
                 ]}
               >
-                <Image source={reloadIcon} style={{ width: 22, height: 22, tintColor: Colors.textDisabled }} />
+                <Image source={reloadIcon} style={{ width: 22, height: 22, tintColor: dark ? Colors.surface : Colors.textDisabled }} />
               </Pressable>
               <Pressable
                 onPress={() => copyToClipboard(item.content, false)}
@@ -202,14 +206,22 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                 delayLongPress={500}
                 style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
               >
-                <Image source={copyIcon} style={{ width: 22, height: 22, tintColor: Colors.textDisabled }} />
+                <Image source={copyIcon} style={{ width: 22, height: 22, tintColor: dark ? Colors.surface : Colors.textDisabled }} />
               </Pressable>
+              {!!onOpenInApp && (
+                <Pressable
+                  onPress={() => onOpenInApp(item)}
+                  style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
+                >
+                  <Image source={chatIcon} style={{ width: 22, height: 22, tintColor: dark ? Colors.surface : Colors.textDisabled }} />
+                </Pressable>
+              )}
               {showMetrics && (
                 <Pressable
                   onPress={() => setShowDetails(prev => !prev)}
                   style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
                 >
-                  <Image source={infoIcon} style={{ width: 22, height: 22, tintColor: showDetails ? (incognito ? Colors.incognito : Colors.primary) : Colors.textDisabled }} />
+                  <Image source={infoIcon} style={{ width: 22, height: 22, tintColor: showDetails ? (incognito ? Colors.incognito : Colors.primary) : (dark ? Colors.surface : Colors.textDisabled) }} />
                 </Pressable>
               )}
             </View>
@@ -229,10 +241,10 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
       )}
     </View>
   );
-}, (prev, next) => prev.item.content === next.item.content && prev.item.metrics === next.item.metrics && prev.incognito === next.incognito && prev.speakerEnabled === next.speakerEnabled && prev.isGenerating === next.isGenerating && prev.isChatGenerating === next.isChatGenerating && prev.isSpeaking === next.isSpeaking && prev.showMetrics === next.showMetrics && prev.canThink === next.canThink);
+}, (prev, next) => prev.item.content === next.item.content && prev.item.metrics === next.item.metrics && prev.incognito === next.incognito && prev.speakerEnabled === next.speakerEnabled && prev.isGenerating === next.isGenerating && prev.isChatGenerating === next.isChatGenerating && prev.isSpeaking === next.isSpeaking && prev.showMetrics === next.showMetrics && prev.canThink === next.canThink && prev.dark === next.dark && prev.onOpenInApp === next.onOpenInApp);
 MessageItem.displayName = "MessageItem";
 
-export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, hideHeader, hideGradients, onOpenConfidentiality, canThink }: ChatViewProps) {
+export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp }: ChatViewProps) {
   const listRef = useRef<FlatList>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
   const isAtBottomRef = useRef(true);
@@ -240,7 +252,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
 
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
 
-  //manual speaker button: tap toggles speech for that message
+  //manual speaker toggle
   const handleSpeak = (item: Message) => {
     if (speakingMessageId === item.id) {
       TTS.stop();
@@ -287,7 +299,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   };
 
   const renderItem = ({ item }: { item: Message }) => {
-    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} />;
+    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} />;
   };
 
   return (
@@ -332,7 +344,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
             </View>
           ) : null
         }
-        contentContainerStyle={[styles.list, { paddingTop: contentTopPadding, paddingBottom: contentBottomPadding }]}
+        contentContainerStyle={[styles.list, { paddingTop: contentTopPadding, paddingBottom: contentBottomPadding, flexGrow: 1, justifyContent: alignBottom ? 'flex-end' : 'flex-start' }]}
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}

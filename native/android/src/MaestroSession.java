@@ -40,7 +40,7 @@ public class MaestroSession extends VoiceInteractionSession {
                 Log.w(TAG, "onHandleScreenshot failed: " + t.getMessage());
             }
         }
-        // start the activity now that we have the screenshot
+        //start activity with screenshot
         startOverlayActivity();
     }
 
@@ -52,7 +52,7 @@ public class MaestroSession extends VoiceInteractionSession {
             Log.d(TAG, "onHandleAssist: current package = " + pkg);
             ScreenshotHolder.setAppPackage(pkg);
 
-            // flatten the assist structure to extract visible text
+            //flatten assist structure for text
             String screenText = flattenStructure(structure);
             ScreenshotHolder.setScreenText(screenText);
             Log.d(TAG, "onHandleAssist: extracted " + screenText.length() + " chars of screen text");
@@ -81,13 +81,13 @@ public class MaestroSession extends VoiceInteractionSession {
     }
 
     private void flattenViewNode(ViewNode node, StringBuilder sb) {
-        // skip invisible nodes
+        //skip invisible nodes
         int visibility = node.getVisibility();
         if (visibility != android.view.View.VISIBLE) {
             return;
         }
 
-        // extract text from this node
+        //extract text from node
         CharSequence text = node.getText();
         if (text != null && text.length() > 0) {
             String trimmed = text.toString().trim();
@@ -96,7 +96,7 @@ public class MaestroSession extends VoiceInteractionSession {
             }
         }
 
-        // also check content description (useful for icons/images with labels)
+        //also check content description
         CharSequence contentDesc = node.getContentDescription();
         if (contentDesc != null && contentDesc.length() > 0) {
             String trimmed = contentDesc.toString().trim();
@@ -105,7 +105,7 @@ public class MaestroSession extends VoiceInteractionSession {
             }
         }
 
-        // recurse into children
+        //recurse into children
         int childCount = node.getChildCount();
         for (int i = 0; i < childCount; i++) {
             ViewNode child = node.getChildAt(i);
@@ -120,8 +120,10 @@ public class MaestroSession extends VoiceInteractionSession {
         super.onShow(args, showFlags);
         Log.d(TAG, "onShow called with flags: " + showFlags);
         activityStarted = false;
+        //clear stale screenshot from previous session
+        ScreenshotHolder.clear();
         
-        // If the system promises a screenshot, we wait for it (max 1000ms)
+        //if system promises screenshot, wait max 1s
         if ((showFlags & VoiceInteractionSession.SHOW_WITH_SCREENSHOT) != 0) {
             handler.postDelayed(startOverlayRunnable, 1000);
         } else {
@@ -135,7 +137,7 @@ public class MaestroSession extends VoiceInteractionSession {
         handler.removeCallbacks(startOverlayRunnable);
 
         Intent intent = new Intent(getContext(), OverlayActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         boolean started = false;
         try {
             startAssistantActivity(intent);

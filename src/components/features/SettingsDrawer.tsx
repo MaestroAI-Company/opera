@@ -1197,9 +1197,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               />
             </View>
             {tool.displayDescription ? (
-              <Text style={styles.helpText}>
-                {tool.displayDescription.endsWith('.') ? tool.displayDescription : `${tool.displayDescription}.`}
-              </Text>
+              <Text style={styles.helpText}>{tool.displayDescription}</Text>
             ) : null}
           </View>
         );
@@ -1222,7 +1220,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 }}
               />
             </View>
-            <Text style={styles.helpText}>{widget.description.split('.')[0]}.</Text>
+            <Text style={styles.helpText}>{widget.description}</Text>
           </View>
         );
       })}

@@ -212,7 +212,7 @@ function pushRawToolCallBlocks(md: string, from: number, to: number, blocks: Too
     
     const cleanBlockText = blockText.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '');
     
-    //partial streaming: accept an open block as soon as it looks like a tool call
+    //accept open block as tool call
     const looksLikeTool = /^\{\s*"?\s*(?:tool[\s\n]*_[\s\n]*calls|name|function)\s*"?\s*:/i.test(cleanBlockText);
     const partialLooksLikeTool = isPartial && /^\{\s*"?\s*(?:tool[\s\n]*_[\s\n]*calls|name|function)/i.test(cleanBlockText);
     
@@ -225,7 +225,7 @@ function pushRawToolCallBlocks(md: string, from: number, to: number, blocks: Too
   }
 }
 
-//scan toolcall json blocks (fenced or raw), skipping raw blocks inside code fences
+//scan toolcall json, skip code fences
 function findToolCallBlocks(md: string, allowPartial = false): ToolCallBlock[] {
   const blocks: ToolCallBlock[] = [];
   const fenceRe = /```[^\n]*/g;
@@ -270,7 +270,7 @@ export function hasConversationalText(md: string): boolean {
   return clean.trim().length > 0;
 }
 
-//extract tool names from a raw toolcall json block (tolerant of incomplete streaming json)
+//extract tool names, tolerate incomplete json
 export function parseToolNames(json: string): string[] {
   const clean = json.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
   const names: string[] = [];
@@ -314,7 +314,7 @@ export type ChatDisplay = {
   currentThought: string;
 };
 
-//single source of truth for the chat bubble display (thinking / tools / streaming)
+//single source for bubble display state
 export function deriveChatDisplay(raw: string, isGenerating: boolean, liveTool: LiveTool, canThink = false): ChatDisplay {
   const normalized = raw === '…' ? '' : raw;
   const thinkMatches = [...normalized.matchAll(/<think>([\s\S]*?)(?:<\/think>|$)/g)];
@@ -323,8 +323,8 @@ export function deriveChatDisplay(raw: string, isGenerating: boolean, liveTool: 
   const stripped = normalized.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '');
   const blocks = findToolCallBlocks(stripped, isGenerating);
 
-  //keep the tool json in finalContent so renderMarkdown turns it into bubbles,
-  //compute conversational presence on a copy without the blocks
+  //keep tool json in finalContent for bubbles
+  //strip blocks to compute presence
   let contentOnly = stripped;
   const contentToolNames: string[] = [];
   for (let k = blocks.length - 1; k >= 0; k--) {
@@ -493,8 +493,13 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
   );
 }
 
-export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: boolean): React.ReactNode[] {
+export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: boolean, dark?: boolean): React.ReactNode[] {
   const selColor = incognito ? Colors.incognitoSelection : Colors.primarySelection;
+  //dark variant text colors
+  const textColor = dark ? Colors.responseText : undefined;
+  const headingColor = dark ? Colors.responseTextStrong : undefined;
+  const mutedColor = dark ? Colors.responseTextMuted : Colors.textFaint;
+  const borderColor = dark ? Colors.responseBorder : Colors.codeBlockText;
   
   //wrap toolcall blocks for bubble rendering
   let processedMd = md;
@@ -648,7 +653,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
     // horizontal rule
     if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
       elements.push(
-        <View key={`hr-${i}`} style={{ height: 1, backgroundColor: incognito ? Colors.incognito : Colors.codeBlockText, marginVertical: 10 }} />
+        <View key={`hr-${i}`} style={{ height: 1, backgroundColor: incognito ? Colors.incognito : borderColor, marginVertical: 10 }} />
       );
       i++;
       continue;
@@ -678,8 +683,8 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
         while (out.length < colCount) out.push("");
         return out;
       };
-      const borderColor = incognito ? Colors.incognito : Colors.codeBlockText;
-      const headerBg = incognito ? Colors.incognitoHeader : Colors.primaryHeader;
+      const borderColor = incognito ? Colors.incognito : (dark ? Colors.responseBorder : Colors.codeBlockText);
+      const headerBg = incognito ? Colors.incognitoHeader : (dark ? Colors.whiteFaint : Colors.primaryHeader);
 
       elements.push(
         <View key={`table-${i}`} style={{ borderWidth: 1, borderColor, borderRadius: Radius.lg, overflow: "hidden", marginVertical: 6 }}>
@@ -687,16 +692,16 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
             <View style={{ flexDirection: "row", backgroundColor: headerBg }}>
               {padCell(headerCells).map((c, ci) => (
                 <View key={`h-${ci}`} style={[s.tableCellBox, ci < colCount - 1 && { borderRightWidth: 1, borderRightColor: borderColor }, { borderBottomWidth: 1, borderBottomColor: borderColor }]}>
-                  {wrapContent(c, `hc-${ci}`, [s.tableCell, s.bold], ci, incognito, selColor)}
+                  {wrapContent(c, `hc-${ci}`, [s.tableCell, s.bold, textColor && { color: textColor }], ci, incognito, selColor)}
                 </View>
               ))}
             </View>
           )}
           {bodyRows.map((row, ri) => (
-            <View key={`r-${ri}`} style={{ flexDirection: "row", backgroundColor: ri % 2 === 1 ? (incognito ? Colors.incognitoStripe : Colors.overlayFaint) : "transparent" }}>
+            <View key={`r-${ri}`} style={{ flexDirection: "row", backgroundColor: ri % 2 === 1 ? (incognito ? Colors.incognitoStripe : (dark ? Colors.overlaySubtle : Colors.overlayFaint)) : "transparent" }}>
               {padCell(row).map((c, ci) => (
                 <View key={`b-${ri}-${ci}`} style={[s.tableCellBox, ci < colCount - 1 && { borderRightWidth: 1, borderRightColor: borderColor }, { borderTopWidth: 1, borderTopColor: borderColor }]}>
-                  {wrapContent(c, `bc-${ri}-${ci}`, s.tableCell, ci, incognito, selColor)}
+                  {wrapContent(c, `bc-${ri}-${ci}`, [s.tableCell, textColor && { color: textColor }], ci, incognito, selColor)}
                 </View>
               ))}
             </View>
@@ -712,7 +717,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
       const level = headingMatch[1].length;
       const style = level === 1 ? s.h1 : level === 2 ? s.h2 : level === 3 ? s.h3 : s.h4;
       elements.push(
-        wrapContent(headingMatch[2], `h-${i}`, [s.base, style], i, incognito, selColor)
+        wrapContent(headingMatch[2], `h-${i}`, [s.base, style, (dark ? headingColor : textColor) && { color: dark ? headingColor : textColor }], i, incognito, selColor)
       );
       i++;
       continue;
@@ -724,7 +729,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
       const depth = Math.min(2, Math.floor(bulletMatch[1].replace(/\t/g, "  ").length / 2));
       const glyph = ["•", "◦", "▪"][depth] || "•";
       elements.push(
-        wrapContent(`${glyph} ${bulletMatch[3]}`, `li-${i}`, [s.base, s.paragraph, { paddingLeft: depth * 14 }], i, incognito, selColor)
+        wrapContent(`${glyph} ${bulletMatch[3]}`, `li-${i}`, [s.base, s.paragraph, { paddingLeft: depth * 14 }, textColor && { color: textColor }], i, incognito, selColor)
       );
       i++;
       continue;
@@ -750,7 +755,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
         i++;
       }
       elements.push(
-        wrapContent(itemLines.join("\n"), `oli-${i}`, [s.base, s.paragraph], i, incognito, selColor)
+        wrapContent(itemLines.join("\n"), `oli-${i}`, [s.base, s.paragraph, textColor && { color: textColor }], i, incognito, selColor)
       );
       continue;
     }
@@ -759,7 +764,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
     if (line.trimStart().startsWith("> ")) {
       const quoteText = line.replace(/^[\s]*>\s?/, "");
       elements.push(
-        wrapContent(quoteText, `quote-${i}`, [s.base, { borderLeftColor: incognito ? Colors.incognito : Colors.primary, borderLeftWidth: 3, paddingLeft: 10, marginVertical: 4 }], i, incognito, selColor)
+        wrapContent(quoteText, `quote-${i}`, [s.base, { borderLeftColor: incognito ? Colors.incognito : (dark ? Colors.responseTextStrong : Colors.primary), borderLeftWidth: 3, paddingLeft: 10, marginVertical: 4 }, textColor && { color: textColor }], i, incognito, selColor)
       );
       i++;
       continue;
@@ -768,7 +773,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
     // custom interrupted line
     if (line.trim() === "_The user interrupted the response_") {
       elements.push(
-        <Text key={`interrupted-${i}`} style={[s.base, s.italic, { color: Colors.textFaint, marginTop: 4 }]} selectable={true} selectionColor={selColor}>
+        <Text key={`interrupted-${i}`} style={[s.base, s.italic, { color: mutedColor, marginTop: 4 }]} selectable={true} selectionColor={selColor}>
           The user interrupted the response
         </Text>
       );
@@ -802,7 +807,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
 
     if (paraLines.length > 0) {
       elements.push(
-        wrapContent(paraLines.join("\n"), `p-${i}`, [s.base, s.paragraph], i, incognito, selColor)
+        wrapContent(paraLines.join("\n"), `p-${i}`, [s.base, s.paragraph, textColor && { color: textColor }], i, incognito, selColor)
       );
     } else {
       //safety fallback prevent infinite loop

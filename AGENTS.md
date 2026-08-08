@@ -6,7 +6,14 @@ Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-s
 
 # Code commenting format
 
-Do simple lowercase simple english comment no sentence. exemple : //load model and detect objects
+Simple lowercase english fragment, no sentence.
+- no space after //, no capital letters, no punctuation (no em-dash, no !), no banner (// ---)
+- short (max ~6 words), describes only the next line
+- not too complicated, not too long, no excessive punctuation
+- only when the code is non-obvious, never for trivial code
+- comment the why, not the how
+- always english, even in french code
+exemple : //load model and detect objects
 
 # Use updated code
 You can get updated docs with the context7 mcp

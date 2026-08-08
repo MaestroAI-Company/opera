@@ -75,6 +75,23 @@ export const Colors = {
   incognitoSelection: "rgba(86,90,117,0.4)",
   incognitoHeader: "rgba(86,90,117,0.25)",
   incognitoStripe: "rgba(86,90,117,0.1)",
+
+  //selection overlay
+  selectionFullFill: "rgba(255,255,255,0.07)",
+  selectionDim: "rgba(0,0,0,0.35)",
+  selectionFill: "rgba(255,255,255,0.08)",
+  selectionOutline: "#FFFFFF",
+  selectionHandle: "#FFFFFF",
+
+  //response overlay (dark gradient)
+  responseSurface: "#101014",
+  responseGradientTop: "rgba(24,24,30,0.92)",
+  responseGradientBottom: "rgba(2,2,4,0.98)",
+  responseText: "#F4F4F5",
+  responseTextStrong: "#FFFFFF",
+  responseTextMuted: "rgba(255,255,255,0.62)",
+  responseLink: "#7CB3FF",
+  responseBorder: "rgba(255,255,255,0.14)",
 } as const;
 
 export const Fonts = {

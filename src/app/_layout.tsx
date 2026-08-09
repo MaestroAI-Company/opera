@@ -15,15 +15,17 @@ import { WidgetManager } from "../services/widgets/WidgetManager";
 import { MapsWidget } from "../components/widgets/MapsWidget";
 import { HtmlWidget } from "../components/widgets/HtmlWidget";
 import { MermaidWidget } from "../components/widgets/MermaidWidget";
+import { WeatherWidget } from "../components/widgets/WeatherWidget";
 import { setupQuickActions } from "../services/quickActions/QuickActionsService";
 
 import * as WebBrowser from "expo-web-browser";
 
-global.Buffer = global.Buffer || Buffer;
+(globalThis as any).Buffer = (globalThis as any).Buffer || Buffer;
 
 WidgetManager.registerWidget(MapsWidget);
 WidgetManager.registerWidget(HtmlWidget);
 WidgetManager.registerWidget(MermaidWidget);
+WidgetManager.registerWidget(WeatherWidget);
 
 WebBrowser.maybeCompleteAuthSession();
 SplashScreen.preventAutoHideAsync();

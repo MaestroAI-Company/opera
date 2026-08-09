@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { IWidget } from '../../services/widgets/WidgetManager';
 
 interface WidgetWrapperProps {
@@ -8,19 +8,14 @@ interface WidgetWrapperProps {
   children: React.ReactNode;
 }
 
-const defaultIcon = require('../../../assets/icons/settings.png'); // fallback icon
-
 export default function WidgetWrapper({ widget, title, children }: WidgetWrapperProps) {
   if (!widget.hasBorder) {
     return <>{children}</>;
   }
 
-  const iconSource = widget.icon || defaultIcon;
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Image source={iconSource} style={styles.icon} resizeMode="contain" />
         <Text style={styles.titleText}>
           {widget.name}{title ? ` - ${title}` : ''}
         </Text>
@@ -47,12 +42,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 5,
     backgroundColor: '#FFFFFF',
-  },
-  icon: {
-    width: 20,
-    height: 20,
-    marginRight: 10,
-    tintColor: '#FF1A1A',
+    paddingLeft: 6,
   },
   titleText: {
     fontSize: 14,
@@ -62,3 +52,5 @@ const styles = StyleSheet.create({
   },
   content: {}
 });
+
+

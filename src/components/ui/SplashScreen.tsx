@@ -35,7 +35,11 @@ export default function SplashScreen({ onFinish }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: Colors.background,
     justifyContent: "center",
     alignItems: "center",

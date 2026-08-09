@@ -41,6 +41,7 @@ const cloudIcon = require("../../../assets/icons/cloud.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
 const generalIcon = require("../../../assets/icons/general.png");
 const serverIcon = require("../../../assets/icons/server.png");
+const botIcon = require("../../../assets/icons/bot.png");
 const toolIcon = require("../../../assets/icons/tool.png");
 const confidentialityIcon = require("../../../assets/icons/confidentiality.png");
 const socialIcon = require("../../../assets/icons/social.png");
@@ -62,7 +63,7 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "assistantoverlay" | "models" | "confidentiality" | "tools" | "profile" | "cloud";
+type SubPage = "main" | "general" | "assistantoverlay" | "models" | "service" | "confidentiality" | "tools" | "profile" | "cloud";
 
 export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
   const { width } = useResponsive();
@@ -846,7 +847,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             <Image source={profilIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>{name || "Profil"}</Text>
-              <Text style={styles.navSubtitle}>Name, AI Instructions</Text>
+              <Text style={styles.navSubtitle}>Name</Text>
             </View>
           </Pressable>
 
@@ -893,10 +894,21 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
             onPress={() => setActiveSubPage("models")}
           >
-            <Image source={serverIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+            <Image source={botIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
             <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>Models & Server</Text>
-              <Text style={styles.navSubtitle}>Ollama server, Whisper Model, TOD</Text>
+              <Text style={styles.navTitle}>Models</Text>
+              <Text style={styles.navSubtitle}>Whisper Model, TOD</Text>
+            </View>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("service")}
+          >
+            <Image source={linkIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>Service</Text>
+              <Text style={styles.navSubtitle}>AI Service, Ollama server</Text>
             </View>
           </Pressable>
 
@@ -950,16 +962,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           placeholder="Enter your name"
           value={name}
           onChangeText={setName}
-        />
-      </View>
-
-      <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Write your instructions to AI</Text>
-        <TextInputField
-          icon={penPlaceholderIcon}
-          placeholder="write"
-          value={instruction}
-          onChangeText={setInstruction}
         />
       </View>
     </View>
@@ -1082,42 +1084,20 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     </View>
   );
 
-  // models & server subpage content
+  // model subpage content
   const modelsSubPageContent = (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Models & Server")}
+      {renderSubPageHeader("Models")}
 
       <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>AI Service</Text>
-        <Selector
-          options={aiServiceOptions}
-          selectedValue={aiService}
-          onSelect={setAiService}
-          title="Select AI Service"
-          fullWidth
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Write your instructions to AI</Text>
+        <TextInputField
+          icon={penPlaceholderIcon}
+          placeholder="write"
+          value={instruction}
+          onChangeText={setInstruction}
         />
       </View>
-      {aiService !== "ollama" && (
-        <Text style={[styles.helpText, { marginBottom: 20 }]}>
-          Runs the local model directly on this device. No server needed.
-        </Text>
-      )}
-
-      {aiService === "ollama" && (
-        <View style={styles.settingRowVertical}>
-          {/* ollama server input section */}
-          <Text style={styles.settingLabel}>Ollama server</Text>
-          <Text style={[styles.helpText, { marginBottom: 10 }]}>URL of your local or remote Ollama instance.</Text>
-          <TextInputField
-            icon={linkIcon}
-            placeholder="server link"
-            value={ollamaUrl}
-            onChangeText={setOllamaUrl}
-            onBlur={fetchOllamaModels}
-          />
-          {ollamaError ? <Text style={styles.errorText}>{ollamaError}</Text> : null}
-        </View>
-      )}
 
       {Platform.OS === "web" && (
         <>
@@ -1152,6 +1132,45 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           </View>
           <Text style={styles.helpText}>Process audio transcriptions locally on your device.</Text>
         </>
+      )}
+    </View>
+  );
+
+  // service subpage content
+  const serviceSubPageContent = (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("Service")}
+
+      <View style={styles.settingRowVertical}>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>AI Service</Text>
+        <Selector
+          options={aiServiceOptions}
+          selectedValue={aiService}
+          onSelect={setAiService}
+          title="Select AI Service"
+          fullWidth
+        />
+      </View>
+      {aiService !== "ollama" && (
+        <Text style={[styles.helpText, { marginBottom: 20 }]}>
+          Runs the local model directly on this device. No server needed.
+        </Text>
+      )}
+
+      {aiService === "ollama" && (
+        <View style={styles.settingRowVertical}>
+          {/* ollama server input section */}
+          <Text style={styles.settingLabel}>Ollama server</Text>
+          <Text style={[styles.helpText, { marginBottom: 10 }]}>URL of your local or remote Ollama instance.</Text>
+          <TextInputField
+            icon={linkIcon}
+            placeholder="server link"
+            value={ollamaUrl}
+            onChangeText={setOllamaUrl}
+            onBlur={fetchOllamaModels}
+          />
+          {ollamaError ? <Text style={styles.errorText}>{ollamaError}</Text> : null}
+        </View>
       )}
     </View>
   );
@@ -1306,6 +1325,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return assistantOverlaySubPageContent;
       case "models":
         return modelsSubPageContent;
+      case "service":
+        return serviceSubPageContent;
       case "confidentiality":
         return confidentialitySubPageContent;
       case "tools":

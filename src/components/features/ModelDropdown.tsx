@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Image, Keyboard, LayoutRectangle, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, Vibration, View } from "react-native";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { AIModule } from "../../services/ai/AIModule";
-import { getAICoreModelLabel } from "../../services/ai/AICoreProvider";
-import NotificationModal from "../ui/NotificationModal";
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { getAICoreModelLabel } from "../../services/ai/AICoreProvider";
+import { AIModule } from "../../services/ai/AIModule";
+import NotificationModal from "../ui/NotificationModal";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const arrowDownIcon = require("../../../assets/icons/down_arrow.png");
@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
   downloadIcon: {
     width: 16,
     height: 16,
-    
+
   },
   downloadText: {
     fontSize: FontSizes.caption,

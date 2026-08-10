@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from "react";
-import { Animated, BackHandler, Image, Keyboard, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useState, useMemo } from "react";
+import { Animated, BackHandler, Image, Keyboard, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useResponsive } from "../../hooks/useResponsive";
 import { Conversation, DB } from "../../services/db/DatabaseService";
 import { CloudSync } from "../../services/CloudSyncService";
 import NotificationModal from "../ui/NotificationModal";
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
 
 const searchIcon = require("../../../assets/icons/search.png");
 const newIcon = require("../../../assets/icons/add.png");
@@ -12,6 +14,8 @@ const deleteIcon = require("../../../assets/icons/delete.png");
 const pinIcon = require("../../../assets/icons/pin.png");
 const unpinIcon = require("../../../assets/icons/unpin.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
+
+const DRAWER_SYNC_DELAY_MS = 1500;
 
 type ConversationsDrawerProps = {
   visible: boolean;
@@ -45,10 +49,10 @@ function getGroupTitle(timestamp: number): string {
   const mm = String(date.getMonth() + 1).padStart(2, '0');
 
   if (date.getFullYear() === now.getFullYear()) {
-    return `DATE (${dd}/${mm})`;
+    return `${dd}/${mm}`;
   } else {
     const yy = String(date.getFullYear()).slice(-2);
-    return `DATE (${dd}/${mm}/${yy})`;
+    return `${dd}/${mm}/${yy}`;
   }
 }
 
@@ -65,10 +69,10 @@ export default function ConversationsDrawer({
   isDesktop = false,
 }: ConversationsDrawerProps) {
   const { width } = useResponsive();
-  const drawerWidth = Math.min(width * 0.88, 360);
+  const drawerWidth = drawerWidthFor(width);
 
-  const translateX = useRef(new Animated.Value(-drawerWidth)).current;
-  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  //one value drives slide and scrim
+  const progress = conversationsProgress;
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -76,12 +80,15 @@ export default function ConversationsDrawer({
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!visible) {
+    //reset only when needed
+    if (!visible && (isSearching || searchQuery !== "" || selectedSearchId !== null)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsSearching(false);
       setSearchQuery("");
       setSearchResults([]);
       setSelectedSearchId(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   //native back exits search mode, then lets parent close the drawer
@@ -100,94 +107,82 @@ export default function ConversationsDrawer({
     return () => sub.remove();
   }, [visible, isSearching]);
 
-  // Triggering Fast Refresh
   useEffect(() => {
-    if (isSearching && searchQuery.trim().length > 0) {
-      DB.searchConversations(searchQuery).then(setSearchResults).catch(console.error);
-    } else {
+    if (!isSearching || searchQuery.trim().length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearchResults([]);
+      return;
     }
+    //debounce full-text queries
+    const timer = setTimeout(() => {
+      DB.searchConversations(searchQuery).then(setSearchResults).catch(console.error);
+    }, 250);
+    return () => clearTimeout(timer);
   }, [searchQuery, isSearching]);
-  const panResponder = useRef(
+  //useMemo read during render
+  const panResponder = useMemo(() =>
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return gestureState.dx < -20 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        return gestureState.dx < -10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        //panel tracks the finger
+        dragDrawer(progress, Math.max(0, Math.min(1, 1 + gestureState.dx / drawerWidth)));
       },
       onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx < -50) {
+        //settle here keeps flick speed
+        const velocity = gestureVelocity(gestureState.vx, drawerWidth);
+        if (gestureState.dx < -drawerWidth * 0.35 || gestureState.vx < -0.5) {
+          settleDrawer(progress, false, velocity);
           onClose();
+        } else {
+          settleDrawer(progress, true, velocity);
         }
       },
+      onPanResponderTerminate: () => {
+        settleDrawer(progress, true);
+      },
     })
-  ).current;
+  , [onClose, drawerWidth, progress]);
 
-  const largeScreenAnim = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  const largeScreenAnim = useAnimatedValue(visible ? 1 : 0);
 
   useEffect(() => {
     if (visible) {
-      CloudSync.requestAutoSync(0);
+      //sync deferred past opening
+      CloudSync.requestAutoSync(DRAWER_SYNC_DELAY_MS);
       Keyboard.dismiss();
-      const anims = [];
       if (isDesktop) {
-        anims.push(Animated.timing(largeScreenAnim, {
-          toValue: 1,
-          duration: 280,
-          useNativeDriver: false,
-        }));
+        settleLayoutDrawer(largeScreenAnim, true);
       } else {
-        anims.push(
-          Animated.timing(translateX, {
-            toValue: 0,
-            duration: 280,
-            useNativeDriver: Platform.OS !== "web",
-          }),
-          Animated.timing(overlayOpacity, {
-            toValue: 1,
-            duration: 280,
-            useNativeDriver: Platform.OS !== "web",
-          })
-        );
+        settleDrawer(progress, true);
       }
-      Animated.parallel(anims).start();
     } else {
-      const anims = [];
       if (isDesktop) {
-        anims.push(Animated.timing(largeScreenAnim, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: false,
-        }));
+        settleLayoutDrawer(largeScreenAnim, false);
       } else {
-        anims.push(
-          Animated.timing(translateX, {
-            toValue: -drawerWidth,
-            duration: 250,
-            useNativeDriver: Platform.OS !== "web",
-          }),
-          Animated.timing(overlayOpacity, {
-            toValue: 0,
-            duration: 250,
-            useNativeDriver: Platform.OS !== "web",
-          })
-        );
+        settleDrawer(progress, false);
       }
-      Animated.parallel(anims).start();
     }
-  }, [visible, isDesktop, drawerWidth]);
+  }, [visible, isDesktop, largeScreenAnim, progress]);
 
-  //group conversations
-  const pinnedConversations = conversations.filter(c => c.pinned);
-  const groups: { title: string; data: Conversation[] }[] = [];
-  const groupMap = new Map<string, Conversation[]>();
+  //group only when list changes
+  const { pinnedConversations, groups } = useMemo(() => {
+    const pinned = conversations.filter(c => c.pinned);
+    const grouped: { title: string; data: Conversation[] }[] = [];
+    const groupMap = new Map<string, Conversation[]>();
 
-  conversations.forEach(c => {
-    const title = getGroupTitle(c.updatedAt);
-    if (!groupMap.has(title)) {
-      groupMap.set(title, []);
-      groups.push({ title, data: groupMap.get(title)! });
-    }
-    groupMap.get(title)!.push(c);
-  });
+    conversations.forEach(c => {
+      const title = getGroupTitle(c.updatedAt);
+      if (!groupMap.has(title)) {
+        groupMap.set(title, []);
+        grouped.push({ title, data: groupMap.get(title)! });
+      }
+      groupMap.get(title)!.push(c);
+    });
+
+    return { pinnedConversations: pinned, groups: grouped };
+  }, [conversations]);
 
   const renderConversationRow = (conv: Conversation) => {
     const isSelected = conv.id === selectedConversationId;
@@ -425,10 +420,21 @@ export default function ConversationsDrawer({
     );
   }
 
+  const translateX = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-drawerWidth, 0],
+  });
+
+  //settle before state change
+  const dismiss = () => {
+    settleDrawer(progress, false);
+    onClose();
+  };
+
   const mobileDrawer = (
     <View style={[styles.root, { pointerEvents: visible ? "auto" : "none" }]}>
-      <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      <Animated.View style={[styles.overlay, { opacity: progress }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
       </Animated.View>
 
       <Animated.View

@@ -65,7 +65,7 @@ export class SearchTool implements ITool {
               const u = new URL(href);
               const uddg = u.searchParams.get('uddg');
               if (uddg) href = uddg;
-            } catch (e) {}
+            } catch {}
           }
           if (href && href.startsWith('http') && href.indexOf('duckduckgo.com') === -1) {
             const snippetText = snippets[i] && snippets[i].textContent ? snippets[i].textContent.trim() : '';

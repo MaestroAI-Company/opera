@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { IWidget } from '../../services/widgets/WidgetManager';
+import { Colors, Fonts, FontSizes, Radius } from '../../../constants/theme';
 
 interface WidgetWrapperProps {
   widget: IWidget;
@@ -29,10 +30,10 @@ export default function WidgetWrapper({ widget, title, children }: WidgetWrapper
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl,
     borderWidth: 2,
-    borderColor: "#00000017",
+    borderColor: Colors.border,
     overflow: 'hidden',
     width: '100%',
     padding: 5,
@@ -41,13 +42,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 5,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     paddingLeft: 6,
   },
   titleText: {
-    fontSize: 14,
-    fontFamily: "IBMPlexMono-Medium",
-    color: '#333333',
+    fontSize: FontSizes.bodyMd,
+    fontFamily: Fonts.mono,
+    color: Colors.textSecondary,
     fontWeight: '600',
   },
   content: {}

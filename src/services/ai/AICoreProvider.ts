@@ -71,8 +71,8 @@ export class AICoreProvider implements IAIProvider {
     return caps;
   }
 
-  //aicore inference occasionally fails with a transient INFERENCE_ERROR
-  //(thermal state, memory pressure, model still warming). retry once.
+  //transient aicore inference error
+  //retry once on transient failure
   private isTransientAICoreError(e: any): boolean {
     const msg = String(e?.message ?? e ?? '');
     return /INFERENCE_ERROR|ErrorCode 200|Inference failed/i.test(msg);
@@ -97,7 +97,7 @@ export class AICoreProvider implements IAIProvider {
       return await this.sendMessageOnce(modelName, systemPrompt, messages, onChunk, signal, options, onMetrics);
     } catch (e: any) {
       if (signal?.aborted || !this.isTransientAICoreError(e)) throw e;
-      //back off briefly then try one more time
+      //brief backoff then retry
       await new Promise(res => setTimeout(res, 300));
       if (signal?.aborted) throw e;
       return this.sendMessageOnce(modelName, systemPrompt, messages, onChunk, signal, options, onMetrics);

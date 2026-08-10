@@ -23,7 +23,6 @@ const texture2 = require("../../assets/images/texture2.png");
 const micIcon = require("../../assets/icons/microphone.png");
 const cameraIcon = require("../../assets/icons/camera.png");
 const photoIcon = require("../../assets/icons/photo.png");
-const notifIcon = require("../../assets/icons/general.png");
 const locationIcon = require("../../assets/icons/pin.png");
 
 type Permission = {
@@ -79,7 +78,7 @@ const WEB_PERMISSIONS: Permission[] = [
     request: async () => {
       const granted = await LocationService.requestPermission();
       if (granted) {
-        //warm up the cache so the first message has location context
+        //warm cache for location context
         LocationService.refresh().catch(() => {});
       }
       return granted;
@@ -129,7 +128,7 @@ const NATIVE_PERMISSIONS: Permission[] = [
     request: async () => {
       const granted = await LocationService.requestPermission();
       if (granted) {
-        //warm up the cache so the first message has location context
+        //warm cache for location context
         LocationService.refresh().catch(() => {});
       }
       return granted;

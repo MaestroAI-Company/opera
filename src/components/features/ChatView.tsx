@@ -1,6 +1,6 @@
 import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   FlatList,
@@ -18,6 +18,7 @@ import { Conversation, Message } from "../../services/db/DatabaseService";
 import { Settings } from "../../services/settings/SettingsService";
 import { TTS } from "../../services/speech/TTSService";
 import { deriveChatDisplay, renderMarkdown } from "../ui/MarkdownText";
+import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 
 const butterflyImage = require("../../../assets/images/butterfly5.png");
 const butterflyGreyImage = require("../../../assets/images/butterfly2_grey.png");
@@ -64,15 +65,18 @@ function formatDate(timestamp: number): string {
 }
 
 const FlashingText = ({ text }: { text: string }) => {
-  const opacity = useRef(new Animated.Value(0.4)).current;
+  const opacity = useAnimatedValue(0.4);
 
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(opacity, { toValue: 1, duration: 600, useNativeDriver: true }),
         Animated.timing(opacity, { toValue: 0.4, duration: 600, useNativeDriver: true })
       ])
-    ).start();
+    );
+    loop.start();
+    //interval kept running after unmount
+    return () => loop.stop();
   }, [opacity]);
 
   return (
@@ -95,6 +99,8 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
         args: AIModule.SharedGenerationState.activeToolArgs
       });
     });
+    //catch up with the store missed before subscribing
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveTool({
       name: AIModule.SharedGenerationState.activeToolName,
       args: AIModule.SharedGenerationState.activeToolArgs
@@ -102,8 +108,18 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
     return unsub;
   }, [isGenerating]);
 
-  const disp = deriveChatDisplay(item.content, !!isGenerating, activeTool, !!canThink);
+  //reparse only when deps move
+  const disp = useMemo(
+    () => deriveChatDisplay(item.content, !!isGenerating, activeTool, !!canThink),
+    [item.content, isGenerating, activeTool, canThink]
+  );
   const isCurrentlyThinking = !isUser && disp.showThinkingRow;
+
+  //key parse on text itself
+  const markdownNodes = useMemo(
+    () => (disp.showMarkdown ? renderMarkdown(disp.finalContent, incognito, isGenerating, dark) : null),
+    [disp.showMarkdown, disp.finalContent, incognito, isGenerating, dark]
+  );
 
   const metricRows = [
     { label: "ai_model", value: item.metrics?.model || fallbackModel || "N/A" },
@@ -142,13 +158,13 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                   if (path.includes('?name=')) {
                     try {
                       return decodeURIComponent(path.split('?name=')[1]);
-                    } catch (e) {
-                        //ignore
+                    } catch {
+                      return 'Audio Recording.wav';
                     }
                   }
                   try {
                     return decodeURIComponent(path.split('/').pop() || 'Audio File');
-                  } catch (e) {
+                  } catch {
                     return path.split('/').pop() || 'Audio File';
                   }
                 };
@@ -184,9 +200,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               {!!disp.currentThought && <FlashingText text={disp.currentThought} />}
             </View>
           )}
-          {disp.showMarkdown && (
-            renderMarkdown(disp.finalContent, incognito, isGenerating, dark)
-          )}
+          {markdownNodes}
           {!isUser && !isCurrentlyThinking && !isGenerating && (
             <View style={styles.aiToolbar}>
               {speakerEnabled && (
@@ -249,7 +263,26 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
       )}
     </View>
   );
-}, (prev, next) => prev.item.content === next.item.content && prev.item.metrics === next.item.metrics && prev.incognito === next.incognito && prev.speakerEnabled === next.speakerEnabled && prev.isGenerating === next.isGenerating && prev.isChatGenerating === next.isChatGenerating && prev.isSpeaking === next.isSpeaking && prev.showMetrics === next.showMetrics && prev.canThink === next.canThink && prev.dark === next.dark && prev.onOpenInApp === next.onOpenInApp);
+}, (prev, next) =>
+  //key avoids stale recycled rows
+  prev.item.id === next.item.id &&
+  prev.item.content === next.item.content &&
+  prev.item.metrics === next.item.metrics &&
+  prev.item.images === next.item.images &&
+  prev.item.screenContext === next.item.screenContext &&
+  prev.incognito === next.incognito &&
+  prev.speakerEnabled === next.speakerEnabled &&
+  prev.isGenerating === next.isGenerating &&
+  prev.isChatGenerating === next.isChatGenerating &&
+  prev.isSpeaking === next.isSpeaking &&
+  prev.showMetrics === next.showMetrics &&
+  prev.canThink === next.canThink &&
+  prev.dark === next.dark &&
+  //stable callbacks avoid stale closures
+  prev.onSpeak === next.onSpeak &&
+  prev.onRegenerate === next.onRegenerate &&
+  prev.showSnackbar === next.showSnackbar &&
+  prev.onOpenInApp === next.onOpenInApp);
 MessageItem.displayName = "MessageItem";
 
 export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp }: ChatViewProps) {
@@ -261,18 +294,19 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
 
   //manual speaker toggle
-  const handleSpeak = (item: Message) => {
-    if (speakingMessageId === item.id) {
-      TTS.stop();
-      setSpeakingMessageId(null);
-    } else {
-      setSpeakingMessageId(item.id);
+  const handleSpeak = useCallback((item: Message) => {
+    setSpeakingMessageId((current) => {
+      if (current === item.id) {
+        TTS.stop();
+        return null;
+      }
       TTS.speak(item.content, {
         language: Settings.getCached().language,
         onDone: () => setSpeakingMessageId(cur => (cur === item.id ? null : cur)),
       });
-    }
-  };
+      return item.id;
+    });
+  }, []);
 
   const [snackbarMessage, setSnackbarMessage] = useState("");
   useEffect(() => {
@@ -297,7 +331,6 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    const atTop = contentOffset.y <= headerHeight + 10;
     //threshold for bottom detection
     const atBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 100;
 
@@ -306,9 +339,9 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
     }
   };
 
-  const renderItem = ({ item }: { item: Message }) => {
+  const renderItem = useCallback(({ item }: { item: Message }) => {
     return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} />;
-  };
+  }, [incognito, onRegenerate, speakerEnabled, handleSpeak, speakingMessageId, generatingMessageId, showMetrics, conversation?.model, canThink, dark, onOpenInApp]);
 
   return (
     <View style={styles.container}>
@@ -354,6 +387,11 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
         }
         contentContainerStyle={[styles.list, { paddingTop: contentTopPadding, paddingBottom: contentBottomPadding, flexGrow: 1, justifyContent: alignBottom ? 'flex-end' : 'flex-start' }]}
         showsVerticalScrollIndicator={false}
+        //keep live rows small
+        windowSize={7}
+        maxToRenderPerBatch={5}
+        initialNumToRender={8}
+        removeClippedSubviews={true}
         onScroll={handleScroll}
         scrollEventThrottle={16}
         onScrollBeginDrag={() => {
@@ -361,16 +399,16 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
           if (autoScrollTimeout.current) clearTimeout(autoScrollTimeout.current);
         }}
         onContentSizeChange={(w, h) => {
-          if (isAtBottomRef.current) {
-            isAutoScrolling.current = true;
-            if (autoScrollTimeout.current) clearTimeout(autoScrollTimeout.current);
-            autoScrollTimeout.current = setTimeout(() => {
-              isAutoScrolling.current = false;
-            }, 500);
+          if (!isAtBottomRef.current) return;
+          isAutoScrolling.current = true;
+          if (autoScrollTimeout.current) clearTimeout(autoScrollTimeout.current);
+          autoScrollTimeout.current = setTimeout(() => {
+            isAutoScrolling.current = false;
+          }, 500);
 
-            //scrollToOffset to avoid android jump
-            listRef.current?.scrollToOffset({ offset: h + 1000, animated: true });
-          }
+          //jump while generating
+          //scrollToOffset to avoid android jump
+          listRef.current?.scrollToOffset({ offset: h + 1000, animated: !generatingMessageId });
         }}
       />
       {!hideGradients && (

@@ -1,40 +1,46 @@
 package __PACKAGE_NAME__
 
 import android.graphics.Bitmap
+import android.util.Log
 
+//passes capture to the overlay
 object ScreenshotHolder {
+    private const val TAG = "ScreenshotHolder"
+
+    //never recycle under active readers
     @Volatile
-    private var bitmap: Bitmap? = null
+    private var capture: Bitmap? = null
 
     @Volatile
-    private var currentAppPackage: String? = null
+    private var appPackage: String? = null
 
     @Volatile
     private var screenText: String? = null
 
     @JvmStatic
-    fun set(b: Bitmap) {
-        bitmap?.recycle()
-        bitmap = b
+    fun set(bitmap: Bitmap) {
+        Log.i(TAG, "capture ${bitmap.width}x${bitmap.height}")
+        capture = bitmap
     }
 
+    //recycled bitmap still answers getWidth
     @JvmStatic
-    fun get(): Bitmap? = bitmap
-
-    @JvmStatic
-    fun consume(): Bitmap? {
-        val b = bitmap
-        bitmap = null
-        return b
+    fun getUsable(): Bitmap? {
+        val bitmap = capture ?: return null
+        if (bitmap.isRecycled) {
+            Log.w(TAG, "capture was recycled before it could be read")
+            return null
+        }
+        return bitmap
     }
 
     @JvmStatic
     fun setAppPackage(pkg: String?) {
-        currentAppPackage = pkg
+        appPackage = pkg
     }
 
     @JvmStatic
-    fun getAppPackage(): String? = currentAppPackage
+    fun getAppPackage(): String? = appPackage
 
     @JvmStatic
     fun setScreenText(text: String?) {
@@ -44,11 +50,11 @@ object ScreenshotHolder {
     @JvmStatic
     fun getScreenText(): String? = screenText
 
+    //new session never shows stale screen
     @JvmStatic
     fun clear() {
-        bitmap?.recycle()
-        bitmap = null
-        currentAppPackage = null
+        capture = null
+        appPackage = null
         screenText = null
     }
 }

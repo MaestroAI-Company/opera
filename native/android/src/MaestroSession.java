@@ -31,14 +31,23 @@ public class MaestroSession extends VoiceInteractionSession {
 
     @Override
     public void onHandleScreenshot(Bitmap screenshot) {
-        Log.d(TAG, "onHandleScreenshot called. screenshot is null? " + (screenshot == null));
         if (screenshot != null) {
             try {
-                Log.d(TAG, "Screenshot size: " + screenshot.getWidth() + "x" + screenshot.getHeight());
-                ScreenshotHolder.set(screenshot);
+                Log.i(TAG, "onHandleScreenshot: got " + screenshot.getWidth() + "x" + screenshot.getHeight()
+                        + " config=" + screenshot.getConfig());
+                //session recycles bitmap keep owned copy
+                Bitmap owned = screenshot.copy(Bitmap.Config.ARGB_8888, false);
+                if (owned == null) {
+                    Log.w(TAG, "onHandleScreenshot: copy failed, keeping the framework bitmap");
+                    owned = screenshot;
+                }
+                ScreenshotHolder.set(owned);
             } catch (Throwable t) {
                 Log.w(TAG, "onHandleScreenshot failed: " + t.getMessage());
             }
+        } else {
+            //system called with empty screenshot
+            Log.w(TAG, "onHandleScreenshot called with a null screenshot");
         }
         //start activity with screenshot
         startOverlayActivity();
@@ -87,7 +96,6 @@ public class MaestroSession extends VoiceInteractionSession {
             return;
         }
 
-        //extract text from node
         CharSequence text = node.getText();
         if (text != null && text.length() > 0) {
             String trimmed = text.toString().trim();
@@ -105,7 +113,6 @@ public class MaestroSession extends VoiceInteractionSession {
             }
         }
 
-        //recurse into children
         int childCount = node.getChildCount();
         for (int i = 0; i < childCount; i++) {
             ViewNode child = node.getChildAt(i);
@@ -118,15 +125,20 @@ public class MaestroSession extends VoiceInteractionSession {
     @Override
     public void onShow(Bundle args, int showFlags) {
         super.onShow(args, showFlags);
-        Log.d(TAG, "onShow called with flags: " + showFlags);
         activityStarted = false;
         //clear stale screenshot from previous session
         ScreenshotHolder.clear();
-        
-        //if system promises screenshot, wait max 1s
-        if ((showFlags & VoiceInteractionSession.SHOW_WITH_SCREENSHOT) != 0) {
+
+        boolean screenshotPromised = (showFlags & VoiceInteractionSession.SHOW_WITH_SCREENSHOT) != 0;
+        Log.d(TAG, "onShow flags=" + showFlags + " screenshotPromised=" + screenshotPromised);
+
+        //wait for promised screenshot
+        if (screenshotPromised) {
             handler.postDelayed(startOverlayRunnable, 1000);
         } else {
+            //without flag selection stays empty
+            Log.w(TAG, "no screenshot promised by the system: enable 'Use screenshot' for this "
+                    + "assistant in the android settings, otherwise selection stays empty");
             startOverlayActivity();
         }
     }

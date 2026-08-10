@@ -142,7 +142,6 @@ function withNativeAndroid(config) {
       copyTemplate('src/AICoreModule.kt', path.join(javaDir, 'AICoreModule.kt'), packageName);
       // useless modules removed
 
-      // YOLO model removed
       // patch AndroidManifest: config plugin serializer drops taskAffinity=""
       const manifestPath = path.join(projectRoot, 'app', 'src', 'main', 'AndroidManifest.xml');
       if (fs.existsSync(manifestPath)) {

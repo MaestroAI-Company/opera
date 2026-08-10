@@ -4,11 +4,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as MediaLibrary from 'expo-media-library/legacy';
 import { TextInputWrapper } from "expo-paste-input";
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, useMemo } from "react";
 import {
   Animated,
   BackHandler,
-  Dimensions,
   Easing,
   Image,
   Keyboard,
@@ -25,10 +24,11 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Settings } from "../../services/settings/SettingsService";
-import { STT } from "../../services/speech/STTService";
+import { STT, WhisperSTT } from "../../services/speech/STTService";
 import AttachmentSheet, { SelectedFile } from "./AttachmentSheet";
 import NotificationModal from "../ui/NotificationModal";
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 
 const nextWhiteIcon = require("../../../assets/icons/arrow.png");
 const micIcon = require("../../../assets/icons/microphone.png");
@@ -37,6 +37,24 @@ const stopIcon = require("../../../assets/icons/stop.png");
 
 const IMAGE_MAX_WIDTH = 1280;
 const IMAGE_COMPRESS_QUALITY = 0.7;
+
+//only two audio containers accepted
+const SUPPORTED_AUDIO_EXTENSIONS = ['wav', 'mp3'];
+const AUDIO_EXTENSION_PATTERN = /\.(wav|mp3|m4a|aac|flac|ogg)$/;
+
+type AttachmentKind = 'image' | 'audio' | 'unsupported';
+
+//one attach rule for all pickers
+function classifyAttachment(name: string, mimeType?: string | null): AttachmentKind {
+  if (mimeType?.startsWith('image/')) return 'image';
+
+  const lowerName = name.toLowerCase();
+  const looksLikeAudio = mimeType?.startsWith('audio/') || AUDIO_EXTENSION_PATTERN.test(lowerName);
+  if (!looksLikeAudio) return 'unsupported';
+
+  const extension = lowerName.split('.').pop() ?? '';
+  return SUPPORTED_AUDIO_EXTENSIONS.includes(extension) ? 'audio' : 'unsupported';
+}
 
 //compress and resize an image to a base64 data uri
 const compressImageToDataUri = async (uri: string): Promise<string> => {
@@ -62,7 +80,6 @@ const compressImageToDataUri = async (uri: string): Promise<string> => {
 
 type ChatInputBarProps = {
   onSend?: (message: string, images?: string[], viaVoice?: boolean) => void;
-  onPlusPress?: () => void;
   onStop?: () => void;
   onTranscribe?: (wavBuffer: ArrayBuffer) => Promise<string | null>;
   onTranscribeError?: () => void;
@@ -75,10 +92,10 @@ type ChatInputBarProps = {
   onAttachmentSheetVisibilityChange?: (visible: boolean) => void;
   enabled?: boolean;
   autoStartMic?: boolean;
-  //screen-selection attachment owned by the parent overlay
+  //screen-selection attachment from overlay
   selection?: { uri: string; label: string } | null;
   onSelectionRemove?: () => void;
-  //foreground-app chip owned by the parent overlay (icon + label + package)
+  //foreground-app chip from overlay
   appContextChip?: { icon: string; label: string } | null;
   onAppContextRemove?: () => void;
 };
@@ -99,7 +116,6 @@ function buildWavBuffer(pcmFloat32Chunks: ArrayBuffer[], sampleRate: number): Ar
   const wave = enc.encode("WAVE");
   const fmt = enc.encode("fmt ");
   const data = enc.encode("data");
-  [riff, wave, fmt, data].forEach(() => { });
   view.setUint8(0, riff[0]); view.setUint8(1, riff[1]);
   view.setUint8(2, riff[2]); view.setUint8(3, riff[3]);
   view.setUint32(4, 36 + dataBytes, true);
@@ -132,7 +148,7 @@ function buildWavBuffer(pcmFloat32Chunks: ArrayBuffer[], sampleRate: number): Ar
 let currentAudioVolume = 0;
 
 function VoiceIndicator() {
-  const anims = useRef(Array.from({ length: 7 }).map(() => new Animated.Value(1))).current;
+  const anims = useMemo(() => Array.from({ length: 7 }).map(() => new Animated.Value(1)), []);
   useEffect(() => {
     let isMounted = true;
     const animate = () => {
@@ -167,7 +183,6 @@ function VoiceIndicator() {
 
 const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   onSend,
-  onPlusPress,
   onStop,
   onTranscribe,
   onTranscribeError,
@@ -185,6 +200,20 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   appContextChip = null,
   onAppContextRemove,
 }, ref) {
+  const insets = useSafeAreaInsets();
+  const bottomInsetToFill = insets.bottom + 16;
+  const [text, setText] = useState("");
+  const [, setWhisperAvailable] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState<{ title: string, message: string, buttons?: { text: string, onPress: () => void, style?: "primary" | "secondary" | "danger" }[] }>({ title: "", message: "" });
+  const [isAttachmentSheetVisible, setIsAttachmentSheetVisible] = useState(false);
+  const [recentPhotos, setRecentPhotos] = useState<any[]>([]);
+  const autoStartedRef = useRef(false);
+  const transcribeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useImperativeHandle(ref, () => ({
     stopRecording: () => {
       setIsRecording(false);
@@ -194,30 +223,18 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       setSelectedFiles([]);
     }
   }));
-  const insets = useSafeAreaInsets();
-  const bottomInsetToFill = insets.bottom + 16;
-  const [text, setText] = useState("");
-  const [whisperAvailable, setWhisperAvailable] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [modalConfig, setModalConfig] = useState<{ title: string, message: string, buttons?: { text: string, onPress: () => void, style?: "primary" | "secondary" | "danger" }[] }>({ title: "", message: "" });
-  const [isAttachmentSheetVisible, setIsAttachmentSheetVisible] = useState(false);
-  const [recentPhotos, setRecentPhotos] = useState<any[]>([]);
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const autoStartedRef = useRef(false);
-  const transcribeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const sheetHeightAnim = useRef(new Animated.Value(0)).current;
-  const spacerHeightAnim = useRef(new Animated.Value(insets.bottom)).current;
+  const sheetHeightAnim = useAnimatedValue(0);
+  const spacerHeightAnim = useAnimatedValue(insets.bottom);
   const targetSheetHeight = useRef(200);
 
   const closeSheet = () => {
     setIsAttachmentSheetVisible(false);
   };
 
-  const handlePanResponder = useRef(
+  //handlers need the live layout height, so they close over the ref
+  const handlePanResponder = useMemo(() =>
+    // eslint-disable-next-line react-hooks/refs
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onPanResponderMove: (e, gestureState) => {
@@ -238,17 +255,11 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         }
       },
     })
-  ).current;
-
-  useEffect(() => {
-    if (!isAttachmentSheetVisible) {
-      setIsSelectionMode(false);
-    }
-  }, [isAttachmentSheetVisible]);
+  , [sheetHeightAnim]);
 
   useEffect(() => {
     onAttachmentSheetVisibilityChange?.(isAttachmentSheetVisible);
-  }, [isAttachmentSheetVisible]);
+  }, [isAttachmentSheetVisible, onAttachmentSheetVisibilityChange]);
 
   useEffect(() => {
     const showSubscription = Keyboard.addListener(
@@ -266,8 +277,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
   const pcmChunksRef = useRef<ArrayBuffer[]>([]);
   const sampleRateRef = useRef<number>(16000);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const pressAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useAnimatedValue(1);
+  const pressAnim = useAnimatedValue(0);
 
   const liveTextRef = useRef<string>("");
   const stopResolverRef = useRef<((text: string | null) => void) | null>(null);
@@ -277,17 +288,10 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     currentAudioVolume = 0;
   };
 
-  //web-only whisper surface
-  const webSTT = STT as unknown as {
-    isModelInstalled(modelName: string): Promise<boolean>;
-    init(modelName: string): Promise<boolean>;
-    isAvailable(): boolean;
-    transcribeData(buffer: ArrayBuffer): Promise<string>;
-  };
-
-  //generic entry points, engine per platform
+  //generic entry points per platform, implementations are declared further down
   const startSTT = async () => {
     if (Platform.OS === 'web') {
+      // eslint-disable-next-line react-hooks/immutability
       await startBatchSTT();
     } else {
       await startContinuousSTT();
@@ -354,7 +358,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     }
   };
 
-  //stop stt, resolve with final transcript
+  //stop stt resolve with transcript
   const stopContinuousSTT = (): Promise<string | null> => {
     stopSTTVolume();
     setIsRecording(false);
@@ -426,16 +430,12 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   }, []);
 
   useEffect(() => {
-    if (selectedFiles.length === 0 && isSelectionMode) {
-      setIsSelectionMode(false);
-    }
-  }, [selectedFiles.length, isSelectionMode]);
-
-  useEffect(() => {
     if (autoStartMic && !autoStartedRef.current) {
       autoStartedRef.current = true;
       setTimeout(() => startSTT(), 800);
     }
+    //fires once, guarded by autoStartedRef
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStartMic]);
 
   const toggleAttachmentSheet = async () => {
@@ -493,7 +493,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         })
       ]).start();
     }
-  }, [isAttachmentSheetVisible]);
+  }, [isAttachmentSheetVisible, insets.bottom, sheetHeightAnim, spacerHeightAnim]);
 
   const handleCamera = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
@@ -557,19 +557,15 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     });
   };
 
-  const handleLongPressRecentPhoto = (photo: any) => {
-    handleSelectRecentPhoto(photo);
-  };
-
 
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     const checkWhisper = async () => {
       const modelName = Settings.getCached().whisperModel || "base";
-      const isInstalled = await webSTT.isModelInstalled(modelName);
+      const isInstalled = await WhisperSTT.isModelInstalled(modelName);
       if (isInstalled) {
-        webSTT.init(modelName).then((ok) => setWhisperAvailable(ok));
+        WhisperSTT.init(modelName).then((ok) => setWhisperAvailable(ok));
       }
     };
     checkWhisper();
@@ -599,7 +595,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     } else {
       pulseAnim.setValue(1);
     }
-  }, [isRecording]);
+  }, [isRecording, pulseAnim]);
 
   const handlePressIn = () => {
     Vibration.vibrate(10);
@@ -670,10 +666,10 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       if (chunks.length === 0) return null;
       setIsTranscribing(true);
       const wavBuffer = buildWavBuffer(chunks, sampleRateRef.current);
-      //delegate to parent, else whisper
+      //delegate to parent or whisper
       const transcribed = onTranscribe
         ? await onTranscribe(wavBuffer)
-        : await webSTT.transcribeData(wavBuffer);
+        : await WhisperSTT.transcribeData(wavBuffer);
       setIsTranscribing(false);
       return transcribed;
     } catch (e) {
@@ -695,22 +691,12 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         let hasInvalidFile = false;
 
         for (const a of result.assets) {
-          const isImage = a.mimeType?.startsWith('image/');
-          const isAudio = a.mimeType?.startsWith('audio/') || a.name.toLowerCase().match(/\.(wav|mp3|m4a|aac|flac|ogg)$/);
-
-          if (isImage) {
-            validFiles.push({ uri: a.uri, type: 'image', name: a.name });
+          const kind = classifyAttachment(a.name, a.mimeType);
+          if (kind === 'unsupported') {
+            hasInvalidFile = true;
             continue;
           }
-
-          if (isAudio) {
-            const ext = a.name.toLowerCase().split('.').pop();
-            if (ext === 'wav' || ext === 'mp3') {
-              validFiles.push({ uri: a.uri, type: 'audio', name: a.name });
-            } else {
-              hasInvalidFile = true;
-            }
-          }
+          validFiles.push({ uri: a.uri, type: kind, name: a.name });
         }
 
         if (hasInvalidFile) {
@@ -750,7 +736,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         return;
       }
 
-      const isInstalled = await webSTT.isModelInstalled(modelName);
+      const isInstalled = await WhisperSTT.isModelInstalled(modelName);
       if (!isInstalled) {
         setModalConfig({
           title: "Whisper Not Installed",
@@ -770,7 +756,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         return;
       }
 
-      const initialized = await webSTT.init(modelName);
+      const initialized = await WhisperSTT.init(modelName);
       if (!initialized) {
         setModalConfig({
           title: "Initialization Error",
@@ -802,14 +788,29 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     }
   };
 
+  //one chip row for both
+  const attachments: { key: string; kind: string; uri: string; name: string; onRemove: () => void }[] = [];
+  if (selection) {
+    attachments.push({ key: 'selection', kind: 'image', uri: selection.uri, name: selection.label, onRemove: () => onSelectionRemove?.() });
+  }
+  selectedFiles.forEach((file, index) => {
+    attachments.push({
+      key: `file-${index}`,
+      kind: file.type,
+      uri: file.uri,
+      name: file.name,
+      onRemove: () => setSelectedFiles(prev => prev.filter((_, i) => i !== index)),
+    });
+  });
+
+  //only picked files need compressing
   const buildImages = async (): Promise<string[]> => {
-    const images = await Promise.all(
+    const picked = await Promise.all(
       selectedFiles.map(f => f.type === 'image'
         ? compressImageToDataUri(f.uri)
         : Promise.resolve(`${f.uri}?name=${encodeURIComponent(f.name)}`))
     );
-    if (selection?.uri) images.push(selection.uri);
-    return images;
+    return selection?.uri ? [...picked, selection.uri] : picked;
   };
 
   const handleSend = async () => {
@@ -822,7 +823,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       if (cancelled) return;
     }
     const finalText = (voiceText ?? text).trim();
-    if ((finalText || selectedFiles.length > 0 || !!selection) && onSend) {
+    if ((finalText || attachments.length > 0) && onSend) {
       const images = await buildImages();
       onSend(finalText, images, voiceText != null);
       setText("");
@@ -856,31 +857,16 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
         const promises = pastedFiles.map(file => {
           return new Promise<SelectedFile | null>((resolve) => {
-            const mimeType = file.type;
             const name = file.name || "pasted_file";
-            const isImage = mimeType.startsWith('image/');
-            const isAudio = mimeType.startsWith('audio/') || name.toLowerCase().match(/\.(wav|mp3|m4a|aac|flac|ogg)$/);
-
-            if (!isImage && !isAudio) {
+            const kind = classifyAttachment(name, file.type);
+            if (kind === 'unsupported') {
               resolve(null);
               return;
             }
 
-            if (isAudio) {
-              const ext = name.toLowerCase().split('.').pop();
-              if (ext !== 'wav' && ext !== 'mp3') {
-                resolve(null);
-                return;
-              }
-            }
-
             const reader = new FileReader();
             reader.onload = (ev) => {
-              resolve({
-                uri: ev.target?.result as string,
-                type: isImage ? 'image' : 'audio',
-                name
-              });
+              resolve({ uri: ev.target?.result as string, type: kind, name });
             };
             reader.onerror = () => resolve(null);
             reader.readAsDataURL(file);
@@ -916,7 +902,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         <Animated.View style={{ width: '100%', maxWidth: 800, zIndex: 2, elevation: 9 }}>
           <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.pressableWrapper}>
             <Animated.View style={{ transform: [{ scale }] }}>
-              {selectedFiles.length > 0 || !!selection || !!appContextChip ? (
+              {attachments.length > 0 || !!appContextChip ? (
                 <View style={[styles.filesContainerTop, incognito && styles.filesContainerTopIncognito]}>
                   <View style={styles.fileChipsContainer}>
                     {appContextChip && (
@@ -929,32 +915,23 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                         )}
                       </View>
                     )}
-                    {selection && (
-                      <View style={styles.filePreviewContainerTop}>
-                        <Image source={{ uri: selection.uri }} style={styles.filePreviewImageTop} />
-                        <Pressable style={({ pressed }) => [styles.removeFileBtnTop, pressed && { opacity: 0.8 }]} onPress={onSelectionRemove}>
-                          <Text style={styles.removeFileBtnTextTop}>✕</Text>
-                        </Pressable>
-                      </View>
-                    )}
-                    {selectedFiles.map((file, i) => (
-                      <View key={i} style={styles.filePreviewContainerTop}>
-                        {file.type === 'image' ? (
-                          <Image source={{ uri: file.uri }} style={styles.filePreviewImageTop} />
+                    {attachments.map(chip => (
+                      <View key={chip.key} style={styles.filePreviewContainerTop}>
+                        {chip.kind === 'image' ? (
+                          <Image source={{ uri: chip.uri }} style={styles.filePreviewImageTop} />
                         ) : (
                           <View style={styles.filePreviewAudioTop}>
-                            <Text style={styles.filePreviewAudioTextTop} numberOfLines={1}>{file.name}</Text>
+                            <Text style={styles.filePreviewAudioTextTop} numberOfLines={1}>{chip.name}</Text>
                           </View>
                         )}
-                        <Pressable style={({ pressed, hovered }) => [styles.removeFileBtnTop, (pressed || hovered) && { opacity: 0.8 }]} onPress={() => setSelectedFiles(prev => prev.filter((_, idx) => idx !== i))}>
+                        <Pressable style={({ pressed, hovered }) => [styles.removeFileBtnTop, (pressed || hovered) && { opacity: 0.8 }]} onPress={chip.onRemove}>
                           <Text style={styles.removeFileBtnTextTop}>✕</Text>
                         </Pressable>
                       </View>
                     ))}
                     <Text style={[styles.filesAddedText, incognito && { color: Colors.textMuted }]}>
                       {(() => {
-                        const fileCount = selectedFiles.length + (selection ? 1 : 0);
-                        const filesPart = fileCount > 0 ? `${fileCount} File${fileCount !== 1 ? 's' : ''}` : '';
+                        const filesPart = attachments.length > 0 ? `${attachments.length} File${attachments.length !== 1 ? 's' : ''}` : '';
                         const appPart = appContextChip ? 'App context' : '';
                         if (filesPart && appPart) return `${filesPart} and app context Added`;
                         if (filesPart) return `${filesPart} Added`;
@@ -981,7 +958,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 {(Platform.OS !== 'web' || Settings.getCached().whisperModel !== 'none' || canTranscribeRemotely) && !isGenerating && (
                   <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={({ pressed, hovered }) => [styles.micButton, (pressed || hovered) && { opacity: 0.8 }]}>
                     <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
-                      <Image source={isRecording ? stopIcon : micIcon} style={[styles.micIcon, isRecording && styles.micIconRecording]} tintColor={Colors.surface} />
+                      <Image source={isRecording ? stopIcon : micIcon} style={styles.micIcon} tintColor={Colors.surface} />
                     </Animated.View>
                   </Pressable>
                 )}
@@ -1073,7 +1050,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
             recentPhotos={recentPhotos}
             selectedFiles={selectedFiles}
             onSelectRecentPhoto={handleSelectRecentPhoto}
-            onLongPressRecentPhoto={handleLongPressRecentPhoto}
+            onLongPressRecentPhoto={handleSelectRecentPhoto}
             panHandlers={handlePanResponder.panHandlers}
           />
         </View>
@@ -1129,16 +1106,10 @@ const styles = StyleSheet.create({
   micIcon: {
     width: 18,
     height: 18,
-
-
-  },
-  micIconRecording: {
-
   },
   plusIcon: {
     width: 18,
     height: 18,
-
 
   },
   input: {
@@ -1169,7 +1140,6 @@ const styles = StyleSheet.create({
   sendIcon: {
     width: 18,
     height: 18,
-
   },
   filesContainerTop: {
     backgroundColor: Colors.surface,

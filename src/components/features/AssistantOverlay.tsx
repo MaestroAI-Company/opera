@@ -1,44 +1,44 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  StyleSheet,
-  Platform,
-  DeviceEventEmitter,
-  Linking,
   Animated,
   BackHandler,
-  Vibration,
+  DeviceEventEmitter,
   InteractionManager,
+  Linking,
+  Platform,
+  StyleSheet,
+  Vibration,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import Reanimated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { KeyboardAvoidingView, KeyboardProvider, useGenericKeyboardHandler } from 'react-native-keyboard-controller';
+import Reanimated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import ChatBar, { ChatBarHandle } from './ChatBar';
-import NotificationModal from '../ui/NotificationModal';
-import ChatView from './ChatView';
-import { Conversation, DB, Message } from '../../services/db/DatabaseService';
-import { Settings } from '../../services/settings/SettingsService';
-import { AIModule } from '../../services/ai/AIModule';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { Colors } from '../../../constants/theme';
+import { AIModule } from '../../services/ai/AIModule';
+import { buildSystemPrompt, streamAssistantReply } from '../../services/ai/chatGeneration';
+import { arrayBufferToBase64 } from '../../services/ai/utils/base64';
+import { CloudSync } from '../../services/CloudSyncService';
+import { Conversation, DB, Message } from '../../services/db/DatabaseService';
+import { AppEvents } from '../../services/events';
+import { Settings } from '../../services/settings/SettingsService';
 import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { TTS } from '../../services/speech/TTSService';
-import { CloudSync } from '../../services/CloudSyncService';
-import { AppEvents } from '../../services/events';
-import { arrayBufferToBase64 } from '../../services/ai/utils/base64';
-import { buildSystemPrompt, streamAssistantReply } from '../../services/ai/chatGeneration';
+import NotificationModal from '../ui/NotificationModal';
+import ChatBar, { ChatBarHandle } from './ChatBar';
+import ChatView from './ChatView';
 import ModelDropdown from './ModelDropdown';
 import SelectionLayer from './SelectionLayer';
 
-import { useScreenSelection } from '../../services/overlay/useScreenSelection';
-import { useScreenDetections } from '../../services/overlay/useScreenDetections';
-import { AppContext, AppIcon, ScreenCapture } from '../../services/overlay/screenCapture';
 import { useResponsive } from '../../hooks/useResponsive';
+import { AppContext, AppIcon, ScreenCapture } from '../../services/overlay/screenCapture';
+import { useScreenDetections } from '../../services/overlay/useScreenDetections';
+import { useScreenSelection } from '../../services/overlay/useScreenSelection';
 
 import SearchWebView from '../../../components/SearchWebView';
+import { useAnimatedValue } from '../../hooks/useAnimatedValue';
 import { PluginRegistry } from '../../services/plugins/PluginRegistry';
 import '../../services/widgets/registerWidgets';
-import { useAnimatedValue } from '../../hooks/useAnimatedValue';
 
 //how far bars start offscreen
 const BAR_ENTRY = 120;
@@ -170,8 +170,8 @@ function AssistantOverlay() {
     Animated.spring(mountOpacity, { toValue: 1, useNativeDriver: true, bounciness: 0, speed: 20 }).start();
     //bars return to their edges
     Animated.spring(topBarEntry, { toValue: 0, useNativeDriver: true, bounciness: 9, speed: 14 }).start();
-    //bar slides up and stops
-    bottomBarEntry.value = withSpring(0, { damping: 32, stiffness: 190 });
+    //bar slides up from the bottom, same feel as ModelDropdown's sheet
+    bottomBarEntry.value = withSpring(0, { duration: 500, dampingRatio: 0.65 });
     Animated.sequence([
       Animated.timing(haloOpacity, { toValue: 1, duration: 240, useNativeDriver: true }),
       Animated.timing(haloOpacity, { toValue: 0, delay: 160, duration: 760, useNativeDriver: true }),
@@ -196,7 +196,7 @@ function AssistantOverlay() {
             if (!cancelled && info) setAppIconInfo(info);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     });
     return () => { cancelled = true; handle.cancel(); };
   }, [session]);
@@ -240,7 +240,7 @@ function AssistantOverlay() {
         //defer model preload past animation
         if (s.ollamaModel) {
           InteractionManager.runAfterInteractions(() => {
-            AIModule.preloadModel(s.ollamaModel!).catch(() => {});
+            AIModule.preloadModel(s.ollamaModel!).catch(() => { });
           });
         }
       } catch (e) {
@@ -248,7 +248,7 @@ function AssistantOverlay() {
       }
       //only needed once tools are used
       InteractionManager.runAfterInteractions(() => {
-        PluginRegistry.init().then(() => PluginRegistry.loadAll()).catch(() => {});
+        PluginRegistry.init().then(() => PluginRegistry.loadAll()).catch(() => { });
       });
     };
     init();
@@ -276,7 +276,7 @@ function AssistantOverlay() {
     AIModule.SharedGenerationState.activeConvId = null;
     AIModule.SharedGenerationState.activeMsgId = null;
     AIModule.SharedGenerationState.content = '';
-    AIModule.SharedGenerationState.abort = () => {};
+    AIModule.SharedGenerationState.abort = () => { };
     AIModule.SharedGenerationState.notify();
   }, []);
 
@@ -300,7 +300,7 @@ function AssistantOverlay() {
 
   //hand off conversation then close
   const openConversationInApp = useCallback((convId: string) => {
-    Linking.openURL(`opera://?convId=${convId}`).catch(() => {});
+    Linking.openURL(`opera://?convId=${convId}`).catch(() => { });
     resetOverlay();
     //close overlay only
     setTimeout(() => ScreenCapture.close(), 100);
@@ -403,7 +403,7 @@ function AssistantOverlay() {
       //patch bubble to show badge
       setMessages(prev => prev.map(m => m.id === userMsg.id ? { ...m, screenContext: badge } : m));
       //persist badge across reloads
-      DB.updateMessageScreenContext(userMsg.id, badge).catch(() => {});
+      DB.updateMessageScreenContext(userMsg.id, badge).catch(() => { });
       const parts: string[] = ['\n\n---\n\n# Screen Context'];
       if (ctx.appPackage) parts.push(`Foreground app: ${ctx.appPackage}`);
       if (ctx.screenText && ctx.screenText.trim().length > 0) {
@@ -490,7 +490,7 @@ function AssistantOverlay() {
 
     setGeneratingConvId(null);
     streamingMsgIdRef.current = null;
-    
+
     AIModule.SharedGenerationState.activeConvId = null;
     AIModule.SharedGenerationState.activeMsgId = null;
     AIModule.SharedGenerationState.notify();
@@ -503,7 +503,7 @@ function AssistantOverlay() {
   const handleTranscribe = useCallback(async (wavBuffer: ArrayBuffer): Promise<string | null> => {
     const model = selectedModelRef.current;
     const useRemote = !alwaysWhisper && modelCapabilities.includes('audio') && model;
-    
+
     if (useRemote) {
       try {
         const base64Audio = 'data:audio/wav;base64,' + arrayBufferToBase64(wavBuffer);
@@ -597,7 +597,7 @@ function AssistantOverlay() {
         ) : (
           <Animated.View style={[styles.phaseContainer, { opacity: responseOpacity }]} pointerEvents="box-none">
             <LinearGradient
-              colors={['rgba(0,0,0,0.50)', 'rgba(0,0,0,0.95)']}
+              colors={['rgba(0,0,0,0.60)', 'rgba(0,0,0,1)']}
               style={styles.chatViewWrapper}
               pointerEvents="box-none"
             >
@@ -634,7 +634,7 @@ function AssistantOverlay() {
               selectedModelRef.current = model;
               Settings.set('ollamaModel', model);
               //preload newly selected model
-              AIModule.preloadModel(model).catch(() => {});
+              AIModule.preloadModel(model).catch(() => { });
             }}
             onReflectionChange={setReflection}
           />
@@ -653,7 +653,7 @@ function AssistantOverlay() {
             onTranscribe={handleTranscribe}
             canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes('audio') && !!selectedModel}
             supportsFiles={modelCapabilities.includes('vision') || modelCapabilities.includes('audio')}
-            onOpenSettings={() => {}}
+            onOpenSettings={() => { }}
             enabled={true}
             autoStartMic={shouldAutoStartMic}
             selection={attachment}

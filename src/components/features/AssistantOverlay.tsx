@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View,
   StyleSheet,
   Platform,
   DeviceEventEmitter,
@@ -11,8 +10,7 @@ import {
   InteractionManager,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Clipboard from 'expo-clipboard';
-import Reanimated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import Reanimated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { KeyboardAvoidingView, KeyboardProvider, useGenericKeyboardHandler } from 'react-native-keyboard-controller';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import ChatBar, { ChatBarHandle } from './ChatBar';
@@ -22,36 +20,30 @@ import { Conversation, DB, Message } from '../../services/db/DatabaseService';
 import { Settings } from '../../services/settings/SettingsService';
 import { AIModule } from '../../services/ai/AIModule';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
-import { Colors, Fonts, FontSizes, Radius } from '../../../constants/theme';
-import { STT } from '../../services/speech/STTService';
+import { Colors } from '../../../constants/theme';
+import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { TTS } from '../../services/speech/TTSService';
-import { NotificationService } from '../../services/notifications/NotificationService';
 import { CloudSync } from '../../services/CloudSyncService';
+import { AppEvents } from '../../services/events';
+import { arrayBufferToBase64 } from '../../services/ai/utils/base64';
+import { buildSystemPrompt, streamAssistantReply } from '../../services/ai/chatGeneration';
 import ModelDropdown from './ModelDropdown';
-import SelectionLayer, { SelectionState } from './SelectionLayer';
+import SelectionLayer from './SelectionLayer';
 
-import DeferredObjectDetector from '../../services/overlay/DeferredObjectDetector';
-import { YoloDetection } from '../../services/overlay/yoloPostprocess';
-import { OverlayNative, AppContext, AppIconInfo } from '../../services/overlay/OverlayNative';
+import { useScreenSelection } from '../../services/overlay/useScreenSelection';
+import { useScreenDetections } from '../../services/overlay/useScreenDetections';
+import { AppContext, AppIcon, ScreenCapture } from '../../services/overlay/screenCapture';
 import { useResponsive } from '../../hooks/useResponsive';
 
-//on-device  yolo model
-const OBJECT_DETECTOR_CONFIG = {
-  modelSource: require('../../../assets/models/deki-yolo.pte'),
-  classes: ['View', 'ImageView', 'Text', 'Line'] as const,
-};
-
-//web whisper surface
-const WebSTT = STT as unknown as {
-  isAvailable(): boolean;
-  isModelInstalled(modelName: string): Promise<boolean>;
-  init(modelName: string): Promise<boolean>;
-  setLanguage(lang: string): void;
-  transcribeData(buffer: ArrayBuffer): Promise<string>;
-};
 import SearchWebView from '../../../components/SearchWebView';
-import { WidgetManager } from '../../services/widgets/WidgetManager';
 import { PluginRegistry } from '../../services/plugins/PluginRegistry';
+import '../../services/widgets/registerWidgets';
+import { useAnimatedValue } from '../../hooks/useAnimatedValue';
+
+//how far bars start offscreen
+const BAR_ENTRY = 120;
+//thickness of the activation rim
+const HALO_SIZE = 88;
 
 export default function AssistantOverlayWrapper() {
   return (
@@ -61,29 +53,6 @@ export default function AssistantOverlayWrapper() {
       </KeyboardProvider>
     </SafeAreaProvider>
   );
-}
-
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const G = globalThis as any;
-  if (G.Buffer?.from) {
-    return G.Buffer.from(buffer).toString('base64');
-  }
-  const bytes = new Uint8Array(buffer);
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const parts: string[] = [];
-  const len = bytes.length;
-  for (let i = 0; i < len; i += 3) {
-    const a = bytes[i];
-    const b = i + 1 < len ? bytes[i + 1] : 0;
-    const c = i + 2 < len ? bytes[i + 2] : 0;
-    parts.push(
-      chars[a >> 2] +
-      chars[((a & 3) << 4) | (b >> 4)] +
-      (i + 1 < len ? chars[((b & 15) << 2) | (c >> 6)] : '=') +
-      (i + 2 < len ? chars[c & 63] : '=')
-    );
-  }
-  return parts.join('');
 }
 
 function AssistantOverlay() {
@@ -132,12 +101,13 @@ function AssistantOverlay() {
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState<{ title: string, message: string, buttons?: any[] }>({ title: '', message: '' });
 
-  const [activeTool, setActiveTool] = useState<{name: string | null, args: any | null}>({ name: null, args: null });
+  //state re-renders while a tool runs
+  const [, setActiveTool] = useState<{ name: string | null, args: any | null }>({ name: null, args: null });
   useEffect(() => {
     const unsub = AIModule.SharedGenerationState.subscribe(() => {
-      setActiveTool({ 
-        name: AIModule.SharedGenerationState.activeToolName, 
-        args: AIModule.SharedGenerationState.activeToolArgs 
+      setActiveTool({
+        name: AIModule.SharedGenerationState.activeToolName,
+        args: AIModule.SharedGenerationState.activeToolArgs
       });
     });
     return unsub;
@@ -151,33 +121,30 @@ function AssistantOverlay() {
     requestAnimationFrame(() => {
       rafPendingRef.current = false;
       const content = streamingContentRef.current;
-      //batch shared-state notify with the render flush instead of once per token
+      //notify shared state with render flush
       AIModule.SharedGenerationState.content = content;
       AIModule.SharedGenerationState.notify();
       setMessages(prev => prev.map(m => (m.id === msgId ? { ...m, content } : m)));
     });
   }, []);
 
-  //overlay phases: select/respond
+  //overlay phases select and respond
   const [phase, setPhase] = useState<'select' | 'respond'>('select');
-  const [detections, setDetections] = useState<YoloDetection[]>([]);
-  const [screenshotSize, setScreenshotSize] = useState<{ width: number; height: number } | null>(null);
-  const [selection, setSelection] = useState<SelectionState>({ kind: 'none' });
-  const [selectionImage, setSelectionImage] = useState<{ uri: string, label: string } | null>(null);
-  //pre-cached full-screen crop so a single tap feels instant
-  const fullScreenCropRef = useRef<string | null>(null);
-  //foreground app + screen text captured via android assist api
-  const appContextRef = useRef<AppContext | null>(null);
-  //icon + label for the foreground-app chip (state so the ChatBar re-renders)
-  const [appIconInfo, setAppIconInfo] = useState<AppIconInfo | null>(null);
-  //user can dismiss the chip to strip screen context from the outgoing message
-  const [appContextDismissed, setAppContextDismissed] = useState(false);
-  //hide chrome (top bar, bottom bar, selection UI) while actively drawing a lasso
-  const [isDrawingSelection, setIsDrawingSelection] = useState(false);
-  //bump on each overlay session to force a fresh screenshot analysis
+  //bump forces fresh screenshot analysis
   const [session, setSession] = useState(0);
+  const { selection, select, clear: clearSelection, attachment } = useScreenSelection(session);
+  //selection works without it
+  const detections = useScreenDetections(session);
+  //foreground app and screen text
+  const appContextRef = useRef<AppContext | null>(null);
+  //chip icon and label state
+  const [appIconInfo, setAppIconInfo] = useState<AppIcon | null>(null);
+  //dismissible chip strips screen context
+  const [appContextDismissed, setAppContextDismissed] = useState(false);
+  //hide chrome while drawing lasso
+  const [isDrawingSelection, setIsDrawingSelection] = useState(false);
 
-  //lift bottom bar above keyboard in select phase
+  //lift bottom bar above keyboard
   const keyboardHeight = useSharedValue(0);
   useGenericKeyboardHandler({
     onMove: (e) => { 'worklet'; keyboardHeight.value = e.height; },
@@ -185,79 +152,47 @@ function AssistantOverlay() {
   }, []);
   const liftBarInSelect = useSharedValue(1);
   useEffect(() => { liftBarInSelect.value = phase === 'select' ? 1 : 0; }, [phase, liftBarInSelect]);
+  //bar rides in above keyboard
+  const bottomBarEntry = useSharedValue(BAR_ENTRY);
   const bottomBarStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -keyboardHeight.value * liftBarInSelect.value }],
+    transform: [{ translateY: bottomBarEntry.value - keyboardHeight.value * liftBarInSelect.value }],
   }));
 
-  // entry bounce (100% native driver)
-  const mountOpacity = useRef(new Animated.Value(0)).current;
-  const mountTranslate = useRef(new Animated.Value(-30)).current;
-  const responseOpacity = useRef(new Animated.Value(0)).current;
+  //entry bounce
+  const mountOpacity = useAnimatedValue(0);
+  const topBarEntry = useAnimatedValue(-BAR_ENTRY);
+  const responseOpacity = useAnimatedValue(0);
+
+  //activation rim fades out
+  const haloOpacity = useAnimatedValue(0);
 
   useEffect(() => {
-    Animated.spring(mountOpacity, { toValue: 1, useNativeDriver: true, bounciness: 8, speed: 18 }).start();
-    Animated.spring(mountTranslate, { toValue: 0, useNativeDriver: true, bounciness: 8, speed: 18 }).start();
-  }, [mountOpacity, mountTranslate]);
+    Animated.spring(mountOpacity, { toValue: 1, useNativeDriver: true, bounciness: 0, speed: 20 }).start();
+    //bars return to their edges
+    Animated.spring(topBarEntry, { toValue: 0, useNativeDriver: true, bounciness: 9, speed: 14 }).start();
+    //bar slides up and stops
+    bottomBarEntry.value = withSpring(0, { damping: 32, stiffness: 190 });
+    Animated.sequence([
+      Animated.timing(haloOpacity, { toValue: 1, duration: 240, useNativeDriver: true }),
+      Animated.timing(haloOpacity, { toValue: 0, delay: 160, duration: 760, useNativeDriver: true }),
+    ]).start();
+  }, [mountOpacity, topBarEntry, bottomBarEntry, haloOpacity]);
 
-  //mount the yolo detector only after the entry animation so its .pte load
-  //doesn't freeze the overlay pop-in. dedicated child + fresh mount guarantees
-  //the internal load useEffect actually fires (a preventLoad flip on the same
-  //instance was unreliable in this codepath)
-  const [detectorMounted, setDetectorMounted] = useState(false);
-  useEffect(() => {
-    setDetectorMounted(false);
-    const t = setTimeout(() => setDetectorMounted(true), 350);
-    return () => clearTimeout(t);
-  }, [session]);
-
-  //warm the full-screen crop so a single tap uses a cached uri
-  //deferred so the overlay paints before we hit the native encoder
-  useEffect(() => {
-    let cancelled = false;
-    fullScreenCropRef.current = null;
-    const handle = InteractionManager.runAfterInteractions(() => {
-      if (cancelled) return;
-      OverlayNative.cropRegion({ x: 0, y: 0, w: 1, h: 1 })
-        .then(uri => { if (!cancelled && uri) fullScreenCropRef.current = uri; })
-        .catch(() => {});
-    });
-    return () => { cancelled = true; handle.cancel(); };
-  }, [session]);
-
-  //fetch screenshot size independently so selection layout doesn't wait for yolo
-  //assist-api screenshot arrives async — retry until it lands or we give up
-  useEffect(() => {
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const attempt = (tries: number) => {
-      if (cancelled) return;
-      OverlayNative.getScreenshotInfo()
-        .then(info => {
-          if (cancelled) return;
-          if (info) setScreenshotSize(info);
-          else if (tries > 0) timer = setTimeout(() => attempt(tries - 1), 200);
-        })
-        .catch(() => {});
-    };
-    attempt(6);
-    return () => { cancelled = true; if (timer) clearTimeout(timer); };
-  }, [session]);
-
-  //capture foreground app context (package + on-screen text) for the ai
-  //deferred: assist-api read + launcher icon rasterization aren't needed for the first paint
+  //capture app context for the ai
+  //defer assist and icon reads
   useEffect(() => {
     let cancelled = false;
     appContextRef.current = null;
-    setAppIconInfo(null);
-    setAppContextDismissed(false);
     const handle = InteractionManager.runAfterInteractions(() => {
       if (cancelled) return;
-      OverlayNative.getAppContext()
+      setAppIconInfo(null);
+      setAppContextDismissed(false);
+      ScreenCapture.getAppContext()
         .then(async ctx => {
           if (cancelled) return;
           appContextRef.current = ctx;
           if (ctx?.appPackage) {
-            const info = await OverlayNative.getAppIcon(ctx.appPackage);
+            const info = await ScreenCapture.getAppIcon(ctx.appPackage);
             if (!cancelled && info) setAppIconInfo(info);
           }
         })
@@ -270,72 +205,22 @@ function AssistantOverlay() {
   const activeConversationRef = useRef<Conversation | null>(null);
   useEffect(() => { activeConversationRef.current = activeConversation; }, [activeConversation]);
 
-  const goToSelect = useCallback(() => {
-    Animated.timing(responseOpacity, {
-      toValue: 0,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => {
-      setPhase('select');
-      setSelection({ kind: 'none' });
-      setSelectionImage(null);
-    });
-  }, [responseOpacity]);
-
-  //bump on every request, only the latest crop is applied to state
-  const cropGenRef = useRef(0);
-  const handleSelectionChange = useCallback((s: SelectionState) => {
-    setSelection(s);
-    if (s.kind === 'none') {
-      cropGenRef.current++;
-      setSelectionImage(null);
-      return;
-    }
-    const isFull = s.region.x <= 0.001 && s.region.y <= 0.001 && s.region.w >= 0.999 && s.region.h >= 0.999;
-    const label = isFull ? 'Full screen' : 'Selection';
-    //full screen uses the pre-warmed crop for instant feedback
-    if (isFull && fullScreenCropRef.current) {
-      cropGenRef.current++;
-      setSelectionImage({ uri: fullScreenCropRef.current, label });
-      return;
-    }
-    const gen = ++cropGenRef.current;
-    OverlayNative.cropRegion(s.region)
-      .then(uri => {
-        //drop the response if a newer request was fired
-        if (gen !== cropGenRef.current) return;
-        if (uri && uri.length > 0) {
-          if (isFull) fullScreenCropRef.current = uri;
-          setSelectionImage({ uri, label });
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  const handleSelectionRemove = useCallback(() => {
-    setSelection({ kind: 'none' });
-    setSelectionImage(null);
-  }, []);
-
   const goToRespond = useCallback(() => {
     setPhase('respond');
-    setSelection({ kind: 'none' });
-    setSelectionImage(null);
+    clearSelection();
     responseOpacity.setValue(0);
     Animated.timing(responseOpacity, {
       toValue: 1,
       duration: 350,
       useNativeDriver: true,
     }).start();
-  }, [responseOpacity]);
+  }, [responseOpacity, clearSelection]);
 
-
-
-  //init db, settings, preload model
+  //init db settings and model
   useEffect(() => {
     const init = async () => {
       try {
-        //db and settings live in the same sqlite file but open independent connections, load in parallel
+        //parallel db and settings connections
         await Promise.all([DB.init(), Settings.init()]);
         const s = await Settings.load();
         setUserInstruction(s.instruction);
@@ -352,7 +237,7 @@ function AssistantOverlay() {
         AIModule.setMode(s.aiService);
         STT.setLanguage(s.whisperLanguage);
 
-        //preload model into ram — deferred so the native call doesn't race the entry animation
+        //defer model preload past animation
         if (s.ollamaModel) {
           InteractionManager.runAfterInteractions(() => {
             AIModule.preloadModel(s.ollamaModel!).catch(() => {});
@@ -361,7 +246,7 @@ function AssistantOverlay() {
       } catch (e) {
         console.warn('Failed to load settings in AssistantOverlay', e);
       }
-      //not needed for the select screen, only once a message with tools is sent
+      //only needed once tools are used
       InteractionManager.runAfterInteractions(() => {
         PluginRegistry.init().then(() => PluginRegistry.loadAll()).catch(() => {});
       });
@@ -381,15 +266,12 @@ function AssistantOverlay() {
     setActiveConversation(null);
     activeConversationRef.current = null;
     setMessages([]);
-    setSelection({ kind: 'none' });
-    setSelectionImage(null);
     setPhase('select');
     setGeneratingConvId(null);
-    setDetections([]);
-    setScreenshotSize(null);
     appContextRef.current = null;
     setAppIconInfo(null);
     setAppContextDismissed(false);
+    //reset capture and selection
     setSession(s => s + 1);
     AIModule.SharedGenerationState.activeConvId = null;
     AIModule.SharedGenerationState.activeMsgId = null;
@@ -410,23 +292,25 @@ function AssistantOverlay() {
 
   //reopen via same activity instance
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('OVERLAY_REOPENED', () => {
+    const sub = DeviceEventEmitter.addListener(AppEvents.overlayReopened, () => {
       resetOverlay();
     });
     return () => sub.remove();
   }, [resetOverlay]);
 
-  //hand conversation to the full app then close overlay
+  //hand off conversation then close
   const openConversationInApp = useCallback((convId: string) => {
     Linking.openURL(`opera://?convId=${convId}`).catch(() => {});
     resetOverlay();
-    //close overlay only, not the app
-    setTimeout(() => OverlayNative.closeOverlay(), 100);
+    //close overlay only
+    setTimeout(() => ScreenCapture.close(), 100);
   }, [resetOverlay]);
 
   //model capabilities for mic auto-start
   useEffect(() => {
     let cancelled = false;
+    //reset the gate while the new model's capabilities load
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCapabilitiesReady(false);
     if (selectedModel) {
       AIModule.getModelCapabilities(selectedModel).then(caps => {
@@ -461,7 +345,7 @@ function AssistantOverlay() {
         );
       }
     } catch (e) {
-      //title generation is best-effort: keep the truncated first-message name on failure
+      //best-effort title keep on failure
       console.warn('Title generation skipped:', (e as any)?.message ?? e);
     }
   }, []);
@@ -494,20 +378,20 @@ function AssistantOverlay() {
       .map(m => ({ role: m.role, content: m.content, images: m.images }));
     taskHistory.push({ role: 'user', content: text, images });
 
-    //include the foreground app + screen text captured by the assist api so the model can reason about what the user is looking at
-    //re-fetch here in case onHandleAssist arrived after the initial useEffect
+    //give model screen context
+    //refetch if assist arrived late
     let screenContextSegment = '';
     const appContextEnabled = Settings.getCached().useAppContext !== false;
     let ctx = appContextDismissed || !appContextEnabled ? null : appContextRef.current;
     if (appContextEnabled && !appContextDismissed && (!ctx || (!ctx.appPackage && !ctx.screenText))) {
-      ctx = await OverlayNative.getAppContext();
+      ctx = await ScreenCapture.getAppContext();
       appContextRef.current = ctx;
     }
     if (ctx && (ctx.appPackage || ctx.screenText)) {
-      //reuse the icon+label already loaded for the ChatBar chip when available
+      //reuse chip icon and label
       let iconInfo = appIconInfo;
       if (!iconInfo && ctx.appPackage) {
-        iconInfo = await OverlayNative.getAppIcon(ctx.appPackage);
+        iconInfo = await ScreenCapture.getAppIcon(ctx.appPackage);
       }
       const badge = {
         appPackage: ctx.appPackage ?? null,
@@ -516,9 +400,9 @@ function AssistantOverlay() {
         label: iconInfo?.label ?? null,
       };
       userMsg.screenContext = badge;
-      //patch the already-rendered bubble so the badge appears
+      //patch bubble to show badge
       setMessages(prev => prev.map(m => m.id === userMsg.id ? { ...m, screenContext: badge } : m));
-      //persist the badge so it survives a conversation reload
+      //persist badge across reloads
       DB.updateMessageScreenContext(userMsg.id, badge).catch(() => {});
       const parts: string[] = ['\n\n---\n\n# Screen Context'];
       if (ctx.appPackage) parts.push(`Foreground app: ${ctx.appPackage}`);
@@ -527,12 +411,10 @@ function AssistantOverlay() {
       }
       screenContextSegment = parts.join('\n');
     }
-    //app context is a first-message attachment: dismiss the chip so it does not linger on follow-ups
+    //dismiss chip after first message
     setAppContextDismissed(true);
 
-    const taskSystemPrompt = (instruction.trim().length > 0
-      ? `${instruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
-      : SYSTEM_PROMPTS.DEFAULT) + WidgetManager.getSystemPromptSegment() + screenContextSegment;
+    const taskSystemPrompt = buildSystemPrompt(instruction, screenContextSegment);
 
     const assistantMsg = await DB.addMessage(conv.id, 'assistant', '…');
     setMessages(prev => [...prev, assistantMsg]);
@@ -558,27 +440,23 @@ function AssistantOverlay() {
       abortControllerRef.current = null;
     } else {
       try {
-        await AIModule.sendMessageWithTools(
+        const outcome = await streamAssistantReply({
           model,
-          taskSystemPrompt,
-          taskHistory,
-          chunk => {
-            streamingContentRef.current += chunk;
+          systemPrompt: taskSystemPrompt,
+          history: taskHistory,
+          think: reflection === 'none' ? false : reflection,
+          signal: abortControllerRef.current.signal,
+          onContent: (content) => {
+            streamingContentRef.current = content;
             scheduleFlush(assistantMsg.id);
           },
-          abortControllerRef.current.signal,
-          { think: reflection === 'none' ? false : reflection }
-        );
-      } catch (e: any) {
-        const isAborted = e.name === 'AbortError'
-          || e.message?.toLowerCase().includes('aborted')
-          || e.message?.toLowerCase().includes('cancel');
-        if (isAborted) {
-          streamingContentRef.current += '\n\n_The user interrupted the response_';
-        } else {
+        });
+
+        if (outcome.status === 'error') {
           isError = true;
           streamingContentRef.current = 'Error generating response.';
-          console.error('AssistantOverlay AI Error:', e);
+        } else {
+          streamingContentRef.current = outcome.content;
         }
         setMessages(prev => prev.map(m =>
           m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current } : m
@@ -616,7 +494,7 @@ function AssistantOverlay() {
     AIModule.SharedGenerationState.activeConvId = null;
     AIModule.SharedGenerationState.activeMsgId = null;
     AIModule.SharedGenerationState.notify();
-  }, [scheduleFlush, generateTitle, goToRespond]);
+  }, [scheduleFlush, generateTitle, goToRespond, appContextDismissed, appIconInfo]);
 
   const handleStop = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -645,7 +523,7 @@ function AssistantOverlay() {
       }
     }
 
-    //fallback or alwaysWhisper = true
+    //fallback or forced whisper
     try {
       const whisperModelName = Settings.getCached().whisperModel || "base";
       if (whisperModelName === "none") {
@@ -658,7 +536,7 @@ function AssistantOverlay() {
         return null;
       }
 
-      const isInstalled = await WebSTT.isModelInstalled(whisperModelName);
+      const isInstalled = await WhisperSTT.isModelInstalled(whisperModelName);
       if (!isInstalled) {
         setModalConfig({
           title: "Whisper Not Installed",
@@ -669,7 +547,7 @@ function AssistantOverlay() {
         return null;
       }
 
-      const initialized = await WebSTT.init(whisperModelName);
+      const initialized = await WhisperSTT.init(whisperModelName);
       if (!initialized) {
         setModalConfig({
           title: "Initialization Error",
@@ -680,23 +558,23 @@ function AssistantOverlay() {
         return null;
       }
 
-      return await WebSTT.transcribeData(wavBuffer);
+      return await WhisperSTT.transcribeData(wavBuffer);
     } catch (e) {
       console.error("Whisper transcription failed:", e);
       return null;
     }
   }, [alwaysWhisper, modelCapabilities]);
 
-  //latest assistant message via reverse scan, no array copy
+  //refs drive the render here, they are written from the async generation flow
+  /* eslint-disable react-hooks/refs */
+  const generatingMessageId = streamingMsgIdRef.current;
+  const shouldAutoStartMic = capabilitiesReady && autoStartMicSetting.current;
+  /* eslint-enable react-hooks/refs */
+
+  //latest assistant message via reverse scan
   let lastMsg: Message | null = null;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === 'assistant') { lastMsg = messages[i]; break; }
-  }
-
-  let isGenerating = false;
-  if (lastMsg) {
-    isGenerating = generatingConvId === activeConversation?.id
-      && streamingMsgIdRef.current === lastMsg.id;
   }
 
   return (
@@ -706,16 +584,15 @@ function AssistantOverlay() {
       enabled={phase === 'respond'}
     >
       <Animated.View
-        style={[styles.phaseContainer, { opacity: mountOpacity, transform: [{ translateY: mountTranslate }] }]}
+        style={[styles.phaseContainer, { opacity: mountOpacity }]}
       >
         {phase === 'select' ? (
           <SelectionLayer
-            detections={detections}
-            screenshotSize={screenshotSize}
             selection={selection}
-            onChange={handleSelectionChange}
+            onChange={select}
             onVibrate={() => Vibration.vibrate(10)}
             onDrawingChange={setIsDrawingSelection}
+            detections={detections}
           />
         ) : (
           <Animated.View style={[styles.phaseContainer, { opacity: responseOpacity }]} pointerEvents="box-none">
@@ -731,7 +608,7 @@ function AssistantOverlay() {
                 contentBottomPadding={insets.bottom + 96}
                 hideHeader={true}
                 hideGradients={true}
-                generatingMessageId={streamingMsgIdRef.current}
+                generatingMessageId={generatingMessageId}
                 speakerEnabled={true}
                 canThink={modelCapabilities.includes('thinking') && selectedReflection !== 'none'}
                 dark={true}
@@ -742,9 +619,9 @@ function AssistantOverlay() {
           </Animated.View>
         )}
 
-        {/* model selector — top center, hidden while drawing a lasso selection */}
-        <View
-          style={[styles.topBar, { paddingTop: insets.top + 16 }, isDrawingSelection && styles.hiddenBar]}
+        {/* model selector top center, hidden while drawing a lasso */}
+        <Animated.View
+          style={[styles.topBar, { paddingTop: insets.top + 16, transform: [{ translateY: topBarEntry }] }, isDrawingSelection && styles.hiddenBar]}
           pointerEvents={isDrawingSelection ? 'none' : 'box-none'}
         >
           <ModelDropdown
@@ -761,7 +638,7 @@ function AssistantOverlay() {
             }}
             onReflectionChange={setReflection}
           />
-        </View>
+        </Animated.View>
 
         <Reanimated.View
           style={[styles.bottomBarOverlay, isLargeScreen && styles.bottomBarOverlayLarge, bottomBarStyle, isDrawingSelection && styles.hiddenBar]}
@@ -770,7 +647,6 @@ function AssistantOverlay() {
           <ChatBar
             ref={chatBarRef}
             onSend={handleSend}
-            onPlusPress={() => {}}
             incognito={false}
             isGenerating={!!generatingConvId}
             onStop={handleStop}
@@ -779,13 +655,20 @@ function AssistantOverlay() {
             supportsFiles={modelCapabilities.includes('vision') || modelCapabilities.includes('audio')}
             onOpenSettings={() => {}}
             enabled={true}
-            autoStartMic={capabilitiesReady && autoStartMicSetting.current}
-            selection={selectionImage}
-            onSelectionRemove={handleSelectionRemove}
+            autoStartMic={shouldAutoStartMic}
+            selection={attachment}
+            onSelectionRemove={clearSelection}
             appContextChip={Settings.getCached().useAppContext !== false && !appContextDismissed && appIconInfo ? { icon: appIconInfo.icon, label: appIconInfo.label } : null}
             onAppContextRemove={() => setAppContextDismissed(true)}
           />
         </Reanimated.View>
+      </Animated.View>
+
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: haloOpacity }]} pointerEvents="none">
+        <LinearGradient colors={[Colors.overlayHalo, Colors.overlayHaloClear]} style={styles.haloTop} />
+        <LinearGradient colors={[Colors.overlayHaloClear, Colors.overlayHalo]} style={styles.haloBottom} />
+        <LinearGradient colors={[Colors.overlayHalo, Colors.overlayHaloClear]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloLeft} />
+        <LinearGradient colors={[Colors.overlayHaloClear, Colors.overlayHalo]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloRight} />
       </Animated.View>
 
       <NotificationModal
@@ -797,14 +680,6 @@ function AssistantOverlay() {
       />
 
       <SearchWebView />
-
-      {detectorMounted && (
-        <DeferredObjectDetector
-          config={OBJECT_DETECTOR_CONFIG}
-          session={session}
-          onDetections={setDetections}
-        />
-      )}
     </KeyboardAvoidingView>
   );
 }
@@ -828,6 +703,34 @@ const styles = StyleSheet.create({
   hiddenBar: {
     opacity: 0,
   },
+  haloTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: HALO_SIZE,
+  },
+  haloBottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: HALO_SIZE,
+  },
+  haloLeft: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: HALO_SIZE,
+  },
+  haloRight: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: HALO_SIZE,
+  },
   topBar: {
     position: 'absolute',
     top: 0,
@@ -847,52 +750,5 @@ const styles = StyleSheet.create({
     right: 24,
     left: 'auto',
     width: 450,
-  },
-  overlayBubbleWrapper: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    paddingBottom: 110,
-  },
-  overlayBubble: {
-    alignSelf: 'center',
-    width: '90%',
-    backgroundColor: Colors.background,
-    borderWidth: 2,
-    borderColor: Colors.borderOnPrimary,
-    borderRadius: Radius.huge,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 16,
-    shadowColor: Colors.textPrimary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    maxHeight: '80%',
-  },
-  bubbleScroll: {
-    flexShrink: 1,
-  },
-  pullIndicator: {
-    width: 36,
-    height: 4,
-    backgroundColor: Colors.scrimDrawer,
-    borderRadius: Radius.xs,
-    alignSelf: 'center',
-    marginBottom: 12,
-  },
-  thinkingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  thinkingIcon: {
-    width: 60,
-  },
-  flashingText: {
-    color: Colors.textSecondary,
-    fontSize: FontSizes.bodyMd,
-    fontFamily: Fonts.mono,
-    flexShrink: 1,
   },
 });

@@ -1,6 +1,7 @@
 import { Platform, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { IWidget } from '../../services/widgets/WidgetManager';
+import { Colors, Radius } from '../../../constants/theme';
 
 export interface MapsWidgetData {
   points: {
@@ -103,8 +104,8 @@ const styles = StyleSheet.create({
   container: {
     height: 300,
     width: '100%',
-    backgroundColor: '#EAEAEA',
-    borderRadius: 5,
+    backgroundColor: Colors.surfacePressed,
+    borderRadius: Radius.md,
     overflow: 'hidden',
   }
 });

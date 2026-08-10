@@ -13,6 +13,17 @@ export type SpeechToTextCallbacks = {
   onDone?: () => void;
 };
 
+//whisper surface lives in web file
+export type WhisperSurface = {
+  isAvailable(): boolean;
+  isModelInstalled(modelName: string): Promise<boolean>;
+  init(modelName: string): Promise<boolean>;
+  setLanguage(lang: string): void;
+  transcribeData(buffer: ArrayBuffer): Promise<string>;
+  deleteModel(modelName: string): Promise<void>;
+  downloadModel(modelName: string, onProgress?: (progress: number, etaSeconds: number, speedStr: string, sizeStr: string) => void): Promise<void>;
+};
+
 class SpeechToTextService {
   private subscribers: { remove: () => void }[] = [];
   private listening = false;
@@ -112,3 +123,6 @@ class SpeechToTextService {
 }
 
 export const STT = new SpeechToTextService();
+
+//one bridge for both platforms
+export const WhisperSTT = STT as unknown as WhisperSurface;

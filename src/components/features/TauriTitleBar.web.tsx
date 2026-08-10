@@ -1,29 +1,28 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Image } from 'react-native';
+import { View, Pressable, StyleSheet, Image } from 'react-native';
 import Svg, { Path, Line, Rect } from 'react-native-svg';
 import { Colors, Fonts, FontSizes } from "../../../constants/theme";
 
+// detect the tauri desktop shell and its host os
+function detectShell() {
+  if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) {
+    return { isTauri: false, isMac: false };
+  }
+  const isWindowsOS = navigator.userAgent.includes("Windows") || navigator.userAgent.includes("Win32");
+  const isMacOS = navigator.userAgent.includes("Mac");
+  return { isTauri: isWindowsOS || isMacOS, isMac: isMacOS };
+}
+
 export default function TauriTitleBar() {
-  const [isTauri, setIsTauri] = useState(false);
+  const [{ isTauri, isMac }] = useState(detectShell);
   const [isMaximized, setIsMaximized] = useState(false);
-  const [isMac, setIsMac] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
-      const isWindowsOS = navigator.userAgent.includes("Windows") || navigator.userAgent.includes("Win32");
-      const isMacOS = navigator.userAgent.includes("Mac");
-      if (isWindowsOS || isMacOS) {
-        setIsTauri(true);
-        if (isMacOS) {
-          setIsMac(true);
-        } else {
-          import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
-            getCurrentWindow().isMaximized().then(setIsMaximized);
-          });
-        }
-      }
-    }
-  }, []);
+    if (!isTauri || isMac) return;
+    import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
+      getCurrentWindow().isMaximized().then(setIsMaximized);
+    });
+  }, [isTauri, isMac]);
 
   if (!isTauri) {
     return null;

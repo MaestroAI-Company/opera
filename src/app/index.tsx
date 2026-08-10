@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useQuickActionCallback } from "expo-quick-actions/hooks";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppState,
   BackHandler,
@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ChatBar from "../components/features/ChatBar";
 import ChatView from "../components/features/ChatView";
 import ConversationsDrawer from "../components/features/ConversationsDrawer";
+import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, settingsProgress, settleDrawer } from "../components/features/drawerAnimation";
 import ModelDropdown from "../components/features/ModelDropdown";
 import SettingsDrawer from "../components/features/SettingsDrawer";
 import SearchWebView from "../../components/SearchWebView";
@@ -30,9 +31,8 @@ import { AIModule } from "../services/ai/AIModule";
 import { Conversation, DB, Message, MessageMetrics } from "../services/db/DatabaseService";
 import { Settings } from "../services/settings/SettingsService";
 import { LocationService } from "../services/location/LocationService";
-import { WidgetManager } from "../services/widgets/WidgetManager";
 import { PluginRegistry } from "../services/plugins/PluginRegistry";
-import { STT } from "../services/speech/STTService";
+import { STT, WhisperSTT } from "../services/speech/STTService";
 import { TTS } from "../services/speech/TTSService";
 import {
   getInitialDeepLink,
@@ -40,17 +40,10 @@ import {
   type DeepLinkRoute,
 } from "../services/deeplinks/DeepLinkService";
 import { NEW_CHAT_ACTION_ID } from "../services/quickActions/QuickActionsService";
+import { AppEvents } from "../services/events";
+import { arrayBufferToBase64 } from "../services/ai/utils/base64";
+import { buildSystemPrompt, streamAssistantReply } from "../services/ai/chatGeneration";
 import { Colors, Fonts, FontSizes, Radius } from "../../constants/theme";
-
-//web whisper surface, only used in browser flows
-const WebSTT = STT as unknown as {
-  isAvailable(): boolean;
-  isModelInstalled(modelName: string): Promise<boolean>;
-  init(modelName: string): Promise<boolean>;
-  setLanguage(lang: string): void;
-  transcribeData(buffer: ArrayBuffer): Promise<string>;
-};
-
 
 const butterflyImage = require("../../assets/images/butterfly5.png");
 const butterflyGrey = require("../../assets/images/butterfly2_grey.png");
@@ -60,13 +53,16 @@ const settingsIcon = require("../../assets/icons/settings.png");
 export default function Index() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isLargeScreen, isDesktop } = useResponsive();
+  const { width, isLargeScreen, isDesktop } = useResponsive();
+  //edge drag maps to drawer progress
+  const dragWidth = drawerWidthFor(width);
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedReflection, setSelectedReflection] = useState("none");
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
   const [settingsInitialSubPage, setSettingsInitialSubPage] = useState<"main" | "general" | "models" | "confidentiality" | "tools">("main");
   const [dbReady, setDbReady] = useState(false);
+  const [dbFailed, setDbFailed] = useState(false);
   const [showDataWarning, setShowDataWarning] = useState(false);
 
   const drawerVisibleRef = useRef(drawerVisible);
@@ -94,8 +90,13 @@ export default function Index() {
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
 
-  //streaming assistant message id ref
+  //ref serves streaming callbacks
   const streamingMsgIdRef = useRef<string | null>(null);
+  const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
+  const setStreamingMessageId = useCallback((id: string | null) => {
+    streamingMsgIdRef.current = id;
+    setStreamingMsgId(id);
+  }, []);
   const streamingContentRef = useRef<string>("");
 
   const [generatingConvId, setGeneratingConvId] = useState<string | null>(null);
@@ -130,18 +131,23 @@ export default function Index() {
   }, []);
 
   const openDrawerSafely = useCallback((openFn: () => void) => {
+    //skip pointless native round trip
+    if (!KeyboardController.isVisible()) {
+      openFn();
+      return;
+    }
     //wait for keyboard retract so drawer opens at full height
     let opened = false;
-    const fallback = setTimeout(() => {
+    const run = () => {
       if (opened) return;
       opened = true;
       openFn();
-    }, 600);
+    };
+    //cap wait to one hide animation
+    const fallback = setTimeout(run, 250);
     KeyboardController.dismiss().then(() => {
-      if (opened) return;
-      opened = true;
       clearTimeout(fallback);
-      openFn();
+      run();
     });
   }, []);
 
@@ -150,50 +156,84 @@ export default function Index() {
   const isProcessingRef = useRef(false);
   const generatingConvIdRef = useRef<string | null>(null);
 
-  const panResponder = useRef(
+  //state read lets compiler memoize
+  const panResponder = useMemo(() =>
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
         if (!isHorizontal || Math.abs(gestureState.dx) <= 10) return false;
-        
-        if (settingsDrawerVisibleRef.current && gestureState.dx > 0) return true;
-        if (drawerVisibleRef.current && gestureState.dx < 0) return true;
-        
+
+        if (settingsDrawerVisible && gestureState.dx > 0) return true;
+        if (drawerVisible && gestureState.dx < 0) return true;
+
         const isLeftEdge = gestureState.x0 < 40;
         if (isLeftEdge && gestureState.dx > 0) return true;
         return gestureState.dx < 0;
       },
+      onPanResponderGrant: () => {
+        //retract before keyboard shrinks panel
+        if (!drawerVisible && !settingsDrawerVisible) KeyboardController.dismiss();
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        //gesture drives panel directly
+        if (drawerVisible || settingsDrawerVisible) return;
+        const ratio = Math.min(1, Math.abs(gestureState.dx) / dragWidth);
+        //crossing start leaves other panel out
+        dragDrawer(conversationsProgress, gestureState.dx > 0 ? ratio : 0);
+        dragDrawer(settingsProgress, gestureState.dx > 0 ? 0 : ratio);
+      },
       onPanResponderRelease: (evt, gestureState) => {
-        if (gestureState.dx > 40) {
-          if (settingsDrawerVisibleRef.current) {
+        const velocity = gestureVelocity(gestureState.vx, dragWidth);
+        //short flicks still commit
+        const opensLeft = gestureState.dx > 40 || gestureState.vx > 0.5;
+        const opensRight = gestureState.dx < -40 || gestureState.vx < -0.5;
+
+        if (opensLeft) {
+          if (settingsDrawerVisible) {
             setSettingsDrawerVisible(false);
           } else {
-            openDrawerSafely(() => setDrawerVisible(true));
+            settleDrawer(conversationsProgress, true, velocity);
+            setDrawerVisible(true);
           }
-        } else if (gestureState.dx < -40) {
-          if (drawerVisibleRef.current) {
+        } else if (opensRight) {
+          if (drawerVisible) {
             setDrawerVisible(false);
           } else {
-            openDrawerSafely(() => setSettingsDrawerVisible(true));
+            settleDrawer(settingsProgress, true, -velocity);
+            setSettingsDrawerVisible(true);
           }
+        } else if (!drawerVisible && !settingsDrawerVisible) {
+          //send peeked panel back off
+          settleDrawer(conversationsProgress, false, velocity);
+          settleDrawer(settingsProgress, false, -velocity);
         }
       },
+      onPanResponderTerminate: () => {
+        if (drawerVisible || settingsDrawerVisible) return;
+        settleDrawer(conversationsProgress, false);
+        settleDrawer(settingsProgress, false);
+      },
     })
-  ).current;
+  , [drawerVisible, settingsDrawerVisible, dragWidth]);
 
   //trackpad two-finger horizontal swipe like mobile gesture
   useEffect(() => {
     if (Platform.OS !== "web" && Platform.OS !== "windows" && Platform.OS !== "macos") return;
 
     const SWIPE_THRESHOLD = 40;
-    const RESET_DELAY = 500;
+    //short rearm for next swipe
+    const IDLE_DELAY = 120;
+    //below it's inertia tail
+    const TAIL_DELTA = 6;
     let accumulator = 0;
     let handled = false;
+    let lastDelta = 0;
     let resetTimer: ReturnType<typeof setTimeout> | null = null;
 
     const resetGesture = () => {
       accumulator = 0;
       handled = false;
+      lastDelta = 0;
     };
 
     const commitSwipe = (total: number) => {
@@ -231,14 +271,24 @@ export default function Index() {
       if (Math.abs(deltaX) <= Math.abs(e.deltaY * factor)) return;
       if (isOverHorizontalScroll(e.target)) return;
       e.preventDefault();
+
+      //reversal unlocks after inertia tail
+      if (handled) {
+        const reversed = lastDelta !== 0 && Math.sign(deltaX) !== Math.sign(lastDelta);
+        const pushedAgain = Math.abs(deltaX) > Math.abs(lastDelta) && Math.abs(lastDelta) < TAIL_DELTA;
+        if (reversed || pushedAgain) resetGesture();
+      }
+      lastDelta = deltaX;
+
+      //rearm on every event
+      if (resetTimer) clearTimeout(resetTimer);
+      resetTimer = setTimeout(resetGesture, IDLE_DELAY);
       if (handled) return;
       accumulator += deltaX;
       if (Math.abs(accumulator) >= SWIPE_THRESHOLD) {
         commitSwipe(accumulator);
         accumulator = 0;
       }
-      if (resetTimer) clearTimeout(resetTimer);
-      resetTimer = setTimeout(resetGesture, RESET_DELAY);
     };
 
     window.addEventListener("wheel", handleWheel, { passive: false });
@@ -252,23 +302,51 @@ export default function Index() {
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
 
-    while (requestQueueRef.current.length > 0) {
-      const item = requestQueueRef.current.shift();
-      setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
-      if (item) {
-        await item.task();
+    try {
+      while (requestQueueRef.current.length > 0) {
+        const item = requestQueueRef.current.shift();
+        setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
+        if (!item) continue;
+        try {
+          await item.task();
+        } catch (e) {
+          //failed task must not drop queue
+          console.error("Generation task failed:", e);
+        }
       }
+    } finally {
+      //always release the lock
+      isProcessingRef.current = false;
+      setGeneratingConvId(null);
+      generatingConvIdRef.current = null;
+      setStreamingMessageId(null);
     }
-
-    isProcessingRef.current = false;
-    setGeneratingConvId(null);
-    generatingConvIdRef.current = null;
-    streamingMsgIdRef.current = null;
   };
 
-  //ref to latest messages for handleSend
+  //latest messages ref via effect
   const messagesRef = useRef<Message[]>([]);
-  messagesRef.current = messages;
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  //write final content if chat visible
+  const showAssistantContent = useCallback((msgId: string, convId: string, content: string) => {
+    if (activeConversationRef.current?.id !== convId) return;
+    setMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, content } : m)));
+  }, []);
+
+  //one render per frame of tokens
+  const rafPendingRef = useRef(false);
+  const scheduleFlush = useCallback((msgId: string, convId: string) => {
+    if (rafPendingRef.current) return;
+    rafPendingRef.current = true;
+    requestAnimationFrame(() => {
+      rafPendingRef.current = false;
+      if (activeConversationRef.current?.id !== convId) return;
+      const content = streamingContentRef.current;
+      setMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, content } : m)));
+    });
+  }, []);
 
   //sync with shared generation from overlay
   useEffect(() => {
@@ -278,7 +356,7 @@ export default function Index() {
         if (generatingConvIdRef.current !== activeState.activeConvId) {
           setGeneratingConvId(activeState.activeConvId);
           generatingConvIdRef.current = activeState.activeConvId;
-          streamingMsgIdRef.current = activeState.activeMsgId;
+          setStreamingMessageId(activeState.activeMsgId);
         }
         streamingContentRef.current = activeState.content;
         setMessages((prev) => {
@@ -293,20 +371,36 @@ export default function Index() {
       } else if (!activeState.activeConvId && generatingConvIdRef.current === activeConversationRef.current?.id && !isProcessingRef.current) {
         setGeneratingConvId(null);
         generatingConvIdRef.current = null;
-        streamingMsgIdRef.current = null;
+        setStreamingMessageId(null);
         if (activeConversationRef.current) {
           DB.getMessages(activeConversationRef.current.id).then(setMessages);
         }
       }
     });
+  }, [setStreamingMessageId]);
+
+  const loadConversations = useCallback(async () => {
+    try {
+      const convs = await DB.getConversations();
+      setConversations(convs);
+    } catch (e) {
+      //read failure never aborts task
+      console.warn("Failed to load conversations", e);
+    }
   }, []);
 
   //init database and settings on mount
   useEffect(() => {
     const init = async () => {
-      await DB.init();
+      try {
+        await DB.init();
+      } catch {
+        //no db, show real error
+        setDbFailed(true);
+        return;
+      }
       loadConversations();
-      //warm up cached location if already granted
+      //warm cached location if granted
       LocationService.hasPermission().then((granted) => {
         if (granted) LocationService.refresh().catch(() => {});
       });
@@ -344,7 +438,7 @@ export default function Index() {
       setDbReady(true);
     };
     init();
-  }, []);
+  }, [loadConversations, router]);
 
   //fetch model capabilities when selectedModel changes
   useEffect(() => {
@@ -358,11 +452,6 @@ export default function Index() {
     };
     fetchCapabilities();
   }, [selectedModel, aiService, ollamaUrl]);
-
-  const loadConversations = async () => {
-    const convs = await DB.getConversations();
-    setConversations(convs);
-  };
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextAppState) => {
@@ -385,18 +474,30 @@ export default function Index() {
     return () => {
       subscription.remove();
     };
-  }, [dbReady]);
+  }, [dbReady, loadConversations]);
 
   //refresh conversation list on any db change (including cloud merges)
   useEffect(() => {
     if (!dbReady) return;
-    const sub = DeviceEventEmitter.addListener("DATA_CHANGED", () => {
-      loadConversations();
-      //live sync ai service when changed in the settings drawer
+    //one reload per write burst
+    let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleReload = () => {
+      if (reloadTimer) clearTimeout(reloadTimer);
+      reloadTimer = setTimeout(loadConversations, 300);
+    };
+
+    const conversationsSub = DeviceEventEmitter.addListener(AppEvents.conversationsChanged, scheduleReload);
+    //sync ai service on change
+    const settingsSub = DeviceEventEmitter.addListener(AppEvents.settingsChanged, () => {
       setAiService(Settings.getCached().aiService);
     });
-    return () => sub.remove();
-  }, [dbReady]);
+
+    return () => {
+      if (reloadTimer) clearTimeout(reloadTimer);
+      conversationsSub.remove();
+      settingsSub.remove();
+    };
+  }, [dbReady, loadConversations]);
 
   //load messages when a conversation is selected
   const selectConversation = useCallback(async (conv: Conversation) => {
@@ -510,7 +611,7 @@ export default function Index() {
           );
         }
       } catch (e) {
-        //title generation is best-effort: keep the truncated first-message name on failure
+        //best-effort title keep on failure
         console.warn("Title generation skipped:", (e as any)?.message ?? e);
       }
     },
@@ -575,11 +676,7 @@ export default function Index() {
       taskHistory.push({ role: "user", content: text, images });
 
       const taskSelectedModel = selectedModel;
-      const taskOllamaUrl = ollamaUrl;
-      const taskAiService = aiService;
-      const taskSystemPrompt = (userInstruction.trim().length > 0
-        ? `${userInstruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
-        : SYSTEM_PROMPTS.DEFAULT) + WidgetManager.getSystemPromptSegment();
+      const taskSystemPrompt = buildSystemPrompt(userInstruction);
       const taskReflection = selectedReflection;
       const taskConv = conv;
 
@@ -605,7 +702,7 @@ export default function Index() {
         setGeneratingConvId(taskConv.id);
         generatingConvIdRef.current = taskConv.id;
 
-        streamingMsgIdRef.current = assistantMsg.id;
+        setStreamingMessageId(assistantMsg.id);
         streamingContentRef.current = "";
 
         abortControllerRef.current = new AbortController();
@@ -617,61 +714,35 @@ export default function Index() {
         if (!taskSelectedModel) {
           isError = true;
           streamingContentRef.current = "Please select a model from the top menu before sending a message.";
-          if (activeConversationRef.current?.id === taskConv.id) {
-            setMessages((prev) => prev.map((m) => m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current } : m));
-          }
+          showAssistantContent(assistantMsg.id, taskConv.id, streamingContentRef.current);
           abortControllerRef.current = null;
         } else {
           try {
-            await AIModule.sendMessageWithTools(
-              taskSelectedModel,
-              taskSystemPrompt,
-              taskHistory,
-              async (chunk) => {
-                streamingContentRef.current += chunk;
-                //update message in state if we are on this conversation
-                if (activeConversationRef.current?.id === taskConv.id) {
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.id === assistantMsg.id
-                        ? { ...m, content: streamingContentRef.current }
-                        : m
-                    )
-                  );
-                }
+            const outcome = await streamAssistantReply({
+              model: taskSelectedModel,
+              systemPrompt: taskSystemPrompt,
+              history: taskHistory,
+              think: taskReflection === "none" ? false : taskReflection,
+              signal: abortControllerRef.current.signal,
+              onContent: (content) => {
+                streamingContentRef.current = content;
+                scheduleFlush(assistantMsg.id, taskConv.id);
               },
-              abortControllerRef.current.signal,
-              { think: taskReflection === "none" ? false : taskReflection },
-              (m) => {
+              onMetrics: (m) => {
                 messageMetrics = m;
                 if (activeConversationRef.current?.id === taskConv.id) {
                   setMessages((prev) => prev.map((msg) => msg.id === assistantMsg.id ? { ...msg, metrics: m } : msg));
                 }
-              }
-            );
-          } catch (e: any) {
-            const isAborted = e.name === "AbortError" ||
-              e.message?.toLowerCase().includes("aborted") ||
-              e.message?.toLowerCase().includes("cancel");
+              },
+            });
 
-            if (isAborted) {
-              console.log("Generation aborted by user");
-              streamingContentRef.current += "\n\n_The user interrupted the response_";
-            } else {
+            if (outcome.status === "error") {
               isError = true;
-              console.error(e);
               streamingContentRef.current = "Error generating response. Please check your model or server connection.";
+            } else {
+              streamingContentRef.current = outcome.content;
             }
-
-            if (activeConversationRef.current?.id === taskConv.id) {
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantMsg.id
-                    ? { ...m, content: streamingContentRef.current }
-                    : m
-                )
-              );
-            }
+            showAssistantContent(assistantMsg.id, taskConv.id, streamingContentRef.current);
           } finally {
             abortControllerRef.current = null;
           }
@@ -714,43 +785,26 @@ export default function Index() {
         isIncognito: isIncognitoTask
       });
       setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
-      processQueue();
+      processQueue().catch((e) => console.error("Queue processing failed:", e));
     },
-    [dbReady, incognitoMode, activeConversation, selectedModel, selectedReflection, generateTitle, userInstruction, aiService, ollamaUrl]
+    //processQueue is recreated every render, keeping it out avoids churn
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dbReady, incognitoMode, activeConversation, selectedModel, selectedReflection, generateTitle, userInstruction, aiService, ollamaUrl, scheduleFlush]
   );
-
-  //encode arraybuffer to base64 without btoa (hermes safe)
-  const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
-    const bytes = new Uint8Array(buffer);
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    const parts: string[] = [];
-    const len = bytes.length;
-    for (let i = 0; i < len; i += 3) {
-      const a = bytes[i];
-      const b = i + 1 < len ? bytes[i + 1] : 0;
-      const c = i + 2 < len ? bytes[i + 2] : 0;
-      parts.push(
-        chars[a >> 2] + chars[((a & 3) << 4) | (b >> 4)] +
-        (i + 1 < len ? chars[((b & 15) << 2) | (c >> 6)] : '=') +
-        (i + 2 < len ? chars[c & 63] : '=')
-      );
-    }
-    return parts.join('');
-  };
 
   //transcribe audio: use remote model if it supports audio and user hasnt forced whisper
   const handleTranscribe = useCallback(async (wavBuffer: ArrayBuffer): Promise<string | null> => {
     const useRemote = !alwaysWhisper && modelCapabilities.includes("audio") && selectedModel;
 
     const transcribeWithWhisper = async () => {
-      if (!WebSTT.isAvailable()) {
+      if (!WhisperSTT.isAvailable()) {
         const modelName = Settings.getCached().whisperModel || "base";
-        if (modelName !== "none" && await WebSTT.isModelInstalled(modelName)) {
-          await WebSTT.init(modelName);
+        if (modelName !== "none" && await WhisperSTT.isModelInstalled(modelName)) {
+          await WhisperSTT.init(modelName);
         }
       }
-      if (WebSTT.isAvailable()) {
-        return WebSTT.transcribeData(wavBuffer);
+      if (WhisperSTT.isAvailable()) {
+        return WhisperSTT.transcribeData(wavBuffer);
       }
       console.error('Whisper fallback failed because Whisper is not initialized or installed.');
       return null;
@@ -806,11 +860,7 @@ export default function Index() {
     setMessages([...historyUpToHere]);
 
     const taskSelectedModel = selectedModel;
-    const taskOllamaUrl = ollamaUrl;
-    const taskAiService = aiService;
-    const taskSystemPrompt = (userInstruction.trim().length > 0
-      ? `${userInstruction.trim()}\n\n---\n\n${SYSTEM_PROMPTS.DEFAULT}`
-      : SYSTEM_PROMPTS.DEFAULT) + WidgetManager.getSystemPromptSegment();
+    const taskSystemPrompt = buildSystemPrompt(userInstruction);
     const taskReflection = selectedReflection;
     const taskConv = activeConversation;
     const isIncognitoTask = taskConv.id.startsWith("incognito_");
@@ -833,7 +883,7 @@ export default function Index() {
     const task = async () => {
       setGeneratingConvId(taskConv.id);
       generatingConvIdRef.current = taskConv.id;
-      streamingMsgIdRef.current = assistantMsg.id;
+      setStreamingMessageId(assistantMsg.id);
       streamingContentRef.current = "";
       abortControllerRef.current = new AbortController();
       let isError = false;
@@ -842,48 +892,35 @@ export default function Index() {
       if (!taskSelectedModel) {
         isError = true;
         streamingContentRef.current = "Please select a model from the top menu before sending a message.";
-        if (activeConversationRef.current?.id === taskConv.id) {
-          setMessages((prev) => prev.map((m) => m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current } : m));
-        }
+        showAssistantContent(assistantMsg.id, taskConv.id, streamingContentRef.current);
         abortControllerRef.current = null;
       } else {
         try {
-          await AIModule.sendMessageWithTools(
-            taskSelectedModel,
-            taskSystemPrompt,
-            taskHistory,
-            async (chunk) => {
-              streamingContentRef.current += chunk;
-              if (activeConversationRef.current?.id === taskConv.id) {
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantMsg.id
-                      ? { ...m, content: streamingContentRef.current }
-                      : m
-                  )
-                );
-              }
+          const outcome = await streamAssistantReply({
+            model: taskSelectedModel,
+            systemPrompt: taskSystemPrompt,
+            history: taskHistory,
+            think: taskReflection === "none" ? false : taskReflection,
+            signal: abortControllerRef.current.signal,
+            onContent: (content) => {
+              streamingContentRef.current = content;
+              scheduleFlush(assistantMsg.id, taskConv.id);
             },
-            abortControllerRef.current.signal,
-            { think: taskReflection === "none" ? false : taskReflection },
-            (m) => {
+            onMetrics: (m) => {
               messageMetrics = m;
               if (activeConversationRef.current?.id === taskConv.id) {
                 setMessages((prev) => prev.map((msg) => msg.id === assistantMsg.id ? { ...msg, metrics: m } : msg));
               }
-            }
-          );
-        } catch (e: any) {
-          const isAborted = e.name === "AbortError" || e.message?.toLowerCase().includes("aborted") || e.message?.toLowerCase().includes("cancel");
-          if (isAborted) {
-            streamingContentRef.current += "\n\n_The user interrupted the response_";
-          } else {
+            },
+          });
+
+          if (outcome.status === "error") {
             isError = true;
             streamingContentRef.current = "Error generating response. Please check your model or server connection.";
+          } else {
+            streamingContentRef.current = outcome.content;
           }
-          if (activeConversationRef.current?.id === taskConv.id) {
-            setMessages((prev) => prev.map((m) => m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current } : m));
-          }
+          showAssistantContent(assistantMsg.id, taskConv.id, streamingContentRef.current);
         } finally {
           abortControllerRef.current = null;
         }
@@ -909,9 +946,11 @@ export default function Index() {
       isIncognito: isIncognitoTask
     });
     setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
-    processQueue();
+    processQueue().catch((e) => console.error("Queue processing failed:", e));
 
-  }, [activeConversation, generatingConvId, incognitoMode, selectedModel, ollamaUrl, aiService, userInstruction, selectedReflection]);
+    //processQueue is recreated every render, keeping it out avoids churn
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeConversation, generatingConvId, incognitoMode, selectedModel, ollamaUrl, aiService, userInstruction, selectedReflection, scheduleFlush]);
 
   const handleStop = useCallback(async () => {
     const currentConvId = activeConversation?.id;
@@ -939,9 +978,61 @@ export default function Index() {
     }
   }, [activeConversation, generatingConvId, pendingConvIds]);
 
+  if (dbFailed) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Text style={styles.welcomeText}>Something went wrong</Text>
+        <Text style={styles.incognitoDescription}>
+          Opera could not open its local database. Please restart the app. If the problem persists, reinstall it.
+        </Text>
+      </View>
+    );
+  }
+
   if (!dbReady) {
     return <View style={styles.container} />;
   }
+
+  const conversationsDrawer = (
+    <ConversationsDrawer
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      visible={drawerVisible}
+      onClose={() => setDrawerVisible(false)}
+      conversations={conversations}
+      selectedConversationId={activeConversation?.id ?? null}
+      onSelectConversation={selectConversation}
+      onNewConversation={startNewConversation}
+      onDeleteConversation={deleteConversation}
+      onTogglePinConversation={togglePinConversation}
+    />
+  );
+
+  const settingsDrawer = (
+    <SettingsDrawer
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      visible={settingsDrawerVisible}
+      initialSubPage={settingsInitialSubPage}
+      onClose={() => {
+        setSettingsDrawerVisible(false);
+        setSettingsInitialSubPage("main");
+        const cached = Settings.getCached();
+        if (cached.ollamaModel && cached.ollamaModel !== selectedModel) {
+          setSelectedModel(cached.ollamaModel);
+        }
+        setAiService(cached.aiService);
+        setOllamaUrl(cached.ollamaUrl);
+        setSpeakerEnabled(cached.speaker);
+        setAlwaysWhisper(cached.alwaysWhisper);
+        setShowTechnicalDetails(cached.showTechnicalDetails);
+      }}
+      onDataChanged={async () => {
+        await loadConversations();
+        startNewConversation();
+      }}
+    />
+  );
 
   return (
     <View style={styles.container}>
@@ -958,18 +1049,9 @@ export default function Index() {
       >
 
         <View style={{ flex: 1, flexDirection: isLargeScreen ? "row" : "column" }} pointerEvents="box-none">
-          <ConversationsDrawer
-            isLargeScreen={isLargeScreen}
-            isDesktop={isDesktop}
-            visible={drawerVisible}
-            onClose={() => setDrawerVisible(false)}
-            conversations={conversations}
-            selectedConversationId={activeConversation?.id ?? null}
-            onSelectConversation={selectConversation}
-            onNewConversation={startNewConversation}
-            onDeleteConversation={deleteConversation}
-            onTogglePinConversation={togglePinConversation}
-          />
+          {/* only the desktop panels take part in layout, the overlay ones live outside the
+              keyboard avoiding view or they get clipped to its shrunken height */}
+          {isDesktop ? conversationsDrawer : null}
 
           <View style={{ flex: 1, backgroundColor: "transparent" }} pointerEvents="box-none">
             {!activeConversation && (
@@ -1020,7 +1102,7 @@ export default function Index() {
                 onRegenerate={handleRegenerate}
                 speakerEnabled={speakerEnabled}
                 showMetrics={showTechnicalDetails}
-                generatingMessageId={generatingConvId === activeConversation.id ? streamingMsgIdRef.current : null}
+                generatingMessageId={generatingConvId === activeConversation.id ? streamingMsgId : null}
                 onOpenConfidentiality={() => {
                   openDrawerSafely(() => {
                     setSettingsInitialSubPage("confidentiality");
@@ -1109,7 +1191,6 @@ export default function Index() {
             <View style={[styles.bottomBarOverlay]} pointerEvents="box-none">
               <ChatBar
                 onSend={handleSend}
-                onPlusPress={() => console.log("plus pressed")}
                 incognito={activeConversation ? activeConversation.id.startsWith("incognito_") : incognitoMode}
                 isGenerating={activeConversation ? (generatingConvId === activeConversation.id || pendingConvIds.includes(activeConversation.id)) : false}
                 onStop={handleStop}
@@ -1128,31 +1209,12 @@ export default function Index() {
             </View>
           </View>
 
-          <SettingsDrawer
-            isLargeScreen={isLargeScreen}
-            isDesktop={isDesktop}
-            visible={settingsDrawerVisible}
-            initialSubPage={settingsInitialSubPage}
-            onClose={() => {
-              setSettingsDrawerVisible(false);
-              setSettingsInitialSubPage("main");
-              const cached = Settings.getCached();
-              if (cached.ollamaModel && cached.ollamaModel !== selectedModel) {
-                setSelectedModel(cached.ollamaModel);
-              }
-              setAiService(cached.aiService);
-              setOllamaUrl(cached.ollamaUrl);
-              setSpeakerEnabled(cached.speaker);
-              setAlwaysWhisper(cached.alwaysWhisper);
-              setShowTechnicalDetails(cached.showTechnicalDetails);
-            }}
-            onDataChanged={async () => {
-              await loadConversations();
-              startNewConversation();
-            }}
-          />
+          {isDesktop ? settingsDrawer : null}
         </View>
       </KeyboardAvoidingView>
+
+      {isDesktop ? null : conversationsDrawer}
+      {isDesktop ? null : settingsDrawer}
 
       <SearchWebView />
 

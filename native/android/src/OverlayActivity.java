@@ -26,7 +26,7 @@ public class OverlayActivity extends ReactActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(null);
-        //keep the screen on while the overlay is visible
+        //keep screen awake while visible
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         sInstance = this;
     }
@@ -41,7 +41,7 @@ public class OverlayActivity extends ReactActivity {
     public void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        //activity reused, tell js to restart
+        //restart js on activity reuse
         ScreenCaptureModule.emitOverlayReopened();
     }
 

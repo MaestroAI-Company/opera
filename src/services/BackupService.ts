@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Sharing from 'expo-sharing';
 import { DB, Conversation, Message, SyncTombstone } from './db/DatabaseService';
 import { Settings, AppSettings } from './settings/SettingsService';
 
@@ -81,6 +82,14 @@ class BackupServiceImpl {
       await FileSystem.writeAsStringAsync(fileUri, jsonStr, {
         encoding: FileSystem.EncodingType.UTF8,
       });
+
+      //sandbox hides the file from users
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/json',
+          dialogTitle: 'Export Opera data',
+        });
+      }
       return true;
 
     } catch (e) {

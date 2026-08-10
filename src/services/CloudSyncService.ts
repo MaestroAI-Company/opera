@@ -1,10 +1,11 @@
 import 'react-native-get-random-values';
-import CryptoJS from 'crypto-js';
+import { BackupCryptoImpl } from './crypto/backupCrypto';
 import { BackupData } from './BackupService';
 import { DB, Conversation, Message, SyncTombstone } from './db/DatabaseService';
 import { Settings, AppSettings } from './settings/SettingsService';
 import { CloudProvider, CloudUserInfo } from './cloud/CloudProvider';
 import { getCloudProviderDefinition } from './cloud/registry';
+import { AppEvents } from './events';
 import * as SecureStore from 'expo-secure-store';
 import { Platform, AppState, DeviceEventEmitter } from 'react-native';
 
@@ -13,18 +14,38 @@ const CLOUD_PROVIDER_KEY = 'cloud_provider';
 const SYNC_PIN_KEY = 'cloud_sync_pin';
 const LAST_SYNC_TIME_KEY = 'cloud_sync_last_time';
 const LAST_SYNC_SIZE_KEY = 'cloud_sync_last_size';
+const SEEN_AUTHENTICATED_KEY = 'cloud_sync_seen_v3';
 
-const ENC_VERSION = 2;
+//v3 authenticates v2 stays readable
+const ENC_VERSION = 3;
+const LEGACY_ENC_VERSION = 2;
 const PBKDF2_ITERATIONS = 50000;
+const AES_KEY_BYTES = 32;
+const IV_BYTES = 16;
+const SALT_BYTES = 16;
+
+type SyncOutcome = { success: boolean; error?: string };
+
+//separate keys from one pbkdf2 pass
+type DerivedKeys = {
+  //v2 raw key opens legacy files
+  legacyKey: string;
+  encryptionKey: string;
+  macKey: string;
+};
 
 class CloudSyncServiceImpl {
   private provider: CloudProvider | null = null;
   private pin: string | null = null;
   private syncTimeout: ReturnType<typeof setTimeout> | null = null;
-  private isAutoSyncing: boolean = false;
+  //current sync promise or null
+  private runningSync: Promise<SyncOutcome> | null = null;
   private isMerging: boolean = false;
-  private keyCache = new Map<string, CryptoJS.lib.WordArray>();
+  private initialized: boolean = false;
+  private keyCache = new Map<string, DerivedKeys>();
   private lastSaltB64: string | null = null;
+  //blocks v2 once authenticated seen
+  private hasSeenAuthenticatedBackup = false;
 
   private async setStorageItem(key: string, value: string | null) {
     if (Platform.OS === 'web') {
@@ -50,6 +71,12 @@ class CloudSyncServiceImpl {
   }
 
   async init(): Promise<void> {
+    //init once or listeners register twice
+    if (this.initialized) return;
+    this.initialized = true;
+
+    await this.loadAuthenticatedBackupFlag();
+
     const providerName = await this.getStorageItem(CLOUD_PROVIDER_KEY);
     const savedPin = await this.getStorageItem(SYNC_PIN_KEY);
     if (savedPin) {
@@ -78,11 +105,13 @@ class CloudSyncServiceImpl {
       }
     });
 
-    //auto-sync on data changes
-    DeviceEventEmitter.addListener('DATA_CHANGED', () => {
+    //sync on any data change
+    const onDataChanged = () => {
       if (this.isMerging) return; //merge already persists tombstones
       this.requestAutoSync(5000); //5s debounce
-    });
+    };
+    DeviceEventEmitter.addListener(AppEvents.conversationsChanged, onDataChanged);
+    DeviceEventEmitter.addListener(AppEvents.settingsChanged, onDataChanged);
   }
 
   requestAutoSync(delay = 5000) {
@@ -90,7 +119,7 @@ class CloudSyncServiceImpl {
     
     if (this.syncTimeout) clearTimeout(this.syncTimeout);
     this.syncTimeout = setTimeout(() => {
-      this.sync(true);
+      this.sync(true).catch((e) => console.error('Auto-sync failed:', e));
     }, delay);
   }
 
@@ -165,6 +194,7 @@ class CloudSyncServiceImpl {
       const data = await this.provider.downloadFile(SYNC_FILE_NAME);
       return data !== null;
     } catch (e) {
+      console.warn('Could not check for a cloud backup:', e);
       return false;
     }
   }
@@ -175,14 +205,14 @@ class CloudSyncServiceImpl {
       const data = await this.provider.downloadFile(SYNC_FILE_NAME);
       if (!data) return false;
 
-      const decrypted = this.decrypt(data, pin);
+      const decrypted = await this.decrypt(data, pin);
       if (decrypted) {
         //decrypt already validated json
         await this.setPin(pin);
         return true;
       }
     } catch (e) {
-      //decrypt failed
+      console.warn('PIN verification failed:', e);
     }
     return false;
   }
@@ -195,6 +225,19 @@ class CloudSyncServiceImpl {
     await this.setStorageItem(LAST_SYNC_SIZE_KEY, null);
   }
 
+  //flag must survive restarts
+  private async loadAuthenticatedBackupFlag(): Promise<void> {
+    this.hasSeenAuthenticatedBackup = (await this.getStorageItem(SEEN_AUTHENTICATED_KEY)) === 'true';
+  }
+
+  private rememberAuthenticatedBackup(): void {
+    if (this.hasSeenAuthenticatedBackup) return;
+    this.hasSeenAuthenticatedBackup = true;
+    this.setStorageItem(SEEN_AUTHENTICATED_KEY, 'true').catch((e) =>
+      console.warn('Could not persist the authenticated-backup flag:', e)
+    );
+  }
+
   private async clearPin(): Promise<void> {
     this.pin = null;
     this.keyCache.clear();
@@ -202,78 +245,138 @@ class CloudSyncServiceImpl {
     await this.setStorageItem(SYNC_PIN_KEY, null);
   }
 
-  private deriveKey(pin: string, saltB64: string, iterations: number): CryptoJS.lib.WordArray {
-    const cacheKey = `${pin}:${iterations}:${saltB64}`;
-    let key = this.keyCache.get(cacheKey);
-    if (!key) {
-      const salt = CryptoJS.enc.Base64.parse(saltB64);
-      key = CryptoJS.PBKDF2(pin, salt, {
-        keySize: 256 / 32,
-        iterations,
-        hasher: CryptoJS.algo.SHA256,
-      });
-      this.keyCache.set(cacheKey, key);
+  //one pbkdf2 pass expands into subkeys
+  private async deriveKeys(pin: string, saltB64: string, iterations: number): Promise<DerivedKeys> {
+    //pin hidden from map keys
+    const cacheKey = await BackupCryptoImpl.sha256B64(`${pin}:${iterations}:${saltB64}`);
+    let keys = this.keyCache.get(cacheKey);
+    if (!keys) {
+      const master = await BackupCryptoImpl.pbkdf2Sha256B64(pin, saltB64, iterations, AES_KEY_BYTES);
+      keys = {
+        legacyKey: master,
+        encryptionKey: await BackupCryptoImpl.hmacSha256B64(master, 'opera-encryption'),
+        macKey: await BackupCryptoImpl.hmacSha256B64(master, 'opera-authentication'),
+      };
+      this.keyCache.set(cacheKey, keys);
     }
-    return key;
+    return keys;
   }
 
-  private encrypt(data: string, pin: string): string {
-    const saltB64 = this.lastSaltB64 ?? CryptoJS.enc.Base64.stringify(CryptoJS.lib.WordArray.random(16));
+  //mac covers ciphertext and params
+  private computeMac(macKey: string, version: number, iterations: number, saltB64: string, ivB64: string, ctB64: string): Promise<string> {
+    return BackupCryptoImpl.hmacSha256B64(macKey, `${version}|${iterations}|${saltB64}|${ivB64}|${ctB64}`);
+  }
+
+  private async encrypt(data: string, pin: string): Promise<string> {
+    const saltB64 = this.lastSaltB64 ?? (await BackupCryptoImpl.randomBytesB64(SALT_BYTES));
     this.lastSaltB64 = saltB64;
-    const key = this.deriveKey(pin, saltB64, PBKDF2_ITERATIONS);
-    const iv = CryptoJS.lib.WordArray.random(16);
-    const ciphertext = CryptoJS.AES.encrypt(data, key as any, { iv });
+    const keys = await this.deriveKeys(pin, saltB64, PBKDF2_ITERATIONS);
+    const ivB64 = await BackupCryptoImpl.randomBytesB64(IV_BYTES);
+    const ctB64 = await BackupCryptoImpl.aesCbcEncryptB64(keys.encryptionKey, ivB64, data);
     return JSON.stringify({
       v: ENC_VERSION,
       kdf: 'pbkdf2-sha256',
       iter: PBKDF2_ITERATIONS,
       salt: saltB64,
-      iv: CryptoJS.enc.Base64.stringify(iv),
-      ct: CryptoJS.enc.Base64.stringify(ciphertext.ciphertext),
+      iv: ivB64,
+      ct: ctB64,
+      mac: await this.computeMac(keys.macKey, ENC_VERSION, PBKDF2_ITERATIONS, saltB64, ivB64, ctB64),
     });
   }
 
-  private decrypt(data: string, pin: string): string | null {
+  private async decrypt(data: string, pin: string): Promise<string | null> {
     try {
       const env = JSON.parse(data);
-      if (env && env.v === ENC_VERSION && env.kdf === 'pbkdf2-sha256') {
-        const iterations = typeof env.iter === 'number' ? env.iter : PBKDF2_ITERATIONS;
-        const key = this.deriveKey(pin, env.salt, iterations);
-        this.lastSaltB64 = env.salt;
-        const iv = CryptoJS.enc.Base64.parse(env.iv);
-        const bytes = CryptoJS.AES.decrypt(env.ct, key as any, { iv });
-        const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-        if (!decrypted) return null;
-        JSON.parse(decrypted); //ensure valid json
-        return decrypted;
+      if (!env || env.kdf !== 'pbkdf2-sha256') return null;
+
+      const iterations = typeof env.iter === 'number' ? env.iter : PBKDF2_ITERATIONS;
+      const keys = await this.deriveKeys(pin, env.salt, iterations);
+
+      if (env.v === ENC_VERSION) {
+        const expectedMac = await this.computeMac(keys.macKey, env.v, iterations, env.salt, env.iv, env.ct);
+        if (env.mac !== expectedMac) {
+          console.warn('Cloud backup failed its integrity check, refusing to import it');
+          return null;
+        }
+      } else if (env.v === LEGACY_ENC_VERSION) {
+        //rejects forged unauthenticated backups
+        if (this.hasSeenAuthenticatedBackup) {
+          console.warn('Refusing a v2 backup: this account already uses the authenticated format');
+          return null;
+        }
+      } else {
+        //written by a newer version
+        console.warn(`Unsupported cloud backup version: ${env.v}`);
+        return null;
       }
+
+      this.lastSaltB64 = env.salt;
+      const aesKey = env.v === LEGACY_ENC_VERSION ? keys.legacyKey : keys.encryptionKey;
+      //wrong pin throws padding error
+      const decrypted = await BackupCryptoImpl.aesCbcDecryptUtf8(aesKey, env.iv, env.ct);
+      if (!decrypted) return null;
+      JSON.parse(decrypted); //ensure valid json
+
+      //remember only once payload readable
+      if (env.v === ENC_VERSION) {
+        this.rememberAuthenticatedBackup();
+      }
+      return decrypted;
     } catch (e) {
-      //invalid or missing fields
+      //caller decides what to report
+      console.warn('Could not decrypt cloud payload:', e);
     }
     return null;
   }
 
-  async sync(isBackground = false): Promise<{ success: boolean; error?: string }> {
+  async sync(isBackground = false): Promise<SyncOutcome> {
     if (!this.provider || !this.pin) {
       return { success: false, error: 'Provider or PIN not configured' };
     }
 
-    //prevent overlapping syncs
-    if (isBackground && this.isAutoSyncing) return { success: true };
-    if (isBackground) this.isAutoSyncing = true;
+    //skip if another sync runs
+    if (isBackground && this.runningSync) {
+      return { success: true };
+    }
+
+    //manual sync waits its turn
+    const thisSync = this.runSyncAfter(this.runningSync);
+    this.runningSync = thisSync;
+    try {
+      return await thisSync;
+    } finally {
+      if (this.runningSync === thisSync) {
+        this.runningSync = null;
+      }
+    }
+  }
+
+  private async runSyncAfter(previousSync: Promise<SyncOutcome> | null): Promise<SyncOutcome> {
+    if (previousSync) {
+      await previousSync.catch(() => undefined);
+    }
+    return this.runSync();
+  }
+
+  private async runSync(): Promise<SyncOutcome> {
+    if (!this.provider || !this.pin) {
+      return { success: false, error: 'Provider or PIN not configured' };
+    }
+    //capture provider once for sync
+    const provider = this.provider;
+    const pin = this.pin;
 
     try {
       //1. download cloud backup
-      const encryptedCloudData = await this.provider.downloadFile(SYNC_FILE_NAME);
+      const encryptedCloudData = await provider.downloadFile(SYNC_FILE_NAME);
       let cloudBackup: BackupData | null = null;
 
       if (encryptedCloudData) {
-        const decryptedStr = this.decrypt(encryptedCloudData, this.pin);
+        const decryptedStr = await this.decrypt(encryptedCloudData, pin);
         if (!decryptedStr) {
           //code no longer valid, clear stored pin
           await this.clearPin();
-          DeviceEventEmitter.emit('SYNC_PIN_INVALIDATED');
-          if (isBackground) this.isAutoSyncing = false;
+          DeviceEventEmitter.emit(AppEvents.syncPinInvalidated);
           return { success: false, error: 'Invalid PIN. Could not decrypt cloud backup.' };
         }
         try {
@@ -283,16 +386,19 @@ class CloudSyncServiceImpl {
           }
           cloudBackup = parsed;
         } catch (e) {
-          if (isBackground) this.isAutoSyncing = false;
+          console.warn('Cloud backup is unreadable:', e);
           return { success: false, error: 'Cloud backup is corrupted or incompatible.' };
         }
       }
 
       //2. merge cloud into local
       if (cloudBackup) {
+        const backupToMerge = cloudBackup;
         this.isMerging = true;
         try {
-          await this.mergeCloudIntoLocal(cloudBackup);
+          await DB.runSilently(() => this.mergeCloudIntoLocal(backupToMerge));
+          //one notification for the merge
+          DeviceEventEmitter.emit(AppEvents.conversationsChanged);
         } finally {
           this.isMerging = false;
         }
@@ -314,22 +420,19 @@ class CloudSyncServiceImpl {
 
       //4. encrypt and upload
       const jsonStr = JSON.stringify(newBackup);
-      const encryptedToUpload = this.encrypt(jsonStr, this.pin);
-      const uploadSuccess = await this.provider.uploadFile(SYNC_FILE_NAME, encryptedToUpload);
+      const encryptedToUpload = await this.encrypt(jsonStr, pin);
+      const uploadSuccess = await provider.uploadFile(SYNC_FILE_NAME, encryptedToUpload);
 
       if (!uploadSuccess) {
-        if (isBackground) this.isAutoSyncing = false;
         return { success: false, error: 'Failed to upload sync data to cloud.' };
       }
 
       await this.setStorageItem(LAST_SYNC_TIME_KEY, Date.now().toString());
       await this.setStorageItem(LAST_SYNC_SIZE_KEY, encryptedToUpload.length.toString());
-      if (isBackground) this.isAutoSyncing = false;
-      DeviceEventEmitter.emit('SYNC_COMPLETED');
+      DeviceEventEmitter.emit(AppEvents.syncCompleted);
       return { success: true };
     } catch (e) {
       console.error('Sync failed:', e);
-      if (isBackground) this.isAutoSyncing = false;
       return { success: false, error: String(e) };
     }
   }

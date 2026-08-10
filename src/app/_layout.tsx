@@ -11,19 +11,15 @@ import { Platform } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import SplashScreenComponent from "../components/ui/SplashScreen";
 import TauriTitleBar from "../components/features/TauriTitleBar";
-import { WidgetManager } from "../services/widgets/WidgetManager";
-import { MapsWidget } from "../components/widgets/MapsWidget";
-import { HtmlWidget } from "../components/widgets/HtmlWidget";
-import { MermaidWidget } from "../components/widgets/MermaidWidget";
 import { setupQuickActions } from "../services/quickActions/QuickActionsService";
+import "../services/widgets/registerWidgets";
 
 import * as WebBrowser from "expo-web-browser";
 
-global.Buffer = global.Buffer || Buffer;
-
-WidgetManager.registerWidget(MapsWidget);
-WidgetManager.registerWidget(HtmlWidget);
-WidgetManager.registerWidget(MermaidWidget);
+//crypto libs expect buffer global
+if (!(globalThis as any).Buffer) {
+  (globalThis as any).Buffer = Buffer;
+}
 
 WebBrowser.maybeCompleteAuthSession();
 SplashScreen.preventAutoHideAsync();

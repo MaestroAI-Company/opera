@@ -1,5 +1,3 @@
-import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system/legacy';
 import { IAIProvider } from './IAIProvider';
 import { OllamaProvider } from './OllamaProvider';
 import { ToolManager } from './tools/ToolManager';
@@ -8,8 +6,10 @@ import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { LocalProvider } from './LocalProvider';
 import { MessageMetrics } from '../db/DatabaseService';
 import { LocationService } from '../location/LocationService';
+import { Settings } from '../settings/SettingsService';
+import { DEFAULT_OLLAMA_URL, imageToBase64 } from './utils/imageToBase64';
 
-const DEFAULT_URL = Platform.OS === 'android' ? 'http://10.0.2.2:11434' : 'http://127.0.0.1:11434';
+const DEFAULT_URL = DEFAULT_OLLAMA_URL;
 
 class CentralAIModule {
   public SharedGenerationState = {
@@ -32,6 +32,8 @@ class CentralAIModule {
 
   private providers: Map<string, IAIProvider>;
   private activeMode: string = 'OLLAMA';
+  //model caps need an http call
+  private capabilitiesCache = new Map<string, string[]>();
 
   constructor() {
     this.providers = new Map();
@@ -51,6 +53,8 @@ class CentralAIModule {
   configure(ollamaUrl: string): void {
     const url = ollamaUrl.trim().length > 0 ? ollamaUrl.trim() : DEFAULT_URL;
     this.providers.set('OLLAMA', new OllamaProvider(url));
+    //new server can serve different models
+    this.capabilitiesCache.clear();
   }
 
   //get active provider
@@ -73,7 +77,7 @@ class CentralAIModule {
     if (!provider) return false;
     try {
       return await provider.isAvailable();
-    } catch (e) {
+    } catch {
       return false;
     }
   }
@@ -98,10 +102,15 @@ class CentralAIModule {
 
   async getModelCapabilities(modelName: string): Promise<string[]> {
     const provider = this.getActiveProvider();
-    if (provider.getModelCapabilities) {
-      return provider.getModelCapabilities(modelName);
-    }
-    return [];
+    if (!provider.getModelCapabilities) return [];
+
+    const cacheKey = `${this.activeMode}:${modelName}`;
+    const cached = this.capabilitiesCache.get(cacheKey);
+    if (cached) return cached;
+
+    const capabilities = await provider.getModelCapabilities(modelName);
+    this.capabilitiesCache.set(cacheKey, capabilities);
+    return capabilities;
   }
 
   //convert local image uris to base64
@@ -113,8 +122,7 @@ class CentralAIModule {
           msg.images.map(async (uri) => {
             try {
               if (uri.startsWith('data:')) return uri.split(',')[1];
-              const fileUri = uri.split('?name=')[0];
-              return await FileSystem.readAsStringAsync(fileUri, { encoding: FileSystem.EncodingType.Base64 });
+              return await imageToBase64(uri);
             } catch (e) {
               console.error('Failed to read image as base64:', e);
               return uri;
@@ -126,15 +134,24 @@ class CentralAIModule {
     );
   }
 
-  //queue any available context lines, only append the block when at least one exists
+    //append context lines when present
   private async buildContextBlock(): Promise<string> {
-    if (!LocationService.getCached() && (await LocationService.hasPermission())) {
-      await LocationService.refresh();
+    //use cached location refresh async
+    if (!LocationService.getCached()) {
+      LocationService.hasPermission().then((granted) => {
+        if (granted) LocationService.refresh().catch(() => {});
+      });
     }
+
     const lines: string[] = [];
-    lines.push(`Current Date and Time: ${new Date().toLocaleString()}`);
+    if (Settings.getCached().includeDateTime) {
+      lines.push(`Current Date and Time: ${new Date().toLocaleString()}`);
+    }
+    const userName = Settings.getCached().name.trim();
+    if (userName) lines.push(`User Name: ${userName}`);
     const locationContext = LocationService.getContextString();
     if (locationContext) lines.push(`User Location: ${locationContext}`);
+
     if (lines.length === 0) return '';
     return `\n\n[System Context]\n- ${lines.join('\n- ')}`;
   }
@@ -202,9 +219,9 @@ class CentralAIModule {
       return summary;
     };
 
-    //one model round, true if tools ran
+    //true if tools ran this round
     const runToolRound = async (): Promise<boolean> => {
-      //native tool calls or prompt injection fallback
+      //native or injected tool calls
       const beforeLen = accumulated.length;
       const result = supportsTools
         ? await provider.sendMessage(
@@ -215,7 +232,7 @@ class CentralAIModule {
 
       if (!result?.toolCalls || result.toolCalls.length === 0) return false;
 
-      //inject raw tool_calls json into stream
+      //inject tool_calls json
       //show ui bubble, keep tool call in history
       const roundChunk = accumulated.substring(beforeLen);
       if (!roundChunk.includes('"tool_calls"')) {
@@ -227,7 +244,7 @@ class CentralAIModule {
         }
       }
 
-      //add tool_calls message, visible text only
+      //text-only tool_calls message
       currentMessages.push({
         role: 'assistant',
         content: (result.content || '').replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim(),
@@ -252,15 +269,18 @@ class CentralAIModule {
       return true;
     };
 
-    //loop tools until answer (max 5 rounds)
+    //loop tools up to 5 rounds
     const MAX_TOOL_ROUNDS = 5;
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       if (!(await runToolRound())) return;
     }
 
-    //cap reached, force final generation
-    //so the answer survives the last tool call
-    await runToolRound();
+    //cap reached force final answer
+    //reoffering tools loops forever
+    await provider.sendMessage(
+      modelName, enhancedPrompt, currentMessages, streamingOnChunk, signal,
+      { think: options?.think }, onMetrics
+    );
   }
 }
 

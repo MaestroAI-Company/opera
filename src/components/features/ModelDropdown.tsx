@@ -58,14 +58,14 @@ export default function ModelDropdown({
   });
 
   const handleClose = (callback?: () => void) => {
-    progress.value = withTiming(0, { duration: 200 }, (finished) => {
+    progress.set(withTiming(0, { duration: 200 }, (finished) => {
       if (finished) {
         runOnJS(setVisible)(false);
         if (callback) {
           runOnJS(callback)();
         }
       }
-    });
+    }));
   };
 
   const [isAvailable, setIsAvailable] = useState(true);
@@ -81,7 +81,7 @@ export default function ModelDropdown({
       }
       const fetched = await AIModule.getAvailableModels();
       setModels(fetched);
-    } catch (e) {
+    } catch {
       setModels([]);
     } finally {
       setLoading(false);
@@ -101,6 +101,7 @@ export default function ModelDropdown({
 
   useEffect(() => {
     //refetch when ai service changes so the list follows the active provider
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loading flag for the fetch
     fetchModels();
   }, [fetchModels, aiService]);
 

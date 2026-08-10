@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { Animated, BackHandler, DeviceEventEmitter, Image, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
@@ -9,9 +9,10 @@ import { BackupService, ImportInspection } from "../../services/BackupService";
 import { CloudUserInfo } from "../../services/cloud/CloudProvider";
 import { CLOUD_PROVIDERS, getCloudProviderDefinition } from "../../services/cloud/registry";
 import { CloudSync } from "../../services/CloudSyncService";
+import { AppEvents } from "../../services/events";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { Settings } from "../../services/settings/SettingsService";
-import { STT } from "../../services/speech/STTService";
+import { WhisperSTT } from "../../services/speech/STTService";
 import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
 import DownloadProgress from "../ui/DownloadProgress";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
@@ -21,16 +22,11 @@ import ThemeSelector from "../ui/ThemeSelector";
 import Toggle from "../ui/Toggle";
 import CloudSyncBox from "./CloudSyncBox";
 
-//web whisper surface, only used in browser flows
-const WebSTT = STT as unknown as {
-  isModelInstalled(modelName: string): Promise<boolean>;
-  init(modelName: string): Promise<boolean>;
-  setLanguage(lang: string): void;
-  deleteModel(modelName: string): Promise<void>;
-  downloadModel(modelName: string, onProgress?: (progress: number, etaSeconds: number, speedStr: string, sizeStr: string) => void): Promise<void>;
-};
-
 import { useResponsive } from "../../hooks/useResponsive";
+
+import ActionButton from "../ui/ActionButton";
+import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { dragDrawer, drawerWidthFor, gestureVelocity, settingsProgress, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
 
 const linkIcon = require("../../../assets/icons/link.png");
 const downloadIcon = require("../../../assets/icons/download.png");
@@ -50,7 +46,7 @@ const photoIcon = require("../../../assets/icons/photo.png");
 const locationIcon = require("../../../assets/icons/pin.png");
 const exportIcon = require("../../../assets/icons/export.png");
 
-import ActionButton from "../ui/ActionButton";
+const DRAWER_SYNC_DELAY_MS = 1500;
 
 type SettingsDrawerProps = {
   visible: boolean;
@@ -65,33 +61,38 @@ type SubPage = "main" | "general" | "models" | "confidentiality" | "tools" | "pr
 
 export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
   const { width } = useResponsive();
-  const drawerWidth = Math.min(width * 0.88, 360);
+  const drawerWidth = drawerWidthFor(width);
 
-  const translateX = useRef(new Animated.Value(drawerWidth)).current;
-  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  //one value drives slide and scrim
+  const progress = settingsProgress;
 
-  const panResponder = useRef(
+  //useMemo read during render
+  const panResponder = useMemo(() =>
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return gestureState.dx > 20 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        return gestureState.dx > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        //panel tracks the finger
+        dragDrawer(progress, Math.max(0, Math.min(1, 1 - gestureState.dx / drawerWidth)));
       },
       onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx > 50) {
+        //settle here keeps flick speed
+        const velocity = -gestureVelocity(gestureState.vx, drawerWidth);
+        if (gestureState.dx > drawerWidth * 0.35 || gestureState.vx > 0.5) {
+          settleDrawer(progress, false, velocity);
           onClose();
+        } else {
+          settleDrawer(progress, true, velocity);
         }
       },
+      onPanResponderTerminate: () => {
+        settleDrawer(progress, true);
+      },
     })
-  ).current;
+  , [onClose, drawerWidth, progress]);
 
   const [activeSubPage, setActiveSubPage] = useState<SubPage>(initialSubPage ?? "main");
-
-  useEffect(() => {
-    if (visible) {
-      setActiveSubPage(initialSubPage ?? "main");
-      CloudSync.requestAutoSync(0);
-      refreshLastSync();
-    }
-  }, [visible, initialSubPage]);
 
   //native back navigates back in the menu, then lets parent close the drawer
   useEffect(() => {
@@ -113,8 +114,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [ollamaUrl, setOllamaUrlState] = useState("");
   const [ollamaError, setOllamaError] = useState("");
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [gemmaDownloadProgress, setGemmaDownloadProgress] = useState<{ progress: number, etaSeconds: number, speedStr: string, sizeStr: string } | null>(null);
+  const [, setIsDownloading] = useState(false);
+  const [, setGemmaDownloadProgress] = useState<{ progress: number, etaSeconds: number, speedStr: string, sizeStr: string } | null>(null);
 
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const [lastSyncSize, setLastSyncSize] = useState<number | null>(null);
@@ -142,11 +143,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     setAlertModalVisible(true);
   };
   const [whisperModel, setWhisperModelState] = useState("none");
-  const [whisperInstalled, setWhisperInstalled] = useState<boolean>(false);
+  const [, setWhisperInstalled] = useState<boolean>(false);
   const [installedWhisperModels, setInstalledWhisperModels] = useState<Record<string, boolean>>({});
   const [isDownloadingWhisper, setIsDownloadingWhisper] = useState(false);
   const [whisperDownloadProgress, setWhisperDownloadProgress] = useState<{ progress: number, etaSeconds: number, speedStr: string, sizeStr: string } | null>(null);
-  const [whisperLanguage, setWhisperLanguageState] = useState(() => {
+  const [, setWhisperLanguageState] = useState(() => {
     try {
       return Intl.DateTimeFormat().resolvedOptions().locale.split('-')[0] || "auto";
     } catch {
@@ -159,7 +160,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [autoSpeak, setAutoSpeakState] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(false);
   const [useAppContext, setUseAppContextState] = useState(true);
-  const [usageAnalytics, setUsageAnalyticsState] = useState(true);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   //plugin enabled states (tool name or widget id -> bool)
@@ -168,15 +168,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const allTools: ITool[] = ToolManager.getAllTools();
   const allWidgets: IWidget[] = WidgetManager.getAllWidgets();
 
-  const [useWebsearch, setUseWebsearchState] = useState(true);
-
   const [cloudProvider, setCloudProvider] = useState<string>("none");
   const [cloudUserInfo, setCloudUserInfo] = useState<CloudUserInfo | null>(null);
   const [hasSyncPin, setHasSyncPin] = useState(false);
   const [hasCloudBackup, setHasCloudBackup] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const [ollamaModelOptions, setOllamaModelOptions] = useState<{ id: string, label: string }[]>([]);
+  const [, setOllamaModelOptions] = useState<{ id: string, label: string }[]>([]);
 
   const languageOptions = [
     { id: "en", label: "English" },
@@ -280,7 +278,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           onPress: async () => {
             setAlertModalVisible(false);
             try {
-              await WebSTT.deleteModel(whisperModel);
+              await WhisperSTT.deleteModel(whisperModel);
               setWhisperInstalled(false);
               setInstalledWhisperModels(prev => ({ ...prev, [whisperModel]: false }));
             } catch (e) {
@@ -358,7 +356,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           Settings.set("aiService", "local");
           AIModule.setMode("local");
         }
-        WebSTT.setLanguage(s.whisperLanguage);
+        WhisperSTT.setLanguage(s.whisperLanguage);
       } catch (e) {
         console.warn("Failed to load settings", e);
       }
@@ -389,13 +387,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   useEffect(() => {
     if (activeSubPage !== 'tools') return;
     const states: Record<string, boolean> = {};
-    for (const tool of allTools) {
+    for (const tool of ToolManager.getAllTools()) {
       const name = tool.definition.function.name;
       states[`tool:${name}`] = PluginRegistry.isEnabled('tool', name, tool.enabledByDefault ?? false);
     }
-    for (const widget of allWidgets) {
+    for (const widget of WidgetManager.getAllWidgets()) {
       states[`widget:${widget.id}`] = PluginRegistry.isEnabled('widget', widget.id, widget.enabledByDefault ?? false);
     }
+    //mirror the registry into state when the tab opens
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPluginStates(states);
   }, [activeSubPage]);
 
@@ -426,11 +426,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     setWhisperModelState(v);
     Settings.set("whisperModel", v);
     if (v && v !== "none") {
-      WebSTT.isModelInstalled(v).then((installed) => {
+      WhisperSTT.isModelInstalled(v).then((installed) => {
         setWhisperInstalled(installed);
         setInstalledWhisperModels(prev => ({ ...prev, [v]: installed }));
         if (installed) {
-          WebSTT.init(v).then((success) => {
+          WhisperSTT.init(v).then((success) => {
             if (!success) {
               showAlert("Error", `Failed to load Whisper model ${v}. It might be corrupted.`);
               setWhisperInstalled(false);
@@ -632,14 +632,24 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   }, []);
 
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener("SYNC_COMPLETED", () => {
+    if (visible) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveSubPage(initialSubPage ?? "main");
+      //sync deferred past opening
+      CloudSync.requestAutoSync(DRAWER_SYNC_DELAY_MS);
+      refreshLastSync();
+    }
+  }, [visible, initialSubPage, refreshLastSync]);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(AppEvents.syncCompleted, () => {
       refreshLastSync();
     });
     return () => sub.remove();
   }, [refreshLastSync]);
 
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener("SYNC_PIN_INVALIDATED", async () => {
+    const sub = DeviceEventEmitter.addListener(AppEvents.syncPinInvalidated, async () => {
       setHasSyncPin(false);
       setHasCloudBackup(await CloudSync.hasCloudBackup());
     });
@@ -678,12 +688,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         fetchOllamaModels();
         if (Platform.OS === "web") {
           ["tiny", "base", "small"].forEach(m => {
-            WebSTT.isModelInstalled(m).then(installed => {
+            WhisperSTT.isModelInstalled(m).then(installed => {
               setInstalledWhisperModels(prev => ({ ...prev, [m]: installed }));
             });
           });
           if (whisperModel && whisperModel !== "none") {
-            WebSTT.isModelInstalled(whisperModel).then(setWhisperInstalled);
+            WhisperSTT.isModelInstalled(whisperModel).then(setWhisperInstalled);
           }
         }
       }, 300);
@@ -721,7 +731,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     setIsDownloadingWhisper(true);
     setWhisperDownloadProgress(null);
     try {
-      await WebSTT.downloadModel(model, (progress, etaSeconds, speedStr, sizeStr) => {
+      await WhisperSTT.downloadModel(model, (progress, etaSeconds, speedStr, sizeStr) => {
         setWhisperDownloadProgress({ progress, etaSeconds, speedStr, sizeStr });
       });
       setWhisperInstalled(true);
@@ -758,58 +768,24 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     );
   };
 
-  const largeScreenAnim = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  const largeScreenAnim = useAnimatedValue(visible ? 1 : 0);
 
   useEffect(() => {
     if (visible) {
       Keyboard.dismiss();
-      const anims = [];
       if (isDesktop) {
-        anims.push(Animated.timing(largeScreenAnim, {
-          toValue: 1,
-          duration: 180,
-          useNativeDriver: false,
-        }));
+        settleLayoutDrawer(largeScreenAnim, true);
       } else {
-        anims.push(
-          Animated.timing(translateX, {
-            toValue: 0,
-            duration: 280,
-            useNativeDriver: Platform.OS !== "web",
-          }),
-          Animated.timing(overlayOpacity, {
-            toValue: 1,
-            duration: 280,
-            useNativeDriver: Platform.OS !== "web",
-          })
-        );
+        settleDrawer(progress, true);
       }
-      Animated.parallel(anims).start();
     } else {
-      const anims = [];
       if (isDesktop) {
-        anims.push(Animated.timing(largeScreenAnim, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: false,
-        }));
+        settleLayoutDrawer(largeScreenAnim, false);
       } else {
-        anims.push(
-          Animated.timing(translateX, {
-            toValue: drawerWidth,
-            duration: 250,
-            useNativeDriver: Platform.OS !== "web",
-          }),
-          Animated.timing(overlayOpacity, {
-            toValue: 0,
-            duration: 250,
-            useNativeDriver: Platform.OS !== "web",
-          })
-        );
+        settleDrawer(progress, false);
       }
-      Animated.parallel(anims).start();
     }
-  }, [visible, isDesktop, drawerWidth]);
+  }, [visible, isDesktop, largeScreenAnim, progress]);
 
   // back header for subpages
   const renderSubPageHeader = (title: string) => (
@@ -825,7 +801,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   );
 
   // main navigation page content
-  const mainPageContent = (
+  const renderMainPage = () => (
     <View style={styles.menuContainer}>
       <Text style={styles.title}>Settings</Text>
 
@@ -919,7 +895,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   );
 
   // profile subpage
-  const profileSubPageContent = (
+  const renderProfileSubPage = () => (
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("Profile")}
 
@@ -946,7 +922,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   );
 
   // general subpage
-  const generalSubPageContent = (
+  const renderGeneralSubPage = () => (
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("General")}
 
@@ -1007,7 +983,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   );
 
   // cloud subpage
-  const cloudSubPageContent = (
+  const renderCloudSubPage = () => (
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("Cloud")}
 
@@ -1045,7 +1021,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   );
 
   // models & server subpage content
-  const modelsSubPageContent = (
+  const renderModelsSubPage = () => (
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("Models & Server")}
 
@@ -1119,7 +1095,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   );
 
   // confidentiality subpage content
-  const confidentialitySubPageContent = (
+  const renderConfidentialitySubPage = () => (
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("Confidentiality")}
 
@@ -1201,7 +1177,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   );
 
   // tools & widgets subpage content
-  const toolsSubPageContent = (
+  const renderToolsSubPage = () => (
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("Tools & Widgets")}
 
@@ -1259,20 +1235,20 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const getSubPageContent = () => {
     switch (activeSubPage) {
       case "profile":
-        return profileSubPageContent;
+        return renderProfileSubPage();
       case "cloud":
-        return cloudSubPageContent;
+        return renderCloudSubPage();
       case "general":
-        return generalSubPageContent;
+        return renderGeneralSubPage();
       case "models":
-        return modelsSubPageContent;
+        return renderModelsSubPage();
       case "confidentiality":
-        return confidentialitySubPageContent;
+        return renderConfidentialitySubPage();
       case "tools":
-        return toolsSubPageContent;
+        return renderToolsSubPage();
       case "main":
       default:
-        return mainPageContent;
+        return renderMainPage();
     }
   };
 
@@ -1403,10 +1379,21 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     );
   }
 
+  const translateX = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [drawerWidth, 0],
+  });
+
+  //settle before state change
+  const dismiss = () => {
+    settleDrawer(progress, false);
+    onClose();
+  };
+
   const mobileDrawer = (
     <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
-      <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      <Animated.View style={[styles.overlay, { opacity: progress }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
       </Animated.View>
 
       <Animated.View style={[styles.content, { width: drawerWidth }, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
@@ -1589,7 +1576,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontFamily: "IBMPlexMono-Medium",
-    color: "#888",
+    color: Colors.textMuted,
     textTransform: "uppercase",
     letterSpacing: 1,
     marginBottom: 10,

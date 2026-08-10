@@ -1,4 +1,5 @@
-﻿import * as SQLite from 'expo-sqlite';
+import * as SQLite from 'expo-sqlite';
+import { openSharedDatabase } from '../db/sqlite';
 
 // manages enabled/disabled state for tools and widgets
 class PluginRegistryService {
@@ -9,7 +10,7 @@ class PluginRegistryService {
   async init(): Promise<void> {
     if (this.db) return;
     try {
-      this.db = await SQLite.openDatabaseAsync('opera.db');
+      this.db = await openSharedDatabase();
       await this.db.runAsync(
         `CREATE TABLE IF NOT EXISTS plugin_registry (
           key TEXT PRIMARY KEY,

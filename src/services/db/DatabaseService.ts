@@ -1,5 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 import { DeviceEventEmitter } from 'react-native';
+import { AppEvents } from '../events';
+import { openSharedDatabase } from './sqlite';
 
 export type Conversation = {
   id: string;
@@ -25,7 +27,7 @@ export type Message = {
   createdAt: number;
   images?: string[];
   metrics?: MessageMetrics;
-  //snapshot of the foreground app context captured at send time
+  //app context at send time
   screenContext?: { appPackage: string | null; hasScreenText: boolean; icon?: string | null; label?: string | null };
 };
 
@@ -35,14 +37,57 @@ export type SyncTombstone = {
   deletedAt: number;
 };
 
+//old deletions reached every device
+const TOMBSTONE_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+
 class DatabaseService {
   private db: SQLite.SQLiteDatabase | null = null;
+  //batch writes count above zero
+  private silentDepth = 0;
+  //init dedupes concurrent calls
+  private initPromise: Promise<void> | null = null;
+
+  //serialize writes on one connection
+  private writeChain: Promise<unknown> = Promise.resolve();
+
+  private transaction(work: () => Promise<void>): Promise<void> {
+    const db = this.getDb();
+    const next = this.writeChain.then(() => db.withTransactionAsync(work));
+    //rejected transaction must not stall
+    this.writeChain = next.catch(() => undefined);
+    return next;
+  }
+
+  //one notification per write batch
+  async runSilently<T>(work: () => Promise<T>): Promise<T> {
+    this.silentDepth++;
+    try {
+      return await work();
+    } finally {
+      this.silentDepth--;
+    }
+  }
+
+  private notifyDataChanged(): void {
+    if (this.silentDepth > 0) return;
+    DeviceEventEmitter.emit(AppEvents.conversationsChanged);
+  }
 
   //open db and create tables if needed
   async init(): Promise<void> {
     if (this.db) return; // already initialized
+    if (this.initPromise) return this.initPromise;
+    this.initPromise = this.doInit();
     try {
-      this.db = await SQLite.openDatabaseAsync('opera.db');
+      await this.initPromise;
+    } finally {
+      this.initPromise = null;
+    }
+  }
+
+  private async doInit(): Promise<void> {
+    try {
+      this.db = await openSharedDatabase();
       await this.db.runAsync(
         `CREATE TABLE IF NOT EXISTS conversations (
           id TEXT PRIMARY KEY,
@@ -56,8 +101,8 @@ class DatabaseService {
       
       try {
         await this.db.runAsync('ALTER TABLE conversations ADD COLUMN pinned INTEGER DEFAULT 0');
-      } catch (e) {
-        // ignore, column might already exist
+      } catch {
+        //column may already exist
       }
 
       await this.db.runAsync(
@@ -73,21 +118,26 @@ class DatabaseService {
       
       try {
         await this.db.runAsync('ALTER TABLE messages ADD COLUMN images TEXT');
-      } catch (e) {
-        // ignore, column might already exist
+      } catch {
+        //column may already exist
       }
 
       try {
         await this.db.runAsync('ALTER TABLE messages ADD COLUMN metrics TEXT');
       } catch {
-        // ignore, column might already exist
+        //column may already exist
       }
 
       try {
         await this.db.runAsync('ALTER TABLE messages ADD COLUMN screenContext TEXT');
       } catch {
-        // ignore, column might already exist
+        //column may already exist
       }
+
+      //conversation open filters on column
+      await this.db.runAsync(
+        'CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversationId, createdAt)'
+      );
 
       await this.db.runAsync(
         `CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
@@ -130,9 +180,21 @@ class DatabaseService {
         )`
       );
 
+      await this.db.runAsync(
+        `CREATE TABLE IF NOT EXISTS tombstones (
+          kind TEXT NOT NULL,
+          id TEXT NOT NULL,
+          deletedAt INTEGER NOT NULL,
+          PRIMARY KEY (kind, id)
+        )`
+      );
+      await this.migrateTombstonesFromSyncState();
+
     } catch (e) {
-      console.error('Database init failed:', e);
+      //fail loudly on half-open db
       this.db = null;
+      console.error('Database init failed:', e);
+      throw e;
     }
   }
 
@@ -142,65 +204,91 @@ class DatabaseService {
   }
 
   //check saved data for inconsistencies that can appear after an update or partial import
+  //sqlite counts beats json parsing
   async detectDataIssues(): Promise<boolean> {
     const db = this.getDb();
-    //orphan messages pointing to a missing conversation
-    const orphan = await db.getFirstAsync<{count: number}>(
-      'SELECT COUNT(*) as count FROM messages m LEFT JOIN conversations c ON m.conversationId = c.id WHERE c.id IS NULL'
-    );
-    if (orphan && orphan.count > 0) return true;
-    //malformed json in message columns
-    const rows = await db.getAllAsync<{ images?: string | null; metrics?: string | null; screenContext?: string | null }>(
-      'SELECT images, metrics, screenContext FROM messages'
-    );
-    for (const row of rows) {
-      if (row.images) {
-        try { JSON.parse(row.images); } catch { return true; }
-      }
-      if (row.metrics) {
-        try { JSON.parse(row.metrics); } catch { return true; }
-      }
-      if (row.screenContext) {
-        try { JSON.parse(row.screenContext); } catch { return true; }
-      }
+    try {
+      const issues = await db.getFirstAsync<{ count: number }>(
+        `SELECT COUNT(*) as count FROM messages m
+         LEFT JOIN conversations c ON m.conversationId = c.id
+         WHERE c.id IS NULL
+            OR (m.images IS NOT NULL AND json_valid(m.images) = 0)
+            OR (m.metrics IS NOT NULL AND json_valid(m.metrics) = 0)
+            OR (m.screenContext IS NOT NULL AND json_valid(m.screenContext) = 0)`
+      );
+      return !!issues && issues.count > 0;
+    } catch (e) {
+      //json1 missing orphan check only
+      console.warn('Full data check unavailable, checking orphans only:', e);
+      const orphan = await db.getFirstAsync<{ count: number }>(
+        'SELECT COUNT(*) as count FROM messages m LEFT JOIN conversations c ON m.conversationId = c.id WHERE c.id IS NULL'
+      );
+      return !!orphan && orphan.count > 0;
     }
-    return false;
   }
 
   //get tombstones (deleted items waiting to propagate via sync)
   async getTombstones(): Promise<SyncTombstone[]> {
     const db = this.getDb();
-    const row = await db.getFirstAsync<{value: string}>('SELECT value FROM sync_state WHERE key = ?', ['tombstones']);
-    if (!row) return [];
-    try {
-      return JSON.parse(row.value);
-    } catch (e) {
-      return [];
-    }
+    await this.pruneExpiredTombstones();
+    return db.getAllAsync<SyncTombstone>('SELECT kind, id, deletedAt FROM tombstones');
   }
 
   //replace local tombstone registry
   async setTombstones(items: SyncTombstone[]): Promise<void> {
     const db = this.getDb();
-    await db.runAsync('INSERT OR REPLACE INTO sync_state (key, value) VALUES (?, ?)', ['tombstones', JSON.stringify(items)]);
+    await this.transaction(async () => {
+      await db.runAsync('DELETE FROM tombstones');
+      for (const item of items) {
+        await db.runAsync(
+          'INSERT OR REPLACE INTO tombstones (kind, id, deletedAt) VALUES (?, ?, ?)',
+          [item.kind, item.id, item.deletedAt]
+        );
+      }
+    });
   }
 
   //merge items into the local tombstone registry (keep newest deletedAt)
   async recordTombstones(items: SyncTombstone[]): Promise<void> {
-    const existing = await this.getTombstones();
-    const map = new Map<string, SyncTombstone>();
-    for (const t of existing) map.set(t.kind + ':' + t.id, t);
-    for (const t of items) {
-      const key = t.kind + ':' + t.id;
-      const cur = map.get(key);
-      if (!cur || t.deletedAt > cur.deletedAt) map.set(key, t);
-    }
-    await this.setTombstones(Array.from(map.values()));
+    if (items.length === 0) return;
+    const db = this.getDb();
+    //upsert per item not whole registry
+    await this.transaction(async () => {
+      for (const item of items) {
+        await db.runAsync(
+          `INSERT INTO tombstones (kind, id, deletedAt) VALUES (?, ?, ?)
+           ON CONFLICT(kind, id) DO UPDATE SET deletedAt = MAX(deletedAt, excluded.deletedAt)`,
+          [item.kind, item.id, item.deletedAt]
+        );
+      }
+    });
   }
 
   //clear all tombstones (used on full backup restore)
   async clearTombstones(): Promise<void> {
     const db = this.getDb();
+    await db.runAsync('DELETE FROM tombstones');
+  }
+
+  //retention-old deletions seen everywhere
+  private async pruneExpiredTombstones(): Promise<void> {
+    const db = this.getDb();
+    await db.runAsync('DELETE FROM tombstones WHERE deletedAt < ?', [Date.now() - TOMBSTONE_RETENTION_MS]);
+  }
+
+  //migrate json registry to table
+  private async migrateTombstonesFromSyncState(): Promise<void> {
+    const db = this.getDb();
+    const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM sync_state WHERE key = ?', ['tombstones']);
+    if (!row) return;
+    try {
+      const legacyItems: SyncTombstone[] = JSON.parse(row.value);
+      if (Array.isArray(legacyItems)) {
+        await this.recordTombstones(legacyItems);
+      }
+    } catch (e) {
+      console.warn('Could not migrate the legacy tombstone registry:', e);
+    }
     await db.runAsync('DELETE FROM sync_state WHERE key = ?', ['tombstones']);
   }
 
@@ -214,7 +302,7 @@ class DatabaseService {
       'INSERT INTO conversations (id, name, model, createdAt, updatedAt, pinned) VALUES (?, ?, ?, ?, ?, ?)',
       [conv.id, conv.name, conv.model, conv.createdAt, conv.updatedAt, conv.pinned ?? 0]
     );
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
     return conv;
   }
 
@@ -222,7 +310,7 @@ class DatabaseService {
   async renameConversation(id: string, name: string): Promise<void> {
     const db = this.getDb();
     await db.runAsync('UPDATE conversations SET name = ?, updatedAt = ? WHERE id = ?', [name, Date.now(), id]);
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
   }
 
   //toggle pin status
@@ -230,7 +318,7 @@ class DatabaseService {
     const db = this.getDb();
     const now = Date.now();
     await db.runAsync('UPDATE conversations SET pinned = ?, updatedAt = ? WHERE id = ?', [pinned ? 1 : 0, now, id]);
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
   }
 
   //get all conversations ordered by most recent
@@ -273,7 +361,7 @@ class DatabaseService {
     }
     await db.runAsync('DELETE FROM messages WHERE conversationId = ?', [id]);
     await db.runAsync('DELETE FROM conversations WHERE id = ?', [id]);
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
   }
 
   //delete a single message
@@ -283,7 +371,7 @@ class DatabaseService {
       await this.recordTombstones([{ kind: 'message', id, deletedAt: Date.now() }]);
     }
     await db.runAsync('DELETE FROM messages WHERE id = ?', [id]);
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
   }
 
   //add a message to a conversation
@@ -300,11 +388,11 @@ class DatabaseService {
     );
     //update conversation timestamp
     await db.runAsync('UPDATE conversations SET updatedAt = ? WHERE id = ?', [now, conversationId]);
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
     return msg;
   }
 
-  //patch the persisted screen context (used when it is resolved asynchronously)
+  //patch async screen context
   async updateMessageScreenContext(id: string, screenContext: Message['screenContext']): Promise<void> {
     const db = this.getDb();
     await db.runAsync('UPDATE messages SET screenContext = ? WHERE id = ?', [screenContext ? JSON.stringify(screenContext) : null, id]);
@@ -314,7 +402,7 @@ class DatabaseService {
   async updateMessageContent(id: string, content: string): Promise<void> {
     const db = this.getDb();
     await db.runAsync('UPDATE messages SET content = ? WHERE id = ?', [content, id]);
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
   }
 
   //store generation metrics for a message
@@ -357,13 +445,13 @@ class DatabaseService {
     await this.recordTombstones(rows.map(r => ({ kind: 'conversation', id: r.id, deletedAt: Date.now() })));
     await db.runAsync('DELETE FROM messages');
     await db.runAsync('DELETE FROM conversations');
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
   }
 
   //import backup data (replaces existing conversations and messages)
   async importBackup(conversations: Conversation[], messages: Message[], tombstones?: SyncTombstone[]): Promise<void> {
     const db = this.getDb();
-    await db.withTransactionAsync(async () => {
+    await this.transaction(async () => {
       await db.runAsync('DELETE FROM messages');
       await db.runAsync('DELETE FROM conversations');
 
@@ -385,13 +473,13 @@ class DatabaseService {
       }
     });
     await this.setTombstones(tombstones ?? []);
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
   }
 
   //replace a conversation and its messages (used by sync merge)
   async replaceConversationWithMessages(conv: Conversation, messages: Message[]): Promise<void> {
     const db = this.getDb();
-    await db.withTransactionAsync(async () => {
+    await this.transaction(async () => {
       await db.runAsync('DELETE FROM messages WHERE conversationId = ?', [conv.id]);
       await db.runAsync('DELETE FROM conversations WHERE id = ?', [conv.id]);
       await db.runAsync(
@@ -408,7 +496,7 @@ class DatabaseService {
         );
       }
     });
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
   }
 }
 

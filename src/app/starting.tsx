@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Animated,
   Image,
@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useResponsive } from "../hooks/useResponsive";
 import { Colors, Fonts, FontSizes, Radius } from "../../constants/theme";
+import { useAnimatedValue } from "../hooks/useAnimatedValue";
 
 const butterflyImage = require("../../assets/images/butterfly2.png");
 const texture2 = require("../../assets/images/texture2.png");
@@ -26,14 +27,14 @@ export default function StartingPage() {
 
   const [displayedText, setDisplayedText] = useState("");
 
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-  const logoTranslateY = useRef(new Animated.Value(-20)).current;
+  const logoOpacity = useAnimatedValue(0);
+  const logoTranslateY = useAnimatedValue(-20);
 
-  const butterflyOpacity = useRef(new Animated.Value(0)).current;
-  const butterflyScale = useRef(new Animated.Value(0.85)).current;
+  const butterflyOpacity = useAnimatedValue(0);
+  const butterflyScale = useAnimatedValue(0.85);
 
-  const buttonOpacity = useRef(new Animated.Value(0)).current;
-  const buttonTranslateY = useRef(new Animated.Value(20)).current;
+  const buttonOpacity = useAnimatedValue(0);
+  const buttonTranslateY = useAnimatedValue(20);
 
   useEffect(() => {
     // 1. Logo & Butterfly animation

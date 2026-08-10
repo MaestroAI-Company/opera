@@ -1,3 +1,5 @@
+import type { WhisperSurface } from './STTService';
+
 class SpeechToTextService {
   private transcriber: any = null;
   private currentLang: string = 'en';
@@ -30,7 +32,7 @@ class SpeechToTextService {
       const keys = await cache.keys();
       //check if cache files exist for repo
       return keys.some(request => request.url.includes(repo));
-    } catch (e) {
+    } catch {
       return false;
     }
   }
@@ -208,3 +210,6 @@ class SpeechToTextService {
 
 // export whisper instance
 export const STT = new SpeechToTextService();
+
+//same bridge as native file
+export const WhisperSTT = STT as unknown as WhisperSurface;

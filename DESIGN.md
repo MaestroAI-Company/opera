@@ -7,8 +7,7 @@ colors:
   primary-pressed: "#D61515"
   primary-active: "#CC1414"
   primary-bright: "#FF4D4D"
-  background: "#FFF5EC"
-  background-splash: "#FDF8F1"
+  background: "#FDF8F1"
   surface: "#FFFFFF"
   surface-muted: "#F9F9F9"
   surface-subtle: "#F5F5F5"
@@ -16,16 +15,10 @@ colors:
   surface-code: "#F0F0F0"
   border: "#00000017"
   border-on-primary: "#FFFFFF52"
+  shadow-ink: "#00000013"
   text-primary: "#000000"
-  text-secondary: "#222222"
-  text-tertiary: "#333333"
-  text-strong: "#444444"
-  text-muted: "#555555"
-  text-body: "#666666"
-  text-faint: "#888888"
-  text-disabled: "#999999"
-  text-placeholder: "#AAAAAA"
-  text-disabled-strong: "#BBBBBB"
+  text-secondary: "#444444"
+  text-muted: "#888888"
   text-on-primary: "#FFFFFF"
   link: "#3B82F6"
   link-alt: "#0066CC"
@@ -43,7 +36,6 @@ colors:
   incognito-pressed: "#3E4157"
   incognito-bright: "#70748E"
   incognito-surface: "#2A2A35"
-  incognito-border: "#00000030"
 typography:
   display-hero:
     fontFamily: Petrona
@@ -197,9 +189,9 @@ The palette is rooted in a warm cream foundation, a single red accent, and a ful
 
 - **Primary — Opera Red (#FF1A1A):** The sole interaction color. Drives primary actions, the chat composer, user chat bubbles, CTAs, and text selection. Use for the single most important action per screen; never for decoration.
 - **Primary pressed/active (#D61515 / #CC1414):** Slightly darker red for pressed and active states of red surfaces.
-- **Background (#FFF5EC):** A warm cream canvas, softer than white, giving the editorial feel. Every screen sits on it.
+- **Background (#FDF8F1):** A warm cream canvas, softer than white, giving the editorial feel. Every screen sits on it.
 - **Surfaces (#FFFFFF + muted/subtle/pressed):** White cards and fields on the cream canvas; muted grays for pressed rows and subtle fills.
-- **Text ramp (#000000 → #AAAAAA):** A ten-step neutral ramp from primary text down to placeholders. Full-black text on cream keeps maximum readability.
+- **Text ramp (#000000 → #888888):** Three neutral steps — primary (#000000), secondary (#444444) and muted (#888888) — plus white on colored surfaces. Full-black text on cream keeps maximum readability. Do not introduce intermediate greys outside these tokens.
 - **Incognito (#565A75):** A purple-gray identity that swaps out every red element when ephemeral mode is on. Base #565A75 acts like the red's role, with a dark surface #2A2A35 for the composer.
 - **Link (#3B82F6):** Blue reserved for hyperlinks and "Confidentiality" links.
 - **Code (#1E1E1E blocks / #D63384 inline):** Dark blocks with light-gray text; pink inline code.

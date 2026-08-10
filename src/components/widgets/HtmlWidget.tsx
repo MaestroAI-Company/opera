@@ -1,6 +1,7 @@
 import { Platform, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { IWidget } from '../../services/widgets/WidgetManager';
+import { Colors, Radius } from '../../../constants/theme';
 
 export interface HtmlWidgetData {
   html?: string;
@@ -50,8 +51,8 @@ export const HtmlWidget: IWidget<HtmlWidgetData> = {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 5,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
     overflow: 'hidden',
   }
 });

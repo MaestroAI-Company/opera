@@ -12,7 +12,10 @@ interface Props {
 export default function SplashScreen({ onFinish }: Props) {
   const dotLottieRef = useRef<DotLottie | null>(null);
   const onFinishRef = useRef(onFinish);
-  onFinishRef.current = onFinish;
+
+  useEffect(() => {
+    onFinishRef.current = onFinish;
+  }, [onFinish]);
 
   const handleComplete = useCallback(() => {
     onFinishRef.current();

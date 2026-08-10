@@ -27,7 +27,7 @@ export default function TopBar({ onMenuPress, onNewPress, centerElement, rightEl
               onPress={onMenuPress}
               style={({ pressed, hovered }) => [styles.button, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
             >
-              <Image source={moreIcon} style={styles.buttonIcon} resizeMode="contain" tintColor={Colors.textSecondary} />
+              <Image source={moreIcon} style={styles.buttonIcon} resizeMode="contain" tintColor={Colors.textPrimary} />
               {showDesktopButtons && <Text style={styles.buttonText}>Conversation</Text>}
             </Pressable>
             {showNewButton && (
@@ -35,7 +35,7 @@ export default function TopBar({ onMenuPress, onNewPress, centerElement, rightEl
                 onPress={onNewPress}
                 style={({ pressed, hovered }) => [styles.button, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
               >
-                <Image source={addIcon} style={styles.buttonIcon} resizeMode="contain" tintColor={Colors.textSecondary} />
+                <Image source={addIcon} style={styles.buttonIcon} resizeMode="contain" tintColor={Colors.textPrimary} />
               </Pressable>
             )}
           </View>

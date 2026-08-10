@@ -11,7 +11,6 @@ import {
   Easing,
   Image,
   Keyboard,
-  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -224,38 +223,9 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     }
   }));
 
-  const sheetHeightAnim = useAnimatedValue(0);
-  const spacerHeightAnim = useAnimatedValue(insets.bottom);
-  const targetSheetHeight = useRef(200);
-
   const closeSheet = () => {
     setIsAttachmentSheetVisible(false);
   };
-
-  //handlers need the live layout height, so they close over the ref
-  const handlePanResponder = useMemo(() =>
-    // eslint-disable-next-line react-hooks/refs
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderMove: (e, gestureState) => {
-        if (gestureState.dy > 0) {
-          sheetHeightAnim.setValue(Math.max(0, targetSheetHeight.current - gestureState.dy));
-        }
-      },
-      onPanResponderRelease: (e, gestureState) => {
-        if (gestureState.dy > 100 || gestureState.vy > 0.5) {
-          closeSheet();
-        } else {
-          Animated.spring(sheetHeightAnim, {
-            toValue: targetSheetHeight.current,
-            useNativeDriver: false,
-            bounciness: 4,
-            speed: 12,
-          }).start();
-        }
-      },
-    })
-  , [sheetHeightAnim]);
 
   useEffect(() => {
     onAttachmentSheetVisibilityChange?.(isAttachmentSheetVisible);
@@ -452,48 +422,21 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   };
 
   useEffect(() => {
-    if (isAttachmentSheetVisible) {
-      Animated.parallel([
-        Animated.spring(sheetHeightAnim, {
-          toValue: targetSheetHeight.current,
-          useNativeDriver: false,
-          bounciness: 4,
-          speed: 12,
-        }),
-        Animated.timing(spacerHeightAnim, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: false,
-        })
-      ]).start();
+    if (!isAttachmentSheetVisible) return;
 
-      const getRecentPhotos = async () => {
-        const { status } = await MediaLibrary.getPermissionsAsync();
-        if (status === 'granted') {
-          const media = await MediaLibrary.getAssetsAsync({
-            mediaType: 'photo',
-            first: 10,
-            sortBy: ['creationTime'],
-          });
-          setRecentPhotos(media.assets);
-        }
-      };
-      getRecentPhotos();
-    } else {
-      Animated.parallel([
-        Animated.timing(sheetHeightAnim, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: false,
-        }),
-        Animated.timing(spacerHeightAnim, {
-          toValue: insets.bottom,
-          duration: 250,
-          useNativeDriver: false,
-        })
-      ]).start();
-    }
-  }, [isAttachmentSheetVisible, insets.bottom, sheetHeightAnim, spacerHeightAnim]);
+    const getRecentPhotos = async () => {
+      const { status } = await MediaLibrary.getPermissionsAsync();
+      if (status === 'granted') {
+        const media = await MediaLibrary.getAssetsAsync({
+          mediaType: 'photo',
+          first: 10,
+          sortBy: ['creationTime'],
+        });
+        setRecentPhotos(media.assets);
+      }
+    };
+    getRecentPhotos();
+  }, [isAttachmentSheetVisible]);
 
   const handleCamera = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
@@ -1016,45 +959,21 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         </Animated.View>
       </View>
 
-      <Animated.View style={{ width: '100%', height: spacerHeightAnim }} />
+      <View style={{ width: '100%', height: insets.bottom }} />
 
-      {/* attachment sheet */}
-      <Animated.View
-        style={{
-          height: sheetHeightAnim,
-          overflow: 'hidden',
-          width: '100%',
-        }}
-      >
-        <View onLayout={(e) => {
-          const newHeight = Math.max(150, e.nativeEvent.layout.height);
-          if (targetSheetHeight.current !== newHeight) {
-            targetSheetHeight.current = newHeight;
-            if (isAttachmentSheetVisible) {
-              Animated.spring(sheetHeightAnim, {
-                toValue: newHeight,
-                useNativeDriver: false,
-                bounciness: 4,
-                speed: 12,
-              }).start();
-            }
-          }
-        }}>
-          <AttachmentSheet
-            bottomInset={bottomInsetToFill}
-            visible={isAttachmentSheetVisible}
-            incognito={incognito}
-            onCamera={handleCamera}
-            onPickFiles={handlePickFiles}
-            onPhotos={handlePhotos}
-            recentPhotos={recentPhotos}
-            selectedFiles={selectedFiles}
-            onSelectRecentPhoto={handleSelectRecentPhoto}
-            onLongPressRecentPhoto={handleSelectRecentPhoto}
-            panHandlers={handlePanResponder.panHandlers}
-          />
-        </View>
-      </Animated.View>
+      <AttachmentSheet
+        bottomInset={bottomInsetToFill}
+        visible={isAttachmentSheetVisible}
+        incognito={incognito}
+        onClose={closeSheet}
+        onCamera={handleCamera}
+        onPickFiles={handlePickFiles}
+        onPhotos={handlePhotos}
+        recentPhotos={recentPhotos}
+        selectedFiles={selectedFiles}
+        onSelectRecentPhoto={handleSelectRecentPhoto}
+        onLongPressRecentPhoto={handleSelectRecentPhoto}
+      />
 
       <NotificationModal
         visible={modalVisible}

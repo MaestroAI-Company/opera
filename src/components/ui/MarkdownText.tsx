@@ -1,17 +1,18 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Animated, Linking, StyleSheet, Text, View, Image } from "react-native";
-import MathText from "react-native-math";
 import AutoHeightWebView from "react-native-autoheight-webview";
 import CodeHighlighter from "react-native-code-highlighter";
 import { vs2015 } from "react-syntax-highlighter/dist/esm/styles/hljs";
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { Colors, Fonts, FontSizes, Radius, Spacing } from "../../../constants/theme";
+import { ensureKatexStylesheet, getKatexCss, KATEX_STYLESHEET_NAME } from "./katexStylesheet";
 import { WidgetManager } from "../../services/widgets/WidgetManager";
 import WidgetWrapper from "../widgets/WidgetWrapper";
+import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 
 const toolIcon = require("../../../assets/icons/tool.png");
 
 const ToolCallBubble = ({ toolName, isGenerating }: { toolName: string, isGenerating?: boolean }) => {
-  const opacity = useRef(new Animated.Value(isGenerating ? 0.4 : 1)).current;
+  const opacity = useAnimatedValue(isGenerating ? 0.4 : 1);
 
   useEffect(() => {
     if (isGenerating) {
@@ -29,9 +30,9 @@ const ToolCallBubble = ({ toolName, isGenerating }: { toolName: string, isGenera
   }, [isGenerating, opacity]);
 
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.04)', padding: 10, borderRadius: 12, marginVertical: 6, alignSelf: 'flex-start' }}>
-      <Image source={toolIcon} style={{ width: 18, height: 18, marginRight: 8, opacity: 0.7, tintColor: '#666' }} />
-      <Animated.Text style={{ fontFamily: 'IBMPlexMono-Medium', fontSize: 13, color: '#555', opacity }}>
+    <View style={s.toolCallBubble}>
+      <Image source={toolIcon} style={s.toolCallIcon} />
+      <Animated.Text style={[s.toolCallLabel, { opacity }]}>
         {isGenerating ? `Using tool: ${toolName}...` : `Used tool: ${toolName}`}
       </Animated.Text>
     </View>
@@ -71,6 +72,48 @@ const s = StyleSheet.create({
   tableCell: { fontSize: FontSizes.body, lineHeight: 20, color: Colors.textPrimary, fontFamily: Fonts.body },
   tableCellBox: { flex: 1, paddingHorizontal: 8, paddingVertical: 6 },
   inlineRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },
+  toolCallBubble: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.overlayFaint,
+    padding: Spacing.lg,
+    borderRadius: Radius.lg2,
+    marginVertical: Spacing.sm,
+    alignSelf: "flex-start",
+  },
+  toolCallIcon: {
+    width: 18,
+    height: 18,
+    marginRight: Spacing.md,
+    opacity: 0.7,
+    tintColor: Colors.textSecondary,
+  },
+  toolCallLabel: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.caption,
+    color: Colors.textSecondary,
+  },
+  widgetLoading: {
+    padding: Spacing.xl2,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.overlayFaint,
+    borderRadius: Radius.lg2,
+    marginVertical: Spacing.md,
+  },
+  mathBlock: {
+    width: "100%",
+    marginVertical: Spacing.md,
+    minHeight: 40,
+    alignSelf: "center",
+    overflow: "hidden",
+    backgroundColor: "transparent",
+  },
+  widgetLoadingText: {
+    fontFamily: Fonts.body,
+    color: Colors.textSecondary,
+    fontStyle: "italic",
+  },
 });
 
 type Token =
@@ -225,7 +268,7 @@ function pushRawToolCallBlocks(md: string, from: number, to: number, blocks: Too
   }
 }
 
-//scan toolcall json, skip code fences
+//scan toolcall json outside fences
 function findToolCallBlocks(md: string, allowPartial = false): ToolCallBlock[] {
   const blocks: ToolCallBlock[] = [];
   const fenceRe = /```[^\n]*/g;
@@ -270,7 +313,7 @@ export function hasConversationalText(md: string): boolean {
   return clean.trim().length > 0;
 }
 
-//extract tool names, tolerate incomplete json
+//extract tool names from json
 export function parseToolNames(json: string): string[] {
   const clean = json.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
   const names: string[] = [];
@@ -283,7 +326,7 @@ export function parseToolNames(json: string): string[] {
     } else if (data?.name) {
       names.push(data.name);
     }
-  } catch (e) {
+  } catch {
     const nameMatches = clean.matchAll(/"name"\s*:\s*"([^"]+)"/g);
     for (const match of nameMatches) names.push(match[1]);
   }
@@ -323,7 +366,7 @@ export function deriveChatDisplay(raw: string, isGenerating: boolean, liveTool: 
   const stripped = normalized.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '');
   const blocks = findToolCallBlocks(stripped, isGenerating);
 
-  //keep tool json in finalContent for bubbles
+  //keep tool json for bubbles
   //strip blocks to compute presence
   let contentOnly = stripped;
   const contentToolNames: string[] = [];
@@ -376,56 +419,88 @@ function splitMath(text: string): { kind: "text" | "math"; content: string }[] {
   return parts;
 }
 
-const KATEX_HTML = (content: string, textSize: number, textColor: string): string => `
+//webview gets prebuilt markup
+const KATEX_HTML = (renderedMath: string, textSize: number, textColor: string, stylesheetDirectory: string | null): string => `
 <!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous"
-onload="renderMathInElement(document.body, {
-    delimiters: [
-        { left: '$$', right: '$$', display: true },
-        { left: '$', right: '$', display: false },
-        { left: '\\\\[', right: '\\\\]', display: true },
-        { left: '\\\\(', right: '\\\\)', display: false }
-            ],
-            ignoredTags: [
-                'script', 'noscript', 'style', 'textarea', 'pre', 'code', 'a'
-            ]
-            });"></script>
-            <style>
-            body { margin: 0; padding: 0; }
-            </style>
-            </head>
-            <body>
-            <div style="font-size: ${textSize}px; color: ${textColor}; padding: 2px 0;">
-            ${content}
-            </div>
-            </body>
-            </html>
+${stylesheetDirectory ? `<link rel="stylesheet" href="${KATEX_STYLESHEET_NAME}">` : `<style>${getKatexCss()}</style>`}
+<style>
+  body { margin: 0; padding: 0; background: transparent; }
+  #math { font-size: ${textSize}px; color: ${textColor}; padding: 2px 0; }
+</style>
+</head>
+<body>
+<div id="math">${renderedMath}</div>
+</body>
+</html>
 `;
 
-function MathInline({ content, estWidth, incognito }: { content: string; estWidth: number; incognito?: boolean }) {
-  const [height, setHeight] = useState(34);
+//plain helpers need manual memo
+const MathView = React.memo(function MathView({ latex, displayMode, width, incognito, dark }: { latex: string; displayMode: boolean; width?: number; incognito?: boolean; dark?: boolean }) {
+  const [height, setHeight] = useState(displayMode ? 40 : 34);
+  //undefined while writing stylesheet
+  const [stylesheetDirectory, setStylesheetDirectory] = useState<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    ensureKatexStylesheet().then((directory) => {
+      if (!cancelled) setStylesheetDirectory(directory);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const textColor = dark ? Colors.responseText : (incognito ? Colors.codeBlockText : Colors.textSecondary);
+
+  const renderedMath = useMemo(() => {
+    try {
+      //lazy require keeps katex off startup
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const katex = require("katex");
+      return katex.renderToString(latex, { displayMode, throwOnError: false });
+    } catch {
+      //malformed latex shows as text
+      return latex;
+    }
+  }, [latex, displayMode]);
+
+  const html = useMemo(
+    () => KATEX_HTML(renderedMath, displayMode ? FontSizes.md : FontSizes.lg, textColor, stylesheetDirectory ?? null),
+    [renderedMath, displayMode, textColor, stylesheetDirectory]
+  );
+
+  //nothing until stylesheet ready
+  if (stylesheetDirectory === undefined) {
+    return <View style={{ width: width ?? undefined, height }} />;
+  }
+
   return (
     <AutoHeightWebView
-      style={{ width: estWidth, height, overflow: "hidden", marginHorizontal: 2, backgroundColor: "transparent" }}
+      style={{
+        width: width ?? undefined,
+        height,
+        overflow: "hidden",
+        marginHorizontal: displayMode ? 0 : 2,
+        backgroundColor: "transparent",
+      }}
       onSizeUpdated={(size) => {
         if (size.height > 0) setHeight(size.height + 2);
       }}
-      source={{ html: KATEX_HTML(`$${content}$`, FontSizes.lg, incognito ? Colors.codeBlockText : Colors.textSecondary) }}
+      source={stylesheetDirectory ? { html, baseUrl: stylesheetDirectory } : { html }}
+      allowFileAccess={true}
+      allowFileAccessFromFileURLs={true}
+      originWhitelist={["*"]}
       scalesPageToFit={false}
       viewportContent={"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"}
       scrollEnabled={false}
     />
   );
-}
+});
 
 function renderMathBlock(content: string, key: string, incognito?: boolean): React.ReactNode {
   const estWidth = Math.min(400, Math.max(70, content.length * 10));
-  return <MathInline key={key} content={content} estWidth={estWidth} incognito={incognito} />;
+  return <MathView key={key} latex={content} displayMode={false} width={estWidth} incognito={incognito} />;
 }
 
 function renderContent(text: string, keyBase: number, incognito?: boolean): React.ReactNode[] {
@@ -469,7 +544,8 @@ const LANG_ALIASES: Record<string, string> = {
   yml: "yaml", "c++": "cpp", "objective-c": "objectivec", md: "markdown",
 };
 
-function CodeBlock({ code, language }: { code: string; language?: string }) {
+//rehighlighting a block is costly
+const CodeBlock = React.memo(function CodeBlock({ code, language }: { code: string; language?: string }) {
   const lang = language ? LANG_ALIASES[language] ?? language : undefined;
   const textStyle = { fontFamily: Fonts.mono, fontSize: FontSizes.code, lineHeight: 18 } as const;
   if (!lang) {
@@ -491,7 +567,7 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
       </CodeHighlighter>
     </View>
   );
-}
+});
 
 export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: boolean, dark?: boolean): React.ReactNode[] {
   const selColor = incognito ? Colors.incognitoSelection : Colors.primarySelection;
@@ -543,9 +619,9 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
         if (widget) {
           if (!isClosed) {
             elements.push(
-              <View key={`loading-${i}`} style={{ padding: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.03)', borderRadius: 12, marginVertical: 8 }}>
-                <Text style={{ fontFamily: 'Jakarta', color: '#666', fontStyle: 'italic' }}>
-                  Génération du widget {widgetTitle || widget.name}...
+              <View key={`loading-${i}`} style={s.widgetLoading}>
+                <Text style={s.widgetLoadingText}>
+                  Generating widget {widgetTitle || widget.name}...
                 </Text>
               </View>
             );
@@ -563,7 +639,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
                 return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
               });
               data = JSON.parse(sanitized);
-            } catch (e2: any) {
+            } catch {
               // fallback to code block on parse error
               elements.push(
                 <Text key={`code-${i}`} style={[s.base, s.codeBlock]} selectable={true} selectionColor={selColor}>
@@ -607,44 +683,28 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
 
     // math block $$
     if (line.trimStart().startsWith("$$")) {
+      const mathLines: string[] = [line];
       const isSingleLine = line.trimEnd().endsWith("$$") && line.trim().length > 4;
+
       if (isSingleLine) {
-        const mathContent = line; // react-native-math needs the $$ intact
-        elements.push(
-          <View key={`math-${i}`} style={{ width: "100%", marginVertical: 8, minHeight: 40, alignSelf: "center", overflow: "hidden", backgroundColor: "transparent" }}>
-            <MathText
-              content={mathContent}
-              textSize={FontSizes.md}
-              textColor={incognito ? Colors.codeBlockText : Colors.textSecondary}
-              style={{ flex: 1, backgroundColor: "transparent" }}
-            />
-          </View>
-        );
         i++;
-        continue;
-      }
-
-      const mathLines: string[] = [];
-      mathLines.push(line);
-
-      i++;
-      while (i < lines.length && !lines[i].includes("$$")) {
-        mathLines.push(lines[i]);
+      } else {
         i++;
-      }
-      if (i < lines.length) {
-        mathLines.push(lines[i]);
-        i++; // skip closing $$
+        while (i < lines.length && !lines[i].includes("$$")) {
+          mathLines.push(lines[i]);
+          i++;
+        }
+        if (i < lines.length) {
+          mathLines.push(lines[i]);
+          i++; //skip closing $$
+        }
       }
 
+      //latex without delimiters
+      const latex = mathLines.join("\n").replace(/^\s*\$\$/, "").replace(/\$\$\s*$/, "").trim();
       elements.push(
-        <View key={`math-${i}`} style={{ width: "100%", marginVertical: 8, minHeight: Math.max(40, mathLines.length * 25), alignSelf: "center", overflow: "hidden", backgroundColor: "transparent" }}>
-          <MathText
-            content={mathLines.join("\n")}
-            textSize={FontSizes.md}
-            textColor={incognito ? Colors.codeBlockText : Colors.textSecondary}
-            style={{ flex: 1, backgroundColor: "transparent" }}
-          />
+        <View key={`math-${i}`} style={s.mathBlock}>
+          <MathView latex={latex} displayMode={true} incognito={incognito} dark={dark} />
         </View>
       );
       continue;

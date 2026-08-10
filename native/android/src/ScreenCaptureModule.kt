@@ -1,10 +1,10 @@
 package __PACKAGE_NAME__
 
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
@@ -14,27 +14,37 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
+import com.facebook.react.bridge.WritableMap
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import java.io.ByteArrayOutputStream
-import java.io.File
-import java.io.FileOutputStream
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
-class ScreenCaptureModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
+//exposes capture size thumbnails and context
+class ScreenCaptureModule(context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
 
   companion object {
-    private const val TAG = "ScreenCaptureModule"
-    private const val YOLO_SIZE = 640
-    //chat attachment thumbnail cap, not a full-res export
+    private const val NAME = "ScreenCaptureModule"
+
     private const val MAX_THUMB_DIM = 1280
+    private const val JPEG_QUALITY = 85
+    private const val ICON_SIZE = 128
+    private const val MAX_SCREEN_TEXT = 4000
+
+    //letterbox padding the detector ignores
+    private const val PAD_COLOR = 0xFF727272.toInt()
+
+    //sentinel means capture not landed
+    private const val NOT_READY = "NO_SCREENSHOT"
+    private const val NOT_READY_MESSAGE = "no screenshot available"
+
+    @Volatile
     private var instance: ScreenCaptureModule? = null
 
-    //notify js overlay of activity reuse
+    //signal overlay was reused not recreated
     @JvmStatic
     fun emitOverlayReopened() {
       instance?.reactApplicationContext
@@ -43,186 +53,196 @@ class ScreenCaptureModule(reactContext: ReactApplicationContext) : ReactContextB
     }
   }
 
+  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
   init {
     instance = this
   }
 
-  //close overlay only
+  override fun getName(): String = NAME
+
+  override fun invalidate() {
+    if (instance === this) instance = null
+    scope.cancel()
+    super.invalidate()
+  }
+
+  //shared not ready contract and errors
+  private fun readCapture(promise: Promise, work: (Bitmap) -> Unit) {
+    val capture = ScreenshotHolder.getUsable()
+    if (capture == null) {
+      promise.reject(NOT_READY, NOT_READY_MESSAGE)
+      return
+    }
+    //holder never recycles reference stays valid
+    scope.launch {
+      try {
+        work(capture)
+      } catch (e: Exception) {
+        promise.reject("ERROR", e.message ?: "error")
+      }
+    }
+  }
+
+  @ReactMethod
+  fun getScreenshotInfo(promise: Promise) {
+    val capture = ScreenshotHolder.getUsable()
+    if (capture == null) {
+      promise.reject(NOT_READY, NOT_READY_MESSAGE)
+      return
+    }
+    promise.resolve(Arguments.createMap().apply {
+      putInt("width", capture.width)
+      putInt("height", capture.height)
+    })
+  }
+
+  //region as jpeg data uri
+  @ReactMethod
+  fun cropRegion(x: Double, y: Double, w: Double, h: Double, promise: Promise) {
+    readCapture(promise) { capture ->
+      val left = (x * capture.width).toInt().coerceIn(0, capture.width)
+      val top = (y * capture.height).toInt().coerceIn(0, capture.height)
+      val width = (w * capture.width).toInt().coerceIn(0, capture.width - left)
+      val height = (h * capture.height).toInt().coerceIn(0, capture.height - top)
+      if (width <= 0 || height <= 0) throw IllegalStateException("empty region")
+
+      //models never need larger thumbs
+      val scale = minOf(1f, MAX_THUMB_DIM.toFloat() / maxOf(width, height))
+      val outWidth = maxOf(1, (width * scale).toInt())
+      val outHeight = maxOf(1, (height * scale).toInt())
+
+      //single blit crops and downscales
+      val thumb = Bitmap.createBitmap(outWidth, outHeight, Bitmap.Config.ARGB_8888)
+      Canvas(thumb).drawBitmap(
+        capture,
+        Rect(left, top, left + width, top + height),
+        Rect(0, 0, outWidth, outHeight),
+        Paint(Paint.FILTER_BITMAP_FLAG)
+      )
+
+      val jpeg = ByteArrayOutputStream()
+      thumb.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, jpeg)
+      thumb.recycle()
+      promise.resolve("data:image/jpeg;base64," + encode(jpeg))
+    }
+  }
+
+  //square rgb bytes model reads directly
+  @ReactMethod
+  fun getDetectionInput(size: Int, promise: Promise) {
+    readCapture(promise) { capture ->
+      val scale = minOf(size.toFloat() / capture.width, size.toFloat() / capture.height)
+      val contentWidth = maxOf(1, (capture.width * scale).toInt()).coerceAtMost(size)
+      val contentHeight = maxOf(1, (capture.height * scale).toInt()).coerceAtMost(size)
+      val offsetX = (size - contentWidth) / 2
+      val offsetY = (size - contentHeight) / 2
+
+      val square = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+      val canvas = Canvas(square)
+      canvas.drawColor(PAD_COLOR)
+      canvas.drawBitmap(
+        capture,
+        null,
+        Rect(offsetX, offsetY, offsetX + contentWidth, offsetY + contentHeight),
+        Paint(Paint.FILTER_BITMAP_FLAG)
+      )
+
+      val pixels = IntArray(size * size)
+      square.getPixels(pixels, 0, size, 0, 0, size, size)
+      square.recycle()
+
+      //model reads channels in nchw order
+      val plane = size * size
+      val planes = ByteArray(3 * plane)
+      for (i in 0 until plane) {
+        val pixel = pixels[i]
+        planes[i] = ((pixel shr 16) and 0xFF).toByte()
+        planes[plane + i] = ((pixel shr 8) and 0xFF).toByte()
+        planes[2 * plane + i] = (pixel and 0xFF).toByte()
+      }
+
+      promise.resolve(Arguments.createMap().apply {
+        putString("data", Base64.encodeToString(planes, Base64.NO_WRAP))
+        putInt("offsetX", offsetX)
+        putInt("offsetY", offsetY)
+        putInt("contentWidth", contentWidth)
+        putInt("contentHeight", contentHeight)
+      })
+    }
+  }
+
+  //foreground package and assist screen text
+  @ReactMethod
+  fun getAppContext(promise: Promise) {
+    promise.resolve(Arguments.createMap().apply {
+      putStringOrNull("appPackage", ScreenshotHolder.getAppPackage())
+      //cap screen text for prompt budget
+      putStringOrNull("screenText", ScreenshotHolder.getScreenText()?.take(MAX_SCREEN_TEXT))
+    })
+  }
+
+  //circular icon png and display label
+  @ReactMethod
+  fun getAppIcon(pkg: String, promise: Promise) {
+    scope.launch {
+      try {
+        val packages = reactApplicationContext.packageManager
+        val label = runCatching {
+          packages.getApplicationLabel(packages.getApplicationInfo(pkg, 0)).toString()
+        }.getOrDefault(pkg)
+
+        val icon = circleCrop(rasterize(packages.getApplicationIcon(pkg)))
+        val png = ByteArrayOutputStream()
+        icon.compress(Bitmap.CompressFormat.PNG, 100, png)
+        icon.recycle()
+
+        promise.resolve(Arguments.createMap().apply {
+          putString("icon", "data:image/png;base64," + encode(png))
+          putString("label", label)
+        })
+      } catch (e: Exception) {
+        promise.reject("NO_ICON", e.message ?: "no icon")
+      }
+    }
+  }
+
+  //drawable never owns the fresh bitmap
+  private fun rasterize(drawable: Drawable): Bitmap {
+    val bitmap = Bitmap.createBitmap(ICON_SIZE, ICON_SIZE, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val source = (drawable as? BitmapDrawable)?.bitmap
+    if (source != null) {
+      canvas.drawBitmap(source, null, Rect(0, 0, ICON_SIZE, ICON_SIZE), Paint(Paint.FILTER_BITMAP_FLAG))
+    } else {
+      drawable.setBounds(0, 0, ICON_SIZE, ICON_SIZE)
+      drawable.draw(canvas)
+    }
+    return bitmap
+  }
+
+  //circle mask keeps icons consistent
+  private fun circleCrop(source: Bitmap): Bitmap {
+    val size = minOf(source.width, source.height)
+    val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+      shader = BitmapShader(source, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+    }
+    Canvas(out).drawCircle(size / 2f, size / 2f, size / 2f, paint)
+    source.recycle()
+    return out
+  }
+
+  //close overlay keep the app alive
   @ReactMethod
   fun closeOverlay() {
     OverlayActivity.finishOverlay()
   }
 
-  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+  private fun encode(stream: ByteArrayOutputStream): String =
+    Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
 
-  override fun getName(): String = TAG
-
-  @ReactMethod
-  fun hasScreenshot(promise: Promise) {
-    promise.resolve(ScreenshotHolder.get() != null)
-  }
-
-  //resolve the launcher icon for a package name as a base64 png data uri
-  @ReactMethod
-  fun getAppIcon(pkg: String, promise: Promise) {
-    try {
-      val pm: PackageManager = reactApplicationContext.packageManager
-      val drawable: Drawable = pm.getApplicationIcon(pkg)
-      val label = try { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() } catch (e: Exception) { pkg }
-      val raw = drawableToBitmap(drawable, 128)
-      //circle-crop for a consistent launcher-style look across devices
-      val bmp = circleCrop(raw)
-      val out = ByteArrayOutputStream()
-      bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
-      val data = Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
-      promise.resolve(Arguments.createMap().apply {
-        putString("icon", "data:image/png;base64,$data")
-        putString("label", label)
-      })
-    } catch (e: Exception) {
-      promise.reject("NO_ICON", e.message ?: "no icon")
-    }
-  }
-
-  private fun drawableToBitmap(drawable: Drawable, size: Int): Bitmap {
-    if (drawable is BitmapDrawable && drawable.bitmap != null) {
-      return Bitmap.createScaledBitmap(drawable.bitmap, size, size, true)
-    }
-    val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bmp)
-    drawable.setBounds(0, 0, size, size)
-    drawable.draw(canvas)
-    return bmp
-  }
-
-  //mask a square bitmap into a circle so app icons look consistent regardless of the launcher's shape
-  private fun circleCrop(src: Bitmap): Bitmap {
-    val size = minOf(src.width, src.height)
-    val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(out)
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    paint.shader = BitmapShader(src, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
-    val r = size / 2f
-    canvas.drawCircle(r, r, r, paint)
-    return out
-  }
-
-  //foreground app package + flattened screen text captured by onHandleAssist
-  @ReactMethod
-  fun getAppContext(promise: Promise) {
-    val pkg = ScreenshotHolder.getAppPackage()
-    val rawText = ScreenshotHolder.getScreenText()
-    //cap to keep prompt budget reasonable
-    val text = if (rawText != null && rawText.length > 4000) rawText.substring(0, 4000) else rawText
-    promise.resolve(Arguments.createMap().apply {
-      if (pkg != null) putString("appPackage", pkg) else putNull("appPackage")
-      if (text != null) putString("screenText", text) else putNull("screenText")
-    })
-  }
-
-  @ReactMethod
-  fun getScreenshotInfo(promise: Promise) {
-    val bmp = ScreenshotHolder.get()
-    if (bmp == null) {
-      promise.reject("NO_SCREENSHOT", "no screenshot available")
-      return
-    }
-    promise.resolve(Arguments.createMap().apply {
-      putInt("width", bmp.width)
-      putInt("height", bmp.height)
-    })
-  }
-
-  //crop normalized region (0..1) to a jpeg base64 data uri for chat attachment
-  @ReactMethod
-  fun cropRegion(x: Double, y: Double, w: Double, h: Double, promise: Promise) {
-    val bmp = ScreenshotHolder.get()
-    if (bmp == null || bmp.isRecycled) {
-      promise.reject("NO_SCREENSHOT", "no screenshot available")
-      return
-    }
-    scope.launch {
-      try {
-        if (bmp.isRecycled) throw IllegalStateException("screenshot recycled")
-        val sx = (x * bmp.width).toInt().coerceIn(0, bmp.width)
-        val sy = (y * bmp.height).toInt().coerceIn(0, bmp.height)
-        val sw = (w * bmp.width).toInt().coerceIn(0, bmp.width - sx)
-        val sh = (h * bmp.height).toInt().coerceIn(0, bmp.height - sy)
-        if (sw <= 0 || sh <= 0) throw IllegalStateException("empty region")
-        var crop = Bitmap.createBitmap(bmp, sx, sy, sw, sh)
-        //downscale before encoding, a full-screen crop at full res is slow to compress and bridge over
-        val maxDim = maxOf(crop.width, crop.height)
-        if (maxDim > MAX_THUMB_DIM) {
-          val scale = MAX_THUMB_DIM.toFloat() / maxDim
-          val scaled = Bitmap.createScaledBitmap(crop, (crop.width * scale).toInt(), (crop.height * scale).toInt(), true)
-          crop.recycle()
-          crop = scaled
-        }
-        val out = ByteArrayOutputStream()
-        crop.compress(Bitmap.CompressFormat.JPEG, 85, out)
-        crop.recycle()
-        val data = Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
-        promise.resolve("data:image/jpeg;base64,$data")
-      } catch (e: Exception) {
-        promise.reject("ERROR", e.message ?: "error")
-      }
-    }
-  }
-
-  //letterboxed rgb chw float32 written to a cache file, returns the absolute path
-  //avoids sending ~6.5MB base64 across the bridge and doing a slow atob loop in js
-  @ReactMethod
-  fun getYoloInputTensor(promise: Promise) {
-    val bmp = ScreenshotHolder.get()
-    if (bmp == null || bmp.isRecycled) {
-      promise.reject("NO_SCREENSHOT", "no screenshot available")
-      return
-    }
-    scope.launch {
-      try {
-        if (bmp.isRecycled) throw IllegalStateException("screenshot recycled")
-        val tensor = preprocess(bmp)
-        val bytes = ByteBuffer.allocate(tensor.size * 4).order(ByteOrder.LITTLE_ENDIAN)
-        bytes.asFloatBuffer().put(tensor)
-        val file = File(reactApplicationContext.cacheDir, "yolo_tensor.bin")
-        FileOutputStream(file).use { it.write(bytes.array()) }
-        promise.resolve(file.absolutePath)
-      } catch (e: Exception) {
-        promise.reject("ERROR", e.message ?: "error")
-      }
-    }
-  }
-
-  private fun preprocess(bmp: Bitmap): FloatArray {
-    val w = bmp.width
-    val h = bmp.height
-    val scale = minOf(YOLO_SIZE.toFloat() / w, YOLO_SIZE.toFloat() / h)
-    val nw = (w * scale).toInt()
-    val nh = (h * scale).toInt()
-    val padX = (YOLO_SIZE - nw) / 2
-    val padY = (YOLO_SIZE - nh) / 2
-
-    val scaled = Bitmap.createScaledBitmap(bmp, nw, nh, true)
-    val src = IntArray(nw * nh)
-    scaled.getPixels(src, 0, nw, 0, 0, nw, nh)
-    scaled.recycle()
-
-    val ch = YOLO_SIZE * YOLO_SIZE
-    val out = FloatArray(3 * ch)
-    //fill letterbox border with 114/255 like ultralytics
-    java.util.Arrays.fill(out, 114f / 255f)
-    for (y in 0 until nh) {
-      for (x in 0 until nw) {
-        val p = src[y * nw + x]
-        val r = ((p shr 16) and 0xFF) / 255f
-        val g = ((p shr 8) and 0xFF) / 255f
-        val b = (p and 0xFF) / 255f
-        val ix = (y + padY) * YOLO_SIZE + (x + padX)
-        out[ix] = r
-        out[ch + ix] = g
-        out[2 * ch + ix] = b
-      }
-    }
-    return out
+  private fun WritableMap.putStringOrNull(key: String, value: String?) {
+    if (value != null) putString(key, value) else putNull(key)
   }
 }

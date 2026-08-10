@@ -68,14 +68,14 @@ export default function Selector({
   }, [visible, windowWidth, windowHeight]);
 
   const handleClose = (callback?: () => void) => {
-    progress.value = withTiming(0, { duration: 200 }, (finished) => {
+    progress.set(withTiming(0, { duration: 200 }, (finished) => {
       if (finished) {
         runOnJS(setVisible)(false);
         if (callback) {
           runOnJS(callback)();
         }
       }
-    });
+    }));
   };
 
   const selectedOption = options.find((o) => o.id === selectedValue);

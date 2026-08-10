@@ -73,8 +73,10 @@ export const Colors = {
   selectionFill: "rgba(255,255,255,0.08)",
   selectionOutline: "#FFFFFF",
   selectionHandle: "#FFFFFF",
+  overlayHalo: "rgba(255,26,26,0.45)",
+  overlayHaloClear: "rgba(255,26,26,0)",
 
-  //response overlay (dark gradient)
+  //response overlay dark gradient
   responseSurface: "#101014",
   responseGradientTop: "rgba(24,24,30,0.92)",
   responseGradientBottom: "rgba(2,2,4,0.98)",

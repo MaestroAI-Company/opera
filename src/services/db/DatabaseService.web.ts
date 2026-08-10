@@ -1,4 +1,5 @@
 import { DeviceEventEmitter } from 'react-native';
+import { AppEvents } from '../events';
 
 export type Conversation = {
   id: string;
@@ -24,7 +25,7 @@ export type Message = {
   createdAt: number;
   images?: string[];
   metrics?: MessageMetrics;
-  //snapshot of the foreground app context captured at send time
+  //app context at send time
   screenContext?: { appPackage: string | null; hasScreenText: boolean; icon?: string | null; label?: string | null };
 };
 
@@ -37,6 +38,23 @@ export type SyncTombstone = {
 class DatabaseService {
   private conversations: Conversation[] = [];
   private messages: Message[] = [];
+  //batch writes count above zero
+  private silentDepth = 0;
+
+  //one notification per write batch
+  async runSilently<T>(work: () => Promise<T>): Promise<T> {
+    this.silentDepth++;
+    try {
+      return await work();
+    } finally {
+      this.silentDepth--;
+    }
+  }
+
+  private notifyDataChanged(): void {
+    if (this.silentDepth > 0) return;
+    DeviceEventEmitter.emit(AppEvents.conversationsChanged);
+  }
 
   // init database
   async init(): Promise<void> {
@@ -66,7 +84,7 @@ class DatabaseService {
     try {
       const stored = localStorage.getItem('opera_tombstones');
       return stored ? JSON.parse(stored) : [];
-    } catch (e) {
+    } catch {
       return [];
     }
   }
@@ -108,7 +126,7 @@ class DatabaseService {
     
     this.conversations.push(conv);
     this.saveConversations();
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
     return conv;
   }
 
@@ -118,7 +136,7 @@ class DatabaseService {
       c.id === id ? { ...c, name, updatedAt: Date.now() } : c
     );
     this.saveConversations();
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
   }
 
   // toggle pin status
@@ -127,7 +145,7 @@ class DatabaseService {
       c.id === id ? { ...c, pinned: pinned ? 1 : 0, updatedAt: Date.now() } : c
     );
     this.saveConversations();
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
   }
 
   // get conversations ordered by updated time
@@ -167,7 +185,7 @@ class DatabaseService {
     this.messages = this.messages.filter(m => m.conversationId !== id);
     this.saveConversations();
     this.saveMessages();
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
   }
 
   // delete single message
@@ -177,7 +195,7 @@ class DatabaseService {
     }
     this.messages = this.messages.filter(m => m.id !== id);
     this.saveMessages();
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
   }
 
   // add message to conversation
@@ -193,11 +211,11 @@ class DatabaseService {
 
     this.saveConversations();
     this.saveMessages();
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
     return msg;
   }
 
-  //patch the persisted screen context (used when it is resolved asynchronously)
+  //patch async screen context
   async updateMessageScreenContext(id: string, screenContext: Message['screenContext']): Promise<void> {
     this.messages = this.messages.map(m => m.id === id ? { ...m, screenContext } : m);
     this.saveMessages();
@@ -209,7 +227,7 @@ class DatabaseService {
       m.id === id ? { ...m, content } : m
     );
     this.saveMessages();
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
   }
 
   //store generation metrics for a message
@@ -239,7 +257,7 @@ class DatabaseService {
     this.messages = [];
     this.saveConversations();
     this.saveMessages();
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
   }
 
   // import backup data
@@ -249,7 +267,7 @@ class DatabaseService {
     this.saveConversations();
     this.saveMessages();
     await this.setTombstones(tombstones ?? []);
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
   }
 
   //replace a conversation and its messages (used by sync merge)
@@ -260,7 +278,7 @@ class DatabaseService {
     this.messages.push(...messages);
     this.saveConversations();
     this.saveMessages();
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    this.notifyDataChanged();
   }
 }
 

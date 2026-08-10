@@ -37,7 +37,7 @@ class LocationServiceImpl {
     }
   }
 
-  //fetch position (and reverse geocode when possible) and cache it
+  //fetch position and cache it
   async refresh(): Promise<LocationSnapshot | null> {
     try {
       if (!(await this.hasPermission())) return null;
@@ -50,7 +50,7 @@ class LocationServiceImpl {
         accuracy: pos.coords.accuracy ?? null,
         timestamp: Date.now(),
       };
-      //reverse geocode only where supported (native)
+      //reverse geocode only on native
       if (Platform.OS !== 'web') {
         try {
           const places = await Location.reverseGeocodeAsync({
@@ -63,7 +63,7 @@ class LocationServiceImpl {
             snap.region = p.region || null;
             snap.country = p.country || null;
           }
-        } catch (e) {
+        } catch {
           //reverse geocode is best-effort
         }
       }
@@ -75,7 +75,7 @@ class LocationServiceImpl {
     }
   }
 
-  //cached snapshot; refreshes in background when stale
+  //cached snapshot refreshes when stale
   getCached(): LocationSnapshot | null {
     if (this.cache && Date.now() - this.cache.timestamp > CACHE_TTL_MS) {
       this.refresh().catch(() => {});
@@ -83,7 +83,7 @@ class LocationServiceImpl {
     return this.cache;
   }
 
-  //string ready to inject into a system prompt, or empty when unavailable
+  //prompt-ready string or empty
   getContextString(): string {
     const s = this.cache;
     if (!s) return '';

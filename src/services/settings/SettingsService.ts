@@ -1,5 +1,7 @@
 import * as SQLite from 'expo-sqlite';
-import { Platform, DeviceEventEmitter } from 'react-native';
+import { DeviceEventEmitter } from 'react-native';
+import { AppEvents } from '../events';
+import { openSharedDatabase } from '../db/sqlite';
 
 export type AppSettings = {
   language: string;
@@ -51,6 +53,23 @@ const DEFAULTS: AppSettings = {
 
 const SETTINGS_UPDATED_AT_KEY = '__settings_updated_at';
 
+//text storage needs per-key readers
+const BOOLEAN_KEYS = [
+  'speaker',
+  'autoSpeak',
+  'alwaysWhisper',
+  'autoStartMic',
+  'hasSeenOnboarding',
+  'includeDateTime',
+  'showTechnicalDetails',
+  'dataWarningDismissed',
+  'useAppContext',
+] as const;
+
+function isBooleanKey(key: string): boolean {
+  return (BOOLEAN_KEYS as readonly string[]).includes(key);
+}
+
 class SettingsService {
   private db: SQLite.SQLiteDatabase | null = null;
   private cache: AppSettings | null = null;
@@ -59,7 +78,7 @@ class SettingsService {
   async init(): Promise<void> {
     if (this.db) return; // already initialized
     try {
-      this.db = await SQLite.openDatabaseAsync('opera.db');
+      this.db = await openSharedDatabase();
       await this.db.runAsync(
         `CREATE TABLE IF NOT EXISTS settings (
           key TEXT PRIMARY KEY,
@@ -82,30 +101,20 @@ class SettingsService {
     const rows = await db.getAllAsync<{ key: string; value: string }>(
       'SELECT key, value FROM settings'
     );
-    const map: Record<string, string> = {};
+
+    const storedValues: Record<string, string> = {};
     for (const row of rows) {
-      map[row.key] = row.value;
+      storedValues[row.key] = row.value;
     }
-    const settings: AppSettings = {
-      language: map['language'] ?? DEFAULTS.language,
-      theme: map['theme'] ?? DEFAULTS.theme,
-      aiService: map['aiService'] ?? DEFAULTS.aiService,
-      ollamaUrl: map['ollamaUrl'] ?? DEFAULTS.ollamaUrl,
-      ollamaModel: map['ollamaModel'] ?? DEFAULTS.ollamaModel,
-      whisperModel: map['whisperModel'] ?? DEFAULTS.whisperModel,
-      whisperLanguage: map['whisperLanguage'] ?? DEFAULTS.whisperLanguage,
-      instruction: map['instruction'] ?? DEFAULTS.instruction,
-      speaker: map['speaker'] === 'true' ? true : (map['speaker'] === 'false' ? false : DEFAULTS.speaker),
-      autoSpeak: map['autoSpeak'] === 'true' ? true : (map['autoSpeak'] === 'false' ? false : DEFAULTS.autoSpeak),
-      alwaysWhisper: map['alwaysWhisper'] === 'true' ? true : (map['alwaysWhisper'] === 'false' ? false : DEFAULTS.alwaysWhisper),
-      autoStartMic: map['autoStartMic'] === 'true' ? true : (map['autoStartMic'] === 'false' ? false : DEFAULTS.autoStartMic),
-      hasSeenOnboarding: map['hasSeenOnboarding'] === 'true' ? true : DEFAULTS.hasSeenOnboarding,
-      name: map['name'] ?? DEFAULTS.name,
-      includeDateTime: map['includeDateTime'] === 'true' ? true : (map['includeDateTime'] === 'false' ? false : DEFAULTS.includeDateTime),
-      showTechnicalDetails: map['showTechnicalDetails'] === 'true' ? true : (map['showTechnicalDetails'] === 'false' ? false : DEFAULTS.showTechnicalDetails),
-      dataWarningDismissed: map['dataWarningDismissed'] === 'true' ? true : DEFAULTS.dataWarningDismissed,
-      useAppContext: map['useAppContext'] === 'false' ? false : DEFAULTS.useAppContext,
-    };
+
+    //one reader rule for all keys
+    const settings = { ...DEFAULTS };
+    for (const key of Object.keys(DEFAULTS) as (keyof AppSettings)[]) {
+      const stored = storedValues[key];
+      if (stored === undefined) continue;
+      (settings as any)[key] = isBooleanKey(key) ? stored === 'true' : stored;
+    }
+
     this.cache = settings;
     return settings;
   }
@@ -128,34 +137,31 @@ class SettingsService {
     if (this.cache) {
       (this.cache as any)[key] = value;
     }
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    DeviceEventEmitter.emit(AppEvents.settingsChanged);
   }
 
   //save multiple settings at once
   async setMany(partial: Partial<AppSettings>): Promise<void> {
-    const db = this.getDb();
-    for (const [key, value] of Object.entries(partial)) {
-      await db.runAsync(
-        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
-        [key, String(value)]
-      );
-    }
+    await this.writeMany(partial);
     await this.bumpSettingsUpdatedAt();
-    if (this.cache) {
-      Object.assign(this.cache, partial);
-    }
-    DeviceEventEmitter.emit('DATA_CHANGED');
+    DeviceEventEmitter.emit(AppEvents.settingsChanged);
   }
 
-  //apply cloud settings without emitting DATA_CHANGED or bumping local timestamp
+  //cloud apply skips local bump
   async applyCloudSettings(partial: Partial<AppSettings>): Promise<void> {
+    await this.writeMany(partial);
+  }
+
+  private async writeMany(partial: Partial<AppSettings>): Promise<void> {
     const db = this.getDb();
-    for (const [key, value] of Object.entries(partial)) {
-      await db.runAsync(
-        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
-        [key, String(value)]
-      );
-    }
+    await db.withTransactionAsync(async () => {
+      for (const [key, value] of Object.entries(partial)) {
+        await db.runAsync(
+          'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+          [key, String(value)]
+        );
+      }
+    });
     if (this.cache) {
       Object.assign(this.cache, partial);
     }

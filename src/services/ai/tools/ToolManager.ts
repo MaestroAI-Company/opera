@@ -1,4 +1,4 @@
-import { ITool, ToolCall, ToolDefinition } from './ITool';
+import { ITool, ToolDefinition } from './ITool';
 import { SearchTool } from './SearchTool';
 import { FetchPagesTool } from './FetchPagesTool';
 import { MathTool } from './MathTool';

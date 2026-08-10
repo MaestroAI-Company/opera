@@ -107,7 +107,7 @@ export default function SearchWebView() {
   const [fetchUrls, setFetchUrls] = useState<string[]>([]);
   
   const ddgRef = useRef<WebView>(null);
-  const pageRefs = useRef<Array<WebView | null>>([]);
+  const pageRefs = useRef<(WebView | null)[]>([]);
   
   const fetchResultsRef = useRef<FetchResult[]>([]);
   const completedCountRef = useRef(0);
@@ -148,7 +148,7 @@ export default function SearchWebView() {
         SearchBridge.resolveSearch(results);
         setQueryUrl('about:blank');
       }
-    } catch(e) {
+    } catch {
       SearchBridge.rejectSearch(new Error('Failed to parse search results'));
       setQueryUrl('about:blank');
     }
@@ -213,7 +213,7 @@ export default function SearchWebView() {
               if (data.type === 'page_content') {
                 handlePageContent(idx, data.content);
               }
-            } catch(e) {}
+            } catch {}
           }}
           onError={() => handlePageContent(idx, 'Failed to load page.')}
           onHttpError={() => handlePageContent(idx, 'Failed to load page.')}

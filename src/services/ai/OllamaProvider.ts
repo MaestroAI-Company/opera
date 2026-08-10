@@ -23,7 +23,7 @@ export class OllamaProvider implements IAIProvider {
       //check root endpoint
       const response = await universalFetch(this.baseUrl, { headers: this.defaultHeaders });
       return response.ok;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -102,8 +102,6 @@ export class OllamaProvider implements IAIProvider {
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
 
-      const startTime = Date.now();
-
       const formatBytes = (bytes: number) => {
         if (bytes === 0 || !bytes) return '0 B';
         const k = 1024;
@@ -118,58 +116,69 @@ export class OllamaProvider implements IAIProvider {
       let lastTime = Date.now();
       let smoothedSpeed = 0;
 
+      const handleLine = (line: string) => {
+        if (line.trim() === '') return;
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.total && parsed.completed !== undefined) {
+            const now = Date.now();
+
+            if (lastCompleted === -1 || parsed.completed < lastCompleted) {
+              //first chunk or new layer
+              lastCompleted = parsed.completed;
+              lastTime = now;
+              smoothedSpeed = 0;
+            } else {
+              const elapsedSeconds = (now - lastTime) / 1000;
+              if (elapsedSeconds >= 0.5) {
+                const currentSpeed = (parsed.completed - lastCompleted) / elapsedSeconds;
+                smoothedSpeed = smoothedSpeed === 0 ? currentSpeed : smoothedSpeed * 0.7 + currentSpeed * 0.3;
+                lastCompleted = parsed.completed;
+                lastTime = now;
+              }
+            }
+
+            const etaSeconds = smoothedSpeed > 0 ? (parsed.total - parsed.completed) / smoothedSpeed : 0;
+
+            const sizeStr = `${formatBytes(parsed.completed)} / ${formatBytes(parsed.total)}`;
+            const speedStr = smoothedSpeed > 0 ? `${formatBytes(smoothedSpeed)}/s` : 'Calcul...';
+            const progress = parsed.total > 0 ? parsed.completed / parsed.total : 0;
+
+            if (onProgress) {
+              onProgress(progress, etaSeconds, speedStr, sizeStr);
+            }
+
+            NotificationService.displayDownloadProgress(
+              downloadId,
+              `Ollama ${modelName}`,
+              progress,
+              etaSeconds,
+              speedStr,
+              sizeStr
+            );
+          }
+        } catch {
+          //ignore incomplete json
+        }
+      };
+
+      //json split across network chunks
+      let pendingLine = '';
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunkText = decoder.decode(value, { stream: true });
-        const lines = chunkText.split('\n').filter((line) => line.trim() !== '');
+        const lines = (pendingLine + decoder.decode(value, { stream: true })).split('\n');
+        //line complete only at newline
+        pendingLine = lines.pop() ?? '';
 
         for (const line of lines) {
-          try {
-            const parsed = JSON.parse(line);
-            if (parsed.total && parsed.completed !== undefined) {
-              const now = Date.now();
-
-              if (lastCompleted === -1 || parsed.completed < lastCompleted) {
-                //first chunk or new layer
-                lastCompleted = parsed.completed;
-                lastTime = now;
-                smoothedSpeed = 0;
-              } else {
-                const elapsedSeconds = (now - lastTime) / 1000;
-                if (elapsedSeconds >= 0.5) { 
-                  const currentSpeed = (parsed.completed - lastCompleted) / elapsedSeconds;
-                  smoothedSpeed = smoothedSpeed === 0 ? currentSpeed : smoothedSpeed * 0.7 + currentSpeed * 0.3;
-                  lastCompleted = parsed.completed;
-                  lastTime = now;
-                }
-              }
-
-              const etaSeconds = smoothedSpeed > 0 ? (parsed.total - parsed.completed) / smoothedSpeed : 0;
-              
-              const sizeStr = `${formatBytes(parsed.completed)} / ${formatBytes(parsed.total)}`;
-              const speedStr = smoothedSpeed > 0 ? `${formatBytes(smoothedSpeed)}/s` : 'Calcul...';
-              const progress = parsed.total > 0 ? parsed.completed / parsed.total : 0;
-              
-              if (onProgress) {
-                onProgress(progress, etaSeconds, speedStr, sizeStr);
-              }
-              
-              NotificationService.displayDownloadProgress(
-                downloadId,
-                `Ollama ${modelName}`,
-                progress,
-                etaSeconds,
-                speedStr,
-                sizeStr
-              );
-            }
-          } catch (e) {
-            //ignore incomplete json
-          }
+          handleLine(line);
         }
       }
+      //stream may end newline-less
+      handleLine(pendingLine);
       await NotificationService.displayDownloadFinished(downloadId, `Ollama ${modelName}`);
     } catch (error) {
       console.error('Error pulling Ollama model:', error);
@@ -188,7 +197,7 @@ export class OllamaProvider implements IAIProvider {
     onMetrics?: (metrics: MessageMetrics) => void
   ): Promise<{ toolCalls?: ToolCall[], content?: string }> {
     if (!this.isConfigured()) throw new Error('AI server not configured');
-    try {
+    {
       const payload: any = {
         model: modelName,
         messages: [
@@ -208,11 +217,13 @@ export class OllamaProvider implements IAIProvider {
         payload.tools = options.tools;
       }
       
-      const logPayload = {
-        ...payload,
-        messages: '[HIDDEN]'
-      };
-      console.log(`[OllamaProvider] sending request:`, JSON.stringify(logPayload, null, 2));
+      //payload serialization was overhead
+      if (__DEV__) {
+        console.log(`[OllamaProvider] sending request to ${modelName}`, {
+          tools: payload.tools?.length ?? 0,
+          think: payload.think,
+        });
+      }
 
       const response = await universalFetch(`${this.baseUrl}/api/chat`, {
         method: 'POST',
@@ -230,9 +241,6 @@ export class OllamaProvider implements IAIProvider {
         throw new Error('No response body for streaming');
       }
 
-      //log response start
-      console.log(`[OllamaProvider] started receiving response from ${modelName}`);
-
       //read stream chunks
       
       const reader = response.body.getReader();
@@ -240,77 +248,84 @@ export class OllamaProvider implements IAIProvider {
       
       let isThinkingMode = false;
       const collectedToolCalls: ToolCall[] = [];
-      
+
       let accumulatedContent = '';
-      
+
+      const handleLine = (line: string) => {
+        if (line.trim() === '') return;
+        try {
+          const parsed = JSON.parse(line);
+
+          if (parsed.message) {
+            //handle thinking stream
+            if (typeof parsed.message.thinking === 'string' && parsed.message.thinking.length > 0) {
+              if (!isThinkingMode) {
+                onChunk("<think>\n");
+                isThinkingMode = true;
+              }
+              onChunk(parsed.message.thinking);
+            }
+
+            //handle content stream
+            if (typeof parsed.message.content === 'string' && parsed.message.content.length > 0) {
+              if (isThinkingMode) {
+                onChunk("\n</think>\n");
+                isThinkingMode = false;
+              }
+              accumulatedContent += parsed.message.content;
+              onChunk(parsed.message.content);
+            }
+
+            //collect tool calls
+            if (parsed.message.tool_calls && Array.isArray(parsed.message.tool_calls)) {
+              collectedToolCalls.push(...parsed.message.tool_calls);
+            }
+          }
+
+          //read stats from final chunk
+          if (parsed.done && onMetrics) {
+            const evalNs = parsed.eval_duration || 0;
+            const timeSec = evalNs > 0 ? evalNs / 1e9 : (parsed.total_duration || 0) / 1e9;
+            const tokens = parsed.eval_count;
+            onMetrics({
+              model: modelName,
+              timeSec,
+              tokens: tokens || undefined,
+              tokensPerSec: timeSec > 0 && tokens ? tokens / timeSec : undefined
+            });
+          }
+        } catch {
+          console.warn('Failed to parse Ollama chunk:', line);
+        }
+      };
+
+      //json split across network chunks
+      let pendingLine = '';
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        
-        const chunkText = decoder.decode(value, { stream: true });
-        //split chunks by newline
-        const lines = chunkText.split('\n').filter((line) => line.trim() !== '');
-        
-        for (const line of lines) {
-          try {
-            const parsed = JSON.parse(line);
-            
-            if (parsed.message) {
-              // handle thinking stream
-              if (typeof parsed.message.thinking === 'string' && parsed.message.thinking.length > 0) {
-                if (!isThinkingMode) {
-                  onChunk("<think>\n");
-                  isThinkingMode = true;
-                }
-                onChunk(parsed.message.thinking);
-              }
-              
-              // handle actual content stream
-              if (typeof parsed.message.content === 'string' && parsed.message.content.length > 0) {
-                if (isThinkingMode) {
-                  onChunk("\n</think>\n");
-                  isThinkingMode = false;
-                }
-                accumulatedContent += parsed.message.content;
-                onChunk(parsed.message.content);
-              }
 
-              //collect tool calls
-              if (parsed.message.tool_calls && Array.isArray(parsed.message.tool_calls)) {
-                collectedToolCalls.push(...parsed.message.tool_calls);
-              }
-            }
-            
-            //read stats from final chunk
-            if (parsed.done && onMetrics) {
-              const evalNs = parsed.eval_duration || 0;
-              const timeSec = evalNs > 0 ? evalNs / 1e9 : (parsed.total_duration || 0) / 1e9;
-              const tokens = parsed.eval_count;
-              onMetrics({
-                model: modelName,
-                timeSec,
-                tokens: tokens || undefined,
-                tokensPerSec: timeSec > 0 && tokens ? tokens / timeSec : undefined
-              });
-            }
-          } catch (e) {
-            //ignore incomplete json
-            console.warn('Failed to parse Ollama chunk:', line);
-          }
+        const lines = (pendingLine + decoder.decode(value, { stream: true })).split('\n');
+        //line complete only at newline
+        pendingLine = lines.pop() ?? '';
+
+        for (const line of lines) {
+          handleLine(line);
         }
       }
-      
+      //stream may end newline-less
+      handleLine(pendingLine);
+
       //close thinking mode if stream ended abruptly
       if (isThinkingMode) {
         onChunk("\n</think>\n");
       }
 
-      return { 
+      return {
         toolCalls: collectedToolCalls.length > 0 ? collectedToolCalls : undefined,
         content: accumulatedContent.trim()
       };
-    } catch (error: any) {
-      throw error;
     }
   }
 }

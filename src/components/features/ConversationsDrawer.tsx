@@ -323,14 +323,14 @@ export default function ConversationsDrawer({
             }}
             style={({ pressed, hovered }) => [styles.quickActionItem, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
           >
-            <Image source={newIcon} style={styles.quickActionIcon} />
+            <Image source={newIcon} style={styles.quickActionIcon} tintColor={Colors.textPrimary} />
             <Text style={styles.quickActionLabel}>New discussion</Text>
           </Pressable>
           <Pressable
             onPress={() => setIsSearching(true)}
             style={({ pressed, hovered }) => [styles.quickActionItem, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
           >
-            <Image source={searchIcon} style={styles.quickActionIcon} />
+            <Image source={searchIcon} style={styles.quickActionIcon} tintColor={Colors.textPrimary} />
             <Text style={styles.quickActionLabel}>Search</Text>
           </Pressable>
         </View>
@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: FontSizes.xxxl,
-    color: Colors.textSecondary,
+    color: Colors.textPrimary,
     marginBottom: 24,
     fontFamily: Fonts.display,
   },

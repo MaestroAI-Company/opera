@@ -1,13 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Image, Keyboard, LayoutRectangle, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, Vibration, View } from "react-native";
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import {
+  Animated,
+  Image,
+  Keyboard,
+  Modal,
+  PanResponder,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  Vibration,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Colors, Fonts, FontSizes, Radius, Spacing } from "../../../constants/theme";
 import { getAICoreModelLabel } from "../../services/ai/AICoreProvider";
 import { AIModule } from "../../services/ai/AIModule";
+import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { useResponsive } from "../../hooks/useResponsive";
 import NotificationModal from "../ui/NotificationModal";
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-const arrowDownIcon = require("../../../assets/icons/down_arrow.png");
+const botIcon = require("../../../assets/icons/bot.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 const thinkingIcon = require("../../../assets/icons/thinking.gif");
 
@@ -16,6 +30,10 @@ const REFLECTIONS = [
   { id: "low", label: "Low" },
   { id: "high", label: "High" },
 ];
+
+//clears the tallest sheet content so it starts fully off-screen
+const SHEET_OFFSET = 500;
+const MAX_MODELS_HEIGHT = 240;
 
 type ModelDropdownProps = {
   selectedModel: string;
@@ -34,41 +52,75 @@ export default function ModelDropdown({
   onReflectionChange,
   aiService,
 }: ModelDropdownProps) {
+  const insets = useSafeAreaInsets();
+  const { isLargeScreen } = useResponsive();
   const [visible, setVisible] = useState(false);
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const [renderModal, setRenderModal] = useState(false);
   const [models, setModels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
-  const triggerRef = useRef<View>(null);
-  const [triggerLayout, setTriggerLayout] = useState<LayoutRectangle | null>(null);
-  const progress = useSharedValue(0);
-
-  const iconStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ rotate: `${progress.value * 180}deg` }],
-    };
-  });
-
-  const overlayAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: progress.value,
-    };
-  });
-
-  const handleClose = (callback?: () => void) => {
-    progress.set(withTiming(0, { duration: 200 }, (finished) => {
-      if (finished) {
-        runOnJS(setVisible)(false);
-        if (callback) {
-          runOnJS(callback)();
-        }
-      }
-    }));
-  };
-
   const [isAvailable, setIsAvailable] = useState(true);
+  const pendingCallbackRef = useRef<(() => void) | null>(null);
+
+  const backdropOpacity = useAnimatedValue(0);
+  const sheetY = useAnimatedValue(SHEET_OFFSET);
+
+  //scrim fades in place, sheet slides, driven separately so the modal itself does no transform
+  useEffect(() => {
+    if (visible) {
+      setRenderModal(true);
+      backdropOpacity.setValue(0);
+      sheetY.setValue(SHEET_OFFSET);
+      //let the modal actually mount before animating, avoids a stutter on open
+      const raf = requestAnimationFrame(() => {
+        Animated.parallel([
+          Animated.timing(backdropOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+          Animated.spring(sheetY, { toValue: 0, useNativeDriver: true, overshootClamping: true, bounciness: 0, speed: 14 }),
+        ]).start();
+      });
+      return () => cancelAnimationFrame(raf);
+    } else {
+      Animated.parallel([
+        Animated.timing(backdropOpacity, { toValue: 0, duration: 160, useNativeDriver: true }),
+        Animated.timing(sheetY, { toValue: SHEET_OFFSET, duration: 180, useNativeDriver: true }),
+      ]).start(() => {
+        setRenderModal(false);
+        const callback = pendingCallbackRef.current;
+        pendingCallbackRef.current = null;
+        callback?.();
+      });
+    }
+  }, [visible, backdropOpacity, sheetY]);
+
+  //drag handle mirrors a native sheet's swipe-to-dismiss
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderMove: (_e, gestureState) => {
+        if (gestureState.dy > 0) {
+          sheetY.setValue(gestureState.dy);
+          backdropOpacity.setValue(Math.max(0, 1 - gestureState.dy / SHEET_OFFSET));
+        }
+      },
+      onPanResponderRelease: (_e, gestureState) => {
+        if (gestureState.dy > 100 || gestureState.vy > 0.5) {
+          closeSheet();
+        } else {
+          Animated.parallel([
+            Animated.spring(sheetY, { toValue: 0, useNativeDriver: true, overshootClamping: true, bounciness: 0, speed: 14 }),
+            Animated.timing(backdropOpacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+          ]).start();
+        }
+      },
+    })
+  ).current;
+
+  const closeSheet = (callback?: () => void) => {
+    pendingCallbackRef.current = callback ?? null;
+    setVisible(false);
+  };
 
   const fetchModels = useCallback(async () => {
     setLoading(true);
@@ -122,185 +174,127 @@ export default function ModelDropdown({
 
   const handleOpen = () => {
     Keyboard.dismiss();
-    triggerRef.current?.measureInWindow((x, y, width, height) => {
-      setTriggerLayout({ x, y, width, height } as LayoutRectangle);
-      setVisible(true);
-      progress.value = withTiming(1, { duration: 250 });
-      fetchModels();
-    });
+    setVisible(true);
+    fetchModels();
   };
-
-  //reposition menu on window resize while open
-  useEffect(() => {
-    if (!visible) return;
-    triggerRef.current?.measureInWindow((x, y, width, height) => {
-      setTriggerLayout({ x, y, width, height } as LayoutRectangle);
-    });
-  }, [visible, windowWidth, windowHeight]);
-
-  const MAX_MODELS_HEIGHT = 200;
-  const modelsHeight = models.length === 0 ? 80 : Math.min(models.length * 40, MAX_MODELS_HEIGHT);
-  let finalMenuHeight = 30 + modelsHeight + 16 + 30 + REFLECTIONS.length * 40 + 24;
-
-  const menuWidth = 220;
-  let menuLeft = 0;
-  let menuTop: number | undefined = 0;
-  let menuBottom: number | undefined = undefined;
-
-  if (triggerLayout) {
-    menuLeft = triggerLayout.x + (triggerLayout.width / 2) - (menuWidth / 2);
-    if (menuLeft + menuWidth > windowWidth - 16) {
-      menuLeft = windowWidth - menuWidth - 16;
-    }
-    if (menuLeft < 16) {
-      menuLeft = 16;
-    }
-
-    const spaceBelow = windowHeight - (triggerLayout.y + triggerLayout.height) - 16;
-    const spaceAbove = triggerLayout.y - 16;
-
-    if (finalMenuHeight <= spaceBelow) {
-      menuTop = triggerLayout.y + triggerLayout.height + 4;
-    } else if (spaceBelow >= 200 || spaceBelow >= spaceAbove) {
-      menuTop = triggerLayout.y + triggerLayout.height + 4;
-      finalMenuHeight = spaceBelow;
-    } else {
-      if (finalMenuHeight > spaceAbove) {
-        finalMenuHeight = spaceAbove;
-      }
-      menuTop = undefined;
-      menuBottom = windowHeight - triggerLayout.y + 4;
-    }
-  }
-
-  const menuAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      maxHeight: progress.value * finalMenuHeight,
-      opacity: progress.value,
-      overflow: "hidden",
-    };
-  });
 
   //friendly label for aicore variants
   const displayName = (model: string) =>
     model.startsWith("aicore-") ? getAICoreModelLabel(model) : model;
 
   return (
-    <View style={styles.container}>
-      <View ref={triggerRef} style={styles.shadowLayer}>
+    <View style={[styles.container, isLargeScreen && styles.containerLarge]}>
+      <View style={styles.shadowLayer}>
         <View style={styles.shadowBlock} />
         <Pressable
           onPress={handleOpen}
           style={({ pressed, hovered }) => [styles.trigger, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
         >
-          <Animated.Image source={arrowDownIcon} style={[styles.icon, iconStyle]} />
+          <Image source={botIcon} style={styles.icon} />
           <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
             {selectedModel ? displayName(selectedModel) : "Modèle"}
           </Text>
         </Pressable>
       </View>
 
-      <Modal
-        visible={visible}
-        transparent
-        animationType="none"
-        onRequestClose={() => handleClose()}
-      >
-        <AnimatedPressable style={[styles.overlay, overlayAnimatedStyle]} onPress={() => handleClose()}>
-          <AnimatedPressable
-            style={[
-              styles.menu,
-              triggerLayout
-                ? { top: menuTop, bottom: menuBottom, left: menuLeft }
-                : {},
-              menuAnimatedStyle,
-            ]}
-          >
-            <Text style={styles.sectionTitle}>Models</Text>
-            <ScrollView style={{ maxHeight: MAX_MODELS_HEIGHT }} showsVerticalScrollIndicator={false} nestedScrollEnabled={true}>
-              {loading ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}>
-                  <Image source={thinkingIcon} style={{ width: 16, height: 16, tintColor: Colors.textMuted, opacity: 0.7 }} />
-                  <Text style={[styles.modelStatus, { paddingHorizontal: 0, paddingVertical: 0 }]}>Loading...</Text>
+      <Modal visible={renderModal} transparent animationType="none" statusBarTranslucent onRequestClose={() => closeSheet()}>
+        <View style={styles.backdropRoot}>
+          <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: backdropOpacity }]} />
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => closeSheet()} />
+          <Pressable style={styles.sheetTouchArea} onPress={() => {}}>
+            <Animated.View style={{ transform: [{ translateY: sheetY }] }}>
+              <View style={[styles.inlineSheet, { paddingBottom: (Platform.OS === 'ios' ? 20 : 10) + insets.bottom }]}>
+                <View style={styles.sheetHandleContainer} {...panResponder.panHandlers}>
+                  <View style={styles.sheetHandle} />
                 </View>
-              ) : models.length === 0 ? (
-                <View>
-                  <Text style={{ color: Colors.error, textAlign: 'center', marginBottom: 12, paddingHorizontal: 12, fontSize: FontSizes.caption }}>
-                    {isAvailable ? "No models found" : "Unable to fetch models / Ollama URL undefined"}
-                  </Text>
-                  {isAvailable && (
-                    <Pressable
-                      onPress={() => {
-                        handleClose(() => setDownloadModalVisible(true));
-                      }}
-                      style={({ pressed, hovered }) => [styles.downloadOption, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
-                    >
-                      <Image source={downloadIcon} style={styles.downloadIcon} />
-                      <Text style={styles.downloadText}>
-                        {isDownloading ? "Downloading..." : "gemma4"}
-                      </Text>
-                    </Pressable>
-                  )}
-                </View>
-              ) : (
-                [...models].sort((a, b) => {
-                  if (a === selectedModel) return -1;
-                  if (b === selectedModel) return 1;
-                  return a.localeCompare(b);
-                }).map((model) => (
-                  <Pressable
-                    key={model}
-                    onPress={() => {
-                      Vibration.vibrate(10);
-                      handleClose(() => onModelChange(model));
-                    }}
-                    style={({ pressed, hovered }) => [
-                      styles.option,
-                      model === selectedModel ? styles.optionSelected : (pressed || hovered) && { backgroundColor: Colors.overlaySubtle },
-                      model === selectedModel && (pressed || hovered) && { backgroundColor: Colors.primaryActive }
-                    ]}
-                  >
-                    <Text
-                      style={[styles.optionText, model === selectedModel && styles.optionTextSelected]}
-                    >
-                      {displayName(model)}
-                    </Text>
-                  </Pressable>
-                ))
-              )}
-            </ScrollView>
 
-            {showReflection && (
-              <>
-                <View style={styles.separator} />
-                <Text style={styles.sectionTitle}>Reflection</Text>
-                {REFLECTIONS.map((item) => (
-                  <Pressable
-                    key={item.id}
-                    onPress={() => {
-                      Vibration.vibrate(10);
-                      handleClose(() => onReflectionChange(item.id));
-                    }}
-                    style={({ pressed, hovered }) => [
-                      styles.option,
-                      item.id === selectedReflection ? styles.optionSelected : (pressed || hovered) && { backgroundColor: Colors.overlaySubtle },
-                      item.id === selectedReflection && (pressed || hovered) && { backgroundColor: Colors.primaryActive }
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.optionText,
-                        item.id === selectedReflection && styles.optionTextSelected,
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </>
-            )}
-          </AnimatedPressable>
-        </AnimatedPressable>
+                <Text style={styles.sectionTitle}>Models</Text>
+                <ScrollView style={{ maxHeight: MAX_MODELS_HEIGHT }} showsVerticalScrollIndicator={false} nestedScrollEnabled={true}>
+                  {loading ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}>
+                      <Image source={thinkingIcon} style={{ width: 16, height: 16, tintColor: Colors.textMuted, opacity: 0.7 }} />
+                      <Text style={[styles.modelStatus, { paddingHorizontal: 0, paddingVertical: 0 }]}>Loading...</Text>
+                    </View>
+                  ) : models.length === 0 ? (
+                    <View>
+                      <Text style={{ color: Colors.error, textAlign: 'center', marginBottom: 12, paddingHorizontal: 12, fontSize: FontSizes.caption }}>
+                        {isAvailable ? "No models found" : "Unable to fetch models / Ollama URL undefined"}
+                      </Text>
+                      {isAvailable && (
+                        <Pressable
+                          onPress={() => {
+                            closeSheet(() => setDownloadModalVisible(true));
+                          }}
+                          style={({ pressed, hovered }) => [styles.downloadOption, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
+                        >
+                          <Image source={downloadIcon} style={styles.downloadIcon} />
+                          <Text style={styles.downloadText}>
+                            {isDownloading ? "Downloading..." : "gemma4"}
+                          </Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  ) : (
+                    [...models].sort((a, b) => {
+                      if (a === selectedModel) return -1;
+                      if (b === selectedModel) return 1;
+                      return a.localeCompare(b);
+                    }).map((model) => (
+                      <Pressable
+                        key={model}
+                        onPress={() => {
+                          Vibration.vibrate(10);
+                          closeSheet(() => onModelChange(model));
+                        }}
+                        style={({ pressed, hovered }) => [
+                          styles.option,
+                          model === selectedModel ? styles.optionSelected : (pressed || hovered) && { backgroundColor: Colors.overlaySubtle },
+                          model === selectedModel && (pressed || hovered) && { backgroundColor: Colors.primaryActive }
+                        ]}
+                      >
+                        <Text
+                          style={[styles.optionText, model === selectedModel && styles.optionTextSelected]}
+                        >
+                          {displayName(model)}
+                        </Text>
+                      </Pressable>
+                    ))
+                  )}
+                </ScrollView>
+
+                {showReflection && (
+                  <>
+                    <View style={styles.separator} />
+                    <Text style={styles.sectionTitle}>Reflection</Text>
+                    {REFLECTIONS.map((item) => (
+                      <Pressable
+                        key={item.id}
+                        onPress={() => {
+                          Vibration.vibrate(10);
+                          closeSheet(() => onReflectionChange(item.id));
+                        }}
+                        style={({ pressed, hovered }) => [
+                          styles.option,
+                          item.id === selectedReflection ? styles.optionSelected : (pressed || hovered) && { backgroundColor: Colors.overlaySubtle },
+                          item.id === selectedReflection && (pressed || hovered) && { backgroundColor: Colors.primaryActive }
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.optionText,
+                            item.id === selectedReflection && styles.optionTextSelected,
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </>
+                )}
+              </View>
+            </Animated.View>
+          </Pressable>
+        </View>
       </Modal>
 
       <NotificationModal
@@ -322,6 +316,9 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  containerLarge: {
+    marginHorizontal: Spacing.xxl,
   },
   shadowLayer: {
     position: "relative",
@@ -360,20 +357,35 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.mono,
     flexShrink: 1,
   },
-  overlay: {
+  backdropRoot: {
     flex: 1,
-    backgroundColor: Colors.overlay,
+    justifyContent: 'flex-end',
   },
-  menu: {
-    position: "absolute",
+  backdrop: {
+    backgroundColor: Colors.scrimModal,
+  },
+  sheetTouchArea: {
+    width: '100%',
+  },
+  inlineSheet: {
     backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.huge2,
+    borderTopRightRadius: Radius.huge2,
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    width: '100%',
+  },
+  sheetHandleContainer: {
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingVertical: 10,
+    marginTop: -10,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
     borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    padding: 12,
-    width: 220,
-    boxShadow: `0px 4px 12px ${Colors.overlay}`,
-    elevation: 8,
+    backgroundColor: Colors.textMuted,
   },
   sectionTitle: {
     fontSize: FontSizes.label,

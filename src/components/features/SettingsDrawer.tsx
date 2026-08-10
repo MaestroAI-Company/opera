@@ -37,7 +37,6 @@ const cloudIcon = require("../../../assets/icons/cloud.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
 const generalIcon = require("../../../assets/icons/general.png");
 const serverIcon = require("../../../assets/icons/server.png");
-const botIcon = require("../../../assets/icons/bot.png");
 const toolIcon = require("../../../assets/icons/tool.png");
 const confidentialityIcon = require("../../../assets/icons/confidentiality.png");
 const socialIcon = require("../../../assets/icons/social.png");
@@ -59,7 +58,7 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "assistantoverlay" | "models" | "service" | "confidentiality" | "tools" | "profile" | "cloud";
+type SubPage = "main" | "general" | "assistantoverlay" | "service" | "confidentiality" | "tools" | "profile" | "cloud";
 
 export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
   const { width } = useResponsive();
@@ -869,17 +868,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
           <Pressable
             style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-            onPress={() => setActiveSubPage("models")}
-          >
-            <Image source={botIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>Models</Text>
-              <Text style={styles.navSubtitle}>Whisper Model, TOD</Text>
-            </View>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
             onPress={() => setActiveSubPage("service")}
           >
             <Image source={linkIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
@@ -941,6 +929,16 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           onChangeText={setName}
         />
       </View>
+
+      <View style={styles.settingRowVertical}>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Write your instructions to AI</Text>
+        <TextInputField
+          icon={penPlaceholderIcon}
+          placeholder="write"
+          value={instruction}
+          onChangeText={setInstruction}
+        />
+      </View>
     </View>
   );
 
@@ -979,19 +977,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <Text style={styles.helpText}>Add an info button below answers to inspect AI technical data.</Text>
       </View>
 
-      {Platform.OS === 'android' && (
-        <View style={styles.settingRowVertical}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>Use app context</Text>
-            <Toggle
-              checked={useAppContext}
-              onToggle={setUseAppContext}
-            />
-          </View>
-          <Text style={styles.helpText}>Send the foreground app and on-screen text to the assistant when using the overlay</Text>
-        </View>
-      )}
-
       <View style={styles.settingRowVertical}>
         <View style={styles.toggleRow}>
           <Text style={styles.settingLabel}>Auto-read replies</Text>
@@ -1020,6 +1005,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </View>
         <Text style={styles.helpText}>Automatically activate the microphone as soon as the assistant opens.</Text>
       </View>
+
+      {Platform.OS === 'android' && (
+        <View style={styles.settingRowVertical}>
+          <View style={styles.toggleRow}>
+            <Text style={styles.settingLabel}>Use app context</Text>
+            <Toggle
+              checked={useAppContext}
+              onToggle={setUseAppContext}
+            />
+          </View>
+          <Text style={styles.helpText}>Send the foreground app and on-screen text to the assistant when using the overlay</Text>
+        </View>
+      )}
     </View>
   );
 
@@ -1061,58 +1059,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     </View>
   );
 
-  // models subpage content
-  const renderModelsSubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Models")}
-
-      <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Write your instructions to AI</Text>
-        <TextInputField
-          icon={penPlaceholderIcon}
-          placeholder="write"
-          value={instruction}
-          onChangeText={setInstruction}
-        />
-      </View>
-
-      {Platform.OS === "web" && (
-        <>
-          <View style={[styles.settingRowVertical, { zIndex: 9 }]}>
-            <Text style={styles.settingLabel}>Whisper Model</Text>
-            <Text style={[styles.helpText, { marginBottom: 10 }]}>The larger size, the longer the processing will take.</Text>
-            <Selector
-              options={whisperModelOptions}
-              selectedValue={whisperModel}
-              onSelect={handleSelectWhisperModel}
-              title="Select Whisper Model"
-              fullWidth
-            />
-            {isDownloadingWhisper && (
-              <View style={{ marginTop: 10 }}>
-                <DownloadProgress
-                  title={`Downloading Whisper ${whisperModel}...`}
-                  progress={whisperDownloadProgress?.progress || 0}
-                  sizeStr={whisperDownloadProgress?.sizeStr}
-                  etaSeconds={whisperDownloadProgress?.etaSeconds}
-                />
-              </View>
-            )}
-          </View>
-
-          <View style={[styles.toggleRow, { marginTop: 10 }]}>
-            <Text style={styles.settingLabel}>Transcribe-On-Device</Text>
-            <Toggle
-              checked={alwaysWhisper}
-              onToggle={setAlwaysWhisper}
-            />
-          </View>
-          <Text style={styles.helpText}>Process audio transcriptions locally on your device.</Text>
-        </>
-      )}
-    </View>
-  );
-
   // service subpage content
   const renderServiceSubPage = () => (
     <View style={styles.subPageContainer}>
@@ -1148,6 +1094,41 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           />
           {ollamaError ? <Text style={styles.errorText}>{ollamaError}</Text> : null}
         </View>
+      )}
+
+      {Platform.OS === "web" && (
+        <>
+          <View style={[styles.settingRowVertical, { zIndex: 9 }]}>
+            <Text style={styles.settingLabel}>Whisper Model</Text>
+            <Text style={[styles.helpText, { marginBottom: 10 }]}>The larger size, the longer the processing will take.</Text>
+            <Selector
+              options={whisperModelOptions}
+              selectedValue={whisperModel}
+              onSelect={handleSelectWhisperModel}
+              title="Select Whisper Model"
+              fullWidth
+            />
+            {isDownloadingWhisper && (
+              <View style={{ marginTop: 10 }}>
+                <DownloadProgress
+                  title={`Downloading Whisper ${whisperModel}...`}
+                  progress={whisperDownloadProgress?.progress || 0}
+                  sizeStr={whisperDownloadProgress?.sizeStr}
+                  etaSeconds={whisperDownloadProgress?.etaSeconds}
+                />
+              </View>
+            )}
+          </View>
+
+          <View style={[styles.toggleRow, { marginTop: 10 }]}>
+            <Text style={styles.settingLabel}>Transcribe-On-Device</Text>
+            <Toggle
+              checked={alwaysWhisper}
+              onToggle={setAlwaysWhisper}
+            />
+          </View>
+          <Text style={styles.helpText}>Process audio transcriptions locally on your device.</Text>
+        </>
       )}
     </View>
   );
@@ -1300,8 +1281,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return renderGeneralSubPage();
       case "assistantoverlay":
         return renderAssistantOverlaySubPage();
-      case "models":
-        return renderModelsSubPage();
       case "service":
         return renderServiceSubPage();
       case "confidentiality":

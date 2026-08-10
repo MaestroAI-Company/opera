@@ -60,7 +60,7 @@ export default function Index() {
   const [selectedReflection, setSelectedReflection] = useState("none");
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
-  const [settingsInitialSubPage, setSettingsInitialSubPage] = useState<"main" | "general" | "models" | "confidentiality" | "tools">("main");
+  const [settingsInitialSubPage, setSettingsInitialSubPage] = useState<"main" | "general" | "confidentiality" | "tools">("main");
   const [dbReady, setDbReady] = useState(false);
   const [dbFailed, setDbFailed] = useState(false);
   const [showDataWarning, setShowDataWarning] = useState(false);

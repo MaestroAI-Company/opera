@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
-import Animated, { Easing, SharedValue, useAnimatedProps, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
+import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useDerivedValue, useSharedValue, withTiming } from 'react-native-reanimated';
+import Svg, { Path } from 'react-native-svg';
 import { Colors, Radius } from '../../../constants/theme';
 import { FULL_SCREEN, isFullScreen, Selection, SelectionRegion } from '../../services/overlay/useScreenSelection';
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 const DOUBLE_TAP_MS = 220;
 const DRAG_TOL = 10;
-const HANDLE_HIT = 32;
-const HANDLE_SIZE = 22;
-const MIN_BOX = 40;
+const HANDLE_HIT = 56;
+//length of each angle arm
+const HANDLE_ARM = 26;
+const HANDLE_STROKE = 6;
+const MIN_BOX = 70;
 const DEFAULT_BOX = 120;
 const MIN_DRAW_DIST = 4;
 const PATH_INFLATE = 1.15;
@@ -24,7 +26,6 @@ const ENCLOSED_MIN = 0.6;
 //padding around detected elements
 const DETECTION_INFLATE = 1.2;
 const STROKE_WIDTH = 7;
-const GLOW_RADIUS = 55;
 const SETTLE_MS = 300;
 
 type Point = { x: number; y: number };
@@ -34,6 +35,15 @@ type Corner = 'tl' | 'tr' | 'bl' | 'br';
 
 const CORNERS: Corner[] = ['tl', 'tr', 'bl', 'br'];
 
+//L-shaped angle hugging the box corner, arms along its edges
+function anglePath(corner: Corner): string {
+  const c = HANDLE_HIT / 2;
+  const dx = corner[1] === 'l' ? 1 : -1;
+  const dy = corner[0] === 't' ? 1 : -1;
+  const r = Radius.xxl;
+  return `M ${c} ${c + dy * HANDLE_ARM} L ${c} ${c + dy * r} Q ${c} ${c} ${c + dx * r} ${c} L ${c + dx * HANDLE_ARM} ${c}`;
+}
+
 type Props = {
   selection: Selection;
   onChange: (selection: Selection) => void;
@@ -42,19 +52,6 @@ type Props = {
   //capture elements aim selection
   detections?: SelectionRegion[];
 };
-
-//quadratic midpoints smooth stroke
-function smoothPath(points: Point[]): string {
-  if (points.length < 2) return '';
-  let d = `M ${points[0].x} ${points[0].y}`;
-  for (let i = 1; i < points.length - 1; i++) {
-    const { x, y } = points[i];
-    const next = points[i + 1];
-    d += ` Q ${x} ${y} ${(x + next.x) / 2} ${(y + next.y) / 2}`;
-  }
-  const last = points[points.length - 1];
-  return `${d} L ${last.x} ${last.y}`;
-}
 
 function boundsOf(points: Point[]): Rect {
   let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
@@ -183,7 +180,6 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
   const [size, setSize] = useState<Size>({ w: 1, h: 1 });
   const [resizing, setResizing] = useState(false);
   const [drawing, setDrawing] = useState(false);
-  const [strokePoints, setStrokePoints] = useState<Point[] | null>(null);
 
   //detections mapped to pixels
   //air around elements reads better
@@ -203,26 +199,29 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
   const y1 = useSharedValue(0);
   const x2 = useSharedValue(0);
   const y2 = useSharedValue(0);
-  //glow follows the finger without re-rendering
-  const glowX = useSharedValue(0);
-  const glowY = useSharedValue(0);
+  //pops in when a selection appears, instead of sliding from the old one
+  const boxScale = useSharedValue(1);
+  //stroke path also writes straight to ui thread
+  const strokeD = useSharedValue('');
 
   const target = selection.kind === 'box' ? toPixels(selection.region, size) : null;
   const hadTarget = useRef(false);
+  //resize already settles the rect live, skip the pop on release
+  const skipPop = useRef(false);
   useEffect(() => {
     if (!target) {
       hadTarget.current = false;
       return;
     }
-    //jump first, ease later
-    const settle = { duration: SETTLE_MS, easing: Easing.out(Easing.cubic) };
-    const apply = (value: SharedValue<number>, to: number) => {
-      value.value = hadTarget.current && !resizing ? withTiming(to, settle) : to;
-    };
-    apply(x1, target.x1);
-    apply(y1, target.y1);
-    apply(x2, target.x2);
-    apply(y2, target.y2);
+    x1.value = target.x1;
+    y1.value = target.y1;
+    x2.value = target.x2;
+    y2.value = target.y2;
+    if (!resizing && !skipPop.current) {
+      boxScale.value = 0.6;
+      boxScale.value = withTiming(1, { duration: SETTLE_MS, easing: Easing.out(Easing.cubic) });
+    }
+    skipPop.current = false;
     hadTarget.current = true;
   }, [target?.x1, target?.y1, target?.x2, target?.y2, resizing]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -254,22 +253,15 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
   const strokeRef = useRef<Point[]>([]);
   const drawingRef = useRef(false);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const strokeFlushPending = useRef(false);
-
-  //repaint stroke once per frame
-  const flushStroke = () => {
-    if (strokeFlushPending.current) return;
-    strokeFlushPending.current = true;
-    requestAnimationFrame(() => {
-      strokeFlushPending.current = false;
-      setStrokePoints([...strokeRef.current]);
-    });
-  };
+  //committed Q segments, plus the point still waiting for its pair
+  const committedPath = useRef('');
+  const pendingPoint = useRef<Point | null>(null);
 
   const finishStroke = () => {
     const points = strokeRef.current;
     strokeRef.current = [];
-    setStrokePoints(null);
+    committedPath.current = '';
+    pendingPoint.current = null;
     if (!drawingRef.current) return;
     drawingRef.current = false;
     setDrawing(false);
@@ -291,9 +283,10 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
       onPanResponderGrant: evt => {
         const { locationX, locationY } = evt.nativeEvent;
         strokeRef.current = [{ x: locationX, y: locationY }];
+        committedPath.current = `M ${locationX} ${locationY}`;
+        pendingPoint.current = null;
+        strokeD.value = '';
         drawingRef.current = false;
-        glowX.value = locationX;
-        glowY.value = locationY;
         //second touch within window taps
         if (tapTimer.current) {
           clearTimeout(tapTimer.current);
@@ -318,27 +311,47 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
           latest.current.onDrawingChange?.(true);
         }
         const { locationX, locationY } = evt.nativeEvent;
-        glowX.value = locationX;
-        glowY.value = locationY;
         const points = strokeRef.current;
         const last = points[points.length - 1];
         //drop points too close to matter
         if (last && Math.hypot(locationX - last.x, locationY - last.y) < MIN_DRAW_DIST) return;
         points.push({ x: locationX, y: locationY });
-        flushStroke();
+        //extend path by one point without rebuilding it
+        if (pendingPoint.current) {
+          const prev = pendingPoint.current;
+          committedPath.current += ` Q ${prev.x} ${prev.y} ${(prev.x + locationX) / 2} ${(prev.y + locationY) / 2}`;
+        }
+        pendingPoint.current = { x: locationX, y: locationY };
+        strokeD.value = `${committedPath.current} L ${locationX} ${locationY}`;
       },
-      onPanResponderRelease: finishStroke,
-      onPanResponderTerminate: finishStroke,
+      onPanResponderRelease: () => {
+        strokeD.value = '';
+        finishStroke();
+      },
+      onPanResponderTerminate: () => {
+        strokeD.value = '';
+        finishStroke();
+      },
     })
     //gestures read latest mirror
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  , []);
+    , []);
 
   const dragStart = useRef<Rect | null>(null);
   const dragCurrent = useRef<Rect | null>(null);
 
+  //active handle grows while dragged
+  const handleScales = {
+    tl: useSharedValue(1),
+    tr: useSharedValue(1),
+    bl: useSharedValue(1),
+    br: useSharedValue(1),
+  };
+
   const finishResize = (corner: Corner) => {
     setResizing(false);
+    skipPop.current = true;
+    handleScales[corner].value = withTiming(1, { duration: 150 });
     const state = latest.current;
     const rect = dragCurrent.current;
     if (!rect) return;
@@ -365,6 +378,7 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
         dragStart.current = base;
         dragCurrent.current = base;
         setResizing(true);
+        handleScales[corner].value = withTiming(1.2, { duration: 150 });
         state.onVibrate?.();
       },
       onPanResponderMove: (_evt, gesture) => {
@@ -401,18 +415,34 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
     []
   );
 
-  const topDim = useAnimatedStyle(() => ({ height: y1.value }));
-  const bottomDim = useAnimatedStyle(() => ({ top: y2.value }));
-  const leftDim = useAnimatedStyle(() => ({ top: y1.value, width: x1.value, height: y2.value - y1.value }));
-  const rightDim = useAnimatedStyle(() => ({ top: y1.value, left: x2.value, height: y2.value - y1.value }));
-  const boxStyle = useAnimatedStyle(() => ({ left: x1.value, top: y1.value, width: x2.value - x1.value, height: y2.value - y1.value }));
-  const glowProps = useAnimatedProps(() => ({ cx: glowX.value, cy: glowY.value }));
+  //single source of truth for the pop, computed once per frame and reused everywhere below
+  const bounds = useDerivedValue(() => {
+    const cx = (x1.value + x2.value) / 2;
+    const cy = (y1.value + y2.value) / 2;
+    const w = (x2.value - x1.value) * boxScale.value;
+    const h = (y2.value - y1.value) * boxScale.value;
+    return { x1: cx - w / 2, y1: cy - h / 2, x2: cx + w / 2, y2: cy + h / 2 };
+  });
+  //plain rectangles around the selection, cheap to animate every frame
+  const topDim = useAnimatedStyle(() => ({ height: bounds.value.y1 }));
+  const bottomDim = useAnimatedStyle(() => ({ top: bounds.value.y2 }));
+  const leftDim = useAnimatedStyle(() => ({ top: bounds.value.y1, width: bounds.value.x1, height: bounds.value.y2 - bounds.value.y1 }));
+  const rightDim = useAnimatedStyle(() => ({ top: bounds.value.y1, left: bounds.value.x2, height: bounds.value.y2 - bounds.value.y1 }));
+  //frame and handles positioned from the same bounds as the mask's hole
+  const groupStyle = useAnimatedStyle(() => ({
+    left: bounds.value.x1,
+    top: bounds.value.y1,
+    width: bounds.value.x2 - bounds.value.x1,
+    height: bounds.value.y2 - bounds.value.y1,
+  }));
+  const strokePathProps = useAnimatedProps(() => ({ d: strokeD.value }));
 
+  //positions relative to the group, so they always sit right on its corners
   const cornerStyles = {
-    tl: useAnimatedStyle(() => ({ left: x1.value - HANDLE_HIT / 2, top: y1.value - HANDLE_HIT / 2 })),
-    tr: useAnimatedStyle(() => ({ left: x2.value - HANDLE_HIT / 2, top: y1.value - HANDLE_HIT / 2 })),
-    bl: useAnimatedStyle(() => ({ left: x1.value - HANDLE_HIT / 2, top: y2.value - HANDLE_HIT / 2 })),
-    br: useAnimatedStyle(() => ({ left: x2.value - HANDLE_HIT / 2, top: y2.value - HANDLE_HIT / 2 })),
+    tl: useAnimatedStyle(() => ({ left: -HANDLE_HIT / 2, top: -HANDLE_HIT / 2, transform: [{ scale: handleScales.tl.value }] })),
+    tr: useAnimatedStyle(() => ({ left: bounds.value.x2 - bounds.value.x1 - HANDLE_HIT / 2, top: -HANDLE_HIT / 2, transform: [{ scale: handleScales.tr.value }] })),
+    bl: useAnimatedStyle(() => ({ left: -HANDLE_HIT / 2, top: bounds.value.y2 - bounds.value.y1 - HANDLE_HIT / 2, transform: [{ scale: handleScales.bl.value }] })),
+    br: useAnimatedStyle(() => ({ left: bounds.value.x2 - bounds.value.x1 - HANDLE_HIT / 2, top: bounds.value.y2 - bounds.value.y1 - HANDLE_HIT / 2, transform: [{ scale: handleScales.br.value }] })),
   };
 
   const showBox = !drawing && (target != null || resizing);
@@ -428,7 +458,6 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
           <Animated.View style={[styles.dim, { left: 0, right: 0, bottom: 0 }, bottomDim]} />
           <Animated.View style={[styles.dim, { left: 0 }, leftDim]} />
           <Animated.View style={[styles.dim, { right: 0 }, rightDim]} />
-          <Animated.View style={[styles.box, boxStyle]} />
         </View>
       )}
 
@@ -436,35 +465,40 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
 
       {drawing && (
         <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Defs>
-            <RadialGradient id="fingerGlow" cx="50%" cy="50%" r="50%">
-              <Stop offset="0%" stopColor={Colors.primary} stopOpacity={0.55} />
-              <Stop offset="100%" stopColor={Colors.primary} stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-          {strokePoints && strokePoints.length > 1 && (
-            <Path
-              d={smoothPath(strokePoints)}
-              stroke={Colors.selectionOutline}
-              strokeWidth={STROKE_WIDTH}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-          )}
-          <AnimatedCircle r={GLOW_RADIUS} fill="url(#fingerGlow)" animatedProps={glowProps} />
+          <AnimatedPath
+            animatedProps={strokePathProps}
+            stroke={Colors.selectionOutline}
+            strokeWidth={STROKE_WIDTH}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
         </Svg>
       )}
 
-      {showBox && CORNERS.map(corner => (
-        <Animated.View
-          key={corner}
-          style={[styles.handleHit, cornerStyles[corner]]}
-          {...cornerResponders[corner].panHandlers}
-        >
-          <View style={styles.handleDot} />
+      {showBox && (
+        <Animated.View style={[styles.group, groupStyle]}>
+          <View style={styles.box} pointerEvents="none" />
+          {CORNERS.map(corner => (
+            <Animated.View
+              key={corner}
+              style={[styles.handleHit, cornerStyles[corner]]}
+              {...cornerResponders[corner].panHandlers}
+            >
+              <Svg width={HANDLE_HIT} height={HANDLE_HIT}>
+                <Path
+                  d={anglePath(corner)}
+                  stroke={Colors.selectionOutline}
+                  strokeWidth={HANDLE_STROKE}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </Svg>
+            </Animated.View>
+          ))}
         </Animated.View>
-      ))}
+      )}
     </View>
   );
 }
@@ -474,13 +508,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     backgroundColor: Colors.selectionDim,
   },
+  group: {
+    position: 'absolute',
+  },
   box: {
     position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: Colors.selectionFill,
-    borderWidth: 2,
-    borderStyle: 'dashed',
     borderColor: Colors.selectionOutline,
     borderRadius: Radius.xxl,
+    boxShadow: `0px 0px 54px ${Colors.primary}`,
   },
   handleHit: {
     position: 'absolute',
@@ -488,13 +528,5 @@ const styles = StyleSheet.create({
     height: HANDLE_HIT,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  handleDot: {
-    width: HANDLE_SIZE,
-    height: HANDLE_SIZE,
-    borderRadius: Radius.xs,
-    backgroundColor: Colors.surface,
-    borderWidth: 2,
-    borderColor: Colors.primary,
   },
 });

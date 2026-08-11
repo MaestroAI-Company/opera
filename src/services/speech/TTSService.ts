@@ -36,13 +36,30 @@ const STOPWORDS: Record<string, string[]> = {
 class TextToSpeechService {
   private generation = 0;
   private speaking = false;
+  private speakingId: string | null = null;
+  private listeners = new Set<() => void>();
 
   isSpeaking(): boolean {
     return this.speaking;
   }
 
+  //id passed to the current speak() call, lets ui know which item is playing regardless of who triggered it
+  getSpeakingId(): string | null {
+    return this.speakingId;
+  }
+
+  //notified whenever speakingId changes (start, stop, or natural end)
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private notify(): void {
+    this.listeners.forEach((l) => l());
+  }
+
   //read text aloud
-  async speak(text: string, options?: { onDone?: () => void; language?: string }): Promise<void> {
+  async speak(text: string, options?: { onDone?: () => void; language?: string; id?: string }): Promise<void> {
     const clean = this.cleanText(text);
     if (!clean || clean === '…') {
       options?.onDone?.();
@@ -57,6 +74,8 @@ class TextToSpeechService {
       console.warn('TTS stop error:', e);
     }
     this.speaking = true;
+    this.speakingId = options?.id ?? null;
+    this.notify();
 
     const lang = this.detectLanguage(clean) || options?.language || 'en';
     const locale = LOCALES[lang] || (/^[a-z]{2,3}(-[a-z0-9]{2,4})?$/i.test(lang) ? lang : 'en-US');
@@ -83,6 +102,8 @@ class TextToSpeechService {
 
     if (gen === this.generation) {
       this.speaking = false;
+      this.speakingId = null;
+      this.notify();
     }
     options?.onDone?.();
   }
@@ -91,11 +112,13 @@ class TextToSpeechService {
   stop(): void {
     this.generation++;
     this.speaking = false;
+    this.speakingId = null;
     try {
       Speech.stop();
     } catch (e) {
       console.warn('TTS stop error:', e);
     }
+    this.notify();
   }
 
   //remove markdown and think blocks before speaking

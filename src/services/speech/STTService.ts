@@ -9,6 +9,8 @@ export type SpeechToTextCallbacks = {
   onPartial?: (text: string) => void;
   onFinal?: (text: string) => void;
   onVolume?: (volume: number) => void;
+  onSpeechStart?: () => void;
+  onSpeechEnd?: () => void;
   onError?: (message: string) => void;
   onDone?: () => void;
 };
@@ -70,6 +72,8 @@ class SpeechToTextService {
       ExpoSpeechRecognitionModule.addListener('result', onResult),
       ExpoSpeechRecognitionModule.addListener('error', onError),
       ExpoSpeechRecognitionModule.addListener('volumechange', onVolume),
+      ExpoSpeechRecognitionModule.addListener('speechstart', () => callbacks.onSpeechStart?.()),
+      ExpoSpeechRecognitionModule.addListener('speechend', () => callbacks.onSpeechEnd?.()),
       ExpoSpeechRecognitionModule.addListener('end', () => {
         this.listening = false;
         listeners.forEach((s) => s.remove());

@@ -774,7 +774,7 @@ export default function Index() {
 
         //auto-read the reply aloud when it was requested via voice
         if (viaVoice && !isError && Settings.getCached().autoSpeak) {
-          TTS.speak(streamingContentRef.current, { language: Settings.getCached().language });
+          TTS.speak(streamingContentRef.current, { language: Settings.getCached().language, id: assistantMsg.id });
         }
       };
 

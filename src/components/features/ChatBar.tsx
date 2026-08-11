@@ -146,6 +146,11 @@ function buildWavBuffer(pcmFloat32Chunks: ArrayBuffer[], sampleRate: number): Ar
 
 let currentAudioVolume = 0;
 
+//vad tuning: native relies on the os's own speechstart/speechend events, web on raw pcm rms
+const VAD_SILENCE_MS = 1500;
+const VAD_GRACE_MS = 600;
+const VAD_WEB_RMS_THRESHOLD = 0.01;
+
 function VoiceIndicator() {
   const anims = useMemo(() => Array.from({ length: 7 }).map(() => new Animated.Value(1)), []);
   useEffect(() => {
@@ -254,8 +259,60 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const stopResolverRef = useRef<((text: string | null) => void) | null>(null);
   const sendCancelledRef = useRef(false);
 
+  //web vad state (rms threshold)
+  const vadHasSpeechRef = useRef(false);
+  const vadLastSpeechAtRef = useRef(0);
+  const vadStartAtRef = useRef(0);
+  const vadTriggeredRef = useRef(false);
+  //native vad state (os speechstart/speechend events)
+  const vadSpeechEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const stopSTTVolume = () => {
     currentAudioVolume = 0;
+  };
+
+  //reset vad state at the start of a new recording
+  const resetVad = () => {
+    const now = Date.now();
+    vadHasSpeechRef.current = false;
+    vadLastSpeechAtRef.current = now;
+    vadStartAtRef.current = now;
+    vadTriggeredRef.current = false;
+    clearTimeout(vadSpeechEndTimerRef.current);
+    vadSpeechEndTimerRef.current = null;
+  };
+
+  //auto-stop recording after a sustained silence following detected speech (web rms)
+  const checkVadSilence = (volume: number) => {
+    if (!isRecordingRef.current || vadTriggeredRef.current) return;
+    const now = Date.now();
+    if (now - vadStartAtRef.current < VAD_GRACE_MS) return;
+    if (volume > VAD_WEB_RMS_THRESHOLD) {
+      vadHasSpeechRef.current = true;
+      vadLastSpeechAtRef.current = now;
+      return;
+    }
+    if (vadHasSpeechRef.current && now - vadLastSpeechAtRef.current > VAD_SILENCE_MS) {
+      vadTriggeredRef.current = true;
+      finishRecording();
+    }
+  };
+
+  //native: os reported speech has stopped, auto-stop unless speech resumes before the timer fires
+  const scheduleNativeVadStop = () => {
+    if (vadTriggeredRef.current) return;
+    clearTimeout(vadSpeechEndTimerRef.current);
+    vadSpeechEndTimerRef.current = setTimeout(() => {
+      if (!isRecordingRef.current || vadTriggeredRef.current) return;
+      vadTriggeredRef.current = true;
+      finishRecording();
+    }, VAD_SILENCE_MS);
+  };
+
+  //native: os reported speech resumed, cancel any pending auto-stop
+  const cancelNativeVadStop = () => {
+    clearTimeout(vadSpeechEndTimerRef.current);
+    vadSpeechEndTimerRef.current = null;
   };
 
   //generic entry points per platform, implementations are declared further down
@@ -275,6 +332,12 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     return stopContinuousSTT();
   };
 
+  //shared stop path for the mic button and the vad auto-stop
+  const finishRecording = async () => {
+    const transcribed = await stopSTT();
+    if (transcribed) setText(transcribed);
+  };
+
   //native continuous stt
   const startContinuousSTT = async () => {
     try {
@@ -283,6 +346,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       clearTimeout(transcribeTimerRef.current);
       setIsTranscribing(false);
       setIsRecording(true);
+      resetVad();
       const granted = await STT.requestPermissions();
       if (!granted) {
         setIsRecording(false);
@@ -301,6 +365,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         onPartial: (t) => { if (t) { liveTextRef.current = t; setText(t); } },
         onFinal: (t) => { if (t) liveTextRef.current = t; },
         onVolume: (v) => { currentAudioVolume = v > 0 ? v / 10 : 0; },
+        onSpeechStart: cancelNativeVadStop,
+        onSpeechEnd: scheduleNativeVadStop,
         onError: (msg) => {
           console.error("STT error:", msg);
           stopSTTVolume();
@@ -331,6 +397,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   //stop stt resolve with transcript
   const stopContinuousSTT = (): Promise<string | null> => {
     stopSTTVolume();
+    cancelNativeVadStop();
     setIsRecording(false);
     setIsTranscribing(true);
     STT.stop();
@@ -374,6 +441,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
           if (webAudioStreamRef.current) webAudioStreamRef.current.getTracks().forEach(t => t.stop());
         } else {
           stopSTTVolume();
+          cancelNativeVadStop();
           STT.abort();
         }
         setIsRecording(false);
@@ -395,6 +463,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   useEffect(() => {
     return () => {
       clearTimeout(transcribeTimerRef.current);
+      clearTimeout(vadSpeechEndTimerRef.current);
       if (Platform.OS !== 'web') STT.abort();
     };
   }, []);
@@ -559,6 +628,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     try {
       pcmChunksRef.current = [];
       setIsRecording(true);
+      resetVad();
       const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
       webAudioStreamRef.current = ms;
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -578,6 +648,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
             sum += chunk[i] * chunk[i];
           }
           currentAudioVolume = Math.sqrt(sum / chunk.length);
+          checkVadSilence(currentAudioVolume);
         }
       };
       source.connect(processor);
@@ -724,8 +795,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
   const handleMicPress = async () => {
     if (isRecording) {
-      const transcribed = await stopSTT();
-      if (transcribed) setText(transcribed);
+      await finishRecording();
     } else {
       await startSTT();
     }

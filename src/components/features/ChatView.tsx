@@ -293,18 +293,21 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
 
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
 
+  //mirrors TTS state so the speaker icon reacts to auto-play too, not just manual taps
+  useEffect(() => {
+    const unsub = TTS.subscribe(() => setSpeakingMessageId(TTS.getSpeakingId()));
+    return unsub;
+  }, []);
+
   //manual speaker toggle
   const handleSpeak = useCallback((item: Message) => {
-    setSpeakingMessageId((current) => {
-      if (current === item.id) {
-        TTS.stop();
-        return null;
-      }
-      TTS.speak(item.content, {
-        language: Settings.getCached().language,
-        onDone: () => setSpeakingMessageId(cur => (cur === item.id ? null : cur)),
-      });
-      return item.id;
+    if (TTS.getSpeakingId() === item.id) {
+      TTS.stop();
+      return;
+    }
+    TTS.speak(item.content, {
+      language: Settings.getCached().language,
+      id: item.id,
     });
   }, []);
 

@@ -1,7 +1,8 @@
-import { useRouter } from "expo-router";
 import { useQuickActionCallback } from "expo-quick-actions/hooks";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  Animated,
   AppState,
   BackHandler,
   DeviceEventEmitter,
@@ -16,39 +17,110 @@ import {
 } from "react-native";
 import { KeyboardAvoidingView, KeyboardController } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import SearchWebView from "../../components/SearchWebView";
+import { SYSTEM_PROMPTS } from "../../constants/prompts";
+import { Colors, Fonts, FontSizes, Radius } from "../../constants/theme";
 import ChatBar from "../components/features/ChatBar";
 import ChatView from "../components/features/ChatView";
 import ConversationsDrawer from "../components/features/ConversationsDrawer";
 import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, settingsProgress, settleDrawer } from "../components/features/drawerAnimation";
 import ModelDropdown from "../components/features/ModelDropdown";
 import SettingsDrawer from "../components/features/SettingsDrawer";
-import SearchWebView from "../../components/SearchWebView";
 import TopBar from "../components/features/TopBar";
 import NotificationModal from "../components/ui/NotificationModal";
-import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { useResponsive } from "../hooks/useResponsive";
 import { AIModule } from "../services/ai/AIModule";
+import { buildSystemPrompt, streamAssistantReply } from "../services/ai/chatGeneration";
+import { arrayBufferToBase64 } from "../services/ai/utils/base64";
 import { Conversation, DB, Message, MessageMetrics } from "../services/db/DatabaseService";
-import { Settings } from "../services/settings/SettingsService";
-import { LocationService } from "../services/location/LocationService";
-import { PluginRegistry } from "../services/plugins/PluginRegistry";
-import { STT, WhisperSTT } from "../services/speech/STTService";
-import { TTS } from "../services/speech/TTSService";
 import {
   getInitialDeepLink,
   subscribeToDeepLinks,
   type DeepLinkRoute,
 } from "../services/deeplinks/DeepLinkService";
-import { NEW_CHAT_ACTION_ID } from "../services/quickActions/QuickActionsService";
 import { AppEvents } from "../services/events";
-import { arrayBufferToBase64 } from "../services/ai/utils/base64";
-import { buildSystemPrompt, streamAssistantReply } from "../services/ai/chatGeneration";
-import { Colors, Fonts, FontSizes, Radius } from "../../constants/theme";
+import { LocationService } from "../services/location/LocationService";
+import { PluginRegistry } from "../services/plugins/PluginRegistry";
+import { NEW_CHAT_ACTION_ID } from "../services/quickActions/QuickActionsService";
+import { Settings } from "../services/settings/SettingsService";
+import { STT, WhisperSTT } from "../services/speech/STTService";
+import { TTS } from "../services/speech/TTSService";
 
 const butterflyImage = require("../../assets/images/butterfly5.png");
 const butterflyGrey = require("../../assets/images/butterfly2_grey.png");
 const texture2 = require("../../assets/images/texture2.png");
 const settingsIcon = require("../../assets/icons/settings.png");
+
+//matches welcomeText's lineHeight, reserved upfront so the second line doesn't shift layout
+const WELCOME_LINE_HEIGHT = 40;
+
+//time-of-day greeting shown on the home screen
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+//fades in then types out text character by character, like a typewriter
+function TypewriterWelcome({ text, style, reserveLines = 1 }: { text: string; style: any; reserveLines?: number }) {
+  const [displayedText, setDisplayedText] = useState("");
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    setDisplayedText("");
+    opacity.setValue(0);
+    let timer: ReturnType<typeof setInterval> | undefined;
+
+    //wait a beat after launch before the reveal starts
+    const startDelay = setTimeout(() => {
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+
+      let currentIndex = 0;
+      timer = setInterval(() => {
+        if (currentIndex < text.length) {
+          currentIndex++;
+          setDisplayedText(text.slice(0, currentIndex));
+        } else {
+          clearInterval(timer);
+        }
+      }, 70);
+    }, 1000);
+
+    return () => {
+      clearTimeout(startDelay);
+      if (timer) clearInterval(timer);
+    };
+  }, [text, opacity]);
+
+  return (
+    <Animated.Text style={[style, { opacity, minHeight: WELCOME_LINE_HEIGHT * reserveLines }]}>
+      {displayedText}
+    </Animated.Text>
+  );
+}
+
+//fades a child in after a delay, later than the welcome text reveal
+function DissolveIn({ delay, style, children }: { delay: number; style?: any; children: ReactNode }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const startDelay = setTimeout(() => {
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+    }, delay);
+    return () => clearTimeout(startDelay);
+  }, [opacity, delay]);
+
+  return <Animated.View style={[style, { opacity }]}>{children}</Animated.View>;
+}
 
 export default function Index() {
   const insets = useSafeAreaInsets();
@@ -56,6 +128,8 @@ export default function Index() {
   const { width, isLargeScreen, isDesktop } = useResponsive();
   //edge drag maps to drawer progress
   const dragWidth = drawerWidthFor(width);
+  //computed once per mount so it doesn't shift mid-session
+  const greeting = useMemo(() => getGreeting(), []);
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedReflection, setSelectedReflection] = useState("none");
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -76,6 +150,7 @@ export default function Index() {
   }, [settingsDrawerVisible]);
 
   const [incognitoMode, setIncognitoMode] = useState(false);
+  const [userName, setUserName] = useState("");
   const [userInstruction, setUserInstruction] = useState("");
   const [aiService, setAiService] = useState("ollama");
   const [ollamaUrl, setOllamaUrl] = useState("");
@@ -214,7 +289,7 @@ export default function Index() {
         settleDrawer(settingsProgress, false);
       },
     })
-  , [drawerVisible, settingsDrawerVisible, dragWidth]);
+    , [drawerVisible, settingsDrawerVisible, dragWidth]);
 
   //trackpad two-finger horizontal swipe like mobile gesture
   useEffect(() => {
@@ -402,7 +477,7 @@ export default function Index() {
       loadConversations();
       //warm cached location if granted
       LocationService.hasPermission().then((granted) => {
-        if (granted) LocationService.refresh().catch(() => {});
+        if (granted) LocationService.refresh().catch(() => { });
       });
       //load and apply settings
       try {
@@ -419,6 +494,7 @@ export default function Index() {
           return;
         }
 
+        setUserName(s.name);
         setUserInstruction(s.instruction);
         if (s.ollamaModel) {
           setSelectedModel(s.ollamaModel);
@@ -490,6 +566,7 @@ export default function Index() {
     //sync ai service on change
     const settingsSub = DeviceEventEmitter.addListener(AppEvents.settingsChanged, () => {
       setAiService(Settings.getCached().aiService);
+      setUserName(Settings.getCached().name);
     });
 
     return () => {
@@ -1061,26 +1138,32 @@ export default function Index() {
                   style={styles.butterfly}
                   resizeMode="contain"
                 />
-                <Text style={styles.welcomeText}>Welcome</Text>
-                <Pressable
-                  onPress={() => setIncognitoMode((prev) => !prev)}
-                  style={({ pressed, hovered }) => [
-                    styles.incognitoBox,
-                    incognitoMode && styles.incognitoBoxActive,
-                    (pressed || hovered) && (incognitoMode ? { backgroundColor: Colors.incognitoPressed } : { backgroundColor: Colors.surfacePressed })
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.incognitoButtonText,
-                      incognitoMode && styles.incognitoButtonTextActive,
+                <TypewriterWelcome
+                  text={userName ? `${greeting}\n${userName}` : greeting}
+                  style={styles.welcomeText}
+                  reserveLines={userName ? 2 : 1}
+                />
+                <DissolveIn delay={2800}>
+                  <Pressable
+                    onPress={() => setIncognitoMode((prev) => !prev)}
+                    style={({ pressed, hovered }) => [
+                      styles.incognitoBox,
+                      incognitoMode && styles.incognitoBoxActive,
+                      (pressed || hovered) && (incognitoMode ? { backgroundColor: Colors.incognitoPressed } : { backgroundColor: Colors.surfacePressed })
                     ]}
                   >
-                    {incognitoMode
-                      ? "Disable incognito mode"
-                      : "Enable incognito mode"}
-                  </Text>
-                </Pressable>
+                    <Text
+                      style={[
+                        styles.incognitoButtonText,
+                        incognitoMode && styles.incognitoButtonTextActive,
+                      ]}
+                    >
+                      {incognitoMode
+                        ? "Disable incognito mode"
+                        : "Enable incognito mode"}
+                    </Text>
+                  </Pressable>
+                </DissolveIn>
                 <Text
                   style={[
                     styles.incognitoDescription,
@@ -1235,10 +1318,12 @@ export default function Index() {
               });
             },
           },
-          { text: "Later", style: "secondary", onPress: () => {
-            Settings.set("dataWarningDismissed", true);
-            setShowDataWarning(false);
-          } },
+          {
+            text: "Later", style: "secondary", onPress: () => {
+              Settings.set("dataWarningDismissed", true);
+              setShowDataWarning(false);
+            }
+          },
         ]}
       />
     </View>
@@ -1276,10 +1361,12 @@ const styles = StyleSheet.create({
   },
   welcomeText: {
     fontSize: FontSizes.displayXl,
-    color: Colors.textSecondary,
+    lineHeight: WELCOME_LINE_HEIGHT,
+    color: Colors.textPrimary,
     letterSpacing: 1,
     fontFamily: Fonts.display,
     marginVertical: 20,
+    textAlign: "center",
   },
   settingsShadowLayer: {
     position: "relative",

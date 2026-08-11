@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useState, useMemo } from "react";
-import { Animated, BackHandler, DeviceEventEmitter, Image, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
+import * as MediaLibrary from "expo-media-library/legacy";
+import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import { getLocalProviderLabel } from "../../services/ai/LocalProvider";
@@ -24,7 +28,6 @@ import CloudSyncBox from "./CloudSyncBox";
 
 import { useResponsive } from "../../hooks/useResponsive";
 
-import ActionButton from "../ui/ActionButton";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { dragDrawer, drawerWidthFor, gestureVelocity, settingsProgress, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
 
@@ -91,7 +94,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         settleDrawer(progress, true);
       },
     })
-  , [onClose, drawerWidth, progress]);
+    , [onClose, drawerWidth, progress]);
 
   const [activeSubPage, setActiveSubPage] = useState<SubPage>(initialSubPage ?? "main");
 
@@ -195,6 +198,47 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       ? [{ id: "local", label: getLocalProviderLabel() }]
       : []),
   ];
+
+  type PermissionState = "granted" | "denied" | "undetermined";
+  const [permissionStatuses, setPermissionStatuses] = useState<Record<"microphone" | "camera" | "location" | "photos", PermissionState>>({
+    microphone: "undetermined",
+    camera: "undetermined",
+    location: "undetermined",
+    photos: "undetermined",
+  });
+
+  const refreshPermissionStatuses = useCallback(async () => {
+    const [mic, camera, location, photos] = await Promise.all([
+      ExpoSpeechRecognitionModule.getPermissionsAsync().catch(() => null),
+      ImagePicker.getCameraPermissionsAsync().catch(() => null),
+      Location.getForegroundPermissionsAsync().catch(() => null),
+      MediaLibrary.getPermissionsAsync().catch(() => null),
+    ]);
+    setPermissionStatuses({
+      microphone: (mic?.status as PermissionState) ?? "undetermined",
+      camera: (camera?.status as PermissionState) ?? "undetermined",
+      location: (location?.status as PermissionState) ?? "undetermined",
+      photos: (photos?.status as PermissionState) ?? "undetermined",
+    });
+  }, []);
+
+  //keep badges in sync after the user flips a permission in system settings
+  useEffect(() => {
+    if (!visible || activeSubPage !== "confidentiality" || Platform.OS === "web") return;
+    refreshPermissionStatuses();
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") refreshPermissionStatuses();
+    });
+    return () => sub.remove();
+  }, [visible, activeSubPage, refreshPermissionStatuses]);
+
+  const renderPermissionBadge = (status: PermissionState) => (
+    <View style={[styles.permissionBadge, status === "granted" && styles.permissionBadgeAllowed]}>
+      <Text style={[styles.permissionBadgeText, status === "granted" && styles.permissionBadgeTextAllowed]}>
+        {status === "granted" ? "Allowed" : status === "denied" ? "Denied" : "Not defined"}
+      </Text>
+    </View>
+  );
 
   const handleExportData = () => {
     setExportSelection({ settings: true, conversations: true });
@@ -1083,7 +1127,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {aiService === "ollama" && (
         <View style={styles.settingRowVertical}>
           {/* ollama server input section */}
-          <Text style={styles.settingLabel}>Ollama server</Text>
+          <Text style={styles.settingLabel}>Ollama</Text>
           <Text style={[styles.helpText, { marginBottom: 10 }]}>URL of your local or remote Ollama instance.</Text>
           <TextInputField
             icon={linkIcon}
@@ -1148,40 +1192,49 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <Text style={[styles.helpText, { marginBottom: 12 }]}>
           {Platform.OS === "web"
             ? "Opera needs a few permissions to work at its best. You can manage them from your browser's site settings."
-            : <>Opera needs a few permissions to work at its best. You can change them in your device{" "}
-              <Text style={styles.settingsLink} onPress={() => Linking.openSettings()}>
-                settings ↗
-              </Text>
-              .</>}
+            : "Opera needs a few permissions to work at its best. You can change them in your device settings."}
         </Text>
 
-        <View style={{ gap: 12 }}>
-          <ActionButton
-            icon={micIcon}
-            title="Microphone"
-            description="To dictate your messages by voice."
-            onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
-          />
-          <ActionButton
-            icon={cameraIcon}
-            title="Camera"
-            description="To photograph and analyze documents."
-            onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
-          />
-          <ActionButton
-            icon={locationIcon}
-            title="Location"
-            description="To give the assistant local context for more relevant answers."
-            onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
-          />
-          {Platform.OS !== "web" && (
-            <ActionButton
-              icon={photoIcon}
-              title="Photos"
-              description="To share images from your gallery."
-              onPress={() => Linking.openSettings()}
-            />
-          )}
+        <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
+          <View style={styles.groupBox}>
+            <Pressable
+              style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+              onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+              disabled={Platform.OS === "web"}
+            >
+              <Image source={micIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <Text style={styles.navLabel}>Microphone</Text>
+              {Platform.OS !== "web" && renderPermissionBadge(permissionStatuses.microphone)}
+            </Pressable>
+            <Pressable
+              style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+              onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+              disabled={Platform.OS === "web"}
+            >
+              <Image source={cameraIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <Text style={styles.navLabel}>Camera</Text>
+              {Platform.OS !== "web" && renderPermissionBadge(permissionStatuses.camera)}
+            </Pressable>
+            <Pressable
+              style={({ pressed, hovered }) => [styles.navItem, Platform.OS === "web" && styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+              onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+              disabled={Platform.OS === "web"}
+            >
+              <Image source={locationIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <Text style={styles.navLabel}>Location</Text>
+              {Platform.OS !== "web" && renderPermissionBadge(permissionStatuses.location)}
+            </Pressable>
+            {Platform.OS !== "web" && (
+              <Pressable
+                style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+                onPress={() => Linking.openSettings()}
+              >
+                <Image source={photoIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+                <Text style={styles.navLabel}>Photos</Text>
+                {renderPermissionBadge(permissionStatuses.photos)}
+              </Pressable>
+            )}
+          </View>
         </View>
       </View>
 
@@ -1191,25 +1244,30 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           Manage your conversations and settings data locally.
         </Text>
 
-        <View style={{ gap: 12 }}>
-          <ActionButton
-            icon={exportIcon}
-            title="Export data"
-            description="Save your data to a json file."
-            onPress={handleExportData}
-          />
-          <ActionButton
-            icon={downloadIcon}
-            title="Import data"
-            description="Restore your data from a backup json file."
-            onPress={handleImportData}
-          />
-          <ActionButton
-            icon={binIcon}
-            title="Delete all conversations"
-            description="Clear all chat history from this device."
-            onPress={handleDeleteAllConversations}
-          />
+        <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
+          <View style={styles.groupBox}>
+            <Pressable
+              style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+              onPress={handleExportData}
+            >
+              <Image source={exportIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <Text style={styles.navLabel}>Export data</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+              onPress={handleImportData}
+            >
+              <Image source={downloadIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <Text style={styles.navLabel}>Import data</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+              onPress={handleDeleteAllConversations}
+            >
+              <Image source={binIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <Text style={styles.navLabel}>Delete all conversations</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </View>
@@ -1565,6 +1623,32 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     color: Colors.textMuted,
   },
+  navLabel: {
+    flex: 1,
+    fontSize: FontSizes.body,
+    fontFamily: Fonts.mono,
+    color: Colors.textPrimary,
+  },
+  permissionBadge: {
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: Radius.md,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+  },
+  permissionBadgeAllowed: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primaryBright,
+  },
+  permissionBadgeText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.labelSm,
+    color: Colors.textSecondary,
+  },
+  permissionBadgeTextAllowed: {
+    color: Colors.textOnPrimary,
+  },
   settingRowVertical: {
     marginBottom: 30,
     zIndex: 10,
@@ -1622,9 +1706,5 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 10,
     marginTop: 4,
-  },
-  settingsLink: {
-    color: Colors.primary,
-    textDecorationLine: "underline",
   },
 });

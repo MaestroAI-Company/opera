@@ -840,7 +840,9 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         duration: 130,
         easing: Easing.in(Easing.quad),
         useNativeDriver: Platform.OS !== "web",
-      }).start(() => setRenderFiles(false));
+      }).start(({ finished }) => {
+        if (finished) setRenderFiles(false);
+      });
     }
   }, [hasAttachments, filesAnim]);
 

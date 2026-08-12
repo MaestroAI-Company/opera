@@ -12,6 +12,7 @@ import {
   Text,
   View,
 } from "react-native";
+import LottieView from "lottie-react-native";
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import { Conversation, Message } from "../../services/db/DatabaseService";
@@ -22,7 +23,7 @@ import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 
 const butterflyImage = require("../../../assets/images/butterfly5.png");
 const butterflyGreyImage = require("../../../assets/images/butterfly2_grey.png");
-const thinkingGif = require("../../../assets/icons/thinking.gif");
+const loadingAnimation = require("../../../assets/animations/loading.json");
 const speakerIcon = require("../../../assets/icons/speaker.png");
 const reloadIcon = require("../../../assets/icons/reload.png");
 const copyIcon = require("../../../assets/icons/copy.png");
@@ -192,10 +193,11 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
         <View style={styles.aiContainer}>
           {isCurrentlyThinking && (
             <View style={styles.thinkingContainer}>
-              <Image
-                source={thinkingGif}
+              <LottieView
+                source={loadingAnimation}
+                autoPlay
+                loop
                 style={styles.thinkingIcon}
-                resizeMode="contain"
               />
               {!!disp.currentThought && <FlashingText text={disp.currentThought} />}
             </View>
@@ -473,8 +475,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
   },
   bubbleText: {
-    fontSize: FontSizes.body,
-    lineHeight: 21,
+    fontSize: FontSizes.lg,
+    lineHeight: 25,
     fontFamily: Fonts.body,
   },
   userText: {
@@ -485,27 +487,27 @@ const styles = StyleSheet.create({
   },
   headerBlock: {
     alignItems: "center",
-    paddingTop: 16,
-    paddingBottom: 20,
+    paddingTop: 24,
+    paddingBottom: 32,
   },
   headerButterfly: {
     width: 100,
     height: 90,
-    marginBottom: 12,
+    marginBottom: 22,
   },
   headerTitle: {
     fontSize: FontSizes.displayMd,
     color: Colors.textSecondary,
     textAlign: "center",
     letterSpacing: 0.5,
-    marginBottom: 8,
+    marginBottom: 16,
     fontFamily: Fonts.display,
   },
   headerDate: {
     fontSize: FontSizes.bodyMd,
     color: Colors.textMuted,
     fontFamily: Fonts.body,
-    marginBottom: 12,
+    marginBottom: 20,
   },
   gradientTop: {
     position: "absolute",
@@ -528,6 +530,7 @@ const styles = StyleSheet.create({
   },
   thinkingIcon: {
     width: 70,
+    height: 35,
   },
   flashingText: {
     color: Colors.textSecondary,
@@ -639,8 +642,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 4,
-    marginBottom: 20,
+    marginTop: 10,
+    marginBottom: 28,
     marginHorizontal: 16,
   },
   disclaimerText: {

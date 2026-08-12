@@ -30,7 +30,7 @@ export default function RootLayout() {
   const [showLottie, setShowLottie] = useState(Platform.OS !== "web" || isTauri);
   const [fontsLoaded, fontError] = useFonts({
     Petrona: require("../../assets/fonts/Petrona-Medium.ttf"),
-    Jakarta: require("../../assets/fonts/PlusJakartaSans-VariableFont_wght.ttf"),
+    Figtree: require("../../assets/fonts/Figtree-Regular.ttf"),
     "IBMPlexMono-Medium": require("../../assets/fonts/IBMPlexMono-Medium.ttf"),
   });
 

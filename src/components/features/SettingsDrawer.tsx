@@ -588,6 +588,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     await connectProvider(v);
   };
 
+  const handleDisconnectCloud = () => {
+    const label = getCloudProviderDefinition(cloudProvider)?.label ?? "cloud storage";
+    showAlert(`Disconnect ${label}?`, "Your account will be unlinked and automatic backups will stop. Your existing cloud backup won't be deleted.", [
+      {
+        text: "Disconnect", style: "secondary", onPress: async () => {
+          setAlertModalVisible(false);
+          await handleSetCloudProvider("none");
+        }
+      },
+      { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "primary" },
+    ]);
+  };
+
   const handleCreateSyncPin = () => {
     let currentInput = "";
     showAlert("Create Sync PIN", "No cloud backup found. Create a 4 to 6 digit PIN. If you forget this PIN, you will lose access to your cloud backups.", [
@@ -620,7 +633,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const handleUnlockSyncPin = () => {
     let currentInput = "";
     showAlert("Unlock Cloud Backup", "A cloud backup was found. Enter your PIN to unlock it and resume sync.", [
-      { text: "Forgot Code", onPress: handleForgetSyncPin, style: "danger" },
+      { text: "Forgot Code", onPress: handleForgetSyncPin, style: "secondary" },
       {
         text: "Unlock", style: "primary", onPress: async () => {
           setAlertModalVisible(false);
@@ -1041,7 +1054,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
         <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>Auto-start Voice Input</Text>
+          <Text style={styles.settingLabel}>Auto-start microphone</Text>
           <Toggle
             checked={autoStartMic}
             onToggle={setAutoStartMic}
@@ -1094,7 +1107,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             lastSyncSize={lastSyncSize}
             onEnterPin={handleUnlockSyncPin}
             onCreatePin={handleCreateSyncPin}
-            onDisconnect={() => handleSetCloudProvider("none")}
+            onDisconnect={handleDisconnectCloud}
             onSync={handleSyncNow}
             isSyncing={isSyncing}
           />
@@ -1184,7 +1197,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={styles.settingRowVertical}>
         <Text style={styles.settingLabel}>Data privacy</Text>
-        <Text style={styles.helpText}>Designed for privacy, Opera operates entirely on-device. All your data, searches, and settings remain strictly local—no personal info, analytics, or crash data are ever transmitted to external servers.</Text>
+        <Text style={[styles.helpText, { marginBottom: 6 }]}>
+          Designed for privacy, Opera keeps all your data and searches entirely on your device.
+        </Text>
+        <Text style={styles.helpText}>
+          Local Storage: All your data, searches, and settings stay strictly on your device.
+        </Text>
+        <Text style={[styles.helpText, { marginTop: 4 }]}>
+          No Tracking: We do not collect personal info, analytics, or crash reports. Your privacy is fully protected.
+        </Text>
       </View>
 
       <View style={styles.settingRowVertical}>
@@ -1619,7 +1640,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   navSubtitle: {
-    fontSize: FontSizes.label,
+    fontSize: FontSizes.bodyMd,
     fontFamily: Fonts.body,
     color: Colors.textMuted,
   },
@@ -1693,10 +1714,11 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.mono,
   },
   helpText: {
-    fontSize: FontSizes.label,
+    fontSize: FontSizes.bodyMd,
     color: Colors.textMuted,
     fontFamily: Fonts.body,
     marginTop: 4,
+    lineHeight: 20,
   },
   sectionTitle: {
     fontSize: 13,

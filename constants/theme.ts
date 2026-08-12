@@ -89,7 +89,7 @@ export const Colors = {
 
 export const Fonts = {
   display: "Petrona",
-  body: "Jakarta",
+  body: "Figtree",
   mono: "IBMPlexMono-Medium",
 } as const;
 
@@ -105,7 +105,7 @@ export const FontSizes = {
   title: 17,
   label: 12,
   labelSm: 10,
-  //reading (jakarta)
+  //reading (figtree)
   body: 15,
   bodyMd: 14,
   caption: 13,
@@ -143,6 +143,7 @@ export const Radius = {
   xxl: 10,
   lg2: 12,
   xl2: 14,
+  window: 15,
   huge: 16,
   pill: 20,
   huge2: 24,

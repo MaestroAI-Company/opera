@@ -40,7 +40,7 @@ const ToolCallBubble = ({ toolName, isGenerating }: { toolName: string, isGenera
 };
 
 const s = StyleSheet.create({
-  base: { fontSize: FontSizes.lg, lineHeight: 26, color: Colors.textPrimary, fontFamily: Fonts.body },
+  base: { fontSize: FontSizes.xl, lineHeight: 28, color: Colors.textPrimary, fontFamily: Fonts.body },
   bold: { fontWeight: "bold" },
   italic: { fontStyle: "italic" },
   code: {
@@ -64,12 +64,12 @@ const s = StyleSheet.create({
   h1: { fontSize: FontSizes.displaySm, fontWeight: "bold", marginTop: 8, marginBottom: 4, color: Colors.textPrimary },
   h2: { fontSize: FontSizes.xl, fontWeight: "bold", marginTop: 7, marginBottom: 3, color: Colors.textPrimary },
   h3: { fontSize: FontSizes.title, fontWeight: "bold", marginTop: 6, marginBottom: 3, color: Colors.textPrimary },
-  h4: { fontSize: FontSizes.body, fontWeight: "bold", marginTop: 5, marginBottom: 3, color: Colors.textPrimary },
+  h4: { fontSize: FontSizes.lg, fontWeight: "bold", marginTop: 5, marginBottom: 3, color: Colors.textPrimary },
   paragraph: { marginVertical: 2 },
   spacing: { height: 8 },
   strike: { textDecorationLine: "line-through" },
   link: { color: Colors.primary, textDecorationLine: "underline" },
-  tableCell: { fontSize: FontSizes.body, lineHeight: 20, color: Colors.textPrimary, fontFamily: Fonts.body },
+  tableCell: { fontSize: FontSizes.lg, lineHeight: 25, color: Colors.textPrimary, fontFamily: Fonts.body },
   tableCellBox: { flex: 1, paddingHorizontal: 8, paddingVertical: 6 },
   inlineRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },
   toolCallBubble: {

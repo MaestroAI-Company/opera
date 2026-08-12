@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   },
   container: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.xxl,
+    borderRadius: Radius.window,
     borderWidth: 2,
     borderColor: Colors.border,
     padding: 24,
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
   button: {
     paddingVertical: 10,
     paddingHorizontal: 20,
-    borderRadius: Radius.md,
+    borderRadius: Radius.xxl,
     borderWidth: 2,
     borderColor: "transparent",
     minWidth: 80,

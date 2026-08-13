@@ -13,6 +13,8 @@ export type SpeechToTextCallbacks = {
   onSpeechEnd?: () => void;
   onError?: (message: string) => void;
   onDone?: () => void;
+  //fires once the persisted recording file is safe to read, only when recordAudio is requested
+  onAudioFile?: (uri: string | null) => void;
 };
 
 //whisper surface lives in web file
@@ -41,6 +43,15 @@ class SpeechToTextService {
   //no-op, matches web stt api
   setLanguage(_lang: string): void {}
 
+  //whether the os can persist the mic audio alongside live recognition
+  supportsRecording(): boolean {
+    try {
+      return ExpoSpeechRecognitionModule.supportsRecording();
+    } catch {
+      return false;
+    }
+  }
+
   //request speech permissions
   async requestPermissions(): Promise<boolean> {
     try {
@@ -52,8 +63,8 @@ class SpeechToTextService {
     }
   }
 
-  //start streaming recognition
-  start(locale: string, callbacks: SpeechToTextCallbacks): void {
+  //start streaming recognition, recordAudio also persists the raw mic audio to a wav file for remote transcription
+  start(locale: string, callbacks: SpeechToTextCallbacks, recordAudio = false): void {
     const onResult = (e: ExpoSpeechRecognitionResultEvent) => {
       const transcript = e.results?.[0]?.transcript ?? '';
       if (e.isFinal) {
@@ -74,6 +85,9 @@ class SpeechToTextService {
       ExpoSpeechRecognitionModule.addListener('volumechange', onVolume),
       ExpoSpeechRecognitionModule.addListener('speechstart', () => callbacks.onSpeechStart?.()),
       ExpoSpeechRecognitionModule.addListener('speechend', () => callbacks.onSpeechEnd?.()),
+      ExpoSpeechRecognitionModule.addListener('audioend', (e: ExpoSpeechRecognitionNativeEventMap['audioend']) => {
+        callbacks.onAudioFile?.(e.uri);
+      }),
       ExpoSpeechRecognitionModule.addListener('end', () => {
         this.listening = false;
         listeners.forEach((s) => s.remove());
@@ -92,6 +106,7 @@ class SpeechToTextService {
         iosTaskHint: 'dictation',
         addsPunctuation: true,
         volumeChangeEventOptions: { enabled: true, intervalMillis: 200 },
+        recordingOptions: recordAudio ? { persist: true, outputFileName: 'opera_stt_recording.wav' } : undefined,
       });
     } catch (e) {
       this.listening = false;

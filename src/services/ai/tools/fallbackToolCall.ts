@@ -30,6 +30,14 @@ export async function sendMessageWithToolPrompt(
   const fullPrompt = buildToolResultsPrompt(prompt, toolResults);
   const images = messages.flatMap((m) => m.images ?? []);
 
+  //payload serialization was overhead
+  if (__DEV__) {
+    console.log(`[fallbackToolCall] sending request to ${modelName}`, {
+      tools: tools.length,
+      think: !!options?.think,
+    });
+  }
+
   let accumulated = "";
   const result = await provider.sendMessage(
     modelName,

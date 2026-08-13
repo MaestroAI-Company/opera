@@ -81,9 +81,13 @@ class ToolManagerService {
       return `Tool "${name}" is disabled.`;
     }
 
+    if (__DEV__) {
+      //no args/result here: they can carry contacts, messages, and other private data
+      console.log(`[ToolManager] executing ${name}`);
+    }
+
     try {
-      const result = await tool.execute(args, summarize);
-      return result;
+      return await tool.execute(args, summarize);
     } catch (e: any) {
       console.error(`[ToolManager] Tool ${name} failed:`, e);
       return `Tool error: ${e.message}`;

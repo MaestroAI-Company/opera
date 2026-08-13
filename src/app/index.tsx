@@ -815,7 +815,7 @@ export default function Index() {
 
             if (outcome.status === "error") {
               isError = true;
-              streamingContentRef.current = "Error generating response. Please check your model or server connection.";
+              streamingContentRef.current = `Error during generation: ${outcome.error ?? "unknown error"}`;
             } else {
               streamingContentRef.current = outcome.content;
             }
@@ -869,11 +869,13 @@ export default function Index() {
     [dbReady, incognitoMode, activeConversation, selectedModel, selectedReflection, generateTitle, userInstruction, aiService, ollamaUrl, scheduleFlush]
   );
 
-  //transcribe audio: use remote model if it supports audio and user hasnt forced whisper
-  const handleTranscribe = useCallback(async (wavBuffer: ArrayBuffer): Promise<string | null> => {
+  //transcribe audio: use remote model if it supports audio and user hasnt forced local transcription
+  //localFallback is the already-captured on-device transcript (native), used instead of whisper when provided
+  const handleTranscribe = useCallback(async (wavBuffer: ArrayBuffer, localFallback?: string | null): Promise<string | null> => {
     const useRemote = !alwaysWhisper && modelCapabilities.includes("audio") && selectedModel;
 
-    const transcribeWithWhisper = async () => {
+    const transcribeLocally = async () => {
+      if (localFallback !== undefined) return localFallback;
       if (!WhisperSTT.isAvailable()) {
         const modelName = Settings.getCached().whisperModel || "base";
         if (modelName !== "none" && await WhisperSTT.isModelInstalled(modelName)) {
@@ -888,11 +890,10 @@ export default function Index() {
     };
 
     if (!useRemote) {
-      //fallback to whisper on-device
-      return transcribeWithWhisper();
+      return transcribeLocally();
     }
     try {
-      //encode wav as data uri 
+      //encode wav as data uri
       const base64Audio = 'data:audio/wav;base64,' + arrayBufferToBase64(wavBuffer);
 
       //send to remote model with TRANSCRIBE prompt
@@ -907,8 +908,8 @@ export default function Index() {
       );
       return transcription.trim() || null;
     } catch (e) {
-      console.error('Remote transcription failed, falling back to Whisper:', e);
-      return transcribeWithWhisper();
+      console.error('Remote transcription failed, falling back to local:', e);
+      return transcribeLocally();
     }
   }, [alwaysWhisper, modelCapabilities, selectedModel]);
 
@@ -993,7 +994,7 @@ export default function Index() {
 
           if (outcome.status === "error") {
             isError = true;
-            streamingContentRef.current = "Error generating response. Please check your model or server connection.";
+            streamingContentRef.current = `Error during generation: ${outcome.error ?? "unknown error"}`;
           } else {
             streamingContentRef.current = outcome.content;
           }

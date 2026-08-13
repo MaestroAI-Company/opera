@@ -454,7 +454,7 @@ function AssistantOverlay() {
 
         if (outcome.status === 'error') {
           isError = true;
-          streamingContentRef.current = 'Error generating response.';
+          streamingContentRef.current = `Error during generation: ${outcome.error ?? 'unknown error'}`;
         } else {
           streamingContentRef.current = outcome.content;
         }
@@ -500,7 +500,8 @@ function AssistantOverlay() {
     abortControllerRef.current?.abort();
   }, []);
 
-  const handleTranscribe = useCallback(async (wavBuffer: ArrayBuffer): Promise<string | null> => {
+  //localFallback is the already-captured on-device transcript (native), used instead of whisper when provided
+  const handleTranscribe = useCallback(async (wavBuffer: ArrayBuffer, localFallback?: string | null): Promise<string | null> => {
     const model = selectedModelRef.current;
     const useRemote = !alwaysWhisper && modelCapabilities.includes('audio') && model;
 
@@ -519,9 +520,11 @@ function AssistantOverlay() {
         const result = transcription.trim();
         if (result) return result;
       } catch (e) {
-        console.warn('Remote transcription failed, falling back to Whisper', e);
+        console.warn('Remote transcription failed, falling back to local', e);
       }
     }
+
+    if (localFallback !== undefined) return localFallback;
 
     //fallback or forced whisper
     try {

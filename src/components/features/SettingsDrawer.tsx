@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
-import { getLocalProviderLabel } from "../../services/ai/LocalProvider";
+import { getLocalProviderLabel } from "../../services/ai/providers/LocalProvider";
 import { ITool } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { BackupService, ImportInspection } from "../../services/BackupService";

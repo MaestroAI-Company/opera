@@ -13,7 +13,7 @@ export type SpeechToTextCallbacks = {
   onSpeechEnd?: () => void;
   onError?: (message: string) => void;
   onDone?: () => void;
-  //fires once the persisted recording file is safe to read, only when recordAudio is requested
+  //fires once persisted audio is readable
   onAudioFile?: (uri: string | null) => void;
 };
 
@@ -43,7 +43,7 @@ class SpeechToTextService {
   //no-op, matches web stt api
   setLanguage(_lang: string): void {}
 
-  //whether the os can persist the mic audio alongside live recognition
+  //mic audio persistable during live recognition
   supportsRecording(): boolean {
     try {
       return ExpoSpeechRecognitionModule.supportsRecording();
@@ -63,7 +63,7 @@ class SpeechToTextService {
     }
   }
 
-  //start streaming recognition, recordAudio also persists the raw mic audio to a wav file for remote transcription
+  //streaming recognition also saves raw audio
   start(locale: string, callbacks: SpeechToTextCallbacks, recordAudio = false): void {
     const onResult = (e: ExpoSpeechRecognitionResultEvent) => {
       const transcript = e.results?.[0]?.transcript ?? '';

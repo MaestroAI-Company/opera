@@ -1,7 +1,9 @@
-import { AIModule } from './AIModule';
-import { MessageMetrics } from '../db/DatabaseService';
-import { WidgetManager } from '../widgets/WidgetManager';
-import { SYSTEM_PROMPTS } from '../../../constants/prompts';
+import { AIModule } from '../AIModule';
+import { MessageMetrics } from '../../db/DatabaseService';
+import { WidgetManager } from '../../widgets/WidgetManager';
+import { SYSTEM_PROMPTS } from '../../../../constants/prompts';
+import { ToolSource } from '../tools/ITool';
+import { extractCitedUrls } from './citations';
 
 //marker when user stops generation
 export const INTERRUPTED_MARKER = '\n\n_The user interrupted the response_';
@@ -19,7 +21,8 @@ export type ReplyOutcome = {
   //streamed content with marker if aborted
   content: string;
   metrics?: MessageMetrics;
-  //raw provider error message, set when status is 'error'
+  sources?: ToolSource[];
+  //raw provider error message
   error?: string;
 };
 
@@ -37,6 +40,13 @@ function isAbortError(error: any): boolean {
   return error?.name === 'AbortError' || message.includes('aborted') || message.includes('cancel');
 }
 
+//keep model-cited sources in citation order
+function resolveCitedSources(content: string, recorded: ToolSource[] | undefined): ToolSource[] | undefined {
+  const citedUrls = extractCitedUrls(content);
+  if (citedUrls.length === 0) return undefined;
+  return citedUrls.map(url => recorded?.find(s => s.url === url) ?? { url });
+}
+
 //one streaming path for both screens
 export async function streamAssistantReply(params: {
   model: string;
@@ -49,6 +59,8 @@ export async function streamAssistantReply(params: {
 }): Promise<ReplyOutcome> {
   let content = '';
   let metrics: MessageMetrics | undefined;
+  //consulted sources narrowed to cited ones
+  let sources: ToolSource[] | undefined;
 
   try {
     await AIModule.sendMessageWithTools(
@@ -64,17 +76,20 @@ export async function streamAssistantReply(params: {
       (received) => {
         metrics = received;
         params.onMetrics?.(received);
+      },
+      (received) => {
+        sources = received;
       }
     );
-    return { status: 'done', content, metrics };
+    return { status: 'done', content, metrics, sources: resolveCitedSources(content, sources) };
   } catch (e) {
     if (isAbortError(e)) {
       content += INTERRUPTED_MARKER;
       params.onContent(content);
-      return { status: 'aborted', content, metrics };
+      return { status: 'aborted', content, metrics, sources: resolveCitedSources(content, sources) };
     }
     console.error('Assistant reply failed:', e);
     //caller picks the user wording
-    return { status: 'error', content, metrics, error: e?.message ?? String(e) };
+    return { status: 'error', content, metrics, sources: resolveCitedSources(content, sources), error: (e as any)?.message ?? String(e) };
   }
 }

@@ -1,4 +1,4 @@
-import { ITool, ToolDefinition, ToolPlatform } from './ITool';
+import { ITool, ToolDefinition, ToolPlatform, ToolSource } from './ITool';
 import { SearchBridge } from '../../search/SearchBridge';
 import { Platform } from 'react-native';
 import { universalFetch } from '../utils/universalFetch';
@@ -34,7 +34,8 @@ export class FetchPagesTool implements ITool {
 
   async execute(
     args: Record<string, any>,
-    summarize?: (text: string) => Promise<string>
+    summarize?: (text: string) => Promise<string>,
+    recordSource?: (source: ToolSource) => void
   ): Promise<string> {
     const urls = args.urls;
     if (!urls || !Array.isArray(urls) || urls.length === 0) {
@@ -69,8 +70,12 @@ export class FetchPagesTool implements ITool {
             const main = doc.querySelector('main, article, [role="main"], .content, #content, .post, .article') || doc.body;
             let text = main.textContent || '';
             text = text.replace(/\s+/g, ' ').trim();
-            
-            return { url, content: text };
+
+            //guessed favicon urls usually 404
+            const iconLink = doc.querySelector('link[rel~="icon"]');
+            const favicon = iconLink ? new URL(iconLink.getAttribute('href') || '', url).href : undefined;
+
+            return { url, content: text, title: doc.title, favicon };
           } catch (e: any) {
             return { url, content: `Failed to fetch: ${e.message}` };
           }
@@ -83,6 +88,12 @@ export class FetchPagesTool implements ITool {
 
       if (results.length === 0) {
         return 'No page content could be extracted.';
+      }
+
+      for (const r of results) {
+        if (r.url && (r.title || r.favicon)) {
+          recordSource?.({ url: r.url, title: r.title, favicon: r.favicon });
+        }
       }
 
       //format results as markdown, summarize if too long

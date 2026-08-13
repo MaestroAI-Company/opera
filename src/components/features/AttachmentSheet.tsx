@@ -22,7 +22,7 @@ const photoIcon = require("../../../assets/icons/photo.png");
 //clears the tallest sheet content so it starts fully off-screen
 const SHEET_OFFSET = 500;
 
-export type SelectedFile = { uri: string; type: string; name: string; id?: string };
+export type SelectedFile = { uri: string; type: string; name: string; id?: string; mimeType?: string };
 
 type AttachmentSheetProps = {
   visible: boolean;

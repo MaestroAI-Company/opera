@@ -23,6 +23,13 @@ export interface ToolDefinition {
 //platforms a tool can run on
 export type ToolPlatform = 'ios' | 'android' | 'web' | 'desktop';
 
+//web page consulted by a tool
+export interface ToolSource {
+  url: string;
+  title?: string;
+  favicon?: string;
+}
+
 //interface for all tools
 export interface ITool {
   definition: ToolDefinition;
@@ -33,5 +40,9 @@ export interface ITool {
   platforms?: ToolPlatform[];
   //request os permission on enable
   requestPermission?(): Promise<boolean>;
-  execute(args: Record<string, any>, summarize?: (text: string, systemPrompt?: string) => Promise<string>): Promise<string>;
+  execute(
+    args: Record<string, any>,
+    summarize?: (text: string, systemPrompt?: string) => Promise<string>,
+    recordSource?: (source: ToolSource) => void
+  ): Promise<string>;
 }

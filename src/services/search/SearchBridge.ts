@@ -1,3 +1,5 @@
+import { WebViewRunner } from '../webview/WebViewRunner';
+
 //search result with extracted content
 export interface SearchResult {
   title: string;
@@ -9,124 +11,140 @@ export interface SearchResult {
 export interface FetchResult {
   url: string;
   content: string;
+  title?: string;
+  favicon?: string;
 }
 
-//bridge between search tool (service) and search webview (component)
+const GOOGLEBOT_UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36 Googlebot/2.1; +http://www.google.com/bot.html";
+
+const MAX_RESULTS = 5;
+
+const EXTRACT_RESULTS_JS = `
+(function() {
+  function extract() {
+    try {
+      var links = document.querySelectorAll('.result__a');
+      if (links.length === 0) return false;
+      var results = [];
+      var snippets = document.querySelectorAll('.result__snippet');
+      for (var i = 0; i < links.length && results.length < ${MAX_RESULTS}; i++) {
+        var href = links[i].href;
+        if (href && href.includes('duckduckgo.com/l/?')) {
+          try {
+            var u = new URL(href);
+            var uddg = u.searchParams.get('uddg');
+            if (uddg) href = uddg;
+          } catch(e) {}
+        }
+        if (href && href.startsWith('http') && href.indexOf('duckduckgo.com') === -1) {
+          var snippetText = (snippets[i] && snippets[i].textContent) ? snippets[i].textContent.trim() : '';
+          results.push({ title: links[i].textContent.trim(), url: href, snippet: snippetText });
+        }
+      }
+      window.ReactNativeWebView.postMessage(JSON.stringify({ results: results }));
+      return true;
+    } catch(e) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ results: [] }));
+      return true;
+    }
+  }
+
+  if (!extract()) {
+    var observer = new MutationObserver(function(mutations, obs) {
+      if (extract()) obs.disconnect();
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    setTimeout(function() { observer.disconnect(); extract(); }, 5000);
+  }
+})(); true;
+`;
+
+const EXTRACT_CONTENT_JS = `
+(function() {
+  function walk(node) {
+    if (node.nodeType === 3) return node.textContent.replace(/\\s+/g, ' ');
+    if (node.nodeType !== 1) return '';
+    var tag = node.tagName.toLowerCase();
+    var content = Array.from(node.childNodes).map(walk).join('');
+    if (tag === 'h1') return '\\n# ' + content + '\\n';
+    if (tag === 'h2') return '\\n## ' + content + '\\n';
+    if (tag === 'h3') return '\\n### ' + content + '\\n';
+    if (tag === 'p') return '\\n\\n' + content + '\\n\\n';
+    if (tag === 'a') return '[' + content.trim() + '](' + node.href + ')';
+    if (tag === 'b' || tag === 'strong') return '**' + content.trim() + '**';
+    if (tag === 'i' || tag === 'em') return '*' + content.trim() + '*';
+    if (tag === 'li') return '\\n- ' + content;
+    if (tag === 'ul' || tag === 'ol') return '\\n' + content + '\\n';
+    return content;
+  }
+
+  function extract(force) {
+    try {
+      var removeTags = ['script','style','nav','header','footer','aside','iframe','noscript','svg','form','button','menu'];
+      removeTags.forEach(function(tag) {
+        var els = document.querySelectorAll(tag);
+        for (var i = 0; i < els.length; i++) els[i].remove();
+      });
+      var main = document.querySelector('main, article, [role="main"], .content, #content, .post, .article') || document.body;
+
+      var text = walk(main);
+      text = text.replace(/\\n{3,}/g, '\\n\\n').trim();
+
+      //guessed favicon urls usually 404
+      var iconLink = document.querySelector('link[rel~="icon"]');
+      var favicon = iconLink ? iconLink.href : null;
+
+      //send if enough text or forced
+      if (text.length > 300 || force) {
+        if (text.length > 5000) text = text.substring(0, 5000) + '...';
+        window.ReactNativeWebView.postMessage(JSON.stringify({ content: text, title: document.title, favicon: favicon }));
+        return true;
+      }
+      return false;
+    } catch(e) {
+      if (force) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ content: 'Failed to extract content.' }));
+      }
+      return force;
+    }
+  }
+
+  var attempts = 0;
+  var interval = setInterval(function() {
+    if (extract(false) || attempts > 50) { //poll every 100ms up to 5s
+      clearInterval(interval);
+      if (attempts > 50) extract(true); //force extract on timeout
+    }
+    attempts++;
+  }, 100);
+})(); true;
+`;
+
+//web browsing via shared headless webview
 class SearchBridgeService {
-  private pendingSearchResolve: ((results: SearchResult[]) => void) | null = null;
-  private pendingSearchReject: ((error: Error) => void) | null = null;
-  private searchTimeoutId: ReturnType<typeof setTimeout> | null = null;
-  private searchListeners = new Set<(query: string) => void>();
-
-  private pendingFetchResolve: ((results: FetchResult[]) => void) | null = null;
-  private pendingFetchReject: ((error: Error) => void) | null = null;
-  private fetchTimeoutId: ReturnType<typeof setTimeout> | null = null;
-  private fetchListeners = new Set<(urls: string[]) => void>();
-
-  //start a search (called by search tool)
-  search(query: string): Promise<SearchResult[]> {
-    this.cancelSearch();
-    return new Promise((resolve, reject) => {
-      this.pendingSearchResolve = resolve;
-      this.pendingSearchReject = reject;
-      //notify webview component
-      this.searchListeners.forEach(l => l(query));
-      //timeout after 15s
-      this.searchTimeoutId = setTimeout(() => {
-        if (this.pendingSearchReject) {
-          this.pendingSearchReject(new Error('Search timeout'));
-          this.cleanupSearch();
-        }
-      }, 15000);
+  //start a search
+  async search(query: string): Promise<SearchResult[]> {
+    const payload = await WebViewRunner.run<{ results?: SearchResult[] }>({
+      source: { uri: `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}` },
+      injectedJavaScript: EXTRACT_RESULTS_JS,
+      timeoutMs: 15000,
     });
+    return (payload.results ?? []).slice(0, MAX_RESULTS);
   }
 
-  //fetch specific pages (called by fetch tool)
-  fetchPages(urls: string[]): Promise<FetchResult[]> {
-    this.cancelFetch();
-    return new Promise((resolve, reject) => {
-      this.pendingFetchResolve = resolve;
-      this.pendingFetchReject = reject;
-      //notify webview component
-      this.fetchListeners.forEach(l => l(urls));
-      //timeout after 25s
-      this.fetchTimeoutId = setTimeout(() => {
-        if (this.pendingFetchReject) {
-          this.pendingFetchReject(new Error('Fetch timeout'));
-          this.cleanupFetch();
-        }
-      }, 25000);
-    });
-  }
-
-  resolveSearch(results: SearchResult[]): void {
-    if (this.pendingSearchResolve) {
-      this.pendingSearchResolve(results);
-      this.cleanupSearch();
-    }
-  }
-
-  rejectSearch(error: Error): void {
-    if (this.pendingSearchReject) {
-      this.pendingSearchReject(error);
-      this.cleanupSearch();
-    }
-  }
-
-  resolveFetch(results: FetchResult[]): void {
-    if (this.pendingFetchResolve) {
-      this.pendingFetchResolve(results);
-      this.cleanupFetch();
-    }
-  }
-
-  rejectFetch(error: Error): void {
-    if (this.pendingFetchReject) {
-      this.pendingFetchReject(error);
-      this.cleanupFetch();
-    }
-  }
-
-  subscribeSearch(listener: (query: string) => void): () => void {
-    this.searchListeners.add(listener);
-    return () => this.searchListeners.delete(listener);
-  }
-
-  subscribeFetch(listener: (urls: string[]) => void): () => void {
-    this.fetchListeners.add(listener);
-    return () => this.fetchListeners.delete(listener);
-  }
-
-  private cancelSearch(): void {
-    if (this.pendingSearchReject) {
-      this.pendingSearchReject(new Error('Search cancelled'));
-    }
-    this.cleanupSearch();
-  }
-
-  private cancelFetch(): void {
-    if (this.pendingFetchReject) {
-      this.pendingFetchReject(new Error('Fetch cancelled'));
-    }
-    this.cleanupFetch();
-  }
-
-  private cleanupSearch(): void {
-    this.pendingSearchResolve = null;
-    this.pendingSearchReject = null;
-    if (this.searchTimeoutId) {
-      clearTimeout(this.searchTimeoutId);
-      this.searchTimeoutId = null;
-    }
-  }
-
-  private cleanupFetch(): void {
-    this.pendingFetchResolve = null;
-    this.pendingFetchReject = null;
-    if (this.fetchTimeoutId) {
-      clearTimeout(this.fetchTimeoutId);
-      this.fetchTimeoutId = null;
-    }
+  //fetch specific pages
+  async fetchPages(urls: string[]): Promise<FetchResult[]> {
+    const payloads = await WebViewRunner.runAll<{ content: string; title?: string; favicon?: string }>(
+      urls.map(url => ({
+        source: { uri: url },
+        injectedJavaScript: EXTRACT_CONTENT_JS,
+        userAgent: GOOGLEBOT_UA,
+        timeoutMs: 25000,
+      }))
+    );
+    return payloads.flatMap((payload, i) =>
+      payload ? [{ url: urls[i], content: payload.content, title: payload.title, favicon: payload.favicon }] : []
+    );
   }
 }
 

@@ -5,6 +5,7 @@ import {
   Animated,
   FlatList,
   Image,
+  Linking,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -15,7 +16,8 @@ import {
 import LottieView from "lottie-react-native";
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
-import { Conversation, Message } from "../../services/db/DatabaseService";
+import { Conversation, Message, MessageSource } from "../../services/db/DatabaseService";
+import { splitDocumentBlocks } from "../../services/documents/DocumentService";
 import { Settings } from "../../services/settings/SettingsService";
 import { TTS } from "../../services/speech/TTSService";
 import { deriveChatDisplay, renderMarkdown } from "../ui/MarkdownText";
@@ -29,6 +31,72 @@ const reloadIcon = require("../../../assets/icons/reload.png");
 const copyIcon = require("../../../assets/icons/copy.png");
 const infoIcon = require("../../../assets/icons/info.png");
 const chatIcon = require("../../../assets/icons/chat.png");
+const arrowIcon = require("../../../assets/icons/arrow.png");
+const appSourceIcon = require("../../../assets/icons/tool.png");
+const imageSourceIcon = require("../../../assets/icons/photo.png");
+const linkSourceIcon = require("../../../assets/icons/hyperlink.png");
+
+//last title segment after separator
+function sourceLabel(source: MessageSource): string {
+  if (source.title) {
+    const parts = source.title.split(/\s[-–|]\s/);
+    if (parts.length > 1) return parts[parts.length - 1].trim();
+    return source.title.trim();
+  }
+  try {
+    return new URL(source.url).hostname.replace(/^www\./, '');
+  } catch {
+    return source.url;
+  }
+}
+
+type SourceKind = 'app' | 'url' | 'image';
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|bmp|svg|ico)(\?.*)?$/i;
+
+//kind from scheme or image extension
+function getSourceKind(url: string): SourceKind {
+  if (!/^https?:\/\//i.test(url)) return 'app';
+  try {
+    if (IMAGE_EXT_RE.test(new URL(url).pathname)) return 'image';
+  } catch {}
+  return 'url';
+}
+
+const SourcePill = ({ source }: { source: MessageSource }) => {
+  //disable open when url unhandled
+  const [canOpen, setCanOpen] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    Linking.canOpenURL(source.url)
+      .then((ok) => { if (!cancelled) setCanOpen(ok); })
+      .catch(() => { if (!cancelled) setCanOpen(false); });
+    return () => { cancelled = true; };
+  }, [source.url]);
+
+  //failed favicon falls back to generic
+  const [faviconFailed, setFaviconFailed] = useState(false);
+  useEffect(() => { setFaviconFailed(false); }, [source.favicon]);
+
+  const kind = useMemo(() => getSourceKind(source.url), [source.url]);
+  const useFavicon = kind === 'url' && !!source.favicon && !faviconFailed;
+  const icon = kind === 'image' ? imageSourceIcon : kind === 'app' ? appSourceIcon : (useFavicon ? { uri: source.favicon } : linkSourceIcon);
+
+  return (
+    <Pressable
+      onPress={() => { if (canOpen) Linking.openURL(source.url).catch(() => {}); }}
+      disabled={!canOpen}
+      style={({ pressed, hovered }) => [styles.sourcePill, canOpen && (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
+    >
+      <Image
+        source={icon}
+        style={[styles.sourceFavicon, !useFavicon && { tintColor: Colors.textMuted }]}
+        onError={() => setFaviconFailed(true)}
+      />
+      <Text style={styles.sourceLabel} numberOfLines={1}>{sourceLabel(source)}</Text>
+      {canOpen && <Image source={arrowIcon} style={styles.sourceArrow} />}
+    </Pressable>
+  );
+};
 
 type ChatViewProps = {
   messages: Message[];
@@ -109,6 +177,12 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
     return unsub;
   }, [isGenerating]);
 
+  //documents live in the message text
+  const visibleContent = useMemo(
+    () => (isUser ? splitDocumentBlocks(item.content).text : item.content),
+    [isUser, item.content]
+  );
+
   //reparse only when deps move
   const disp = useMemo(
     () => deriveChatDisplay(item.content, !!isGenerating, activeTool, !!canThink),
@@ -181,13 +255,15 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               })}
             </View>
           )}
-          <Text
-            style={[styles.bubbleText, styles.userText]}
-            selectable={true}
-            selectionColor={Colors.whiteDim}
-          >
-            {item.content}
-          </Text>
+          {!!visibleContent && (
+            <Text
+              style={[styles.bubbleText, styles.userText]}
+              selectable={true}
+              selectionColor={Colors.whiteDim}
+            >
+              {visibleContent}
+            </Text>
+          )}
         </View>
       ) : (
         <View style={styles.aiContainer}>
@@ -203,6 +279,13 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
             </View>
           )}
           {markdownNodes}
+          {!isCurrentlyThinking && !!item.sources && item.sources.length > 0 && (
+            <View style={styles.sourcesRow}>
+              {item.sources.map((source) => (
+                <SourcePill key={source.url} source={source} />
+              ))}
+            </View>
+          )}
           {!isUser && !isCurrentlyThinking && !isGenerating && (
             <View style={styles.aiToolbar}>
               {speakerEnabled && (
@@ -623,6 +706,42 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: FontSizes.xxs,
     flexShrink: 1,
+  },
+  sourcesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  sourcePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.pill,
+    paddingLeft: 6,
+    paddingRight: 10,
+    paddingVertical: 6,
+    gap: 6,
+    maxWidth: 220,
+  },
+  sourceFavicon: {
+    width: 16,
+    height: 16,
+    borderRadius: Radius.xs,
+  },
+  sourceLabel: {
+    color: Colors.textSecondary,
+    fontFamily: Fonts.body,
+    fontSize: FontSizes.label,
+    flexShrink: 1,
+  },
+  sourceArrow: {
+    width: 9,
+    height: 9,
+    tintColor: Colors.textMuted,
+    transform: [{ rotate: '-45deg' }],
   },
   audioAttachmentBubble: {
     backgroundColor: Colors.whiteFaint,

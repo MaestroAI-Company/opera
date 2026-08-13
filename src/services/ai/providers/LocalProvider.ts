@@ -1,8 +1,8 @@
 import { Platform } from 'react-native';
 import { IAIProvider } from './IAIProvider';
 import { AICoreProvider } from './AICoreProvider';
-import { MessageMetrics } from '../db/DatabaseService';
-import { ToolCall, ToolDefinition } from "./tools/ITool";
+import { MessageMetrics } from '../../db/DatabaseService';
+import { ToolCall, ToolDefinition } from "../tools/ITool";
 
 //universal on-device provider: picks the local backend for the current platform
 //android -> aicore (gemini nano), ios -> apple foundation models, tauri windows -> phi silica, tauri macos -> apple foundation models

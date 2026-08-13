@@ -1,4 +1,4 @@
-import { IAIProvider } from '../IAIProvider';
+import { IAIProvider } from '../providers/IAIProvider';
 import { ToolCall, ToolDefinition } from './ITool';
 import {
   parseToolCalls,

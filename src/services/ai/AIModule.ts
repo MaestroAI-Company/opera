@@ -1,9 +1,10 @@
-import { IAIProvider } from './IAIProvider';
-import { OllamaProvider } from './OllamaProvider';
+import { IAIProvider } from './providers/IAIProvider';
+import { OllamaProvider } from './providers/OllamaProvider';
 import { ToolManager } from './tools/ToolManager';
+import { ToolSource } from './tools/ITool';
 import { sendMessageWithToolPrompt } from './tools/fallbackToolCall';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
-import { LocalProvider } from './LocalProvider';
+import { LocalProvider } from './providers/LocalProvider';
 import { MessageMetrics } from '../db/DatabaseService';
 import { LocationService } from '../location/LocationService';
 import { Settings } from '../settings/SettingsService';
@@ -32,6 +33,8 @@ class CentralAIModule {
 
   private providers: Map<string, IAIProvider>;
   private activeMode: string = 'OLLAMA';
+  //mode guessed until settings load
+  private modeConfigured = false;
   //model caps need an http call
   private capabilitiesCache = new Map<string, string[]>();
 
@@ -47,6 +50,7 @@ class CentralAIModule {
   setMode(mode: string): void {
     //old 'aicore' setting maps to the universal local provider
     this.activeMode = (mode || 'ollama').toUpperCase() === 'AICORE' ? 'LOCAL' : (mode || 'ollama').toUpperCase();
+    this.modeConfigured = true;
   }
 
   //reconfigure ollama provider with url from settings
@@ -88,6 +92,8 @@ class CentralAIModule {
   }
 
   async preloadModel(modelName: string): Promise<void> {
+    //no provider until settings land
+    if (!this.modeConfigured) return;
     const provider = this.getActiveProvider();
     return provider.preloadModel(modelName);
   }
@@ -101,6 +107,7 @@ class CentralAIModule {
   }
 
   async getModelCapabilities(modelName: string): Promise<string[]> {
+    if (!this.modeConfigured) return [];
     const provider = this.getActiveProvider();
     if (!provider.getModelCapabilities) return [];
 
@@ -179,7 +186,8 @@ class CentralAIModule {
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
     options?: { think?: boolean | string },
-    onMetrics?: (metrics: MessageMetrics) => void
+    onMetrics?: (metrics: MessageMetrics) => void,
+    onSources?: (sources: ToolSource[]) => void
   ): Promise<void> {
     const provider = this.getActiveProvider();
 
@@ -201,6 +209,17 @@ class CentralAIModule {
 
     let currentMessages = [...processedMessages];
     let accumulated = '';
+    const sources: ToolSource[] = [];
+    const recordSource = (source: ToolSource) => {
+      //fetch result upgrades earlier search-only entry
+      const existingIdx = sources.findIndex(s => s.url === source.url);
+      if (existingIdx !== -1) {
+        if (!sources[existingIdx].favicon && source.favicon) sources[existingIdx] = source;
+        return;
+      }
+      sources.push(source);
+      onSources?.([...sources]);
+    };
     const userOnChunk = onChunk;
     const streamingOnChunk = (chunk: string) => {
       accumulated += chunk;
@@ -263,7 +282,7 @@ class CentralAIModule {
         this.SharedGenerationState.activeToolArgs = tc.function.arguments;
         this.SharedGenerationState.notify();
 
-        const toolResult = await ToolManager.execute(tc.function.name, tc.function.arguments, summarize);
+        const toolResult = await ToolManager.execute(tc.function.name, tc.function.arguments, summarize, recordSource);
 
         this.SharedGenerationState.activeToolName = null;
         this.SharedGenerationState.activeToolArgs = null;

@@ -16,7 +16,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { Colors } from '../../../constants/theme';
 import { AIModule } from '../../services/ai/AIModule';
-import { buildSystemPrompt, streamAssistantReply } from '../../services/ai/chatGeneration';
+import { buildSystemPrompt, streamAssistantReply } from '../../services/ai/generation/chatGeneration';
 import { arrayBufferToBase64 } from '../../services/ai/utils/base64';
 import { CloudSync } from '../../services/CloudSyncService';
 import { Conversation, DB, Message } from '../../services/db/DatabaseService';
@@ -35,7 +35,7 @@ import { AppContext, AppIcon, ScreenCapture } from '../../services/overlay/scree
 import { useScreenDetections } from '../../services/overlay/useScreenDetections';
 import { useScreenSelection } from '../../services/overlay/useScreenSelection';
 
-import SearchWebView from '../../../components/SearchWebView';
+import HeadlessWebView from '../../../components/HeadlessWebView';
 import { useAnimatedValue } from '../../hooks/useAnimatedValue';
 import { PluginRegistry } from '../../services/plugins/PluginRegistry';
 import '../../services/widgets/registerWidgets';
@@ -430,6 +430,7 @@ function AssistantOverlay() {
     AIModule.SharedGenerationState.abort = () => abortControllerRef.current?.abort();
 
     let isError = false;
+    let messageSources: Message['sources'];
 
     if (!model) {
       isError = true;
@@ -458,26 +459,21 @@ function AssistantOverlay() {
         } else {
           streamingContentRef.current = outcome.content;
         }
+        messageSources = outcome.sources;
         setMessages(prev => prev.map(m =>
-          m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current } : m
+          m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current, sources: messageSources ?? m.sources } : m
         ));
       } finally {
         abortControllerRef.current = null;
       }
     }
 
-    if (isError) {
-      if (isFirstMessage) {
-        await DB.deleteConversation(conv.id);
-        setActiveConversation(null);
-        activeConversationRef.current = null;
-        setMessages([]);
-      } else {
-        await DB.deleteMessage(userMsg.id);
-        await DB.deleteMessage(assistantMsg.id);
+    //keep partial text on error
+    await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
+    if (!isError) {
+      if (messageSources && messageSources.length > 0) {
+        await DB.updateMessageSources(assistantMsg.id, messageSources);
       }
-    } else {
-      await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
       CloudSync.requestAutoSync(0); //push completed ai message right away
     }
 
@@ -500,7 +496,7 @@ function AssistantOverlay() {
     abortControllerRef.current?.abort();
   }, []);
 
-  //localFallback is the already-captured on-device transcript (native), used instead of whisper when provided
+  //native transcript used instead of whisper
   const handleTranscribe = useCallback(async (wavBuffer: ArrayBuffer, localFallback?: string | null): Promise<string | null> => {
     const model = selectedModelRef.current;
     const useRemote = !alwaysWhisper && modelCapabilities.includes('audio') && model;
@@ -682,7 +678,7 @@ function AssistantOverlay() {
         onClose={() => setModalVisible(false)}
       />
 
-      <SearchWebView />
+      <HeadlessWebView />
     </KeyboardAvoidingView>
   );
 }

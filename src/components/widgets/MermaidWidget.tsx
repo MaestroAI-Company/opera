@@ -49,7 +49,7 @@ const generateMermaidHtml = (rawCode: string) => {
         renderDiagram();
     <\/script>
     <style>
-        body { margin: 0; padding: 16px; background-color: transparent; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Jakarta', sans-serif; overflow: auto; }
+        body { margin: 0; padding: 16px; background-color: transparent; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Figtree', sans-serif; overflow: auto; }
         #container { background-color: transparent; max-width: 100%; display: flex; justify-content: center; }
         ::-webkit-scrollbar { width: 0px; height: 0px; }
     </style>

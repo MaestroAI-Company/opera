@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet } from "react-native";
-import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
+import { useEffect, useRef } from "react";
+import { PanResponder, StyleSheet } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Colors, Radius } from "../../../constants/theme";
 
 type ToggleProps = {
@@ -8,32 +9,78 @@ type ToggleProps = {
   disabled?: boolean;
 };
 
-// custom toggle switch component matching design
+const TRAVEL = 16;
+const TAP_TOLERANCE = 3;
+
+//custom draggable toggle switch matching design
 export default function Toggle({ checked, onToggle, disabled = false }: ToggleProps) {
-  const thumbStyle = useAnimatedStyle(() => {
-    return {
-      transform: [
-        {
-          translateX: withTiming(checked ? 16 : 0, { duration: 200 }),
-        },
-      ],
-      backgroundColor: checked ? Colors.surface : Colors.primary,
-    };
-  });
+  const translateX = useSharedValue(checked ? TRAVEL : 0);
+  const scale = useSharedValue(1);
+  const pressed = useSharedValue(0);
+
+  const startXRef = useRef(0);
+  //keeps PanResponder callbacks (created once) reading fresh props instead of their mount-time values
+  const latestRef = useRef({ checked, onToggle, disabled });
+  latestRef.current = { checked, onToggle, disabled };
+
+  //sync thumb to external state changes
+  useEffect(() => {
+    translateX.value = withTiming(checked ? TRAVEL : 0, { duration: 200 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checked]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => !latestRef.current.disabled,
+      onMoveShouldSetPanResponder: () => !latestRef.current.disabled,
+      //keep the gesture even if the settings drawer's swipe-to-close tries to steal it
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        startXRef.current = translateX.value;
+        scale.value = withTiming(1.2, { duration: 120 });
+        pressed.value = withTiming(1, { duration: 120 });
+      },
+      onPanResponderMove: (_e, g) => {
+        translateX.value = Math.min(TRAVEL, Math.max(0, startXRef.current + g.dx));
+      },
+      onPanResponderRelease: (_e, g) => {
+        const { checked: isChecked, onToggle: cb } = latestRef.current;
+        const isTap = Math.abs(g.dx) < TAP_TOLERANCE;
+        const next = isTap ? !isChecked : translateX.value >= TRAVEL / 2;
+        translateX.value = withTiming(next ? TRAVEL : 0, { duration: 200 });
+        scale.value = withTiming(1, { duration: 150 });
+        pressed.value = withTiming(0, { duration: 150 });
+        if (next !== isChecked) cb(next);
+      },
+      onPanResponderTerminate: () => {
+        const { checked: isChecked } = latestRef.current;
+        translateX.value = withTiming(isChecked ? TRAVEL : 0, { duration: 200 });
+        scale.value = withTiming(1, { duration: 150 });
+        pressed.value = withTiming(0, { duration: 150 });
+      },
+    })
+  ).current;
+
+  const thumbStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }, { scale: scale.value }],
+    backgroundColor: checked ? Colors.surface : Colors.primary,
+  }));
+
+  const trackStyle = useAnimatedStyle(() => ({
+    opacity: disabled ? 0.5 : 1 - 0.2 * pressed.value,
+  }));
 
   return (
-    <Pressable
-      style={({ pressed, hovered }) => [
+    <Animated.View
+      style={[
         styles.track,
         checked ? styles.trackChecked : styles.trackUnchecked,
-        (pressed || hovered) && !disabled && { opacity: 0.8 },
-        disabled && { opacity: 0.5 },
+        trackStyle,
       ]}
-      onPress={() => !disabled && onToggle(!checked)}
-      disabled={disabled}
+      {...panResponder.panHandlers}
     >
       <Animated.View style={[styles.thumb, thumbStyle]} />
-    </Pressable>
+    </Animated.View>
   );
 }
 

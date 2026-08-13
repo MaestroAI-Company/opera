@@ -363,7 +363,10 @@ export function deriveChatDisplay(raw: string, isGenerating: boolean, liveTool: 
   const thinkMatches = [...normalized.matchAll(/<think>([\s\S]*?)(?:<\/think>|$)/g)];
   const thinkingText = thinkMatches.map(m => m[1].trim()).filter(t => t.length > 0).join('\n');
 
-  const stripped = normalized.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '');
+  const stripped = normalized
+    .replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '')
+    //strip citation markers from text
+    .replace(/\[\[cite:[\s\S]*?(?:\]\]|$)/g, '');
   const blocks = findToolCallBlocks(stripped, isGenerating);
 
   //keep tool json for bubbles

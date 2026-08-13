@@ -17,7 +17,7 @@ import {
 } from "react-native";
 import { KeyboardAvoidingView, KeyboardController } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import SearchWebView from "../../components/SearchWebView";
+import HeadlessWebView from "../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { Colors, Fonts, FontSizes, Radius } from "../../constants/theme";
 import ChatBar from "../components/features/ChatBar";
@@ -30,9 +30,10 @@ import TopBar from "../components/features/TopBar";
 import NotificationModal from "../components/ui/NotificationModal";
 import { useResponsive } from "../hooks/useResponsive";
 import { AIModule } from "../services/ai/AIModule";
-import { buildSystemPrompt, streamAssistantReply } from "../services/ai/chatGeneration";
+import { buildSystemPrompt, streamAssistantReply } from "../services/ai/generation/chatGeneration";
 import { arrayBufferToBase64 } from "../services/ai/utils/base64";
 import { Conversation, DB, Message, MessageMetrics } from "../services/db/DatabaseService";
+import { splitDocumentBlocks } from "../services/documents/DocumentService";
 import {
   getInitialDeepLink,
   subscribeToDeepLinks,
@@ -669,10 +670,13 @@ export default function Index() {
     async (convId: string, userMessage: string, images?: string[]) => {
       try {
         let title = "";
+        //title prompt only needs doc names
+        const { names, text } = splitDocumentBlocks(userMessage);
+        const summarized = names.length > 0 ? `${names.join(', ')}\n${text}` : text;
         await AIModule.sendMessage(
           selectedModel,
           SYSTEM_PROMPTS.SUMMARIZE,
-          [{ role: "user", content: userMessage, images }],
+          [{ role: "user", content: summarized, images }],
           (chunk) => { title += chunk; },
           undefined,
           { think: false }
@@ -786,6 +790,7 @@ export default function Index() {
 
         let isError = false;
         let messageMetrics: MessageMetrics | undefined;
+        let messageSources: Message['sources'];
 
         //send to AI and stream chunks
         if (!taskSelectedModel) {
@@ -819,25 +824,25 @@ export default function Index() {
             } else {
               streamingContentRef.current = outcome.content;
             }
+            messageSources = outcome.sources;
             showAssistantContent(assistantMsg.id, taskConv.id, streamingContentRef.current);
+            if (messageSources && messageSources.length > 0 && activeConversationRef.current?.id === taskConv.id) {
+              setMessages((prev) => prev.map((msg) => msg.id === assistantMsg.id ? { ...msg, sources: messageSources } : msg));
+            }
           } finally {
             abortControllerRef.current = null;
           }
         }
 
         if (!isIncognitoTask) {
-          if (isError) {
-            if (isFirstMessage) {
-              await DB.deleteConversation(taskConv.id);
-            } else {
-              await DB.deleteMessage(userMsg.id);
-              await DB.deleteMessage(assistantMsg.id);
-            }
-          } else {
-            //save final assistant message content to db
-            await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
+          //keep partial text on error
+          await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
+          if (!isError) {
             if (messageMetrics) {
               await DB.updateMessageMetrics(assistantMsg.id, messageMetrics);
+            }
+            if (messageSources && messageSources.length > 0) {
+              await DB.updateMessageSources(assistantMsg.id, messageSources);
             }
             //refresh conversation list (updatedAt changed)
             await loadConversations();
@@ -869,8 +874,8 @@ export default function Index() {
     [dbReady, incognitoMode, activeConversation, selectedModel, selectedReflection, generateTitle, userInstruction, aiService, ollamaUrl, scheduleFlush]
   );
 
-  //transcribe audio: use remote model if it supports audio and user hasnt forced local transcription
-  //localFallback is the already-captured on-device transcript (native), used instead of whisper when provided
+  //use remote model unless local forced
+  //native transcript used instead of whisper
   const handleTranscribe = useCallback(async (wavBuffer: ArrayBuffer, localFallback?: string | null): Promise<string | null> => {
     const useRemote = !alwaysWhisper && modelCapabilities.includes("audio") && selectedModel;
 
@@ -966,6 +971,7 @@ export default function Index() {
       abortControllerRef.current = new AbortController();
       let isError = false;
       let messageMetrics: MessageMetrics | undefined;
+      let messageSources: Message['sources'];
 
       if (!taskSelectedModel) {
         isError = true;
@@ -998,19 +1004,25 @@ export default function Index() {
           } else {
             streamingContentRef.current = outcome.content;
           }
+          messageSources = outcome.sources;
           showAssistantContent(assistantMsg.id, taskConv.id, streamingContentRef.current);
+          if (messageSources && messageSources.length > 0 && activeConversationRef.current?.id === taskConv.id) {
+            setMessages((prev) => prev.map((msg) => msg.id === assistantMsg.id ? { ...msg, sources: messageSources } : msg));
+          }
         } finally {
           abortControllerRef.current = null;
         }
       }
 
       if (!isIncognitoTask) {
-        if (isError) {
-          await DB.deleteMessage(assistantMsg.id);
-        } else {
-          await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
+        //keep partial text on error
+        await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
+        if (!isError) {
           if (messageMetrics) {
             await DB.updateMessageMetrics(assistantMsg.id, messageMetrics);
+          }
+          if (messageSources && messageSources.length > 0) {
+            await DB.updateMessageSources(assistantMsg.id, messageSources);
           }
           await loadConversations();
         }
@@ -1300,7 +1312,7 @@ export default function Index() {
       {isDesktop ? null : conversationsDrawer}
       {isDesktop ? null : settingsDrawer}
 
-      <SearchWebView />
+      <HeadlessWebView />
 
       <NotificationModal
         visible={showDataWarning}

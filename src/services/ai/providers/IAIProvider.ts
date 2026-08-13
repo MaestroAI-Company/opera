@@ -1,5 +1,5 @@
-import { MessageMetrics } from '../db/DatabaseService';
-import { ToolCall, ToolDefinition } from './tools/ITool';
+import { MessageMetrics } from '../../db/DatabaseService';
+import { ToolCall, ToolDefinition } from '../tools/ITool';
 
 export interface IAIProvider {
   //check if service is online

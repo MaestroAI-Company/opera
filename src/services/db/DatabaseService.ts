@@ -19,6 +19,13 @@ export type MessageMetrics = {
   tokensPerSec?: number;
 };
 
+//web page consulted during generation
+export type MessageSource = {
+  url: string;
+  title?: string;
+  favicon?: string;
+};
+
 export type Message = {
   id: string;
   conversationId: string;
@@ -27,6 +34,7 @@ export type Message = {
   createdAt: number;
   images?: string[];
   metrics?: MessageMetrics;
+  sources?: MessageSource[];
   //app context at send time
   screenContext?: { appPackage: string | null; hasScreenText: boolean; icon?: string | null; label?: string | null };
 };
@@ -134,6 +142,12 @@ class DatabaseService {
         //column may already exist
       }
 
+      try {
+        await this.db.runAsync('ALTER TABLE messages ADD COLUMN sources TEXT');
+      } catch {
+        //column may already exist
+      }
+
       //conversation open filters on column
       await this.db.runAsync(
         'CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversationId, createdAt)'
@@ -214,7 +228,8 @@ class DatabaseService {
          WHERE c.id IS NULL
             OR (m.images IS NOT NULL AND json_valid(m.images) = 0)
             OR (m.metrics IS NOT NULL AND json_valid(m.metrics) = 0)
-            OR (m.screenContext IS NOT NULL AND json_valid(m.screenContext) = 0)`
+            OR (m.screenContext IS NOT NULL AND json_valid(m.screenContext) = 0)
+            OR (m.sources IS NOT NULL AND json_valid(m.sources) = 0)`
       );
       return !!issues && issues.count > 0;
     } catch (e) {
@@ -411,6 +426,12 @@ class DatabaseService {
     await db.runAsync('UPDATE messages SET metrics = ? WHERE id = ?', [JSON.stringify(metrics), id]);
   }
 
+  //store sources consulted for a message
+  async updateMessageSources(id: string, sources: Message['sources']): Promise<void> {
+    const db = this.getDb();
+    await db.runAsync('UPDATE messages SET sources = ? WHERE id = ?', [sources && sources.length > 0 ? JSON.stringify(sources) : null, id]);
+  }
+
   //get all messages for a conversation
   async getMessages(conversationId: string): Promise<Message[]> {
     const db = this.getDb();
@@ -422,7 +443,8 @@ class DatabaseService {
       ...row,
       images: row.images ? JSON.parse(row.images) : undefined,
       metrics: row.metrics ? JSON.parse(row.metrics) : undefined,
-      screenContext: row.screenContext ? JSON.parse(row.screenContext) : undefined
+      screenContext: row.screenContext ? JSON.parse(row.screenContext) : undefined,
+      sources: row.sources ? JSON.parse(row.sources) : undefined
     }));
   }
 
@@ -434,7 +456,8 @@ class DatabaseService {
       ...row,
       images: row.images ? JSON.parse(row.images) : undefined,
       metrics: row.metrics ? JSON.parse(row.metrics) : undefined,
-      screenContext: row.screenContext ? JSON.parse(row.screenContext) : undefined
+      screenContext: row.screenContext ? JSON.parse(row.screenContext) : undefined,
+      sources: row.sources ? JSON.parse(row.sources) : undefined
     }));
   }
 
@@ -466,9 +489,10 @@ class DatabaseService {
         const imagesJson = msg.images ? JSON.stringify(msg.images) : null;
         const metricsJson = msg.metrics ? JSON.stringify(msg.metrics) : null;
         const screenContextJson = msg.screenContext ? JSON.stringify(msg.screenContext) : null;
+        const sourcesJson = msg.sources ? JSON.stringify(msg.sources) : null;
         await db.runAsync(
-          'INSERT INTO messages (id, conversationId, role, content, createdAt, images, metrics, screenContext) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson, metricsJson, screenContextJson]
+          'INSERT INTO messages (id, conversationId, role, content, createdAt, images, metrics, screenContext, sources) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson, metricsJson, screenContextJson, sourcesJson]
         );
       }
     });
@@ -490,9 +514,10 @@ class DatabaseService {
         const imagesJson = msg.images ? JSON.stringify(msg.images) : null;
         const metricsJson = msg.metrics ? JSON.stringify(msg.metrics) : null;
         const screenContextJson = msg.screenContext ? JSON.stringify(msg.screenContext) : null;
+        const sourcesJson = msg.sources ? JSON.stringify(msg.sources) : null;
         await db.runAsync(
-          'INSERT INTO messages (id, conversationId, role, content, createdAt, images, metrics, screenContext) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson, metricsJson, screenContextJson]
+          'INSERT INTO messages (id, conversationId, role, content, createdAt, images, metrics, screenContext, sources) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson, metricsJson, screenContextJson, sourcesJson]
         );
       }
     });

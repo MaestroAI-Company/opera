@@ -25,6 +25,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import {
+  DOCUMENT_MIME_TYPES,
+  classifyDocument,
+  extractDocument,
+  formatDocumentsForPrompt,
+  type ExtractedDocument,
+} from "../../services/documents/DocumentService";
 import { Settings } from "../../services/settings/SettingsService";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
 import NotificationModal from "../ui/NotificationModal";
@@ -34,6 +41,7 @@ const nextWhiteIcon = require("../../../assets/icons/arrow.png");
 const micIcon = require("../../../assets/icons/microphone.png");
 const addIcon = require("../../../assets/icons/add.png");
 const stopIcon = require("../../../assets/icons/stop.png");
+const fileIcon = require("../../../assets/icons/file.png");
 
 const IMAGE_MAX_WIDTH = 1280;
 const IMAGE_COMPRESS_QUALITY = 0.7;
@@ -42,7 +50,7 @@ const IMAGE_COMPRESS_QUALITY = 0.7;
 const SUPPORTED_AUDIO_EXTENSIONS = ['wav', 'mp3'];
 const AUDIO_EXTENSION_PATTERN = /\.(wav|mp3|m4a|aac|flac|ogg)$/;
 
-type AttachmentKind = 'image' | 'audio' | 'unsupported';
+type AttachmentKind = 'image' | 'audio' | 'document' | 'unsupported';
 
 //one attach rule for all pickers
 function classifyAttachment(name: string, mimeType?: string | null): AttachmentKind {
@@ -50,7 +58,7 @@ function classifyAttachment(name: string, mimeType?: string | null): AttachmentK
 
   const lowerName = name.toLowerCase();
   const looksLikeAudio = mimeType?.startsWith('audio/') || AUDIO_EXTENSION_PATTERN.test(lowerName);
-  if (!looksLikeAudio) return 'unsupported';
+  if (!looksLikeAudio) return classifyDocument(name, mimeType) ? 'document' : 'unsupported';
 
   const extension = lowerName.split('.').pop() ?? '';
   return SUPPORTED_AUDIO_EXTENSIONS.includes(extension) ? 'audio' : 'unsupported';
@@ -218,6 +226,34 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const [recentPhotos, setRecentPhotos] = useState<any[]>([]);
   const autoStartedRef = useRef(false);
   const transcribeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  //cache extraction so send stays instant
+  const documentsRef = useRef(new Map<string, Promise<ExtractedDocument>>());
+
+  const readDocument = (file: SelectedFile): Promise<ExtractedDocument> => {
+    let pending = documentsRef.current.get(file.uri);
+    if (!pending) {
+      pending = extractDocument({ uri: file.uri, name: file.name, mimeType: file.mimeType });
+      documentsRef.current.set(file.uri, pending);
+    }
+    return pending;
+  };
+
+  //warm cache and drop unreadable files
+  useEffect(() => {
+    let cancelled = false;
+    selectedFiles
+      .filter(f => f.type === 'document' && !documentsRef.current.has(f.uri))
+      .forEach(file => {
+        readDocument(file).catch((e: any) => {
+          documentsRef.current.delete(file.uri);
+          if (cancelled) return;
+          setSelectedFiles(prev => prev.filter(f => f.uri !== file.uri));
+          setModalConfig({ title: "Unreadable Document", message: `${file.name}: ${e.message}` });
+          setModalVisible(true);
+        });
+      });
+    return () => { cancelled = true; };
+  }, [selectedFiles]);
 
   useImperativeHandle(ref, () => ({
     stopRecording: () => {
@@ -340,7 +376,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     if (transcribed) setText(transcribed);
   };
 
-  //reads the persisted recording and tries the remote model, falling back to the native live transcript
+  //try remote model on persisted audio
   const resolveNativeTranscript = async (localText: string | null): Promise<string | null> => {
     const uri = nativeAudioUriRef.current;
     nativeAudioUriRef.current = null;
@@ -717,7 +753,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const handlePickFiles = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['image/*', 'audio/wav', 'audio/x-wav', 'audio/mpeg', 'audio/mp3'],
+        type: ['image/*', 'audio/wav', 'audio/x-wav', 'audio/mpeg', 'audio/mp3', ...DOCUMENT_MIME_TYPES],
         multiple: true,
         copyToCacheDirectory: true
       });
@@ -731,11 +767,11 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
             hasInvalidFile = true;
             continue;
           }
-          validFiles.push({ uri: a.uri, type: kind, name: a.name });
+          validFiles.push({ uri: a.uri, type: kind, name: a.name, mimeType: a.mimeType ?? undefined });
         }
 
         if (hasInvalidFile) {
-          setModalConfig({ title: "Unsupported Format", message: "Only WAV and MP3 audio files are supported." });
+          setModalConfig({ title: "Unsupported Format", message: "Audio must be WAV or MP3. Documents must be PDF, Word or plain text." });
           setModalVisible(true);
         }
 
@@ -867,12 +903,14 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     }
   }, [hasAttachments, filesAnim]);
 
-  //only picked files need compressing
+  //compress only picked images
   const buildImages = async (): Promise<string[]> => {
     const picked = await Promise.all(
-      selectedFiles.map(f => f.type === 'image'
-        ? compressImageToDataUri(f.uri)
-        : Promise.resolve(`${f.uri}?name=${encodeURIComponent(f.name)}`))
+      selectedFiles
+        .filter(f => f.type !== 'document')
+        .map(f => f.type === 'image'
+          ? compressImageToDataUri(f.uri)
+          : Promise.resolve(`${f.uri}?name=${encodeURIComponent(f.name)}`))
     );
     return selection?.uri ? [...picked, selection.uri] : picked;
   };
@@ -888,10 +926,23 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     }
     const finalText = (voiceText ?? text).trim();
     if ((finalText || attachments.length > 0) && onSend) {
+      let documents: ExtractedDocument[];
+      try {
+        documents = await Promise.all(selectedFiles.filter(f => f.type === 'document').map(readDocument));
+      } catch (e: any) {
+        setModalConfig({ title: "Unreadable Document", message: e.message });
+        setModalVisible(true);
+        return;
+      }
       const images = await buildImages();
-      onSend(finalText, images, voiceText != null);
+      onSend(
+        formatDocumentsForPrompt(documents) + finalText,
+        [...images, ...documents.flatMap(d => d.images)],
+        voiceText != null
+      );
       setText("");
       setSelectedFiles([]);
+      documentsRef.current.clear();
     } else if (voiceText === null && wasRecording && autoStartMic) {
       onTranscribeError?.();
     }
@@ -930,7 +981,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
             const reader = new FileReader();
             reader.onload = (ev) => {
-              resolve({ uri: ev.target?.result as string, type: kind, name });
+              resolve({ uri: ev.target?.result as string, type: kind, name, mimeType: file.type });
             };
             reader.onerror = () => resolve(null);
             reader.readAsDataURL(file);
@@ -941,7 +992,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
           const validFiles = results.filter(r => r !== null) as SelectedFile[];
 
           if (validFiles.length < pastedFiles.length) {
-            setModalConfig({ title: "Unsupported Format", message: "Only images, WAV and MP3 audio files are supported." });
+            setModalConfig({ title: "Unsupported Format", message: "Only images, WAV/MP3 audio and PDF, Word or plain text documents are supported." });
             setModalVisible(true);
           }
 
@@ -991,7 +1042,11 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                             <Image source={{ uri: chip.uri }} style={styles.filePreviewImageTop} />
                           ) : (
                             <View style={styles.filePreviewAudioTop}>
-                              <Text style={styles.filePreviewAudioTextTop} numberOfLines={1}>{chip.name}</Text>
+                              {chip.kind === 'document' ? (
+                                <Image source={fileIcon} style={styles.filePreviewDocumentIconTop} tintColor={Colors.surface} />
+                              ) : (
+                                <Text style={styles.filePreviewAudioTextTop} numberOfLines={1}>{chip.name}</Text>
+                              )}
                             </View>
                           )}
                           <Pressable style={({ pressed, hovered }) => [styles.removeFileBtnTop, (pressed || hovered) && { opacity: 0.8 }]} onPress={chip.onRemove}>
@@ -1247,6 +1302,10 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: FontSizes.xxs,
     textAlign: 'center',
+  },
+  filePreviewDocumentIconTop: {
+    width: 18,
+    height: 18,
   },
   removeFileBtnTop: {
     position: 'absolute',

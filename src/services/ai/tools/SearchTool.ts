@@ -1,4 +1,4 @@
-import { ITool, ToolDefinition, ToolPlatform } from './ITool';
+import { ITool, ToolDefinition, ToolPlatform, ToolSource } from './ITool';
 import { SearchBridge } from '../../search/SearchBridge';
 import { Platform } from 'react-native';
 import { universalFetch } from '../utils/universalFetch';
@@ -30,7 +30,8 @@ export class SearchTool implements ITool {
 
   async execute(
     args: Record<string, any>,
-    summarize?: (text: string) => Promise<string>
+    summarize?: (text: string) => Promise<string>,
+    recordSource?: (source: ToolSource) => void
   ): Promise<string> {
     const query = args.query;
     if (!query || typeof query !== 'string') {
@@ -80,6 +81,10 @@ export class SearchTool implements ITool {
 
       if (results.length === 0) {
         return 'No search results found.';
+      }
+
+      for (const r of results) {
+        if (r.url && r.title) recordSource?.({ url: r.url, title: r.title });
       }
 
       const formatted = results.map((r, i) => {

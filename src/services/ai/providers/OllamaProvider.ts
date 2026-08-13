@@ -1,8 +1,8 @@
 import { IAIProvider } from './IAIProvider';
-import { ToolCall, ToolDefinition } from './tools/ITool';
-import { NotificationService } from '../notifications/NotificationService';
-import { MessageMetrics } from '../db/DatabaseService';
-import { universalFetch } from './utils/universalFetch';
+import { ToolCall, ToolDefinition } from '../tools/ITool';
+import { NotificationService } from '../../notifications/NotificationService';
+import { MessageMetrics } from '../../db/DatabaseService';
+import { universalFetch } from '../utils/universalFetch';
 
 export class OllamaProvider implements IAIProvider {
   private baseUrl: string;

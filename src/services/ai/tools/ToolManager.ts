@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { ITool, ToolDefinition, ToolPlatform } from './ITool';
+import { ITool, ToolDefinition, ToolPlatform, ToolSource } from './ITool';
 import { SearchTool } from './SearchTool';
 import { FetchPagesTool } from './FetchPagesTool';
 import { MathTool } from './MathTool';
@@ -67,7 +67,8 @@ class ToolManagerService {
   async execute(
     name: string,
     args: Record<string, any>,
-    summarize?: (text: string) => Promise<string>
+    summarize?: (text: string) => Promise<string>,
+    recordSource?: (source: ToolSource) => void
   ): Promise<string> {
     const tool = this.tools.get(name);
     if (!tool) {
@@ -82,12 +83,12 @@ class ToolManagerService {
     }
 
     if (__DEV__) {
-      //no args/result here: they can carry contacts, messages, and other private data
+      //private data in args and result
       console.log(`[ToolManager] executing ${name}`);
     }
 
     try {
-      return await tool.execute(args, summarize);
+      return await tool.execute(args, summarize, recordSource);
     } catch (e: any) {
       console.error(`[ToolManager] Tool ${name} failed:`, e);
       return `Tool error: ${e.message}`;

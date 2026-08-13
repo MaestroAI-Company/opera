@@ -1,13 +1,13 @@
 import { DeviceEventEmitter, NativeModules, Platform } from 'react-native';
 import { IAIProvider } from './IAIProvider';
-import { MessageMetrics } from '../db/DatabaseService';
-import { ToolCall, ToolDefinition } from "./tools/ITool";
+import { MessageMetrics } from '../../db/DatabaseService';
+import { ToolCall, ToolDefinition } from "../tools/ITool";
 import {
   parseToolCalls,
   buildToolSystemPrompt,
   buildToolResultsPrompt,
   extractContentBeforeToolCalls,
-} from "./tools/toolCallParser";
+} from "../tools/toolCallParser";
 
 const MODULE =
   Platform.OS === "android" ? (NativeModules.AICoreModule as any) : null;

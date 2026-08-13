@@ -16,7 +16,7 @@ import {
 import LottieView from "lottie-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors, Fonts, FontSizes, Radius, Spacing } from "../../../constants/theme";
-import { getAICoreModelLabel } from "../../services/ai/AICoreProvider";
+import { getAICoreModelLabel } from "../../services/ai/providers/AICoreProvider";
 import { AIModule } from "../../services/ai/AIModule";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useResponsive } from "../../hooks/useResponsive";
@@ -162,7 +162,7 @@ export default function ModelDropdown({
     if (selectedModel) {
       AIModule.preloadModel(selectedModel).catch(console.error);
     }
-  }, [selectedModel]);
+  }, [selectedModel, aiService]);
 
   const handlePullModel = () => {
     setDownloadModalVisible(false);

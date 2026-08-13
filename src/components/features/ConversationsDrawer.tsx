@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
   },
   quickActionLabel: {
     fontSize: FontSizes.body,
-    color: Colors.textSecondary,
+    color: Colors.textPrimary,
     fontFamily: Fonts.mono,
   },
   scrollContent: {

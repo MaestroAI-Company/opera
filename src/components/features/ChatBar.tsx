@@ -1,10 +1,10 @@
 
 import * as DocumentPicker from 'expo-document-picker';
-import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library/legacy';
 import { TextInputWrapper } from "expo-paste-input";
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState, useMemo } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   Animated,
   BackHandler,
@@ -22,12 +22,12 @@ import {
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Settings } from "../../services/settings/SettingsService";
-import { STT, WhisperSTT } from "../../services/speech/STTService";
-import AttachmentSheet, { SelectedFile } from "./AttachmentSheet";
-import NotificationModal from "../ui/NotificationModal";
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { Settings } from "../../services/settings/SettingsService";
+import { STT, WhisperSTT } from "../../services/speech/STTService";
+import NotificationModal from "../ui/NotificationModal";
+import AttachmentSheet, { SelectedFile } from "./AttachmentSheet";
 
 const nextWhiteIcon = require("../../../assets/icons/arrow.png");
 const micIcon = require("../../../assets/icons/microphone.png");
@@ -816,6 +816,36 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     });
   });
 
+  const hasAttachments = attachments.length > 0 || !!appContextChip;
+  const [renderFiles, setRenderFiles] = useState(hasAttachments);
+  const filesAnim = useAnimatedValue(hasAttachments ? 1 : 0);
+  const [drawerHeight, setDrawerHeight] = useState(36);
+
+  //keep the drawer mounted through the close slide, unmount when it finishes
+  useEffect(() => {
+    if (hasAttachments) {
+      setRenderFiles(true);
+      const raf = requestAnimationFrame(() => {
+        Animated.timing(filesAnim, {
+          toValue: 1,
+          duration: 150,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: Platform.OS !== "web",
+        }).start();
+      });
+      return () => cancelAnimationFrame(raf);
+    } else {
+      Animated.timing(filesAnim, {
+        toValue: 0,
+        duration: 130,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: Platform.OS !== "web",
+      }).start(({ finished }) => {
+        if (finished) setRenderFiles(false);
+      });
+    }
+  }, [hasAttachments, filesAnim]);
+
   //only picked files need compressing
   const buildImages = async (): Promise<string[]> => {
     const picked = await Promise.all(
@@ -915,44 +945,51 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         <Animated.View style={{ width: '100%', maxWidth: 800, zIndex: 2, elevation: 9 }}>
           <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.pressableWrapper}>
             <Animated.View style={{ transform: [{ scale }] }}>
-              {attachments.length > 0 || !!appContextChip ? (
-                <View style={[styles.filesContainerTop, incognito && styles.filesContainerTopIncognito]}>
-                  <View style={styles.fileChipsContainer}>
-                    {appContextChip && (
-                      <View style={styles.filePreviewContainerTop}>
-                        <Image source={{ uri: appContextChip.icon }} style={styles.appContextChipIcon} resizeMode="contain" />
-                        {onAppContextRemove && (
-                          <Pressable style={({ pressed, hovered }) => [styles.removeFileBtnTop, (pressed || hovered) && { opacity: 0.8 }]} onPress={onAppContextRemove}>
+              {renderFiles ? (
+                <Animated.View
+                  onLayout={e => setDrawerHeight(e.nativeEvent.layout.height)}
+                  style={{
+                    transform: [{ translateY: filesAnim.interpolate({ inputRange: [0, 1], outputRange: [drawerHeight, 0] }) }],
+                  }}
+                >
+                  <View style={[styles.filesContainerTop, incognito && styles.filesContainerTopIncognito]}>
+                    <View style={styles.fileChipsContainer}>
+                      {appContextChip && (
+                        <View style={styles.filePreviewContainerTop}>
+                          <Image source={{ uri: appContextChip.icon }} style={styles.appContextChipIcon} resizeMode="contain" />
+                          {onAppContextRemove && (
+                            <Pressable style={({ pressed, hovered }) => [styles.removeFileBtnTop, (pressed || hovered) && { opacity: 0.8 }]} onPress={onAppContextRemove}>
+                              <Text style={styles.removeFileBtnTextTop}>✕</Text>
+                            </Pressable>
+                          )}
+                        </View>
+                      )}
+                      {attachments.map(chip => (
+                        <View key={chip.key} style={styles.filePreviewContainerTop}>
+                          {chip.kind === 'image' ? (
+                            <Image source={{ uri: chip.uri }} style={styles.filePreviewImageTop} />
+                          ) : (
+                            <View style={styles.filePreviewAudioTop}>
+                              <Text style={styles.filePreviewAudioTextTop} numberOfLines={1}>{chip.name}</Text>
+                            </View>
+                          )}
+                          <Pressable style={({ pressed, hovered }) => [styles.removeFileBtnTop, (pressed || hovered) && { opacity: 0.8 }]} onPress={chip.onRemove}>
                             <Text style={styles.removeFileBtnTextTop}>✕</Text>
                           </Pressable>
-                        )}
-                      </View>
-                    )}
-                    {attachments.map(chip => (
-                      <View key={chip.key} style={styles.filePreviewContainerTop}>
-                        {chip.kind === 'image' ? (
-                          <Image source={{ uri: chip.uri }} style={styles.filePreviewImageTop} />
-                        ) : (
-                          <View style={styles.filePreviewAudioTop}>
-                            <Text style={styles.filePreviewAudioTextTop} numberOfLines={1}>{chip.name}</Text>
-                          </View>
-                        )}
-                        <Pressable style={({ pressed, hovered }) => [styles.removeFileBtnTop, (pressed || hovered) && { opacity: 0.8 }]} onPress={chip.onRemove}>
-                          <Text style={styles.removeFileBtnTextTop}>✕</Text>
-                        </Pressable>
-                      </View>
-                    ))}
-                    <Text style={[styles.filesAddedText, incognito && { color: Colors.textMuted }]}>
-                      {(() => {
-                        const filesPart = attachments.length > 0 ? `${attachments.length} File${attachments.length !== 1 ? 's' : ''}` : '';
-                        const appPart = appContextChip ? 'App context' : '';
-                        if (filesPart && appPart) return `${filesPart} and app context Added`;
-                        if (filesPart) return `${filesPart} Added`;
-                        return `${appPart} Added`;
-                      })()}
-                    </Text>
+                        </View>
+                      ))}
+                      <Text style={[styles.filesAddedText, incognito && { color: Colors.textMuted }]}>
+                        {(() => {
+                          const filesPart = attachments.length > 0 ? `${attachments.length} File${attachments.length !== 1 ? 's' : ''}` : '';
+                          const appPart = appContextChip ? 'App context' : '';
+                          if (filesPart && appPart) return `${filesPart} and app context Added`;
+                          if (filesPart) return `${filesPart} Added`;
+                          return `${appPart} Added`;
+                        })()}
+                      </Text>
+                    </View>
                   </View>
-                </View>
+                </Animated.View>
               ) : null}
 
               <Animated.View

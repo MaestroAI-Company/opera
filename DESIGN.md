@@ -66,18 +66,18 @@ typography:
     fontSize: 10px
     fontWeight: 500
   body:
-    fontFamily: Jakarta
+    fontFamily: Figtree
     fontSize: 15px
     lineHeight: 21px
   body-md:
-    fontFamily: Jakarta
+    fontFamily: Figtree
     fontSize: 14px
     lineHeight: 20px
   caption:
-    fontFamily: Jakarta
+    fontFamily: Figtree
     fontSize: 13px
   micro:
-    fontFamily: Jakarta
+    fontFamily: Figtree
     fontSize: 11px
   code:
     fontFamily: IBMPlexMono-Medium
@@ -89,6 +89,7 @@ rounded:
   lg: 6px
   xl: 8px
   xxl: 10px
+  window: 15px
   huge: 16px
   pill: 20px
 spacing:
@@ -158,7 +159,7 @@ components:
     rounded: "{rounded.xxl}"
   modal:
     backgroundColor: "{colors.surface}"
-    rounded: "{rounded.xxl}"
+    rounded: "{rounded.window}"
     padding: 16px
   code-block:
     backgroundColor: "{colors.code-block-bg}"
@@ -201,7 +202,7 @@ The palette is rooted in a warm cream foundation, a single red accent, and a ful
 Three fonts with strict roles — never swap them.
 
 - **Petrona (serif):** Display only. Drawer titles ("Settings", "Discussions"), conversation headers, welcome and onboarding screens. Sizes 22–48px. It carries the editorial, literary identity.
-- **Plus Jakarta Sans:** Reading content. Chat bubbles, markdown body, captions, help text. Sizes 13–16px.
+- **Figtree:** Reading content. Chat bubbles, markdown body, captions, help text. Sizes 13–16px.
 - **IBM Plex Mono (Medium):** UI chrome. Buttons, labels, nav items, timestamps, dropdown options, setting names, section headers. Sizes 10–17px. Its technical construction gives the terminal/engineer feel that matches a local AI tool.
 
 ## Layout
@@ -227,6 +228,7 @@ Depth comes from **2px sticker outlines and hard-offset shadows**, not heavy blu
 The shape language is **sticker-like**: 2px outlines on nearly every interactive element, with a **10px default radius** for cards, inputs, buttons, and bubbles.
 
 - `sm` 4px — checkboxes, inline code; `lg` 6px — code blocks; `xl` 8px — message images, dropdown options.
+- `window` 15px — confirmation/info modal windows only, with buttons and inputs inside staying at the 10px default.
 - `huge` 16px — 32×32 icon buttons and audio bubbles; `pill` 20px — toggles, snackbars, avatars.
 - Don't mix sharp and rounded corners in the same view.
 
@@ -234,17 +236,17 @@ The shape language is **sticker-like**: 2px outlines on nearly every interactive
 
 - **Buttons:** Primary is solid Opera Red with white mono text (pressed → #D61515). Ghost is white with a 2px ink outline and mono secondary text (pressed → surface-pressed). Danger is a soft red-tinted fill (#FFF0F0) with red mono text.
 - **Input fields:** White bordered pills, 10px radius, mono 14px text, placeholder #AAAAAA, optional 18×18 leading icon.
-- **Chat messages:** User messages are right-aligned red pills (10px radius, max-width 80%) with white Plus Jakarta Sans text — purple #565A75 in incognito. Assistant messages are transparent and full-width, rendered as markdown with no bubble.
+- **Chat messages:** User messages are right-aligned red pills (10px radius, max-width 80%) with white Figtree text — purple #565A75 in incognito. Assistant messages are transparent and full-width, rendered as markdown with no bubble.
 - **Chat composer:** A 56px colored pill (red, or dark #2A2A35 incognito) with a glow shadow; white 16px text, 28×28 plus/mic/send icon buttons.
 - **Code blocks:** Dark #1E1E1E background, #D4D4D4 text, 6px radius, mono 13px, VS2015-style highlighting. Inline code is #F0F0F0 with pink #D63384 text.
-- **Drawers & modals:** White surfaces with scrims (drawer rgba(0,0,0,0.25), modal rgba(0,0,0,0.4)); drawers use the sticker shadow on desktop.
+- **Drawers & modals:** White surfaces with scrims (drawer rgba(0,0,0,0.25), modal rgba(0,0,0,0.4)); drawers use the sticker shadow on desktop. Confirmation/info modals (`NotificationModal`) use a 15px window radius, with their buttons and text input kept at the 10px default.
 - **Snackbar:** A #333333 pill floating above the composer, white mono text.
 
 ## Do's and Don'ts
 
 - Do use Opera Red only for the single most important action per screen.
 - Do always pull values from the design tokens in `constants/theme.ts` (Colors, Fonts, FontSizes, Spacing, Radius) — never hardcode colors, fonts, or radii.
-- Do use Petrona for display headings, Plus Jakarta Sans for reading, and IBM Plex Mono for UI chrome.
+- Do use Petrona for display headings, Figtree for reading, and IBM Plex Mono for UI chrome.
 - Do keep the incognito recolor coherent: swap every red element to the purple-gray #565A75 family.
 - Don't add heavy drop shadows; prefer sticker shadows and 2px outlines.
 - Don't mix serif display and monospace in the same heading.

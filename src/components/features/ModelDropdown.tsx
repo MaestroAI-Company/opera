@@ -13,6 +13,7 @@ import {
   Vibration,
   View,
 } from "react-native";
+import LottieView from "lottie-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors, Fonts, FontSizes, Radius, Spacing } from "../../../constants/theme";
 import { getAICoreModelLabel } from "../../services/ai/AICoreProvider";
@@ -23,7 +24,7 @@ import NotificationModal from "../ui/NotificationModal";
 
 const botIcon = require("../../../assets/icons/bot.png");
 const downloadIcon = require("../../../assets/icons/download.png");
-const thinkingIcon = require("../../../assets/icons/thinking.gif");
+const loadingAnimation = require("../../../assets/animations/loading.json");
 
 const REFLECTIONS = [
   { id: "none", label: "Quick" },
@@ -212,7 +213,7 @@ export default function ModelDropdown({
                 <ScrollView style={{ maxHeight: MAX_MODELS_HEIGHT }} showsVerticalScrollIndicator={false} nestedScrollEnabled={true}>
                   {loading ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}>
-                      <Image source={thinkingIcon} style={{ width: 16, height: 16, tintColor: Colors.textMuted, opacity: 0.7 }} />
+                      <LottieView source={loadingAnimation} autoPlay loop style={{ width: 24, height: 16 }} />
                       <Text style={[styles.modelStatus, { paddingHorizontal: 0, paddingVertical: 0 }]}>Loading...</Text>
                     </View>
                   ) : models.length === 0 ? (

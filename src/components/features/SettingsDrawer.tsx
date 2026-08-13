@@ -160,7 +160,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   });
   const [instruction, setInstructionState] = useState("");
   const [name, setNameState] = useState("");
-  const [alwaysWhisper, setAlwaysWhisperState] = useState(true);
+  const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
   const [autoSpeak, setAutoSpeakState] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(false);
   const [useAppContext, setUseAppContextState] = useState(true);
@@ -1176,17 +1176,23 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               </View>
             )}
           </View>
-
-          <View style={[styles.toggleRow, { marginTop: 10 }]}>
-            <Text style={styles.settingLabel}>Transcribe-On-Device</Text>
-            <Toggle
-              checked={alwaysWhisper}
-              onToggle={setAlwaysWhisper}
-            />
-          </View>
-          <Text style={styles.helpText}>Process audio transcriptions locally on your device.</Text>
         </>
       )}
+
+      <View style={[styles.settingRowVertical, Platform.OS === "web" && { marginTop: 10 }]}>
+        <View style={styles.toggleRow}>
+          <Text style={styles.settingLabel}>Always Transcribe Locally</Text>
+          <Toggle
+            checked={alwaysWhisper}
+            onToggle={setAlwaysWhisper}
+          />
+        </View>
+        <Text style={styles.helpText}>
+          {Platform.OS === "web"
+            ? "Process audio transcriptions locally on your device instead of using the selected model."
+            : "Use your device's built-in speech recognition instead of the selected model."}
+        </Text>
+      </View>
     </View>
   );
 

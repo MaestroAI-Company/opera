@@ -19,6 +19,8 @@ export type ReplyOutcome = {
   //streamed content with marker if aborted
   content: string;
   metrics?: MessageMetrics;
+  //raw provider error message, set when status is 'error'
+  error?: string;
 };
 
 //instruction then app prompt then extras
@@ -73,6 +75,6 @@ export async function streamAssistantReply(params: {
     }
     console.error('Assistant reply failed:', e);
     //caller picks the user wording
-    return { status: 'error', content, metrics };
+    return { status: 'error', content, metrics, error: e?.message ?? String(e) };
   }
 }

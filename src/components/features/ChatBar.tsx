@@ -1,5 +1,6 @@
 
 import * as DocumentPicker from 'expo-document-picker';
+import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library/legacy';
@@ -80,7 +81,7 @@ const compressImageToDataUri = async (uri: string): Promise<string> => {
 type ChatInputBarProps = {
   onSend?: (message: string, images?: string[], viaVoice?: boolean) => void;
   onStop?: () => void;
-  onTranscribe?: (wavBuffer: ArrayBuffer) => Promise<string | null>;
+  onTranscribe?: (wavBuffer: ArrayBuffer, localFallback?: string | null) => Promise<string | null>;
   onTranscribeError?: () => void;
   placeholder?: string;
   incognito?: boolean;
@@ -256,6 +257,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const pressAnim = useAnimatedValue(0);
 
   const liveTextRef = useRef<string>("");
+  const nativeAudioUriRef = useRef<string | null>(null);
   const stopResolverRef = useRef<((text: string | null) => void) | null>(null);
   const sendCancelledRef = useRef(false);
 
@@ -338,10 +340,25 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     if (transcribed) setText(transcribed);
   };
 
+  //reads the persisted recording and tries the remote model, falling back to the native live transcript
+  const resolveNativeTranscript = async (localText: string | null): Promise<string | null> => {
+    const uri = nativeAudioUriRef.current;
+    nativeAudioUriRef.current = null;
+    if (!uri || !onTranscribe) return localText;
+    try {
+      const wavBuffer = await new File(uri).arrayBuffer();
+      return await onTranscribe(wavBuffer, localText);
+    } catch (e) {
+      console.error("failed to read native recording for remote transcription:", e);
+      return localText;
+    }
+  };
+
   //native continuous stt
   const startContinuousSTT = async () => {
     try {
       liveTextRef.current = "";
+      nativeAudioUriRef.current = null;
       setText("");
       clearTimeout(transcribeTimerRef.current);
       setIsTranscribing(false);
@@ -361,12 +378,14 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       }
       let locale = Settings.getCached().whisperLanguage || "en-US";
       if (locale === "auto" || locale.length > 5) locale = "en-US";
+      const recordAudio = canTranscribeRemotely && STT.supportsRecording();
       STT.start(locale, {
         onPartial: (t) => { if (t) { liveTextRef.current = t; setText(t); } },
         onFinal: (t) => { if (t) liveTextRef.current = t; },
         onVolume: (v) => { currentAudioVolume = v > 0 ? v / 10 : 0; },
         onSpeechStart: cancelNativeVadStop,
         onSpeechEnd: scheduleNativeVadStop,
+        onAudioFile: (uri) => { nativeAudioUriRef.current = uri; },
         onError: (msg) => {
           console.error("STT error:", msg);
           stopSTTVolume();
@@ -376,15 +395,16 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
           stopResolverRef.current = null;
           onTranscribeError?.();
         },
-        onDone: () => {
+        onDone: async () => {
           const text = liveTextRef.current.trim() || null;
           liveTextRef.current = "";
           const resolver = stopResolverRef.current;
           stopResolverRef.current = null;
+          const finalText = await resolveNativeTranscript(text);
           setIsTranscribing(false);
-          resolver?.(text);
+          resolver?.(finalText);
         },
-      });
+      }, recordAudio);
     } catch (e) {
       console.error("failed to start continuous STT:", e);
       stopSTTVolume();
@@ -404,11 +424,12 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     clearTimeout(transcribeTimerRef.current);
     return new Promise<string | null>((resolve) => {
       stopResolverRef.current = resolve;
-      transcribeTimerRef.current = setTimeout(() => {
+      transcribeTimerRef.current = setTimeout(async () => {
         const resolver = stopResolverRef.current;
         stopResolverRef.current = null;
+        const finalText = await resolveNativeTranscript(liveTextRef.current.trim() || null);
         setIsTranscribing(false);
-        resolver?.(liveTextRef.current.trim() || null);
+        resolver?.(finalText);
         liveTextRef.current = "";
       }, 3000);
     });
@@ -471,7 +492,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   useEffect(() => {
     if (autoStartMic && !autoStartedRef.current) {
       autoStartedRef.current = true;
-      setTimeout(() => startSTT(), 800);
+      setTimeout(() => startSTT(), 150);
     }
     //fires once, guarded by autoStartedRef
     // eslint-disable-next-line react-hooks/exhaustive-deps

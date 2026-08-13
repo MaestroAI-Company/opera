@@ -142,6 +142,14 @@ export class AICoreProvider implements IAIProvider {
       .map((m) => `[SYSTEM: Automated Tool Execution Result]\n${m.content}`);
     const fullPrompt = buildToolResultsPrompt(prompt, toolResults);
 
+    //payload serialization was overhead
+    if (__DEV__) {
+      console.log(`[AICoreProvider] sending request to ${modelName}`, {
+        tools: tools.length,
+        think: !!options?.think,
+      });
+    }
+
     const firstImage =
       messages
         .flatMap((m) => m.images ?? [])

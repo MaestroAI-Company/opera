@@ -207,10 +207,11 @@ class CentralAIModule {
       userOnChunk(chunk);
     };
 
-    const summarize = async (text: string): Promise<string> => {
+    //isolated call, system prompt is overridable
+    const summarize = async (text: string, systemPrompt?: string): Promise<string> => {
       let summary = '';
       await provider.sendMessage(
-        modelName, SYSTEM_PROMPTS.SEARCH_SUMMARIZE,
+        modelName, systemPrompt ?? SYSTEM_PROMPTS.SEARCH_SUMMARIZE,
         [{ role: 'user', content: text }],
         chunk => { summary += chunk; },
         signal,
@@ -219,8 +220,8 @@ class CentralAIModule {
       return summary;
     };
 
-    //true if tools ran this round
-    const runToolRound = async (): Promise<boolean> => {
+    //outcome of a tool round
+    const runToolRound = async (): Promise<'tools' | 'answered' | 'empty'> => {
       //native or injected tool calls
       const beforeLen = accumulated.length;
       const result = supportsTools
@@ -230,7 +231,11 @@ class CentralAIModule {
           )
         : await sendMessageWithToolPrompt(provider, modelName, enhancedPrompt, currentMessages, streamingOnChunk, signal, options, tools);
 
-      if (!result?.toolCalls || result.toolCalls.length === 0) return false;
+      if (!result?.toolCalls || result.toolCalls.length === 0) {
+        //empty means the model stayed silent
+        const producedText = accumulated.substring(beforeLen).replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
+        return producedText.length > 0 ? 'answered' : 'empty';
+      }
 
       //inject tool_calls json
       //show ui bubble, keep tool call in history
@@ -266,16 +271,18 @@ class CentralAIModule {
 
         currentMessages.push({ role: 'tool', content: toolResult });
       }
-      return true;
+      return 'tools';
     };
 
     //loop tools up to 5 rounds
     const MAX_TOOL_ROUNDS = 5;
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      if (!(await runToolRound())) return;
+      const outcome = await runToolRound();
+      if (outcome === 'answered') return;
+      if (outcome === 'empty') break;
     }
 
-    //cap reached force final answer
+    //cap or silence, force a final answer
     //reoffering tools loops forever
     await provider.sendMessage(
       modelName, enhancedPrompt, currentMessages, streamingOnChunk, signal,

@@ -1,4 +1,4 @@
-import { ITool, ToolDefinition } from './ITool';
+import { ITool, ToolDefinition, ToolPlatform } from './ITool';
 import { SearchBridge } from '../../search/SearchBridge';
 import { Platform } from 'react-native';
 import { universalFetch } from '../utils/universalFetch';
@@ -10,6 +10,8 @@ export class FetchPagesTool implements ITool {
   displayName = 'Fetch Pages';
   displayDescription = 'Allow the assistant to read the full content of web pages from search results.';
   enabledByDefault = true;
+  //ios/android need the SearchWebView bridge
+  platforms: ToolPlatform[] = ['ios', 'android', 'web', 'desktop'];
 
   definition: ToolDefinition = {
     type: 'function',

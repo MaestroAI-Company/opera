@@ -1,4 +1,4 @@
-import { ITool, ToolDefinition } from './ITool';
+import { ITool, ToolDefinition, ToolPlatform } from './ITool';
 import { SearchBridge } from '../../search/SearchBridge';
 import { Platform } from 'react-native';
 import { universalFetch } from '../utils/universalFetch';
@@ -7,6 +7,8 @@ export class SearchTool implements ITool {
   displayName = 'Web Search';
   displayDescription = 'Allow the assistant to search the web for real-time information.';
   enabledByDefault = true;
+  //ios/android need the SearchWebView bridge
+  platforms: ToolPlatform[] = ['ios', 'android', 'web', 'desktop'];
 
   definition: ToolDefinition = {
     type: 'function',

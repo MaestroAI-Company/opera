@@ -96,6 +96,18 @@
         }
       ],
       [
+        "expo-contacts",
+        {
+          "contactsPermission": "Opera needs access to your contacts to look up phone numbers and emails when you ask."
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Opera needs calendar access to check, create, and manage your events when you ask."
+        }
+      ],
+      [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Opera uses your location to give the assistant local context for better answers.",

@@ -1235,6 +1235,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 onToggle={async (v) => {
                   setPluginStates(prev => ({ ...prev, [key]: v }));
                   await PluginRegistry.setEnabled('tool', name, v);
+                  //request permission at enable time
+                  if (v) await tool.requestPermission?.();
                 }}
               />
             </View>

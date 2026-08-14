@@ -1,6 +1,36 @@
-import { ITool, ToolDefinition } from './ITool';
-import { ContactsService } from '../../contacts/ContactsService';
+import { View } from 'react-native';
+import { ITool, ToolDefinition, ToolWidget } from './ITool';
+import { ContactResult, ContactsService } from '../../contacts/ContactsService';
 import { SYSTEM_PROMPTS } from '../../../../constants/prompts';
+import { Block, BlockRow, Caption } from '../../../components/toolwidgets/ToolWidgetBlocks';
+
+interface ContactWidgetData {
+  label: string;
+  name: string;
+  phone?: string;
+  email?: string;
+}
+
+//caption echoes the user's query
+function buildLabel(query: unknown): string {
+  const clean = typeof query === 'string' ? query.trim() : '';
+  if (clean.length === 0) return 'Contact found';
+  return `${clean.charAt(0).toUpperCase()}${clean.slice(1)} found`;
+}
+
+//match answer to existing contact
+function resolveContact(contacts: ContactResult[], answer: string): Omit<ContactWidgetData, 'label'> | null {
+  const clean = answer.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').toLowerCase();
+  const named = contacts.filter(c => c.name.trim().length > 0 && clean.includes(c.name.toLowerCase()));
+  if (named.length === 0) return null;
+
+  //longest name contains the shorter ones
+  const best = named.reduce((a, b) => (b.name.length > a.name.length ? b : a));
+  const bestName = best.name.toLowerCase();
+  if (named.some(c => !bestName.includes(c.name.toLowerCase()))) return null;
+
+  return { name: best.name, phone: best.phoneNumbers[0], email: best.emails[0] };
+}
 
 export class ContactsTool implements ITool {
   displayName = 'Find Contact';
@@ -34,7 +64,35 @@ export class ContactsTool implements ITool {
     return ContactsService.requestPermission();
   }
 
+  //contact resolved during the last execute
+  private resolved: Omit<ContactWidgetData, 'label'> | null = null;
+
+  widget: ToolWidget<ContactWidgetData> = {
+    name: 'Contact Widget',
+    hasBorder: true,
+    build: (args) => (this.resolved ? { label: buildLabel(args.query), ...this.resolved } : null),
+    component: ({ data }) => (
+      <View>
+        <Caption text={data.label} />
+        <BlockRow>
+          <Block text={data.name} filled serif />
+        </BlockRow>
+        {!!data.phone && (
+          <BlockRow>
+            <Block text={data.phone} />
+          </BlockRow>
+        )}
+        {!!data.email && (
+          <BlockRow>
+            <Block text={data.email} />
+          </BlockRow>
+        )}
+      </View>
+    ),
+  };
+
   async execute(args: Record<string, any>, summarize?: (text: string, systemPrompt?: string) => Promise<string>): Promise<string> {
+    this.resolved = null;
     const query = args.query;
     if (typeof query !== 'string' || query.trim().length === 0) {
       return 'Error: missing "query" to search for.';
@@ -64,7 +122,9 @@ export class ContactsTool implements ITool {
       if (!summarize) {
         return listText;
       }
-      return await summarize(`${listText}\n\nQuery: ${query}`, SYSTEM_PROMPTS.CONTACT_RESOLVE);
+      const answer = await summarize(`${listText}\n\nQuery: ${query}`, SYSTEM_PROMPTS.CONTACT_RESOLVE);
+      this.resolved = resolveContact(contacts, answer);
+      return answer;
     } catch (e: any) {
       return `Contact lookup failed: ${e.message}`;
     }

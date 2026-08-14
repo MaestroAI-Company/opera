@@ -6,6 +6,7 @@ import { vs2015 } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { Colors, Fonts, FontSizes, Radius, Spacing } from "../../../constants/theme";
 import { ensureKatexStylesheet, getKatexCss, KATEX_STYLESHEET_NAME } from "./katexStylesheet";
 import { WidgetManager } from "../../services/widgets/WidgetManager";
+import { ToolManager } from "../../services/ai/tools/ToolManager";
 import WidgetWrapper from "../widgets/WidgetWrapper";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 
@@ -572,6 +573,19 @@ const CodeBlock = React.memo(function CodeBlock({ code, language }: { code: stri
   );
 });
 
+//closed tool widget blocks per tool name, they replace their bubble
+function countToolWidgetBlocks(md: string): Map<string, number> {
+  const counts = new Map<string, number>();
+  const re = /```toolwidget\s+id="([^"]+)"[\s\S]*?\n\s*```/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(md)) !== null) {
+    const id = m[1];
+    if (!ToolManager.getWidget(id)) continue;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
+}
+
 export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: boolean, dark?: boolean): React.ReactNode[] {
   const selColor = incognito ? Colors.incognitoSelection : Colors.primarySelection;
   //dark variant text colors
@@ -587,6 +601,8 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
     const b = blocks[k];
     processedMd = processedMd.substring(0, b.start) + '\n```toolcall\n' + b.json + '\n```\n' + processedMd.substring(b.end);
   }
+
+  const pendingToolWidgets = countToolWidgetBlocks(processedMd);
 
   const lines = processedMd.split("\n");
   const elements: React.ReactNode[] = [];
@@ -662,15 +678,42 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
         }
       }
 
+      if (language === "toolwidget") {
+        const idMatch = header.match(/id="([^"]+)"/);
+        const toolWidget = idMatch ? ToolManager.getWidget(idMatch[1]) : undefined;
+        //unknown id or streaming keeps bubble
+        if (!toolWidget || !isClosed) continue;
+
+        let data;
+        try {
+          data = JSON.parse(codeLines.join("\n"));
+        } catch {
+          continue;
+        }
+
+        elements.push(
+          <WidgetWrapper key={`toolwidget-${i}`} widget={toolWidget}>
+            <toolWidget.component data={data} />
+          </WidgetWrapper>
+        );
+        continue;
+      }
+
       if (language === "toolcall") {
         const rawJson = codeLines.join("\n");
         let toolNames = parseToolNames(rawJson);
-        
+
         if (toolNames.length === 0) {
           toolNames = ["Tool"];
         }
 
         toolNames.forEach((tName, idx) => {
+          //result widget replaces the bubble
+          const pending = pendingToolWidgets.get(tName) ?? 0;
+          if (pending > 0) {
+            pendingToolWidgets.set(tName, pending - 1);
+            return;
+          }
           elements.push(
             <ToolCallBubble key={`toolcall-${i}-${idx}`} toolName={tName} isGenerating={isGenerating} />
           );

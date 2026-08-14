@@ -1,11 +1,27 @@
-import { ITool, ToolDefinition } from './ITool';
+import { View } from 'react-native';
+import { ITool, ToolDefinition, ToolWidget } from './ITool';
 import { CalendarService } from '../../calendar/CalendarService';
+import { Block, BlockRow, Caption } from '../../../components/toolwidgets/ToolWidgetBlocks';
+
+interface CalendarWidgetData {
+  title: string;
+  day: string;
+  startTime: string;
+  endTime: string;
+}
 
 const DEFAULT_LIST_DAYS = 14;
 
 function formatEvent(e: { id: string; title: string; startDate: string; endDate: string; location: string | null }): string {
   const loc = e.location ? ` @ ${e.location}` : '';
   return `[${e.id}] ${e.title}: ${e.startDate} - ${e.endDate}${loc}`;
+}
+
+//event line gives title start end
+const EVENT_RESULT_RE = /^(?:Created|Updated) event: \[[^\]]*\] ([\s\S]+?): (\S+) - (\S+)/;
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 export class CalendarTool implements ITool {
@@ -68,6 +84,35 @@ export class CalendarTool implements ITool {
     return CalendarService.requestPermission();
   }
 
+  widget: ToolWidget<CalendarWidgetData> = {
+    name: 'Calendar Widget',
+    hasBorder: true,
+    //single created or updated event shows
+    build: (args, result) => {
+      const match = result.match(EVENT_RESULT_RE);
+      if (!match) return null;
+      const start = new Date(match[2]);
+      const end = new Date(match[3]);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+      const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
+      return {
+        title: match[1],
+        day: capitalize(start.toLocaleDateString(undefined, { weekday: 'long' })),
+        startTime: start.toLocaleTimeString(undefined, timeOpts),
+        endTime: end.toLocaleTimeString(undefined, timeOpts),
+      };
+    },
+    component: ({ data }) => (
+      <View>
+        <Caption text={`${data.title} set for`} />
+        <BlockRow>
+          <Block text={data.day} filled serif />
+          <Block text={`${data.startTime} - ${data.endTime}`} grow={false} />
+        </BlockRow>
+      </View>
+    ),
+  };
+
   async execute(args: Record<string, any>): Promise<string> {
     const action = args.action;
     if (!['list', 'create', 'update', 'delete'].includes(action)) {
@@ -122,7 +167,14 @@ export class CalendarTool implements ITool {
         if (typeof args.location === 'string') patch.location = args.location;
         if (typeof args.startDate === 'string') patch.startDate = new Date(args.startDate);
         if (typeof args.endDate === 'string') patch.endDate = new Date(args.endDate);
+        if (__DEV__) {
+          //spot wrong hour vs storage bug
+          console.log('[CalendarTool] update requested startDate/endDate:', args.startDate, args.endDate);
+        }
         const event = await CalendarService.updateEvent(args.eventId, patch);
+        if (__DEV__) {
+          console.log('[CalendarTool] update stored startDate/endDate:', event.startDate, event.endDate);
+        }
         return `Updated event: ${formatEvent(event)}`;
       }
 

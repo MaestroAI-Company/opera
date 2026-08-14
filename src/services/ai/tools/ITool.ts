@@ -1,3 +1,5 @@
+import type React from 'react';
+
 // tool call returned by ollama
 export interface ToolCall {
   function: {
@@ -30,6 +32,17 @@ export interface ToolSource {
   favicon?: string;
 }
 
+//widget rendering a tool result in place of the "using tool" bubble
+export interface ToolWidget<T = any> {
+  //header label
+  name: string;
+  //toggle container border
+  hasBorder: boolean;
+  //null result keeps the default bubble
+  build(args: Record<string, any>, result: string): T | null;
+  component: React.ComponentType<{ data: T }>;
+}
+
 //interface for all tools
 export interface ITool {
   definition: ToolDefinition;
@@ -40,6 +53,8 @@ export interface ITool {
   platforms?: ToolPlatform[];
   //request os permission on enable
   requestPermission?(): Promise<boolean>;
+  //optional ui for the tool result
+  widget?: ToolWidget;
   execute(
     args: Record<string, any>,
     summarize?: (text: string, systemPrompt?: string) => Promise<string>,

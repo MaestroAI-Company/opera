@@ -1,6 +1,22 @@
 import * as IntentLauncher from 'expo-intent-launcher';
-import { Platform } from 'react-native';
-import { ITool, ToolDefinition } from './ITool';
+import { Platform, View } from 'react-native';
+import { ITool, ToolDefinition, ToolWidget } from './ITool';
+import { Block, BlockRow, Caption } from '../../../components/toolwidgets/ToolWidgetBlocks';
+
+interface AlarmWidgetData {
+  label: string;
+  value: string;
+  note?: string;
+}
+
+//duration like 45s or 1h30
+function formatDuration(totalSeconds: number): string {
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.round((totalSeconds % 3600) / 60);
+  if (hours === 0) return `${minutes}min`;
+  return minutes === 0 ? `${hours}h` : `${hours}h${String(minutes).padStart(2, '0')}`;
+}
 
 export class AlarmTool implements ITool {
   displayName = 'Set Alarm or Timer';
@@ -43,6 +59,35 @@ export class AlarmTool implements ITool {
         required: ['action'],
       },
     },
+  };
+
+  widget: ToolWidget<AlarmWidgetData> = {
+    name: 'Alarm Widget',
+    hasBorder: true,
+    build: (args, result) => {
+      //widget only for a real launch
+      if (!result.startsWith('Opened Clock app')) return null;
+      const note = typeof args.message === 'string' && args.message.trim().length > 0 ? args.message.trim() : undefined;
+
+      if (args.action === 'set_alarm') {
+        const value = `${String(args.hour).padStart(2, '0')}h${String(args.minute).padStart(2, '0')}`;
+        return { label: 'Alarm set for', value, note };
+      }
+      return { label: 'Timer set for', value: formatDuration(args.seconds), note };
+    },
+    component: ({ data }) => (
+      <View>
+        <Caption text={data.label} />
+        <BlockRow>
+          <Block text={data.value} filled />
+        </BlockRow>
+        {!!data.note && (
+          <BlockRow>
+            <Block text={data.note} serif />
+          </BlockRow>
+        )}
+      </View>
+    ),
   };
 
   async execute(args: Record<string, any>): Promise<string> {

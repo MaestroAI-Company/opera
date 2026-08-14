@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { ITool, ToolDefinition, ToolPlatform, ToolSource } from './ITool';
+import { ITool, ToolDefinition, ToolPlatform, ToolSource, ToolWidget } from './ITool';
 import { SearchTool } from './SearchTool';
 import { FetchPagesTool } from './FetchPagesTool';
 import { MathTool } from './MathTool';
@@ -61,6 +61,28 @@ class ToolManagerService {
         return PluginRegistry.isEnabled('tool', name, defaultEnabled);
       })
       .map(t => t.definition);
+  }
+
+  //widget declared by the tool
+  getWidget(name: string): ToolWidget | undefined {
+    return this.tools.get(name)?.widget;
+  }
+
+  //markdown block or null without widget
+  buildWidgetBlock(name: string, args: Record<string, any>, result: string): string | null {
+    const tool = this.tools.get(name);
+    if (!tool?.widget) return null;
+    try {
+      const data = tool.widget.build(args, result);
+      if (!data) {
+        if (__DEV__) console.log(`[ToolManager] ${name} produced no widget data, keeping the bubble`);
+        return null;
+      }
+      return `\n\n\`\`\`toolwidget id="${name}"\n${JSON.stringify(data)}\n\`\`\`\n\n`;
+    } catch (e) {
+      console.warn(`[ToolManager] widget data failed for ${name}:`, e);
+      return null;
+    }
   }
 
   //execute a tool by name

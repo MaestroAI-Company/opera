@@ -4,7 +4,7 @@ import { IWidget } from '../../services/widgets/WidgetManager';
 import { Colors, Fonts, FontSizes, Radius } from '../../../constants/theme';
 
 interface WidgetWrapperProps {
-  widget: IWidget;
+  widget: Pick<IWidget, 'name' | 'hasBorder'>;
   title?: string;
   children: React.ReactNode;
 }

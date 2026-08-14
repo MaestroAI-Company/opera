@@ -1,4 +1,6 @@
-import { ITool, ToolDefinition } from './ITool';
+import { View } from 'react-native';
+import { ITool, ToolDefinition, ToolWidget } from './ITool';
+import { Block, BlockRow, Caption } from '../../../components/toolwidgets/ToolWidgetBlocks';
 
 // token types for the expression parser
 enum TokType {
@@ -357,6 +359,11 @@ function formatResult(v: number): string {
   return parseFloat(cleaned.toPrecision(12)).toString();
 }
 
+interface MathWidgetData {
+  expression: string;
+  result: string;
+}
+
 export class MathTool implements ITool {
   displayName = 'Math Calculator';
   displayDescription = 'Allow the assistant to compute exact results of mathematical expressions.';
@@ -385,6 +392,26 @@ export class MathTool implements ITool {
         required: ['expression'],
       },
     },
+  };
+
+  widget: ToolWidget<MathWidgetData> = {
+    name: 'Calculate',
+    hasBorder: true,
+    build: (args, result) => {
+      //errors keep the default bubble
+      const separator = result.lastIndexOf(' = ');
+      if (separator === -1) return null;
+      return { expression: String(args.expression), result: result.slice(separator + 3) };
+    },
+    component: ({ data }) => (
+      <View>
+        <Caption text={data.expression} />
+        <BlockRow>
+          <Block text="=" grow={false} />
+          <Block text={data.result} filled />
+        </BlockRow>
+      </View>
+    ),
   };
 
   async execute(args: Record<string, any>): Promise<string> {

@@ -19,7 +19,7 @@ export default function Toggle({ checked, onToggle, disabled = false }: TogglePr
   const pressed = useSharedValue(0);
 
   const startXRef = useRef(0);
-  //keeps PanResponder callbacks (created once) reading fresh props instead of their mount-time values
+  //reads fresh props not mount-time values
   const latestRef = useRef({ checked, onToggle, disabled });
   latestRef.current = { checked, onToggle, disabled };
 
@@ -33,7 +33,7 @@ export default function Toggle({ checked, onToggle, disabled = false }: TogglePr
     PanResponder.create({
       onStartShouldSetPanResponder: () => !latestRef.current.disabled,
       onMoveShouldSetPanResponder: () => !latestRef.current.disabled,
-      //keep the gesture even if the settings drawer's swipe-to-close tries to steal it
+      //keep gesture vs drawer's swipe-to-close
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
         startXRef.current = translateX.value;

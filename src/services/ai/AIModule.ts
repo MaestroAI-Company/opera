@@ -288,6 +288,10 @@ class CentralAIModule {
         this.SharedGenerationState.activeToolArgs = null;
         this.SharedGenerationState.notify();
 
+        //widget block replaces tool bubble
+        const widgetBlock = ToolManager.buildWidgetBlock(toolName, tc.function.arguments, toolResult);
+        if (widgetBlock) streamingOnChunk(widgetBlock);
+
         currentMessages.push({ role: 'tool', content: toolResult });
       }
       return 'tools';

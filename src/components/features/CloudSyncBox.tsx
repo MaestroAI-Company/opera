@@ -1,5 +1,5 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { Colors, Fonts, FontSizes, Radius, Spacing } from "../../../constants/theme";
 import { CloudUserInfo } from '../../services/cloud/CloudProvider';
 
 type CloudSyncBoxProps = {
@@ -94,28 +94,28 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.xxl,
-    padding: 16,
+    padding: Spacing.lg,
     borderWidth: 2,
     borderColor: Colors.border,
-    marginTop: 12,
+    marginTop: Spacing.lg2,
   },
   userInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: Spacing.md,
   },
   avatar: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderRadius: Radius.pill,
-    marginRight: 12,
+    marginRight: Spacing.lg2,
   },
   avatarPlaceholder: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderRadius: Radius.pill,
     backgroundColor: Colors.textMuted,
-    marginRight: 12,
+    marginRight: Spacing.lg2,
   },
   userInfoText: {
     flex: 1,
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   statusRow: {
-    marginBottom: 16,
+    marginBottom: Spacing.lg2,
   },
   statusText: {
     fontSize: FontSizes.label,
@@ -141,12 +141,12 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     flexDirection: 'column',
-    gap: 8,
+    gap: Spacing.md,
   },
   actionBtn: {
     flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.lg2,
     borderRadius: Radius.md,
     borderWidth: 2,
     borderColor: Colors.border,
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.borderOnPrimary,
   },
   actionBtnText: {
-    fontSize: FontSizes.label,
+    fontSize: FontSizes.bodyMd,
     fontFamily: Fonts.mono,
     color: Colors.textSecondary,
   },

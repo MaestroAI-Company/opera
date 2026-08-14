@@ -1,8 +1,7 @@
-import { View } from 'react-native';
 import { ITool, ToolDefinition, ToolWidget } from './ITool';
 import { ContactResult, ContactsService } from '../../contacts/ContactsService';
 import { SYSTEM_PROMPTS } from '../../../../constants/prompts';
-import { Block, BlockRow, Caption } from '../../../components/toolwidgets/ToolWidgetBlocks';
+import { Block, BlockContainer, BlockRow, Caption } from '../../../components/toolwidgets/ToolWidgetBlocks';
 
 interface ContactWidgetData {
   label: string;
@@ -33,7 +32,7 @@ function resolveContact(contacts: ContactResult[], answer: string): Omit<Contact
 }
 
 export class ContactsTool implements ITool {
-  displayName = 'Find Contact';
+  displayName = 'Contact';
   displayDescription = 'Allow the assistant to search your device contacts by name or relationship (e.g. "mom") for phone numbers and emails.';
   enabledByDefault = false;
   platforms: ITool['platforms'] = ['ios', 'android'];
@@ -41,7 +40,7 @@ export class ContactsTool implements ITool {
   definition: ToolDefinition = {
     type: 'function',
     function: {
-      name: 'find_contact',
+      name: 'contact',
       description:
         "Look up a contact in the user's device contacts by name, nickname, or relationship/role " +
         '(e.g. "maman", "mom", "my brother", "boss") and return matching phone numbers/emails. ' +
@@ -72,7 +71,7 @@ export class ContactsTool implements ITool {
     hasBorder: true,
     build: (args) => (this.resolved ? { label: buildLabel(args.query), ...this.resolved } : null),
     component: ({ data }) => (
-      <View>
+      <BlockContainer>
         <Caption text={data.label} />
         <BlockRow>
           <Block text={data.name} filled serif />
@@ -87,7 +86,7 @@ export class ContactsTool implements ITool {
             <Block text={data.email} />
           </BlockRow>
         )}
-      </View>
+      </BlockContainer>
     ),
   };
 
@@ -126,6 +125,7 @@ export class ContactsTool implements ITool {
       this.resolved = resolveContact(contacts, answer);
       return answer;
     } catch (e: any) {
+      console.error('[ContactsTool] error:', e?.message || e);
       return `Contact lookup failed: ${e.message}`;
     }
   }

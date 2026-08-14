@@ -2,6 +2,8 @@ import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { useRouter } from "expo-router";
 import { useState } from "react";
+import { CalendarService } from "../services/calendar/CalendarService";
+import { ContactsService } from "../services/contacts/ContactsService";
 import { LocationService } from "../services/location/LocationService";
 import {
   Image,
@@ -24,6 +26,8 @@ const micIcon = require("../../assets/icons/microphone.png");
 const cameraIcon = require("../../assets/icons/camera.png");
 const photoIcon = require("../../assets/icons/photo.png");
 const locationIcon = require("../../assets/icons/pin.png");
+const contactIcon = require("../../assets/icons/profil.png");
+const calendarIcon = require("../../assets/icons/calendar.png");
 
 type Permission = {
   id: string;
@@ -117,6 +121,26 @@ const NATIVE_PERMISSIONS: Permission[] = [
     request: async () => {
       const { granted } = await MediaLibrary.requestPermissionsAsync();
       return granted;
+    },
+  },
+  {
+    id: "contacts",
+    icon: contactIcon,
+    label: "Contacts",
+    description: "To search your contacts for phone numbers and emails.",
+    status: "idle",
+    request: async () => {
+      return await ContactsService.requestPermission();
+    },
+  },
+  {
+    id: "calendar",
+    icon: calendarIcon,
+    label: "Calendar",
+    description: "To read and manage events on your calendar.",
+    status: "idle",
+    request: async () => {
+      return await CalendarService.requestPermission();
     },
   },
   {

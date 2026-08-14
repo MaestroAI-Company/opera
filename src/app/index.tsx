@@ -13,6 +13,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  Vibration,
   View
 } from "react-native";
 import { KeyboardAvoidingView, KeyboardController } from "react-native-keyboard-controller";
@@ -1158,7 +1159,10 @@ export default function Index() {
                 />
                 <DissolveIn delay={2800}>
                   <Pressable
-                    onPress={() => setIncognitoMode((prev) => !prev)}
+                    onPress={() => {
+                      Vibration.vibrate(10);
+                      setIncognitoMode((prev) => !prev);
+                    }}
                     style={({ pressed, hovered }) => [
                       styles.incognitoBox,
                       incognitoMode && styles.incognitoBoxActive,

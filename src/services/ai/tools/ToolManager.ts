@@ -48,7 +48,7 @@ class ToolManagerService {
 
   //get tools for ui
   getAllTools(): ITool[] {
-    return Array.from(this.tools.values()).filter(t => this.isSupportedOnPlatform(t));
+    return Array.from(this.tools.values());
   }
 
   //get enabled tools
@@ -112,8 +112,8 @@ class ToolManagerService {
     try {
       return await tool.execute(args, summarize, recordSource);
     } catch (e: any) {
-      console.error(`[ToolManager] Tool ${name} failed:`, e);
-      return `Tool error: ${e.message}`;
+      console.error(`[ToolManager] Tool ${name} error:`, e?.message || e);
+      return `Tool error: ${e?.message || 'unknown error'}`;
     }
   }
 }

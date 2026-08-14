@@ -1,6 +1,5 @@
-import { View } from 'react-native';
 import { ITool, ToolDefinition, ToolWidget } from './ITool';
-import { Block, BlockRow, Caption } from '../../../components/toolwidgets/ToolWidgetBlocks';
+import { Block, BlockContainer, BlockRow, Caption } from '../../../components/toolwidgets/ToolWidgetBlocks';
 
 // token types for the expression parser
 enum TokType {
@@ -404,13 +403,13 @@ export class MathTool implements ITool {
       return { expression: String(args.expression), result: result.slice(separator + 3) };
     },
     component: ({ data }) => (
-      <View>
+      <BlockContainer>
         <Caption text={data.expression} />
         <BlockRow>
           <Block text="=" grow={false} />
           <Block text={data.result} filled />
         </BlockRow>
-      </View>
+      </BlockContainer>
     ),
   };
 
@@ -424,6 +423,7 @@ export class MathTool implements ITool {
       const value = evaluate(expression);
       return `${expression} = ${formatResult(value)}`;
     } catch (e: any) {
+      console.error('[MathTool] error:', e?.message || e);
       return `Math error: ${e.message}`;
     }
   }

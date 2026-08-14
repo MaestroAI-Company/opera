@@ -90,7 +90,7 @@ export const Colors = {
 export const Fonts = {
   display: "Petrona",
   body: "Figtree",
-  mono: "IBMPlexMono-Medium",
+  mono: "FragmentMono",
 } as const;
 
 export const FontSizes = {

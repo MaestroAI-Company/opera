@@ -93,6 +93,7 @@ export class SearchTool implements ITool {
 
       return `Search results for "${query}":\n\n${formatted.join('\n\n---\n\n')}\n\nCRITICAL INSTRUCTION: You MUST NOT answer the user's question yet based only on these short snippets. You MUST call the fetch_pages tool on up to 2 of the most relevant URLs above to read their full contents first. Always prioritize well-known, highly trusted, and official sources over obscure blogs or unreliable sites.`;
     } catch (e: any) {
+      console.error('[SearchTool] error:', e?.message || e);
       return `Search failed: ${e.message}`;
     }
   }

@@ -1,6 +1,11 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Colors, Fonts, FontSizes, Radius, Spacing } from '../../../constants/theme';
 
+//container holding caption and block rows
+export function BlockContainer({ children }: { children: React.ReactNode }) {
+  return <View style={styles.container}>{children}</View>;
+}
+
 //muted line describing the blocks
 export function Caption({ text }: { text: string }) {
   return <Text style={styles.caption}>{text}</Text>;
@@ -9,6 +14,11 @@ export function Caption({ text }: { text: string }) {
 //row holding the result blocks
 export function BlockRow({ children }: { children: React.ReactNode }) {
   return <View style={styles.row}>{children}</View>;
+}
+
+//symbol between blocks
+export function BlockSymbol({ text }: { text: string }) {
+  return <Text style={styles.symbol}>{text}</Text>;
 }
 
 interface BlockProps {
@@ -40,20 +50,29 @@ export function Block({ text, filled, serif, grow = true }: BlockProps) {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    gap: Spacing.sm,
+  },
   caption: {
     fontFamily: Fonts.body,
     fontSize: FontSizes.lg,
     color: Colors.textMuted,
     paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.md,
+    paddingTop: Spacing.xs,
   },
   row: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.sm,
-    marginBottom: Spacing.sm,
+  },
+  symbol: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.displayMd,
+    color: Colors.textPrimary,
+    paddingHorizontal: Spacing.xs,
   },
   block: {
-    borderRadius: Radius.xxl,
+    borderRadius: Radius.md,
     borderWidth: 2,
     paddingVertical: Spacing.xl,
     paddingHorizontal: Spacing.xl2,
@@ -65,7 +84,8 @@ const styles = StyleSheet.create({
   },
   blockFilled: {
     backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    borderColor: Colors.borderOnPrimary,
+    borderWidth: 2,
   },
   blockOutlined: {
     backgroundColor: Colors.surface,

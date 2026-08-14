@@ -54,15 +54,15 @@ typography:
     fontSize: 22px
     lineHeight: 1.2
   title:
-    fontFamily: IBMPlexMono-Medium
+    fontFamily: FragmentMono
     fontSize: 17px
     fontWeight: 500
   label:
-    fontFamily: IBMPlexMono-Medium
+    fontFamily: FragmentMono
     fontSize: 12px
     fontWeight: 500
   label-sm:
-    fontFamily: IBMPlexMono-Medium
+    fontFamily: FragmentMono
     fontSize: 10px
     fontWeight: 500
   body:
@@ -80,7 +80,7 @@ typography:
     fontFamily: Figtree
     fontSize: 11px
   code:
-    fontFamily: IBMPlexMono-Medium
+    fontFamily: FragmentMono
     fontSize: 13px
     lineHeight: 18px
 rounded:
@@ -203,7 +203,7 @@ Three fonts with strict roles — never swap them.
 
 - **Petrona (serif):** Display only. Drawer titles ("Settings", "Discussions"), conversation headers, welcome and onboarding screens. Sizes 22–48px. It carries the editorial, literary identity.
 - **Figtree:** Reading content. Chat bubbles, markdown body, captions, help text. Sizes 13–16px.
-- **IBM Plex Mono (Medium):** UI chrome. Buttons, labels, nav items, timestamps, dropdown options, setting names, section headers. Sizes 10–17px. Its technical construction gives the terminal/engineer feel that matches a local AI tool.
+- **Fragment Mono:** UI chrome. Buttons, labels, nav items, timestamps, dropdown options, setting names, section headers. Sizes 10–17px. Its technical construction gives the terminal/engineer feel that matches a local AI tool.
 
 ## Layout
 
@@ -246,7 +246,7 @@ The shape language is **sticker-like**: 2px outlines on nearly every interactive
 
 - Do use Opera Red only for the single most important action per screen.
 - Do always pull values from the design tokens in `constants/theme.ts` (Colors, Fonts, FontSizes, Spacing, Radius) — never hardcode colors, fonts, or radii.
-- Do use Petrona for display headings, Figtree for reading, and IBM Plex Mono for UI chrome.
+- Do use Petrona for display headings, Figtree for reading, and Fragment Mono for UI chrome.
 - Do keep the incognito recolor coherent: swap every red element to the purple-gray #565A75 family.
 - Don't add heavy drop shadows; prefer sticker shadows and 2px outlines.
 - Don't mix serif display and monospace in the same heading.

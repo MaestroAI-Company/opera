@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
     height: 18,
   },
   label: {
-    fontSize: FontSizes.caption,
+    fontSize: FontSizes.bodyMd,
     color: Colors.textPrimary,
     fontFamily: Fonts.mono,
     flex: 1,
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.borderOnPrimary,
   },
   optionText: {
-    fontSize: FontSizes.body,
+    fontSize: FontSizes.bodyMd,
     color: Colors.textPrimary,
     fontFamily: Fonts.mono,
   },
@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
     height: 16,
   },
   downloadText: {
-    fontSize: FontSizes.caption,
+    fontSize: FontSizes.bodyMd,
     color: Colors.primary,
     fontFamily: Fonts.mono,
   },

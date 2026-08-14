@@ -1,7 +1,6 @@
-import { View } from 'react-native';
 import { ITool, ToolDefinition, ToolWidget } from './ITool';
 import { CalendarService } from '../../calendar/CalendarService';
-import { Block, BlockRow, Caption } from '../../../components/toolwidgets/ToolWidgetBlocks';
+import { Block, BlockContainer, BlockRow, BlockSymbol, Caption } from '../../../components/toolwidgets/ToolWidgetBlocks';
 
 interface CalendarWidgetData {
   title: string;
@@ -103,13 +102,17 @@ export class CalendarTool implements ITool {
       };
     },
     component: ({ data }) => (
-      <View>
+      <BlockContainer>
         <Caption text={`${data.title} set for`} />
         <BlockRow>
           <Block text={data.day} filled serif />
-          <Block text={`${data.startTime} - ${data.endTime}`} grow={false} />
         </BlockRow>
-      </View>
+        <BlockRow>
+          <Block text={data.startTime} />
+          <BlockSymbol text="→" />
+          <Block text={data.endTime} />
+        </BlockRow>
+      </BlockContainer>
     ),
   };
 
@@ -181,6 +184,7 @@ export class CalendarTool implements ITool {
       await CalendarService.deleteEvent(args.eventId);
       return `Deleted event ${args.eventId}.`;
     } catch (e: any) {
+      console.error('[CalendarTool] error:', e?.message || e);
       return `Calendar error: ${e.message}`;
     }
   }

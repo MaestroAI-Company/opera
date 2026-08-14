@@ -1,7 +1,7 @@
 import * as IntentLauncher from 'expo-intent-launcher';
-import { Platform, View } from 'react-native';
+import { Platform } from 'react-native';
 import { ITool, ToolDefinition, ToolWidget } from './ITool';
-import { Block, BlockRow, Caption } from '../../../components/toolwidgets/ToolWidgetBlocks';
+import { Block, BlockContainer, BlockRow, Caption } from '../../../components/toolwidgets/ToolWidgetBlocks';
 
 interface AlarmWidgetData {
   label: string;
@@ -19,7 +19,7 @@ function formatDuration(totalSeconds: number): string {
 }
 
 export class AlarmTool implements ITool {
-  displayName = 'Set Alarm or Timer';
+  displayName = 'Timer';
   displayDescription = 'Allow the assistant to open the Clock app with an alarm or timer pre-filled for you to confirm.';
   enabledByDefault = true;
   platforms: ITool['platforms'] = ['android'];
@@ -27,7 +27,7 @@ export class AlarmTool implements ITool {
   definition: ToolDefinition = {
     type: 'function',
     function: {
-      name: 'set_alarm_or_timer',
+      name: 'timer',
       description:
         'Android only. Open the Clock app to set an alarm or a timer. The user still confirms in the Clock app — nothing is set silently. ' +
         'Use "set_alarm" with an hour/minute, or "set_timer" with a duration in seconds.',
@@ -76,17 +76,17 @@ export class AlarmTool implements ITool {
       return { label: 'Timer set for', value: formatDuration(args.seconds), note };
     },
     component: ({ data }) => (
-      <View>
+      <BlockContainer>
         <Caption text={data.label} />
         <BlockRow>
-          <Block text={data.value} filled />
+          <Block text={data.value} filled serif />
         </BlockRow>
         {!!data.note && (
           <BlockRow>
-            <Block text={data.note} serif />
+            <Block text={data.note} />
           </BlockRow>
         )}
-      </View>
+      </BlockContainer>
     ),
   };
 
@@ -129,6 +129,7 @@ export class AlarmTool implements ITool {
       });
       return `Opened Clock app to set a ${seconds}s timer.`;
     } catch (e: any) {
+      console.error('[AlarmTool] error:', e?.message || e);
       return `Could not open Clock app: ${e.message}`;
     }
   }

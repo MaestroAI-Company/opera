@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { PanResponder, StyleSheet } from "react-native";
+import { PanResponder, StyleSheet, Vibration } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Colors, Radius } from "../../../constants/theme";
 
@@ -50,7 +50,10 @@ export default function Toggle({ checked, onToggle, disabled = false }: TogglePr
         translateX.value = withTiming(next ? TRAVEL : 0, { duration: 200 });
         scale.value = withTiming(1, { duration: 150 });
         pressed.value = withTiming(0, { duration: 150 });
-        if (next !== isChecked) cb(next);
+        if (next !== isChecked) {
+          Vibration.vibrate(10);
+          cb(next);
+        }
       },
       onPanResponderTerminate: () => {
         const { checked: isChecked } = latestRef.current;
@@ -105,5 +108,7 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: Radius.xxl,
+    borderWidth: 2,
+    borderColor: Colors.borderOnPrimary,
   },
 });

@@ -31,7 +31,6 @@ const reloadIcon = require("../../../assets/icons/reload.png");
 const copyIcon = require("../../../assets/icons/copy.png");
 const infoIcon = require("../../../assets/icons/info.png");
 const chatIcon = require("../../../assets/icons/chat.png");
-const arrowIcon = require("../../../assets/icons/arrow.png");
 const appSourceIcon = require("../../../assets/icons/tool.png");
 const imageSourceIcon = require("../../../assets/icons/photo.png");
 const linkSourceIcon = require("../../../assets/icons/hyperlink.png");
@@ -87,13 +86,12 @@ const SourcePill = ({ source }: { source: MessageSource }) => {
       disabled={!canOpen}
       style={({ pressed, hovered }) => [styles.sourcePill, canOpen && (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
     >
+      <Text style={styles.sourceLabel} numberOfLines={1}>{sourceLabel(source)}</Text>
       <Image
         source={icon}
         style={[styles.sourceFavicon, !useFavicon && { tintColor: Colors.textMuted }]}
         onError={() => setFaviconFailed(true)}
       />
-      <Text style={styles.sourceLabel} numberOfLines={1}>{sourceLabel(source)}</Text>
-      {canOpen && <Image source={arrowIcon} style={styles.sourceArrow} />}
     </Pressable>
   );
 };
@@ -717,31 +715,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: Colors.border,
-    borderRadius: Radius.pill,
-    paddingLeft: 6,
-    paddingRight: 10,
+    borderRadius: Radius.xxl,
+    paddingLeft: 10,
+    paddingRight: 6,
     paddingVertical: 6,
     gap: 6,
     maxWidth: 220,
   },
   sourceFavicon: {
-    width: 16,
-    height: 16,
+    width: 20,
+    height: 20,
     borderRadius: Radius.xs,
   },
   sourceLabel: {
     color: Colors.textSecondary,
-    fontFamily: Fonts.body,
+    fontFamily: Fonts.mono,
     fontSize: FontSizes.label,
     flexShrink: 1,
-  },
-  sourceArrow: {
-    width: 9,
-    height: 9,
-    tintColor: Colors.textMuted,
-    transform: [{ rotate: '-45deg' }],
   },
   audioAttachmentBubble: {
     backgroundColor: Colors.whiteFaint,

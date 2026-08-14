@@ -1,3 +1,5 @@
+import * as Calendar from "expo-calendar";
+import * as Contacts from "expo-contacts";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import * as MediaLibrary from "expo-media-library/legacy";
@@ -47,10 +49,20 @@ const micIcon = require("../../../assets/icons/microphone.png");
 const cameraIcon = require("../../../assets/icons/camera.png");
 const photoIcon = require("../../../assets/icons/photo.png");
 const locationIcon = require("../../../assets/icons/location.png");
+const calendarIcon = require("../../../assets/icons/calendar.png");
 const binIcon = require("../../../assets/icons/bin.png");
 const exportIcon = require("../../../assets/icons/export.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
+
+const MOBILE_TOOL_NAMES = new Set([
+  "contact",
+  "calendar",
+  "settings",
+  "timer",
+  "clipboard",
+  "send_message",
+]);
 
 type SettingsDrawerProps = {
   visible: boolean;
@@ -61,7 +73,7 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "assistantoverlay" | "service" | "confidentiality" | "tools" | "profile" | "cloud";
+type SubPage = "main" | "general" | "assistantoverlay" | "service" | "confidentiality" | "tools" | "profile" | "cloud" | "mobileactions";
 
 export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
   const { width } = useResponsive();
@@ -102,6 +114,10 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   useEffect(() => {
     if (!visible) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (activeSubPage === "mobileactions") {
+        setActiveSubPage("tools");
+        return true;
+      }
       if (activeSubPage !== "main") {
         setActiveSubPage("main");
         return true;
@@ -172,6 +188,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [pluginStates, setPluginStates] = useState<Record<string, boolean>>({});
 
   const allTools: ITool[] = ToolManager.getAllTools();
+  const generalTools = allTools.filter(t => !MOBILE_TOOL_NAMES.has(t.definition.function.name));
+  const mobileTools = allTools.filter(t => MOBILE_TOOL_NAMES.has(t.definition.function.name));
   const allWidgets: IWidget[] = WidgetManager.getAllWidgets();
 
   const [cloudProvider, setCloudProvider] = useState<string>("none");
@@ -200,25 +218,31 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   ];
 
   type PermissionState = "granted" | "denied" | "undetermined";
-  const [permissionStatuses, setPermissionStatuses] = useState<Record<"microphone" | "camera" | "location" | "photos", PermissionState>>({
+  const [permissionStatuses, setPermissionStatuses] = useState<Record<"microphone" | "camera" | "location" | "photos" | "contacts" | "calendar", PermissionState>>({
     microphone: "undetermined",
     camera: "undetermined",
     location: "undetermined",
     photos: "undetermined",
+    contacts: "undetermined",
+    calendar: "undetermined",
   });
 
   const refreshPermissionStatuses = useCallback(async () => {
-    const [mic, camera, location, photos] = await Promise.all([
+    const [mic, camera, location, photos, contacts, calendar] = await Promise.all([
       ExpoSpeechRecognitionModule.getPermissionsAsync().catch(() => null),
       ImagePicker.getCameraPermissionsAsync().catch(() => null),
       Location.getForegroundPermissionsAsync().catch(() => null),
       MediaLibrary.getPermissionsAsync().catch(() => null),
+      Contacts.getPermissionsAsync().catch(() => null),
+      Calendar.getCalendarPermissions().catch(() => null),
     ]);
     setPermissionStatuses({
       microphone: (mic?.status as PermissionState) ?? "undetermined",
       camera: (camera?.status as PermissionState) ?? "undetermined",
       location: (location?.status as PermissionState) ?? "undetermined",
       photos: (photos?.status as PermissionState) ?? "undetermined",
+      contacts: (contacts?.status as PermissionState) ?? "undetermined",
+      calendar: (calendar?.status as PermissionState) ?? "undetermined",
     });
   }, []);
 
@@ -432,7 +456,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   //load plugin states when settings tab opens
   useEffect(() => {
-    if (activeSubPage !== 'tools') return;
+    if (activeSubPage !== 'tools' && activeSubPage !== 'mobileactions') return;
     const states: Record<string, boolean> = {};
     for (const tool of ToolManager.getAllTools()) {
       const name = tool.definition.function.name;
@@ -852,11 +876,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   }, [visible, isDesktop, largeScreenAnim, progress]);
 
   // back header for subpages
-  const renderSubPageHeader = (title: string) => (
+  const renderSubPageHeader = (title: string, backTo: SubPage = "main") => (
     <View style={styles.subPageHeader}>
       <Text style={[styles.title, { marginBottom: 12 }]}>{title}</Text>
       <Pressable
-        onPress={() => setActiveSubPage("main")}
+        onPress={() => setActiveSubPage(backTo)}
         hitSlop={12}
         style={({ pressed, hovered }) => [styles.backButton, (pressed || hovered) && { opacity: 0.6 }]}
       >
@@ -940,8 +964,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           >
             <Image source={toolIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
             <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>Tools & Widgets</Text>
-              <Text style={styles.navSubtitle}>Websearch</Text>
+              <Text style={styles.navTitle}>Tools</Text>
+              <Text style={styles.navSubtitle}>Websearch, Webfetch, Communication Shortcuts, Mobile actions</Text>
             </View>
           </Pressable>
         </View>
@@ -1253,12 +1277,32 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             </Pressable>
             {Platform.OS !== "web" && (
               <Pressable
-                style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+                style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
                 onPress={() => Linking.openSettings()}
               >
                 <Image source={photoIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
                 <Text style={styles.navLabel}>Photos</Text>
                 {renderPermissionBadge(permissionStatuses.photos)}
+              </Pressable>
+            )}
+            {Platform.OS !== "web" && (
+              <Pressable
+                style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+                onPress={() => Linking.openSettings()}
+              >
+                <Image source={profilIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+                <Text style={styles.navLabel}>Contacts</Text>
+                {renderPermissionBadge(permissionStatuses.contacts)}
+              </Pressable>
+            )}
+            {Platform.OS !== "web" && (
+              <Pressable
+                style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+                onPress={() => Linking.openSettings()}
+              >
+                <Image source={calendarIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+                <Text style={styles.navLabel}>Calendar</Text>
+                {renderPermissionBadge(permissionStatuses.calendar)}
               </Pressable>
             )}
           </View>
@@ -1305,9 +1349,29 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("Tools & Widgets")}
 
+      {/* mobile actions block */}
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Mobile actions</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          Allow the assistant to integrate and interact with installed apps.
+        </Text>
+
+        <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
+          <View style={styles.groupBox}>
+            <Pressable
+              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+              onPress={() => setActiveSubPage("mobileactions")}
+            >
+              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <Text style={styles.navLabel}>See mobile actions</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+
       {/* tools section */}
       <Text style={styles.sectionTitle}>Tools</Text>
-      {allTools.map((tool) => {
+      {generalTools.map((tool) => {
         const name = tool.definition.function.name;
         const key = `tool:${name}`;
         const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
@@ -1358,6 +1422,40 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     </View>
   );
 
+  // mobile actions subpage content
+  const renderMobileActionsSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("Mobile actions", "tools")}
+
+      {mobileTools.map((tool) => {
+        const name = tool.definition.function.name;
+        const key = `tool:${name}`;
+        const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
+        return (
+          <View key={name} style={styles.settingRowVertical}>
+            <View style={styles.toggleRow}>
+              <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
+              <Toggle
+                checked={enabled}
+                onToggle={async (v) => {
+                  setPluginStates(prev => ({ ...prev, [key]: v }));
+                  await PluginRegistry.setEnabled('tool', name, v);
+                  //request permission at enable time
+                  if (v) await tool.requestPermission?.();
+                }}
+              />
+            </View>
+            {tool.displayDescription ? (
+              <Text style={styles.helpText}>
+                {tool.displayDescription.endsWith('.') ? tool.displayDescription : `${tool.displayDescription}.`}
+              </Text>
+            ) : null}
+          </View>
+        );
+      })}
+    </View>
+  );
+
   const getSubPageContent = () => {
     switch (activeSubPage) {
       case "profile":
@@ -1374,6 +1472,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return renderConfidentialitySubPage();
       case "tools":
         return renderToolsSubPage();
+      case "mobileactions":
+        return renderMobileActionsSubPage();
       case "main":
       default:
         return renderMainPage();
@@ -1730,7 +1830,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 13,
-    fontFamily: "IBMPlexMono-Medium",
+    fontFamily: Fonts.mono,
     color: Colors.textMuted,
     textTransform: "uppercase",
     letterSpacing: 1,

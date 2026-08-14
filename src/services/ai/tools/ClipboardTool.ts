@@ -51,6 +51,7 @@ export class ClipboardTool implements ITool {
       const text = await Clipboard.getStringAsync();
       return text ? `Clipboard contents: "${text}"` : 'Clipboard is empty.';
     } catch (e: any) {
+      console.error('[ClipboardTool] error:', e?.message || e);
       return `Clipboard error: ${e.message}`;
     }
   }

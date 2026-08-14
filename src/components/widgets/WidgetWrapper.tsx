@@ -1,7 +1,7 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { IWidget } from '../../services/widgets/WidgetManager';
-import { Colors, Fonts, FontSizes, Radius } from '../../../constants/theme';
+import { Colors, Radius } from '../../../constants/theme';
 
 interface WidgetWrapperProps {
   widget: Pick<IWidget, 'name' | 'hasBorder'>;
@@ -9,21 +9,14 @@ interface WidgetWrapperProps {
   children: React.ReactNode;
 }
 
-export default function WidgetWrapper({ widget, title, children }: WidgetWrapperProps) {
+export default function WidgetWrapper({ widget, children }: WidgetWrapperProps) {
   if (!widget.hasBorder) {
     return <>{children}</>;
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.titleText}>
-          {widget.name}{title ? ` - ${title}` : ''}
-        </Text>
-      </View>
-      <View style={styles.content}>
-        {children}
-      </View>
+      {children}
     </View>
   );
 }
@@ -38,20 +31,4 @@ const styles = StyleSheet.create({
     width: '100%',
     padding: 5,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 5,
-    backgroundColor: Colors.surface,
-    paddingLeft: 6,
-  },
-  titleText: {
-    fontSize: FontSizes.bodyMd,
-    fontFamily: Fonts.mono,
-    color: Colors.textSecondary,
-    fontWeight: '600',
-  },
-  content: {}
 });
-
-

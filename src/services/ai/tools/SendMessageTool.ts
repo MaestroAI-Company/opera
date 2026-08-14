@@ -2,8 +2,8 @@ import { Linking, Platform } from 'react-native';
 import { ITool, ToolDefinition } from './ITool';
 
 export class SendMessageTool implements ITool {
-  displayName = 'Call, Text, or Email';
-  displayDescription = 'Allow the assistant to call, text, or email a number/address by opening the appropriate app with it pre-filled.';
+  displayName = 'Communications';
+  displayDescription = 'Allow the assistant to launch calls, texts, or emails with pre-filled contact details.';
   enabledByDefault = true;
 
   definition: ToolDefinition = {
@@ -14,7 +14,7 @@ export class SendMessageTool implements ITool {
         'Call, text (SMS), or email a specific phone number or email address by opening the appropriate app with the recipient ' +
         '(and message, for text/email) pre-filled. The user still has to hit send/call in that app — nothing is sent silently. ' +
         'If the user refers to a person by name or relationship (e.g. "maman", "my mom") rather than giving a number/address directly, ' +
-        'call find_contact first to resolve it.',
+        'call contact first to resolve it.',
       parameters: {
         type: 'object',
         properties: {
@@ -73,6 +73,7 @@ export class SendMessageTool implements ITool {
       await Linking.openURL(`mailto:${to}${query ? `?${query}` : ''}`);
       return `Opened email to ${to}.`;
     } catch (e: any) {
+      console.error('[SendMessageTool] error:', e?.message || e);
       return `Could not open ${method}: ${e.message}. The target app may not be installed.`;
     }
   }

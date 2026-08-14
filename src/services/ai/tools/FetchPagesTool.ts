@@ -77,6 +77,7 @@ export class FetchPagesTool implements ITool {
 
             return { url, content: text, title: doc.title, favicon };
           } catch (e: any) {
+            console.error('[FetchPagesTool] page fetch error:', e?.message || e);
             return { url, content: `Failed to fetch: ${e.message}` };
           }
         });
@@ -117,6 +118,7 @@ export class FetchPagesTool implements ITool {
 
       return `Fetched page contents:\n\n${formatted.join('\n\n---\n\n')}`;
     } catch (e: any) {
+      console.error('[FetchPagesTool] error:', e?.message || e);
       return `Fetch failed: ${e.message}`;
     }
   }

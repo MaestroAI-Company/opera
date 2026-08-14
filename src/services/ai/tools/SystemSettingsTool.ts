@@ -16,7 +16,7 @@ const PANEL_ACTIONS: Record<string, IntentLauncher.ActivityAction> = {
 };
 
 export class SystemSettingsTool implements ITool {
-  displayName = 'Open System Settings Panel';
+  displayName = 'Settings';
   displayDescription = 'Allow the assistant to open a specific Android settings panel, like WiFi or Bluetooth.';
   enabledByDefault = true;
   platforms: ITool['platforms'] = ['android'];
@@ -24,7 +24,7 @@ export class SystemSettingsTool implements ITool {
   definition: ToolDefinition = {
     type: 'function',
     function: {
-      name: 'open_system_settings_panel',
+      name: 'settings',
       description:
         'Android only. Open a specific OS settings panel (WiFi, Bluetooth, etc.) rather than this app\'s own settings. ' +
         'Not available on iOS/web/desktop — explain the limitation to the user on those platforms.',
@@ -57,6 +57,7 @@ export class SystemSettingsTool implements ITool {
       await IntentLauncher.startActivityAsync(action);
       return `Opened ${panel} settings.`;
     } catch (e: any) {
+      console.error('[SystemSettingsTool] error:', e?.message || e);
       return `Could not open ${panel} settings: ${e.message}`;
     }
   }

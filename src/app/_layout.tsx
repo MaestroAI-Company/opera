@@ -31,7 +31,7 @@ export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Petrona: require("../../assets/fonts/Petrona-Medium.ttf"),
     Figtree: require("../../assets/fonts/Figtree-Regular.ttf"),
-    "IBMPlexMono-Medium": require("../../assets/fonts/IBMPlexMono-Medium.ttf"),
+    FragmentMono: require("../../assets/fonts/FragmentMono-Regular.ttf"),
   });
 
   useEffect(() => {

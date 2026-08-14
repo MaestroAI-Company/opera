@@ -1,7 +1,7 @@
 import { Image, ImageSourcePropType, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import Checkbox from "./Checkbox";
 import TextInputField from "./TextInputField";
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { Colors, Fonts, FontSizes, Radius, Spacing } from "../../../constants/theme";
 
 export type ModalButton = {
   text: string;
@@ -208,11 +208,11 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: "column",
     alignItems: "stretch",
-    gap: 8,
+    gap: Spacing.lg,
   },
   button: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingVertical: Spacing.lg2,
+    paddingHorizontal: Spacing.xxl,
     borderRadius: Radius.xxl,
     borderWidth: 2,
     borderColor: "transparent",
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: Colors.surface,
-    fontSize: FontSizes.bodyMd,
+    fontSize: FontSizes.body,
     fontFamily: Fonts.mono,
   },
   buttonTextSecondary: {

@@ -50,7 +50,7 @@ export default function Selector({
   const triggerRef = useRef<View>(null);
   const [triggerLayout, setTriggerLayout] = useState<LayoutRectangle | null>(null);
 
-  //floating pill drag-to-select, mirrors ThemeSelector but vertical
+  //floating pill drag-to-select, mirrors SliderToggle but vertical
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [rowLayoutsVersion, setRowLayoutsVersion] = useState(0);
 

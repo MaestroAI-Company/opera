@@ -241,7 +241,7 @@ export default function PermissionsPage() {
                     isGranted && styles.permissionBtnTextGranted,
                     isDenied && styles.permissionBtnTextDenied,
                   ]}>
-                    {isGranted ? "Granted" : isDenied ? "Denied" : "Allow"}
+                    {isGranted ? "Allowed" : isDenied ? "Denied" : "Allow"}
                   </Text>
                 </Pressable>
               </View>
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
   },
   permissionBtnGranted: {
     backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    borderColor: Colors.borderOnPrimary,
   },
   permissionBtnDenied: {
     backgroundColor: Colors.textMuted,

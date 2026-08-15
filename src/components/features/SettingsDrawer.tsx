@@ -23,8 +23,8 @@ import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
 import DownloadProgress from "../ui/DownloadProgress";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import Selector from "../ui/Selector";
+import SliderToggle from "../ui/SliderToggle";
 import TextInputField from "../ui/TextInputField";
-import ThemeSelector from "../ui/ThemeSelector";
 import Toggle from "../ui/Toggle";
 import CloudSyncBox from "./CloudSyncBox";
 
@@ -1041,7 +1041,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={styles.settingRowVertical}>
         <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Theme app</Text>
-        <ThemeSelector
+        <SliderToggle
           selectedValue={theme}
           onSelect={setTheme}
         />

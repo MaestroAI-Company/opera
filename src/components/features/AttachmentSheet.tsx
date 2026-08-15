@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: Colors.codeBlockText,
+    borderColor: Colors.border,
   },
   sheetIconButtonIncognito: {
     backgroundColor: Colors.incognitoPressed,

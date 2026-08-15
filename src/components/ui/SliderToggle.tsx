@@ -1,17 +1,30 @@
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { useEffect, useRef, useState } from "react";
-import { Image, LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Image, ImageSourcePropType, LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
-// load theme icons
+//load theme icons
 const autoIcon = require("../../../assets/icons/auto.png");
 const lightIcon = require("../../../assets/icons/light.png");
 const darkIcon = require("../../../assets/icons/dark.png");
 
-type ThemeSelectorProps = {
+export type SliderToggleOption = {
+  id: string;
+  label: string;
+  icon?: ImageSourcePropType;
+};
+
+type SliderToggleProps = {
   selectedValue: string;
   onSelect: (value: string) => void;
+  options?: SliderToggleOption[];
 };
+
+const defaultOptions: SliderToggleOption[] = [
+  { id: "system", label: "Auto", icon: autoIcon },
+  { id: "light", label: "Light", icon: lightIcon },
+  { id: "dark", label: "Dark", icon: darkIcon },
+];
 
 const GAP = 4;
 const LONG_PRESS_DELAY = 180;
@@ -24,15 +37,23 @@ const rubberBand = (d: number, dim: number) => {
   return sign * dim * (1 - 1 / (1 + Math.abs(d) / dim));
 };
 
-// theme selector component
-export default function ThemeSelector({ selectedValue, onSelect }: ThemeSelectorProps) {
-  const options = [
-    { id: "system", label: "Auto" },
-    { id: "light", label: "Light" },
-    { id: "dark", label: "Dark" },
-  ];
+//slider toggle component
+export default function SliderToggle({
+  selectedValue,
+  onSelect,
+  options = defaultOptions,
+}: SliderToggleProps) {
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+  const selectedValueRef = useRef(selectedValue);
+  selectedValueRef.current = selectedValue;
 
   const selectedIndex = Math.max(0, options.findIndex((o) => o.id === selectedValue));
+  const selectedIndexRef = useRef(selectedIndex);
+  selectedIndexRef.current = selectedIndex;
+
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [buttonWidth, setButtonWidth] = useState(0);
 
@@ -53,33 +74,33 @@ export default function ThemeSelector({ selectedValue, onSelect }: ThemeSelector
     }
   };
 
-  // park the pill on the selected slot whenever it's not being dragged
+  //park pill on selected slot
   useEffect(() => {
     if (previewIndex === null && buttonWidth > 0) {
       pillX.value = withTiming(selectedIndex * (buttonWidth + GAP), { duration: 180 });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedValue, buttonWidth]);
+  }, [selectedIndex, buttonWidth, pillX, previewIndex]);
 
   const handleLayout = (e: LayoutChangeEvent) => {
     const width = e.nativeEvent.layout.width;
-    const bw = (width - GAP * (options.length - 1)) / options.length;
+    const count = optionsRef.current.length;
+    const bw = count > 0 ? (width - GAP * (count - 1)) / count : 0;
     buttonWidthRef.current = bw;
     setButtonWidth(bw);
-    pillX.value = selectedIndex * (bw + GAP);
+    pillX.value = selectedIndexRef.current * (bw + GAP);
   };
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      //keep the gesture even if an ancestor (eg. the settings drawer's swipe-to-close) tries to steal it
+      //keep gesture when drawer scrolls
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
         armedRef.current = false;
         startXRef.current = pillX.value;
-        previewIndexRef.current = selectedIndex;
+        previewIndexRef.current = selectedIndexRef.current;
         clearLongPressTimer();
-        //require a hold before dragging starts, matching press-and-drag gesture
+        //require hold before drag
         longPressTimerRef.current = setTimeout(() => {
           armedRef.current = true;
           scale.value = withTiming(1.2, { duration: 120 });
@@ -90,12 +111,11 @@ export default function ThemeSelector({ selectedValue, onSelect }: ThemeSelector
         if (!armedRef.current) return;
         const bw = buttonWidthRef.current;
         const slot = bw + GAP;
-        const maxIndex = options.length - 1;
-        //unclamped: how far the finger has actually travelled from where the drag began
+        const currentOptions = optionsRef.current;
+        const maxIndex = currentOptions.length - 1;
         const rawX = startXRef.current + gestureState.dx;
 
-        //pulled toward its current anchor; past BREAK_RATIO it snaps loose and gets grabbed by the next one
-        let anchor = previewIndexRef.current ?? selectedIndex;
+        let anchor = previewIndexRef.current ?? selectedIndexRef.current;
         let d = rawX - anchor * slot;
         while (Math.abs(d) >= slot * BREAK_RATIO) {
           const next = Math.min(maxIndex, Math.max(0, anchor + (d > 0 ? 1 : -1)));
@@ -114,15 +134,16 @@ export default function ThemeSelector({ selectedValue, onSelect }: ThemeSelector
         clearLongPressTimer();
         if (armedRef.current) {
           const bw = buttonWidthRef.current;
-          const idx = previewIndexRef.current ?? selectedIndex;
+          const currentOptions = optionsRef.current;
+          const idx = previewIndexRef.current ?? selectedIndexRef.current;
           scale.value = withTiming(1, { duration: 150 });
           pillLit.value = withTiming(0, { duration: 150 });
           pillX.value = withTiming(idx * (bw + GAP), { duration: 150 });
-          const newValue = options[idx].id;
+          const newValue = currentOptions[idx]?.id;
           armedRef.current = false;
           previewIndexRef.current = null;
           setPreviewIndex(null);
-          if (newValue !== selectedValue) onSelect(newValue);
+          if (newValue && newValue !== selectedValueRef.current) onSelectRef.current(newValue);
         }
       },
       onPanResponderTerminate: () => {
@@ -131,7 +152,7 @@ export default function ThemeSelector({ selectedValue, onSelect }: ThemeSelector
           const bw = buttonWidthRef.current;
           scale.value = withTiming(1, { duration: 150 });
           pillLit.value = withTiming(0, { duration: 150 });
-          pillX.value = withTiming(selectedIndex * (bw + GAP), { duration: 150 });
+          pillX.value = withTiming(selectedIndexRef.current * (bw + GAP), { duration: 150 });
         }
         armedRef.current = false;
         previewIndexRef.current = null;
@@ -146,24 +167,12 @@ export default function ThemeSelector({ selectedValue, onSelect }: ThemeSelector
   }));
 
   const activeIndex = previewIndex ?? selectedIndex;
-  const activeOption = options[activeIndex];
-
-  // get icon based on the previewed/selected value
-  const getSelectedIcon = () => {
-    switch (activeOption.id) {
-      case "light":
-        return lightIcon;
-      case "dark":
-        return darkIcon;
-      case "system":
-      default:
-        return autoIcon;
-    }
-  };
+  const activeOption = options[activeIndex] ?? options[0];
+  const iconSource = activeOption?.icon;
 
   return (
     <View style={styles.container}>
-      <Image source={getSelectedIcon()} style={styles.icon} />
+      {iconSource && <Image source={iconSource} style={styles.icon} />}
       <View style={styles.optionsContainer} onLayout={handleLayout}>
         {options.map((option) => (
           <Pressable
@@ -177,7 +186,7 @@ export default function ThemeSelector({ selectedValue, onSelect }: ThemeSelector
             <Text style={styles.optionText}>{option.label}</Text>
           </Pressable>
         ))}
-        {buttonWidth > 0 && (
+        {buttonWidth > 0 && activeOption && (
           <Animated.View style={[styles.pill, { width: buttonWidth }, pillAnimatedStyle]} {...panResponder.panHandlers}>
             <Text style={styles.pillText}>{activeOption.label}</Text>
           </Animated.View>

@@ -21,15 +21,19 @@ import { AIModule } from "../../services/ai/AIModule";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useResponsive } from "../../hooks/useResponsive";
 import NotificationModal from "../ui/NotificationModal";
+import SliderToggle, { SliderToggleOption } from "../ui/SliderToggle";
 
 const botIcon = require("../../../assets/icons/bot.png");
 const downloadIcon = require("../../../assets/icons/download.png");
+const quickIcon = require("../../../assets/icons/Quick.png");
+const lowIcon = require("../../../assets/icons/Low.png");
+const highIcon = require("../../../assets/icons/High.png");
 const loadingAnimation = require("../../../assets/animations/loading.json");
 
-const REFLECTIONS = [
-  { id: "none", label: "Quick" },
-  { id: "low", label: "Low" },
-  { id: "high", label: "High" },
+const REFLECTIONS: SliderToggleOption[] = [
+  { id: "none", label: "Quick", icon: quickIcon },
+  { id: "low", label: "Low", icon: lowIcon },
+  { id: "high", label: "High", icon: highIcon },
 ];
 
 //clears the tallest sheet content so it starts fully off-screen
@@ -267,29 +271,11 @@ export default function ModelDropdown({
                   <>
                     <View style={styles.separator} />
                     <Text style={styles.sectionTitle}>Reflection</Text>
-                    {REFLECTIONS.map((item) => (
-                      <Pressable
-                        key={item.id}
-                        onPress={() => {
-                          Vibration.vibrate(10);
-                          closeSheet(() => onReflectionChange(item.id));
-                        }}
-                        style={({ pressed, hovered }) => [
-                          styles.option,
-                          item.id === selectedReflection ? styles.optionSelected : (pressed || hovered) && { backgroundColor: Colors.overlaySubtle },
-                          item.id === selectedReflection && (pressed || hovered) && { backgroundColor: Colors.primaryActive }
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.optionText,
-                            item.id === selectedReflection && styles.optionTextSelected,
-                          ]}
-                        >
-                          {item.label}
-                        </Text>
-                      </Pressable>
-                    ))}
+                    <SliderToggle
+                      selectedValue={selectedReflection}
+                      onSelect={onReflectionChange}
+                      options={REFLECTIONS}
+                    />
                   </>
                 )}
               </View>

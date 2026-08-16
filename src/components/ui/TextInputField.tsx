@@ -1,4 +1,5 @@
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { Image, ImageSourcePropType, StyleProp, StyleSheet, TextInput, TextInputProps, View, ViewStyle } from "react-native";
 
 interface TextInputFieldProps extends TextInputProps {
@@ -7,6 +8,8 @@ interface TextInputFieldProps extends TextInputProps {
 }
 
 export default function TextInputField({ icon, style, containerStyle, ...props }: TextInputFieldProps) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={[styles.container, containerStyle]}>
       {icon && <Image source={icon} style={styles.icon} />}
@@ -19,7 +22,7 @@ export default function TextInputField({ icon, style, containerStyle, ...props }
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
@@ -33,7 +36,7 @@ const styles = StyleSheet.create({
   icon: {
     width: 18,
     height: 18,
-    
+    tintColor: Colors.textSecondary,
   },
   input: {
     flex: 1,

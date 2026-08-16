@@ -1,6 +1,8 @@
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Colors, Fonts, FontSizes, Spacing } from '../../../constants/theme';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from '../../../constants/theme';
+import { useColors, useThemedStyles } from '../../hooks/useTheme';
 import { IWidget } from '../../services/widgets/WidgetManager';
+import { Block, BlockContainer, BlockRow, Caption } from '../toolwidgets/ToolWidgetBlocks';
 
 export interface WeatherItem {
   label?: string;
@@ -11,9 +13,10 @@ export interface WeatherItem {
 }
 
 export interface WeatherWidgetData {
-  mode?: 'now' | 'hourly' | 'daily';
+  description?: string;
   unit?: string;
-  items: WeatherItem[];
+  now: WeatherItem;
+  forecast: WeatherItem[];
 }
 
 const ICONS: Record<string, any> = {
@@ -42,113 +45,114 @@ export const WeatherWidget: IWidget<WeatherWidgetData> = {
   aiDefinesTitle: true,
   enabledByDefault: true,
   icon: ICONS.clear_day,
-  description: 'Displays a weather forecast for a location. REQUIRED title="CITY": the title attribute MUST contain ONLY the city name (e.g. title="Paris"), never add other words like "Weather", "Forecast", "Météo" or the date. Choose EXACTLY ONE mode and respect its item count: "now" = current conditions only (exactly 1 item, only the first item is displayed); "hourly" = the NEXT 4 HOURS (exactly 4 items, no more, no less); "daily" = the NEXT 4 DAYS (exactly 4 items, no more, no less). Never give more or fewer than 4 items for hourly and daily. The label is the hour ("14:00", "Now") in hourly mode and the day ("Today", "Tomorrow", "Friday") in daily mode. You do not know the weather: get it with the search tools first, then render this widget.',
+  description: 'Displays a single weather card combining current conditions and a 4-item forecast. REQUIRED title="CITY": the title attribute MUST contain ONLY the city name (e.g. title="Paris"), never add other words like "Weather", "Forecast", "Météo" or the date. REQUIRED "description": a short weather condition (e.g. "Sunny", "Partly cloudy"), written in the same language as your reply. "now" is the current conditions (exactly 1 item, REQUIRED max/min for the day). "forecast" is exactly 4 items, each with icon, temp, AND max/min, either the NEXT 4 HOURS or the NEXT 4 DAYS — choose exactly one granularity, never mix, never more or fewer than 4. The label is the hour ("14:00", "Now") for an hourly forecast and the day ("Today", "Tomorrow", "Friday") for a daily forecast. You do not know the weather: get it with the search tools first, then render this widget.',
   schema: `{
-    "mode": "now | hourly | daily",
+    "description": "Sunny",
     "unit": "C",
-    "items": [
-      { "label": "Now", "icon": "clear_day", "temp": 27, "max": 29, "min": 18 }
+    "now": { "icon": "clear_day", "temp": 23, "max": 28, "min": 21 },
+    "forecast": [
+      { "label": "18:00", "icon": "clear_day", "temp": 26, "max": 27, "min": 24 },
+      { "label": "19:00", "icon": "partly_cloudy_day", "temp": 24, "max": 25, "min": 22 },
+      { "label": "20:00", "icon": "cloud", "temp": 21, "max": 22, "min": 19 },
+      { "label": "21:00", "icon": "cloud", "temp": 19, "max": 20, "min": 17 }
     ]
   }
   RULES:
-  - mode "now": exactly 1 item (current conditions).
-  - mode "hourly": exactly 4 items, the next 4 hours.
-  - mode "daily": exactly 4 items, the next 4 days.
+  - "now": exactly 1 item, the current conditions, with max/min for the day.
+  - "forecast": exactly 4 items with max/min each, either the next 4 hours or the next 4 days (not both, no more, no less).
   Allowed icon values: clear_day, moon_stars, partly_cloudy_day, partly_cloudy_night, cloud, rainy, thunderstorm, foggy, weather_hail`,
-  component: ({ data }) => {
-    let items = data.items || [];
+  component: function WeatherWidgetView({ data, title, incognito }) {
+    const Colors = useColors();
+    const styles = useThemedStyles(makeStyles);
+    const now = data.now;
+    if (!now) return null;
+
     const unit = data.unit || 'C';
-    const mode = data.mode || 'now';
+    //enforce max of 4 items, no more no less
+    const forecast = (data.forecast || []).slice(0, 4);
+    const nowRange = formatRange(now);
+    const caption = [title, data.description].filter(Boolean).join(' ');
 
-    if (items.length === 0) return null;
+    return (
+      <BlockContainer>
+        {!!caption && <Caption text={caption} />}
 
-    //enforce max of 4 items for hourly/daily, no more no less
-    if (mode !== 'now') {
-      items = items.slice(0, 4);
-    }
-
-    if (mode === 'now') {
-      const item = items[0];
-      const range = formatRange(item);
-
-      return (
-        <View style={styles.nowRow}>
-          <Image source={ICONS[item.icon] || ICONS.cloud} style={styles.nowIcon} resizeMode="contain" />
-          <View style={styles.nowValues}>
-            <Text style={styles.nowTemp}>{formatTemp(item.temp, unit)}</Text>
-            {range && <Text style={styles.range}>{range}</Text>}
+        <BlockRow>
+          <View style={[styles.iconTile, incognito && { backgroundColor: Colors.incognito }]}>
+            <Image source={ICONS[now.icon] || ICONS.cloud} style={styles.iconTileImage} resizeMode="contain" />
           </View>
-        </View>
-      );
-    }
+          <View style={styles.nowValues}>
+            <Block text={formatTemp(now.temp, unit)} />
+            {!!nowRange && <Block text={nowRange} />}
+          </View>
+        </BlockRow>
 
-    //scroll instead of squeezing columns when the forecast is long
-    const isScrollable = items.length > 4;
+        {forecast.length > 0 && (
+          <View style={styles.forecastBox}>
+            <View style={styles.forecastRow}>
+              {forecast.map((item, index) => {
+                const range = formatRange(item);
 
-    const columns = items.map((item, index) => {
-      const range = formatRange(item);
-
-      return (
-        <View key={index} style={[styles.column, isScrollable ? styles.columnFixed : styles.columnFlex]}>
-          <Text style={styles.temp}>{formatTemp(item.temp, unit)}</Text>
-          {range && <Text style={styles.range}>{range}</Text>}
-          <Image source={ICONS[item.icon] || ICONS.cloud} style={styles.icon} resizeMode="contain" />
-          {item.label && <Text style={styles.label}>{item.label}</Text>}
-        </View>
-      );
-    });
-
-    if (isScrollable) {
-      return (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {columns}
-        </ScrollView>
-      );
-    }
-
-    return <View style={styles.row}>{columns}</View>;
+                return (
+                  <View key={index} style={styles.column}>
+                    <Text style={styles.temp}>{formatTemp(item.temp, unit)}</Text>
+                    {!!range && <Text style={styles.columnRange}>{range}</Text>}
+                    <Image source={ICONS[item.icon] || ICONS.cloud} style={styles.icon} resizeMode="contain" />
+                    {!!item.label && <Text style={styles.label}>{item.label}</Text>}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+      </BlockContainer>
+    );
   },
 };
 
-const styles = StyleSheet.create({
-  nowRow: {
-    flexDirection: 'row',
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
+  //same filled treatment as the primary Block, sized to a square
+  iconTile: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: Radius.md,
+    borderWidth: 2,
+    borderColor: Colors.borderOnPrimary,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
-    padding: Spacing.lg,
+    justifyContent: 'center',
   },
-  nowIcon: {
-    width: 88,
-    height: 88,
+  iconTileImage: {
+    width: '55%',
+    height: '55%',
+    tintColor: Colors.textOnPrimary,
   },
   nowValues: {
     flex: 1,
-    alignItems: 'flex-end',
+    gap: Spacing.sm,
   },
-  nowTemp: {
-    fontFamily: Fonts.body,
-    fontSize: FontSizes.displayLg,
-    color: Colors.textPrimary,
+  //outlined like the value Blocks, wraps the whole forecast strip
+  forecastBox: {
+    borderRadius: Radius.md,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
   },
-  row: {
+  forecastRow: {
     flexDirection: 'row',
     paddingVertical: Spacing.md,
   },
   column: {
+    flex: 1,
     alignItems: 'center',
     paddingHorizontal: Spacing.xs,
   },
-  columnFlex: {
-    flex: 1,
-  },
-  columnFixed: {
-    width: 76,
-  },
   temp: {
-    fontFamily: Fonts.body,
+    fontFamily: Fonts.mono,
     fontSize: FontSizes.md,
     color: Colors.textPrimary,
   },
-  range: {
+  columnRange: {
     fontFamily: Fonts.body,
     fontSize: FontSizes.micro,
     color: Colors.textMuted,
@@ -158,6 +162,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     marginVertical: Spacing.md,
+    tintColor: Colors.textPrimary,
   },
   label: {
     fontFamily: Fonts.mono,

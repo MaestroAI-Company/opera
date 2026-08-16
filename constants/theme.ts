@@ -1,5 +1,5 @@
 //design tokens for the opera design system
-export const Colors = {
+export const LightColors = {
   //brand
   primary: "#FF1A1A",
   primaryPressed: "#D61515",
@@ -85,7 +85,62 @@ export const Colors = {
   responseTextMuted: "rgba(255,255,255,0.62)",
   responseLink: "#7CB3FF",
   responseBorder: "rgba(255,255,255,0.14)",
+
+  //hover tint on ghost icon buttons
+  overlayHover: "rgba(0,0,0,0.15)",
+  //snackbar stays a dark pill in both themes
+  snackbarBg: "#444444",
 } as const;
+
+//every palette carries the same keys, values stay free-form color strings
+export type ThemeColors = { readonly [K in keyof typeof LightColors]: string };
+
+//dark palette: red untouched, cream canvas and white surfaces go dark, ramps invert
+export const DarkColors: ThemeColors = {
+  ...LightColors,
+
+  //canvas & surfaces
+  background: "#1C1B1A",
+  surface: "#252525",
+  surfaceMuted: "#2A2A2A",
+  surfaceSubtle: "#2F2F2F",
+  surfacePressed: "#383838",
+  surfaceCode: "#2F2F2F",
+
+  //outlines stay invisible, surface contrast carries the separation
+  border: "rgba(255,255,255,0.07)",
+  shadowInk: "#00000080",
+
+  //text ramp
+  textPrimary: "#FFFFFF",
+  textSecondary: "#C9C9C9",
+  textMuted: "#8A8A8A",
+
+  //links & errors
+  link: "#7CB3FF",
+  linkAlt: "#4DA3FF",
+  dangerBorder: "#FF1A1A44",
+  dangerBg: "#2E1E1E",
+  dangerBgSoft: "#2A1D1D",
+  dangerBorderSoft: "#5A2E2E",
+
+  //code blocks must stay recessed against the dark canvas
+  codeBlockBg: "#101010",
+  codeInlineText: "#FF7AB6",
+
+  //tints flip to white, scrims stay black
+  overlayFaint: "rgba(255,255,255,0.03)",
+  overlaySubtle: "rgba(255,255,255,0.06)",
+  overlayHover: "rgba(255,255,255,0.12)",
+  snackbarBg: "#3A3A3A",
+  scrimDrawer: "rgba(0,0,0,0.5)",
+  scrimModal: "rgba(0,0,0,0.6)",
+  backgroundFade: "rgba(28,27,26,0.9)",
+  backgroundClear: "rgba(28,27,26,0)",
+};
+
+//light stays the module default so non-react code keeps working
+export const Colors = LightColors;
 
 export const Fonts = {
   display: "Petrona",

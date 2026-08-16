@@ -1,7 +1,8 @@
 import { Platform, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { IWidget } from '../../services/widgets/WidgetManager';
-import { Colors, Radius } from '../../../constants/theme';
+import { Radius, ThemeColors } from '../../../constants/theme';
+import { useThemedStyles } from '../../hooks/useTheme';
 
 export interface HtmlWidgetData {
   html?: string;
@@ -21,7 +22,8 @@ export const HtmlWidget: IWidget<HtmlWidgetData> = {
     "url": "https://example.com",
     "height": 300
   }`,
-  component: ({ data }) => {
+  component: function HtmlWidgetView({ data }) {
+    const styles = useThemedStyles(makeStyles);
     const source = data.html ? { html: data.html } : data.url ? { uri: data.url } : { html: '<p>No content provided</p>' };
     const widgetHeight = data.height || 300;
 
@@ -48,7 +50,7 @@ export const HtmlWidget: IWidget<HtmlWidgetData> = {
   }
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     width: '100%',
     backgroundColor: Colors.surface,

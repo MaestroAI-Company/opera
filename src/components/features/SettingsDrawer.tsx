@@ -4,7 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
@@ -31,7 +31,7 @@ import CloudSyncBox from "./CloudSyncBox";
 import { useResponsive } from "../../hooks/useResponsive";
 
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
-import { dragDrawer, drawerWidthFor, gestureVelocity, settingsProgress, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
+import { dragDrawer, drawerWidthFor, gestureVelocity, playPageTransition, settingsProgress, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
 
 const linkIcon = require("../../../assets/icons/link.png");
 const downloadIcon = require("../../../assets/icons/download.png");
@@ -73,27 +73,21 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "assistantoverlay" | "service" | "confidentiality" | "tools" | "profile" | "cloud" | "mobileactions";
+type SubPage = "main" | "general" | "assistantoverlay" | "service" | "confidentiality" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions";
 
 export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
   const { width } = useResponsive();
   const drawerWidth = drawerWidthFor(width);
-
-  //one value drives slide and scrim
   const progress = settingsProgress;
-
-  //useMemo read during render
   const panResponder = useMemo(() =>
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
         return gestureState.dx > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
       },
       onPanResponderMove: (_, gestureState) => {
-        //panel tracks the finger
         dragDrawer(progress, Math.max(0, Math.min(1, 1 - gestureState.dx / drawerWidth)));
       },
       onPanResponderRelease: (_, gestureState) => {
-        //settle here keeps flick speed
         const velocity = -gestureVelocity(gestureState.vx, drawerWidth);
         if (gestureState.dx > drawerWidth * 0.35 || gestureState.vx > 0.5) {
           settleDrawer(progress, false, velocity);
@@ -109,12 +103,27 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     , [onClose, drawerWidth, progress]);
 
   const [activeSubPage, setActiveSubPage] = useState<SubPage>(initialSubPage ?? "main");
+  const pageAnim = useAnimatedValue(1);
+
+  useEffect(() => {
+    if (!visible && activeSubPage !== (initialSubPage ?? "main")) {
+      setActiveSubPage(initialSubPage ?? "main");
+    }
+  }, [visible]);
+
+  const prevSubPageRef = useRef(activeSubPage);
+  useEffect(() => {
+    if (visible && activeSubPage !== prevSubPageRef.current) {
+      playPageTransition(pageAnim);
+    }
+    prevSubPageRef.current = activeSubPage;
+  }, [activeSubPage, visible, pageAnim]);
 
   //native back navigates back in the menu, then lets parent close the drawer
   useEffect(() => {
     if (!visible) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (activeSubPage === "mobileactions") {
+      if (activeSubPage === "mobileactions" || activeSubPage === "widgets") {
         setActiveSubPage("tools");
         return true;
       }
@@ -398,7 +407,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     }
   };
 
-  //load settings on first open
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -456,7 +464,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   //load plugin states when settings tab opens
   useEffect(() => {
-    if (activeSubPage !== 'tools' && activeSubPage !== 'mobileactions') return;
+    if (activeSubPage !== 'tools' && activeSubPage !== 'widgets' && activeSubPage !== 'mobileactions') return;
     const states: Record<string, boolean> = {};
     for (const tool of ToolManager.getAllTools()) {
       const name = tool.definition.function.name;
@@ -465,8 +473,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     for (const widget of WidgetManager.getAllWidgets()) {
       states[`widget:${widget.id}`] = PluginRegistry.isEnabled('widget', widget.id, widget.enabledByDefault ?? false);
     }
-    //mirror the registry into state when the tab opens
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPluginStates(states);
   }, [activeSubPage]);
 
@@ -721,9 +727,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   useEffect(() => {
     if (visible) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveSubPage(initialSubPage ?? "main");
-      //sync deferred past opening
       CloudSync.requestAutoSync(DRAWER_SYNC_DELAY_MS);
       refreshLastSync();
     }
@@ -965,7 +969,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             <Image source={toolIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>Tools</Text>
-              <Text style={styles.navSubtitle}>Websearch, Webfetch, Communication Shortcuts, Mobile actions</Text>
+              <Text style={styles.navSubtitle}>Assistant Tools, Widgets, Mobile actions</Text>
             </View>
           </Pressable>
         </View>
@@ -1344,33 +1348,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     </View>
   );
 
-  // tools & widgets subpage content
+  // tools subpage content: assistant tools stay inline, widgets and mobile actions link out
   const renderToolsSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Tools & Widgets")}
+      {renderSubPageHeader("Tools")}
 
-      {/* mobile actions block */}
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Mobile actions</Text>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          Allow the assistant to integrate and interact with installed apps.
-        </Text>
-
-        <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
-          <View style={styles.groupBox}>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-              onPress={() => setActiveSubPage("mobileactions")}
-            >
-              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>See mobile actions</Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
-
-      {/* tools section */}
-      <Text style={styles.sectionTitle}>Tools</Text>
       {generalTools.map((tool) => {
         const name = tool.definition.function.name;
         const key = `tool:${name}`;
@@ -1398,8 +1380,53 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         );
       })}
 
-      {/* widgets section */}
-      <Text style={styles.sectionTitle}>Widgets</Text>
+      {/* widgets block: links out, same pattern as mobile actions below */}
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Widgets</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          Structured results the assistant can display: {allWidgets.map(w => w.name).join(", ")}.
+        </Text>
+
+        <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
+          <View style={styles.groupBox}>
+            <Pressable
+              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+              onPress={() => setActiveSubPage("widgets")}
+            >
+              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <Text style={styles.navLabel}>See widgets</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+
+      {/* mobile actions block, last: points to a deeper subpage instead of toggling in place */}
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Mobile actions</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          Allow the assistant to integrate with installed apps: {mobileTools.map(t => t.displayName ?? t.definition.function.name).join(", ")}.
+        </Text>
+
+        <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
+          <View style={styles.groupBox}>
+            <Pressable
+              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+              onPress={() => setActiveSubPage("mobileactions")}
+            >
+              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <Text style={styles.navLabel}>See mobile actions</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
+  // widgets subpage content
+  const renderWidgetsSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("Widgets", "tools")}
+
       {allWidgets.map((widget) => {
         const key = `widget:${widget.id}`;
         const enabled = pluginStates[key] ?? (widget.enabledByDefault ?? false);
@@ -1472,6 +1499,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return renderConfidentialitySubPage();
       case "tools":
         return renderToolsSubPage();
+      case "widgets":
+        return renderWidgetsSubPage();
       case "mobileactions":
         return renderMobileActionsSubPage();
       case "main":
@@ -1482,7 +1511,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const innerContent = (
     <ScrollView contentContainerStyle={{ paddingTop: isDesktop ? 0 : 60, paddingBottom: 40, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-      {getSubPageContent()}
+      <Animated.View style={{ opacity: pageAnim, transform: [{ translateY: pageAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
+        {getSubPageContent()}
+      </Animated.View>
     </ScrollView>
   );
 

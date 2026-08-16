@@ -1,12 +1,13 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Animated, BackHandler, Image, Keyboard, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useResponsive } from "../../hooks/useResponsive";
 import { Conversation, DB } from "../../services/db/DatabaseService";
 import { CloudSync } from "../../services/CloudSyncService";
 import NotificationModal from "../ui/NotificationModal";
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
-import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
+import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, playPageTransition, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
 
 const searchIcon = require("../../../assets/icons/search.png");
 const newIcon = require("../../../assets/icons/add.png");
@@ -68,6 +69,8 @@ export default function ConversationsDrawer({
   isLargeScreen = false,
   isDesktop = false,
 }: ConversationsDrawerProps) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const { width } = useResponsive();
   const drawerWidth = drawerWidthFor(width);
 
@@ -78,6 +81,7 @@ export default function ConversationsDrawer({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Conversation[]>([]);
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null);
+  const pageAnim = useAnimatedValue(1);
 
   useEffect(() => {
     //reset only when needed
@@ -90,6 +94,15 @@ export default function ConversationsDrawer({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
+
+  //fade/slide on every real navigation (forward or back), but not just on open/reopen
+  const prevSearchingRef = useRef(isSearching);
+  useEffect(() => {
+    if (visible && isSearching !== prevSearchingRef.current) {
+      playPageTransition(pageAnim);
+    }
+    prevSearchingRef.current = isSearching;
+  }, [isSearching, visible, pageAnim]);
 
   //native back exits search mode, then lets parent close the drawer
   useEffect(() => {
@@ -208,15 +221,15 @@ export default function ConversationsDrawer({
             <>
               <Pressable
                 onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
-                style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlay }]}
+                style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlayHover }]}
               >
-                <Image source={conv.pinned ? unpinIcon : pinIcon} style={styles.actionIcon} tintColor={Colors.surface} />
+                <Image source={conv.pinned ? unpinIcon : pinIcon} style={styles.actionIcon} tintColor={Colors.textOnPrimary} />
               </Pressable>
               <Pressable
                 onPress={() => setDeleteConfirmId(conv.id)}
-                style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlay }]}
+                style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlayHover }]}
               >
-                <Image source={deleteIcon} style={styles.actionIcon} tintColor={Colors.surface} />
+                <Image source={deleteIcon} style={styles.actionIcon} tintColor={Colors.textOnPrimary} />
               </Pressable>
             </>
           ) : (
@@ -285,15 +298,15 @@ export default function ConversationsDrawer({
                     <>
                       <Pressable
                         onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
-                        style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlay }]}
+                        style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlayHover }]}
                       >
-                        <Image source={conv.pinned ? unpinIcon : pinIcon} style={styles.actionIcon} tintColor={Colors.surface} />
+                        <Image source={conv.pinned ? unpinIcon : pinIcon} style={styles.actionIcon} tintColor={Colors.textOnPrimary} />
                       </Pressable>
                       <Pressable
                         onPress={() => setDeleteConfirmId(conv.id)}
-                        style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlay }]}
+                        style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlayHover }]}
                       >
-                        <Image source={deleteIcon} style={styles.actionIcon} tintColor={Colors.surface} />
+                        <Image source={deleteIcon} style={styles.actionIcon} tintColor={Colors.textOnPrimary} />
                       </Pressable>
                     </>
                   ) : (
@@ -412,7 +425,9 @@ export default function ConversationsDrawer({
       ]}>
         <View style={{ width: 320, flex: 1 }}>
           <View style={isDesktop ? styles.floatingContent : styles.attachedContent}>
-            {isSearching ? searchContent : innerContent}
+            <Animated.View style={{ flex: 1, opacity: pageAnim, transform: [{ translateY: pageAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
+              {isSearching ? searchContent : innerContent}
+            </Animated.View>
           </View>
         </View>
         {notificationModal}
@@ -441,7 +456,9 @@ export default function ConversationsDrawer({
         style={[styles.content, { width: drawerWidth }, { transform: [{ translateX }] }]}
         {...panResponder.panHandlers}
       >
-        {isSearching ? searchContent : innerContent}
+        <Animated.View style={{ flex: 1, opacity: pageAnim, transform: [{ translateY: pageAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
+          {isSearching ? searchContent : innerContent}
+        </Animated.View>
       </Animated.View>
 
       {notificationModal}
@@ -451,7 +468,7 @@ export default function ConversationsDrawer({
   return mobileDrawer;
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   root: {
     ...StyleSheet.absoluteFill,
     zIndex: 1000,
@@ -564,11 +581,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: Radius.xxl,
     marginBottom: 2,
+    //keep the 2px box so selecting doesn't shift layout, just hide it
     borderWidth: 2,
-    borderColor: Colors.borderOnPrimary,
+    borderColor: "transparent",
   },
   discussionRowSelected: {
     backgroundColor: Colors.primary,
+    borderColor: Colors.borderOnPrimary,
   },
   discussionTextContainer: {
     flex: 1,
@@ -580,7 +599,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.mono,
   },
   discussionTextSelected: {
-    color: Colors.surface,
+    color: Colors.textOnPrimary,
   },
   rowActions: {
     flexDirection: "row",

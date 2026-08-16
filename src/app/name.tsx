@@ -12,12 +12,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TextInputField from "../components/ui/TextInputField";
 import { useResponsive } from "../hooks/useResponsive";
 import { Settings } from "../services/settings/SettingsService";
-import { Colors, Fonts, FontSizes, Radius } from "../../constants/theme";
+import { FontSizes, Fonts, Radius, ThemeColors } from "../../constants/theme";
+import { useColors, useThemedStyles } from "../hooks/useTheme";
 
 const texture2 = require("../../assets/images/texture2.png");
 const profilIcon = require("../../assets/icons/pencil.png");
 
 export default function NamePage() {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isLargeScreen } = useResponsive();
@@ -76,7 +79,7 @@ export default function NamePage() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -136,7 +139,7 @@ const styles = StyleSheet.create({
   buttonText: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.bodyMd,
-    color: Colors.surface,
+    color: Colors.textOnPrimary,
   },
   skipText: {
     fontFamily: Fonts.body,

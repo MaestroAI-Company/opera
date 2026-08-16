@@ -10,7 +10,7 @@ export interface IWidget<T = any> {
   description: string; // system prompt description
   schema: string; // json schema definition
   enabledByDefault?: boolean; // default enabled state in settings
-  component: React.ComponentType<{ data: T }>;
+  component: React.ComponentType<{ data: T; title?: string; incognito?: boolean }>;
 }
 
 class CentralWidgetManager {

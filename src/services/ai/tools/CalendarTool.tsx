@@ -5,6 +5,7 @@ import { Block, BlockContainer, BlockRow, BlockSymbol, Caption } from '../../../
 interface CalendarWidgetData {
   title: string;
   day: string;
+  date: string;
   startTime: string;
   endTime: string;
 }
@@ -94,19 +95,26 @@ export class CalendarTool implements ITool {
       const end = new Date(match[3]);
       if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
       const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
+      const monthName = capitalize(start.toLocaleDateString(undefined, { month: 'long' }));
       return {
         title: match[1],
         day: capitalize(start.toLocaleDateString(undefined, { weekday: 'long' })),
+        date: `${start.getDate()} ${monthName}`,
         startTime: start.toLocaleTimeString(undefined, timeOpts),
         endTime: end.toLocaleTimeString(undefined, timeOpts),
       };
     },
-    component: ({ data }) => (
+    component: ({ data, incognito }) => (
       <BlockContainer>
-        <Caption text={`${data.title} set for`} />
+        <Caption text={data.title} />
         <BlockRow>
-          <Block text={data.day} filled serif />
+          <Block text={data.day} filled serif incognito={incognito} />
         </BlockRow>
+        {!!data.date && (
+          <BlockRow>
+            <Block text={data.date} />
+          </BlockRow>
+        )}
         <BlockRow>
           <Block text={data.startTime} />
           <BlockSymbol text="→" />

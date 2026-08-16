@@ -19,7 +19,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useResponsive } from "../hooks/useResponsive";
 import { STT } from "../services/speech/STTService";
-import { Colors, Fonts, FontSizes, Radius } from "../../constants/theme";
+import { FontSizes, Fonts, Radius, ThemeColors } from "../../constants/theme";
+import { useColors, useThemedStyles } from "../hooks/useTheme";
 
 const texture2 = require("../../assets/images/texture2.png");
 const micIcon = require("../../assets/icons/microphone.png");
@@ -161,6 +162,8 @@ const NATIVE_PERMISSIONS: Permission[] = [
 ];
 
 export default function PermissionsPage() {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isLargeScreen } = useResponsive();
@@ -266,7 +269,7 @@ export default function PermissionsPage() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -366,10 +369,10 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   permissionBtnTextGranted: {
-    color: Colors.surface,
+    color: Colors.textOnPrimary,
   },
   permissionBtnTextDenied: {
-    color: Colors.surface,
+    color: Colors.textOnPrimary,
   },
   footer: {
     padding: 28,
@@ -395,7 +398,7 @@ const styles = StyleSheet.create({
   buttonText: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.bodyMd,
-    color: Colors.surface,
+    color: Colors.textOnPrimary,
   },
   skipText: {
     fontFamily: Fonts.body,

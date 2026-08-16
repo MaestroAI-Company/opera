@@ -70,11 +70,11 @@ export class ContactsTool implements ITool {
     name: 'Contact Widget',
     hasBorder: true,
     build: (args) => (this.resolved ? { label: buildLabel(args.query), ...this.resolved } : null),
-    component: ({ data }) => (
+    component: ({ data, incognito }) => (
       <BlockContainer>
         <Caption text={data.label} />
         <BlockRow>
-          <Block text={data.name} filled serif />
+          <Block text={data.name} filled serif incognito={incognito} />
         </BlockRow>
         {!!data.phone && (
           <BlockRow>

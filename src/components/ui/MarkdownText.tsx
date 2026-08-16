@@ -3,7 +3,8 @@ import { Animated, Linking, StyleSheet, Text, View, Image } from "react-native";
 import AutoHeightWebView from "react-native-autoheight-webview";
 import CodeHighlighter from "react-native-code-highlighter";
 import { vs2015 } from "react-syntax-highlighter/dist/esm/styles/hljs";
-import { Colors, Fonts, FontSizes, Radius, Spacing } from "../../../constants/theme";
+import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import { getColors, getThemedStyles, useColors, useThemedStyles } from "../../hooks/useTheme";
 import { ensureKatexStylesheet, getKatexCss, KATEX_STYLESHEET_NAME } from "./katexStylesheet";
 import { WidgetManager } from "../../services/widgets/WidgetManager";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
@@ -13,6 +14,8 @@ import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 const toolIcon = require("../../../assets/icons/tool.png");
 
 const ToolCallBubble = ({ toolName, isGenerating }: { toolName: string, isGenerating?: boolean }) => {
+  const Colors = useColors();
+  const s = useThemedStyles(makeS);
   const opacity = useAnimatedValue(isGenerating ? 0.4 : 1);
 
   useEffect(() => {
@@ -40,7 +43,7 @@ const ToolCallBubble = ({ toolName, isGenerating }: { toolName: string, isGenera
   );
 };
 
-const s = StyleSheet.create({
+const makeS = (Colors: ThemeColors) => StyleSheet.create({
   base: { fontSize: FontSizes.xl, lineHeight: 28, color: Colors.textPrimary, fontFamily: Fonts.body },
   bold: { fontWeight: "bold" },
   italic: { fontStyle: "italic" },
@@ -200,6 +203,7 @@ function parseInline(text: string): Token[] {
 }
 
 function renderTokens(tokens: Token[], keyBase: number): React.ReactNode[] {
+  const s = getThemedStyles(makeS);
   return tokens.map((t, i) => {
     const key = `${keyBase}-${i}`;
     switch (t.type) {
@@ -443,6 +447,7 @@ ${stylesheetDirectory ? `<link rel="stylesheet" href="${KATEX_STYLESHEET_NAME}">
 
 //plain helpers need manual memo
 const MathView = React.memo(function MathView({ latex, displayMode, width, incognito, dark }: { latex: string; displayMode: boolean; width?: number; incognito?: boolean; dark?: boolean }) {
+  const Colors = useColors();
   const [height, setHeight] = useState(displayMode ? 40 : 34);
   //undefined while writing stylesheet
   const [stylesheetDirectory, setStylesheetDirectory] = useState<string | null | undefined>(undefined);
@@ -508,6 +513,7 @@ function renderMathBlock(content: string, key: string, incognito?: boolean): Rea
 }
 
 function renderContent(text: string, keyBase: number, incognito?: boolean): React.ReactNode[] {
+  const s = getThemedStyles(makeS);
   return splitMath(text).map((part, i) => {
     if (part.kind === "math") {
       return renderMathBlock(part.content, `im-${keyBase}-${i}`, incognito);
@@ -528,6 +534,7 @@ function wrapContent(
   incognito?: boolean,
   selColor?: string
 ): React.ReactNode {
+  const s = getThemedStyles(makeS);
   if (!text.includes("$")) {
     return (
       <Text key={key} style={style} selectable={true} selectionColor={selColor}>
@@ -550,6 +557,8 @@ const LANG_ALIASES: Record<string, string> = {
 
 //rehighlighting a block is costly
 const CodeBlock = React.memo(function CodeBlock({ code, language }: { code: string; language?: string }) {
+  const Colors = useColors();
+  const s = useThemedStyles(makeS);
   const lang = language ? LANG_ALIASES[language] ?? language : undefined;
   const textStyle = { fontFamily: Fonts.mono, fontSize: FontSizes.code, lineHeight: 18 } as const;
   if (!lang) {
@@ -587,6 +596,8 @@ function countToolWidgetBlocks(md: string): Map<string, number> {
 }
 
 export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: boolean, dark?: boolean): React.ReactNode[] {
+  const Colors = getColors();
+  const s = getThemedStyles(makeS);
   const selColor = incognito ? Colors.incognitoSelection : Colors.primarySelection;
   //dark variant text colors
   const textColor = dark ? Colors.responseText : undefined;
@@ -671,7 +682,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
 
           elements.push(
             <WidgetWrapper key={`widget-${i}`} widget={widget} title={widgetTitle}>
-              <widget.component data={data} />
+              <widget.component data={data} title={widgetTitle} incognito={incognito} />
             </WidgetWrapper>
           );
           continue;
@@ -693,7 +704,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
 
         elements.push(
           <WidgetWrapper key={`toolwidget-${i}`} widget={toolWidget}>
-            <toolWidget.component data={data} />
+            <toolWidget.component data={data} incognito={incognito} />
           </WidgetWrapper>
         );
         continue;

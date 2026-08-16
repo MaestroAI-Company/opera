@@ -11,6 +11,7 @@ import { Platform } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import SplashScreenComponent from "../components/ui/SplashScreen";
 import TauriTitleBar from "../components/features/TauriTitleBar";
+import { initTheme, useIsDark } from "../hooks/useTheme";
 import { setupQuickActions } from "../services/quickActions/QuickActionsService";
 import "../services/widgets/registerWidgets";
 
@@ -24,9 +25,13 @@ if (!(globalThis as any).Buffer) {
 WebBrowser.maybeCompleteAuthSession();
 SplashScreen.preventAutoHideAsync();
 
+//resolve the palette before the first paint
+initTheme();
+
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 export default function RootLayout() {
+  const isDark = useIsDark();
   const [showLottie, setShowLottie] = useState(Platform.OS !== "web" || isTauri);
   const [fontsLoaded, fontError] = useFonts({
     Petrona: require("../../assets/fonts/Petrona-Medium.ttf"),
@@ -79,7 +84,7 @@ export default function RootLayout() {
     <KeyboardProvider>
       <TauriTitleBar />
       <Stack screenOptions={{ headerShown: false }} />
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? "light" : "dark"} />
     </KeyboardProvider>
   );
 }

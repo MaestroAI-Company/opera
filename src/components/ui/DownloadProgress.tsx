@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { useColors } from "../../hooks/useTheme";
 
 type DownloadProgressProps = {
   title: string;
@@ -10,6 +11,7 @@ type DownloadProgressProps = {
 };
 
 export default function DownloadProgress({ title, progress, sizeStr, etaSeconds }: DownloadProgressProps) {
+  const Colors = useColors();
   return (
     <View style={{ marginTop: 10, padding: 12, backgroundColor: Colors.surfaceMuted, borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.surfacePressed }}>
       <Text style={{ fontFamily: Fonts.mono, color: Colors.textSecondary, fontSize: FontSizes.caption, marginBottom: 8 }}>

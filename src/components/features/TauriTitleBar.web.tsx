@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { View, Pressable, StyleSheet, Image } from 'react-native';
 import Svg, { Path, Line, Rect } from 'react-native-svg';
-import { Colors, Fonts, FontSizes } from "../../../constants/theme";
+import { FontSizes, Fonts, ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 
 // detect the tauri desktop shell and its host os
 function detectShell() {
@@ -14,6 +15,8 @@ function detectShell() {
 }
 
 export default function TauriTitleBar() {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const [{ isTauri, isMac }] = useState(detectShell);
   const [isMaximized, setIsMaximized] = useState(false);
 
@@ -88,7 +91,7 @@ export default function TauriTitleBar() {
             onPress={handleClose}>
             {({ pressed, hovered }: any) => (
               <Svg width="12" height="12" viewBox="0 0 10 10">
-                <Path d="M 1 1 L 9 9 M 9 1 L 1 9" stroke={(hovered || pressed) ? Colors.surface : Colors.textSecondary} strokeWidth="1" />
+                <Path d="M 1 1 L 9 9 M 9 1 L 1 9" stroke={(hovered || pressed) ? Colors.textOnPrimary : Colors.textSecondary} strokeWidth="1" />
               </Svg>
             )}
           </Pressable>
@@ -98,7 +101,7 @@ export default function TauriTitleBar() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     height: 32,
     flexDirection: 'row',
@@ -163,6 +166,6 @@ const styles = StyleSheet.create({
     tintColor: Colors.textSecondary,
   },
   closeControlIconActive: {
-    tintColor: Colors.surface,
+    tintColor: Colors.textOnPrimary,
   },
 });

@@ -20,7 +20,8 @@ import { KeyboardAvoidingView, KeyboardController } from "react-native-keyboard-
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import HeadlessWebView from "../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
-import { Colors, Fonts, FontSizes, Radius } from "../../constants/theme";
+import { FontSizes, Fonts, Radius, ThemeColors } from "../../constants/theme";
+import { useColors, useThemedStyles } from "../hooks/useTheme";
 import ChatBar from "../components/features/ChatBar";
 import ChatView from "../components/features/ChatView";
 import ConversationsDrawer from "../components/features/ConversationsDrawer";
@@ -125,6 +126,8 @@ function DissolveIn({ delay, style, children }: { delay: number; style?: any; ch
 }
 
 export default function Index() {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { width, isLargeScreen, isDesktop } = useResponsive();
@@ -1347,7 +1350,7 @@ export default function Index() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -1415,6 +1418,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     marginRight: 8,
+    tintColor: Colors.textPrimary,
   },
   settingsButtonText: {
     fontSize: FontSizes.bodyMd,
@@ -1443,7 +1447,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   incognitoButtonTextActive: {
-    color: Colors.surface,
+    color: Colors.textOnPrimary,
   },
   incognitoDescription: {
     marginTop: 14,

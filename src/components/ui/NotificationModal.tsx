@@ -1,7 +1,8 @@
 import { Image, ImageSourcePropType, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import Checkbox from "./Checkbox";
 import TextInputField from "./TextInputField";
-import { Colors, Fonts, FontSizes, Radius, Spacing } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 
 export type ModalButton = {
   text: string;
@@ -55,6 +56,8 @@ export default function NotificationModal({
   options,
   onClose,
 }: NotificationModalProps) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
 
   //fallback to single close button if none provided
   const activeButtons = buttons && buttons.length > 0
@@ -153,7 +156,7 @@ export default function NotificationModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: Colors.scrimModal,
@@ -236,7 +239,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   buttonText: {
-    color: Colors.surface,
+    color: Colors.textOnPrimary,
     fontSize: FontSizes.body,
     fontFamily: Fonts.mono,
   },

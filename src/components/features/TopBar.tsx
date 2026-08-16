@@ -1,4 +1,5 @@
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { Image, Platform, Pressable, StyleSheet, View, Text } from "react-native";
 
 const moreIcon = require("../../../assets/icons/More.png");
@@ -14,6 +15,8 @@ type TopBarProps = {
 };
 
 export default function TopBar({ onMenuPress, onNewPress, centerElement, rightElement, isLargeScreen, isDesktop }: TopBarProps) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const showDesktopButtons = isDesktop;
   const showNewButton = !showDesktopButtons || Platform.OS === "web";
 
@@ -50,7 +53,7 @@ export default function TopBar({ onMenuPress, onNewPress, centerElement, rightEl
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   topBar: {
     flexDirection: "row",
     alignItems: "center",

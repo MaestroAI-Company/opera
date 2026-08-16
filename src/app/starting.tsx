@@ -11,7 +11,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useResponsive } from "../hooks/useResponsive";
-import { Colors, Fonts, FontSizes, Radius } from "../../constants/theme";
+import { FontSizes, Fonts, Radius, ThemeColors } from "../../constants/theme";
+import { useColors, useThemedStyles } from "../hooks/useTheme";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
 
 const butterflyImage = require("../../assets/images/butterfly2.png");
@@ -21,6 +22,8 @@ const logoImage = require("../../assets/icons/opera.png");
 const FULL_TEXT = "AI for all,\nprivacy for freedom";
 
 export default function StartingPage() {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isLargeScreen } = useResponsive();
@@ -131,7 +134,7 @@ export default function StartingPage() {
           },
         ]}
       >
-        <Image source={logoImage} style={styles.logo} tintColor={Colors.surface} resizeMode="contain" />
+        <Image source={logoImage} style={styles.logo} tintColor={Colors.textOnPrimary} resizeMode="contain" />
       </Animated.View>
 
       {/* Content */}
@@ -181,7 +184,7 @@ export default function StartingPage() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.primary,
@@ -226,7 +229,7 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: Fonts.display,
     fontSize: FontSizes.displayHero,
-    color: Colors.surface,
+    color: Colors.textOnPrimary,
     textAlign: "left",
     lineHeight: 52,
   },

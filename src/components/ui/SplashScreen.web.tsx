@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import { DotLottie, DotLottieReact } from "@lottiefiles/dotlottie-react";
-import { Colors } from "../../../constants/theme";
+import { ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 
 const animation = require("../../../assets/animations/Splashscreen.json");
 
@@ -10,6 +11,8 @@ interface Props {
 }
 
 export default function SplashScreen({ onFinish }: Props) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const dotLottieRef = useRef<DotLottie | null>(null);
   const onFinishRef = useRef(onFinish);
 
@@ -56,7 +59,7 @@ export default function SplashScreen({ onFinish }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     position: "absolute",
     left: 0,

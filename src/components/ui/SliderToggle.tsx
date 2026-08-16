@@ -1,4 +1,5 @@
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useEffect, useRef, useState } from "react";
 import { Image, ImageSourcePropType, LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
@@ -43,6 +44,8 @@ export default function SliderToggle({
   onSelect,
   options = defaultOptions,
 }: SliderToggleProps) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const optionsRef = useRef(options);
   optionsRef.current = options;
   const onSelectRef = useRef(onSelect);
@@ -196,7 +199,7 @@ export default function SliderToggle({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
@@ -215,6 +218,7 @@ const styles = StyleSheet.create({
 
     marginRight: 10,
 
+    tintColor: Colors.textPrimary,
   },
   optionsContainer: {
     flex: 1,
@@ -250,6 +254,6 @@ const styles = StyleSheet.create({
   pillText: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.bodyMd,
-    color: Colors.surface,
+    color: Colors.textOnPrimary,
   },
 });

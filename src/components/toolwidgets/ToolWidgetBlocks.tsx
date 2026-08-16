@@ -1,23 +1,28 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { Colors, Fonts, FontSizes, Radius, Spacing } from '../../../constants/theme';
+import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from '../../../constants/theme';
+import { useColors, useThemedStyles } from '../../hooks/useTheme';
 
 //container holding caption and block rows
 export function BlockContainer({ children }: { children: React.ReactNode }) {
+  const styles = useThemedStyles(makeStyles);
   return <View style={styles.container}>{children}</View>;
 }
 
 //muted line describing the blocks
 export function Caption({ text }: { text: string }) {
+  const styles = useThemedStyles(makeStyles);
   return <Text style={styles.caption}>{text}</Text>;
 }
 
 //row holding the result blocks
 export function BlockRow({ children }: { children: React.ReactNode }) {
+  const styles = useThemedStyles(makeStyles);
   return <View style={styles.row}>{children}</View>;
 }
 
 //symbol between blocks
 export function BlockSymbol({ text }: { text: string }) {
+  const styles = useThemedStyles(makeStyles);
   return <Text style={styles.symbol}>{text}</Text>;
 }
 
@@ -28,11 +33,22 @@ interface BlockProps {
   //serif names else mono
   serif?: boolean;
   grow?: boolean;
+  //incognito discussion swaps the fill to purple-gray
+  incognito?: boolean;
 }
 
-export function Block({ text, filled, serif, grow = true }: BlockProps) {
+export function Block({ text, filled, serif, grow = true, incognito }: BlockProps) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return (
-    <View style={[styles.block, filled ? styles.blockFilled : styles.blockOutlined, grow && styles.blockGrow]}>
+    <View
+      style={[
+        styles.block,
+        filled ? styles.blockFilled : styles.blockOutlined,
+        grow && styles.blockGrow,
+        filled && incognito && { backgroundColor: Colors.incognito },
+      ]}
+    >
       <Text
         numberOfLines={1}
         adjustsFontSizeToFit
@@ -49,7 +65,7 @@ export function Block({ text, filled, serif, grow = true }: BlockProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     gap: Spacing.sm,
   },

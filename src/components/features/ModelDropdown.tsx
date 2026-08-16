@@ -15,7 +15,8 @@ import {
 } from "react-native";
 import LottieView from "lottie-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors, Fonts, FontSizes, Radius, Spacing } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { getAICoreModelLabel } from "../../services/ai/providers/AICoreProvider";
 import { AIModule } from "../../services/ai/AIModule";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
@@ -57,6 +58,8 @@ export default function ModelDropdown({
   onReflectionChange,
   aiService,
 }: ModelDropdownProps) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { isLargeScreen } = useResponsive();
   const [visible, setVisible] = useState(false);
@@ -299,7 +302,7 @@ export default function ModelDropdown({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
@@ -337,6 +340,7 @@ const styles = StyleSheet.create({
   icon: {
     width: 18,
     height: 18,
+    tintColor: Colors.textPrimary,
   },
   label: {
     fontSize: FontSizes.body,
@@ -411,7 +415,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.mono,
   },
   optionTextSelected: {
-    color: Colors.surface,
+    color: Colors.textOnPrimary,
   },
   downloadOption: {
     flexDirection: "row",
@@ -429,6 +433,7 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
 
+    tintColor: Colors.textPrimary,
   },
   downloadText: {
     fontSize: FontSizes.caption,

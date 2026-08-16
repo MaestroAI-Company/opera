@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { LayoutChangeEvent, LayoutRectangle, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, Vibration, View } from "react-native";
 import Animated, { interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const arrowDownIcon = require("../../../assets/icons/down_arrow.png");
@@ -44,6 +45,8 @@ export default function Selector({
   title,
   fullWidth = false,
 }: SelectorProps) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const [visible, setVisible] = useState(false);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const progress = useSharedValue(0);
@@ -394,7 +397,7 @@ export default function Selector({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     alignItems: "flex-start",
   },
@@ -425,6 +428,7 @@ const styles = StyleSheet.create({
   icon: {
     width: 18,
     height: 18,
+    tintColor: Colors.textPrimary,
   },
   label: {
     fontSize: FontSizes.bodyMd,
@@ -493,7 +497,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.mono,
   },
   optionTextSelected: {
-    color: Colors.surface,
+    color: Colors.textOnPrimary,
   },
   rightIconPressable: {
     justifyContent: "center",

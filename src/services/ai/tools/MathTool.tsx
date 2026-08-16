@@ -1,5 +1,5 @@
 import { ITool, ToolDefinition, ToolWidget } from './ITool';
-import { Block, BlockContainer, BlockRow, Caption } from '../../../components/toolwidgets/ToolWidgetBlocks';
+import { Block, BlockContainer, BlockRow, BlockSymbol, Caption } from '../../../components/toolwidgets/ToolWidgetBlocks';
 
 // token types for the expression parser
 enum TokType {
@@ -402,12 +402,12 @@ export class MathTool implements ITool {
       if (separator === -1) return null;
       return { expression: String(args.expression), result: result.slice(separator + 3) };
     },
-    component: ({ data }) => (
+    component: ({ data, incognito }) => (
       <BlockContainer>
         <Caption text={data.expression} />
         <BlockRow>
-          <Block text="=" grow={false} />
-          <Block text={data.result} filled />
+          <BlockSymbol text="=" />
+          <Block text={data.result} filled serif incognito={incognito} />
         </BlockRow>
       </BlockContainer>
     ),

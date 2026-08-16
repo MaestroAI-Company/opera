@@ -10,7 +10,7 @@
       "com.googleusercontent.apps.390321100520-3mi4mkdrdt8ke2nvl3ksbjef000ad5eg",
       "com.googleusercontent.apps.390321100520-8pkv241s2finuqth4cc9h74ii4ph99af"
     ],
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/icons/opera.png",
       "supportsTablet": true,

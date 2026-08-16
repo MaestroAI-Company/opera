@@ -75,11 +75,11 @@ export class AlarmTool implements ITool {
       }
       return { label: 'Timer set for', value: formatDuration(args.seconds), note };
     },
-    component: ({ data }) => (
+    component: ({ data, incognito }) => (
       <BlockContainer>
         <Caption text={data.label} />
         <BlockRow>
-          <Block text={data.value} filled serif />
+          <Block text={data.value} filled serif incognito={incognito} />
         </BlockRow>
         {!!data.note && (
           <BlockRow>

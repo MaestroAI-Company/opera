@@ -191,6 +191,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   backgroundTexture: {
     opacity: 0.05,
+    width: "100%",
+    height: "100%",
   },
   topBar: {
     paddingHorizontal: 24,

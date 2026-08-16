@@ -1,4 +1,5 @@
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 type CheckboxProps = {
@@ -10,6 +11,8 @@ type CheckboxProps = {
 };
 
 export default function Checkbox({ label, checked, onToggle, disabled = false, labelFirst = false }: CheckboxProps) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return (
     <Pressable
       style={({ pressed, hovered }) => [
@@ -39,7 +42,7 @@ export default function Checkbox({ label, checked, onToggle, disabled = false, l
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
@@ -60,7 +63,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   checkmark: {
-    color: Colors.surface,
+    color: Colors.textOnPrimary,
     fontSize: FontSizes.caption,
     fontWeight: "bold",
     lineHeight: 16,

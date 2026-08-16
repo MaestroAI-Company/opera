@@ -35,9 +35,7 @@ export function settleDrawer(progress: Animated.Value, open: boolean, velocity =
   settledTarget.set(progress, toValue);
   Animated.spring(progress, {
     toValue,
-    //closing takes faster route
     velocity: open ? velocity : Math.min(velocity, DISMISS_VELOCITY),
-    //flick must not cross border
     overshootClamping: true,
     bounciness: 0,
     speed: 14,
@@ -50,8 +48,18 @@ export function settleLayoutDrawer(progress: Animated.Value, open: boolean) {
   Animated.timing(progress, {
     toValue: open ? 1 : 0,
     duration: open ? 280 : 220,
-    //decelerate in, accelerate out
     easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
     useNativeDriver: false,
+  }).start();
+}
+
+//page content fades and slides in on every subpage navigation
+export function playPageTransition(value: Animated.Value) {
+  value.setValue(0);
+  Animated.timing(value, {
+    toValue: 1,
+    duration: 220,
+    easing: Easing.out(Easing.cubic),
+    useNativeDriver: DRAWER_NATIVE_DRIVER,
   }).start();
 }

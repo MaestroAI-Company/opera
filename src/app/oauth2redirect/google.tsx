@@ -1,11 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { View, ActivityIndicator, StyleSheet, Platform } from 'react-native';
-import { Colors } from "../../../constants/theme";
+import { ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { CloudSync } from "../../services/CloudSyncService";
 import { GoogleDriveProvider } from "../../services/cloud/GoogleDriveProvider";
 
 export default function OAuthRedirect() {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const router = useRouter();
   const handled = useRef(false);
 
@@ -47,7 +50,7 @@ export default function OAuthRedirect() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',

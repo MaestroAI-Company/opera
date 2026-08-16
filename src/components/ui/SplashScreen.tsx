@@ -1,7 +1,8 @@
 import { useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import LottieView from "lottie-react-native";
-import { Colors } from "../../../constants/theme";
+import { ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 
 const animation = require("../../../assets/animations/Splashscreen.json");
 
@@ -10,6 +11,8 @@ interface Props {
 }
 
 export default function SplashScreen({ onFinish }: Props) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const animationRef = useRef<LottieView>(null);
 
   const isDesktop = typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || window.innerWidth > 1024);
@@ -33,7 +36,7 @@ export default function SplashScreen({ onFinish }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFill,
     backgroundColor: Colors.background,

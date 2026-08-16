@@ -1,5 +1,6 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Colors, Fonts, FontSizes, Radius, Spacing } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { CloudUserInfo } from '../../services/cloud/CloudProvider';
 
 type CloudSyncBoxProps = {
@@ -33,6 +34,8 @@ export default function CloudSyncBox({
   onSync,
   isSyncing,
 }: CloudSyncBoxProps) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   if (!userInfo) return null;
 
   const locked = status === "locked";
@@ -79,7 +82,7 @@ export default function CloudSyncBox({
               <Text style={styles.actionBtnText}>Disconnect</Text>
             </Pressable>
             <Pressable style={({ pressed, hovered }) => [styles.actionBtn, styles.syncBtn, (pressed || hovered) && { backgroundColor: Colors.primaryPressed }]} onPress={onSync} disabled={isSyncing}>
-              <Text style={[styles.actionBtnText, { color: Colors.surface }]}>
+              <Text style={[styles.actionBtnText, { color: Colors.textOnPrimary }]}>
                 {isSyncing ? "Syncing..." : "Sync Now"}
               </Text>
             </Pressable>
@@ -90,7 +93,7 @@ export default function CloudSyncBox({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.xxl,

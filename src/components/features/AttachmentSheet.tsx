@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import {
   Animated,
@@ -51,6 +52,8 @@ export default function AttachmentSheet({
   onLongPressRecentPhoto,
   bottomInset = 0,
 }: AttachmentSheetProps) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   //enough to clear any sheet height, kept mounted until the close animation finishes
   const [renderModal, setRenderModal] = useState(visible);
   const backdropOpacity = useAnimatedValue(0);
@@ -150,7 +153,7 @@ export default function AttachmentSheet({
                             opacity: selectedFiles.some(f => (f.id && f.id === photo.id) || f.uri === (photo.uri || photo.localUri)) ? 0.7 : 1,
                             borderWidth: 2,
                             borderColor: selectedFiles.some(f => (f.id && f.id === photo.id) || f.uri === (photo.uri || photo.localUri))
-                              ? (incognito ? Colors.surface : Colors.primary)
+                              ? (incognito ? Colors.textOnPrimary : Colors.primary)
                               : 'transparent'
                           }
                         ]}
@@ -167,7 +170,7 @@ export default function AttachmentSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   backdropRoot: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -237,7 +240,7 @@ const styles = StyleSheet.create({
     tintColor: Colors.textPrimary,
   },
   sheetIconIncognito: {
-    tintColor: Colors.surface,
+    tintColor: Colors.textOnPrimary,
   },
   sheetIconText: {
     fontSize: FontSizes.label,
@@ -245,7 +248,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.mono,
   },
   sheetTextIncognito: {
-    color: Colors.surface,
+    color: Colors.textOnPrimary,
   },
   sheetRecentPhotosContainer: {
     paddingHorizontal: 16,

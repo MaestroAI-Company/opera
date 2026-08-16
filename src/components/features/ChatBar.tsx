@@ -23,7 +23,8 @@ import {
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import {
   DOCUMENT_MIME_TYPES,
@@ -161,6 +162,8 @@ const VAD_GRACE_MS = 600;
 const VAD_WEB_RMS_THRESHOLD = 0.01;
 
 function VoiceIndicator() {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const anims = useMemo(() => Array.from({ length: 7 }).map(() => new Animated.Value(1)), []);
   useEffect(() => {
     let isMounted = true;
@@ -213,6 +216,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   appContextChip = null,
   onAppContextRemove,
 }, ref) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const bottomInsetToFill = insets.bottom + 16;
   const [text, setText] = useState("");
@@ -1043,7 +1048,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                           ) : (
                             <View style={styles.filePreviewAudioTop}>
                               {chip.kind === 'document' ? (
-                                <Image source={fileIcon} style={styles.filePreviewDocumentIconTop} tintColor={Colors.surface} />
+                                <Image source={fileIcon} style={styles.filePreviewDocumentIconTop} tintColor={Colors.textOnPrimary} />
                               ) : (
                                 <Text style={styles.filePreviewAudioTextTop} numberOfLines={1}>{chip.name}</Text>
                               )}
@@ -1077,14 +1082,14 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
               >
                 {supportsFiles && (
                   <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} style={({ pressed, hovered }) => [styles.plusButton, (pressed || hovered) && { opacity: 0.8 }]}>
-                    <Image source={addIcon} style={styles.plusIcon} tintColor={Colors.surface} />
+                    <Image source={addIcon} style={styles.plusIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 )}
 
                 {(Platform.OS !== 'web' || Settings.getCached().whisperModel !== 'none' || canTranscribeRemotely) && !isGenerating && (
                   <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={({ pressed, hovered }) => [styles.micButton, (pressed || hovered) && { opacity: 0.8 }]}>
                     <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
-                      <Image source={isRecording ? stopIcon : micIcon} style={styles.micIcon} tintColor={Colors.surface} />
+                      <Image source={isRecording ? stopIcon : micIcon} style={styles.micIcon} tintColor={Colors.textOnPrimary} />
                     </Animated.View>
                   </Pressable>
                 )}
@@ -1128,11 +1133,11 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
                 {isGenerating ? (
                   <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} style={({ pressed, hovered }) => [styles.sendButton, (pressed || hovered) && { opacity: 0.8 }]}>
-                    <Image source={stopIcon} style={styles.sendIcon} tintColor={Colors.surface} />
+                    <Image source={stopIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 ) : (
                   <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} style={({ pressed, hovered }) => [styles.sendButton, (pressed || hovered) && { opacity: 0.8 }]}>
-                    <Image source={nextWhiteIcon} style={styles.sendIcon} tintColor={Colors.surface} />
+                    <Image source={nextWhiteIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 )}
               </Animated.View>
@@ -1171,7 +1176,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
 export default ChatBar;
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   pressableWrapper: {
     marginHorizontal: 16,
     marginBottom: 16,
@@ -1215,7 +1220,7 @@ const styles = StyleSheet.create({
 
   },
   input: {
-    color: Colors.surface,
+    color: Colors.textOnPrimary,
     fontSize: FontSizes.md,
     paddingVertical: 8,
   },
@@ -1231,7 +1236,8 @@ const styles = StyleSheet.create({
   voiceSquare: {
     width: 3,
     height: 6,
-    backgroundColor: Colors.surface,
+    //bars sit on the red/incognito composer in both themes, always white
+    backgroundColor: Colors.textOnPrimary,
   },
   sendButton: {
     width: 28,

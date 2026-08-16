@@ -1,5 +1,6 @@
 import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
+import LottieView from "lottie-react-native";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -13,15 +14,14 @@ import {
   Text,
   View,
 } from "react-native";
-import LottieView from "lottie-react-native";
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { AIModule } from "../../services/ai/AIModule";
 import { Conversation, Message, MessageSource } from "../../services/db/DatabaseService";
 import { splitDocumentBlocks } from "../../services/documents/DocumentService";
 import { Settings } from "../../services/settings/SettingsService";
 import { TTS } from "../../services/speech/TTSService";
 import { deriveChatDisplay, renderMarkdown } from "../ui/MarkdownText";
-import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 
 const butterflyImage = require("../../../assets/images/butterfly5.png");
 const butterflyGreyImage = require("../../../assets/images/butterfly2_grey.png");
@@ -57,7 +57,7 @@ function getSourceKind(url: string): SourceKind {
   if (!/^https?:\/\//i.test(url)) return 'app';
   try {
     if (IMAGE_EXT_RE.test(new URL(url).pathname)) return 'image';
-  } catch {}
+  } catch { }
   return 'url';
 }
 
@@ -82,7 +82,7 @@ const SourcePill = ({ source }: { source: MessageSource }) => {
 
   return (
     <Pressable
-      onPress={() => { if (canOpen) Linking.openURL(source.url).catch(() => {}); }}
+      onPress={() => { if (canOpen) Linking.openURL(source.url).catch(() => { }); }}
       disabled={!canOpen}
       style={({ pressed, hovered }) => [styles.sourcePill, canOpen && (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
     >
@@ -437,6 +437,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
         data={messages}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        nestedScrollEnabled={true}
         ListHeaderComponent={
           !hideHeader && conversation ? (
             <View
@@ -491,10 +492,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
           autoScrollTimeout.current = setTimeout(() => {
             isAutoScrolling.current = false;
           }, 500);
-
-          //jump while generating
-          //scrollToOffset to avoid android jump
-          listRef.current?.scrollToOffset({ offset: h + 1000, animated: !generatingMessageId });
+          listRef.current?.scrollToOffset({ offset: h + 1000, animated: true });
         }}
       />
       {!hideGradients && (

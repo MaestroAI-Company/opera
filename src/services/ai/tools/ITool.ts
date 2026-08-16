@@ -40,7 +40,7 @@ export interface ToolWidget<T = any> {
   hasBorder: boolean;
   //null result keeps the default bubble
   build(args: Record<string, any>, result: string): T | null;
-  component: React.ComponentType<{ data: T }>;
+  component: React.ComponentType<{ data: T; incognito?: boolean }>;
 }
 
 //interface for all tools

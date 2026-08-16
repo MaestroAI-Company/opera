@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import { PanResponder, StyleSheet, Vibration } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { Colors, Radius } from "../../../constants/theme";
+import { Radius, ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 
 type ToggleProps = {
   checked: boolean;
@@ -14,6 +15,8 @@ const TAP_TOLERANCE = 3;
 
 //custom draggable toggle switch matching design
 export default function Toggle({ checked, onToggle, disabled = false }: ToggleProps) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const translateX = useSharedValue(checked ? TRAVEL : 0);
   const scale = useSharedValue(1);
   const pressed = useSharedValue(0);
@@ -87,7 +90,7 @@ export default function Toggle({ checked, onToggle, disabled = false }: TogglePr
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   track: {
     width: 40,
     height: 24,

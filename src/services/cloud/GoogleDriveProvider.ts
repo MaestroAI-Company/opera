@@ -5,7 +5,9 @@ import { CloudProvider, CloudUserInfo } from './CloudProvider';
 
 const ANDROID_CLIENT_ID = '390321100520-3mi4mkdrdt8ke2nvl3ksbjef000ad5eg.apps.googleusercontent.com';
 const IOS_CLIENT_ID = '390321100520-8pkv241s2finuqth4cc9h74ii4ph99af.apps.googleusercontent.com';
-const WEB_CLIENT_ID = '390321100520-82j857htbn2g0i6as2ai8uhiti6aurk1.apps.googleusercontent.com';
+const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+  || '390321100520-82j857htbn2g0i6as2ai8uhiti6aurk1.apps.googleusercontent.com';
+const WEB_REDIRECT_URI = process.env.EXPO_PUBLIC_GOOGLE_REDIRECT_URI;
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -38,7 +40,8 @@ export class GoogleDriveProvider implements CloudProvider {
 
   private getRedirectUri(): string {
     if (Platform.OS === 'web') {
-      return AuthSession.makeRedirectUri({ preferLocalhost: true, path: 'oauth2redirect/google' });
+      return WEB_REDIRECT_URI
+        || AuthSession.makeRedirectUri({ preferLocalhost: true, path: 'oauth2redirect/google' });
     }
     const clientId = this.getClientId();
     const reversedClientId = clientId.split('.').reverse().join('.');

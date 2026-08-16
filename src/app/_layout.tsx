@@ -6,9 +6,10 @@ import { Stack } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Platform } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
+import SiteHead from "../components/SiteHead";
 import SplashScreenComponent from "../components/ui/SplashScreen";
 import TauriTitleBar from "../components/features/TauriTitleBar";
 import { initTheme, useIsDark } from "../hooks/useTheme";
@@ -29,6 +30,13 @@ SplashScreen.preventAutoHideAsync();
 initTheme();
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+const screenLayout = ({ children }: { children: ReactNode }) => (
+  <>
+    <SiteHead />
+    {children}
+  </>
+);
 
 export default function RootLayout() {
   const isDark = useIsDark();
@@ -83,7 +91,7 @@ export default function RootLayout() {
   return (
     <KeyboardProvider>
       <TauriTitleBar />
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
       <StatusBar style={isDark ? "light" : "dark"} />
     </KeyboardProvider>
   );

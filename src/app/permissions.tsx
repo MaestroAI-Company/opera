@@ -276,6 +276,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   backgroundTexture: {
     opacity: 0.02,
+    width: "100%",
+    height: "100%",
   },
   scrollContent: {
     paddingHorizontal: 28,

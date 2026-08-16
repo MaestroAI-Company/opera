@@ -494,7 +494,9 @@ export default function Index() {
         await PluginRegistry.init();
         await PluginRegistry.loadAll();
 
-        if (!s.hasSeenOnboarding) {
+        //onboarding flow is native/desktop only, browser web skips straight to the app
+        const isBrowserWeb = Platform.OS === "web" && !(typeof window !== "undefined" && "__TAURI_INTERNALS__" in window);
+        if (!s.hasSeenOnboarding && !isBrowserWeb) {
           router.replace("/starting");
           return;
         }
@@ -1356,7 +1358,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  backgroundTexture: { opacity: 0.02 },
+  backgroundTexture: { opacity: 0.02, width: "100%", height: "100%" },
   topBarOverlay: {
     position: "absolute",
     top: 0,

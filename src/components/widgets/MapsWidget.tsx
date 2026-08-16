@@ -3,6 +3,7 @@ import { WebView } from 'react-native-webview';
 import { IWidget } from '../../services/widgets/WidgetManager';
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from '../../../constants/theme';
 import { useThemedStyles } from '../../hooks/useTheme';
+import { useResponsive } from '../../hooks/useResponsive';
 
 export interface MapsWidgetData {
   label?: string;
@@ -82,6 +83,7 @@ export const MapsWidget: IWidget<MapsWidgetData> = {
   }`,
   component: function MapsWidgetView({ data }) {
     const styles = useThemedStyles(makeStyles);
+    const { isDesktop } = useResponsive();
     const html = generateMapHtml(data.points || []);
     const caption = data.label || data.title || data.location;
 
@@ -98,7 +100,7 @@ export const MapsWidget: IWidget<MapsWidgetData> = {
         {!!caption && (
           <Text style={styles.caption} numberOfLines={1}>{caption}</Text>
         )}
-        <View style={styles.mapWrapper}>
+        <View style={[styles.mapWrapper, isDesktop && styles.mapWrapperLarge]}>
           {Platform.OS === 'web' ? (
             <iframe
               srcDoc={html}
@@ -140,5 +142,9 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     backgroundColor: Colors.surfacePressed,
     borderRadius: Radius.md,
     overflow: 'hidden',
+  },
+  //elongated on desktop
+  mapWrapperLarge: {
+    height: 420,
   },
 });

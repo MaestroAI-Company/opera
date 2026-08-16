@@ -1,7 +1,9 @@
 import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet, Text, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { IWidget } from '../../services/widgets/WidgetManager';
+import { FontSizes, Fonts, Spacing, ThemeColors } from '../../../constants/theme';
+import { useThemedStyles } from '../../hooks/useTheme';
 
 export interface MermaidWidgetData {
   mermaid: string;
@@ -64,43 +66,57 @@ const generateMermaidHtml = (rawCode: string) => {
 export const MermaidWidget: IWidget<MermaidWidgetData> = {
   id: 'diagram',
   name: 'Diagram',
-  hasBorder: false,
+  hasBorder: true,
   aiDefinesTitle: false,
   enabledByDefault: true,
   description: 'Displays a flowchart, sequence diagram, or mindmap using Mermaid.js syntax. CRITICAL: Do NOT use \\n for line breaks inside diagram nodes or messages. You MUST use <br/> instead. Output valid Mermaid syntax in the "mermaid" property. When you explain something, you can use it to illustrate.',
   schema: `{
     "mermaid": "graph TD;\\nA-->B;"
   }`,
-  component: ({ data }) => {
+  component: function MermaidWidgetView({ data, title }) {
+    const styles = useThemedStyles(makeStyles);
     const html = generateMermaidHtml(data.mermaid || 'graph TD;\\nError-->NoData;');
 
     return (
       <View style={styles.container}>
-        {Platform.OS === 'web' ? (
-          <iframe 
-            srcDoc={html}
-            style={{ width: '100%', height: '100%', border: 'none', backgroundColor: 'transparent' }}
-            sandbox="allow-scripts allow-same-origin"
-          />
-        ) : (
-          <WebView 
-            source={{ html }} 
-            style={{ flex: 1, backgroundColor: 'transparent' }} 
-            scrollEnabled={false}
-            bounces={false}
-            javaScriptEnabled={true}
-          />
-        )}
+        <Text style={styles.title}>{title || 'Diagram'}</Text>
+        <View style={styles.diagram}>
+          {Platform.OS === 'web' ? (
+            <iframe
+              srcDoc={html}
+              style={{ width: '100%', height: '100%', border: 'none', backgroundColor: 'transparent' }}
+              sandbox="allow-scripts allow-same-origin"
+            />
+          ) : (
+            <WebView
+              source={{ html }}
+              style={{ flex: 1, backgroundColor: 'transparent' }}
+              scrollEnabled={false}
+              bounces={false}
+              javaScriptEnabled={true}
+            />
+          )}
+        </View>
       </View>
     );
   }
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
+    width: '100%',
+  },
+  title: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.title,
+    color: Colors.textPrimary,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xs,
+  },
+  diagram: {
     width: '100%',
     height: 350,
     backgroundColor: 'transparent',
-    marginVertical: 12,
-  }
+  },
 });

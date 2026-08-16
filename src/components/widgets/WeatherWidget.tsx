@@ -1,8 +1,9 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from '../../../constants/theme';
 import { useColors, useThemedStyles } from '../../hooks/useTheme';
+import { useResponsive } from '../../hooks/useResponsive';
 import { IWidget } from '../../services/widgets/WidgetManager';
-import { Block, BlockContainer, BlockRow, Caption } from '../toolwidgets/ToolWidgetBlocks';
+import { Block, BlockContainer, Caption } from '../toolwidgets/ToolWidgetBlocks';
 
 export interface WeatherItem {
   label?: string;
@@ -64,6 +65,7 @@ export const WeatherWidget: IWidget<WeatherWidgetData> = {
   component: function WeatherWidgetView({ data, title, incognito }) {
     const Colors = useColors();
     const styles = useThemedStyles(makeStyles);
+    const { isDesktop } = useResponsive();
     const now = data.now;
     if (!now) return null;
 
@@ -77,7 +79,7 @@ export const WeatherWidget: IWidget<WeatherWidgetData> = {
       <BlockContainer>
         {!!caption && <Caption text={caption} />}
 
-        <BlockRow>
+        <View style={[styles.nowRow, isDesktop && styles.nowRowLarge]}>
           <View style={[styles.iconTile, incognito && { backgroundColor: Colors.incognito }]}>
             <Image source={ICONS[now.icon] || ICONS.cloud} style={styles.iconTileImage} resizeMode="contain" />
           </View>
@@ -85,11 +87,11 @@ export const WeatherWidget: IWidget<WeatherWidgetData> = {
             <Block text={formatTemp(now.temp, unit)} />
             {!!nowRange && <Block text={nowRange} />}
           </View>
-        </BlockRow>
+        </View>
 
         {forecast.length > 0 && (
           <View style={styles.forecastBox}>
-            <View style={styles.forecastRow}>
+            <View style={[styles.forecastRow, isDesktop && styles.forecastRowLarge]}>
               {forecast.map((item, index) => {
                 const range = formatRange(item);
 
@@ -111,6 +113,16 @@ export const WeatherWidget: IWidget<WeatherWidgetData> = {
 };
 
 const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
+  //icon + now values, stretched so the value column fills the icon's height
+  nowRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: Spacing.sm,
+  },
+  //taller on desktop, elongates the whole card
+  nowRowLarge: {
+    minHeight: 160,
+  },
   //same filled treatment as the primary Block, sized to a square
   iconTile: {
     flex: 1,
@@ -141,6 +153,9 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   forecastRow: {
     flexDirection: 'row',
     paddingVertical: Spacing.md,
+  },
+  forecastRowLarge: {
+    paddingVertical: Spacing.xl2,
   },
   column: {
     flex: 1,

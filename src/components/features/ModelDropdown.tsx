@@ -191,7 +191,7 @@ export default function ModelDropdown({
     model.startsWith("aicore-") ? getAICoreModelLabel(model) : model;
 
   return (
-    <View style={[styles.container, isLargeScreen && styles.containerLarge]}>
+    <View style={styles.container}>
       <View style={styles.shadowLayer}>
         <View style={styles.shadowBlock} />
         <Pressable
@@ -206,12 +206,12 @@ export default function ModelDropdown({
       </View>
 
       <Modal visible={renderModal} transparent animationType="none" statusBarTranslucent onRequestClose={() => closeSheet()}>
-        <View style={styles.backdropRoot}>
+        <View style={[styles.backdropRoot, isLargeScreen && styles.backdropRootLarge]}>
           <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: backdropOpacity }]} />
           <Pressable style={StyleSheet.absoluteFill} onPress={() => closeSheet()} />
-          <Pressable style={styles.sheetTouchArea} onPress={() => {}}>
+          <Pressable style={[styles.sheetTouchArea, isLargeScreen && styles.sheetTouchAreaLarge]} onPress={() => {}}>
             <Animated.View style={{ transform: [{ translateY: sheetY }] }}>
-              <View style={[styles.inlineSheet, { paddingBottom: (Platform.OS === 'ios' ? 20 : 10) + insets.bottom }]}>
+              <View style={[styles.inlineSheet, isLargeScreen && styles.inlineSheetLarge, { paddingBottom: (Platform.OS === 'ios' ? 20 : 10) + insets.bottom }]}>
                 <View style={styles.sheetHandleContainer} {...panResponder.panHandlers}>
                   <View style={styles.sheetHandle} />
                 </View>
@@ -307,9 +307,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  containerLarge: {
-    marginHorizontal: Spacing.xxl,
-  },
   shadowLayer: {
     position: "relative",
   },
@@ -352,11 +349,20 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
+  //docks the sheet as a floating panel bottom-right instead of a full-width mobile sheet
+  backdropRootLarge: {
+    alignItems: 'flex-end',
+    paddingRight: Spacing.xl2,
+    paddingBottom: Spacing.xl2,
+  },
   backdrop: {
     backgroundColor: Colors.scrimModal,
   },
   sheetTouchArea: {
     width: '100%',
+  },
+  sheetTouchAreaLarge: {
+    width: 320,
   },
   inlineSheet: {
     backgroundColor: Colors.surface,
@@ -365,6 +371,17 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingTop: 12,
     paddingHorizontal: 16,
     width: '100%',
+  },
+  //floating card treatment matching NotificationModal: window radius, ink outline, blurred elevation shadow
+  inlineSheetLarge: {
+    borderTopLeftRadius: Radius.window,
+    borderTopRightRadius: Radius.window,
+    borderBottomLeftRadius: Radius.window,
+    borderBottomRightRadius: Radius.window,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    boxShadow: `0px 4px 12px ${Colors.overlay}`,
+    elevation: 8,
   },
   sheetHandleContainer: {
     alignItems: 'center',

@@ -62,6 +62,7 @@ const MOBILE_TOOL_NAMES = new Set([
   "timer",
   "clipboard",
   "send_message",
+  "open_app",
 ]);
 
 type SettingsDrawerProps = {
@@ -969,7 +970,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             <Image source={toolIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>Tools</Text>
-              <Text style={styles.navSubtitle}>Assistant Tools, Widgets, Mobile actions</Text>
+              <Text style={styles.navSubtitle}>{isDesktop ? "Assistant Tools, Widgets" : "Assistant Tools, Widgets, Mobile actions"}</Text>
             </View>
           </Pressable>
         </View>
@@ -1400,25 +1401,27 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </View>
       </View>
 
-      {/* mobile actions block, last: points to a deeper subpage instead of toggling in place */}
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Mobile actions</Text>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          Allow the assistant to integrate with installed apps: {mobileTools.map(t => t.displayName ?? t.definition.function.name).join(", ")}.
-        </Text>
+      {/* mobile actions block, last: points to a deeper subpage instead of toggling in place. desktop has no mobile apps to open, so it's hidden there */}
+      {!isDesktop && (
+        <View style={styles.settingRowVertical}>
+          <Text style={styles.settingLabel}>Mobile actions</Text>
+          <Text style={[styles.helpText, { marginBottom: 12 }]}>
+            Allow the assistant to integrate with installed apps: {mobileTools.map(t => t.displayName ?? t.definition.function.name).join(", ")}.
+          </Text>
 
-        <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
-          <View style={styles.groupBox}>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-              onPress={() => setActiveSubPage("mobileactions")}
-            >
-              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>See mobile actions</Text>
-            </Pressable>
+          <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
+            <View style={styles.groupBox}>
+              <Pressable
+                style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+                onPress={() => setActiveSubPage("mobileactions")}
+              >
+                <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+                <Text style={styles.navLabel}>See mobile actions</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
-      </View>
+      )}
     </View>
   );
 

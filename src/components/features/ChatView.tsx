@@ -432,7 +432,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   return (
     <View style={styles.container}>
       <FlatList
-        style={{ width: '100%', maxWidth: 840, alignSelf: 'center' }}
+        style={{ flex: 1, width: '100%' }}
         ref={listRef}
         data={messages}
         keyExtractor={(item) => item.id}
@@ -472,7 +472,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
             </View>
           ) : null
         }
-        contentContainerStyle={[styles.list, { paddingTop: contentTopPadding, paddingBottom: contentBottomPadding, flexGrow: 1, justifyContent: alignBottom ? 'flex-end' : 'flex-start' }]}
+        contentContainerStyle={[styles.list, { width: '100%', maxWidth: 840, alignSelf: 'center', paddingTop: contentTopPadding, paddingBottom: contentBottomPadding, flexGrow: 1, justifyContent: alignBottom ? 'flex-end' : 'flex-start' }]}
         showsVerticalScrollIndicator={false}
         //keep live rows small
         windowSize={7}

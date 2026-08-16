@@ -1206,6 +1206,7 @@ export default function Index() {
                 speakerEnabled={speakerEnabled}
                 showMetrics={showTechnicalDetails}
                 generatingMessageId={generatingConvId === activeConversation.id ? streamingMsgId : null}
+                hideGradients={isDesktop}
                 onOpenConfidentiality={() => {
                   openDrawerSafely(() => {
                     setSettingsInitialSubPage("confidentiality");

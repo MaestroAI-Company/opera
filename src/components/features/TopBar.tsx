@@ -20,6 +20,44 @@ export default function TopBar({ onMenuPress, onNewPress, centerElement, rightEl
   const showDesktopButtons = isDesktop;
   const showNewButton = !showDesktopButtons || Platform.OS === "web";
 
+  //desktop: Discussions and New are two independent pills, side by side (matches the Model/Settings pattern)
+  if (showDesktopButtons) {
+    return (
+      <View style={styles.topBar}>
+        <View style={styles.leftSectionRow}>
+          <View style={styles.shadowLayer}>
+            <View style={styles.shadowBlock} />
+            <Pressable
+              onPress={onMenuPress}
+              style={({ pressed, hovered }) => [styles.soloButton, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
+            >
+              <Image source={moreIcon} style={styles.buttonIcon} resizeMode="contain" tintColor={Colors.textPrimary} />
+              <Text style={styles.buttonText}>Discussions</Text>
+            </Pressable>
+          </View>
+          {showNewButton && (
+            <View style={[styles.shadowLayer, styles.newGap]}>
+              <View style={styles.shadowBlock} />
+              <Pressable
+                onPress={onNewPress}
+                style={({ pressed, hovered }) => [styles.soloButton, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
+              >
+                <Image source={addIcon} style={styles.buttonIcon} resizeMode="contain" tintColor={Colors.textPrimary} />
+                <Text style={styles.buttonText}>New</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.rightSection}>
+          {centerElement && <View style={{ marginRight: 16 }}>{centerElement}</View>}
+          {rightElement}
+        </View>
+      </View>
+    );
+  }
+
+  //mobile/tablet: unchanged, both icon-only buttons share one segmented pill
   return (
     <View style={styles.topBar}>
       <View style={styles.leftSection}>
@@ -31,7 +69,6 @@ export default function TopBar({ onMenuPress, onNewPress, centerElement, rightEl
               style={({ pressed, hovered }) => [styles.button, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
             >
               <Image source={moreIcon} style={styles.buttonIcon} resizeMode="contain" tintColor={Colors.textPrimary} />
-              {showDesktopButtons && <Text style={styles.buttonText}>Conversation</Text>}
             </Pressable>
             {showNewButton && (
               <Pressable
@@ -46,7 +83,7 @@ export default function TopBar({ onMenuPress, onNewPress, centerElement, rightEl
       </View>
 
       <View style={styles.rightSection}>
-        {centerElement && <View style={{ marginRight: isDesktop ? 16 : 4 }}>{centerElement}</View>}
+        {centerElement && <View style={{ marginRight: 4 }}>{centerElement}</View>}
         {rightElement}
       </View>
     </View>
@@ -64,6 +101,15 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   leftSection: {
     flex: 1,
     alignItems: "flex-start",
+  },
+  //desktop: Discussions and New sit as independent pills in a row
+  leftSectionRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  newGap: {
+    marginLeft: 16,
   },
   rightSection: {
     flex: 1,
@@ -100,6 +146,20 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
+  },
+  //desktop: standalone bordered pill, same treatment as the Settings button
+  soloButton: {
+    height: 44,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    borderRadius: Radius.xxl,
+    position: "relative",
+    zIndex: 1,
   },
   buttonIcon: {
     width: 18,

@@ -57,6 +57,8 @@ const locationIcon = require("../../../assets/icons/location.png");
 const calendarIcon = require("../../../assets/icons/calendar.png");
 const binIcon = require("../../../assets/icons/bin.png");
 const exportIcon = require("../../../assets/icons/export.png");
+const messageIcon = require("../../../assets/icons/message.png");
+const timeIcon = require("../../../assets/icons/time.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
 
@@ -243,7 +245,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     { id: "18000", label: "5h" },
     { id: "43200", label: "12h" },
     { id: "86400", label: "24h" },
-    { id: "-1", label: "Infinite" },
+    { id: "-1", label: "∞" },
   ];
 
   const ollamaContextLengthOptions = [
@@ -1269,17 +1271,22 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               </View>
             ))}
 
-            <Pressable
-              onPress={() => saveOllamaUrls([...ollamaUrls, ""])}
-              style={({ pressed, hovered }) => [styles.addServerButton, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
-            >
-              <Image source={addIcon} style={styles.addServerIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.addServerText}>Add server link</Text>
-            </Pressable>
+            <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
+              <View style={styles.groupBox}>
+                <Pressable
+                  style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+                  onPress={() => saveOllamaUrls([...ollamaUrls, ""])}
+                >
+                  <Image source={addIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+                  <Text style={styles.navLabel}>Add server link</Text>
+                </Pressable>
+              </View>
+            </View>
 
             <Text style={[styles.settingLabel, { marginTop: 20 }]}>Context Length</Text>
             <Text style={[styles.helpText, { marginBottom: 10 }]}>Maximum number of tokens the model can use.</Text>
             <Slider
+              icon={messageIcon}
               options={ollamaContextLengthOptions}
               selectedValue={String(effectiveContextLength())}
               onSelect={setOllamaContextLength}
@@ -1287,6 +1294,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             <Text style={[styles.settingLabel, { marginTop: 20 }]}>Model Keep Alive</Text>
             <Text style={[styles.helpText, { marginBottom: 10 }]}>How long the model stays loaded in memory after a request.</Text>
             <Slider
+              icon={timeIcon}
               options={ollamaKeepAliveOptions}
               selectedValue={ollamaKeepAlive}
               onSelect={setOllamaKeepAlive}
@@ -1946,27 +1954,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     fontFamily: Fonts.body,
     marginTop: 8,
     marginBottom: 0,
-  },
-  addServerButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    gap: 8,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: Radius.xxl,
-    backgroundColor: Colors.surface,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  addServerIcon: {
-    width: 14,
-    height: 14,
-  },
-  addServerText: {
-    fontSize: FontSizes.bodyMd,
-    color: Colors.textPrimary,
-    fontFamily: Fonts.mono,
   },
   downloadOption: {
     flexDirection: "row",

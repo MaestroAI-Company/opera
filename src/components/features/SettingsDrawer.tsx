@@ -60,6 +60,7 @@ const binIcon = require("../../../assets/icons/bin.png");
 const exportIcon = require("../../../assets/icons/export.png");
 const messageIcon = require("../../../assets/icons/message.png");
 const timeIcon = require("../../../assets/icons/time.png");
+const hyperlinkIcon = require("../../../assets/images/hyperlink2.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
 
@@ -1355,9 +1356,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <Text style={styles.helpText}>
           Local Storage: All your data, searches, and settings stay strictly on your device.
         </Text>
-        <Text style={[styles.helpText, { marginTop: 4 }]}>
+        <Text style={[styles.helpText, { marginTop: 4, marginBottom: 12 }]}>
           No Tracking: We do not collect personal info, analytics, or crash reports. Your privacy is fully protected.
         </Text>
+        <ActionButton
+          icon={hyperlinkIcon}
+          label="Privacy Policy"
+          onPress={() => Linking.openURL("https://maestroai.company/privacy.html").catch(() => {})}
+          standalone
+        />
       </View>
 
       <View style={styles.settingRowVertical}>

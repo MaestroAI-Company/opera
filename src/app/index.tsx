@@ -1160,12 +1160,13 @@ export default function Index() {
         colors={[
           Colors.background,
           `${Colors.background}D9`,
-          `${Colors.background}B3`,
-          `${Colors.background}73`,
-          `${Colors.background}26`,
+          `${Colors.background}BF`,
+          `${Colors.background}A6`,
+          `${Colors.background}4D`,
+          `${Colors.background}1A`,
           "transparent",
         ]}
-        locations={[0, 0.55, 0.72, 0.85, 0.95, 1]}
+        locations={[0, 0.2, 0.5, 0.75, 0.85, 0.95, 1]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}

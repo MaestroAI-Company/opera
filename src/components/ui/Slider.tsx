@@ -1,49 +1,36 @@
 import { useEffect, useRef, useState } from "react";
-import { Image, ImageSourcePropType, LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
-import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import Animated, { interpolateColor, LinearTransition, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 
-//load theme icons
-const autoIcon = require("../../../assets/icons/auto.png");
-const lightIcon = require("../../../assets/icons/light.png");
-const darkIcon = require("../../../assets/icons/dark.png");
-
-export type SliderToggleOption = {
+export type SliderOption = {
   id: string;
   label: string;
-  icon?: ImageSourcePropType;
 };
 
-type SliderToggleProps = {
+type SliderProps = {
   selectedValue: string;
   onSelect: (value: string) => void;
-  options?: SliderToggleOption[];
+  options: SliderOption[];
 };
 
-const defaultOptions: SliderToggleOption[] = [
-  { id: "system", label: "Auto", icon: autoIcon },
-  { id: "light", label: "Light", icon: lightIcon },
-  { id: "dark", label: "Dark", icon: darkIcon },
-];
-
-const GAP = 4;
 const LONG_PRESS_DELAY = 180;
-const BREAK_RATIO = 0.85;
+const BREAK_RATIO = 0.6; // fraction of a slot the finger must cross to hand the pill to the next one
+const SLOT_TRANSITION = LinearTransition.duration(200);
 
-// rubber-band curve: approaches but never exceeds `dim`, resisting harder the further it's pulled
+//elastic resistance beyond bounds
 const rubberBand = (d: number, dim: number) => {
   if (dim <= 0) return 0;
   const sign = d < 0 ? -1 : 1;
   return sign * dim * (1 - 1 / (1 + Math.abs(d) / dim));
 };
 
-//slider toggle component
-export default function SliderToggle({
+export default function Slider({
   selectedValue,
   onSelect,
-  options = defaultOptions,
-}: SliderToggleProps) {
+  options,
+}: SliderProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const optionsRef = useRef(options);
@@ -57,18 +44,24 @@ export default function SliderToggle({
   const selectedIndexRef = useRef(selectedIndex);
   selectedIndexRef.current = selectedIndex;
 
+  //while dragging, the pill "hovers" a slot; that slot grows and pushes the others aside
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
-  const [buttonWidth, setButtonWidth] = useState(0);
+  const [trackWidth, setTrackWidth] = useState(0);
 
   const pillX = useSharedValue(0);
   const scale = useSharedValue(1);
   const pillLit = useSharedValue(0);
 
-  const buttonWidthRef = useRef(0);
+  const trackWidthRef = useRef(0);
   const armedRef = useRef(false);
   const startXRef = useRef(0);
   const previewIndexRef = useRef<number | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  //measured center (in px from the track's left edge) of each slot, updated as flex resizes them
+  const slotCentersRef = useRef<number[]>([]);
+
+  //step = distance the pill travels between two adjacent options, used only while actively dragging
+  const stepFor = (width: number) => (options.length > 0 ? width / options.length : 0);
 
   const clearLongPressTimer = () => {
     if (longPressTimerRef.current) {
@@ -77,20 +70,32 @@ export default function SliderToggle({
     }
   };
 
-  //park pill on selected slot
+  //park pill on the selected slot's real (measured) center when not being dragged
   useEffect(() => {
-    if (previewIndex === null && buttonWidth > 0) {
-      pillX.value = withTiming(selectedIndex * (buttonWidth + GAP), { duration: 180 });
+    if (previewIndex === null && trackWidth > 0) {
+      const measured = slotCentersRef.current[selectedIndex];
+      const step = stepFor(trackWidth);
+      const fallback = selectedIndex * step + step / 2;
+      pillX.value = withTiming(measured ?? fallback, { duration: 180 });
     }
-  }, [selectedIndex, buttonWidth, pillX, previewIndex]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIndex, trackWidth, previewIndex]);
 
-  const handleLayout = (e: LayoutChangeEvent) => {
+  const handleTrackLayout = (e: LayoutChangeEvent) => {
     const width = e.nativeEvent.layout.width;
-    const count = optionsRef.current.length;
-    const bw = count > 0 ? (width - GAP * (count - 1)) / count : 0;
-    buttonWidthRef.current = bw;
-    setButtonWidth(bw);
-    pillX.value = selectedIndexRef.current * (bw + GAP);
+    trackWidthRef.current = width;
+    setTrackWidth(width);
+    const step = stepFor(width);
+    pillX.value = selectedIndexRef.current * step + step / 2;
+  };
+
+  const handleSlotLayout = (index: number) => (e: LayoutChangeEvent) => {
+    const { x, width } = e.nativeEvent.layout;
+    slotCentersRef.current[index] = x + width / 2;
+    //keep the parked pill glued to the slot as it grows/shrinks, without re-touching drag state
+    if (previewIndexRef.current === null && index === selectedIndexRef.current) {
+      pillX.value = withTiming(x + width / 2, { duration: 180 });
+    }
   };
 
   const panResponder = useRef(
@@ -103,45 +108,45 @@ export default function SliderToggle({
         startXRef.current = pillX.value;
         previewIndexRef.current = selectedIndexRef.current;
         clearLongPressTimer();
-        //require hold before drag
+        //require hold before drag, like picking the handle up
         longPressTimerRef.current = setTimeout(() => {
           armedRef.current = true;
-          scale.value = withTiming(1.2, { duration: 120 });
+          scale.value = withTiming(1.15, { duration: 120 });
           pillLit.value = withTiming(1, { duration: 120 });
         }, LONG_PRESS_DELAY);
       },
       onPanResponderMove: (_e, gestureState) => {
         if (!armedRef.current) return;
-        const bw = buttonWidthRef.current;
-        const slot = bw + GAP;
+        const step = stepFor(trackWidthRef.current);
+        if (step <= 0) return;
         const currentOptions = optionsRef.current;
         const maxIndex = currentOptions.length - 1;
         const rawX = startXRef.current + gestureState.dx;
 
         let anchor = previewIndexRef.current ?? selectedIndexRef.current;
-        let d = rawX - anchor * slot;
-        while (Math.abs(d) >= slot * BREAK_RATIO) {
+        let d = rawX - (anchor * step + step / 2);
+        while (Math.abs(d) >= step * BREAK_RATIO) {
           const next = Math.min(maxIndex, Math.max(0, anchor + (d > 0 ? 1 : -1)));
           if (next === anchor) break;
           anchor = next;
-          d = rawX - anchor * slot;
+          d = rawX - (anchor * step + step / 2);
         }
         if (anchor !== previewIndexRef.current) {
           previewIndexRef.current = anchor;
           setPreviewIndex(anchor);
           Vibration.vibrate(10);
         }
-        pillX.value = anchor * slot + rubberBand(d, slot);
+        pillX.value = anchor * step + step / 2 + rubberBand(d, step);
       },
       onPanResponderRelease: () => {
         clearLongPressTimer();
         if (armedRef.current) {
-          const bw = buttonWidthRef.current;
+          const step = stepFor(trackWidthRef.current);
           const currentOptions = optionsRef.current;
           const idx = previewIndexRef.current ?? selectedIndexRef.current;
           scale.value = withTiming(1, { duration: 150 });
           pillLit.value = withTiming(0, { duration: 150 });
-          pillX.value = withTiming(idx * (bw + GAP), { duration: 150 });
+          pillX.value = withTiming(idx * step + step / 2, { duration: 150 });
           const newValue = currentOptions[idx]?.id;
           armedRef.current = false;
           previewIndexRef.current = null;
@@ -152,10 +157,10 @@ export default function SliderToggle({
       onPanResponderTerminate: () => {
         clearLongPressTimer();
         if (armedRef.current) {
-          const bw = buttonWidthRef.current;
+          const step = stepFor(trackWidthRef.current);
           scale.value = withTiming(1, { duration: 150 });
           pillLit.value = withTiming(0, { duration: 150 });
-          pillX.value = withTiming(selectedIndexRef.current * (bw + GAP), { duration: 150 });
+          pillX.value = withTiming(selectedIndexRef.current * step + step / 2, { duration: 150 });
         }
         armedRef.current = false;
         previewIndexRef.current = null;
@@ -171,27 +176,42 @@ export default function SliderToggle({
 
   const activeIndex = previewIndex ?? selectedIndex;
   const activeOption = options[activeIndex] ?? options[0];
-  const iconSource = activeOption?.icon;
 
   return (
     <View style={styles.container}>
-      {iconSource && <Image source={iconSource} style={styles.icon} />}
-      <View style={styles.optionsContainer} onLayout={handleLayout}>
-        {options.map((option) => (
-          <Pressable
-            key={option.id}
-            onPress={() => {
-              if (option.id !== selectedValue) Vibration.vibrate(10);
-              onSelect(option.id);
-            }}
-            style={({ pressed, hovered }) => [styles.optionButton, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
+      <View style={styles.track} onLayout={handleTrackLayout}>
+        {/* ticks: plain flex slots, the active one grows and naturally pushes its neighbors */}
+        {options.map((option, index) => {
+          const isActive = index === activeIndex;
+          return (
+            <Animated.View
+              key={option.id}
+              layout={SLOT_TRANSITION}
+              onLayout={handleSlotLayout(index)}
+              style={[styles.slot, isActive && styles.slotActive]}
+            >
+              <Pressable
+                onPress={() => {
+                  if (option.id !== selectedValue) Vibration.vibrate(10);
+                  onSelect(option.id);
+                }}
+                style={styles.slotPressable}
+              >
+                {!isActive && <View style={[styles.tick, index < activeIndex && styles.tickFilled]} />}
+              </Pressable>
+            </Animated.View>
+          );
+        })}
+
+        {/* pill: floats above the track and is dragged directly by the finger, in px */}
+        {trackWidth > 0 && activeOption && (
+          <Animated.View
+            style={[styles.pill, pillAnimatedStyle]}
+            {...panResponder.panHandlers}
           >
-            <Text style={styles.optionText}>{option.label}</Text>
-          </Pressable>
-        ))}
-        {buttonWidth > 0 && activeOption && (
-          <Animated.View style={[styles.pill, { width: buttonWidth }, pillAnimatedStyle]} {...panResponder.panHandlers}>
-            <Text style={styles.pillText}>{activeOption.label}</Text>
+            <Text style={styles.pillText} numberOfLines={1} adjustsFontSizeToFit>
+              {activeOption.label}
+            </Text>
           </Animated.View>
         )}
       </View>
@@ -208,48 +228,57 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     borderWidth: 2,
     borderColor: Colors.border,
     height: 44,
-    paddingLeft: 12,
-    paddingRight: 4,
+    paddingHorizontal: 4,
     width: "100%",
   },
-  icon: {
-    width: 18,
-    height: 18,
-
-    marginRight: 10,
-
-    tintColor: Colors.textPrimary,
-  },
-  optionsContainer: {
+  track: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     height: "100%",
-    gap: 4,
   },
-  optionButton: {
+  //inactive slots share the leftover space evenly; the active one grows to make room for the pill's label
+  slot: {
     flex: 1,
-    height: 32,
+    height: "100%",
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: Radius.md,
+  },
+  slotActive: {
+    flexGrow: 3,
+    flexBasis: 0,
+  },
+  slotPressable: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  tick: {
+    width: 6,
+    height: 10,
+    borderRadius: Radius.xs,
+    backgroundColor: Colors.surface,
+    borderWidth: 2,
+    borderColor: Colors.border,
+  },
+  tickFilled: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.borderOnPrimary,
   },
   pill: {
     position: "absolute",
-    left: 0,
+    left: -38,
     top: "50%",
     marginTop: -16,
+    width: 76,
     height: 32,
     justifyContent: "center",
     alignItems: "center",
     borderRadius: Radius.md,
     borderWidth: 2,
     borderColor: Colors.borderOnPrimary,
-  },
-  optionText: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.bodyMd,
-    color: Colors.textPrimary,
+    paddingHorizontal: 4,
   },
   pillText: {
     fontFamily: Fonts.mono,

@@ -3,7 +3,6 @@ import { Animated, Easing, Platform } from "react-native";
 //module scope shared with screen
 export const conversationsProgress = new Animated.Value(0);
 export const settingsProgress = new Animated.Value(0);
-export const modelSelectorProgress = new Animated.Value(0);
 
 export const DRAWER_NATIVE_DRIVER = Platform.OS !== "web";
 

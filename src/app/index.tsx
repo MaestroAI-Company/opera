@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { useQuickActionCallback } from "expo-quick-actions/hooks";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -21,7 +22,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import HeadlessWebView from "../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../constants/theme";
-import { useColors, useThemedStyles } from "../hooks/useTheme";
 import ChatBar from "../components/features/ChatBar";
 import ChatView from "../components/features/ChatView";
 import ConversationsDrawer from "../components/features/ConversationsDrawer";
@@ -32,16 +32,17 @@ import TopBar from "../components/features/TopBar";
 import NotificationModal from "../components/ui/NotificationModal";
 import { hasOpenOverlaySheet } from "../components/ui/SheetSurface";
 import { useResponsive } from "../hooks/useResponsive";
+import { useColors, useThemedStyles } from "../hooks/useTheme";
 import { AIModule } from "../services/ai/AIModule";
 import { buildSystemPrompt, streamAssistantReply } from "../services/ai/generation/chatGeneration";
 import { arrayBufferToBase64 } from "../services/ai/utils/base64";
 import { Conversation, DB, Message, MessageMetrics } from "../services/db/DatabaseService";
-import { splitDocumentBlocks } from "../services/documents/DocumentService";
 import {
   getInitialDeepLink,
   subscribeToDeepLinks,
   type DeepLinkRoute,
 } from "../services/deeplinks/DeepLinkService";
+import { splitDocumentBlocks } from "../services/documents/DocumentService";
 import { AppEvents } from "../services/events";
 import { LocationService } from "../services/location/LocationService";
 import { PluginRegistry } from "../services/plugins/PluginRegistry";
@@ -1151,8 +1152,23 @@ export default function Index() {
     <View style={styles.container}>
       <ImageBackground
         source={texture2}
-        style={StyleSheet.absoluteFill}
-        imageStyle={styles.backgroundTexture} resizeMode="cover"
+        style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
+        imageStyle={styles.backgroundTexture}
+        resizeMode="cover"
+      />
+      <LinearGradient
+        colors={[
+          Colors.background,
+          `${Colors.background}D9`,
+          `${Colors.background}B3`,
+          `${Colors.background}73`,
+          `${Colors.background}26`,
+          "transparent",
+        ]}
+        locations={[0, 0.55, 0.72, 0.85, 0.95, 1]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
       />
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: "transparent" }]}

@@ -26,7 +26,7 @@ import ChatBar from "../components/features/ChatBar";
 import ChatView from "../components/features/ChatView";
 import ConversationsDrawer from "../components/features/ConversationsDrawer";
 import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, settingsProgress, settleDrawer } from "../components/features/drawerAnimation";
-import ModelSelector from "../components/features/ModelSelector";
+import ModelSelector, { ModelSelectorDrawer, ModelSelectorTrigger } from "../components/features/ModelSelector";
 import SettingsDrawer from "../components/features/SettingsDrawer";
 import TopBar from "../components/features/TopBar";
 import NotificationModal from "../components/ui/NotificationModal";
@@ -141,6 +141,7 @@ export default function Index() {
   const [selectedReflection, setSelectedReflection] = useState("none");
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
+  const [modelSelectorVisible, setModelSelectorVisible] = useState(false);
   const [settingsInitialSubPage, setSettingsInitialSubPage] = useState<"main" | "general" | "confidentiality" | "tools">("main");
   const [dbReady, setDbReady] = useState(false);
   const [dbFailed, setDbFailed] = useState(false);
@@ -243,30 +244,50 @@ export default function Index() {
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
         //a sheet floats over the ui, it owns the gesture
-        if (hasOpenOverlaySheet()) return false;
+        if (hasOpenOverlaySheet() || modelSelectorVisible) return false;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-        if (!isHorizontal || Math.abs(gestureState.dx) <= 10) return false;
+        if (isHorizontal) {
+          if (Math.abs(gestureState.dx) <= 10) return false;
+          if (settingsDrawerVisible && gestureState.dx > 0) return true;
+          if (drawerVisible && gestureState.dx < 0) return true;
 
-        if (settingsDrawerVisible && gestureState.dx > 0) return true;
-        if (drawerVisible && gestureState.dx < 0) return true;
+          const isLeftEdge = gestureState.x0 < 40;
+          if (isLeftEdge && gestureState.dx > 0) return true;
+          return gestureState.dx < 0;
+        }
 
-        const isLeftEdge = gestureState.x0 < 40;
-        if (isLeftEdge && gestureState.dx > 0) return true;
-        return gestureState.dx < 0;
+        //swipe up on homepage opens model selector
+        if (!drawerVisible && !settingsDrawerVisible && !modelSelectorVisible && !activeConversation) {
+          return gestureState.dy < -15;
+        }
+
+        return false;
       },
       onPanResponderGrant: () => {
         //retract before keyboard shrinks panel
-        if (!drawerVisible && !settingsDrawerVisible) KeyboardController.dismiss();
+        if (!drawerVisible && !settingsDrawerVisible && !modelSelectorVisible) KeyboardController.dismiss();
       },
       onPanResponderMove: (evt, gestureState) => {
         //gesture drives panel directly
-        if (drawerVisible || settingsDrawerVisible) return;
-        const ratio = Math.min(1, Math.abs(gestureState.dx) / dragWidth);
-        //crossing start leaves other panel out
-        dragDrawer(conversationsProgress, gestureState.dx > 0 ? ratio : 0);
-        dragDrawer(settingsProgress, gestureState.dx > 0 ? 0 : ratio);
+        if (drawerVisible || settingsDrawerVisible || modelSelectorVisible) return;
+        if (Math.abs(gestureState.dx) > Math.abs(gestureState.dy)) {
+          const ratio = Math.min(1, Math.abs(gestureState.dx) / dragWidth);
+          //crossing start leaves other panel out
+          dragDrawer(conversationsProgress, gestureState.dx > 0 ? ratio : 0);
+          dragDrawer(settingsProgress, gestureState.dx > 0 ? 0 : ratio);
+        }
       },
       onPanResponderRelease: (evt, gestureState) => {
+        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        if (!isHorizontal) {
+          if (!drawerVisible && !settingsDrawerVisible && !modelSelectorVisible && !activeConversation) {
+            if (gestureState.dy < -40 || gestureState.vy < -0.5) {
+              openDrawerSafely(() => setModelSelectorVisible(true));
+            }
+          }
+          return;
+        }
+
         const velocity = gestureVelocity(gestureState.vx, dragWidth);
         //short flicks still commit
         const opensLeft = gestureState.dx > 40 || gestureState.vx > 0.5;
@@ -293,12 +314,12 @@ export default function Index() {
         }
       },
       onPanResponderTerminate: () => {
-        if (drawerVisible || settingsDrawerVisible) return;
+        if (drawerVisible || settingsDrawerVisible || modelSelectorVisible) return;
         settleDrawer(conversationsProgress, false);
         settleDrawer(settingsProgress, false);
       },
     })
-    , [drawerVisible, settingsDrawerVisible, dragWidth]);
+    , [drawerVisible, settingsDrawerVisible, modelSelectorVisible, dragWidth, activeConversation, openDrawerSafely]);
 
   //trackpad two-finger horizontal swipe like mobile gesture
   useEffect(() => {
@@ -580,13 +601,17 @@ export default function Index() {
       setOllamaUrl(Settings.getCached().ollamaUrl);
       setUserName(Settings.getCached().name);
     });
+    const modelSelectorSub = DeviceEventEmitter.addListener(AppEvents.openModelSelector, () => {
+      openDrawerSafely(() => setModelSelectorVisible(true));
+    });
 
     return () => {
       if (reloadTimer) clearTimeout(reloadTimer);
       conversationsSub.remove();
       settingsSub.remove();
+      modelSelectorSub.remove();
     };
-  }, [dbReady, loadConversations]);
+  }, [dbReady, loadConversations, openDrawerSafely]);
 
   //load messages when a conversation is selected
   const selectConversation = useCallback(async (conv: Conversation) => {
@@ -1270,19 +1295,12 @@ export default function Index() {
                 isLargeScreen={isLargeScreen}
                 isDesktop={isDesktop}
                 centerElement={
-                  <ModelSelector
+                  <ModelSelectorTrigger
                     selectedModel={selectedModel}
-                    selectedReflection={selectedReflection}
-                    showReflection={modelCapabilities.includes("thinking")}
-                    aiService={aiService}
-                    ollamaUrl={ollamaUrl}
-                    onServiceChange={handleServiceChange}
-                    onModelChange={(model) => {
-                      setSelectedModel(model);
-                      Settings.set("ollamaModel", model);
+                    onPress={() => {
+                      if (!isDesktop && (drawerVisible || settingsDrawerVisible)) return;
+                      openDrawerSafely(() => setModelSelectorVisible(prev => !prev));
                     }}
-                    onReflectionChange={setSelectedReflection}
-                    closeSignal={isDesktop ? `${drawerVisible}:${settingsDrawerVisible}` : undefined}
                   />
                 }
                 rightElement={
@@ -1356,6 +1374,24 @@ export default function Index() {
 
       {isDesktop ? null : conversationsDrawer}
       {isDesktop ? null : settingsDrawer}
+
+      <ModelSelectorDrawer
+        visible={modelSelectorVisible}
+        onClose={() => setModelSelectorVisible(false)}
+        selectedModel={selectedModel}
+        selectedReflection={selectedReflection}
+        showReflection={modelCapabilities.includes("thinking")}
+        aiService={aiService}
+        ollamaUrl={ollamaUrl}
+        onServiceChange={handleServiceChange}
+        onModelChange={(model) => {
+          setSelectedModel(model);
+          Settings.set("ollamaModel", model);
+        }}
+        onReflectionChange={setSelectedReflection}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
 
       <HeadlessWebView />
 

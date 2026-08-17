@@ -514,7 +514,7 @@ export default function Index() {
         setSpeakerEnabled(s.speaker);
         setAlwaysWhisper(s.alwaysWhisper);
         setShowTechnicalDetails(s.showTechnicalDetails);
-        AIModule.configure(s.ollamaUrl);
+        AIModule.configure(s.ollamaUrl, s.ollamaContextLength, s.ollamaKeepAlive);
         AIModule.setMode(s.aiService);
         STT.setLanguage(s.whisperLanguage);
       } catch (e) {
@@ -891,7 +891,10 @@ export default function Index() {
     Settings.set("aiService", service);
     Settings.set("ollamaUrl", url);
     AIModule.setMode(service);
-    if (service === "ollama") AIModule.configure(url);
+    if (service === "ollama") {
+      const cached = Settings.getCached();
+      AIModule.configure(url, cached.ollamaContextLength, cached.ollamaKeepAlive);
+    }
   }, []);
 
   //use remote model unless local forced

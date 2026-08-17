@@ -54,9 +54,9 @@ class CentralAIModule {
   }
 
   //reconfigure ollama provider with url from settings
-  configure(ollamaUrl: string): void {
+  configure(ollamaUrl: string, contextLength?: number, keepAlive?: number): void {
     const url = ollamaUrl.trim().length > 0 ? ollamaUrl.trim() : DEFAULT_URL;
-    this.providers.set('OLLAMA', new OllamaProvider(url));
+    this.providers.set('OLLAMA', new OllamaProvider(url, {}, contextLength, keepAlive));
     //new server can serve different models
     this.capabilitiesCache.clear();
   }

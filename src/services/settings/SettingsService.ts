@@ -11,6 +11,8 @@ export type AppSettings = {
   ollamaUrls: string;
   enabledProviders: string;
   ollamaModel: string;
+  ollamaContextLength: number;
+  ollamaKeepAlive: number;
   whisperModel: string;
   whisperLanguage: string;
   instruction: string;
@@ -34,6 +36,8 @@ const DEFAULTS: AppSettings = {
   ollamaUrls: '[]',
   enabledProviders: 'local,ollama',
   ollamaModel: '',
+  ollamaContextLength: 8192,
+  ollamaKeepAlive: 300,
   whisperModel: 'base',
   whisperLanguage: (() => {
     try {
@@ -70,8 +74,17 @@ const BOOLEAN_KEYS = [
   'useAppContext',
 ] as const;
 
+const NUMBER_KEYS = [
+  'ollamaContextLength',
+  'ollamaKeepAlive',
+] as const;
+
 function isBooleanKey(key: string): boolean {
   return (BOOLEAN_KEYS as readonly string[]).includes(key);
+}
+
+function isNumberKey(key: string): boolean {
+  return (NUMBER_KEYS as readonly string[]).includes(key);
 }
 
 class SettingsService {
@@ -116,7 +129,13 @@ class SettingsService {
     for (const key of Object.keys(DEFAULTS) as (keyof AppSettings)[]) {
       const stored = storedValues[key];
       if (stored === undefined) continue;
-      (settings as any)[key] = isBooleanKey(key) ? stored === 'true' : stored;
+      if (isNumberKey(key)) {
+        const parsed = parseInt(stored, 10);
+        //keep alive of zero stays loaded
+        (settings as any)[key] = isNaN(parsed) ? (DEFAULTS as any)[key] : parsed;
+      } else {
+        (settings as any)[key] = isBooleanKey(key) ? stored === 'true' : stored;
+      }
     }
 
     this.cache = settings;

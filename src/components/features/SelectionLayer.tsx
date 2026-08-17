@@ -3,7 +3,7 @@ import { PanResponder, StyleSheet, View } from 'react-native';
 import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useDerivedValue, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { Colors, Radius } from '../../../constants/theme';
-import { FULL_SCREEN, isFullScreen, Selection, SelectionRegion } from '../../services/overlay/useScreenSelection';
+import { FULL_SCREEN, Selection, SelectionRegion } from '../../services/overlay/useScreenSelection';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
@@ -14,15 +14,16 @@ const HANDLE_HIT = 56;
 const HANDLE_ARM = 26;
 const HANDLE_STROKE = 6;
 const MIN_BOX = 70;
-const DEFAULT_BOX = 120;
 const MIN_DRAW_DIST = 4;
 const PATH_INFLATE = 1.15;
 //edge distance for element snap
 const SNAP_DIST = 24;
-//beyond this the finger misses
-const NEAR_DIST = 120;
+//lasso pulls from further out
+const LASSO_SNAP_DIST = 48;
 //lasso coverage counts as picked
-const ENCLOSED_MIN = 0.6;
+const ENCLOSED_MIN = 0.45;
+  //scribble overlap picks element
+const MAGNET_MIN = 0.55;
 //padding around detected elements
 const DETECTION_INFLATE = 1.2;
 const STROKE_WIDTH = 7;
@@ -49,6 +50,8 @@ type Props = {
   onChange: (selection: Selection) => void;
   onVibrate?: () => void;
   onDrawingChange?: (drawing: boolean) => void;
+  //single tap leaves the overlay
+  onDismiss?: () => void;
   //capture elements aim selection
   detections?: SelectionRegion[];
 };
@@ -90,29 +93,26 @@ function toPixels(region: SelectionRegion, size: Size): Rect {
 
 const areaOf = (rect: Rect) => (rect.x2 - rect.x1) * (rect.y2 - rect.y1);
 
-//closest element under finger
-function pickAt(rects: Rect[], x: number, y: number): Rect | null {
-  let inside: Rect | null = null;
-  let nearest: Rect | null = null;
-  let nearestGap = NEAR_DIST;
+//scribble inside an element picks it
+function magnet(rects: Rect[], bounds: Rect): Rect | null {
+  const area = areaOf(bounds);
+  if (area <= 0) return null;
+
+  let best: Rect | null = null;
+  let bestScore = MAGNET_MIN;
 
   for (const rect of rects) {
-    if (x >= rect.x1 && x <= rect.x2 && y >= rect.y1 && y <= rect.y2) {
-      //tightest overlap wins
-      if (!inside || areaOf(rect) < areaOf(inside)) inside = rect;
-      continue;
-    }
-    const gap = Math.hypot(
-      Math.max(rect.x1 - x, 0, x - rect.x2),
-      Math.max(rect.y1 - y, 0, y - rect.y2)
-    );
-    if (gap < nearestGap) {
-      nearestGap = gap;
-      nearest = rect;
+    const width = Math.min(rect.x2, bounds.x2) - Math.max(rect.x1, bounds.x1);
+    const height = Math.min(rect.y2, bounds.y2) - Math.max(rect.y1, bounds.y1);
+    if (width <= 0 || height <= 0) continue;
+    const score = (width * height) / area;
+    if (score > bestScore) {
+      bestScore = score;
+      best = rect;
     }
   }
 
-  return inside ?? nearest;
+  return best;
 }
 
 //stroke loop merged into region
@@ -138,7 +138,7 @@ function enclosed(rects: Rect[], bounds: Rect): Rect | null {
 }
 
 //edges snap to nearest element
-function snap(rect: Rect, rects: Rect[]): Rect {
+function snap(rect: Rect, rects: Rect[], tolerance: number = SNAP_DIST): Rect {
   if (rects.length === 0) return rect;
 
   const xs: number[] = [];
@@ -150,7 +150,7 @@ function snap(rect: Rect, rects: Rect[]): Rect {
 
   const pull = (value: number, candidates: number[]) => {
     let best = value;
-    let bestGap = SNAP_DIST;
+    let bestGap = tolerance;
     for (const candidate of candidates) {
       const gap = Math.abs(candidate - value);
       if (gap < bestGap) {
@@ -176,7 +176,7 @@ function toRegion(rect: Rect, size: Size): SelectionRegion {
   return { x, y, w: Math.max(0.02, x2 / size.w - x), h: Math.max(0.02, y2 / size.h - y) };
 }
 
-export default function SelectionLayer({ selection, onChange, onVibrate, onDrawingChange, detections }: Props) {
+export default function SelectionLayer({ selection, onChange, onVibrate, onDrawingChange, onDismiss, detections }: Props) {
   const [size, setSize] = useState<Size>({ w: 1, h: 1 });
   const [resizing, setResizing] = useState(false);
   const [drawing, setDrawing] = useState(false);
@@ -189,10 +189,10 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
   );
 
   //handlers read through mirror
-  const latest = useRef({ size, selection, onChange, onVibrate, onDrawingChange, rects });
+  const latest = useRef({ size, selection, onChange, onVibrate, onDrawingChange, onDismiss, rects });
   useEffect(() => {
-    latest.current = { size, selection, onChange, onVibrate, onDrawingChange, rects };
-  }, [size, selection, onChange, onVibrate, onDrawingChange, rects]);
+    latest.current = { size, selection, onChange, onVibrate, onDrawingChange, onDismiss, rects };
+  }, [size, selection, onChange, onVibrate, onDrawingChange, onDismiss, rects]);
 
   //resize writes to ui rect
   const x1 = useSharedValue(0);
@@ -231,23 +231,16 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
     state.onVibrate?.();
   };
 
-  //single tap toggles the whole screen
+  //single tap leaves the overlay
   const onTap = () => {
-    const state = latest.current;
-    const isFull = state.selection.kind === 'box' && isFullScreen(state.selection.region);
-    state.onChange(isFull ? { kind: 'none' } : { kind: 'box', region: FULL_SCREEN });
-    state.onVibrate?.();
+    latest.current.onDismiss?.();
   };
 
-  //double tap grabs element
-  const onDoubleTap = (x: number, y: number) => {
-    const hit = pickAt(latest.current.rects, x, y);
-    commit(hit ?? {
-      x1: x - DEFAULT_BOX / 2,
-      y1: y - DEFAULT_BOX / 2,
-      x2: x + DEFAULT_BOX / 2,
-      y2: y + DEFAULT_BOX / 2,
-    });
+  //double tap grabs the whole screen
+  const onDoubleTap = () => {
+    const state = latest.current;
+    state.onChange({ kind: 'box', region: FULL_SCREEN });
+    state.onVibrate?.();
   };
 
   const strokeRef = useRef<Point[]>([]);
@@ -256,6 +249,9 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
   //committed Q segments, plus the point still waiting for its pair
   const committedPath = useRef('');
   const pendingPoint = useRef<Point | null>(null);
+
+  //page offset for stroke coordinates
+  const pageOffset = useRef<Point>({ x: 0, y: 0 });
 
   const finishStroke = () => {
     const points = strokeRef.current;
@@ -270,9 +266,9 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
 
     const state = latest.current;
     const bounds = boundsOf(points);
-    //closed stroke lands on element
-    const hit = enclosed(state.rects, bounds);
-    commit(clampRect(hit ?? snap(inflate(bounds, PATH_INFLATE), state.rects), state.size));
+    //closed stroke or scribble picks element
+    const hit = enclosed(state.rects, bounds) ?? magnet(state.rects, bounds);
+    commit(clampRect(hit ?? snap(inflate(bounds, PATH_INFLATE), state.rects, LASSO_SNAP_DIST), state.size));
   };
 
   //handlers need the live gesture state, so they close over the refs
@@ -280,8 +276,10 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
     // eslint-disable-next-line react-hooks/refs
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: evt => {
+      onPanResponderGrant: (evt, gesture) => {
         const { locationX, locationY } = evt.nativeEvent;
+        //page coords stay valid over child views
+        pageOffset.current = { x: gesture.x0 - locationX, y: gesture.y0 - locationY };
         strokeRef.current = [{ x: locationX, y: locationY }];
         committedPath.current = `M ${locationX} ${locationY}`;
         pendingPoint.current = null;
@@ -291,7 +289,7 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
         if (tapTimer.current) {
           clearTimeout(tapTimer.current);
           tapTimer.current = null;
-          onDoubleTap(locationX, locationY);
+          onDoubleTap();
           return;
         }
         tapTimer.current = setTimeout(() => {
@@ -299,7 +297,7 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
           onTap();
         }, DOUBLE_TAP_MS);
       },
-      onPanResponderMove: (evt, gesture) => {
+      onPanResponderMove: (_evt, gesture) => {
         if (Math.abs(gesture.dx) <= DRAG_TOL && Math.abs(gesture.dy) <= DRAG_TOL) return;
         if (tapTimer.current) {
           clearTimeout(tapTimer.current);
@@ -310,7 +308,8 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
           setDrawing(true);
           latest.current.onDrawingChange?.(true);
         }
-        const { locationX, locationY } = evt.nativeEvent;
+        const locationX = gesture.moveX - pageOffset.current.x;
+        const locationY = gesture.moveY - pageOffset.current.y;
         const points = strokeRef.current;
         const last = points[points.length - 1];
         //drop points too close to matter

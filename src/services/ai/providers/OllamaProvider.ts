@@ -7,10 +7,14 @@ import { universalFetch } from '../utils/universalFetch';
 export class OllamaProvider implements IAIProvider {
   private baseUrl: string;
   private defaultHeaders: Record<string, string>;
+  private contextLength: number;
+  private keepAlive: number;
 
-  constructor(baseUrl: string, defaultHeaders: Record<string, string> = {}) {
+  constructor(baseUrl: string, defaultHeaders: Record<string, string> = {}, contextLength: number = 8192, keepAlive: number = 300) {
     this.baseUrl = baseUrl;
     this.defaultHeaders = defaultHeaders;
+    this.contextLength = contextLength;
+    this.keepAlive = keepAlive;
   }
 
   private isConfigured(): boolean {
@@ -53,6 +57,7 @@ export class OllamaProvider implements IAIProvider {
         headers: { 'Content-Type': 'application/json', ...this.defaultHeaders },
         body: JSON.stringify({
           model: modelName,
+          keep_alive: this.keepAlive,
           //load without generating
         }),
       });
@@ -209,7 +214,8 @@ export class OllamaProvider implements IAIProvider {
         ],
         stream: true,
         think: options?.think,
-        options: { num_ctx: 16384 },
+        keep_alive: this.keepAlive,
+        options: { num_ctx: this.contextLength },
       };
 
       //add tools if provided

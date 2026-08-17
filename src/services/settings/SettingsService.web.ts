@@ -9,6 +9,8 @@ export type AppSettings = {
   ollamaUrls: string;
   enabledProviders: string;
   ollamaModel: string;
+  ollamaContextLength: number;
+  ollamaKeepAlive: number;
   whisperModel: string;
   whisperLanguage: string;
   instruction: string;
@@ -31,6 +33,8 @@ const DEFAULTS: AppSettings = {
   ollamaUrls: '[]',
   enabledProviders: 'local,ollama',
   ollamaModel: '',
+  ollamaContextLength: 8192,
+  ollamaKeepAlive: 300,
   whisperModel: 'base',
   whisperLanguage: (() => {
     try {
@@ -77,6 +81,8 @@ class SettingsService {
         ollamaUrls: parsed.ollamaUrls ?? DEFAULTS.ollamaUrls,
         enabledProviders: parsed.enabledProviders ?? DEFAULTS.enabledProviders,
         ollamaModel: parsed.ollamaModel ?? DEFAULTS.ollamaModel,
+        ollamaContextLength: typeof parsed.ollamaContextLength === 'number' ? parsed.ollamaContextLength : DEFAULTS.ollamaContextLength,
+        ollamaKeepAlive: typeof parsed.ollamaKeepAlive === 'number' ? parsed.ollamaKeepAlive : DEFAULTS.ollamaKeepAlive,
         whisperModel: parsed.whisperModel ?? DEFAULTS.whisperModel,
         whisperLanguage: parsed.whisperLanguage ?? DEFAULTS.whisperLanguage,
         instruction: parsed.instruction ?? DEFAULTS.instruction,

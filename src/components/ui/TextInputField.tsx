@@ -14,7 +14,7 @@ export default function TextInputField({ icon, style, containerStyle, ...props }
     <View style={[styles.container, containerStyle]}>
       {icon && <Image source={icon} style={styles.icon} />}
       <TextInput
-        style={[styles.input, icon ? { paddingLeft: 10 } : undefined, style]}
+        style={[styles.input, style]}
         placeholderTextColor={Colors.textMuted}
         {...props}
       />
@@ -29,19 +29,21 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     borderWidth: 2,
     borderColor: Colors.border,
     borderRadius: Radius.xxl,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    height: 44,
+    paddingLeft: 12,
+    paddingRight: 12,
     backgroundColor: Colors.surface,
   },
   icon: {
     width: 18,
     height: 18,
-    tintColor: Colors.textSecondary,
+    marginRight: 10,
+    tintColor: Colors.textPrimary,
   },
   input: {
     flex: 1,
     fontSize: FontSizes.bodyMd,
-    color: Colors.textSecondary,
+    color: Colors.textPrimary,
     fontFamily: Fonts.mono,
     padding: 0,
   },

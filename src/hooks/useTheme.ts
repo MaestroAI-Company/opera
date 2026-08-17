@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { Appearance, DeviceEventEmitter } from "react-native";
+import { Animated, Appearance, AppState, DeviceEventEmitter, Easing, Platform } from "react-native";
 import { DarkColors, LightColors, ThemeColors } from "../../constants/theme";
 import { AppEvents } from "../services/events";
 import { Settings } from "../services/settings/SettingsService";
@@ -12,12 +12,25 @@ let systemDark = Appearance.getColorScheme() === "dark";
 let active: ThemeColors = systemDark ? DarkColors : LightColors;
 const listeners = new Set<() => void>();
 let started = false;
+let didResolveOnce = false;
 
 function resolve(): void {
   const next = mode === "dark" || (mode === "system" && systemDark) ? DarkColors : LightColors;
+
+  //set even on a no-op resolve
+  const isFirstResolve = !didResolveOnce;
+  didResolveOnce = true;
+
   if (next === active) return;
+
+  const from = active;
   active = next;
   for (const listener of listeners) listener();
+
+  //skip the veil on boot or when backgrounded
+  if (!isFirstResolve && veilListeners.size > 0 && AppState.currentState === "active") {
+    playVeil(from.background);
+  }
 }
 
 export function setThemeMode(next: ThemeMode): void {
@@ -77,6 +90,47 @@ export function useColors(): ThemeColors {
 
 export function useIsDark(): boolean {
   return useColors() === DarkColors;
+}
+
+const VEIL_DURATION_MS = 1000;
+//web has no native driver
+const VEIL_NATIVE_DRIVER = Platform.OS !== "web";
+
+//old color fades away over new content
+const veilOpacity = new Animated.Value(0);
+let veilColor: string = active.background;
+const veilListeners = new Set<() => void>();
+
+function playVeil(fromBackground: string): void {
+  veilColor = fromBackground;
+  for (const listener of veilListeners) listener();
+
+  veilOpacity.stopAnimation(() => {
+    veilOpacity.setValue(1);
+    Animated.timing(veilOpacity, {
+      toValue: 0,
+      duration: VEIL_DURATION_MS,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: VEIL_NATIVE_DRIVER,
+    }).start();
+  });
+}
+
+function subscribeVeil(callback: () => void): () => void {
+  veilListeners.add(callback);
+  return () => {
+    veilListeners.delete(callback);
+  };
+}
+
+function getVeilSnapshot(): string {
+  return veilColor;
+}
+
+//mount once at the root above everything
+export function useThemeVeil(): { color: string; opacity: Animated.Value } {
+  const color = useSyncExternalStore(subscribeVeil, getVeilSnapshot, getVeilSnapshot);
+  return { color, opacity: veilOpacity };
 }
 
 //stylesheets are built once per factory and per palette, not per render

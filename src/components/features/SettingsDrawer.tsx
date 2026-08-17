@@ -32,7 +32,7 @@ import CloudSyncBox from "./CloudSyncBox";
 import { useResponsive } from "../../hooks/useResponsive";
 
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
-import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { setThemeMode, useColors, useThemedStyles } from "../../hooks/useTheme";
 import { dragDrawer, drawerWidthFor, gestureVelocity, playPageTransition, settingsProgress, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
 
 const linkIcon = require("../../../assets/icons/link.png");
@@ -501,6 +501,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const setTheme = (v: string) => {
     setThemeState(v);
+    //skips the db round trip lag
+    setThemeMode(v as "system" | "light" | "dark");
     Settings.set("theme", v);
   };
 

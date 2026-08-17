@@ -1,0 +1,37 @@
+name: Deploy web
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build web export
+        env:
+          EXPO_PUBLIC_GOOGLE_REDIRECT_URI: ${{ secrets.EXPO_PUBLIC_GOOGLE_REDIRECT_URI }}
+        run: npx expo export -p web
+
+      - name: Deploy to VPS
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          rsync -avz --delete \
+            --exclude='docker-compose.yml' --exclude='nginx.conf' \
+            -e "ssh -i ~/.ssh/deploy_key" dist/ "$VPS_USER@$VPS_HOST:$VPS_DEPLOY_PATH"

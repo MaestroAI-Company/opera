@@ -5,7 +5,6 @@ import {
   BackHandler,
   DeviceEventEmitter,
   Image,
-  Keyboard,
   LayoutChangeEvent,
   PanResponder,
   Platform,
@@ -21,7 +20,6 @@ import {
 import Reanimated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
-import { useResponsive } from "../../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { AIModule } from "../../services/ai/AIModule";
 import { getAICoreModelLabel } from "../../services/ai/providers/AICoreProvider";
@@ -29,7 +27,7 @@ import { buildSources, ModelSource } from "../../services/ai/providers/sources";
 import { AppEvents } from "../../services/events";
 import NotificationModal from "../ui/NotificationModal";
 import SliderToggle, { SliderToggleOption } from "../ui/SliderToggle";
-import { dragDrawer, gestureVelocity, modelSelectorProgress, settleDrawer } from "./drawerAnimation";
+import { dragDrawer, gestureVelocity, settleDrawer } from "./drawerAnimation";
 
 const botIcon = require("../../../assets/icons/bot.png");
 const downloadIcon = require("../../../assets/icons/download.png");
@@ -98,6 +96,9 @@ export function ModelSelectorTrigger({
 export type ModelSelectorDrawerProps = {
   visible: boolean;
   onClose: () => void;
+  //owned by the caller so its own gesture handler (e.g. a swipe-up on the home screen)
+  //can drag it live, same as conversationsProgress/settingsProgress
+  progress: Animated.Value;
   selectedModel: string;
   selectedReflection: string;
   showReflection: boolean;
@@ -110,10 +111,12 @@ export type ModelSelectorDrawerProps = {
   isDesktop?: boolean;
 };
 
-//fluid drawer style model selector
+//fluid drawer, built the same way as ConversationsDrawer/SettingsDrawer: mounted at the screen
+//root, driven by PanResponder + spring, no Modal involved
 export function ModelSelectorDrawer({
   visible,
   onClose,
+  progress,
   selectedModel,
   selectedReflection,
   showReflection,
@@ -128,7 +131,6 @@ export function ModelSelectorDrawer({
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
-  const progress = modelSelectorProgress;
 
   const [models, setModels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -137,6 +139,7 @@ export function ModelSelectorDrawer({
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
   const [localAvailable, setLocalAvailable] = useState(false);
+  //settings own the source list, this forces a rebuild when they change
   const [sourcesRevision, setSourcesRevision] = useState(0);
   const [browsedKey, setBrowsedKey] = useState<string | null>(null);
 
@@ -201,30 +204,40 @@ export function ModelSelectorDrawer({
     return () => sub.remove();
   }, []);
 
+  //settings may have changed while the panel was closed
+  useEffect(() => {
+    if (visible) setSourcesRevision((r) => r + 1);
+  }, [visible]);
+
   const sources = useMemo(
     () => buildSources(localAvailable),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- revision tracks the settings behind buildSources
     [localAvailable, sourcesRevision]
   );
 
+  //the source the app currently generates with, falls back to the first tab
   const matchesActive = (source?: ModelSource) =>
     !!source && source.service === aiService && (source.service !== "ollama" || source.url === ollamaUrl);
   const activeSource = useMemo(
     () => sources.find(matchesActive) ?? sources[0],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- matchesActive only reads the deps below
     [sources, aiService, ollamaUrl]
   );
   const browsedSource = sources.find((s) => s.key === browsedKey) ?? activeSource;
   const isBrowsingActive = matchesActive(browsedSource);
 
   useEffect(() => {
+    //active source changed under us, stop browsing an old tab
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- follow the active source again
     setBrowsedKey(null);
   }, [aiService, ollamaUrl]);
 
+  //switching source or refreshing only drops what disappeared and appends what is new
   const applyModels = (next: string[]) => {
     setModels((prev) => {
       const kept = prev.filter((m) => next.includes(m));
       const merged = [...kept, ...next.filter((m) => !kept.includes(m))];
+      //nothing moved, keep the same list so the rows are not touched
       const same = merged.length === prev.length && merged.every((m, i) => m === prev[i]);
       return same ? prev : merged;
     });
@@ -251,12 +264,13 @@ export function ModelSelectorDrawer({
   }, []);
 
   useEffect(() => {
-    if (visible) {
-      fetchModels(browsedSource);
-    }
+    //refetch when the panel opens or the browsed source changes
+    if (visible) fetchModels(browsedSource);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the source key should trigger a refetch
   }, [visible, fetchModels, browsedSource?.key]);
 
   useEffect(() => {
+    //only the active source may correct the selected model
     if (!isBrowsingActive) return;
     if (models.length > 0) {
       if (!selectedModel || !models.includes(selectedModel)) {
@@ -290,6 +304,7 @@ export function ModelSelectorDrawer({
     dismiss();
   };
 
+  //friendly label for aicore variants
   const displayName = (model: string) =>
     model.startsWith("aicore-") ? getAICoreModelLabel(model) : model;
 
@@ -333,12 +348,14 @@ export function ModelSelectorDrawer({
     setRowLayoutsVersion((v) => v + 1);
   };
 
+  //reset measured rows on change
   const modelsKey = displayModels.join("|");
   useEffect(() => {
     rowLayoutsRef.current = [];
     setRowLayoutsVersion((v) => v + 1);
   }, [modelsKey]);
 
+  //park pill on selected slot
   useEffect(() => {
     if (previewIndex !== null) return;
     if (selectedIndex < 0 || selectedIndex >= displayModels.length) return;
@@ -360,6 +377,7 @@ export function ModelSelectorDrawer({
         startYRef.current = pillY.value;
         previewIndexRef.current = selectedIndexRef.current;
         clearLongPressTimer();
+        //require hold before drag
         longPressTimerRef.current = setTimeout(() => {
           armedRef.current = true;
           pillScale.value = withTiming(1.04, { duration: 120 });
@@ -598,66 +616,6 @@ export function ModelSelectorDrawer({
   );
 }
 
-export type ModelSelectorProps = {
-  selectedModel: string;
-  selectedReflection: string;
-  showReflection: boolean;
-  onModelChange: (model: string) => void;
-  onReflectionChange: (reflection: string) => void;
-  aiService: string;
-  ollamaUrl: string;
-  onServiceChange: (service: string, ollamaUrl: string) => void;
-  closeSignal?: unknown;
-};
-
-//combined component with internal state for drop-in usage
-export default function ModelSelector(props: ModelSelectorProps) {
-  const [visible, setVisible] = useState(false);
-  const { isLargeScreen, isDesktop } = useResponsive();
-
-  const handleOpen = () => {
-    Keyboard.dismiss();
-    setVisible(true);
-  };
-
-  useEffect(() => {
-    const sub = DeviceEventEmitter.addListener(AppEvents.openModelSelector, handleOpen);
-    return () => sub.remove();
-  }, []);
-
-  const closeSignalRef = useRef(props.closeSignal);
-  useEffect(() => {
-    if (closeSignalRef.current !== props.closeSignal) {
-      closeSignalRef.current = props.closeSignal;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setVisible(false);
-    }
-  }, [props.closeSignal]);
-
-  return (
-    <>
-      <ModelSelectorTrigger
-        selectedModel={props.selectedModel}
-        onPress={handleOpen}
-      />
-      <ModelSelectorDrawer
-        visible={visible}
-        onClose={() => setVisible(false)}
-        selectedModel={props.selectedModel}
-        selectedReflection={props.selectedReflection}
-        showReflection={props.showReflection}
-        onModelChange={props.onModelChange}
-        onReflectionChange={props.onReflectionChange}
-        aiService={props.aiService}
-        ollamaUrl={props.ollamaUrl}
-        onServiceChange={props.onServiceChange}
-        isLargeScreen={isLargeScreen}
-        isDesktop={isDesktop}
-      />
-    </>
-  );
-}
-
 const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     flexDirection: "row",
@@ -702,16 +660,16 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flexShrink: 1,
   },
   root: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 1000,
     elevation: 1000,
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: Colors.scrimDrawer,
   },
   desktopRootWrapper: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "flex-end",
     paddingRight: Spacing.xl2,
     paddingBottom: Spacing.xl2,
@@ -736,10 +694,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     backgroundColor: Colors.surface,
     borderTopLeftRadius: Radius.xxl,
     borderTopRightRadius: Radius.xxl,
-    borderTopWidth: 2,
-    borderLeftWidth: 2,
-    borderRightWidth: 2,
-    borderColor: Colors.border,
+    borderBottomLeftRadius: Radius.xxl,
+    borderBottomRightRadius: Radius.xxl,
     paddingHorizontal: 16,
     paddingTop: 8,
   },
@@ -751,7 +707,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   dragHandle: {
     width: 36,
     height: 4,
-    borderRadius: Radius.full,
+    borderRadius: Radius.pill,
     backgroundColor: Colors.overlay,
   },
   sheetInner: {

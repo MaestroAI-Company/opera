@@ -26,11 +26,12 @@ import ChatBar from "../components/features/ChatBar";
 import ChatView from "../components/features/ChatView";
 import ConversationsDrawer from "../components/features/ConversationsDrawer";
 import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, settingsProgress, settleDrawer } from "../components/features/drawerAnimation";
-import ModelSelector, { ModelSelectorDrawer, ModelSelectorTrigger } from "../components/features/ModelSelector";
+import { ModelSelectorDrawer, ModelSelectorTrigger } from "../components/features/ModelSelector";
 import SettingsDrawer from "../components/features/SettingsDrawer";
 import TopBar from "../components/features/TopBar";
 import NotificationModal from "../components/ui/NotificationModal";
 import { hasOpenOverlaySheet } from "../components/ui/SheetSurface";
+import { useAnimatedValue } from "../hooks/useAnimatedValue";
 import { useResponsive } from "../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
 import { AIModule } from "../services/ai/AIModule";
@@ -58,6 +59,9 @@ const settingsIcon = require("../../assets/icons/settings.png");
 
 //matches welcomeText's lineHeight, reserved upfront so the second line doesn't shift layout
 const WELCOME_LINE_HEIGHT = 40;
+
+//swipe-up distance that fully drags the model selector into view
+const MODEL_SELECTOR_DRAG_DISTANCE = 280;
 
 //time-of-day greeting shown on the home screen
 function getGreeting(): string {
@@ -142,6 +146,8 @@ export default function Index() {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
   const [modelSelectorVisible, setModelSelectorVisible] = useState(false);
+  //shared with the panResponder below so the swipe-up gesture can drag it live
+  const modelSelectorProgress = useAnimatedValue(0);
   const [settingsInitialSubPage, setSettingsInitialSubPage] = useState<"main" | "general" | "confidentiality" | "tools">("main");
   const [dbReady, setDbReady] = useState(false);
   const [dbFailed, setDbFailed] = useState(false);
@@ -156,6 +162,14 @@ export default function Index() {
   useEffect(() => {
     settingsDrawerVisibleRef.current = settingsDrawerVisible;
   }, [settingsDrawerVisible]);
+
+  //desktop: opening discussions or settings closes the model dropdown behind it
+  useEffect(() => {
+    if (isDesktop && (drawerVisible || settingsDrawerVisible)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- closes a sibling panel on desktop
+      setModelSelectorVisible(false);
+    }
+  }, [drawerVisible, settingsDrawerVisible, isDesktop]);
 
   const [incognitoMode, setIncognitoMode] = useState(false);
   const [userName, setUserName] = useState("");
@@ -270,19 +284,29 @@ export default function Index() {
       onPanResponderMove: (evt, gestureState) => {
         //gesture drives panel directly
         if (drawerVisible || settingsDrawerVisible || modelSelectorVisible) return;
-        if (Math.abs(gestureState.dx) > Math.abs(gestureState.dy)) {
+        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        if (isHorizontal) {
           const ratio = Math.min(1, Math.abs(gestureState.dx) / dragWidth);
           //crossing start leaves other panel out
           dragDrawer(conversationsProgress, gestureState.dx > 0 ? ratio : 0);
           dragDrawer(settingsProgress, gestureState.dx > 0 ? 0 : ratio);
+        } else if (gestureState.dy < 0 && !activeConversation) {
+          //carries the model selector up with the finger, same as the horizontal drawers
+          const ratio = Math.min(1, Math.abs(gestureState.dy) / MODEL_SELECTOR_DRAG_DISTANCE);
+          dragDrawer(modelSelectorProgress, ratio);
         }
       },
       onPanResponderRelease: (evt, gestureState) => {
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
         if (!isHorizontal) {
           if (!drawerVisible && !settingsDrawerVisible && !modelSelectorVisible && !activeConversation) {
+            const velocity = -gestureVelocity(gestureState.vy, MODEL_SELECTOR_DRAG_DISTANCE);
             if (gestureState.dy < -40 || gestureState.vy < -0.5) {
-              openDrawerSafely(() => setModelSelectorVisible(true));
+              settleDrawer(modelSelectorProgress, true, velocity);
+              setModelSelectorVisible(true);
+            } else {
+              //send peeked panel back off
+              settleDrawer(modelSelectorProgress, false, velocity);
             }
           }
           return;
@@ -317,9 +341,10 @@ export default function Index() {
         if (drawerVisible || settingsDrawerVisible || modelSelectorVisible) return;
         settleDrawer(conversationsProgress, false);
         settleDrawer(settingsProgress, false);
+        settleDrawer(modelSelectorProgress, false);
       },
     })
-    , [drawerVisible, settingsDrawerVisible, modelSelectorVisible, dragWidth, activeConversation, openDrawerSafely]);
+    , [drawerVisible, settingsDrawerVisible, modelSelectorVisible, dragWidth, activeConversation, modelSelectorProgress]);
 
   //trackpad two-finger horizontal swipe like mobile gesture
   useEffect(() => {
@@ -1378,6 +1403,7 @@ export default function Index() {
       <ModelSelectorDrawer
         visible={modelSelectorVisible}
         onClose={() => setModelSelectorVisible(false)}
+        progress={modelSelectorProgress}
         selectedModel={selectedModel}
         selectedReflection={selectedReflection}
         showReflection={modelCapabilities.includes("thinking")}

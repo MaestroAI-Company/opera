@@ -27,7 +27,7 @@ import { TTS } from '../../services/speech/TTSService';
 import NotificationModal from '../ui/NotificationModal';
 import ChatBar, { ChatBarHandle } from './ChatBar';
 import ChatView from './ChatView';
-import ModelSelector from './ModelSelector';
+import { ModelSelectorDrawer, ModelSelectorTrigger } from './ModelSelector';
 import SelectionLayer from './SelectionLayer';
 
 import { useResponsive } from '../../hooks/useResponsive';
@@ -69,6 +69,8 @@ function AssistantOverlay() {
   const [selectedModel, setSelectedModel] = useState('');
   const [aiService, setAiService] = useState('ollama');
   const [ollamaUrl, setOllamaUrl] = useState('');
+  const [modelSelectorVisible, setModelSelectorVisible] = useState(false);
+  const modelSelectorProgress = useAnimatedValue(0);
   const [userInstruction, setUserInstruction] = useState('');
   const [alwaysWhisper, setAlwaysWhisper] = useState(false);
   //autoStartMic setting from db
@@ -648,31 +650,9 @@ function AssistantOverlay() {
           style={[styles.topBar, { paddingTop: insets.top + 16, transform: [{ translateY: topBarEntry }] }, isDrawingSelection && styles.hiddenBar]}
           pointerEvents={isDrawingSelection ? 'none' : 'box-none'}
         >
-          <ModelSelector
+          <ModelSelectorTrigger
             selectedModel={selectedModel}
-            selectedReflection={selectedReflection}
-            showReflection={modelCapabilities.includes('thinking')}
-            aiService={aiService}
-            ollamaUrl={ollamaUrl}
-            onServiceChange={(service, url) => {
-              setAiService(service);
-              setOllamaUrl(url);
-              Settings.set('aiService', service);
-              Settings.set('ollamaUrl', url);
-              AIModule.setMode(service);
-              if (service === 'ollama') {
-                const cached = Settings.getCached();
-                AIModule.configure(url, cached.ollamaContextLength, cached.ollamaKeepAlive);
-              }
-            }}
-            onModelChange={model => {
-              setSelectedModel(model);
-              selectedModelRef.current = model;
-              Settings.set('ollamaModel', model);
-              //preload newly selected model
-              AIModule.preloadModel(model).catch(() => { });
-            }}
-            onReflectionChange={setReflection}
+            onPress={() => setModelSelectorVisible(v => !v)}
           />
         </Animated.View>
 
@@ -713,6 +693,37 @@ function AssistantOverlay() {
         message={modalConfig.message}
         buttons={modalConfig.buttons}
         onClose={() => setModalVisible(false)}
+      />
+
+      <ModelSelectorDrawer
+        visible={modelSelectorVisible}
+        onClose={() => setModelSelectorVisible(false)}
+        progress={modelSelectorProgress}
+        selectedModel={selectedModel}
+        selectedReflection={selectedReflection}
+        showReflection={modelCapabilities.includes('thinking')}
+        aiService={aiService}
+        ollamaUrl={ollamaUrl}
+        onServiceChange={(service, url) => {
+          setAiService(service);
+          setOllamaUrl(url);
+          Settings.set('aiService', service);
+          Settings.set('ollamaUrl', url);
+          AIModule.setMode(service);
+          if (service === 'ollama') {
+            const cached = Settings.getCached();
+            AIModule.configure(url, cached.ollamaContextLength, cached.ollamaKeepAlive);
+          }
+        }}
+        onModelChange={model => {
+          setSelectedModel(model);
+          selectedModelRef.current = model;
+          Settings.set('ollamaModel', model);
+          //preload newly selected model
+          AIModule.preloadModel(model).catch(() => { });
+        }}
+        onReflectionChange={setReflection}
+        isLargeScreen={isLargeScreen}
       />
 
       <HeadlessWebView />

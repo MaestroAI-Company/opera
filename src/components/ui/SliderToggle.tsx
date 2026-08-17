@@ -1,8 +1,8 @@
-import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
-import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useEffect, useRef, useState } from "react";
 import { Image, ImageSourcePropType, LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 
 //load theme icons
 const autoIcon = require("../../../assets/icons/auto.png");
@@ -29,7 +29,7 @@ const defaultOptions: SliderToggleOption[] = [
 
 const GAP = 4;
 const LONG_PRESS_DELAY = 180;
-const BREAK_RATIO = 0.85; // fraction of a slot the finger must pull past to break free toward the next anchor
+const BREAK_RATIO = 0.85;
 
 // rubber-band curve: approaches but never exceeds `dim`, resisting harder the further it's pulled
 const rubberBand = (d: number, dim: number) => {

@@ -1,4 +1,5 @@
 import * as Calendar from "expo-calendar";
+import Constants from "expo-constants";
 import * as Contacts from "expo-contacts";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
@@ -24,6 +25,7 @@ import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
 import DownloadProgress from "../ui/DownloadProgress";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import Selector from "../ui/Selector";
+import Slider from "../ui/Slider";
 import SliderToggle from "../ui/SliderToggle";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
@@ -57,6 +59,8 @@ const binIcon = require("../../../assets/icons/bin.png");
 const exportIcon = require("../../../assets/icons/export.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
+
+const appVersion = Constants.expoConfig?.version ?? "1.0.0";
 
 const MOBILE_TOOL_NAMES = new Set([
   "contact",
@@ -231,12 +235,25 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   ];
 
   const ollamaKeepAliveOptions = [
-    { id: "300", label: "5 minutes" },
-    { id: "600", label: "10 minutes" },
-    { id: "1800", label: "30 minutes" },
-    { id: "3600", label: "1 hour" },
-    { id: "7200", label: "2 hours" },
+    { id: "300", label: "5m" },
+    { id: "600", label: "10m" },
+    { id: "1800", label: "30m" },
+    { id: "3600", label: "1h" },
+    { id: "7200", label: "2h" },
+    { id: "18000", label: "5h" },
+    { id: "43200", label: "12h" },
+    { id: "86400", label: "24h" },
     { id: "-1", label: "Infinite" },
+  ];
+
+  const ollamaContextLengthOptions = [
+    { id: "8192", label: "8k" },
+    { id: "16384", label: "16k" },
+    { id: "32768", label: "32k" },
+    { id: "65536", label: "64k" },
+    { id: "131072", label: "128k" },
+    { id: "262144", label: "256k" },
+    { id: "524288", label: "512k" },
   ];
 
   type PermissionState = "granted" | "denied" | "undetermined";
@@ -1057,6 +1074,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           </View>
         </View>
       </View>
+
+      <Text style={styles.versionText}>v{appVersion}</Text>
     </View>
   );
 
@@ -1260,21 +1279,17 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
             <Text style={[styles.settingLabel, { marginTop: 20 }]}>Context Length</Text>
             <Text style={[styles.helpText, { marginBottom: 10 }]}>Maximum number of tokens the model can use.</Text>
-            <TextInputField
-              icon={serverIcon}
-              placeholder="8192"
-              keyboardType="number-pad"
-              value={ollamaContextLength}
-              onChangeText={setOllamaContextLength}
+            <Slider
+              options={ollamaContextLengthOptions}
+              selectedValue={String(effectiveContextLength())}
+              onSelect={setOllamaContextLength}
             />
             <Text style={[styles.settingLabel, { marginTop: 20 }]}>Model Keep Alive</Text>
             <Text style={[styles.helpText, { marginBottom: 10 }]}>How long the model stays loaded in memory after a request.</Text>
-            <Selector
+            <Slider
               options={ollamaKeepAliveOptions}
               selectedValue={ollamaKeepAlive}
               onSelect={setOllamaKeepAlive}
-              title="Select Keep Alive"
-              fullWidth
             />
           </>
         )}
@@ -1612,7 +1627,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const innerContent = (
     <ScrollView contentContainerStyle={{ paddingTop: isDesktop ? 0 : 60, paddingBottom: 40, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-      <Animated.View style={{ opacity: pageAnim, transform: [{ translateY: pageAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
+      <Animated.View style={{ flex: 1, opacity: pageAnim, transform: [{ translateY: pageAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
         {getSubPageContent()}
       </Animated.View>
     </ScrollView>
@@ -1935,20 +1950,21 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   addServerButton: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
+    justifyContent: "flex-start",
+    gap: 8,
     borderWidth: 2,
     borderColor: Colors.border,
     borderRadius: Radius.xxl,
     backgroundColor: Colors.surface,
-    paddingVertical: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
   },
   addServerIcon: {
-    width: 18,
-    height: 18,
+    width: 14,
+    height: 14,
   },
   addServerText: {
-    fontSize: FontSizes.body,
+    fontSize: FontSizes.bodyMd,
     color: Colors.textPrimary,
     fontFamily: Fonts.mono,
   },
@@ -1988,5 +2004,13 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 10,
     marginTop: 4,
+  },
+  versionText: {
+    textAlign: "center",
+    fontSize: FontSizes.label,
+    fontFamily: Fonts.mono,
+    color: Colors.textMuted,
+    marginTop: "auto",
+    paddingTop: 16,
   },
 });

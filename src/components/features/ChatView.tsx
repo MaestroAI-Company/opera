@@ -14,8 +14,9 @@ import {
   Text,
   View,
 } from "react-native";
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { AIModule } from "../../services/ai/AIModule";
 import { Conversation, Message, MessageSource } from "../../services/db/DatabaseService";
 import { splitDocumentBlocks } from "../../services/documents/DocumentService";
@@ -62,6 +63,8 @@ function getSourceKind(url: string): SourceKind {
 }
 
 const SourcePill = ({ source }: { source: MessageSource }) => {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   //disable open when url unhandled
   const [canOpen, setCanOpen] = useState(true);
   useEffect(() => {
@@ -132,6 +135,7 @@ function formatDate(timestamp: number): string {
 }
 
 const FlashingText = ({ text }: { text: string }) => {
+  const styles = useThemedStyles(makeStyles);
   const opacity = useAnimatedValue(0.4);
 
   useEffect(() => {
@@ -154,6 +158,8 @@ const FlashingText = ({ text }: { text: string }) => {
 };
 
 const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isChatGenerating, showMetrics, fallbackModel, canThink, dark, onOpenInApp }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string; canThink?: boolean; dark?: boolean; onOpenInApp?: (item: Message) => void }) => {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const isUser = item.role === "user";
   const [showDetails, setShowDetails] = useState(false);
 
@@ -369,6 +375,8 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
 MessageItem.displayName = "MessageItem";
 
 export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp }: ChatViewProps) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const listRef = useRef<FlatList>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
   const isAtBottomRef = useRef(true);
@@ -520,7 +528,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -559,7 +567,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
   },
   userText: {
-    color: Colors.surface,
+    color: Colors.textOnPrimary,
   },
   aiContainer: {
     gap: 2,

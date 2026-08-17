@@ -6,7 +6,7 @@ import * as MediaLibrary from "expo-media-library/legacy";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
+import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import { getLocalProviderLabel } from "../../services/ai/providers/LocalProvider";
 import { getEnabledProviders, getOllamaUrls, serializeOllamaUrls, serializeProviders } from "../../services/ai/providers/sources";
@@ -32,6 +32,7 @@ import CloudSyncBox from "./CloudSyncBox";
 import { useResponsive } from "../../hooks/useResponsive";
 
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { dragDrawer, drawerWidthFor, gestureVelocity, playPageTransition, settingsProgress, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
 
 const linkIcon = require("../../../assets/icons/link.png");
@@ -79,6 +80,8 @@ type SettingsDrawerProps = {
 type SubPage = "main" | "general" | "assistantoverlay" | "service" | "confidentiality" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions";
 
 export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const { width } = useResponsive();
   const drawerWidth = drawerWidthFor(width);
   const progress = settingsProgress;
@@ -146,6 +149,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [ollamaUrl, setOllamaUrlState] = useState("");
   const [ollamaUrls, setOllamaUrlsState] = useState<string[]>([]);
   const [enabledProviders, setEnabledProvidersState] = useState<string[]>([]);
+  const [ollamaContextLength, setOllamaContextLengthState] = useState("");
+  const [ollamaKeepAlive, setOllamaKeepAliveState] = useState("300");
   //unreachable server url
   const [serverErrors, setServerErrors] = useState<Record<string, boolean>>({});
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
@@ -223,6 +228,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const cloudStorageOptions = [
     { id: "none", label: "None" },
     ...CLOUD_PROVIDERS.map(def => ({ id: def.id, label: def.label })),
+  ];
+
+  const ollamaKeepAliveOptions = [
+    { id: "300", label: "5 minutes" },
+    { id: "600", label: "10 minutes" },
+    { id: "1800", label: "30 minutes" },
+    { id: "3600", label: "1 hour" },
+    { id: "7200", label: "2 hours" },
+    { id: "-1", label: "Infinite" },
   ];
 
   type PermissionState = "granted" | "denied" | "undetermined";
@@ -417,6 +431,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setOllamaUrlState(s.ollamaUrl);
         setOllamaUrlsState(getOllamaUrls());
         setEnabledProvidersState(getEnabledProviders());
+        setOllamaContextLengthState(s.ollamaContextLength && s.ollamaContextLength !== 8192 ? String(s.ollamaContextLength) : "");
+        setOllamaKeepAliveState(String(s.ollamaKeepAlive ?? 300));
         setWhisperModelState(s.whisperModel);
         setWhisperLanguageState(s.whisperLanguage);
         setInstructionState(s.instruction);
@@ -426,7 +442,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setShowTechnicalDetailsState(s.showTechnicalDetails);
         setUseAppContextState(s.useAppContext);
         //apply to services
-        AIModule.configure(s.ollamaUrl);
+        AIModule.configure(s.ollamaUrl, s.ollamaContextLength, s.ollamaKeepAlive);
         AIModule.setMode(s.aiService);
         const localModeAvailable = await AIModule.isModeAvailable("local");
         setLocalAvailable(localModeAvailable);
@@ -494,6 +510,17 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     AIModule.setMode(v);
   };
 
+  //fallback when caller did not change value
+  const effectiveContextLength = (raw: string = ollamaContextLength) => {
+    const parsed = parseInt(raw, 10);
+    return isNaN(parsed) || parsed <= 0 ? 8192 : parsed;
+  };
+
+  const effectiveKeepAlive = (raw: string = ollamaKeepAlive) => {
+    const parsed = parseInt(raw, 10);
+    return isNaN(parsed) ? 300 : parsed;
+  };
+
   //keep active server in the list
   const saveOllamaUrls = (urls: string[]) => {
     setOllamaUrlsState(urls);
@@ -503,12 +530,24 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     if (activeUrl !== ollamaUrl) {
       setOllamaUrlState(activeUrl);
       Settings.set("ollamaUrl", activeUrl);
-      AIModule.configure(activeUrl);
+      AIModule.configure(activeUrl, effectiveContextLength(), effectiveKeepAlive());
     }
   };
 
   const setOllamaUrlAt = (index: number, value: string) => {
     saveOllamaUrls(ollamaUrls.map((url, i) => (i === index ? value : url)));
+  };
+
+  const setOllamaContextLength = (v: string) => {
+    setOllamaContextLengthState(v);
+    Settings.set("ollamaContextLength", effectiveContextLength(v));
+    AIModule.configure(ollamaUrl, effectiveContextLength(v), effectiveKeepAlive());
+  };
+
+  const setOllamaKeepAlive = (v: string) => {
+    setOllamaKeepAliveState(v);
+    Settings.set("ollamaKeepAlive", effectiveKeepAlive(v));
+    AIModule.configure(ollamaUrl, effectiveContextLength(), effectiveKeepAlive(v));
   };
 
   //drop server on empty field
@@ -1216,6 +1255,25 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               <Image source={addIcon} style={styles.addServerIcon} tintColor={Colors.textPrimary} />
               <Text style={styles.addServerText}>Add server link</Text>
             </Pressable>
+
+            <Text style={[styles.settingLabel, { marginTop: 20 }]}>Context Length</Text>
+            <Text style={[styles.helpText, { marginBottom: 10 }]}>Maximum number of tokens the model can use.</Text>
+            <TextInputField
+              icon={serverIcon}
+              placeholder="8192"
+              keyboardType="number-pad"
+              value={ollamaContextLength}
+              onChangeText={setOllamaContextLength}
+            />
+            <Text style={[styles.settingLabel, { marginTop: 20 }]}>Model Keep Alive</Text>
+            <Text style={[styles.helpText, { marginBottom: 10 }]}>How long the model stays loaded in memory after a request.</Text>
+            <Selector
+              options={ollamaKeepAliveOptions}
+              selectedValue={ollamaKeepAlive}
+              onSelect={setOllamaKeepAlive}
+              title="Select Keep Alive"
+              fullWidth
+            />
           </>
         )}
       </View>
@@ -1707,7 +1765,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   return mobileDrawer;
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   root: {
     ...StyleSheet.absoluteFill,
     zIndex: 1000,

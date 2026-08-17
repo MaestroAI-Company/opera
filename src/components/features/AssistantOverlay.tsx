@@ -21,7 +21,7 @@ import { arrayBufferToBase64 } from '../../services/ai/utils/base64';
 import { CloudSync } from '../../services/CloudSyncService';
 import { Conversation, DB, Message } from '../../services/db/DatabaseService';
 import { AppEvents } from '../../services/events';
-import { Settings } from '../../services/settings/SettingsService';
+import { AppSettings, Settings } from '../../services/settings/SettingsService';
 import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { TTS } from '../../services/speech/TTSService';
 import NotificationModal from '../ui/NotificationModal';
@@ -216,6 +216,28 @@ function AssistantOverlay() {
     }).start();
   }, [responseOpacity, clearSelection]);
 
+  //push db settings into module and local state
+  const applySettings = useCallback((s: AppSettings) => {
+    setUserInstruction(s.instruction);
+    if (s.ollamaModel) {
+      setSelectedModel(s.ollamaModel);
+      selectedModelRef.current = s.ollamaModel;
+    }
+    setAiService(s.aiService);
+    setOllamaUrl(s.ollamaUrl);
+    setAlwaysWhisper(s.alwaysWhisper);
+    //store setting for later
+    autoStartMicSetting.current = s.autoStartMic ?? true;
+    AIModule.configure(s.ollamaUrl, s.ollamaContextLength, s.ollamaKeepAlive);
+    AIModule.setMode(s.aiService);
+    STT.setLanguage(s.whisperLanguage);
+  }, []);
+
+  //reload settings changed while overlay open
+  const reloadSettings = useCallback(() => {
+    Settings.load().then(applySettings).catch(() => { });
+  }, [applySettings]);
+
   //init db settings and model
   useEffect(() => {
     const init = async () => {
@@ -223,19 +245,7 @@ function AssistantOverlay() {
         //parallel db and settings connections
         await Promise.all([DB.init(), Settings.init()]);
         const s = await Settings.load();
-        setUserInstruction(s.instruction);
-        if (s.ollamaModel) {
-          setSelectedModel(s.ollamaModel);
-          selectedModelRef.current = s.ollamaModel;
-        }
-        setAiService(s.aiService);
-        setOllamaUrl(s.ollamaUrl);
-        setAlwaysWhisper(s.alwaysWhisper);
-        //store setting for later
-        autoStartMicSetting.current = s.autoStartMic ?? true;
-        AIModule.configure(s.ollamaUrl);
-        AIModule.setMode(s.aiService);
-        STT.setLanguage(s.whisperLanguage);
+        applySettings(s);
 
         //defer model preload past animation
         if (s.ollamaModel) {
@@ -252,7 +262,13 @@ function AssistantOverlay() {
       });
     };
     init();
-  }, []);
+  }, [applySettings]);
+
+  //settings edited elsewhere in this process
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(AppEvents.settingsChanged, reloadSettings);
+    return () => sub.remove();
+  }, [reloadSettings]);
 
   //full overlay reset on close/reopen
   const resetOverlay = useCallback(() => {
@@ -294,8 +310,16 @@ function AssistantOverlay() {
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener(AppEvents.overlayReopened, () => {
       resetOverlay();
+      //settings may have changed while closed
+      reloadSettings();
     });
     return () => sub.remove();
+  }, [resetOverlay, reloadSettings]);
+
+  //close overlay but keep app alive
+  const closeOverlay = useCallback(() => {
+    resetOverlay();
+    setTimeout(() => ScreenCapture.close(), 100);
   }, [resetOverlay]);
 
   //hand off conversation then close
@@ -591,6 +615,7 @@ function AssistantOverlay() {
             onChange={select}
             onVibrate={() => Vibration.vibrate(10)}
             onDrawingChange={setIsDrawingSelection}
+            onDismiss={closeOverlay}
             detections={detections}
           />
         ) : (
@@ -635,7 +660,10 @@ function AssistantOverlay() {
               Settings.set('aiService', service);
               Settings.set('ollamaUrl', url);
               AIModule.setMode(service);
-              if (service === 'ollama') AIModule.configure(url);
+              if (service === 'ollama') {
+                const cached = Settings.getCached();
+                AIModule.configure(url, cached.ollamaContextLength, cached.ollamaKeepAlive);
+              }
             }}
             onModelChange={model => {
               setSelectedModel(model);

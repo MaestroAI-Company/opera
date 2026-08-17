@@ -22,6 +22,7 @@ import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { Settings } from "../../services/settings/SettingsService";
 import { WhisperSTT } from "../../services/speech/STTService";
 import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
+import ActionButton from "../ui/ActionButton";
 import DownloadProgress from "../ui/DownloadProgress";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import Selector from "../ui/Selector";
@@ -1271,17 +1272,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               </View>
             ))}
 
-            <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
-              <View style={styles.groupBox}>
-                <Pressable
-                  style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-                  onPress={() => saveOllamaUrls([...ollamaUrls, ""])}
-                >
-                  <Image source={addIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-                  <Text style={styles.navLabel}>Add server link</Text>
-                </Pressable>
-              </View>
-            </View>
+            <ActionButton
+              icon={addIcon}
+              label="Add server link"
+              onPress={() => saveOllamaUrls([...ollamaUrls, ""])}
+              standalone
+            />
 
             <Text style={[styles.settingLabel, { marginTop: 20 }]}>Context Length</Text>
             <Text style={[styles.helpText, { marginBottom: 10 }]}>Maximum number of tokens the model can use.</Text>
@@ -1374,62 +1370,52 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
         <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
           <View style={styles.groupBox}>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+            <ActionButton
+              icon={micIcon}
+              label="Microphone"
               onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
               disabled={Platform.OS === "web"}
-            >
-              <Image source={micIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>Microphone</Text>
-              {Platform.OS !== "web" && renderPermissionBadge(permissionStatuses.microphone)}
-            </Pressable>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+              rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.microphone) : undefined}
+            />
+            <ActionButton
+              icon={cameraIcon}
+              label="Camera"
               onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
               disabled={Platform.OS === "web"}
-            >
-              <Image source={cameraIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>Camera</Text>
-              {Platform.OS !== "web" && renderPermissionBadge(permissionStatuses.camera)}
-            </Pressable>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, Platform.OS === "web" && styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+              rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.camera) : undefined}
+            />
+            <ActionButton
+              icon={locationIcon}
+              label="Location"
               onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
               disabled={Platform.OS === "web"}
-            >
-              <Image source={locationIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>Location</Text>
-              {Platform.OS !== "web" && renderPermissionBadge(permissionStatuses.location)}
-            </Pressable>
+              isLast={Platform.OS === "web"}
+              rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.location) : undefined}
+            />
             {Platform.OS !== "web" && (
-              <Pressable
-                style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+              <ActionButton
+                icon={photoIcon}
+                label="Photos"
                 onPress={() => Linking.openSettings()}
-              >
-                <Image source={photoIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-                <Text style={styles.navLabel}>Photos</Text>
-                {renderPermissionBadge(permissionStatuses.photos)}
-              </Pressable>
+                rightElement={renderPermissionBadge(permissionStatuses.photos)}
+              />
             )}
             {Platform.OS !== "web" && (
-              <Pressable
-                style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+              <ActionButton
+                icon={profilIcon}
+                label="Contacts"
                 onPress={() => Linking.openSettings()}
-              >
-                <Image source={profilIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-                <Text style={styles.navLabel}>Contacts</Text>
-                {renderPermissionBadge(permissionStatuses.contacts)}
-              </Pressable>
+                rightElement={renderPermissionBadge(permissionStatuses.contacts)}
+              />
             )}
             {Platform.OS !== "web" && (
-              <Pressable
-                style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+              <ActionButton
+                icon={calendarIcon}
+                label="Calendar"
                 onPress={() => Linking.openSettings()}
-              >
-                <Image source={calendarIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-                <Text style={styles.navLabel}>Calendar</Text>
-                {renderPermissionBadge(permissionStatuses.calendar)}
-              </Pressable>
+                isLast
+                rightElement={renderPermissionBadge(permissionStatuses.calendar)}
+              />
             )}
           </View>
         </View>
@@ -1443,27 +1429,22 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
         <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
           <View style={styles.groupBox}>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+            <ActionButton
+              icon={exportIcon}
+              label="Export data"
               onPress={handleExportData}
-            >
-              <Image source={exportIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>Export data</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+            />
+            <ActionButton
+              icon={downloadIcon}
+              label="Import data"
               onPress={handleImportData}
-            >
-              <Image source={downloadIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>Import data</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+            />
+            <ActionButton
+              icon={binIcon}
+              label="Delete all conversations"
               onPress={handleDeleteAllConversations}
-            >
-              <Image source={binIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>Delete all conversations</Text>
-            </Pressable>
+              isLast
+            />
           </View>
         </View>
       </View>

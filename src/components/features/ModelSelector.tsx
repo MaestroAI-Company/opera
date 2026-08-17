@@ -1,8 +1,11 @@
+import LottieView from "lottie-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DeviceEventEmitter,
   Image,
   Keyboard,
+  LayoutChangeEvent,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -11,15 +14,15 @@ import {
   Vibration,
   View,
 } from "react-native";
-import LottieView from "lottie-react-native";
+import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import { useResponsive } from "../../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { AIModule } from "../../services/ai/AIModule";
 import { getAICoreModelLabel } from "../../services/ai/providers/AICoreProvider";
 import { buildSources, ModelSource } from "../../services/ai/providers/sources";
-import { AIModule } from "../../services/ai/AIModule";
 import { AppEvents } from "../../services/events";
-import { useResponsive } from "../../hooks/useResponsive";
 import NotificationModal from "../ui/NotificationModal";
 import SheetSurface, { AnchorRect } from "../ui/SheetSurface";
 import SliderToggle, { SliderToggleOption } from "../ui/SliderToggle";
@@ -36,6 +39,17 @@ const REFLECTIONS: SliderToggleOption[] = [
   { id: "low", label: "Low", icon: lowIcon },
   { id: "high", label: "High", icon: highIcon },
 ];
+
+const LONG_PRESS_DELAY = 180;
+const BREAK_RATIO = 0.85;
+const ROW_GAP = 4;
+
+//rubber-band curve for vertical pull
+const rubberBand = (d: number, dim: number) => {
+  if (dim <= 0) return 0;
+  const sign = d < 0 ? -1 : 1;
+  return sign * dim * (1 - 1 / (1 + Math.abs(d) / dim));
+};
 
 //sheet floats over the ui instead of lifting it
 const MODEL_SELECTOR_LIFTS = false;
@@ -226,6 +240,155 @@ export default function ModelSelector({
   const displayName = (model: string) =>
     model.startsWith("aicore-") ? getAICoreModelLabel(model) : model;
 
+  const displayModels = useMemo(() => {
+    return [...models].sort((a, b) => a.localeCompare(b));
+  }, [models]);
+
+  const selectedIndex = isBrowsingActive ? displayModels.findIndex((m) => m === selectedModel) : -1;
+  const selectedIndexRef = useRef(selectedIndex);
+  selectedIndexRef.current = selectedIndex;
+
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [rowLayoutsVersion, setRowLayoutsVersion] = useState(0);
+
+  const pillY = useSharedValue(0);
+  const pillHeight = useSharedValue(0);
+  const pillScale = useSharedValue(1);
+  const pillLit = useSharedValue(0);
+
+  const rowLayoutsRef = useRef<({ y: number; height: number } | undefined)[]>([]);
+  const armedRef = useRef(false);
+  const startYRef = useRef(0);
+  const previewIndexRef = useRef<number | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const activeIndex = previewIndex ?? (selectedIndex >= 0 ? selectedIndex : 0);
+  const hasPill = isBrowsingActive && selectedIndex >= 0;
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleRowLayout = (index: number) => (e: LayoutChangeEvent) => {
+    const { y, height } = e.nativeEvent.layout;
+    const existing = rowLayoutsRef.current[index];
+    if (existing && existing.y === y && existing.height === height) return;
+    rowLayoutsRef.current[index] = { y, height };
+    setRowLayoutsVersion((v) => v + 1);
+  };
+
+  //reset measured rows on change
+  const modelsKey = displayModels.join("|");
+  useEffect(() => {
+    rowLayoutsRef.current = [];
+    setRowLayoutsVersion((v) => v + 1);
+  }, [modelsKey]);
+
+  //park pill on selected slot
+  useEffect(() => {
+    if (previewIndex !== null) return;
+    if (selectedIndex < 0 || selectedIndex >= displayModels.length) return;
+    const layout = rowLayoutsRef.current[selectedIndex];
+    if (!layout) return;
+    pillY.value = withTiming(layout.y, { duration: 180 });
+    pillHeight.value = withTiming(layout.height, { duration: 180 });
+  }, [selectedModel, rowLayoutsVersion, visible, selectedIndex, displayModels.length, pillY, pillHeight]);
+
+  const latestModelsRef = useRef(displayModels);
+  latestModelsRef.current = displayModels;
+
+  const pillPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        armedRef.current = false;
+        startYRef.current = pillY.value;
+        previewIndexRef.current = selectedIndexRef.current;
+        clearLongPressTimer();
+        //require hold before drag
+        longPressTimerRef.current = setTimeout(() => {
+          armedRef.current = true;
+          pillScale.value = withTiming(1.04, { duration: 120 });
+          pillLit.value = withTiming(1, { duration: 120 });
+        }, LONG_PRESS_DELAY);
+      },
+      onPanResponderMove: (_e, gestureState) => {
+        if (!armedRef.current) return;
+        const layouts = rowLayoutsRef.current;
+        const maxIndex = latestModelsRef.current.length - 1;
+
+        let anchor = previewIndexRef.current ?? selectedIndexRef.current;
+        if (!layouts[anchor]) return;
+        const rawY = startYRef.current + gestureState.dy;
+
+        let d = rawY - layouts[anchor]!.y;
+        let slot = layouts[anchor]!.height + ROW_GAP;
+        while (Math.abs(d) >= slot * BREAK_RATIO) {
+          const dir = d > 0 ? 1 : -1;
+          const next = anchor + dir;
+          if (next < 0 || next > maxIndex) break;
+          anchor = next;
+          d = rawY - layouts[anchor]!.y;
+          slot = layouts[anchor]!.height + ROW_GAP;
+        }
+
+        if (anchor !== previewIndexRef.current) {
+          previewIndexRef.current = anchor;
+          setPreviewIndex(anchor);
+          Vibration.vibrate(10);
+        }
+
+        pillY.value = layouts[anchor]!.y + rubberBand(d, slot);
+        pillHeight.value = withTiming(layouts[anchor]!.height, { duration: 100 });
+      },
+      onPanResponderRelease: () => {
+        clearLongPressTimer();
+        if (armedRef.current) {
+          const idx = previewIndexRef.current ?? selectedIndexRef.current;
+          const layout = rowLayoutsRef.current[idx];
+          pillScale.value = withTiming(1, { duration: 150 });
+          pillLit.value = withTiming(0, { duration: 150 });
+          if (layout) {
+            pillY.value = withTiming(layout.y, { duration: 150 });
+            pillHeight.value = withTiming(layout.height, { duration: 150 });
+          }
+          armedRef.current = false;
+          previewIndexRef.current = null;
+          setPreviewIndex(null);
+          const newModel = latestModelsRef.current[idx];
+          if (newModel) {
+            handleSelectModel(newModel);
+          }
+        }
+      },
+      onPanResponderTerminate: () => {
+        clearLongPressTimer();
+        if (armedRef.current) {
+          const layout = rowLayoutsRef.current[selectedIndexRef.current];
+          pillScale.value = withTiming(1, { duration: 150 });
+          pillLit.value = withTiming(0, { duration: 150 });
+          if (layout) {
+            pillY.value = withTiming(layout.y, { duration: 150 });
+            pillHeight.value = withTiming(layout.height, { duration: 150 });
+          }
+        }
+        armedRef.current = false;
+        previewIndexRef.current = null;
+        setPreviewIndex(null);
+      },
+    })
+  ).current;
+
+  const pillAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: pillY.value }, { scale: pillScale.value }],
+    height: pillHeight.value,
+    backgroundColor: interpolateColor(pillLit.value, [0, 1], [Colors.primary, Colors.primaryBright]),
+  }));
+
   return (
     <View style={styles.container}>
       <View style={styles.shadowLayer}>
@@ -281,7 +444,12 @@ export default function ModelSelector({
         </View>
 
         <View style={styles.modelsBox}>
-          <ScrollView style={{ maxHeight: MAX_MODELS_HEIGHT }} showsVerticalScrollIndicator={false} nestedScrollEnabled={true}>
+          <ScrollView
+            style={{ maxHeight: MAX_MODELS_HEIGHT }}
+            contentContainerStyle={styles.modelsScrollContent}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+          >
             {sources.length === 0 ? (
               <Text style={styles.emptyText}>No provider enabled, turn one on in Settings → Service</Text>
             ) : loading && models.length === 0 ? (
@@ -309,28 +477,35 @@ export default function ModelSelector({
                 )}
               </View>
             ) : (
-              [...models].sort((a, b) => {
-                if (a === selectedModel) return -1;
-                if (b === selectedModel) return 1;
-                return a.localeCompare(b);
-              }).map((model) => {
-                const selected = isBrowsingActive && model === selectedModel;
-                return (
-                  <Pressable
-                    key={model}
-                    onPress={() => handleSelectModel(model)}
-                    style={({ pressed, hovered }) => [
-                      styles.option,
-                      selected ? styles.optionSelected : (pressed || hovered) && { backgroundColor: Colors.overlaySubtle },
-                      selected && (pressed || hovered) && { backgroundColor: Colors.primaryActive }
-                    ]}
-                  >
-                    <Text style={[styles.optionText, selected && styles.optionTextSelected]} numberOfLines={1}>
-                      {displayName(model)}
+              <View style={styles.optionsList}>
+                {displayModels.map((model, index) => {
+                  const selected = isBrowsingActive && model === selectedModel;
+                  const isSpecialActive = !hasPill && selected;
+                  return (
+                    <Pressable
+                      key={model}
+                      onLayout={handleRowLayout(index)}
+                      onPress={() => handleSelectModel(model)}
+                      style={({ pressed, hovered }) => [
+                        styles.option,
+                        isSpecialActive ? styles.optionSelected : (pressed || hovered) && { backgroundColor: Colors.overlaySubtle },
+                        isSpecialActive && (pressed || hovered) && { backgroundColor: Colors.primaryActive }
+                      ]}
+                    >
+                      <Text style={[styles.optionText, isSpecialActive && styles.optionTextSelected]} numberOfLines={1}>
+                        {displayName(model)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+                {hasPill && rowLayoutsRef.current[activeIndex] && (
+                  <Animated.View style={[styles.pill, pillAnimatedStyle]} {...pillPanResponder.panHandlers}>
+                    <Text style={[styles.optionText, styles.optionTextSelected]} numberOfLines={1}>
+                      {displayName(displayModels[activeIndex])}
                     </Text>
-                  </Pressable>
-                );
-              })
+                  </Animated.View>
+                )}
+              </View>
             )}
           </ScrollView>
         </View>
@@ -457,6 +632,11 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: Radius.xxl,
     padding: 4,
+    overflow: "hidden",
+  },
+  modelsScrollContent: {
+    paddingHorizontal: 6,
+    paddingVertical: 6,
   },
   loadingRow: {
     flexDirection: 'row',
@@ -478,10 +658,30 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     fontSize: FontSizes.caption,
     fontFamily: Fonts.body,
   },
+  optionsList: {
+    position: "relative",
+  },
+  pill: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    borderRadius: Radius.md,
+    borderWidth: 2,
+    borderColor: Colors.borderOnPrimary,
+  },
   option: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: Radius.md,
+    marginBottom: 4,
+    borderWidth: 2,
+    borderColor: "transparent",
   },
   optionSelected: {
     backgroundColor: Colors.primary,

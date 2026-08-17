@@ -36,7 +36,7 @@ import {
 import { Settings } from "../../services/settings/SettingsService";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
 import NotificationModal from "../ui/NotificationModal";
-import AttachmentSheet, { SelectedFile } from "./AttachmentSheet";
+import AttachmentSheet, { ATTACHMENT_SHEET_LIFTS, SelectedFile } from "./AttachmentSheet";
 
 const nextWhiteIcon = require("../../../assets/icons/arrow.png");
 const micIcon = require("../../../assets/icons/microphone.png");
@@ -1147,10 +1147,11 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         </Animated.View>
       </View>
 
-      <View style={{ width: '100%', height: insets.bottom }} />
+      {/* lifting sheet needs safe area below */}
+      {!ATTACHMENT_SHEET_LIFTS && <View style={{ width: '100%', height: insets.bottom }} />}
 
       <AttachmentSheet
-        bottomInset={bottomInsetToFill}
+        bottomInset={ATTACHMENT_SHEET_LIFTS ? insets.bottom : bottomInsetToFill}
         visible={isAttachmentSheetVisible}
         incognito={incognito}
         onClose={closeSheet}
@@ -1162,6 +1163,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         onSelectRecentPhoto={handleSelectRecentPhoto}
         onLongPressRecentPhoto={handleSelectRecentPhoto}
       />
+
+      {ATTACHMENT_SHEET_LIFTS && <View style={{ width: '100%', height: insets.bottom }} />}
 
       <NotificationModal
         visible={modalVisible}

@@ -26,10 +26,11 @@ import ChatBar from "../components/features/ChatBar";
 import ChatView from "../components/features/ChatView";
 import ConversationsDrawer from "../components/features/ConversationsDrawer";
 import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, settingsProgress, settleDrawer } from "../components/features/drawerAnimation";
-import ModelDropdown from "../components/features/ModelDropdown";
+import ModelSelector from "../components/features/ModelSelector";
 import SettingsDrawer from "../components/features/SettingsDrawer";
 import TopBar from "../components/features/TopBar";
 import NotificationModal from "../components/ui/NotificationModal";
+import { hasOpenOverlaySheet } from "../components/ui/SheetSurface";
 import { useResponsive } from "../hooks/useResponsive";
 import { AIModule } from "../services/ai/AIModule";
 import { buildSystemPrompt, streamAssistantReply } from "../services/ai/generation/chatGeneration";
@@ -240,6 +241,8 @@ export default function Index() {
   const panResponder = useMemo(() =>
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
+        //a sheet floats over the ui, it owns the gesture
+        if (hasOpenOverlaySheet()) return false;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
         if (!isHorizontal || Math.abs(gestureState.dx) <= 10) return false;
 
@@ -573,6 +576,7 @@ export default function Index() {
     //sync ai service on change
     const settingsSub = DeviceEventEmitter.addListener(AppEvents.settingsChanged, () => {
       setAiService(Settings.getCached().aiService);
+      setOllamaUrl(Settings.getCached().ollamaUrl);
       setUserName(Settings.getCached().name);
     });
 
@@ -879,6 +883,16 @@ export default function Index() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [dbReady, incognitoMode, activeConversation, selectedModel, selectedReflection, generateTitle, userInstruction, aiService, ollamaUrl, scheduleFlush]
   );
+
+  //switch active provider or server
+  const handleServiceChange = useCallback((service: string, url: string) => {
+    setAiService(service);
+    setOllamaUrl(url);
+    Settings.set("aiService", service);
+    Settings.set("ollamaUrl", url);
+    AIModule.setMode(service);
+    if (service === "ollama") AIModule.configure(url);
+  }, []);
 
   //use remote model unless local forced
   //native transcript used instead of whisper
@@ -1236,19 +1250,20 @@ export default function Index() {
                 isLargeScreen={isLargeScreen}
                 isDesktop={isDesktop}
                 centerElement={
-                  (aiService === "ollama" || aiService === "aicore" || aiService === "local") ? (
-                    <ModelDropdown
-                      selectedModel={selectedModel}
-                      selectedReflection={selectedReflection}
-                      showReflection={modelCapabilities.includes("thinking")}
-                      aiService={aiService}
-                      onModelChange={(model) => {
-                        setSelectedModel(model);
-                        Settings.set("ollamaModel", model);
-                      }}
-                      onReflectionChange={setSelectedReflection}
-                    />
-                  ) : null
+                  <ModelSelector
+                    selectedModel={selectedModel}
+                    selectedReflection={selectedReflection}
+                    showReflection={modelCapabilities.includes("thinking")}
+                    aiService={aiService}
+                    ollamaUrl={ollamaUrl}
+                    onServiceChange={handleServiceChange}
+                    onModelChange={(model) => {
+                      setSelectedModel(model);
+                      Settings.set("ollamaModel", model);
+                    }}
+                    onReflectionChange={setSelectedReflection}
+                    closeSignal={isDesktop ? `${drawerVisible}:${settingsDrawerVisible}` : undefined}
+                  />
                 }
                 rightElement={
                   <View style={styles.settingsShadowLayer}>

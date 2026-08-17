@@ -91,6 +91,36 @@ class CentralAIModule {
     return provider.getAvailableModels();
   }
 
+  //build provider without touching active one
+  private providerFor(mode: string, ollamaUrl?: string): IAIProvider | null {
+    const key = (mode || 'ollama').toUpperCase() === 'AICORE' ? 'LOCAL' : (mode || 'ollama').toUpperCase();
+    if (key === 'OLLAMA') {
+      const url = (ollamaUrl ?? '').trim();
+      return url.length > 0 ? new OllamaProvider(url) : null;
+    }
+    return this.providers.get(key) ?? null;
+  }
+
+  async isSourceAvailable(mode: string, ollamaUrl?: string): Promise<boolean> {
+    const provider = this.providerFor(mode, ollamaUrl);
+    if (!provider) return false;
+    try {
+      return await provider.isAvailable();
+    } catch {
+      return false;
+    }
+  }
+
+  async getModelsFor(mode: string, ollamaUrl?: string): Promise<string[]> {
+    const provider = this.providerFor(mode, ollamaUrl);
+    if (!provider) return [];
+    try {
+      return await provider.getAvailableModels();
+    } catch {
+      return [];
+    }
+  }
+
   async preloadModel(modelName: string): Promise<void> {
     //no provider until settings land
     if (!this.modeConfigured) return;

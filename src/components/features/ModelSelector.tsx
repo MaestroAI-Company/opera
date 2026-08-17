@@ -1,6 +1,8 @@
 import LottieView from "lottie-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
+  BackHandler,
   DeviceEventEmitter,
   Image,
   Keyboard,
@@ -9,12 +11,14 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StyleProp,
   StyleSheet,
   Text,
   Vibration,
   View,
+  ViewStyle,
 } from "react-native";
-import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Reanimated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useResponsive } from "../../hooks/useResponsive";
@@ -24,8 +28,8 @@ import { getAICoreModelLabel } from "../../services/ai/providers/AICoreProvider"
 import { buildSources, ModelSource } from "../../services/ai/providers/sources";
 import { AppEvents } from "../../services/events";
 import NotificationModal from "../ui/NotificationModal";
-import SheetSurface, { AnchorRect } from "../ui/SheetSurface";
 import SliderToggle, { SliderToggleOption } from "../ui/SliderToggle";
+import { dragDrawer, gestureVelocity, modelSelectorProgress, settleDrawer } from "./drawerAnimation";
 
 const botIcon = require("../../../assets/icons/bot.png");
 const downloadIcon = require("../../../assets/icons/download.png");
@@ -43,6 +47,7 @@ const REFLECTIONS: SliderToggleOption[] = [
 const LONG_PRESS_DELAY = 180;
 const BREAK_RATIO = 0.85;
 const ROW_GAP = 4;
+const MAX_MODELS_HEIGHT = 240;
 
 //rubber-band curve for vertical pull
 const rubberBand = (d: number, dim: number) => {
@@ -51,14 +56,48 @@ const rubberBand = (d: number, dim: number) => {
   return sign * dim * (1 - 1 / (1 + Math.abs(d) / dim));
 };
 
-//sheet floats over the ui instead of lifting it
-const MODEL_SELECTOR_LIFTS = false;
-//desktop drops the panel under its trigger instead of docking it as a sheet
-const MODEL_SELECTOR_ANCHORS_ON_DESKTOP = true;
-const MAX_MODELS_HEIGHT = 240;
-const PANEL_WIDTH = 320;
+export type ModelSelectorTriggerProps = {
+  selectedModel: string;
+  onPress: () => void;
+  style?: StyleProp<ViewStyle>;
+};
 
-type ModelSelectorProps = {
+//button trigger in topbar
+export function ModelSelectorTrigger({
+  selectedModel,
+  onPress,
+  style,
+}: ModelSelectorTriggerProps) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
+
+  const displayName = (model: string) =>
+    model.startsWith("aicore-") ? getAICoreModelLabel(model) : model;
+
+  return (
+    <View style={[styles.container, style]}>
+      <View style={styles.shadowLayer}>
+        <View style={styles.shadowBlock} />
+        <Pressable
+          onPress={onPress}
+          style={({ pressed, hovered }) => [
+            styles.trigger,
+            (pressed || hovered) && { backgroundColor: Colors.surfacePressed },
+          ]}
+        >
+          <Image source={botIcon} style={styles.icon} />
+          <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
+            {selectedModel ? displayName(selectedModel) : "Modèle"}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+export type ModelSelectorDrawerProps = {
+  visible: boolean;
+  onClose: () => void;
   selectedModel: string;
   selectedReflection: string;
   showReflection: boolean;
@@ -67,11 +106,14 @@ type ModelSelectorProps = {
   aiService: string;
   ollamaUrl: string;
   onServiceChange: (service: string, ollamaUrl: string) => void;
-  //any value that changes closes the panel, e.g. a drawer opening or closing
-  closeSignal?: unknown;
+  isLargeScreen?: boolean;
+  isDesktop?: boolean;
 };
 
-export default function ModelSelector({
+//fluid drawer style model selector
+export function ModelSelectorDrawer({
+  visible,
+  onClose,
   selectedModel,
   selectedReflection,
   showReflection,
@@ -80,13 +122,14 @@ export default function ModelSelector({
   aiService,
   ollamaUrl,
   onServiceChange,
-  closeSignal,
-}: ModelSelectorProps) {
+  isLargeScreen = false,
+  isDesktop = false,
+}: ModelSelectorDrawerProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
-  const { isLargeScreen, isDesktop } = useResponsive();
-  const [visible, setVisible] = useState(false);
+  const progress = modelSelectorProgress;
+
   const [models, setModels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
@@ -94,64 +137,94 @@ export default function ModelSelector({
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
   const [localAvailable, setLocalAvailable] = useState(false);
-  //settings own the source list, this forces a rebuild when they change
   const [sourcesRevision, setSourcesRevision] = useState(0);
   const [browsedKey, setBrowsedKey] = useState<string | null>(null);
-  const [anchorRect, setAnchorRect] = useState<AnchorRect | null>(null);
-  const pendingCallbackRef = useRef<(() => void) | null>(null);
-  const triggerRef = useRef<View>(null);
 
-  const anchored = MODEL_SELECTOR_ANCHORS_ON_DESKTOP && isDesktop;
+  useEffect(() => {
+    settleDrawer(progress, visible);
+  }, [visible, progress]);
+
+  //dismiss settles progress before callback
+  const dismiss = useCallback(() => {
+    settleDrawer(progress, false);
+    onClose();
+  }, [progress, onClose]);
+
+  //mobile pull down gesture
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          return gestureState.dy > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+        },
+        onPanResponderMove: (_, gestureState) => {
+          dragDrawer(progress, Math.max(0, Math.min(1, 1 - gestureState.dy / 280)));
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          const velocity = -gestureVelocity(gestureState.vy, 280);
+          if (gestureState.dy > 70 || gestureState.vy > 0.5) {
+            dismiss();
+          } else {
+            settleDrawer(progress, true, velocity);
+          }
+        },
+        onPanResponderTerminate: () => {
+          settleDrawer(progress, true);
+        },
+      }),
+    [dismiss, progress]
+  );
+
+  //hardware back dismisses drawer
+  useEffect(() => {
+    if (!visible) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      dismiss();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible, dismiss]);
+
+  //desktop escape key dismiss
+  useEffect(() => {
+    if (!visible || Platform.OS !== "web") return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") dismiss();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [visible, dismiss]);
 
   useEffect(() => {
     AIModule.isModeAvailable("local").then(setLocalAvailable).catch(() => setLocalAvailable(false));
-    const sub = DeviceEventEmitter.addListener(AppEvents.settingsChanged, () => setSourcesRevision(r => r + 1));
+    const sub = DeviceEventEmitter.addListener(AppEvents.settingsChanged, () => setSourcesRevision((r) => r + 1));
     return () => sub.remove();
   }, []);
 
   const sources = useMemo(
     () => buildSources(localAvailable),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- revision tracks the settings behind buildSources
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [localAvailable, sourcesRevision]
   );
 
-  //the source the app currently generates with, falls back to the first tab
   const matchesActive = (source?: ModelSource) =>
     !!source && source.service === aiService && (source.service !== "ollama" || source.url === ollamaUrl);
   const activeSource = useMemo(
     () => sources.find(matchesActive) ?? sources[0],
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- matchesActive only reads the deps below
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [sources, aiService, ollamaUrl]
   );
-  const browsedSource = sources.find(s => s.key === browsedKey) ?? activeSource;
+  const browsedSource = sources.find((s) => s.key === browsedKey) ?? activeSource;
   const isBrowsingActive = matchesActive(browsedSource);
 
   useEffect(() => {
-    //active source changed under us, stop browsing an old tab
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- follow the active source again
     setBrowsedKey(null);
   }, [aiService, ollamaUrl]);
 
-  const closeSheet = (callback?: () => void) => {
-    pendingCallbackRef.current = callback ?? null;
-    setVisible(false);
-  };
-
-  //a drawer opening or closing behind the panel should close it too
-  const closeSignalRef = useRef(closeSignal);
-  useEffect(() => {
-    if (closeSignalRef.current !== closeSignal) {
-      closeSignalRef.current = closeSignal;
-      closeSheet();
-    }
-  }, [closeSignal]);
-
-  //switching source or refreshing only drops what disappeared and appends what is new
   const applyModels = (next: string[]) => {
-    setModels(prev => {
-      const kept = prev.filter(m => next.includes(m));
-      const merged = [...kept, ...next.filter(m => !kept.includes(m))];
-      //nothing moved, keep the same list so the rows are not touched
+    setModels((prev) => {
+      const kept = prev.filter((m) => next.includes(m));
+      const merged = [...kept, ...next.filter((m) => !kept.includes(m))];
       const same = merged.length === prev.length && merged.every((m, i) => m === prev[i]);
       return same ? prev : merged;
     });
@@ -178,14 +251,12 @@ export default function ModelSelector({
   }, []);
 
   useEffect(() => {
-    //refetch when the browsed source changes so the list follows the tab
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- loading flag for the fetch
-    fetchModels(browsedSource);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the source key should trigger a refetch
-  }, [fetchModels, browsedSource?.key]);
+    if (visible) {
+      fetchModels(browsedSource);
+    }
+  }, [visible, fetchModels, browsedSource?.key]);
 
   useEffect(() => {
-    //only the active source may correct the selected model
     if (!isBrowsingActive) return;
     if (models.length > 0) {
       if (!selectedModel || !models.includes(selectedModel)) {
@@ -211,32 +282,14 @@ export default function ModelSelector({
       .finally(() => setIsDownloading(false));
   };
 
-  const handleOpen = () => {
-    Keyboard.dismiss();
-    //settings may have changed while the panel was closed
-    setSourcesRevision(r => r + 1);
-    if (anchored && triggerRef.current) {
-      //panel drops under the trigger, so it needs its window position first
-      triggerRef.current.measureInWindow((x, y, width, height) => {
-        setAnchorRect({ x, y, width, height });
-        setVisible(true);
-      });
-    } else {
-      setVisible(true);
-    }
-    fetchModels(browsedSource);
-  };
-
   const handleSelectModel = (model: string) => {
     const source = browsedSource;
     Vibration.vibrate(10);
-    closeSheet(() => {
-      if (source && !isBrowsingActive) onServiceChange(source.service, source.url);
-      onModelChange(model);
-    });
+    if (source && !isBrowsingActive) onServiceChange(source.service, source.url);
+    onModelChange(model);
+    dismiss();
   };
 
-  //friendly label for aicore variants
   const displayName = (model: string) =>
     model.startsWith("aicore-") ? getAICoreModelLabel(model) : model;
 
@@ -280,14 +333,12 @@ export default function ModelSelector({
     setRowLayoutsVersion((v) => v + 1);
   };
 
-  //reset measured rows on change
   const modelsKey = displayModels.join("|");
   useEffect(() => {
     rowLayoutsRef.current = [];
     setRowLayoutsVersion((v) => v + 1);
   }, [modelsKey]);
 
-  //park pill on selected slot
   useEffect(() => {
     if (previewIndex !== null) return;
     if (selectedIndex < 0 || selectedIndex >= displayModels.length) return;
@@ -309,7 +360,6 @@ export default function ModelSelector({
         startYRef.current = pillY.value;
         previewIndexRef.current = selectedIndexRef.current;
         clearLongPressTimer();
-        //require hold before drag
         longPressTimerRef.current = setTimeout(() => {
           armedRef.current = true;
           pillScale.value = withTiming(1.04, { duration: 120 });
@@ -389,137 +439,149 @@ export default function ModelSelector({
     backgroundColor: interpolateColor(pillLit.value, [0, 1], [Colors.primary, Colors.primaryBright]),
   }));
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.shadowLayer}>
-        <View style={styles.shadowBlock} />
-        <Pressable
-          ref={triggerRef}
-          onPress={handleOpen}
-          style={({ pressed, hovered }) => [styles.trigger, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
-        >
-          <Image source={botIcon} style={styles.icon} />
-          <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
-            {selectedModel ? displayName(selectedModel) : "Modèle"}
-          </Text>
-        </Pressable>
+  const innerContent = (
+    <View style={styles.sheetInner}>
+      <View style={styles.tabsRow}>
+        {sources.map((source) => {
+          const active = source.key === browsedSource?.key;
+          return (
+            <Pressable
+              key={source.key}
+              onPress={() => setBrowsedKey(source.key)}
+              style={({ pressed, hovered }) => [styles.tab, (pressed || hovered) && { backgroundColor: Colors.overlaySubtle }]}
+            >
+              <Text style={[styles.tabText, active && styles.tabTextActive]} numberOfLines={1}>
+                {source.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
-      <SheetSurface
-        visible={visible}
-        lift={MODEL_SELECTOR_LIFTS}
-        onClose={() => closeSheet()}
-        onClosed={() => {
-          const callback = pendingCallbackRef.current;
-          pendingCallbackRef.current = null;
-          callback?.();
-        }}
-        anchor={anchored ? anchorRect : null}
-        anchorWidth={PANEL_WIDTH}
-        rootStyle={isLargeScreen ? styles.backdropRootLarge : undefined}
-        touchAreaStyle={isLargeScreen ? styles.sheetTouchAreaLarge : undefined}
-        sheetStyle={[
-          styles.sheet,
-          isLargeScreen && styles.sheetLarge,
-          anchored
-            ? styles.sheetAnchored
-            : { paddingBottom: (Platform.OS === 'ios' ? 20 : 10) + insets.bottom },
-        ]}
-      >
-        <View style={styles.tabsRow}>
-          {sources.map((source) => {
-            const active = source.key === browsedSource?.key;
-            return (
-              <Pressable
-                key={source.key}
-                onPress={() => setBrowsedKey(source.key)}
-                style={({ pressed, hovered }) => [styles.tab, (pressed || hovered) && { backgroundColor: Colors.overlaySubtle }]}
-              >
-                <Text style={[styles.tabText, active && styles.tabTextActive]} numberOfLines={1}>
-                  {source.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={styles.modelsBox}>
-          <ScrollView
-            style={{ maxHeight: MAX_MODELS_HEIGHT }}
-            contentContainerStyle={styles.modelsScrollContent}
-            showsVerticalScrollIndicator={false}
-            nestedScrollEnabled={true}
-          >
-            {sources.length === 0 ? (
-              <Text style={styles.emptyText}>No provider enabled, turn one on in Settings → Service</Text>
-            ) : loading && models.length === 0 ? (
-              <View style={styles.loadingRow}>
-                <LottieView source={loadingAnimation} autoPlay loop style={{ width: 24, height: 16 }} />
-                <Text style={styles.modelStatus}>Loading...</Text>
-              </View>
-            ) : models.length === 0 ? (
-              <View>
-                <Text style={styles.emptyText}>
-                  {isAvailable ? "No models found" : "Unable to fetch models / server unreachable"}
-                </Text>
-                {isAvailable && isBrowsingActive && (
+      <View style={styles.modelsBox}>
+        <ScrollView
+          style={{ maxHeight: MAX_MODELS_HEIGHT }}
+          contentContainerStyle={styles.modelsScrollContent}
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled={true}
+        >
+          {sources.length === 0 ? (
+            <Text style={styles.emptyText}>No provider enabled, turn one on in Settings → Service</Text>
+          ) : loading && models.length === 0 ? (
+            <View style={styles.loadingRow}>
+              <LottieView source={loadingAnimation} autoPlay loop style={{ width: 24, height: 16 }} />
+              <Text style={styles.modelStatus}>Loading...</Text>
+            </View>
+          ) : models.length === 0 ? (
+            <View>
+              <Text style={styles.emptyText}>
+                {isAvailable ? "No models found" : "Unable to fetch models / server unreachable"}
+              </Text>
+              {isAvailable && isBrowsingActive && (
+                <Pressable
+                  onPress={() => setDownloadModalVisible(true)}
+                  style={({ pressed, hovered }) => [styles.downloadOption, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
+                >
+                  <Image source={downloadIcon} style={styles.downloadIcon} />
+                  <Text style={styles.downloadText}>
+                    {isDownloading ? "Downloading..." : "gemma4"}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          ) : (
+            <View style={styles.optionsList}>
+              {displayModels.map((model, index) => {
+                const selected = isBrowsingActive && model === selectedModel;
+                const isSpecialActive = !hasPill && selected;
+                return (
                   <Pressable
-                    onPress={() => {
-                      closeSheet(() => setDownloadModalVisible(true));
-                    }}
-                    style={({ pressed, hovered }) => [styles.downloadOption, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
+                    key={model}
+                    onLayout={handleRowLayout(index)}
+                    onPress={() => handleSelectModel(model)}
+                    style={({ pressed, hovered }) => [
+                      styles.option,
+                      isSpecialActive ? styles.optionSelected : (pressed || hovered) && { backgroundColor: Colors.overlaySubtle },
+                      isSpecialActive && (pressed || hovered) && { backgroundColor: Colors.primaryActive }
+                    ]}
                   >
-                    <Image source={downloadIcon} style={styles.downloadIcon} />
-                    <Text style={styles.downloadText}>
-                      {isDownloading ? "Downloading..." : "gemma4"}
+                    <Text style={[styles.optionText, isSpecialActive && styles.optionTextSelected]} numberOfLines={1}>
+                      {displayName(model)}
                     </Text>
                   </Pressable>
-                )}
-              </View>
-            ) : (
-              <View style={styles.optionsList}>
-                {displayModels.map((model, index) => {
-                  const selected = isBrowsingActive && model === selectedModel;
-                  const isSpecialActive = !hasPill && selected;
-                  return (
-                    <Pressable
-                      key={model}
-                      onLayout={handleRowLayout(index)}
-                      onPress={() => handleSelectModel(model)}
-                      style={({ pressed, hovered }) => [
-                        styles.option,
-                        isSpecialActive ? styles.optionSelected : (pressed || hovered) && { backgroundColor: Colors.overlaySubtle },
-                        isSpecialActive && (pressed || hovered) && { backgroundColor: Colors.primaryActive }
-                      ]}
-                    >
-                      <Text style={[styles.optionText, isSpecialActive && styles.optionTextSelected]} numberOfLines={1}>
-                        {displayName(model)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-                {hasPill && rowLayoutsRef.current[activeIndex] && (
-                  <Animated.View style={[styles.pill, pillAnimatedStyle]} {...pillPanResponder.panHandlers}>
-                    <Text style={[styles.optionText, styles.optionTextSelected]} numberOfLines={1}>
-                      {displayName(displayModels[activeIndex])}
-                    </Text>
-                  </Animated.View>
-                )}
-              </View>
-            )}
-          </ScrollView>
-        </View>
+                );
+              })}
+              {hasPill && rowLayoutsRef.current[activeIndex] && (
+                <Reanimated.View style={[styles.pill, pillAnimatedStyle]} {...pillPanResponder.panHandlers}>
+                  <Text style={[styles.optionText, styles.optionTextSelected]} numberOfLines={1}>
+                    {displayName(displayModels[activeIndex])}
+                  </Text>
+                </Reanimated.View>
+              )}
+            </View>
+          )}
+        </ScrollView>
+      </View>
 
-        {showReflection && (
-          <View style={styles.reflectionRow}>
-            <SliderToggle
-              selectedValue={selectedReflection}
-              onSelect={onReflectionChange}
-              options={REFLECTIONS}
-            />
+      {showReflection && (
+        <View style={styles.reflectionRow}>
+          <SliderToggle
+            selectedValue={selectedReflection}
+            onSelect={onReflectionChange}
+            options={REFLECTIONS}
+          />
+        </View>
+      )}
+    </View>
+  );
+
+  const translateYMobile = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [420, 0],
+  });
+
+  const translateYDesktop = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-10, 0],
+  });
+
+  return (
+    <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
+      <Animated.View style={[styles.overlay, { opacity: progress }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
+      </Animated.View>
+
+      {isLargeScreen || isDesktop ? (
+        <View style={styles.desktopRootWrapper} pointerEvents="box-none">
+          <Animated.View
+            style={[
+              styles.desktopCard,
+              {
+                opacity: progress,
+                transform: [{ translateY: translateYDesktop }],
+              },
+            ]}
+          >
+            {innerContent}
+          </Animated.View>
+        </View>
+      ) : (
+        <Animated.View
+          style={[
+            styles.mobileSheet,
+            {
+              transform: [{ translateY: translateYMobile }],
+              paddingBottom: (Platform.OS === "ios" ? 20 : 10) + insets.bottom,
+            },
+          ]}
+          {...panResponder.panHandlers}
+        >
+          <View style={styles.handleContainer}>
+            <View style={styles.dragHandle} />
           </View>
-        )}
-      </SheetSurface>
+          {innerContent}
+        </Animated.View>
+      )}
 
       <NotificationModal
         visible={downloadModalVisible}
@@ -533,6 +595,66 @@ export default function ModelSelector({
         ]}
       />
     </View>
+  );
+}
+
+export type ModelSelectorProps = {
+  selectedModel: string;
+  selectedReflection: string;
+  showReflection: boolean;
+  onModelChange: (model: string) => void;
+  onReflectionChange: (reflection: string) => void;
+  aiService: string;
+  ollamaUrl: string;
+  onServiceChange: (service: string, ollamaUrl: string) => void;
+  closeSignal?: unknown;
+};
+
+//combined component with internal state for drop-in usage
+export default function ModelSelector(props: ModelSelectorProps) {
+  const [visible, setVisible] = useState(false);
+  const { isLargeScreen, isDesktop } = useResponsive();
+
+  const handleOpen = () => {
+    Keyboard.dismiss();
+    setVisible(true);
+  };
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(AppEvents.openModelSelector, handleOpen);
+    return () => sub.remove();
+  }, []);
+
+  const closeSignalRef = useRef(props.closeSignal);
+  useEffect(() => {
+    if (closeSignalRef.current !== props.closeSignal) {
+      closeSignalRef.current = props.closeSignal;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setVisible(false);
+    }
+  }, [props.closeSignal]);
+
+  return (
+    <>
+      <ModelSelectorTrigger
+        selectedModel={props.selectedModel}
+        onPress={handleOpen}
+      />
+      <ModelSelectorDrawer
+        visible={visible}
+        onClose={() => setVisible(false)}
+        selectedModel={props.selectedModel}
+        selectedReflection={props.selectedReflection}
+        showReflection={props.showReflection}
+        onModelChange={props.onModelChange}
+        onReflectionChange={props.onReflectionChange}
+        aiService={props.aiService}
+        ollamaUrl={props.ollamaUrl}
+        onServiceChange={props.onServiceChange}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
+    </>
   );
 }
 
@@ -579,33 +701,61 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     fontFamily: Fonts.mono,
     flexShrink: 1,
   },
-  //docks the sheet as a floating panel bottom-right instead of a full-width mobile sheet
-  backdropRootLarge: {
-    alignItems: 'flex-end',
+  root: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1000,
+    elevation: 1000,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Colors.scrimDrawer,
+  },
+  desktopRootWrapper: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "flex-end",
     paddingRight: Spacing.xl2,
     paddingBottom: Spacing.xl2,
+    justifyContent: "flex-end",
   },
-  sheetTouchAreaLarge: {
-    width: PANEL_WIDTH,
-  },
-  sheet: {
-    paddingHorizontal: 16,
-  },
-  //floating card treatment matching NotificationModal: window radius, ink outline, blurred elevation shadow
-  sheetLarge: {
-    borderTopLeftRadius: Radius.window,
-    borderTopRightRadius: Radius.window,
-    borderBottomLeftRadius: Radius.window,
-    borderBottomRightRadius: Radius.window,
+  desktopCard: {
+    width: 320,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl,
     borderWidth: 2,
     borderColor: Colors.border,
-    boxShadow: `0px 4px 12px ${Colors.overlay}`,
-    elevation: 8,
+    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
+    elevation: 5,
+    overflow: "hidden",
+    padding: 16,
   },
-  //no drag handle up top, so the padding has to come back
-  sheetAnchored: {
-    paddingTop: 16,
-    paddingBottom: 16,
+  mobileSheet: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.xxl,
+    borderTopRightRadius: Radius.xxl,
+    borderTopWidth: 2,
+    borderLeftWidth: 2,
+    borderRightWidth: 2,
+    borderColor: Colors.border,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  handleContainer: {
+    alignItems: "center",
+    paddingVertical: 6,
+    marginBottom: 8,
+  },
+  dragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.overlay,
+  },
+  sheetInner: {
+    width: "100%",
   },
   tabsRow: {
     flexDirection: "row",
@@ -631,7 +781,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     borderWidth: 2,
     borderColor: Colors.border,
     borderRadius: Radius.xxl,
-    padding: 4,
     overflow: "hidden",
   },
   modelsScrollContent: {
@@ -639,8 +788,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingVertical: 6,
   },
   loadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 8,
@@ -652,7 +801,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   emptyText: {
     color: Colors.error,
-    textAlign: 'center',
+    textAlign: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: FontSizes.caption,

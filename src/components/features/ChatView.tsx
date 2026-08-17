@@ -194,10 +194,10 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   );
   const isCurrentlyThinking = !isUser && disp.showThinkingRow;
 
-  //key parse on text itself
+  //reparse keyed on text and theme colors
   const markdownNodes = useMemo(
     () => (disp.showMarkdown ? renderMarkdown(disp.finalContent, incognito, isGenerating, dark) : null),
-    [disp.showMarkdown, disp.finalContent, incognito, isGenerating, dark]
+    [disp.showMarkdown, disp.finalContent, incognito, isGenerating, dark, Colors]
   );
 
   const metricRows = [

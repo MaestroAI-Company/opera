@@ -7,12 +7,12 @@ import * as ScreenOrientation from "expo-screen-orientation";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState, type ReactNode } from "react";
-import { Platform } from "react-native";
+import { Animated, Platform, StyleSheet } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import SiteHead from "../components/SiteHead";
 import SplashScreenComponent from "../components/ui/SplashScreen";
 import TauriTitleBar from "../components/features/TauriTitleBar";
-import { initTheme, useIsDark } from "../hooks/useTheme";
+import { initTheme, useIsDark, useThemeVeil } from "../hooks/useTheme";
 import { setupQuickActions } from "../services/quickActions/QuickActionsService";
 import "../services/widgets/registerWidgets";
 
@@ -37,6 +37,17 @@ const screenLayout = ({ children }: { children: ReactNode }) => (
     {children}
   </>
 );
+
+//isolated to skip navigator re-renders
+function ThemeVeil() {
+  const { color, opacity } = useThemeVeil();
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, { backgroundColor: color, opacity, zIndex: 10 }]}
+    />
+  );
+}
 
 export default function RootLayout() {
   const isDark = useIsDark();
@@ -92,6 +103,7 @@ export default function RootLayout() {
     <KeyboardProvider>
       <TauriTitleBar />
       <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
+      <ThemeVeil />
       <StatusBar style={isDark ? "light" : "dark"} />
     </KeyboardProvider>
   );

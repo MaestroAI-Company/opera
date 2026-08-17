@@ -27,7 +27,7 @@ import { TTS } from '../../services/speech/TTSService';
 import NotificationModal from '../ui/NotificationModal';
 import ChatBar, { ChatBarHandle } from './ChatBar';
 import ChatView from './ChatView';
-import ModelDropdown from './ModelDropdown';
+import ModelSelector from './ModelSelector';
 import SelectionLayer from './SelectionLayer';
 
 import { useResponsive } from '../../hooks/useResponsive';
@@ -170,7 +170,7 @@ function AssistantOverlay() {
     Animated.spring(mountOpacity, { toValue: 1, useNativeDriver: true, bounciness: 0, speed: 20 }).start();
     //bars return to their edges
     Animated.spring(topBarEntry, { toValue: 0, useNativeDriver: true, bounciness: 9, speed: 14 }).start();
-    //bar slides up from the bottom, same feel as ModelDropdown's sheet
+    //bar slides up from the bottom, same feel as ModelSelector's sheet
     bottomBarEntry.value = withSpring(0, { duration: 500, dampingRatio: 0.65 });
     Animated.sequence([
       Animated.timing(haloOpacity, { toValue: 1, duration: 240, useNativeDriver: true }),
@@ -623,11 +623,20 @@ function AssistantOverlay() {
           style={[styles.topBar, { paddingTop: insets.top + 16, transform: [{ translateY: topBarEntry }] }, isDrawingSelection && styles.hiddenBar]}
           pointerEvents={isDrawingSelection ? 'none' : 'box-none'}
         >
-          <ModelDropdown
+          <ModelSelector
             selectedModel={selectedModel}
             selectedReflection={selectedReflection}
             showReflection={modelCapabilities.includes('thinking')}
             aiService={aiService}
+            ollamaUrl={ollamaUrl}
+            onServiceChange={(service, url) => {
+              setAiService(service);
+              setOllamaUrl(url);
+              Settings.set('aiService', service);
+              Settings.set('ollamaUrl', url);
+              AIModule.setMode(service);
+              if (service === 'ollama') AIModule.configure(url);
+            }}
             onModelChange={model => {
               setSelectedModel(model);
               selectedModelRef.current = model;

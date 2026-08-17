@@ -9,6 +9,7 @@ import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, Keyboard, L
 import { Colors, Fonts, FontSizes, Radius } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import { getLocalProviderLabel } from "../../services/ai/providers/LocalProvider";
+import { getEnabledProviders, getOllamaUrls, serializeOllamaUrls, serializeProviders } from "../../services/ai/providers/sources";
 import { ITool } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { BackupService, ImportInspection } from "../../services/BackupService";
@@ -34,6 +35,7 @@ import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { dragDrawer, drawerWidthFor, gestureVelocity, playPageTransition, settingsProgress, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
 
 const linkIcon = require("../../../assets/icons/link.png");
+const addIcon = require("../../../assets/icons/add.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 const deleteIcon = require("../../../assets/icons/delete.png");
 const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
@@ -142,7 +144,10 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [aiService, setAiServiceState] = useState("ollama");
   const [localAvailable, setLocalAvailable] = useState(false);
   const [ollamaUrl, setOllamaUrlState] = useState("");
-  const [ollamaError, setOllamaError] = useState("");
+  const [ollamaUrls, setOllamaUrlsState] = useState<string[]>([]);
+  const [enabledProviders, setEnabledProvidersState] = useState<string[]>([]);
+  //unreachable server url
+  const [serverErrors, setServerErrors] = useState<Record<string, boolean>>({});
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
   const [, setIsDownloading] = useState(false);
   const [, setGemmaDownloadProgress] = useState<{ progress: number, etaSeconds: number, speedStr: string, sizeStr: string } | null>(null);
@@ -218,13 +223,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const cloudStorageOptions = [
     { id: "none", label: "None" },
     ...CLOUD_PROVIDERS.map(def => ({ id: def.id, label: def.label })),
-  ];
-
-  const aiServiceOptions = [
-    { id: "ollama", label: "Ollama" },
-    ...(localAvailable
-      ? [{ id: "local", label: getLocalProviderLabel() }]
-      : []),
   ];
 
   type PermissionState = "granted" | "denied" | "undetermined";
@@ -417,6 +415,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setThemeState(s.theme);
         setAiServiceState(s.aiService);
         setOllamaUrlState(s.ollamaUrl);
+        setOllamaUrlsState(getOllamaUrls());
+        setEnabledProvidersState(getEnabledProviders());
         setWhisperModelState(s.whisperModel);
         setWhisperLanguageState(s.whisperLanguage);
         setInstructionState(s.instruction);
@@ -488,16 +488,50 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     Settings.set("theme", v);
   };
 
-  const setOllamaUrl = (v: string) => {
-    setOllamaUrlState(v);
-    Settings.set("ollamaUrl", v);
-    AIModule.configure(v);
-  };
-
   const setAiService = (v: string) => {
     setAiServiceState(v);
     Settings.set("aiService", v);
     AIModule.setMode(v);
+  };
+
+  //keep active server in the list
+  const saveOllamaUrls = (urls: string[]) => {
+    setOllamaUrlsState(urls);
+    const filled = urls.map(u => u.trim()).filter(Boolean);
+    const activeUrl = filled.includes(ollamaUrl.trim()) ? ollamaUrl : (filled[0] ?? "");
+    Settings.set("ollamaUrls", serializeOllamaUrls(urls));
+    if (activeUrl !== ollamaUrl) {
+      setOllamaUrlState(activeUrl);
+      Settings.set("ollamaUrl", activeUrl);
+      AIModule.configure(activeUrl);
+    }
+  };
+
+  const setOllamaUrlAt = (index: number, value: string) => {
+    saveOllamaUrls(ollamaUrls.map((url, i) => (i === index ? value : url)));
+  };
+
+  //drop server on empty field
+  const handleOllamaUrlBlur = (index: number) => {
+    if (!ollamaUrls[index]?.trim()) {
+      saveOllamaUrls(ollamaUrls.filter((_, i) => i !== index));
+      return;
+    }
+    checkOllamaServers();
+  };
+
+  const setProviderEnabled = (id: string, enabled: boolean) => {
+    const next = enabled
+      ? [...enabledProviders.filter(p => p !== id), id]
+      : enabledProviders.filter(p => p !== id);
+    setEnabledProvidersState(next);
+    Settings.set("enabledProviders", serializeProviders(next));
+    //the active service has to stay on an enabled provider
+    if (!enabled && aiService === id && next.length > 0) {
+      setAiService(next[0]);
+    } else if (enabled && !enabledProviders.includes(aiService)) {
+      setAiService(id);
+    }
   };
 
   const setWhisperModel = (v: string) => {
@@ -749,36 +783,20 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     return () => sub.remove();
   }, []);
 
-  const fetchOllamaModels = useCallback(async () => {
+  //ping every configured server
+  const checkOllamaServers = useCallback(async () => {
     if (!settingsLoaded) return;
-    try {
-      const isAvailable = await AIModule.isAvailable();
-      if (!isAvailable) {
-        setOllamaError("The Ollama URL is incorrect or the server is unreachable");
-        setOllamaModelOptions([]);
-        return;
-      }
-      setOllamaError("");
-
-      const fetchedModels = await AIModule.getAvailableModels();
-      if (fetchedModels && fetchedModels.length > 0) {
-        const options = fetchedModels.map((m: string) => ({
-          id: m,
-          label: m,
-        }));
-        setOllamaModelOptions(options);
-      } else {
-        setOllamaModelOptions([]);
-      }
-    } catch (e) {
-      console.warn("Could not fetch Ollama models", e);
-    }
-  }, [settingsLoaded]);
+    const urls = ollamaUrls.map(u => u.trim()).filter(Boolean);
+    const results = await Promise.all(urls.map(url => AIModule.isSourceAvailable("ollama", url)));
+    const errors: Record<string, boolean> = {};
+    urls.forEach((url, i) => { errors[url] = !results[i]; });
+    setServerErrors(errors);
+  }, [settingsLoaded, ollamaUrls]);
 
   useEffect(() => {
     if (visible) {
       setTimeout(() => {
-        fetchOllamaModels();
+        checkOllamaServers();
         if (Platform.OS === "web") {
           ["tiny", "base", "small"].forEach(m => {
             WhisperSTT.isModelInstalled(m).then(installed => {
@@ -791,7 +809,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         }
       }, 300);
     }
-  }, [visible, fetchOllamaModels, whisperModel]);
+  }, [visible, checkOllamaServers, whisperModel]);
 
   const handleDownloadGemma = async () => {
     setDownloadModalVisible(false);
@@ -1150,37 +1168,57 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("Service")}
 
-      <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>AI Service</Text>
-        <Selector
-          options={aiServiceOptions}
-          selectedValue={aiService}
-          onSelect={setAiService}
-          title="Select AI Service"
-          fullWidth
-        />
-      </View>
-      {aiService !== "ollama" && (
-        <Text style={[styles.helpText, { marginBottom: 20 }]}>
-          Runs the local model directly on this device. No server needed.
-        </Text>
-      )}
-
-      {aiService === "ollama" && (
+      {localAvailable && (
         <View style={styles.settingRowVertical}>
-          {/* ollama server input section */}
-          <Text style={styles.settingLabel}>Ollama</Text>
-          <Text style={[styles.helpText, { marginBottom: 10 }]}>URL of your local or remote Ollama instance.</Text>
-          <TextInputField
-            icon={linkIcon}
-            placeholder="server link"
-            value={ollamaUrl}
-            onChangeText={setOllamaUrl}
-            onBlur={fetchOllamaModels}
-          />
-          {ollamaError ? <Text style={styles.errorText}>{ollamaError}</Text> : null}
+          <View style={styles.toggleRow}>
+            <Text style={styles.settingLabel}>{getLocalProviderLabel()}</Text>
+            <Toggle
+              checked={enabledProviders.includes("local")}
+              onToggle={(v) => setProviderEnabled("local", v)}
+            />
+          </View>
+          <Text style={styles.helpText}>Runs the local model directly on this device. No server needed.</Text>
         </View>
       )}
+
+      <View style={styles.settingRowVertical}>
+        {/* ollama servers section */}
+        <View style={styles.toggleRow}>
+          <Text style={styles.settingLabel}>Ollama</Text>
+          <Toggle
+            checked={enabledProviders.includes("ollama")}
+            onToggle={(v) => setProviderEnabled("ollama", v)}
+          />
+        </View>
+        <Text style={[styles.helpText, { marginBottom: 10 }]}>Use your Ollama servers to run powerful AI models at home.</Text>
+
+        {enabledProviders.includes("ollama") && (
+          <>
+            {ollamaUrls.map((url, index) => (
+              <View key={index} style={{ marginBottom: 10 }}>
+                <TextInputField
+                  icon={linkIcon}
+                  placeholder="server link"
+                  value={url}
+                  onChangeText={(v) => setOllamaUrlAt(index, v)}
+                  onBlur={() => handleOllamaUrlBlur(index)}
+                />
+                {serverErrors[url.trim()] ? (
+                  <Text style={styles.errorText}>This server is unreachable</Text>
+                ) : null}
+              </View>
+            ))}
+
+            <Pressable
+              onPress={() => saveOllamaUrls([...ollamaUrls, ""])}
+              style={({ pressed, hovered }) => [styles.addServerButton, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
+            >
+              <Image source={addIcon} style={styles.addServerIcon} tintColor={Colors.textPrimary} />
+              <Text style={styles.addServerText}>Add server link</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
 
       {Platform.OS === "web" && (
         <>
@@ -1833,6 +1871,26 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     marginTop: 8,
     marginBottom: 0,
+  },
+  addServerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    borderRadius: Radius.xxl,
+    backgroundColor: Colors.surface,
+    paddingVertical: 12,
+  },
+  addServerIcon: {
+    width: 18,
+    height: 18,
+  },
+  addServerText: {
+    fontSize: FontSizes.body,
+    color: Colors.textPrimary,
+    fontFamily: Fonts.mono,
   },
   downloadOption: {
     flexDirection: "row",

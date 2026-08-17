@@ -8,6 +8,8 @@ export type AppSettings = {
   theme: string;
   aiService: string;
   ollamaUrl: string;
+  ollamaUrls: string;
+  enabledProviders: string;
   ollamaModel: string;
   whisperModel: string;
   whisperLanguage: string;
@@ -29,6 +31,8 @@ const DEFAULTS: AppSettings = {
   theme: 'system',
   aiService: 'ollama',
   ollamaUrl: '',
+  ollamaUrls: '[]',
+  enabledProviders: 'local,ollama',
   ollamaModel: '',
   whisperModel: 'base',
   whisperLanguage: (() => {
@@ -154,14 +158,13 @@ class SettingsService {
 
   private async writeMany(partial: Partial<AppSettings>): Promise<void> {
     const db = this.getDb();
-    await db.withTransactionAsync(async () => {
-      for (const [key, value] of Object.entries(partial)) {
-        await db.runAsync(
-          'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
-          [key, String(value)]
-        );
-      }
-    });
+    //avoid nested transaction from shared db
+    for (const [key, value] of Object.entries(partial)) {
+      await db.runAsync(
+        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+        [key, String(value)]
+      );
+    }
     if (this.cache) {
       Object.assign(this.cache, partial);
     }

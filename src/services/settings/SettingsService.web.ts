@@ -1,8 +1,13 @@
+import { DeviceEventEmitter } from 'react-native';
+import { AppEvents } from '../events';
+
 export type AppSettings = {
   language: string;
   theme: string;
   aiService: string;
   ollamaUrl: string;
+  ollamaUrls: string;
+  enabledProviders: string;
   ollamaModel: string;
   whisperModel: string;
   whisperLanguage: string;
@@ -23,6 +28,8 @@ const DEFAULTS: AppSettings = {
   theme: 'system',
   aiService: 'ollama',
   ollamaUrl: '',
+  ollamaUrls: '[]',
+  enabledProviders: 'local,ollama',
   ollamaModel: '',
   whisperModel: 'base',
   whisperLanguage: (() => {
@@ -67,6 +74,8 @@ class SettingsService {
         theme: parsed.theme ?? DEFAULTS.theme,
         aiService: parsed.aiService ?? DEFAULTS.aiService,
         ollamaUrl: parsed.ollamaUrl ?? DEFAULTS.ollamaUrl,
+        ollamaUrls: parsed.ollamaUrls ?? DEFAULTS.ollamaUrls,
+        enabledProviders: parsed.enabledProviders ?? DEFAULTS.enabledProviders,
         ollamaModel: parsed.ollamaModel ?? DEFAULTS.ollamaModel,
         whisperModel: parsed.whisperModel ?? DEFAULTS.whisperModel,
         whisperLanguage: parsed.whisperLanguage ?? DEFAULTS.whisperLanguage,
@@ -128,6 +137,7 @@ class SettingsService {
     (this.cache as any)[key] = value;
     this.bumpSettingsUpdatedAt();
     this.save();
+    DeviceEventEmitter.emit(AppEvents.settingsChanged);
   }
 
   // set multiple settings
@@ -138,6 +148,7 @@ class SettingsService {
     Object.assign(this.cache, partial);
     this.bumpSettingsUpdatedAt();
     this.save();
+    DeviceEventEmitter.emit(AppEvents.settingsChanged);
   }
 
   //apply cloud settings without bumping local timestamp

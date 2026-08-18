@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { LayoutChangeEvent, LayoutRectangle, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, Vibration, View } from "react-native";
 import Animated, { interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -9,8 +9,8 @@ const arrowDownIcon = require("../../../assets/icons/down_arrow.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 
 const LONG_PRESS_DELAY = 180;
-const BREAK_RATIO = 0.85; // fraction of a row's height the finger must pull past to break free toward the next anchor
-const ROW_GAP = 4; // matches option/downloadOption marginBottom
+const BREAK_RATIO = 0.85;
+const ROW_GAP = 4;
 
 // rubber-band curve: approaches but never exceeds `dim`, resisting harder the further it's pulled
 const rubberBand = (d: number, dim: number) => {
@@ -102,7 +102,6 @@ export default function Selector({
   useEffect(() => {
     rowLayoutsRef.current = [];
     setRowLayoutsVersion((v) => v + 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [optionsKey]);
 
   //park the pill on the selected row whenever it's not being dragged
@@ -118,7 +117,6 @@ export default function Selector({
   const pillPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      //keep the gesture even though it starts inside a ScrollView that wants vertical pans for itself
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
         armedRef.current = false;
@@ -142,7 +140,6 @@ export default function Selector({
         if (!layouts[anchor]) return;
         const rawY = startYRef.current + gestureState.dy;
 
-        //pulled toward its current row; past BREAK_RATIO it snaps loose and gets grabbed by the next one
         let d = rawY - layouts[anchor]!.y;
         let slot = layouts[anchor]!.height + ROW_GAP;
         while (Math.abs(d) >= slot * BREAK_RATIO) {
@@ -447,7 +444,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     borderRadius: Radius.xxl,
     borderWidth: 2,
     borderColor: Colors.border,
-    padding: 12,
+    padding: 0,
     width: 220,
     boxShadow: `0px 4px 12px ${Colors.overlay}`,
     elevation: 8,
@@ -456,7 +453,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     fontSize: FontSizes.label,
     color: Colors.textMuted,
     marginBottom: 8,
-    marginTop: 4,
+    marginTop: 8,
     fontFamily: Fonts.body,
     textTransform: "uppercase",
     letterSpacing: 1,

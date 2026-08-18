@@ -1192,7 +1192,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: 2,
-    borderColor: Colors.border,
+    borderColor: Colors.borderOnPrimary,
     height: 56,
     boxShadow: `2px 6px 22px ${Colors.primary}`,
     elevation: 8,

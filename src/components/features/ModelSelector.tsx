@@ -298,7 +298,6 @@ export function ModelSelectorDrawer({
 
   const handleSelectModel = (model: string) => {
     const source = browsedSource;
-    Vibration.vibrate(10);
     if (source && !isBrowsingActive) onServiceChange(source.service, source.url);
     onModelChange(model);
     dismiss();
@@ -516,7 +515,10 @@ export function ModelSelectorDrawer({
                   <Pressable
                     key={model}
                     onLayout={handleRowLayout(index)}
-                    onPress={() => handleSelectModel(model)}
+                    onPress={() => {
+                      Vibration.vibrate(10);
+                      handleSelectModel(model);
+                    }}
                     style={({ pressed, hovered }) => [
                       styles.option,
                       isSpecialActive ? styles.optionSelected : (pressed || hovered) && { backgroundColor: Colors.overlaySubtle },
@@ -692,8 +694,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.xxl,
-    borderTopRightRadius: Radius.xxl,
+    borderTopLeftRadius: Radius.huge2,
+    borderTopRightRadius: Radius.huge2,
     borderBottomLeftRadius: Radius.xxl,
     borderBottomRightRadius: Radius.xxl,
     paddingHorizontal: 16,
@@ -708,7 +710,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.overlay,
+    backgroundColor: Colors.textMuted,
   },
   sheetInner: {
     width: "100%",

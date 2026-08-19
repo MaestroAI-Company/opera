@@ -15,6 +15,7 @@ const SYNC_PIN_KEY = 'cloud_sync_pin';
 const LAST_SYNC_TIME_KEY = 'cloud_sync_last_time';
 const LAST_SYNC_SIZE_KEY = 'cloud_sync_last_size';
 const SEEN_AUTHENTICATED_KEY = 'cloud_sync_seen_v3';
+const SYNC_PAUSED_KEY = 'cloud_sync_paused';
 
 //v3 authenticates v2 stays readable
 const ENC_VERSION = 3;
@@ -46,6 +47,8 @@ class CloudSyncServiceImpl {
   private lastSaltB64: string | null = null;
   //blocks v2 once authenticated seen
   private hasSeenAuthenticatedBackup = false;
+  //account stays linked while sync is off
+  private paused: boolean = false;
 
   private async setStorageItem(key: string, value: string | null) {
     if (Platform.OS === 'web') {
@@ -76,14 +79,13 @@ class CloudSyncServiceImpl {
     this.initialized = true;
 
     await this.loadAuthenticatedBackupFlag();
+    this.paused = (await this.getStorageItem(SYNC_PAUSED_KEY)) === 'true';
 
     const providerName = await this.getStorageItem(CLOUD_PROVIDER_KEY);
-    const savedPin = await this.getStorageItem(SYNC_PIN_KEY);
-    if (savedPin) {
-      this.pin = savedPin;
-    }
 
     if (providerName && providerName !== 'none') {
+      await this.migrateSharedPin(providerName);
+      await this.loadPinFor(providerName);
       const def = getCloudProviderDefinition(providerName);
       if (def) {
         const provider = def.create();
@@ -115,7 +117,7 @@ class CloudSyncServiceImpl {
   }
 
   requestAutoSync(delay = 5000) {
-    if (!this.provider || !this.pin) return;
+    if (this.paused || !this.provider || !this.pin) return;
     
     if (this.syncTimeout) clearTimeout(this.syncTimeout);
     this.syncTimeout = setTimeout(() => {
@@ -143,15 +145,14 @@ class CloudSyncServiceImpl {
 
   async setProvider(providerName: string): Promise<boolean> {
     if (providerName === 'none') {
-      if (this.provider) {
-        await this.provider.logout();
-      }
-      this.provider = null;
-      this.keyCache.clear();
-      this.lastSaltB64 = null;
-      await this.setStorageItem(CLOUD_PROVIDER_KEY, null);
-      await this.setStorageItem(LAST_SYNC_SIZE_KEY, null);
-      await this.clearPin();
+      await this.setPaused(true);
+      return true;
+    }
+
+    //same account still linked just turn sync back on
+    if (this.provider?.getId() === providerName) {
+      await this.setStorageItem(CLOUD_PROVIDER_KEY, providerName);
+      await this.setPaused(false);
       return true;
     }
 
@@ -163,12 +164,40 @@ class CloudSyncServiceImpl {
     if (success) {
       this.provider = newProvider;
       await this.setStorageItem(CLOUD_PROVIDER_KEY, providerName);
+      await this.loadPinFor(providerName);
+      await this.setPaused(false);
       return true;
     }
     return false;
   }
 
+  //unlinks the account for good
+  async disconnect(): Promise<void> {
+    await this.clearPin();
+    if (this.provider) {
+      await this.provider.logout();
+    }
+    this.provider = null;
+    this.keyCache.clear();
+    this.lastSaltB64 = null;
+    await this.setStorageItem(CLOUD_PROVIDER_KEY, null);
+    await this.setStorageItem(LAST_SYNC_SIZE_KEY, null);
+    await this.setPaused(false);
+  }
+
+  private async setPaused(paused: boolean): Promise<void> {
+    this.paused = paused;
+    if (paused && this.syncTimeout) {
+      clearTimeout(this.syncTimeout);
+      this.syncTimeout = null;
+    }
+    await this.setStorageItem(SYNC_PAUSED_KEY, paused ? 'true' : null);
+    if (!paused) this.requestAutoSync(0);
+  }
+
   getProviderName(): string {
+    //paused reads as none so the ui shows sync off
+    if (this.paused) return 'none';
     return this.provider?.getId() ?? 'none';
   }
 
@@ -181,11 +210,36 @@ class CloudSyncServiceImpl {
     this.pin = pin;
     this.keyCache.clear();
     this.lastSaltB64 = null;
-    await this.setStorageItem(SYNC_PIN_KEY, pin);
+    const providerName = this.provider?.getId();
+    if (providerName) {
+      await this.setStorageItem(this.pinKey(providerName), pin);
+    }
   }
 
   hasPin(): boolean {
     return !!this.pin;
+  }
+
+  //each account encrypts its backup with its own pin
+  private pinKey(providerName: string): string {
+    return `${SYNC_PIN_KEY}_${providerName}`;
+  }
+
+  private async loadPinFor(providerName: string): Promise<void> {
+    this.pin = await this.getStorageItem(this.pinKey(providerName));
+    this.keyCache.clear();
+    this.lastSaltB64 = null;
+  }
+
+  //older builds kept one pin for every provider
+  private async migrateSharedPin(providerName: string): Promise<void> {
+    const sharedPin = await this.getStorageItem(SYNC_PIN_KEY);
+    if (!sharedPin) return;
+    const key = this.pinKey(providerName);
+    if (!(await this.getStorageItem(key))) {
+      await this.setStorageItem(key, sharedPin);
+    }
+    await this.setStorageItem(SYNC_PIN_KEY, null);
   }
 
   async hasCloudBackup(): Promise<boolean> {
@@ -242,7 +296,10 @@ class CloudSyncServiceImpl {
     this.pin = null;
     this.keyCache.clear();
     this.lastSaltB64 = null;
-    await this.setStorageItem(SYNC_PIN_KEY, null);
+    const providerName = this.provider?.getId();
+    if (providerName) {
+      await this.setStorageItem(this.pinKey(providerName), null);
+    }
   }
 
   //one pbkdf2 pass expands into subkeys
@@ -330,6 +387,9 @@ class CloudSyncServiceImpl {
   }
 
   async sync(isBackground = false): Promise<SyncOutcome> {
+    if (this.paused) {
+      return { success: false, error: 'Sync is turned off' };
+    }
     if (!this.provider || !this.pin) {
       return { success: false, error: 'Provider or PIN not configured' };
     }

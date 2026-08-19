@@ -140,6 +140,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   field: {
     marginBottom: Spacing.md,
+    borderRadius: Radius.md,
   },
   statusText: {
     fontSize: FontSizes.label,

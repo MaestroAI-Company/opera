@@ -40,7 +40,7 @@ export default function ActionButton({
       disabled={disabled || !onPress}
     >
       {icon && <Image source={icon} style={styles.menuIcon} tintColor={Colors.textPrimary} />}
-      <Text style={styles.navLabel}>{label}</Text>
+      <Text style={styles.navLabel} numberOfLines={1} ellipsizeMode="tail">{label}</Text>
       {rightElement}
     </Pressable>
   );

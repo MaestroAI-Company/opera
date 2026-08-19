@@ -51,6 +51,10 @@ const serverIcon = require("../../../assets/icons/server.png");
 const toolIcon = require("../../../assets/icons/tool.png");
 const confidentialityIcon = require("../../../assets/icons/confidentiality.png");
 const socialIcon = require("../../../assets/icons/social.png");
+const informationIcon = require("../../../assets/icons/information.png");
+const githubIcon = require("../../../assets/icons/github.png");
+const websiteIcon = require("../../../assets/icons/website.png");
+const instagramIcon = require("../../../assets/icons/instagram.png");
 const micIcon = require("../../../assets/icons/microphone.png");
 const cameraIcon = require("../../../assets/icons/camera.png");
 const photoIcon = require("../../../assets/icons/photo.png");
@@ -85,7 +89,7 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "assistantoverlay" | "service" | "confidentiality" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions";
+type SubPage = "main" | "general" | "assistantoverlay" | "service" | "confidentiality" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "sociallinks";
 
 export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
   const Colors = useColors();
@@ -1075,17 +1079,67 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             </View>
           </Pressable>
 
-          <View style={[styles.navItem, styles.navItemLast]}>
-            <Image source={socialIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <Pressable
+            style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("sociallinks")}
+          >
+            <Image source={informationIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
             <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>Social Links</Text>
+              <Text style={styles.navTitle}>Informations</Text>
               <Text style={styles.navSubtitle}>Github, Instagram, Website</Text>
             </View>
+          </Pressable>
+        </View>
+      </View>
+
+    </View>
+  );
+
+  // social links subpage content
+  const renderSocialLinksSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("Informations")}
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Version</Text>
+        <Text style={styles.helpText}>
+          Opera Development v{appVersion}
+        </Text>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Links</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          Find Opera online, follow our updates, and contribute to the project.
+        </Text>
+
+        <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
+          <View style={styles.groupBox}>
+            <ActionButton
+              icon={websiteIcon}
+              label="Website"
+              onPress={() => Linking.openURL("https://maestroai.company").catch(() => { })}
+            />
+            <ActionButton
+              icon={githubIcon}
+              label="Github"
+              onPress={() => Linking.openURL("https://github.com/MaestroAI-Company/opera").catch(() => { })}
+            />
+            <ActionButton
+              icon={instagramIcon}
+              label="Instagram"
+              isLast
+              onPress={() => Linking.openURL("https://www.instagram.com/maestroai.company?igsh=MWF4dmZvMXl1ZmdzeA==").catch(() => { })}
+            />
           </View>
         </View>
       </View>
 
-      <Text style={styles.versionText}>v{appVersion}</Text>
+      <View style={{ flex: 1, justifyContent: "flex-end" }}>
+        <Text style={[styles.helpText, { textAlign: "center" }]}>
+          Maestroai.Company
+        </Text>
+      </View>
     </View>
   );
 
@@ -1368,7 +1422,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <ActionButton
           icon={hyperlinkIcon}
           label="Privacy Policy"
-          onPress={() => Linking.openURL("https://maestroai.company/privacy.html").catch(() => {})}
+          onPress={() => Linking.openURL("https://maestroai.company/privacy.html").catch(() => { })}
           standalone
         />
       </View>
@@ -1621,6 +1675,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return renderWidgetsSubPage();
       case "mobileactions":
         return renderMobileActionsSubPage();
+      case "sociallinks":
+        return renderSocialLinksSubPage();
       case "main":
       default:
         return renderMainPage();

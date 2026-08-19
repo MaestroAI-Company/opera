@@ -25,6 +25,8 @@ export default function OAuthRedirect() {
           try {
             const provider = new GoogleDriveProvider();
             await provider.persistRedirectTokens(accessToken, expiresIn);
+            //hard load lands here with an uninitialized sync service
+            await CloudSync.init();
             await CloudSync.setProvider('google_drive');
           } catch (e) {
             console.warn('Failed to complete Google Drive connect:', e);

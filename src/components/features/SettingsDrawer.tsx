@@ -663,6 +663,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       setTimeout(async () => {
         const cloudBackupExists = await CloudSync.hasCloudBackup();
         setHasCloudBackup(cloudBackupExists);
+        //pin already known when sync is turned back on
+        if (pinSet) return;
         if (cloudBackupExists) {
           handleUnlockSyncPin();
         } else {
@@ -682,9 +684,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     if (success) {
       await completeCloudConnect(providerName);
     } else {
-      setCloudProvider("none");
+      const def = getCloudProviderDefinition(providerName);
+      //keep setup providers selected so the form can be corrected
+      setCloudProvider(def?.SetupComponent ? providerName : "none");
       setCloudUserInfo(null);
-      showAlert("Connection Error", `Could not connect to ${getCloudProviderDefinition(providerName)?.label ?? providerName}. Check your settings and try again.`);
+      showAlert("Connection Error", `Could not connect to ${def?.label ?? providerName}. Check your settings and try again.`);
     }
   };
 
@@ -721,7 +725,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {
         text: "Disconnect", style: "secondary", onPress: async () => {
           setAlertModalVisible(false);
-          await handleSetCloudProvider("none");
+          setCloudProvider("none");
+          await CloudSync.disconnect();
+          await completeCloudConnect("none");
         }
       },
       { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "primary" },

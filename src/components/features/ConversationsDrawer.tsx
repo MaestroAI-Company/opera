@@ -1,12 +1,12 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, BackHandler, Image, Keyboard, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { useResponsive } from "../../hooks/useResponsive";
-import { Conversation, DB } from "../../services/db/DatabaseService";
-import { CloudSync } from "../../services/CloudSyncService";
-import NotificationModal from "../ui/NotificationModal";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
-import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { useResponsive } from "../../hooks/useResponsive";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { CloudSync } from "../../services/CloudSyncService";
+import { Conversation, DB } from "../../services/db/DatabaseService";
+import NotificationModal from "../ui/NotificationModal";
 import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, playPageTransition, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
 
 const searchIcon = require("../../../assets/icons/search.png");
@@ -122,11 +122,9 @@ export default function ConversationsDrawer({
 
   useEffect(() => {
     if (!isSearching || searchQuery.trim().length === 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearchResults([]);
       return;
     }
-    //debounce full-text queries
     const timer = setTimeout(() => {
       DB.searchConversations(searchQuery).then(setSearchResults).catch(console.error);
     }, 250);
@@ -139,11 +137,9 @@ export default function ConversationsDrawer({
         return gestureState.dx < -10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
       },
       onPanResponderMove: (_, gestureState) => {
-        //panel tracks the finger
         dragDrawer(progress, Math.max(0, Math.min(1, 1 + gestureState.dx / drawerWidth)));
       },
       onPanResponderRelease: (_, gestureState) => {
-        //settle here keeps flick speed
         const velocity = gestureVelocity(gestureState.vx, drawerWidth);
         if (gestureState.dx < -drawerWidth * 0.35 || gestureState.vx < -0.5) {
           settleDrawer(progress, false, velocity);
@@ -156,7 +152,7 @@ export default function ConversationsDrawer({
         settleDrawer(progress, true);
       },
     })
-  , [onClose, drawerWidth, progress]);
+    , [onClose, drawerWidth, progress]);
 
   const largeScreenAnim = useAnimatedValue(visible ? 1 : 0);
 
@@ -234,8 +230,8 @@ export default function ConversationsDrawer({
             </>
           ) : (
             conv.pinned ? (
-              <View style={styles.actionIconButton}>
-                <Image source={pinIcon} style={[styles.actionIcon, { opacity: 0.5 }]} tintColor={Colors.textMuted} />
+              <View style={styles.pinnedIndicator}>
+                <Image source={pinIcon} style={styles.pinnedIcon} tintColor={Colors.textMuted} />
               </View>
             ) : null
           )}
@@ -525,7 +521,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   quickActionsShadowLayer: {
     position: "relative",
-    marginBottom: 24,
+    marginBottom: 12,
   },
   quickActionsBox: {
     position: "relative",
@@ -563,7 +559,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     color: Colors.textMuted,
     fontFamily: Fonts.body,
     textTransform: "uppercase",
-    letterSpacing: 1,
     marginBottom: 8,
   },
   emptyText: {
@@ -577,17 +572,17 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 5,
+    paddingVertical: 8,
     paddingHorizontal: 8,
     borderRadius: Radius.xxl,
     marginBottom: 2,
-    //keep the 2px box so selecting doesn't shift layout, just hide it
     borderWidth: 2,
     borderColor: "transparent",
   },
   discussionRowSelected: {
     backgroundColor: Colors.primary,
     borderColor: Colors.borderOnPrimary,
+    paddingVertical: 4,
   },
   discussionTextContainer: {
     flex: 1,
@@ -616,6 +611,16 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   actionIcon: {
     width: 18,
     height: 18,
+  },
+  pinnedIndicator: {
+    paddingHorizontal: 4,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  pinnedIcon: {
+    width: 18,
+    height: 18,
+    opacity: 0.5,
   },
   searchInputContainer: {
     flex: 1,

@@ -136,11 +136,8 @@ class BackupServiceImpl {
   }
 
   // import data from local json file
-  async importData(scope?: BackupScope, backup?: BackupFile): Promise<ImportResult> {
+  async importData(backup?: BackupFile): Promise<ImportResult> {
     try {
-      const includeSettings = scope?.includeSettings ?? true;
-      const includeConversations = scope?.includeConversations ?? true;
-
       if (!backup) {
         const inspection = await this.pickAndReadBackup();
         if (!inspection) {
@@ -149,16 +146,16 @@ class BackupServiceImpl {
         backup = inspection.backup;
       }
 
-      if (includeSettings && !backup.settings) {
-        throw new Error('Backup file contains no settings');
-      }
-      if (includeConversations && (!backup.conversations || !backup.messages)) {
-        throw new Error('Backup file contains no conversations');
+      const hasSettings = !!backup.settings;
+      const hasConversations = !!(backup.conversations && backup.messages);
+
+      if (!hasSettings && !hasConversations) {
+        throw new Error('Backup file contains no valid data');
       }
 
       //check internal consistency of imported json (warn but still import)
       let warning: string | undefined;
-      if (includeConversations && backup.conversations && backup.messages) {
+      if (hasConversations && backup.conversations && backup.messages) {
         const convIds = new Set(backup.conversations.map(c => c.id));
         const orphans = backup.messages.filter(m => !convIds.has(m.conversationId));
         if (orphans.length > 0) {
@@ -167,12 +164,12 @@ class BackupServiceImpl {
       }
 
       // restore settings
-      if (includeSettings && backup.settings) {
+      if (hasSettings && backup.settings) {
         await Settings.setMany(backup.settings);
       }
 
       // restore database
-      if (includeConversations && backup.conversations && backup.messages) {
+      if (hasConversations && backup.conversations && backup.messages) {
         await DB.importBackup(backup.conversations, backup.messages, backup.tombstones ?? []);
       }
 

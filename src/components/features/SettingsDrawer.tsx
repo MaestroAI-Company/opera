@@ -13,7 +13,7 @@ import { getLocalProviderLabel } from "../../services/ai/providers/LocalProvider
 import { getEnabledProviders, getOllamaUrls, serializeOllamaUrls, serializeProviders } from "../../services/ai/providers/sources";
 import { ITool } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
-import { BackupService, ImportInspection } from "../../services/BackupService";
+import { BackupService } from "../../services/BackupService";
 import { CloudUserInfo } from "../../services/cloud/CloudProvider";
 import { CLOUD_PROVIDERS, getCloudProviderDefinition } from "../../services/cloud/registry";
 import { CloudSync } from "../../services/CloudSyncService";
@@ -50,10 +50,12 @@ const generalIcon = require("../../../assets/icons/general.png");
 const serverIcon = require("../../../assets/icons/server.png");
 const toolIcon = require("../../../assets/icons/tool.png");
 const confidentialityIcon = require("../../../assets/icons/confidentiality.png");
+const reportsIcon = require("../../../assets/icons/bug.png");
+const supportIcon = require("../../../assets/icons/support.png");
 const socialIcon = require("../../../assets/icons/social.png");
 const informationIcon = require("../../../assets/icons/information.png");
 const githubIcon = require("../../../assets/icons/github.png");
-const websiteIcon = require("../../../assets/icons/website.png");
+const operaIcon = require("../../../assets/icons/operaicon.png");
 const instagramIcon = require("../../../assets/icons/instagram.png");
 const micIcon = require("../../../assets/icons/microphone.png");
 const cameraIcon = require("../../../assets/icons/camera.png");
@@ -89,7 +91,7 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "assistantoverlay" | "service" | "confidentiality" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "sociallinks";
+type SubPage = "main" | "general" | "assistantoverlay" | "service" | "confidentiality" | "reports" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "sociallinks";
 
 export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
   const Colors = useColors();
@@ -174,10 +176,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [exportScopeVisible, setExportScopeVisible] = useState(false);
-  const [importScopeVisible, setImportScopeVisible] = useState(false);
   const [exportSelection, setExportSelection] = useState({ settings: true, conversations: true });
-  const [importSelection, setImportSelection] = useState({ settings: true, conversations: true });
-  const [importInspection, setImportInspection] = useState<ImportInspection | null>(null);
   const [alertConfig, setAlertConfig] = useState<{
     title: string,
     message: string,
@@ -206,6 +205,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       return "auto";
     }
   });
+  const [reportText, setReportText] = useState("");
   const [instruction, setInstructionState] = useState("");
   const [name, setNameState] = useState("");
   const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
@@ -327,28 +327,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   };
 
   const handleImportData = async () => {
-    setImportInspection(null);
     try {
-      const inspection = await BackupService.pickAndReadBackup();
-      if (!inspection) return;
-      setImportInspection(inspection);
-      setImportSelection({
-        settings: inspection.hasSettings,
-        conversations: inspection.hasConversations,
-      });
-      setImportScopeVisible(true);
-    } catch {
-      showAlert("Error", "Failed to read the backup file.");
-    }
-  };
-
-  const runImport = async (includeSettings: boolean, includeConversations: boolean) => {
-    setImportScopeVisible(false);
-    try {
-      const result = await BackupService.importData(
-        { includeSettings, includeConversations },
-        importInspection?.backup
-      );
+      const result = await BackupService.importData();
       if (result.success) {
         onDataChanged?.();
         showAlert("Import", result.warning ?? "Data imported successfully.");
@@ -667,8 +647,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       setTimeout(async () => {
         const cloudBackupExists = await CloudSync.hasCloudBackup();
         setHasCloudBackup(cloudBackupExists);
-        //pin already known when sync is turned back on
-        if (pinSet) return;
         if (cloudBackupExists) {
           handleUnlockSyncPin();
         } else {
@@ -688,11 +666,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     if (success) {
       await completeCloudConnect(providerName);
     } else {
-      const def = getCloudProviderDefinition(providerName);
-      //keep setup providers selected so the form can be corrected
-      setCloudProvider(def?.SetupComponent ? providerName : "none");
+      setCloudProvider("none");
       setCloudUserInfo(null);
-      showAlert("Connection Error", `Could not connect to ${def?.label ?? providerName}. Check your settings and try again.`);
+      showAlert("Connection Error", `Could not connect to ${getCloudProviderDefinition(providerName)?.label ?? providerName}. Check your settings and try again.`);
     }
   };
 
@@ -729,9 +705,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {
         text: "Disconnect", style: "secondary", onPress: async () => {
           setAlertModalVisible(false);
-          setCloudProvider("none");
-          await CloudSync.disconnect();
-          await completeCloudConnect("none");
+          await handleSetCloudProvider("none");
         }
       },
       { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "primary" },
@@ -1080,6 +1054,17 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           </Pressable>
 
           <Pressable
+            style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("reports")}
+          >
+            <Image source={reportsIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>Support</Text>
+              <Text style={styles.navSubtitle}>Report an issue</Text>
+            </View>
+          </Pressable>
+
+          <Pressable
             style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
             onPress={() => setActiveSubPage("sociallinks")}
           >
@@ -1103,7 +1088,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <View style={styles.settingRowVertical}>
         <Text style={styles.settingLabel}>Version</Text>
         <Text style={styles.helpText}>
-          Opera Development v{appVersion}
+          Opera Beta v{appVersion}
         </Text>
       </View>
 
@@ -1116,7 +1101,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
           <View style={styles.groupBox}>
             <ActionButton
-              icon={websiteIcon}
+              icon={operaIcon}
               label="Website"
               onPress={() => Linking.openURL("https://maestroai.company").catch(() => { })}
             />
@@ -1518,6 +1503,47 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     </View>
   );
 
+  // reports subpage content
+  const renderReportsSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("Support")}
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Report</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          Describe the issue you encountered.
+        </Text>
+        <TextInputField
+          icon={penPlaceholderIcon}
+          placeholder="Describe the issue"
+          value={reportText}
+          onChangeText={setReportText}
+        />
+        <View style={{ marginTop: 12 }}>
+          <ActionButton
+            icon={addIcon}
+            label="Add photo"
+            onPress={() => { }}
+            standalone
+          />
+        </View>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Need more help</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          Contact our support team for additional assistance and resources.
+        </Text>
+        <ActionButton
+          icon={supportIcon}
+          label="Contact support"
+          onPress={() => Linking.openURL("https://maestroai.company/contact.html").catch(() => { })}
+          standalone
+        />
+      </View>
+    </View>
+  );
+
   // tools subpage content: assistant tools stay inline, widgets and mobile actions link out
   const renderToolsSubPage = () => (
     <View style={styles.subPageContainer}>
@@ -1669,6 +1695,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return renderServiceSubPage();
       case "confidentiality":
         return renderConfidentialitySubPage();
+      case "reports":
+        return renderReportsSubPage();
       case "tools":
         return renderToolsSubPage();
       case "widgets":
@@ -1742,35 +1770,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             onPress: () => runExport(exportSelection.settings, exportSelection.conversations),
           },
           { text: "Cancel", style: "secondary", onPress: () => setExportScopeVisible(false) },
-        ]}
-      />
-      <NotificationModal
-        visible={importScopeVisible}
-        title="Import data"
-        message="Select what would you like to import. This will replace the selected data."
-        onClose={() => setImportScopeVisible(false)}
-        options={[
-          {
-            label: "Conversations",
-            checked: importSelection.conversations,
-            disabled: !(importInspection?.hasConversations ?? true),
-            onToggle: (checked) => setImportSelection(prev => ({ ...prev, conversations: checked })),
-          },
-          {
-            label: "Settings",
-            checked: importSelection.settings,
-            disabled: !(importInspection?.hasSettings ?? true),
-            onToggle: (checked) => setImportSelection(prev => ({ ...prev, settings: checked })),
-          },
-        ]}
-        buttons={[
-          {
-            text: "Import",
-            style: "primary",
-            disabled: !importSelection.settings && !importSelection.conversations,
-            onPress: () => runImport(importSelection.settings, importSelection.conversations),
-          },
-          { text: "Cancel", style: "secondary", onPress: () => setImportScopeVisible(false) },
         ]}
       />
     </>

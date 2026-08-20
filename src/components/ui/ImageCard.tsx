@@ -1,6 +1,4 @@
-import React from 'react';
 import { Image, ImageSourcePropType, StyleSheet, View } from 'react-native';
-import { Colors, Radius, Spacing } from '../../../constants/theme';
 
 interface ImageCardProps {
   source: ImageSourcePropType;
@@ -11,9 +9,6 @@ interface ImageCardProps {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
     overflow: 'hidden',
   },
   image: {

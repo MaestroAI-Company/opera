@@ -1,8 +1,9 @@
 import { Image, ImageSourcePropType, Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import Checkbox from "./Checkbox";
-import TextInputField from "./TextInputField";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import Checkbox from "./Checkbox";
+import Group from "./Group";
+import TextInputField from "./TextInputField";
 
 export type ModalButton = {
   text: string;
@@ -32,10 +33,7 @@ export type NotificationModalProps = {
   inputSecureTextEntry?: boolean;
   inputKeyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
 
-  //custom buttons (up to 4)
   buttons?: ModalButton[];
-
-  //checkable option rows (label left, checkbox right)
   options?: ModalOption[];
 
   onClose: () => void;
@@ -72,7 +70,7 @@ export default function NotificationModal({
       onRequestClose={onClose}
     >
       <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.container} onPress={() => {}}>
+        <Pressable style={styles.container} onPress={() => { }}>
 
           {(title || icon) && (
             <View style={styles.header}>
@@ -85,13 +83,15 @@ export default function NotificationModal({
 
           {showInput && (
             <View style={styles.inputContainer}>
-              <TextInputField
-                value={inputValue || ""}
-                onChangeText={onInputChange}
-                placeholder={inputPlaceholder}
-                secureTextEntry={inputSecureTextEntry}
-                keyboardType={inputKeyboardType}
-              />
+              <Group>
+                <TextInputField
+                  value={inputValue || ""}
+                  onChangeText={onInputChange}
+                  placeholder={inputPlaceholder}
+                  secureTextEntry={inputSecureTextEntry}
+                  keyboardType={inputKeyboardType}
+                />
+              </Group>
             </View>
           )}
 
@@ -117,38 +117,38 @@ export default function NotificationModal({
                 return rank(a) - rank(b);
               })
               .map((btn, index) => {
-              const isPrimary = btn.style === "primary" || !btn.style;
-              const isDanger = btn.style === "danger";
+                const isPrimary = btn.style === "primary" || !btn.style;
+                const isDanger = btn.style === "danger";
 
-              return (
-                <Pressable
-                  key={index}
-                  style={({ pressed, hovered }) => [
-                    styles.button,
-                    isPrimary && styles.buttonPrimary,
-                    isDanger && styles.buttonDanger,
-                    !isPrimary && !isDanger && styles.buttonSecondary,
-                    btn.disabled && styles.buttonDisabled,
-                    !btn.disabled && (pressed || hovered) && (
-                      isPrimary
-                        ? { backgroundColor: Colors.primaryPressed, borderColor: Colors.primaryPressed }
-                        : isDanger
+                return (
+                  <Pressable
+                    key={index}
+                    style={({ pressed, hovered }) => [
+                      styles.button,
+                      isPrimary && styles.buttonPrimary,
+                      isDanger && styles.buttonDanger,
+                      !isPrimary && !isDanger && styles.buttonSecondary,
+                      btn.disabled && styles.buttonDisabled,
+                      !btn.disabled && (pressed || hovered) && (
+                        isPrimary
                           ? { backgroundColor: Colors.primaryPressed, borderColor: Colors.primaryPressed }
-                          : { backgroundColor: Colors.surfacePressed }
-                    )
-                  ]}
-                  onPress={() => !btn.disabled && btn.onPress()}
-                >
-                  <Text style={[
-                    styles.buttonText,
-                    !isPrimary && !isDanger && styles.buttonTextSecondary,
-                    btn.disabled && styles.buttonTextDisabled
-                  ]}>
-                    {btn.text}
-                  </Text>
-                </Pressable>
-              );
-            })}
+                          : isDanger
+                            ? { backgroundColor: Colors.primaryPressed, borderColor: Colors.primaryPressed }
+                            : { backgroundColor: Colors.surfacePressed }
+                      )
+                    ]}
+                    onPress={() => !btn.disabled && btn.onPress()}
+                  >
+                    <Text style={[
+                      styles.buttonText,
+                      !isPrimary && !isDanger && styles.buttonTextSecondary,
+                      btn.disabled && styles.buttonTextDisabled
+                    ]}>
+                      {btn.text}
+                    </Text>
+                  </Pressable>
+                );
+              })}
           </View>
         </Pressable>
       </Pressable>
@@ -187,12 +187,12 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     height: 24,
 
   },
-    title: {
+  title: {
     fontSize: FontSizes.lg,
     color: Colors.textPrimary,
     fontFamily: Fonts.mono,
-      textAlign: "center",
-    },
+    textAlign: "center",
+  },
   message: {
     fontSize: FontSizes.bodyMd,
     color: Colors.textMuted,

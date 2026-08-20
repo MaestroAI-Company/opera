@@ -7,6 +7,7 @@ import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { CloudSync } from "../../services/CloudSyncService";
 import { Conversation, DB } from "../../services/db/DatabaseService";
 import ActionButton from "../ui/ActionButton";
+import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, playPageTransition, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
 
@@ -324,24 +325,21 @@ export default function ConversationsDrawer({
     <>
       <Text style={styles.title}>Discussions</Text>
 
-      <View style={styles.quickActionsShadowLayer}>
-        <View style={styles.quickActionsBox}>
-          <ActionButton
-            icon={newIcon}
-            label="New discussion"
-            onPress={() => {
-              onNewConversation();
-              if (!isDesktop) onClose();
-            }}
-          />
-          <ActionButton
-            icon={searchIcon}
-            label="Search"
-            isLast
-            onPress={() => setIsSearching(true)}
-          />
-        </View>
-      </View>
+      <Group style={styles.quickActionsSpacing}>
+        <ActionButton
+          icon={newIcon}
+          label="New discussion"
+          onPress={() => {
+            onNewConversation();
+            if (!isDesktop) onClose();
+          }}
+        />
+        <ActionButton
+          icon={searchIcon}
+          label="Search"
+          onPress={() => setIsSearching(true)}
+        />
+      </Group>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {conversations.length === 0 && (
@@ -517,18 +515,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     marginBottom: 24,
     fontFamily: Fonts.display,
   },
-  quickActionsShadowLayer: {
-    position: "relative",
+  quickActionsSpacing: {
     marginBottom: 12,
-  },
-  quickActionsBox: {
-    position: "relative",
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: Radius.xxl,
-    backgroundColor: Colors.surface,
-    zIndex: 1,
-    overflow: "hidden",
   },
   scrollContent: {
     paddingBottom: 40,

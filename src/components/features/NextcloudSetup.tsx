@@ -3,6 +3,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { loadNextcloudConfig, runNextcloudLoginFlow } from "../../services/cloud/NextcloudProvider";
+import Group from "../ui/Group";
 import TextInputField from "../ui/TextInputField";
 
 const linkIcon = require("../../../assets/icons/link.png");
@@ -20,8 +21,6 @@ export default function NextcloudSetup({ onDone }: NextcloudSetupProps) {
   const [connecting, setConnecting] = useState(false);
   const [failed, setFailed] = useState(false);
   const cancelledRef = useRef(false);
-
-  //plain browser tabs are blocked by the servers cors policy
   const isBrowser = Platform.OS === "web" && !("__TAURI_INTERNALS__" in window);
 
   useEffect(() => {
@@ -66,17 +65,18 @@ export default function NextcloudSetup({ onDone }: NextcloudSetupProps) {
         Enter your server address, then approve the connection in the browser window that opens.
       </Text>
 
-      <TextInputField
-        icon={linkIcon}
-        placeholder="cloud.example.com"
-        value={serverUrl}
-        onChangeText={setServerUrl}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="url"
-        editable={!connecting}
-        containerStyle={styles.field}
-      />
+      <Group style={styles.field}>
+        <TextInputField
+          icon={linkIcon}
+          placeholder="cloud.example.com"
+          value={serverUrl}
+          onChangeText={setServerUrl}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          editable={!connecting}
+        />
+      </Group>
 
       {connecting ? (
         <>
@@ -140,7 +140,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   field: {
     marginBottom: Spacing.md,
-    borderRadius: Radius.md,
   },
   statusText: {
     fontSize: FontSizes.label,

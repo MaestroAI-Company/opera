@@ -100,7 +100,7 @@ export const DarkColors: ThemeColors = {
   ...LightColors,
 
   //canvas & surfaces
-  background: "#1C1B1A",
+  background: "#171715",
   surface: "#252525",
   surfaceMuted: "#2A2A2A",
   surfaceSubtle: "#2F2F2F",
@@ -135,8 +135,8 @@ export const DarkColors: ThemeColors = {
   snackbarBg: "#3A3A3A",
   scrimDrawer: "rgba(0,0,0,0.5)",
   scrimModal: "rgba(0,0,0,0.6)",
-  backgroundFade: "rgba(28,27,26,0.9)",
-  backgroundClear: "rgba(28,27,26,0)",
+  backgroundFade: "rgba(23,23,21,0.9)",
+  backgroundClear: "rgba(23,23,21,0)",
 };
 
 //light stays the module default so non-react code keeps working

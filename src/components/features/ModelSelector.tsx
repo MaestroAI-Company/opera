@@ -25,6 +25,7 @@ import { AIModule } from "../../services/ai/AIModule";
 import { getAICoreModelLabel } from "../../services/ai/providers/AICoreProvider";
 import { buildSources, ModelSource } from "../../services/ai/providers/sources";
 import { AppEvents } from "../../services/events";
+import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 import SliderToggle, { SliderToggleOption } from "../ui/SliderToggle";
 import { dragDrawer, gestureVelocity, settleDrawer } from "./drawerAnimation";
@@ -545,11 +546,13 @@ export function ModelSelectorDrawer({
 
       {showReflection && (
         <View style={styles.reflectionRow}>
-          <SliderToggle
-            selectedValue={selectedReflection}
-            onSelect={onReflectionChange}
-            options={REFLECTIONS}
-          />
+          <Group>
+            <SliderToggle
+              selectedValue={selectedReflection}
+              onSelect={onReflectionChange}
+              options={REFLECTIONS}
+            />
+          </Group>
         </View>
       )}
     </View>

@@ -96,14 +96,12 @@ export default function SliderToggle({
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      //keep gesture when drawer scrolls
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
         armedRef.current = false;
         startXRef.current = pillX.value;
         previewIndexRef.current = selectedIndexRef.current;
         clearLongPressTimer();
-        //require hold before drag
         longPressTimerRef.current = setTimeout(() => {
           armedRef.current = true;
           scale.value = withTiming(1.2, { duration: 120 });
@@ -204,9 +202,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.surface,
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
     height: 44,
     paddingLeft: 12,
     paddingRight: 4,
@@ -229,7 +224,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   optionButton: {
     flex: 1,
-    height: 32,
+    height: 34,
     justifyContent: "center",
     alignItems: "center",
     borderRadius: Radius.md,
@@ -238,13 +233,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     position: "absolute",
     left: 0,
     top: "50%",
-    marginTop: -16,
-    height: 32,
+    marginTop: -18,
+    height: 36,
     justifyContent: "center",
     alignItems: "center",
     borderRadius: Radius.md,
     borderWidth: 2,
     borderColor: Colors.borderOnPrimary,
+    paddingHorizontal: 6,
   },
   optionText: {
     fontFamily: Fonts.mono,

@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Group from "../components/ui/Group";
 import TextInputField from "../components/ui/TextInputField";
 import { useResponsive } from "../hooks/useResponsive";
 import { Settings } from "../services/settings/SettingsService";
@@ -53,13 +54,15 @@ export default function NamePage() {
           </View>
 
           <View style={styles.inputWrapper}>
-            <TextInputField
-              icon={profilIcon}
-              value={name}
-              onChangeText={setName}
-              placeholder="Enter your name"
-              autoFocus
-            />
+            <Group>
+              <TextInputField
+                icon={profilIcon}
+                value={name}
+                onChangeText={setName}
+                placeholder="Enter your name"
+                autoFocus
+              />
+            </Group>
           </View>
         </View>
       </ScrollView>

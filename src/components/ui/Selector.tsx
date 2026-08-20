@@ -405,13 +405,10 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   trigger: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 2,
-    borderColor: Colors.border,
     paddingHorizontal: 12,
     height: 44,
     backgroundColor: Colors.surface,
     gap: 8,
-    borderRadius: Radius.xxl,
     minWidth: 120,
     maxWidth: 240,
     overflow: "hidden",

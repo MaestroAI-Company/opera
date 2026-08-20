@@ -24,6 +24,7 @@ import { WhisperSTT } from "../../services/speech/STTService";
 import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
 import ActionButton from "../ui/ActionButton";
 import DownloadProgress from "../ui/DownloadProgress";
+import Group from "../ui/Group";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import Selector from "../ui/Selector";
 import Slider from "../ui/Slider";
@@ -964,118 +965,112 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <Text style={styles.title}>Settings</Text>
 
       {/* profile section */}
-      <View style={styles.groupShadowLayer}>
-        <View style={styles.groupBox}>
+      <Group style={styles.groupSpacing}>
+        <Pressable
+          style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+          onPress={() => setActiveSubPage("profile")}
+        >
+          <Image source={profilIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>{name || "Profil"}</Text>
+            <Text style={styles.navSubtitle}>Name</Text>
+          </View>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+          onPress={() => setActiveSubPage("cloud")}
+        >
+          <Image source={cloudIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>Cloud</Text>
+            <Text style={styles.navSubtitle}>Cloud storage, Backup</Text>
+          </View>
+        </Pressable>
+      </Group>
+
+      <Group style={styles.groupSpacing}>
+        <Pressable
+          style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+          onPress={() => setActiveSubPage("general")}
+        >
+          <Image source={generalIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>General</Text>
+            <Text style={styles.navSubtitle}>Language, Theme</Text>
+          </View>
+        </Pressable>
+
+        {!isDesktop && (
           <Pressable
             style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-            onPress={() => setActiveSubPage("profile")}
+            onPress={() => setActiveSubPage("assistantoverlay")}
           >
-            <Image source={profilIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+            <Image source={micIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
             <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>{name || "Profil"}</Text>
-              <Text style={styles.navSubtitle}>Name</Text>
+              <Text style={styles.navTitle}>Assistant Overlay</Text>
+              <Text style={styles.navSubtitle}>Voice, Screen context</Text>
             </View>
           </Pressable>
+        )}
 
-          <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-            onPress={() => setActiveSubPage("cloud")}
-          >
-            <Image source={cloudIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>Cloud</Text>
-              <Text style={styles.navSubtitle}>Cloud storage, Backup</Text>
-            </View>
-          </Pressable>
-        </View>
-      </View>
+        <Pressable
+          style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+          onPress={() => setActiveSubPage("service")}
+        >
+          <Image source={linkIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>Service</Text>
+            <Text style={styles.navSubtitle}>AI Service, Ollama server</Text>
+          </View>
+        </Pressable>
 
-      <View style={styles.groupShadowLayer}>
-        <View style={styles.groupBox}>
-          <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-            onPress={() => setActiveSubPage("general")}
-          >
-            <Image source={generalIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>General</Text>
-              <Text style={styles.navSubtitle}>Language, Theme</Text>
-            </View>
-          </Pressable>
+        <Pressable
+          style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+          onPress={() => setActiveSubPage("tools")}
+        >
+          <Image source={toolIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>Tools</Text>
+            <Text style={styles.navSubtitle}>{isDesktop ? "Assistant Tools, Widgets" : "Assistant Tools, Widgets, Mobile actions"}</Text>
+          </View>
+        </Pressable>
+      </Group>
 
-          {!isDesktop && (
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-              onPress={() => setActiveSubPage("assistantoverlay")}
-            >
-              <Image source={micIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <View style={styles.navTextContainer}>
-                <Text style={styles.navTitle}>Assistant Overlay</Text>
-                <Text style={styles.navSubtitle}>Voice, Screen context</Text>
-              </View>
-            </Pressable>
-          )}
+      <Group style={styles.groupSpacing}>
+        <Pressable
+          style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+          onPress={() => setActiveSubPage("confidentiality")}
+        >
+          <Image source={confidentialityIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>Confidentiality</Text>
+            <Text style={styles.navSubtitle}>Data privacy, Usage analytics</Text>
+          </View>
+        </Pressable>
 
-          <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-            onPress={() => setActiveSubPage("service")}
-          >
-            <Image source={linkIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>Service</Text>
-              <Text style={styles.navSubtitle}>AI Service, Ollama server</Text>
-            </View>
-          </Pressable>
+        <Pressable
+          style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+          onPress={() => setActiveSubPage("reports")}
+        >
+          <Image source={reportsIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>Support</Text>
+            <Text style={styles.navSubtitle}>Report an issue</Text>
+          </View>
+        </Pressable>
 
-          <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-            onPress={() => setActiveSubPage("tools")}
-          >
-            <Image source={toolIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>Tools</Text>
-              <Text style={styles.navSubtitle}>{isDesktop ? "Assistant Tools, Widgets" : "Assistant Tools, Widgets, Mobile actions"}</Text>
-            </View>
-          </Pressable>
-        </View>
-      </View>
-
-      <View style={styles.groupShadowLayer}>
-        <View style={styles.groupBox}>
-          <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-            onPress={() => setActiveSubPage("confidentiality")}
-          >
-            <Image source={confidentialityIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>Confidentiality</Text>
-              <Text style={styles.navSubtitle}>Data privacy, Usage analytics</Text>
-            </View>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-            onPress={() => setActiveSubPage("reports")}
-          >
-            <Image source={reportsIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>Support</Text>
-              <Text style={styles.navSubtitle}>Report an issue</Text>
-            </View>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-            onPress={() => setActiveSubPage("sociallinks")}
-          >
-            <Image source={informationIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>Informations</Text>
-              <Text style={styles.navSubtitle}>Github, Instagram, Website</Text>
-            </View>
-          </Pressable>
-        </View>
-      </View>
+        <Pressable
+          style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+          onPress={() => setActiveSubPage("sociallinks")}
+        >
+          <Image source={informationIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>Informations</Text>
+            <Text style={styles.navSubtitle}>Version App, Github, Instagram</Text>
+          </View>
+        </Pressable>
+      </Group>
 
     </View>
   );
@@ -1098,26 +1093,23 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           Find Opera online, follow our updates, and contribute to the project.
         </Text>
 
-        <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
-          <View style={styles.groupBox}>
-            <ActionButton
-              icon={operaIcon}
-              label="Website"
-              onPress={() => Linking.openURL("https://maestroai.company").catch(() => { })}
-            />
-            <ActionButton
-              icon={githubIcon}
-              label="Github"
-              onPress={() => Linking.openURL("https://github.com/MaestroAI-Company/opera").catch(() => { })}
-            />
-            <ActionButton
-              icon={instagramIcon}
-              label="Instagram"
-              isLast
-              onPress={() => Linking.openURL("https://www.instagram.com/maestroai.company?igsh=MWF4dmZvMXl1ZmdzeA==").catch(() => { })}
-            />
-          </View>
-        </View>
+        <Group>
+          <ActionButton
+            icon={operaIcon}
+            label="Website"
+            onPress={() => Linking.openURL("https://maestroai.company").catch(() => { })}
+          />
+          <ActionButton
+            icon={githubIcon}
+            label="Github"
+            onPress={() => Linking.openURL("https://github.com/MaestroAI-Company/opera").catch(() => { })}
+          />
+          <ActionButton
+            icon={instagramIcon}
+            label="Instagram"
+            onPress={() => Linking.openURL("https://www.instagram.com/maestroai.company?igsh=MWF4dmZvMXl1ZmdzeA==").catch(() => { })}
+          />
+        </Group>
       </View>
 
       <View style={{ flex: 1, justifyContent: "flex-end" }}>
@@ -1135,22 +1127,26 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={styles.settingRowVertical}>
         <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Name</Text>
-        <TextInputField
-          icon={penPlaceholderIcon}
-          placeholder="Enter your name"
-          value={name}
-          onChangeText={setName}
-        />
+        <Group>
+          <TextInputField
+            icon={penPlaceholderIcon}
+            placeholder="Enter your name"
+            value={name}
+            onChangeText={setName}
+          />
+        </Group>
       </View>
 
       <View style={styles.settingRowVertical}>
         <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Write your instructions to AI</Text>
-        <TextInputField
-          icon={penPlaceholderIcon}
-          placeholder="write"
-          value={instruction}
-          onChangeText={setInstruction}
-        />
+        <Group>
+          <TextInputField
+            icon={penPlaceholderIcon}
+            placeholder="write"
+            value={instruction}
+            onChangeText={setInstruction}
+          />
+        </Group>
       </View>
     </View>
   );
@@ -1162,21 +1158,25 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
         <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Language</Text>
-        <Selector
-          options={languageOptions}
-          selectedValue={language}
-          onSelect={setLanguage}
-          title="Select Language"
-          fullWidth
-        />
+        <Group>
+          <Selector
+            options={languageOptions}
+            selectedValue={language}
+            onSelect={setLanguage}
+            title="Select Language"
+            fullWidth
+          />
+        </Group>
       </View>
 
       <View style={styles.settingRowVertical}>
         <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Theme app</Text>
-        <SliderToggle
-          selectedValue={theme}
-          onSelect={setTheme}
-        />
+        <Group>
+          <SliderToggle
+            selectedValue={theme}
+            onSelect={setTheme}
+          />
+        </Group>
       </View>
 
       <View style={styles.settingRowVertical}>
@@ -1241,13 +1241,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
         <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Cloud storage</Text>
-        <Selector
-          options={cloudStorageOptions}
-          selectedValue={cloudProvider}
-          onSelect={handleSetCloudProvider}
-          title="Select Cloud Storage"
-          fullWidth
-        />
+        <Group>
+          <Selector
+            options={cloudStorageOptions}
+            selectedValue={cloudProvider}
+            onSelect={handleSetCloudProvider}
+            title="Select Cloud Storage"
+            fullWidth
+          />
+        </Group>
         {cloudProvider !== "none" && !cloudUserInfo && (() => {
           const def = getCloudProviderDefinition(cloudProvider);
           if (!def?.SetupComponent) return null;
@@ -1303,44 +1305,51 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
         {enabledProviders.includes("ollama") && (
           <>
-            {ollamaUrls.map((url, index) => (
-              <View key={index} style={{ marginBottom: 10 }}>
-                <TextInputField
-                  icon={linkIcon}
-                  placeholder="server link"
-                  value={url}
-                  onChangeText={(v) => setOllamaUrlAt(index, v)}
-                  onBlur={() => handleOllamaUrlBlur(index)}
-                />
-                {serverErrors[url.trim()] ? (
-                  <Text style={styles.errorText}>This server is unreachable</Text>
-                ) : null}
-              </View>
-            ))}
+            <Group style={styles.groupSpacingTight}>
+              {ollamaUrls.map((url, index) => (
+                <View key={index}>
+                  <TextInputField
+                    icon={linkIcon}
+                    placeholder="server link"
+                    value={url}
+                    onChangeText={(v) => setOllamaUrlAt(index, v)}
+                    onBlur={() => handleOllamaUrlBlur(index)}
+                  />
+                  {serverErrors[url.trim()] ? (
+                    <Text style={[styles.errorText, { paddingHorizontal: 12 }]}>This server is unreachable</Text>
+                  ) : null}
+                </View>
+              ))}
+            </Group>
 
-            <ActionButton
-              icon={addIcon}
-              label="Add server link"
-              onPress={() => saveOllamaUrls([...ollamaUrls, ""])}
-              standalone
-            />
+            <Group style={styles.groupSpacing}>
+              <ActionButton
+                icon={addIcon}
+                label="Add server link"
+                onPress={() => saveOllamaUrls([...ollamaUrls, ""])}
+              />
+            </Group>
 
             <Text style={[styles.settingLabel, { marginTop: 20 }]}>Context Length</Text>
             <Text style={[styles.helpText, { marginBottom: 10 }]}>Maximum number of tokens the model can use.</Text>
-            <Slider
-              icon={messageIcon}
-              options={ollamaContextLengthOptions}
-              selectedValue={String(effectiveContextLength())}
-              onSelect={setOllamaContextLength}
-            />
+            <Group>
+              <Slider
+                icon={messageIcon}
+                options={ollamaContextLengthOptions}
+                selectedValue={String(effectiveContextLength())}
+                onSelect={setOllamaContextLength}
+              />
+            </Group>
             <Text style={[styles.settingLabel, { marginTop: 20 }]}>Model Keep Alive</Text>
             <Text style={[styles.helpText, { marginBottom: 10 }]}>How long the model stays loaded in memory after a request.</Text>
-            <Slider
-              icon={timeIcon}
-              options={ollamaKeepAliveOptions}
-              selectedValue={ollamaKeepAlive}
-              onSelect={setOllamaKeepAlive}
-            />
+            <Group>
+              <Slider
+                icon={timeIcon}
+                options={ollamaKeepAliveOptions}
+                selectedValue={ollamaKeepAlive}
+                onSelect={setOllamaKeepAlive}
+              />
+            </Group>
           </>
         )}
       </View>
@@ -1350,13 +1359,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           <View style={[styles.settingRowVertical, { zIndex: 9 }]}>
             <Text style={styles.settingLabel}>Whisper Model</Text>
             <Text style={[styles.helpText, { marginBottom: 10 }]}>The larger size, the longer the processing will take.</Text>
-            <Selector
-              options={whisperModelOptions}
-              selectedValue={whisperModel}
-              onSelect={handleSelectWhisperModel}
-              title="Select Whisper Model"
-              fullWidth
-            />
+            <Group>
+              <Selector
+                options={whisperModelOptions}
+                selectedValue={whisperModel}
+                onSelect={handleSelectWhisperModel}
+                title="Select Whisper Model"
+                fullWidth
+              />
+            </Group>
             {isDownloadingWhisper && (
               <View style={{ marginTop: 10 }}>
                 <DownloadProgress
@@ -1404,12 +1415,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <Text style={[styles.helpText, { marginTop: 4, marginBottom: 12 }]}>
           No Tracking: We do not collect personal info, analytics, or crash reports. Your privacy is fully protected.
         </Text>
-        <ActionButton
-          icon={hyperlinkIcon}
-          label="Privacy Policy"
-          onPress={() => Linking.openURL("https://maestroai.company/privacy.html").catch(() => { })}
-          standalone
-        />
+        <Group>
+          <ActionButton
+            icon={hyperlinkIcon}
+            label="Privacy Policy"
+            onPress={() => Linking.openURL("https://maestroai.company/privacy.html").catch(() => { })}
+          />
+        </Group>
       </View>
 
       <View style={styles.settingRowVertical}>
@@ -1420,57 +1432,53 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             : "Opera needs a few permissions to work at its best. You can change them in your device settings."}
         </Text>
 
-        <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
-          <View style={styles.groupBox}>
+        <Group>
+          <ActionButton
+            icon={micIcon}
+            label="Microphone"
+            onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+            disabled={Platform.OS === "web"}
+            rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.microphone) : undefined}
+          />
+          <ActionButton
+            icon={cameraIcon}
+            label="Camera"
+            onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+            disabled={Platform.OS === "web"}
+            rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.camera) : undefined}
+          />
+          <ActionButton
+            icon={locationIcon}
+            label="Location"
+            onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+            disabled={Platform.OS === "web"}
+            rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.location) : undefined}
+          />
+          {Platform.OS !== "web" && (
             <ActionButton
-              icon={micIcon}
-              label="Microphone"
-              onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
-              disabled={Platform.OS === "web"}
-              rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.microphone) : undefined}
+              icon={photoIcon}
+              label="Photos"
+              onPress={() => Linking.openSettings()}
+              rightElement={renderPermissionBadge(permissionStatuses.photos)}
             />
+          )}
+          {Platform.OS !== "web" && (
             <ActionButton
-              icon={cameraIcon}
-              label="Camera"
-              onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
-              disabled={Platform.OS === "web"}
-              rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.camera) : undefined}
+              icon={profilIcon}
+              label="Contacts"
+              onPress={() => Linking.openSettings()}
+              rightElement={renderPermissionBadge(permissionStatuses.contacts)}
             />
+          )}
+          {Platform.OS !== "web" && (
             <ActionButton
-              icon={locationIcon}
-              label="Location"
-              onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
-              disabled={Platform.OS === "web"}
-              isLast={Platform.OS === "web"}
-              rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.location) : undefined}
+              icon={calendarIcon}
+              label="Calendar"
+              onPress={() => Linking.openSettings()}
+              rightElement={renderPermissionBadge(permissionStatuses.calendar)}
             />
-            {Platform.OS !== "web" && (
-              <ActionButton
-                icon={photoIcon}
-                label="Photos"
-                onPress={() => Linking.openSettings()}
-                rightElement={renderPermissionBadge(permissionStatuses.photos)}
-              />
-            )}
-            {Platform.OS !== "web" && (
-              <ActionButton
-                icon={profilIcon}
-                label="Contacts"
-                onPress={() => Linking.openSettings()}
-                rightElement={renderPermissionBadge(permissionStatuses.contacts)}
-              />
-            )}
-            {Platform.OS !== "web" && (
-              <ActionButton
-                icon={calendarIcon}
-                label="Calendar"
-                onPress={() => Linking.openSettings()}
-                isLast
-                rightElement={renderPermissionBadge(permissionStatuses.calendar)}
-              />
-            )}
-          </View>
-        </View>
+          )}
+        </Group>
       </View>
 
       <View style={styles.settingRowVertical}>
@@ -1479,26 +1487,23 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           Manage your conversations and settings data locally.
         </Text>
 
-        <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
-          <View style={styles.groupBox}>
-            <ActionButton
-              icon={exportIcon}
-              label="Export data"
-              onPress={handleExportData}
-            />
-            <ActionButton
-              icon={downloadIcon}
-              label="Import data"
-              onPress={handleImportData}
-            />
-            <ActionButton
-              icon={binIcon}
-              label="Delete all conversations"
-              onPress={handleDeleteAllConversations}
-              isLast
-            />
-          </View>
-        </View>
+        <Group>
+          <ActionButton
+            icon={exportIcon}
+            label="Export data"
+            onPress={handleExportData}
+          />
+          <ActionButton
+            icon={downloadIcon}
+            label="Import data"
+            onPress={handleImportData}
+          />
+          <ActionButton
+            icon={binIcon}
+            label="Delete all conversations"
+            onPress={handleDeleteAllConversations}
+          />
+        </Group>
       </View>
     </View>
   );
@@ -1513,20 +1518,27 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <Text style={[styles.helpText, { marginBottom: 12 }]}>
           Describe the issue you encountered.
         </Text>
-        <TextInputField
-          icon={penPlaceholderIcon}
-          placeholder="Describe the issue"
-          value={reportText}
-          onChangeText={setReportText}
-        />
-        <View style={{ marginTop: 12 }}>
+        <Group style={styles.groupSpacingTight}>
+          <TextInputField
+            icon={penPlaceholderIcon}
+            placeholder="Describe the issue"
+            value={reportText}
+            onChangeText={setReportText}
+          />
           <ActionButton
             icon={addIcon}
             label="Add photo"
             onPress={() => { }}
-            standalone
           />
-        </View>
+        </Group>
+
+        <Group>
+          <ActionButton
+            icon={arrowIcon}
+            label="Send my issue"
+            onPress={() => setReportText("")}
+          />
+        </Group>
       </View>
 
       <View style={styles.settingRowVertical}>
@@ -1534,12 +1546,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <Text style={[styles.helpText, { marginBottom: 12 }]}>
           Contact our support team for additional assistance and resources.
         </Text>
-        <ActionButton
-          icon={supportIcon}
-          label="Contact support"
-          onPress={() => Linking.openURL("https://maestroai.company/contact.html").catch(() => { })}
-          standalone
-        />
+        <Group>
+          <ActionButton
+            icon={supportIcon}
+            label="Contact support"
+            onPress={() => Linking.openURL("https://maestroai.company/contact.html").catch(() => { })}
+          />
+        </Group>
       </View>
     </View>
   );
@@ -1583,17 +1596,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           Structured results the assistant can display: {allWidgets.map(w => w.name).join(", ")}.
         </Text>
 
-        <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
-          <View style={styles.groupBox}>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-              onPress={() => setActiveSubPage("widgets")}
-            >
-              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>See widgets</Text>
-            </Pressable>
-          </View>
-        </View>
+        <Group>
+          <Pressable
+            style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("widgets")}
+          >
+            <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+            <Text style={styles.navLabel}>See widgets</Text>
+          </Pressable>
+        </Group>
       </View>
 
       {/* mobile actions block, last: points to a deeper subpage instead of toggling in place. desktop has no mobile apps to open, so it's hidden there */}
@@ -1604,17 +1615,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             Allow the assistant to integrate with installed apps: {mobileTools.map(t => t.displayName ?? t.definition.function.name).join(", ")}.
           </Text>
 
-          <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
-            <View style={styles.groupBox}>
-              <Pressable
-                style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-                onPress={() => setActiveSubPage("mobileactions")}
-              >
-                <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-                <Text style={styles.navLabel}>See mobile actions</Text>
-              </Pressable>
-            </View>
-          </View>
+          <Group>
+            <Pressable
+              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+              onPress={() => setActiveSubPage("mobileactions")}
+            >
+              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <Text style={styles.navLabel}>See mobile actions</Text>
+            </Pressable>
+          </Group>
         </View>
       )}
     </View>
@@ -1912,18 +1921,11 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     height: 18,
     transform: [{ rotate: "-180deg" }],
   },
-  groupShadowLayer: {
-    position: "relative",
+  groupSpacing: {
     marginBottom: 20,
   },
-  groupBox: {
-    position: "relative",
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: Radius.xxl,
-    backgroundColor: Colors.surface,
-    zIndex: 1,
-    overflow: "hidden",
+  groupSpacingTight: {
+    marginBottom: 8,
   },
   navItem: {
     flexDirection: "row",

@@ -6,6 +6,7 @@ import { useResponsive } from "../../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { CloudSync } from "../../services/CloudSyncService";
 import { Conversation, DB } from "../../services/db/DatabaseService";
+import ActionButton from "../ui/ActionButton";
 import NotificationModal from "../ui/NotificationModal";
 import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, playPageTransition, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
 
@@ -325,23 +326,20 @@ export default function ConversationsDrawer({
 
       <View style={styles.quickActionsShadowLayer}>
         <View style={styles.quickActionsBox}>
-          <Pressable
+          <ActionButton
+            icon={newIcon}
+            label="New discussion"
             onPress={() => {
               onNewConversation();
               if (!isDesktop) onClose();
             }}
-            style={({ pressed, hovered }) => [styles.quickActionItem, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
-          >
-            <Image source={newIcon} style={styles.quickActionIcon} tintColor={Colors.textPrimary} />
-            <Text style={styles.quickActionLabel}>New discussion</Text>
-          </Pressable>
-          <Pressable
+          />
+          <ActionButton
+            icon={searchIcon}
+            label="Search"
+            isLast
             onPress={() => setIsSearching(true)}
-            style={({ pressed, hovered }) => [styles.quickActionItem, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
-          >
-            <Image source={searchIcon} style={styles.quickActionIcon} tintColor={Colors.textPrimary} />
-            <Text style={styles.quickActionLabel}>Search</Text>
-          </Pressable>
+          />
         </View>
       </View>
 
@@ -531,22 +529,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     backgroundColor: Colors.surface,
     zIndex: 1,
     overflow: "hidden",
-  },
-  quickActionItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    gap: 10,
-  },
-  quickActionIcon: {
-    width: 18,
-    height: 18,
-  },
-  quickActionLabel: {
-    fontSize: FontSizes.body,
-    color: Colors.textPrimary,
-    fontFamily: Fonts.mono,
   },
   scrollContent: {
     paddingBottom: 40,

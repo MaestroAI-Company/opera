@@ -964,6 +964,24 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.menuContainer}>
       <Text style={styles.title}>Settings</Text>
 
+      <Group style={[styles.groupSpacing, styles.highlightGroup]}>
+        <ActionButton
+          icon={operaIcon}
+          label="Set Opera as your default assistant"
+          iconTintColor={Colors.textOnPrimary}
+          labelColor={Colors.textOnPrimary}
+        />
+      </Group>
+
+      <Group style={[styles.groupSpacing, styles.highlightGroup]}>
+        <ActionButton
+          icon={downloadIcon}
+          label="New Update is available"
+          iconTintColor={Colors.textOnPrimary}
+          labelColor={Colors.textOnPrimary}
+        />
+      </Group>
+
       {/* profile section */}
       <Group style={styles.groupSpacing}>
         <Pressable
@@ -1200,6 +1218,21 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </View>
         <Text style={styles.helpText}>Speak the answer aloud when you ask by voice.</Text>
       </View>
+
+      <View style={[styles.settingRowVertical, Platform.OS === "web" && { marginTop: 10 }]}>
+        <View style={styles.toggleRow}>
+          <Text style={styles.settingLabel}>Always Transcribe Locally</Text>
+          <Toggle
+            checked={alwaysWhisper}
+            onToggle={setAlwaysWhisper}
+          />
+        </View>
+        <Text style={styles.helpText}>
+          {Platform.OS === "web"
+            ? "Process audio transcriptions locally on your device instead of using the selected model."
+            : "Use your device's built-in speech recognition instead of the selected model."}
+        </Text>
+      </View>
     </View>
   );
 
@@ -1381,21 +1414,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           </View>
         </>
       )}
-
-      <View style={[styles.settingRowVertical, Platform.OS === "web" && { marginTop: 10 }]}>
-        <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>Always Transcribe Locally</Text>
-          <Toggle
-            checked={alwaysWhisper}
-            onToggle={setAlwaysWhisper}
-          />
-        </View>
-        <Text style={styles.helpText}>
-          {Platform.OS === "web"
-            ? "Process audio transcriptions locally on your device instead of using the selected model."
-            : "Use your device's built-in speech recognition instead of the selected model."}
-        </Text>
-      </View>
     </View>
   );
 
@@ -1923,6 +1941,10 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   groupSpacing: {
     marginBottom: 20,
+  },
+  highlightGroup: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.borderOnPrimary,
   },
   groupSpacingTight: {
     marginBottom: 8,

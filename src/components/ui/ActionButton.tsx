@@ -10,6 +10,8 @@ export type ActionButtonProps = {
   onPress?: () => void;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  iconTintColor?: string;
+  labelColor?: string;
 };
 
 //action button for settings actions and lists, wrap in <Group> to get a shared frame
@@ -20,6 +22,8 @@ export default function ActionButton({
   onPress,
   disabled = false,
   style,
+  iconTintColor,
+  labelColor,
 }: ActionButtonProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -34,8 +38,8 @@ export default function ActionButton({
       onPress={onPress}
       disabled={disabled || !onPress}
     >
-      {icon && <Image source={icon} style={styles.menuIcon} tintColor={Colors.textPrimary} />}
-      <Text style={styles.navLabel} numberOfLines={1} ellipsizeMode="tail">{label}</Text>
+      {icon && <Image source={icon} style={styles.menuIcon} tintColor={iconTintColor ?? Colors.textPrimary} />}
+      <Text style={[styles.navLabel, labelColor && { color: labelColor }]} numberOfLines={1} ellipsizeMode="tail">{label}</Text>
       {rightElement}
     </Pressable>
   );

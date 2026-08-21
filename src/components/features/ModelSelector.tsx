@@ -2,7 +2,6 @@ import LottieView from "lottie-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
-  BackHandler,
   DeviceEventEmitter,
   Image,
   LayoutChangeEvent,
@@ -26,9 +25,10 @@ import { getAICoreModelLabel } from "../../services/ai/providers/AICoreProvider"
 import { buildSources, ModelSource } from "../../services/ai/providers/sources";
 import { AppEvents } from "../../services/events";
 import Group from "../ui/Group";
+import DrawerSheet from "./DrawerSheet";
 import NotificationModal from "../ui/NotificationModal";
 import SliderToggle, { SliderToggleOption } from "../ui/SliderToggle";
-import { dragDrawer, gestureVelocity, settleDrawer } from "./drawerAnimation";
+import { settleDrawer } from "./drawerAnimation";
 
 const botIcon = require("../../../assets/icons/bot.png");
 const downloadIcon = require("../../../assets/icons/download.png");
@@ -144,60 +144,11 @@ export function ModelSelectorDrawer({
   const [sourcesRevision, setSourcesRevision] = useState(0);
   const [browsedKey, setBrowsedKey] = useState<string | null>(null);
 
-  useEffect(() => {
-    settleDrawer(progress, visible);
-  }, [visible, progress]);
-
-  //dismiss settles progress before callback
+  //dismiss settles progress before callback, used when picking a model closes the sheet
   const dismiss = useCallback(() => {
     settleDrawer(progress, false);
     onClose();
   }, [progress, onClose]);
-
-  //mobile pull down gesture
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) => {
-          return gestureState.dy > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
-        },
-        onPanResponderMove: (_, gestureState) => {
-          dragDrawer(progress, Math.max(0, Math.min(1, 1 - gestureState.dy / 280)));
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          const velocity = -gestureVelocity(gestureState.vy, 280);
-          if (gestureState.dy > 70 || gestureState.vy > 0.5) {
-            dismiss();
-          } else {
-            settleDrawer(progress, true, velocity);
-          }
-        },
-        onPanResponderTerminate: () => {
-          settleDrawer(progress, true);
-        },
-      }),
-    [dismiss, progress]
-  );
-
-  //hardware back dismisses drawer
-  useEffect(() => {
-    if (!visible) return;
-    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-      dismiss();
-      return true;
-    });
-    return () => sub.remove();
-  }, [visible, dismiss]);
-
-  //desktop escape key dismiss
-  useEffect(() => {
-    if (!visible || Platform.OS !== "web") return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") dismiss();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [visible, dismiss]);
 
   useEffect(() => {
     AIModule.isModeAvailable("local").then(setLocalAvailable).catch(() => setLocalAvailable(false));
@@ -558,53 +509,22 @@ export function ModelSelectorDrawer({
     </View>
   );
 
-  const translateYMobile = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [420, 0],
-  });
-
-  const translateYDesktop = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-10, 0],
-  });
-
   return (
-    <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
-      <Animated.View style={[styles.overlay, { opacity: progress }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
-      </Animated.View>
-
-      {isLargeScreen || isDesktop ? (
-        <View style={styles.desktopRootWrapper} pointerEvents="box-none">
-          <Animated.View
-            style={[
-              styles.desktopCard,
-              {
-                opacity: progress,
-                transform: [{ translateY: translateYDesktop }],
-              },
-            ]}
-          >
-            {innerContent}
-          </Animated.View>
-        </View>
-      ) : (
-        <Animated.View
-          style={[
-            styles.mobileSheet,
-            {
-              transform: [{ translateY: translateYMobile }],
-              paddingBottom: (Platform.OS === "ios" ? 20 : 10) + insets.bottom,
-            },
-          ]}
-          {...panResponder.panHandlers}
-        >
-          <View style={styles.handleContainer}>
-            <View style={styles.dragHandle} />
-          </View>
-          {innerContent}
-        </Animated.View>
-      )}
+    <>
+      <DrawerSheet
+        visible={visible}
+        onClose={onClose}
+        mode="overlay"
+        progress={progress}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        sheetStyle={[styles.mobileSheet, { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + insets.bottom }]}
+        desktopStyle={styles.desktopCard}
+        handleContainerStyle={styles.handleContainer}
+        handleStyle={styles.dragHandle}
+      >
+        {innerContent}
+      </DrawerSheet>
 
       <NotificationModal
         visible={downloadModalVisible}
@@ -617,7 +537,7 @@ export function ModelSelectorDrawer({
           { text: "Download", onPress: handlePullModel, style: "primary" },
         ]}
       />
-    </View>
+    </>
   );
 }
 
@@ -663,22 +583,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     color: Colors.textPrimary,
     fontFamily: Fonts.mono,
     flexShrink: 1,
-  },
-  root: {
-    ...StyleSheet.absoluteFill,
-    zIndex: 1000,
-    elevation: 1000,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: Colors.scrimDrawer,
-  },
-  desktopRootWrapper: {
-    ...StyleSheet.absoluteFill,
-    alignItems: "flex-end",
-    paddingRight: Spacing.xl2,
-    paddingBottom: Spacing.xl2,
-    justifyContent: "flex-end",
   },
   desktopCard: {
     width: 320,

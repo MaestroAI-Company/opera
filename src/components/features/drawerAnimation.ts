@@ -29,7 +29,15 @@ export function dragDrawer(progress: Animated.Value, ratio: number) {
 const DISMISS_VELOCITY = -3;
 
 //spring carries finger velocity
-export function settleDrawer(progress: Animated.Value, open: boolean, velocity = 0) {
+//nativeDriver defaults to the shared drawer setting, override false when the value
+//also feeds a layout property (eg. marginBottom), which the native driver can't touch
+export function settleDrawer(
+  progress: Animated.Value,
+  open: boolean,
+  velocity = 0,
+  nativeDriver = DRAWER_NATIVE_DRIVER,
+  onComplete?: () => void
+) {
   const toValue = open ? 1 : 0;
   if (settledTarget.get(progress) === toValue) return;
   settledTarget.set(progress, toValue);
@@ -39,8 +47,8 @@ export function settleDrawer(progress: Animated.Value, open: boolean, velocity =
     overshootClamping: true,
     bounciness: 0,
     speed: 14,
-    useNativeDriver: DRAWER_NATIVE_DRIVER,
-  }).start();
+    useNativeDriver: nativeDriver,
+  }).start(() => onComplete?.());
 }
 
 //desktop width animates on fixed timing

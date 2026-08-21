@@ -248,6 +248,9 @@ export default function Index() {
     });
   }, []);
 
+  //desktop hangs the model panel under this button instead of docking it bottom-right
+  const modelTriggerRef = useRef<View | null>(null);
+
   const [pendingConvIds, setPendingConvIds] = useState<string[]>([]);
   const requestQueueRef = useRef<{ convId: string, task: () => Promise<void>, assistantMsgId: string, isIncognito: boolean }[]>([]);
   const isProcessingRef = useRef(false);
@@ -1321,6 +1324,7 @@ export default function Index() {
                 isDesktop={isDesktop}
                 centerElement={
                   <ModelSelectorTrigger
+                    viewRef={modelTriggerRef}
                     selectedModel={selectedModel}
                     onPress={() => {
                       if (!isDesktop && (drawerVisible || settingsDrawerVisible)) return;
@@ -1417,6 +1421,7 @@ export default function Index() {
         onReflectionChange={setSelectedReflection}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
+        triggerRef={modelTriggerRef}
       />
 
       <HeadlessWebView />

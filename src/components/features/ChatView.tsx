@@ -616,7 +616,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     gap: 12,
   },
   thinkingIcon: {
-    width: 70,
+    width: 35,
     height: 35,
   },
   flashingText: {

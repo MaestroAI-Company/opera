@@ -48,4 +48,16 @@ export const BackupCryptoImpl: BackupCrypto = {
     const decrypted = Buffer.concat([decipher.update(fromB64(ciphertextB64)), decipher.final()]);
     return decrypted.toString('utf8');
   },
+
+  async aesCbcEncryptBytesB64(keyB64, ivB64, plaintext) {
+    const cipher = createCipheriv(AES_ALGORITHM, fromB64(keyB64), fromB64(ivB64));
+    const encrypted = Buffer.concat([cipher.update(Buffer.from(plaintext)), cipher.final()]);
+    return encrypted.toString('base64');
+  },
+
+  async aesCbcDecryptBytes(keyB64, ivB64, ciphertextB64) {
+    const decipher = createDecipheriv(AES_ALGORITHM, fromB64(keyB64), fromB64(ivB64));
+    const decrypted = Buffer.concat([decipher.update(fromB64(ciphertextB64)), decipher.final()]);
+    return new Uint8Array(decrypted.buffer, decrypted.byteOffset, decrypted.byteLength);
+  },
 };

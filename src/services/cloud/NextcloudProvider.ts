@@ -4,7 +4,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 import { arrayBufferToBase64 } from '../ai/utils/base64';
 import { universalFetch } from '../ai/utils/universalFetch';
-import { CloudProvider, CloudUserInfo } from './CloudProvider';
+import { CloudDownload, CloudProvider, CloudUpload, CloudUserInfo } from './CloudProvider';
 
 const SERVER_URL_KEY = 'nextcloud_server_url';
 const USERNAME_KEY = 'nextcloud_username';
@@ -235,9 +235,9 @@ export class NextcloudProvider implements CloudProvider {
     }
   }
 
-  async uploadFile(filename: string, content: string): Promise<boolean> {
+  async uploadFile(filename: string, content: string): Promise<CloudUpload> {
     const config = await this.getConfig();
-    if (!config) return false;
+    if (!config) return { ok: false, tag: null };
 
     try {
       let response = await this.dav(config, 'PUT', this.fileUrl(config, filename), content);
@@ -246,24 +246,33 @@ export class NextcloudProvider implements CloudProvider {
         await this.createFolder(config);
         response = await this.dav(config, 'PUT', this.fileUrl(config, filename), content);
       }
-      return response.ok;
+      if (!response.ok) return { ok: false, tag: null };
+      return { ok: true, tag: response.headers.get('etag') };
     } catch (e) {
       console.error('Failed to upload file:', e);
-      return false;
+      return { ok: false, tag: null };
     }
   }
 
-  async downloadFile(filename: string): Promise<string | null> {
+  async downloadFile(filename: string, knownTag?: string | null): Promise<CloudDownload> {
     const config = await this.getConfig();
-    if (!config) return null;
+    if (!config) return { status: 'error' };
 
     try {
-      const response = await this.dav(config, 'GET', this.fileUrl(config, filename));
-      if (!response.ok) return null;
-      return await response.text();
+      const response = await this.dav(
+        config,
+        'GET',
+        this.fileUrl(config, filename),
+        undefined,
+        knownTag ? { 'If-None-Match': knownTag } : undefined
+      );
+      if (response.status === 304) return { status: 'unchanged' };
+      if (response.status === 404) return { status: 'missing' };
+      if (!response.ok) return { status: 'error' };
+      return { status: 'ok', content: await response.text(), tag: response.headers.get('etag') };
     } catch (e) {
       console.error('Failed to download file:', e);
-      return null;
+      return { status: 'error' };
     }
   }
 
@@ -301,12 +310,19 @@ export class NextcloudProvider implements CloudProvider {
     return `${this.folderUrl(config)}/${encodeURIComponent(filename)}`;
   }
 
-  private dav(config: NextcloudConfig, method: string, url: string, body?: string): Promise<Response> {
+  private dav(
+    config: NextcloudConfig,
+    method: string,
+    url: string,
+    body?: string,
+    extraHeaders?: Record<string, string>
+  ): Promise<Response> {
     return universalFetch(url, {
       method,
       headers: {
         ...this.authHeader(config),
         ...(body !== undefined ? { 'Content-Type': 'text/plain' } : {}),
+        ...extraHeaders,
       },
       ...(body !== undefined ? { body } : {}),
     });

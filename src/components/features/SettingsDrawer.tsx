@@ -11,6 +11,7 @@ import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme"
 import { AIModule } from "../../services/ai/AIModule";
 import { getLocalProviderLabel } from "../../services/ai/providers/LocalProvider";
 import { getEnabledProviders, getOllamaUrls, serializeOllamaUrls, serializeProviders } from "../../services/ai/providers/sources";
+import { isDefaultAssistant, openAssistantSettings } from "../../services/assistant/DefaultAssistant";
 import { ITool } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { BackupService } from "../../services/BackupService";
@@ -25,6 +26,8 @@ import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
 import ActionButton from "../ui/ActionButton";
 import DownloadProgress from "../ui/DownloadProgress";
 import Group from "../ui/Group";
+import NotificationBanner from "../ui/NotificationBanner";
+import NotificationCard from "../ui/NotificationCard";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import Selector from "../ui/Selector";
 import Slider from "../ui/Slider";
@@ -34,6 +37,7 @@ import Toggle from "../ui/Toggle";
 import CloudSyncBox from "./CloudSyncBox";
 
 import { useResponsive } from "../../hooks/useResponsive";
+import { useSettingsNotices } from "../../hooks/useSettingsNotices";
 
 import { REPORT_CONSENT, REPORT_LOG_LINES, useBugReport } from "../../hooks/useBugReport";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
@@ -69,6 +73,7 @@ const exportIcon = require("../../../assets/icons/export.png");
 const messageIcon = require("../../../assets/icons/message.png");
 const timeIcon = require("../../../assets/icons/time.png");
 const hyperlinkIcon = require("../../../assets/images/hyperlink2.png");
+const assistantImage = require("../../../assets/images/icon_nobg.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
 
@@ -207,6 +212,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       return "auto";
     }
   });
+  const notices = useSettingsNotices(visible);
   const report = useBugReport(showAlert);
   const [instruction, setInstructionState] = useState("");
   const [name, setNameState] = useState("");
@@ -304,6 +310,23 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     });
     return () => sub.remove();
   }, [visible, activeSubPage, refreshPermissionStatuses]);
+
+  //null means no assistant role here
+  const [assistantStatus, setAssistantStatus] = useState<boolean | null>(null);
+
+  const refreshAssistantStatus = useCallback(() => {
+    isDefaultAssistant().then(setAssistantStatus).catch(() => { });
+  }, []);
+
+  //recheck after returning from system settings
+  useEffect(() => {
+    if (!visible || activeSubPage !== "assistantoverlay") return;
+    refreshAssistantStatus();
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") refreshAssistantStatus();
+    });
+    return () => sub.remove();
+  }, [visible, activeSubPage, refreshAssistantStatus]);
 
   const renderPermissionBadge = (status: PermissionState) => (
     <View style={[styles.permissionBadge, status === "granted" && styles.permissionBadgeAllowed]}>
@@ -965,23 +988,25 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.menuContainer}>
       <Text style={styles.title}>Settings</Text>
 
-      <Group style={[styles.groupSpacing, styles.highlightGroup]}>
-        <ActionButton
-          icon={operaIcon}
-          label="Set Opera as your default assistant"
-          iconTintColor={Colors.textOnPrimary}
-          labelColor={Colors.textOnPrimary}
+      {notices.assistant && (
+        <NotificationCard
+          image={assistantImage}
+          title="Add Opera as an assistant"
+          description="Set Opera as your default assistant to call Maestro from anywhere."
+          onPress={notices.openAssistant}
+          onDismiss={notices.closeAssistant}
+          style={styles.groupSpacing}
         />
-      </Group>
+      )}
 
-      <Group style={[styles.groupSpacing, styles.highlightGroup]}>
-        <ActionButton
+      {!!notices.update && (
+        <NotificationBanner
           icon={downloadIcon}
-          label="New Update is available"
-          iconTintColor={Colors.textOnPrimary}
-          labelColor={Colors.textOnPrimary}
+          label={`Opera ${notices.update.version} is available`}
+          onPress={notices.openUpdate}
+          style={styles.groupSpacing}
         />
-      </Group>
+      )}
 
       {/* profile section */}
       <Group style={styles.groupSpacing}>
@@ -1242,7 +1267,30 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("Assistant Overlay")}
 
-      <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
+      {assistantStatus !== null && (
+        <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
+          <Text style={styles.settingLabel}>Default assistant</Text>
+          <Text style={styles.helpText}>
+            Get help from Opera anywhere on your device, from any app.
+          </Text>
+          <Text style={[styles.assistantStatusText, assistantStatus ? styles.assistantStatusOn : styles.assistantStatusOff]}>
+            {assistantStatus
+              ? "Opera is set as your default assistant."
+              : "Opera is not set as your default assistant."}
+          </Text>
+          {!assistantStatus && (
+            <Group>
+              <ActionButton
+                icon={operaIcon}
+                label="Set as default assistant"
+                onPress={openAssistantSettings}
+              />
+            </Group>
+          )}
+        </View>
+      )}
+
+      <View style={[styles.settingRowVertical, assistantStatus === null && { marginTop: 0 }]}>
         <View style={styles.toggleRow}>
           <Text style={styles.settingLabel}>Auto-start microphone</Text>
           <Toggle
@@ -1578,6 +1626,24 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             icon={supportIcon}
             label="Contact support"
             onPress={() => Linking.openURL("https://maestroai.company/contact.html").catch(() => { })}
+          />
+        </Group>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Testing</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          Crashes the app on purpose to test the crash report screen.
+        </Text>
+        <Group style={styles.dangerGroup}>
+          <ActionButton
+            icon={deleteIcon}
+            label="Trigger a test crash"
+            iconTintColor={Colors.textOnPrimary}
+            labelColor={Colors.textOnPrimary}
+            onPress={() => {
+              throw new Error("Test crash triggered from Report a bug settings");
+            }}
           />
         </Group>
       </View>
@@ -1951,10 +2017,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   groupSpacing: {
     marginBottom: 20,
   },
-  highlightGroup: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.borderOnPrimary,
-  },
   groupSpacingTight: {
     marginBottom: 8,
   },
@@ -2064,6 +2126,23 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     fontFamily: Fonts.body,
     marginTop: 4,
     lineHeight: 20,
+  },
+  assistantStatusText: {
+    fontSize: FontSizes.bodyMd,
+    fontFamily: Fonts.body,
+    marginTop: 6,
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  assistantStatusOn: {
+    color: Colors.primary,
+  },
+  assistantStatusOff: {
+    color: Colors.textMuted,
+  },
+  dangerGroup: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.borderOnPrimary,
   },
   sectionTitle: {
     fontSize: 13,

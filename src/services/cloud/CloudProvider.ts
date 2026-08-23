@@ -4,6 +4,19 @@ export interface CloudUserInfo {
   picture?: string;
 }
 
+/**
+ * Result of a download. `unchanged` is only ever returned when the caller
+ * supplied a tag that still matches the remote file. `error` must be used for
+ * any failure, so callers never mistake an unreachable server for an empty one.
+ */
+export type CloudDownload =
+  | { status: 'ok'; content: string; tag: string | null }
+  | { status: 'unchanged' }
+  | { status: 'missing' }
+  | { status: 'error' };
+
+export type CloudUpload = { ok: boolean; tag: string | null };
+
 export interface CloudProvider {
   /**
    * Unique identifier of the provider (used to persist the active provider).
@@ -36,14 +49,16 @@ export interface CloudProvider {
   /**
    * Upload a file with the given content.
    * If the file already exists, it should overwrite it.
+   * Reports the new remote tag when the provider exposes one.
    */
-  uploadFile(filename: string, content: string): Promise<boolean>;
+  uploadFile(filename: string, content: string): Promise<CloudUpload>;
 
   /**
-   * Download a file's content as a string.
-   * Returns null if the file does not exist.
+   * Download a file's content.
+   * When knownTag still matches the remote file, answer 'unchanged' rather
+   * than transferring the content again.
    */
-  downloadFile(filename: string): Promise<string | null>;
+  downloadFile(filename: string, knownTag?: string | null): Promise<CloudDownload>;
 
   /**
    * Delete a file by filename.

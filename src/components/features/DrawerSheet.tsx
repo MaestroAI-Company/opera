@@ -30,6 +30,8 @@ export type DrawerSheetProps = {
   isLargeScreen?: boolean;
   isDesktop?: boolean;
   liftOffset?: number;
+  //extra native-driven translateY (eg. keyboard follow), composed with the drawer's own slide
+  keyboardTranslateY?: Animated.Value;
   children: ReactNode;
   sheetStyle?: StyleProp<ViewStyle>;
   desktopStyle?: StyleProp<ViewStyle>;
@@ -45,6 +47,7 @@ export default function DrawerSheet({
   isLargeScreen = false,
   isDesktop = false,
   liftOffset = 0,
+  keyboardTranslateY,
   children,
   sheetStyle,
   desktopStyle,
@@ -156,6 +159,7 @@ export default function DrawerSheet({
   const closedOffset = Math.max(contentHeight, CLOSED_SLIDE);
   const translateYMobile = progress.interpolate({ inputRange: [0, 1], outputRange: [closedOffset, 0] });
   const translateYDesktop = progress.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] });
+  const translateYMobileWithKeyboard = keyboardTranslateY ? Animated.add(translateYMobile, keyboardTranslateY) : translateYMobile;
 
   return (
     <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
@@ -177,7 +181,7 @@ export default function DrawerSheet({
         <Animated.View
           pointerEvents={visible ? "auto" : "none"}
           onLayout={(e: LayoutChangeEvent) => setContentHeight(e.nativeEvent.layout.height)}
-          style={[sheetStyle, { transform: [{ translateY: translateYMobile }] }]}
+          style={[sheetStyle, { transform: [{ translateY: translateYMobileWithKeyboard }] }]}
           {...panResponder.panHandlers}
         >
           {handle}

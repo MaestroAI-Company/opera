@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import HeadlessWebView from "../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../constants/theme";
+import BugReportSheet from "../components/features/BugReportSheet";
 import ChatBar from "../components/features/ChatBar";
 import ChatView from "../components/features/ChatView";
 import ConversationsDrawer from "../components/features/ConversationsDrawer";
@@ -32,6 +33,9 @@ import TopBar from "../components/features/TopBar";
 import NotificationModal from "../components/ui/NotificationModal";
 import { hasOpenOverlaySheet } from "../components/ui/SheetSurface";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
+import { useBugReportTrigger } from "../hooks/useBugReportTrigger";
+import { takePendingCrash, type Crash } from "../services/logging/CrashReporter";
+import { captureScreen } from "../services/logging/ReportScreenshot";
 import { useResponsive } from "../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
 import { AIModule } from "../services/ai/AIModule";
@@ -148,7 +152,7 @@ export default function Index() {
   const [modelSelectorVisible, setModelSelectorVisible] = useState(false);
   //shared with the panResponder below so the swipe-up gesture can drag it live
   const modelSelectorProgress = useAnimatedValue(0);
-  const [settingsInitialSubPage, setSettingsInitialSubPage] = useState<"main" | "general" | "confidentiality" | "tools">("main");
+  const [settingsInitialSubPage, setSettingsInitialSubPage] = useState<"main" | "general" | "confidentiality" | "tools" | "reports">("main");
   const [dbReady, setDbReady] = useState(false);
   const [dbFailed, setDbFailed] = useState(false);
   const [showDataWarning, setShowDataWarning] = useState(false);
@@ -248,8 +252,31 @@ export default function Index() {
     });
   }, []);
 
-  //desktop hangs the model panel under this button instead of docking it bottom-right
+  //desktop panel hangs under this button
   const modelTriggerRef = useRef<View | null>(null);
+
+  //reopen crash report from last run
+  const [pendingCrash, setPendingCrash] = useState<Crash | null>(takePendingCrash);
+  const [bugReportVisible, setBugReportVisible] = useState(pendingCrash !== null);
+  const [screenshot, setScreenshot] = useState<string | null>(null);
+  const rootRef = useRef<View>(null);
+
+  const bugReportVisibleRef = useRef(bugReportVisible);
+  useEffect(() => {
+    bugReportVisibleRef.current = bugReportVisible;
+  }, [bugReportVisible]);
+
+  const openBugReport = useCallback(async () => {
+    //shakes ignored while sheet is open
+    if (bugReportVisibleRef.current) return;
+    if (!Settings.getCached().shakeToReport) return;
+    Vibration.vibrate(30);
+    //capture first or sheet shoots itself
+    setScreenshot(await captureScreen(rootRef));
+    openDrawerSafely(() => setBugReportVisible(true));
+  }, [openDrawerSafely]);
+
+  useBugReportTrigger(openBugReport);
 
   const [pendingConvIds, setPendingConvIds] = useState<string[]>([]);
   const requestQueueRef = useRef<{ convId: string, task: () => Promise<void>, assistantMsgId: string, isIncognito: boolean }[]>([]);
@@ -1202,7 +1229,7 @@ export default function Index() {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} ref={rootRef} collapsable={false}>
       <ImageBackground
         source={texture2}
         style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
@@ -1403,6 +1430,20 @@ export default function Index() {
 
       {isDesktop ? null : conversationsDrawer}
       {isDesktop ? null : settingsDrawer}
+
+      <BugReportSheet
+        visible={bugReportVisible}
+        crash={pendingCrash}
+        screenshot={screenshot}
+        onClose={() => {
+          setBugReportVisible(false);
+          setPendingCrash(null);
+          setScreenshot(null);
+        }}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        bottomInset={insets.bottom}
+      />
 
       <ModelSelectorDrawer
         visible={modelSelectorVisible}

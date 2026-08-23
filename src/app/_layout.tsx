@@ -13,6 +13,8 @@ import SiteHead from "../components/SiteHead";
 import SplashScreenComponent from "../components/ui/SplashScreen";
 import TauriTitleBar from "../components/features/TauriTitleBar";
 import { initTheme, useIsDark } from "../hooks/useTheme";
+import { installCrashHandler } from "../services/logging/CrashReporter";
+import { installLogger } from "../services/logging/Logger";
 import { setupQuickActions } from "../services/quickActions/QuickActionsService";
 import "../services/widgets/registerWidgets";
 
@@ -28,6 +30,12 @@ SplashScreen.preventAutoHideAsync();
 
 //resolve the palette before the first paint
 initTheme();
+
+//bug reports carry console output
+installLogger();
+
+//crash reported on next launch
+installCrashHandler();
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 

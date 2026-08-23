@@ -26,6 +26,7 @@ export type AppSettings = {
   showTechnicalDetails: boolean;
   dataWarningDismissed: boolean;
   useAppContext: boolean;
+  shakeToReport: boolean;
 };
 
 const DEFAULTS: AppSettings = {
@@ -57,6 +58,7 @@ const DEFAULTS: AppSettings = {
   showTechnicalDetails: false,
   dataWarningDismissed: false,
   useAppContext: true,
+  shakeToReport: true,
 };
 
 const SETTINGS_UPDATED_AT_KEY = '__settings_updated_at';
@@ -72,6 +74,7 @@ const BOOLEAN_KEYS = [
   'showTechnicalDetails',
   'dataWarningDismissed',
   'useAppContext',
+  'shakeToReport',
 ] as const;
 
 const NUMBER_KEYS = [

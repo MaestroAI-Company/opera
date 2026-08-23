@@ -49,7 +49,7 @@ const BREAK_RATIO = 0.85;
 const ROW_GAP = 4;
 const MAX_MODELS_HEIGHT = 240;
 
-//desktop panel hangs this far below the trigger, never closer than this to a window edge
+//panel hangs this far below trigger
 const ANCHOR_GAP = 8;
 const ANCHOR_MARGIN = 8;
 const DESKTOP_CARD_WIDTH = 320;
@@ -65,7 +65,7 @@ export type ModelSelectorTriggerProps = {
   selectedModel: string;
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
-  //desktop measures it to drop the panel right under the button
+  //desktop drops panel under button
   viewRef?: React.Ref<View>;
 };
 
@@ -119,7 +119,7 @@ export type ModelSelectorDrawerProps = {
   onServiceChange: (service: string, ollamaUrl: string) => void;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
-  //the trigger to hang the desktop panel under, docks bottom-right when absent
+  //trigger to hang panel under
   triggerRef?: React.RefObject<View | null>;
 };
 
@@ -146,7 +146,7 @@ export function ModelSelectorDrawer({
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
 
-  //remeasured on every open, the topbar shifts with window size
+  //remeasured on every open
   const [anchor, setAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   useEffect(() => {
     if (!visible || !isDesktop || !triggerRef?.current) return;
@@ -531,7 +531,7 @@ export function ModelSelectorDrawer({
     </View>
   );
 
-  //absolute wins over the wrapper's bottom-right docking, so the card hangs under the button
+  //card hangs under its trigger
   const anchoredStyle = anchor
     ? {
       position: "absolute" as const,

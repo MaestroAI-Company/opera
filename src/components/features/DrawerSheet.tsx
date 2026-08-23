@@ -19,7 +19,7 @@ import { dragDrawer, gestureVelocity, settleDrawer } from "./drawerAnimation";
 //distance the finger must travel to fully open/close by drag alone
 const PULL_DISTANCE = 280;
 
-//fallback slide for overlay sheets, until onLayout reports the real height
+//slide fallback before real measure
 const CLOSED_SLIDE = 420;
 
 export type DrawerSheetProps = {
@@ -66,10 +66,8 @@ export default function DrawerSheet({
   const progress = isLift ? ownedProgress : externalProgress ?? ownedProgress;
   const nativeDriver = !isLift;
 
-  //content unmounts once fully closed (frees lift content like photo thumbnails, and on web
-  //stops a faded-out overlay from still eating clicks - RN-web ignores an ancestor's
-  //pointerEvents="none" for children that don't opt into it themselves). Kept mounted while
-  //the close animation still runs so it doesn't jump or cut the fade short.
+  //fully closed content unmounts
+  //frees thumbnails and stops web ghost clicks
   const [rendered, setRendered] = useState(visible);
   const [contentHeight, setContentHeight] = useState(0);
 
@@ -168,7 +166,7 @@ export default function DrawerSheet({
 
   if (!rendered) return null;
 
-  //a sheet taller than the default slide would stay peeking once closed, so use its real height
+  //tall sheets need their real height
   const closedOffset = Math.max(contentHeight, CLOSED_SLIDE);
   const translateYMobile = progress.interpolate({ inputRange: [0, 1], outputRange: [closedOffset, 0] });
   const translateYDesktop = progress.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] });

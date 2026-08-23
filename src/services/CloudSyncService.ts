@@ -1,7 +1,7 @@
 import 'react-native-get-random-values';
 import { gunzipSync, gzipSync, strFromU8, strToU8 } from 'fflate';
 import { BackupCryptoImpl } from './crypto/backupCrypto';
-import { BackupData, BackupService } from './BackupService';
+import { BackupData } from './BackupService';
 import { DB, Conversation, Message, SyncTombstone } from './db/DatabaseService';
 import { Settings, AppSettings } from './settings/SettingsService';
 import { CloudProvider, CloudUserInfo } from './cloud/CloudProvider';
@@ -15,19 +15,11 @@ const CLOUD_PROVIDER_KEY = 'cloud_provider';
 const SYNC_PIN_KEY = 'cloud_sync_pin';
 const LAST_SYNC_TIME_KEY = 'cloud_sync_last_time';
 const LAST_SYNC_SIZE_KEY = 'cloud_sync_last_size';
-const SEEN_AUTHENTICATED_KEY = 'cloud_sync_seen_v3';
 const SYNC_PAUSED_KEY = 'cloud_sync_paused';
 const REMOTE_STATE_KEY = 'cloud_sync_remote_state';
-const WRITE_COMPRESSED_KEY = 'cloud_sync_write_v4';
-const MIGRATION_SNOOZED_KEY = 'cloud_sync_migration_snoozed';
 
-//v4 gzips payload, v3 adds mac
-const ENC_VERSION = 4;
-const COMPRESSED_MIN_VERSION = 4;
-const AUTHENTICATED_MIN_VERSION = 3;
-const LEGACY_ENC_VERSION = 2;
-//kept until every device reads v4
-const UNCOMPRESSED_WRITE_VERSION = 3;
+//a full migration flow (prompt, gating, local snapshot) lives in 78bd429
+const ENC_VERSION = 1;
 const PBKDF2_ITERATIONS = 50000;
 const AES_KEY_BYTES = 32;
 const IV_BYTES = 16;
@@ -46,8 +38,6 @@ type DecryptOutcome = { text: string | null; unsupportedVersion?: boolean };
 
 //separate keys from one pbkdf2 pass
 type DerivedKeys = {
-  //v2 raw key opens legacy files
-  legacyKey: string;
   encryptionKey: string;
   macKey: string;
 };
@@ -62,17 +52,11 @@ class CloudSyncServiceImpl {
   private initialized: boolean = false;
   private keyCache = new Map<string, DerivedKeys>();
   private lastSaltB64: string | null = null;
-  //blocks v2 once authenticated seen
-  private hasSeenAuthenticatedBackup = false;
   //account stays linked while sync is off
   private paused: boolean = false;
   //lets sync skip when nothing moved
   private remoteState: RemoteState | null = null;
   private retryAttempt = 0;
-  //off until every device reads v4
-  private writeCompressed = false;
-  //envelope version seen at last sync
-  private cloudFormatVersion: number | null = null;
 
   private async setStorageItem(key: string, value: string | null) {
     if (Platform.OS === 'web') {
@@ -102,8 +86,6 @@ class CloudSyncServiceImpl {
     if (this.initialized) return;
     this.initialized = true;
 
-    await this.loadAuthenticatedBackupFlag();
-    this.writeCompressed = (await this.getStorageItem(WRITE_COMPRESSED_KEY)) === 'true';
     this.remoteState = await this.loadRemoteState();
     this.paused = (await this.getStorageItem(SYNC_PAUSED_KEY)) === 'true';
 
@@ -193,8 +175,6 @@ class CloudSyncServiceImpl {
       await this.loadPinFor(providerName);
       //another account, another remote file
       await this.setRemoteState(null);
-      await this.setWriteCompressed(false);
-      this.cloudFormatVersion = null;
       this.retryAttempt = 0;
       await this.setPaused(false);
       return true;
@@ -212,9 +192,7 @@ class CloudSyncServiceImpl {
     this.keyCache.clear();
     this.lastSaltB64 = null;
     this.retryAttempt = 0;
-    this.cloudFormatVersion = null;
     await this.setRemoteState(null);
-    await this.setWriteCompressed(false);
     await this.setStorageItem(CLOUD_PROVIDER_KEY, null);
     await this.setStorageItem(LAST_SYNC_SIZE_KEY, null);
     await this.setPaused(false);
@@ -319,19 +297,6 @@ class CloudSyncServiceImpl {
     await this.setStorageItem(LAST_SYNC_SIZE_KEY, null);
   }
 
-  //flag must survive restarts
-  private async loadAuthenticatedBackupFlag(): Promise<void> {
-    this.hasSeenAuthenticatedBackup = (await this.getStorageItem(SEEN_AUTHENTICATED_KEY)) === 'true';
-  }
-
-  private rememberAuthenticatedBackup(): void {
-    if (this.hasSeenAuthenticatedBackup) return;
-    this.hasSeenAuthenticatedBackup = true;
-    this.setStorageItem(SEEN_AUTHENTICATED_KEY, 'true').catch((e) =>
-      console.warn('Could not persist the authenticated-backup flag:', e)
-    );
-  }
-
   private async clearPin(): Promise<void> {
     this.pin = null;
     this.keyCache.clear();
@@ -361,51 +326,6 @@ class CloudSyncServiceImpl {
     await this.setStorageItem(REMOTE_STATE_KEY, state ? JSON.stringify(state) : null);
   }
 
-  private async setWriteCompressed(enabled: boolean): Promise<void> {
-    this.writeCompressed = enabled;
-    await this.setStorageItem(WRITE_COMPRESSED_KEY, enabled ? 'true' : null);
-  }
-
-  //a shrinkable old backup was seen
-  isFormatMigrationAvailable(): boolean {
-    return !this.paused
-      && !!this.provider
-      && !!this.pin
-      && !this.writeCompressed
-      && this.cloudFormatVersion !== null
-      && this.cloudFormatVersion < COMPRESSED_MIN_VERSION;
-  }
-
-  //asks again after next app update
-  async shouldOfferFormatMigration(appVersion: string): Promise<boolean> {
-    if (!this.isFormatMigrationAvailable()) return false;
-    return (await this.getStorageItem(MIGRATION_SNOOZED_KEY)) !== appVersion;
-  }
-
-  async snoozeFormatMigration(appVersion: string): Promise<void> {
-    await this.setStorageItem(MIGRATION_SNOOZED_KEY, appVersion);
-  }
-
-  //snapshot locally then recompress cloud
-  async migrateFormat(): Promise<{ success: boolean; error?: string; snapshot: string | null }> {
-    if (!this.provider || !this.pin) {
-      return { success: false, error: 'Provider or PIN not configured', snapshot: null };
-    }
-
-    const snapshot = await BackupService.saveLocalSnapshot('pre_migration');
-
-    await this.setWriteCompressed(true);
-    //payload unchanged, force the upload
-    await this.setRemoteState(null);
-
-    const outcome = await this.sync();
-    if (!outcome.success) {
-      //keep old format so account works
-      await this.setWriteCompressed(false);
-      return { success: false, error: outcome.error, snapshot };
-    }
-    return { success: true, snapshot };
-  }
 
   private scheduleRetry(): void {
     if (this.retryAttempt >= MAX_RETRY_ATTEMPTS) return;
@@ -423,7 +343,6 @@ class CloudSyncServiceImpl {
     if (!keys) {
       const master = await BackupCryptoImpl.pbkdf2Sha256B64(pin, saltB64, iterations, AES_KEY_BYTES);
       keys = {
-        legacyKey: master,
         encryptionKey: await BackupCryptoImpl.hmacSha256B64(master, 'opera-encryption'),
         macKey: await BackupCryptoImpl.hmacSha256B64(master, 'opera-authentication'),
       };
@@ -438,23 +357,21 @@ class CloudSyncServiceImpl {
   }
 
   private async encrypt(data: string, pin: string): Promise<string> {
-    const version = this.writeCompressed ? ENC_VERSION : UNCOMPRESSED_WRITE_VERSION;
     const saltB64 = this.lastSaltB64 ?? (await BackupCryptoImpl.randomBytesB64(SALT_BYTES));
     this.lastSaltB64 = saltB64;
     const keys = await this.deriveKeys(pin, saltB64, PBKDF2_ITERATIONS);
     const ivB64 = await BackupCryptoImpl.randomBytesB64(IV_BYTES);
     //gzip shrinks chat json about fivefold
-    const ctB64 = version >= COMPRESSED_MIN_VERSION
-      ? await BackupCryptoImpl.aesCbcEncryptBytesB64(keys.encryptionKey, ivB64, gzipSync(strToU8(data), { mtime: 0 }))
-      : await BackupCryptoImpl.aesCbcEncryptB64(keys.encryptionKey, ivB64, data);
+    const payload = gzipSync(strToU8(data), { mtime: 0 });
+    const ctB64 = await BackupCryptoImpl.aesCbcEncryptBytesB64(keys.encryptionKey, ivB64, payload);
     return JSON.stringify({
-      v: version,
+      v: ENC_VERSION,
       kdf: 'pbkdf2-sha256',
       iter: PBKDF2_ITERATIONS,
       salt: saltB64,
       iv: ivB64,
       ct: ctB64,
-      mac: await this.computeMac(keys.macKey, version, PBKDF2_ITERATIONS, saltB64, ivB64, ctB64),
+      mac: await this.computeMac(keys.macKey, ENC_VERSION, PBKDF2_ITERATIONS, saltB64, ivB64, ctB64),
     });
   }
 
@@ -463,42 +380,27 @@ class CloudSyncServiceImpl {
       const env = JSON.parse(data);
       if (!env || env.kdf !== 'pbkdf2-sha256') return { text: null };
 
-      if (env.v > ENC_VERSION || env.v < LEGACY_ENC_VERSION) {
-        //pin fine, file from newer version
+      if (env.v !== ENC_VERSION) {
+        //pin fine, file written by another version
         console.warn(`Unsupported cloud backup version: ${env.v}`);
         return { text: null, unsupportedVersion: true };
       }
 
-      const authenticated = env.v >= AUTHENTICATED_MIN_VERSION;
       const iterations = typeof env.iter === 'number' ? env.iter : PBKDF2_ITERATIONS;
       const keys = await this.deriveKeys(pin, env.salt, iterations);
 
-      if (authenticated) {
-        const expectedMac = await this.computeMac(keys.macKey, env.v, iterations, env.salt, env.iv, env.ct);
-        if (env.mac !== expectedMac) {
-          console.warn('Cloud backup failed its integrity check, refusing to import it');
-          return { text: null };
-        }
-      } else if (this.hasSeenAuthenticatedBackup) {
-        //rejects forged unauthenticated backups
-        console.warn('Refusing a v2 backup: this account already uses the authenticated format');
+      const expectedMac = await this.computeMac(keys.macKey, env.v, iterations, env.salt, env.iv, env.ct);
+      if (env.mac !== expectedMac) {
+        console.warn('Cloud backup failed its integrity check, refusing to import it');
         return { text: null };
       }
 
       this.lastSaltB64 = env.salt;
-      const aesKey = authenticated ? keys.encryptionKey : keys.legacyKey;
       //wrong pin throws padding error
-      const decrypted = env.v >= COMPRESSED_MIN_VERSION
-        ? strFromU8(gunzipSync(await BackupCryptoImpl.aesCbcDecryptBytes(aesKey, env.iv, env.ct)))
-        : await BackupCryptoImpl.aesCbcDecryptUtf8(aesKey, env.iv, env.ct);
+      const decrypted = strFromU8(gunzipSync(await BackupCryptoImpl.aesCbcDecryptBytes(keys.encryptionKey, env.iv, env.ct)));
       if (!decrypted) return { text: null };
       JSON.parse(decrypted); //ensure valid json
 
-      //remember only once payload readable
-      if (authenticated) {
-        this.rememberAuthenticatedBackup();
-      }
-      this.cloudFormatVersion = env.v;
       return { text: decrypted };
     } catch (e) {
       //caller decides what to report
@@ -562,11 +464,6 @@ class CloudSyncServiceImpl {
         return { success: false, error: 'Could not reach the cloud.', retryable: true };
       }
 
-      //nothing to keep readable, start v4
-      if (download.status === 'missing' && !this.writeCompressed) {
-        await this.setWriteCompressed(true);
-      }
-
       let cloudBackup: BackupData | null = null;
 
       if (download.status === 'ok') {
@@ -581,11 +478,6 @@ class CloudSyncServiceImpl {
           DeviceEventEmitter.emit(AppEvents.syncPinInvalidated);
           return { success: false, error: 'Invalid PIN. Could not decrypt cloud backup.' };
         }
-        //another device migrated, follow it
-        if (!this.writeCompressed && (this.cloudFormatVersion ?? 0) >= COMPRESSED_MIN_VERSION) {
-          await this.setWriteCompressed(true);
-        }
-
         try {
           const parsed = JSON.parse(decrypted.text);
           if (!parsed || typeof parsed !== 'object' || !parsed.settings || !Array.isArray(parsed.conversations) || !Array.isArray(parsed.messages)) {

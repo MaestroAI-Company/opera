@@ -8,7 +8,7 @@ export const DRAWER_NATIVE_DRIVER = Platform.OS !== "web";
 
 //shared cap maps drag to progress
 export function drawerWidthFor(windowWidth: number): number {
-  return Math.min(windowWidth * 0.93, 360);
+  return Math.min(windowWidth * 0.90, 360);
 }
 
 //pan speed to spring units

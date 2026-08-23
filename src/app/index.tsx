@@ -1291,7 +1291,7 @@ export default function Index() {
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: "transparent" }]}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        enabled={!drawerVisible && !settingsDrawerVisible}
+        enabled={!drawerVisible && !settingsDrawerVisible && !bugReportVisible}
         {...(isLargeScreen ? {} : panResponder.panHandlers)}
       >
 

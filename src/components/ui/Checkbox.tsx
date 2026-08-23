@@ -19,7 +19,7 @@ export default function Checkbox({ label, checked, onToggle, disabled = false, l
       style={({ pressed, hovered }) => [
         styles.box,
         checked && styles.boxChecked,
-        (pressed || hovered) && !disabled && { opacity: 0.7 },
+        (pressed || hovered) && !disabled && (checked ? styles.boxCheckedActive : styles.boxActive),
         disabled && { opacity: 0.5 },
       ]}
       onPress={() => {
@@ -70,6 +70,12 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   boxChecked: {
     backgroundColor: Colors.primary,
     borderColor: Colors.borderOnPrimary,
+  },
+  boxActive: {
+    backgroundColor: Colors.surfacePressed,
+  },
+  boxCheckedActive: {
+    backgroundColor: Colors.primaryPressed,
   },
   checkmark: {
     color: Colors.textOnPrimary,

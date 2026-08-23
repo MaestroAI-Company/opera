@@ -1,7 +1,7 @@
 import * as AuthSession from 'expo-auth-session';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import { CloudProvider, CloudUserInfo } from './CloudProvider';
+import { CloudDownload, CloudProvider, CloudUpload, CloudUserInfo } from './CloudProvider';
 
 const ANDROID_CLIENT_ID = '390321100520-3mi4mkdrdt8ke2nvl3ksbjef000ad5eg.apps.googleusercontent.com';
 const IOS_CLIENT_ID = '390321100520-8pkv241s2finuqth4cc9h74ii4ph99af.apps.googleusercontent.com';
@@ -12,8 +12,10 @@ const WEB_REDIRECT_URI = process.env.EXPO_PUBLIC_GOOGLE_REDIRECT_URI;
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
-const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
 const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files';
+//drive lacks etag, checksum stands in
+const META_FIELDS = 'id,md5Checksum';
 const USERINFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
 
 const ACCESS_TOKEN_KEY = 'gdrive_access_token';
@@ -23,10 +25,15 @@ const TOKEN_EXPIRY_KEY = 'gdrive_token_expiry';
 //fixed loopback port, must be registered in google console as authorized redirect uri
 const OAUTH_LOOPBACK_PORT = 46357;
 
+//lookup outcome, null when missing
+type DriveFileMeta = { id: string; md5Checksum: string | null };
+
 export class GoogleDriveProvider implements CloudProvider {
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
   private tokenExpiry: number | null = null;
+  //saves a lookup query per transfer
+  private fileIds = new Map<string, string>();
 
   getId(): string {
     return 'google_drive';
@@ -204,6 +211,7 @@ export class GoogleDriveProvider implements CloudProvider {
     this.accessToken = null;
     this.refreshToken = null;
     this.tokenExpiry = null;
+    this.fileIds.clear();
     await this.setStorageItem(ACCESS_TOKEN_KEY, null);
     await this.setStorageItem(REFRESH_TOKEN_KEY, null);
     await this.setStorageItem(TOKEN_EXPIRY_KEY, null);
@@ -234,68 +242,59 @@ export class GoogleDriveProvider implements CloudProvider {
     }
   }
 
-  async uploadFile(filename: string, content: string): Promise<boolean> {
+  async uploadFile(filename: string, content: string): Promise<CloudUpload> {
     const token = await this.getValidToken();
-    if (!token) return false;
+    if (!token) return { ok: false, tag: null };
 
     try {
-      const existingFileId = await this.getFileId(filename);
+      let existingFileId = this.fileIds.get(filename) ?? null;
+      if (!existingFileId) {
+        const meta = await this.lookupMeta(filename, token);
+        //failed lookup risks duplicate, retry later
+        if (meta === 'error') return { ok: false, tag: null };
+        existingFileId = meta?.id ?? null;
+      }
 
-      const boundary = 'foo_bar_baz';
-      const metadata = {
-        name: filename,
-        mimeType: 'text/plain',
-        ...(existingFileId ? {} : { parents: ['appDataFolder'] }),
-      };
+      let response = await this.putContent(token, filename, content, existingFileId);
+      //cached id stale, create again
+      if (existingFileId && response.status === 404) {
+        this.fileIds.delete(filename);
+        response = await this.putContent(token, filename, content, null);
+      }
+      if (!response.ok) return { ok: false, tag: null };
 
-      const requestBody =
-        `--${boundary}\r\n` +
-        `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
-        `${JSON.stringify(metadata)}\r\n` +
-        `--${boundary}\r\n` +
-        `Content-Type: text/plain\r\n\r\n` +
-        `${content}\r\n` +
-        `--${boundary}--`;
-
-      const method = existingFileId ? 'PATCH' : 'POST';
-      const url = existingFileId 
-        ? `${DRIVE_UPLOAD_URL.replace('/upload/drive/v3/files', '/upload/drive/v3/files/' + existingFileId)}` 
-        : DRIVE_UPLOAD_URL;
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': `multipart/related; boundary=${boundary}`,
-          'Content-Length': requestBody.length.toString(),
-        },
-        body: requestBody,
-      });
-
-      return response.ok;
+      const data = await response.json();
+      if (data?.id) this.fileIds.set(filename, data.id);
+      return { ok: true, tag: data?.md5Checksum ?? null };
     } catch (e) {
       console.error('Failed to upload file:', e);
-      return false;
+      return { ok: false, tag: null };
     }
   }
 
-  async downloadFile(filename: string): Promise<string | null> {
+  async downloadFile(filename: string, knownTag?: string | null): Promise<CloudDownload> {
     const token = await this.getValidToken();
-    if (!token) return null;
+    if (!token) return { status: 'error' };
 
     try {
-      const fileId = await this.getFileId(filename);
-      if (!fileId) return null;
+      const meta = await this.getFileMeta(filename, token);
+      if (meta === 'error') return { status: 'error' };
+      if (!meta) return { status: 'missing' };
+      if (knownTag && meta.md5Checksum === knownTag) return { status: 'unchanged' };
 
-      const response = await fetch(`${DRIVE_FILES_URL}/${fileId}?alt=media`, {
+      const response = await fetch(`${DRIVE_FILES_URL}/${meta.id}?alt=media`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!response.ok) return null;
-      return await response.text();
+      if (response.status === 404) {
+        this.fileIds.delete(filename);
+        return { status: 'missing' };
+      }
+      if (!response.ok) return { status: 'error' };
+      return { status: 'ok', content: await response.text(), tag: meta.md5Checksum };
     } catch (e) {
       console.error('Failed to download file:', e);
-      return null;
+      return { status: 'error' };
     }
   }
 
@@ -304,40 +303,87 @@ export class GoogleDriveProvider implements CloudProvider {
     if (!token) return false;
 
     try {
-      const fileId = await this.getFileId(filename);
-      if (!fileId) return true; //already deleted
+      const meta = await this.getFileMeta(filename, token);
+      if (meta === 'error') return false;
+      if (!meta) return true; //already deleted
 
-      const response = await fetch(`${DRIVE_FILES_URL}/${fileId}`, {
+      const response = await fetch(`${DRIVE_FILES_URL}/${meta.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      return response.ok;
+      if (!response.ok && response.status !== 404) return false;
+      this.fileIds.delete(filename);
+      return true;
     } catch (e) {
       console.error('Failed to delete file:', e);
       return false;
     }
   }
 
-  private async getFileId(filename: string): Promise<string | null> {
-    const token = await this.getValidToken();
-    if (!token) return null;
+  private putContent(token: string, filename: string, content: string, fileId: string | null): Promise<Response> {
+    const boundary = 'foo_bar_baz';
+    const metadata = {
+      name: filename,
+      mimeType: 'text/plain',
+      ...(fileId ? {} : { parents: ['appDataFolder'] }),
+    };
 
-    const q = encodeURIComponent(`name = '${filename}' and 'appDataFolder' in parents and trashed = false`);
-    const url = `${DRIVE_FILES_URL}?spaces=appDataFolder&q=${q}&fields=files(id,name)`;
-    
-    const response = await fetch(url, {
+    const requestBody =
+      `--${boundary}\r\n` +
+      `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+      `${JSON.stringify(metadata)}\r\n` +
+      `--${boundary}\r\n` +
+      `Content-Type: text/plain\r\n\r\n` +
+      `${content}\r\n` +
+      `--${boundary}--`;
+
+    const query = `?uploadType=multipart&fields=${META_FIELDS}`;
+    return fetch(fileId ? `${DRIVE_UPLOAD_URL}/${fileId}${query}` : `${DRIVE_UPLOAD_URL}${query}`, {
+      method: fileId ? 'PATCH' : 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`,
+        'Content-Length': requestBody.length.toString(),
+      },
+      body: requestBody,
+    });
+  }
+
+  //cached id first, else lookup query
+  private async getFileMeta(filename: string, token: string): Promise<DriveFileMeta | null | 'error'> {
+    const cachedId = this.fileIds.get(filename);
+    if (!cachedId) return this.lookupMeta(filename, token);
+
+    const response = await fetch(`${DRIVE_FILES_URL}/${cachedId}?fields=${META_FIELDS}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (!response.ok) return null;
-    
-    const data = await response.json();
-    if (data.files && data.files.length > 0) {
-      return data.files[0].id;
+    if (response.status === 404) {
+      this.fileIds.delete(filename);
+      return this.lookupMeta(filename, token);
     }
-    
-    return null;
+    if (!response.ok) return 'error';
+
+    const data = await response.json();
+    return { id: cachedId, md5Checksum: data?.md5Checksum ?? null };
+  }
+
+  private async lookupMeta(filename: string, token: string): Promise<DriveFileMeta | null | 'error'> {
+    const q = encodeURIComponent(`name = '${filename}' and 'appDataFolder' in parents and trashed = false`);
+    const url = `${DRIVE_FILES_URL}?spaces=appDataFolder&q=${q}&fields=files(${META_FIELDS})`;
+
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return 'error';
+
+    const data = await response.json();
+    const file = data?.files?.[0];
+    if (!file?.id) return null;
+
+    this.fileIds.set(filename, file.id);
+    return { id: file.id, md5Checksum: file.md5Checksum ?? null };
   }
 
   private async getValidToken(): Promise<string | null> {

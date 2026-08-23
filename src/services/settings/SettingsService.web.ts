@@ -24,6 +24,7 @@ export type AppSettings = {
   dataWarningDismissed: boolean;
   useAppContext: boolean;
   shakeToReport: boolean;
+  assistantPromptDismissed: boolean;
 };
 
 const DEFAULTS: AppSettings = {
@@ -55,6 +56,7 @@ const DEFAULTS: AppSettings = {
   dataWarningDismissed: false,
   useAppContext: true,
   shakeToReport: true,
+  assistantPromptDismissed: false,
 };
 
 class SettingsService {
@@ -98,6 +100,7 @@ class SettingsService {
         dataWarningDismissed: typeof parsed.dataWarningDismissed === 'boolean' ? parsed.dataWarningDismissed : DEFAULTS.dataWarningDismissed,
         useAppContext: typeof parsed.useAppContext === 'boolean' ? parsed.useAppContext : DEFAULTS.useAppContext,
         shakeToReport: typeof parsed.shakeToReport === 'boolean' ? parsed.shakeToReport : DEFAULTS.shakeToReport,
+        assistantPromptDismissed: typeof parsed.assistantPromptDismissed === 'boolean' ? parsed.assistantPromptDismissed : DEFAULTS.assistantPromptDismissed,
       };
       
       this.cache = settings;

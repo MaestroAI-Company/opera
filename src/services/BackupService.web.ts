@@ -37,6 +37,34 @@ export type ImportInspection = {
 };
 
 class BackupServiceImpl {
+  //web saves snapshots as downloads
+  async saveLocalSnapshot(label: string): Promise<string | null> {
+    try {
+      const backup: BackupFile = {
+        version: 2,
+        settings: Settings.getCached(),
+        settingsUpdatedAt: await Settings.getSettingsUpdatedAt(),
+        conversations: await DB.getConversations(),
+        messages: await DB.getAllMessagesAllConversations(),
+        tombstones: await DB.getTombstones(),
+      };
+
+      const filename = `opera_${label}_${Date.now()}.json`;
+      const url = URL.createObjectURL(new Blob([JSON.stringify(backup)], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return filename;
+    } catch (e) {
+      console.warn('Could not download a local snapshot', e);
+      return null;
+    }
+  }
+
   // export data to json file download
   async exportData(scope?: BackupScope): Promise<boolean> {
     try {

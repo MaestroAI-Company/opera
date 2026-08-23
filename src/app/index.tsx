@@ -1,3 +1,4 @@
+import Constants from "expo-constants";
 import { LinearGradient } from "expo-linear-gradient";
 import { useQuickActionCallback } from "expo-quick-actions/hooks";
 import { useRouter } from "expo-router";
@@ -38,6 +39,7 @@ import { takePendingCrash, type Crash } from "../services/logging/CrashReporter"
 import { captureScreen } from "../services/logging/ReportScreenshot";
 import { useResponsive } from "../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
+import { CloudSync } from "../services/CloudSyncService";
 import { AIModule } from "../services/ai/AIModule";
 import { buildSystemPrompt, streamAssistantReply } from "../services/ai/generation/chatGeneration";
 import { arrayBufferToBase64 } from "../services/ai/utils/base64";
@@ -156,6 +158,39 @@ export default function Index() {
   const [dbReady, setDbReady] = useState(false);
   const [dbFailed, setDbFailed] = useState(false);
   const [showDataWarning, setShowDataWarning] = useState(false);
+  const [showCloudMigration, setShowCloudMigration] = useState(false);
+  const [migrationBusy, setMigrationBusy] = useState(false);
+  const [migrationResult, setMigrationResult] = useState<string | null>(null);
+
+  const appVersion = Constants.expoConfig?.version ?? "0.0.0";
+
+  //cloud format known after first sync
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(AppEvents.syncCompleted, () => {
+      CloudSync.shouldOfferFormatMigration(appVersion)
+        .then((offer) => { if (offer) setShowCloudMigration(true); })
+        .catch(() => { });
+    });
+    return () => sub.remove();
+  }, [appVersion]);
+
+  //asks again after the next update
+  const postponeCloudMigration = useCallback(() => {
+    setShowCloudMigration(false);
+    CloudSync.snoozeFormatMigration(appVersion).catch(() => { });
+  }, [appVersion]);
+
+  const runCloudMigration = useCallback(async () => {
+    setMigrationBusy(true);
+    const result = await CloudSync.migrateFormat();
+    setMigrationBusy(false);
+    setShowCloudMigration(false);
+    setMigrationResult(
+      result.success
+        ? `Your cloud backup now uses the compact format.${result.snapshot ? `\n\nA local copy was saved as ${result.snapshot}.` : ""}`
+        : result.error ?? "The migration could not be completed. Your cloud backup was left untouched."
+    );
+  }, []);
 
   const drawerVisibleRef = useRef(drawerVisible);
   useEffect(() => {
@@ -571,6 +606,8 @@ export default function Index() {
         if ((await DB.detectDataIssues()) && !s.dataWarningDismissed) {
           setShowDataWarning(true);
         }
+        //arms background sync at launch
+        CloudSync.init().catch((e) => console.warn("Could not start cloud sync:", e));
         await PluginRegistry.init();
         await PluginRegistry.loadAll();
 
@@ -1491,6 +1528,34 @@ export default function Index() {
             }
           },
         ]}
+      />
+
+      <NotificationModal
+        visible={showCloudMigration}
+        title="New cloud backup format"
+        message="Opera can now store your cloud backup about five times smaller. A local copy of your data is saved automatically before switching. Only migrate once all your devices run this version of Opera, as older ones cannot read the new format."
+        onClose={postponeCloudMigration}
+        buttons={[
+          {
+            text: migrationBusy ? "Migrating…" : "Migrate now",
+            style: "primary",
+            disabled: migrationBusy,
+            onPress: runCloudMigration,
+          },
+          {
+            text: "Later",
+            style: "secondary",
+            disabled: migrationBusy,
+            onPress: postponeCloudMigration,
+          },
+        ]}
+      />
+
+      <NotificationModal
+        visible={!!migrationResult}
+        title="Cloud backup"
+        message={migrationResult ?? ""}
+        onClose={() => setMigrationResult(null)}
       />
     </View>
   );

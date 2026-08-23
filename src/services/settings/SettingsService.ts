@@ -27,6 +27,7 @@ export type AppSettings = {
   dataWarningDismissed: boolean;
   useAppContext: boolean;
   shakeToReport: boolean;
+  assistantPromptDismissed: boolean;
 };
 
 const DEFAULTS: AppSettings = {
@@ -59,6 +60,7 @@ const DEFAULTS: AppSettings = {
   dataWarningDismissed: false,
   useAppContext: true,
   shakeToReport: true,
+  assistantPromptDismissed: false,
 };
 
 const SETTINGS_UPDATED_AT_KEY = '__settings_updated_at';
@@ -75,6 +77,7 @@ const BOOLEAN_KEYS = [
   'dataWarningDismissed',
   'useAppContext',
   'shakeToReport',
+  'assistantPromptDismissed',
 ] as const;
 
 const NUMBER_KEYS = [

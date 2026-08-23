@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useKeyboardState } from "react-native-keyboard-controller";
-import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
-import { REPORT_CONSENT, REPORT_LOG_LINES, useBugReport } from "../../hooks/useBugReport";
+import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import { REPORT_CONSENT, useBugReport } from "../../hooks/useBugReport";
 import { useThemedStyles } from "../../hooks/useTheme";
 import type { Crash } from "../../services/logging/CrashReporter";
 import ActionButton from "../ui/ActionButton";
+import Checkbox from "../ui/Checkbox";
 import Group from "../ui/Group";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
-import Toggle from "../ui/Toggle";
 import DrawerSheet from "./DrawerSheet";
 
 const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
@@ -33,8 +33,6 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
   const styles = useThemedStyles(makeStyles);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{ title: string; message: string; buttons?: ModalButton[] }>({ title: "", message: "" });
-
-  //sheet clears the android keyboard itself
   const keyboardHeight = useKeyboardState((state) => state.height);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
@@ -50,8 +48,6 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
     if (visible) reset(crash, screenshot);
   }, [visible, crash, screenshot, reset]);
 
-  //report form centered not docked
-  //content sized card sits above centre
   const centeredStyle = {
     position: "absolute" as const,
     left: Math.max(DESKTOP_MARGIN, (windowWidth - DESKTOP_CARD_WIDTH) / 2),
@@ -70,7 +66,6 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
         handleContainerStyle={styles.sheetHandleContainer}
         sheetStyle={[
           styles.sheet,
-          //field stays visible above keyboard
           { bottom: keyboardHeight, paddingBottom: (Platform.OS === "ios" ? 20 : 10) + (keyboardHeight ? 0 : bottomInset) },
         ]}
         desktopStyle={[styles.desktopCard, centeredStyle]}
@@ -84,27 +79,40 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
             </Text>
           )}
 
-          <Group style={styles.groupSpacing}>
-            <TextInputField
-              icon={penPlaceholderIcon}
-              placeholder={crash ? "What were you doing?" : "Describe the issue"}
-              value={report.text}
-              onChangeText={report.setText}
-            />
-          </Group>
+          <View style={styles.settingRowVertical}>
+            <Group>
+              <TextInputField
+                icon={penPlaceholderIcon}
+                placeholder={crash ? "What were you doing?" : "Describe the issue"}
+                value={report.text}
+                onChangeText={report.setText}
+              />
+            </Group>
+          </View>
 
-          <View style={styles.toggleRow}>
-            <Text style={styles.label}>Attach {REPORT_LOG_LINES} log lines</Text>
-            <Toggle checked={report.logs !== null} onToggle={report.toggleLogs} />
+          <View style={styles.settingRowVertical}>
+            <View style={styles.toggleRow}>
+              <Checkbox
+                label="Attach lastest log lines"
+                checked={report.logs !== null}
+                onToggle={report.toggleLogs}
+                labelFirst
+                style={styles.checkboxRow}
+              />
+            </View>
           </View>
 
           {screenshot && (
-            <View style={styles.toggleRow}>
-              <Text style={styles.label}>Attach a screenshot</Text>
-              <Toggle
-                checked={report.screenshot !== null}
-                onToggle={(v) => report.setScreenshot(v ? screenshot : null)}
-              />
+            <View style={styles.settingRowVertical}>
+              <View style={styles.toggleRow}>
+                <Checkbox
+                  label="Attach a screenshot"
+                  checked={report.screenshot !== null}
+                  onToggle={(v) => report.setScreenshot(v ? screenshot : null)}
+                  labelFirst
+                  style={styles.checkboxRow}
+                />
+              </View>
             </View>
           )}
 
@@ -113,11 +121,12 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
             {report.screenshot ? " The screenshot taken when you shook the phone goes to your clipboard, paste it into the issue if it helps." : ""}
           </Text>
 
-          <Group>
+          <Group style={styles.highlightGroup}>
             <ActionButton
               icon={arrowIcon}
               label="Send my issue"
               onPress={() => report.send(onClose)}
+              variant="highlight"
             />
           </Group>
         </ScrollView>
@@ -163,37 +172,40 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     marginTop: -10,
   },
   content: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl2,
+    paddingTop: Spacing.md,
     paddingBottom: Spacing.lg,
   },
   title: {
-    fontSize: FontSizes.title,
-    color: Colors.textPrimary,
-    fontFamily: Fonts.body,
-    marginBottom: 6,
-  },
-  label: {
-    fontSize: FontSizes.bodyMd,
+    fontSize: FontSizes.body,
     color: Colors.textPrimary,
     fontFamily: Fonts.mono,
+    marginBottom: 6,
   },
   help: {
     fontSize: FontSizes.caption,
     color: Colors.textMuted,
-    fontFamily: Fonts.mono,
+    fontFamily: Fonts.body,
   },
   consent: {
     marginTop: 12,
     marginBottom: 12,
   },
-  groupSpacing: {
-    marginBottom: 8,
+  settingRowVertical: {
+    marginBottom: 30,
   },
   toggleRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: 8,
+  },
+  checkboxRow: {
+    flex: 1,
+    justifyContent: "space-between",
+  },
+  highlightGroup: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.borderOnPrimary,
   },
 });

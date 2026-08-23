@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
-import { useKeyboardState } from "react-native-keyboard-controller";
+import { useKeyboardAnimation, useKeyboardState } from "react-native-keyboard-controller";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { REPORT_CONSENT, useBugReport } from "../../hooks/useBugReport";
 import { useThemedStyles } from "../../hooks/useTheme";
@@ -33,7 +33,9 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
   const styles = useThemedStyles(makeStyles);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{ title: string; message: string; buttons?: ModalButton[] }>({ title: "", message: "" });
-  const keyboardHeight = useKeyboardState((state) => state.height);
+  //fluid, native-driven keyboard height, same source as the chatbar's KeyboardAvoidingView
+  const { height: keyboardHeight } = useKeyboardAnimation();
+  const isKeyboardOpen = useKeyboardState((state) => state.isVisible);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
   const notify = useCallback((title: string, message: string, buttons?: ModalButton[]) => {
@@ -64,9 +66,10 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
         handleContainerStyle={styles.sheetHandleContainer}
+        keyboardTranslateY={keyboardHeight}
         sheetStyle={[
           styles.sheet,
-          { bottom: keyboardHeight, paddingBottom: (Platform.OS === "ios" ? 20 : 10) + (keyboardHeight ? 0 : bottomInset) },
+          { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + (isKeyboardOpen ? 0 : bottomInset) },
         ]}
         desktopStyle={[styles.desktopCard, centeredStyle]}
       >

@@ -25,15 +25,10 @@ const CLOSED_SLIDE = 420;
 export type DrawerSheetProps = {
   visible: boolean;
   onClose: () => void;
-  //overlay floats above everything behind a backdrop and can be dismissed with back/escape,
-  //lift grows in place and pushes whatever sits below it in the layout, like a native input accessory
   mode: "overlay" | "lift";
-  //owned by the caller so an external gesture (eg. a home screen swipe-up) can drag it live, overlay only
   progress?: Animated.Value;
-  //overlay only: docks a card bottom-right instead of the mobile sheet
   isLargeScreen?: boolean;
   isDesktop?: boolean;
-  //lift only: space the sheet must clear to sit fully off-screen
   liftOffset?: number;
   children: ReactNode;
   sheetStyle?: StyleProp<ViewStyle>;
@@ -42,8 +37,6 @@ export type DrawerSheetProps = {
   handleStyle?: StyleProp<ViewStyle>;
 };
 
-//fluid drawer, driven by PanResponder + spring, no Modal involved. shared skeleton for every
-//panel that slides in from the bottom, either lifting the ui above it or floating over it
 export default function DrawerSheet({
   visible,
   onClose,
@@ -60,14 +53,9 @@ export default function DrawerSheet({
 }: DrawerSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const isLift = mode === "lift";
-
-  //marginBottom (lift) can't run on the native driver, so lift always owns a js-driven value
   const ownedProgress = useAnimatedValue(0);
   const progress = isLift ? ownedProgress : externalProgress ?? ownedProgress;
   const nativeDriver = !isLift;
-
-  //fully closed content unmounts
-  //frees thumbnails and stops web ghost clicks
   const [rendered, setRendered] = useState(visible);
   const [contentHeight, setContentHeight] = useState(0);
 
@@ -81,7 +69,6 @@ export default function DrawerSheet({
   );
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- remount content before it animates open
     if (visible) setRendered(true);
     settle(visible);
   }, [visible, settle]);
@@ -141,7 +128,6 @@ export default function DrawerSheet({
 
   if (isLift) {
     if (!rendered) return null;
-    //first pass measures out of flow, otherwise the sheet would flash at full height
     const measuring = contentHeight === 0;
     return (
       <Animated.View
@@ -151,9 +137,9 @@ export default function DrawerSheet({
           measuring
             ? styles.measuring
             : {
-                marginBottom: progress.interpolate({ inputRange: [0, 1], outputRange: [-contentHeight, 0] }),
-                transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [liftOffset, 0] }) }],
-              }
+              marginBottom: progress.interpolate({ inputRange: [0, 1], outputRange: [-contentHeight, 0] }),
+              transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [liftOffset, 0] }) }],
+            }
         }
       >
         <View style={sheetStyle} {...panResponder.panHandlers}>

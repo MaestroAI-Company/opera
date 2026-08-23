@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, BackHandler, Image, Keyboard, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Animated, BackHandler, Image, Keyboard, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useResponsive } from "../../hooks/useResponsive";
@@ -9,6 +9,7 @@ import { Conversation, DB } from "../../services/db/DatabaseService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
+import TextInputField from "../ui/TextInputField";
 import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, playPageTransition, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
 
 const searchIcon = require("../../../assets/icons/search.png");
@@ -86,18 +87,14 @@ export default function ConversationsDrawer({
   const pageAnim = useAnimatedValue(1);
 
   useEffect(() => {
-    //reset only when needed
     if (!visible && (isSearching || searchQuery !== "" || selectedSearchId !== null)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsSearching(false);
       setSearchQuery("");
       setSearchResults([]);
       setSelectedSearchId(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  //fade/slide on every real navigation (forward or back), but not just on open/reopen
   const prevSearchingRef = useRef(isSearching);
   useEffect(() => {
     if (visible && isSearching !== prevSearchingRef.current) {
@@ -132,7 +129,6 @@ export default function ConversationsDrawer({
     }, 250);
     return () => clearTimeout(timer);
   }, [searchQuery, isSearching]);
-  //useMemo read during render
   const panResponder = useMemo(() =>
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
@@ -253,16 +249,16 @@ export default function ConversationsDrawer({
           <Image source={arrowIcon} style={{ width: 18, height: 18, transform: [{ rotate: '-180deg' }] }} tintColor={Colors.textPrimary} />
         </Pressable>
 
-        <View style={styles.searchInputContainer}>
-          <Image source={searchIcon} style={{ width: 16, height: 16, tintColor: Colors.textPrimary }} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search conversations"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoFocus
-            placeholderTextColor={Colors.textMuted}
-          />
+        <View style={{ flex: 1 }}>
+          <Group>
+            <TextInputField
+              icon={searchIcon}
+              placeholder="Search conversations"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoFocus
+            />
+          </Group>
         </View>
       </View>
 
@@ -591,22 +587,5 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     width: 18,
     height: 18,
     opacity: 0.5,
-  },
-  searchInputContainer: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surface,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: Radius.xl,
-    paddingHorizontal: 12,
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: FontSizes.md,
-    fontFamily: Fonts.mono,
-    color: Colors.textPrimary,
   },
 });

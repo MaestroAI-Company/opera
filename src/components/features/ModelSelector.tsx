@@ -12,6 +12,7 @@ import {
   StyleProp,
   StyleSheet,
   Text,
+  useWindowDimensions,
   Vibration,
   View,
   ViewStyle,
@@ -48,6 +49,11 @@ const BREAK_RATIO = 0.85;
 const ROW_GAP = 4;
 const MAX_MODELS_HEIGHT = 240;
 
+//panel hangs this far below trigger
+const ANCHOR_GAP = 8;
+const ANCHOR_MARGIN = 8;
+const DESKTOP_CARD_WIDTH = 320;
+
 //rubber-band curve for vertical pull
 const rubberBand = (d: number, dim: number) => {
   if (dim <= 0) return 0;
@@ -59,6 +65,8 @@ export type ModelSelectorTriggerProps = {
   selectedModel: string;
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
+  //desktop drops panel under button
+  viewRef?: React.Ref<View>;
 };
 
 //button trigger in topbar
@@ -66,6 +74,7 @@ export function ModelSelectorTrigger({
   selectedModel,
   onPress,
   style,
+  viewRef,
 }: ModelSelectorTriggerProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -74,7 +83,7 @@ export function ModelSelectorTrigger({
     model.startsWith("aicore-") ? getAICoreModelLabel(model) : model;
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, style]} ref={viewRef} collapsable={false}>
       <View style={styles.shadowLayer}>
         <View style={styles.shadowBlock} />
         <Pressable
@@ -110,6 +119,8 @@ export type ModelSelectorDrawerProps = {
   onServiceChange: (service: string, ollamaUrl: string) => void;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
+  //trigger to hang panel under
+  triggerRef?: React.RefObject<View | null>;
 };
 
 //fluid drawer, built the same way as ConversationsDrawer/SettingsDrawer: mounted at the screen
@@ -128,10 +139,21 @@ export function ModelSelectorDrawer({
   onServiceChange,
   isLargeScreen = false,
   isDesktop = false,
+  triggerRef,
 }: ModelSelectorDrawerProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+
+  //remeasured on every open
+  const [anchor, setAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  useEffect(() => {
+    if (!visible || !isDesktop || !triggerRef?.current) return;
+    triggerRef.current.measureInWindow((x, y, width, height) => {
+      setAnchor({ x, y, width, height });
+    });
+  }, [visible, isDesktop, triggerRef]);
 
   const [models, setModels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -509,6 +531,18 @@ export function ModelSelectorDrawer({
     </View>
   );
 
+  //card hangs under its trigger
+  const anchoredStyle = anchor
+    ? {
+      position: "absolute" as const,
+      top: anchor.y + anchor.height + ANCHOR_GAP,
+      left: Math.max(
+        ANCHOR_MARGIN,
+        Math.min(anchor.x + anchor.width / 2 - DESKTOP_CARD_WIDTH / 2, windowWidth - DESKTOP_CARD_WIDTH - ANCHOR_MARGIN)
+      ),
+    }
+    : null;
+
   return (
     <>
       <DrawerSheet
@@ -519,7 +553,7 @@ export function ModelSelectorDrawer({
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
         sheetStyle={[styles.mobileSheet, { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + insets.bottom }]}
-        desktopStyle={styles.desktopCard}
+        desktopStyle={[styles.desktopCard, anchoredStyle]}
         handleContainerStyle={styles.handleContainer}
         handleStyle={styles.dragHandle}
       >
@@ -585,7 +619,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flexShrink: 1,
   },
   desktopCard: {
-    width: 320,
+    width: DESKTOP_CARD_WIDTH,
     backgroundColor: Colors.surface,
     borderRadius: Radius.xxl,
     borderWidth: 2,

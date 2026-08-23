@@ -19,6 +19,9 @@ import { dragDrawer, gestureVelocity, settleDrawer } from "./drawerAnimation";
 //distance the finger must travel to fully open/close by drag alone
 const PULL_DISTANCE = 280;
 
+//slide fallback before real measure
+const CLOSED_SLIDE = 420;
+
 export type DrawerSheetProps = {
   visible: boolean;
   onClose: () => void;
@@ -63,25 +66,24 @@ export default function DrawerSheet({
   const progress = isLift ? ownedProgress : externalProgress ?? ownedProgress;
   const nativeDriver = !isLift;
 
-  //lift unmounts its content once fully closed to free it (eg. photo thumbnails), kept
-  //mounted while the close spring still runs so it doesn't jump
+  //fully closed content unmounts
+  //frees thumbnails and stops web ghost clicks
   const [rendered, setRendered] = useState(visible);
   const [contentHeight, setContentHeight] = useState(0);
 
   const settle = useCallback(
     (open: boolean, velocity = 0) => {
       settleDrawer(progress, open, velocity, nativeDriver, () => {
-        if (isLift && !open) setRendered(false);
+        if (!open) setRendered(false);
       });
     },
-    [progress, nativeDriver, isLift]
+    [progress, nativeDriver]
   );
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- remount lift content before it animates open
-    if (isLift && visible) setRendered(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- remount content before it animates open
+    if (visible) setRendered(true);
     settle(visible);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- settle already tracks progress/nativeDriver/isLift
   }, [visible, settle]);
 
   const dismiss = useCallback(() => {
@@ -162,7 +164,11 @@ export default function DrawerSheet({
     );
   }
 
-  const translateYMobile = progress.interpolate({ inputRange: [0, 1], outputRange: [420, 0] });
+  if (!rendered) return null;
+
+  //tall sheets need their real height
+  const closedOffset = Math.max(contentHeight, CLOSED_SLIDE);
+  const translateYMobile = progress.interpolate({ inputRange: [0, 1], outputRange: [closedOffset, 0] });
   const translateYDesktop = progress.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] });
 
   return (
@@ -173,12 +179,21 @@ export default function DrawerSheet({
 
       {isLargeScreen || isDesktop ? (
         <View style={styles.desktopRootWrapper} pointerEvents="box-none">
-          <Animated.View style={[desktopStyle, { opacity: progress, transform: [{ translateY: translateYDesktop }] }]}>
+          {/* box-none re-enables hit testing on the web, so the closed card has to opt out itself */}
+          <Animated.View
+            pointerEvents={visible ? "auto" : "none"}
+            style={[desktopStyle, { opacity: progress, transform: [{ translateY: translateYDesktop }] }]}
+          >
             {children}
           </Animated.View>
         </View>
       ) : (
-        <Animated.View style={[sheetStyle, { transform: [{ translateY: translateYMobile }] }]} {...panResponder.panHandlers}>
+        <Animated.View
+          pointerEvents={visible ? "auto" : "none"}
+          onLayout={(e: LayoutChangeEvent) => setContentHeight(e.nativeEvent.layout.height)}
+          style={[sheetStyle, { transform: [{ translateY: translateYMobile }] }]}
+          {...panResponder.panHandlers}
+        >
           {handle}
           {children}
         </Animated.View>

@@ -35,6 +35,7 @@ import CloudSyncBox from "./CloudSyncBox";
 
 import { useResponsive } from "../../hooks/useResponsive";
 
+import { REPORT_CONSENT, REPORT_LOG_LINES, useBugReport } from "../../hooks/useBugReport";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { setThemeMode, useColors, useThemedStyles } from "../../hooks/useTheme";
 import { dragDrawer, drawerWidthFor, gestureVelocity, playPageTransition, settingsProgress, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
@@ -206,7 +207,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       return "auto";
     }
   });
-  const [reportText, setReportText] = useState("");
+  const report = useBugReport(showAlert);
   const [instruction, setInstructionState] = useState("");
   const [name, setNameState] = useState("");
   const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
@@ -1073,8 +1074,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         >
           <Image source={reportsIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
           <View style={styles.navTextContainer}>
-            <Text style={styles.navTitle}>Support</Text>
-            <Text style={styles.navSubtitle}>Report an issue</Text>
+            <Text style={styles.navTitle}>Report a bug</Text>
+            <Text style={styles.navSubtitle}>Send an issue, contact support</Text>
           </View>
         </Pressable>
 
@@ -1526,10 +1527,16 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     </View>
   );
 
+  //fresh draft on every visit
+  useEffect(() => {
+    if (activeSubPage === "reports") report.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset is stable
+  }, [activeSubPage]);
+
   // reports subpage content
   const renderReportsSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Support")}
+      {renderSubPageHeader("Report a bug")}
 
       <View style={styles.settingRowVertical}>
         <Text style={styles.settingLabel}>Report</Text>
@@ -1540,21 +1547,23 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           <TextInputField
             icon={penPlaceholderIcon}
             placeholder="Describe the issue"
-            value={reportText}
-            onChangeText={setReportText}
-          />
-          <ActionButton
-            icon={addIcon}
-            label="Add photo"
-            onPress={() => { }}
+            value={report.text}
+            onChangeText={report.setText}
           />
         </Group>
+
+        <View style={styles.toggleRow}>
+          <Text style={styles.settingLabel}>Attach {REPORT_LOG_LINES} log lines</Text>
+          <Toggle checked={report.logs !== null} onToggle={report.toggleLogs} />
+        </View>
+
+        <Text style={[styles.helpText, { marginTop: 12, marginBottom: 12 }]}>{REPORT_CONSENT}</Text>
 
         <Group>
           <ActionButton
             icon={arrowIcon}
             label="Send my issue"
-            onPress={() => setReportText("")}
+            onPress={() => report.send()}
           />
         </Group>
       </View>

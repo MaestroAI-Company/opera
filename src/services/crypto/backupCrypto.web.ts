@@ -1,7 +1,6 @@
 import type { BackupCrypto } from './types';
 
 const encoder = new TextEncoder();
-const decoder = new TextDecoder();
 
 const subtle = () => {
   const webcrypto = globalThis.crypto;
@@ -49,18 +48,6 @@ export const BackupCryptoImpl: BackupCrypto = {
   async hmacSha256B64(keyB64, messageUtf8) {
     const key = await subtle().importKey('raw', fromB64(keyB64), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
     return toB64(await subtle().sign('HMAC', key, encoder.encode(messageUtf8)));
-  },
-
-  async aesCbcEncryptB64(keyB64, ivB64, plaintextUtf8) {
-    const key = await aesKey(keyB64, 'encrypt');
-    const encrypted = await subtle().encrypt({ name: 'AES-CBC', iv: fromB64(ivB64) }, key, encoder.encode(plaintextUtf8));
-    return toB64(encrypted);
-  },
-
-  async aesCbcDecryptUtf8(keyB64, ivB64, ciphertextB64) {
-    const key = await aesKey(keyB64, 'decrypt');
-    const decrypted = await subtle().decrypt({ name: 'AES-CBC', iv: fromB64(ivB64) }, key, fromB64(ciphertextB64));
-    return decoder.decode(decrypted);
   },
 
   async aesCbcEncryptBytesB64(keyB64, ivB64, plaintext) {

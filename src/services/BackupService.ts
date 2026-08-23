@@ -41,6 +41,8 @@ export type ImportInspection = {
 };
 
 //snapshots written by the app itself
+//app private storage, so the document picker can never reach these
+//todo: restore path that reads this folder directly, unreachable to users until then
 const SNAPSHOT_DIR = `${FileSystem.documentDirectory}backups/`;
 const MAX_SNAPSHOTS = 3;
 
@@ -57,6 +59,7 @@ class BackupServiceImpl {
   }
 
   //silent safety copy, null on failure
+  //todo: no caller yet, kept for the next cloud envelope migration
   async saveLocalSnapshot(label: string): Promise<string | null> {
     try {
       const backup = await this.collectBackup();

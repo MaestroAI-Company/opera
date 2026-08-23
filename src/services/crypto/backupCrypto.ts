@@ -37,18 +37,6 @@ export const BackupCryptoImpl: BackupCrypto = {
     return createHmac('sha256', fromB64(keyB64)).update(messageUtf8, 'utf8').digest('base64');
   },
 
-  async aesCbcEncryptB64(keyB64, ivB64, plaintextUtf8) {
-    const cipher = createCipheriv(AES_ALGORITHM, fromB64(keyB64), fromB64(ivB64));
-    const encrypted = Buffer.concat([cipher.update(Buffer.from(plaintextUtf8, 'utf8')), cipher.final()]);
-    return encrypted.toString('base64');
-  },
-
-  async aesCbcDecryptUtf8(keyB64, ivB64, ciphertextB64) {
-    const decipher = createDecipheriv(AES_ALGORITHM, fromB64(keyB64), fromB64(ivB64));
-    const decrypted = Buffer.concat([decipher.update(fromB64(ciphertextB64)), decipher.final()]);
-    return decrypted.toString('utf8');
-  },
-
   async aesCbcEncryptBytesB64(keyB64, ivB64, plaintext) {
     const cipher = createCipheriv(AES_ALGORITHM, fromB64(keyB64), fromB64(ivB64));
     const encrypted = Buffer.concat([cipher.update(Buffer.from(plaintext)), cipher.final()]);

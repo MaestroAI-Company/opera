@@ -29,14 +29,17 @@ if (!(globalThis as any).Buffer) {
 WebBrowser.maybeCompleteAuthSession();
 SplashScreen.preventAutoHideAsync();
 
-//resolve the palette before the first paint
-initTheme();
+//expo static analysis runs without window
+if (typeof window !== "undefined") {
+  //resolve palette before first paint
+  initTheme();
+
+  //crash reported on next launch
+  installCrashHandler();
+}
 
 //bug reports carry console output
 installLogger();
-
-//crash reported on next launch
-installCrashHandler();
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 

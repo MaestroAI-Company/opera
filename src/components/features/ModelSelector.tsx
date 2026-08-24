@@ -149,14 +149,17 @@ export function ModelSelectorDrawer({
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
 
+  //anchor must match drawersheet layout
+  const anchored = isDesktop || isLargeScreen;
+
   //remeasured on every open
   const [anchor, setAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   useEffect(() => {
-    if (!visible || !isDesktop || !triggerRef?.current) return;
+    if (!anchored || !triggerRef?.current) return;
     triggerRef.current.measureInWindow((x, y, width, height) => {
       setAnchor({ x, y, width, height });
     });
-  }, [visible, isDesktop, triggerRef]);
+  }, [visible, anchored, triggerRef]);
 
   const [models, setModels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -241,10 +244,11 @@ export function ModelSelectorDrawer({
   }, []);
 
   useEffect(() => {
-    //refetch when the panel opens or the browsed source changes
-    if (visible) fetchModels(browsedSource);
+    //refetch on open and source change
+    //picks a model without opening
+    if (visible || !selectedModel) fetchModels(browsedSource);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only the source key should trigger a refetch
-  }, [visible, fetchModels, browsedSource?.key]);
+  }, [visible, selectedModel, fetchModels, browsedSource?.key]);
 
   useEffect(() => {
     //only the active source may correct the selected model

@@ -10,7 +10,8 @@ import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, Keyboard, L
 import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import { getLocalProviderLabel } from "../../services/ai/providers/LocalProvider";
-import { getEnabledProviders, getOllamaUrls, serializeOllamaUrls, serializeProviders } from "../../services/ai/providers/sources";
+import { buildSources, getEnabledProviders, getOllamaUrls, serializeOllamaUrls, serializeProviders } from "../../services/ai/providers/sources";
+import { parseQuickFlowOptionId, quickFlowOptionId } from "../../services/ai/quickFlow";
 import { isDefaultAssistant, openAssistantSettings } from "../../services/assistant/DefaultAssistant";
 import { ITool } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
@@ -30,7 +31,7 @@ import Group from "../ui/Group";
 import NotificationBanner from "../ui/NotificationBanner";
 import NotificationCard from "../ui/NotificationCard";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
-import Selector from "../ui/Selector";
+import Selector, { SelectorOption } from "../ui/Selector";
 import Slider from "../ui/Slider";
 import SliderToggle from "../ui/SliderToggle";
 import TextInputField from "../ui/TextInputField";
@@ -201,6 +202,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     setAlertConfig({ title, message, buttons, ...extraProps });
     setAlertModalVisible(true);
   };
+  //empty id means chores follow the main model
+  const [quickFlowId, setQuickFlowIdState] = useState("");
+  const [quickFlowOptions, setQuickFlowOptions] = useState<SelectorOption[]>([]);
   const [whisperModel, setWhisperModelState] = useState("none");
   const [, setWhisperInstalled] = useState<boolean>(false);
   const [installedWhisperModels, setInstalledWhisperModels] = useState<Record<string, boolean>>({});
@@ -464,6 +468,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setEnabledProvidersState(getEnabledProviders());
         setOllamaContextLengthState(s.ollamaContextLength && s.ollamaContextLength !== 8192 ? String(s.ollamaContextLength) : "");
         setOllamaKeepAliveState(String(s.ollamaKeepAlive ?? 300));
+        setQuickFlowIdState(s.quickFlowModel ? quickFlowOptionId(s.quickFlowService, s.quickFlowUrl, s.quickFlowModel) : "");
         setWhisperModelState(s.whisperModel);
         setWhisperLanguageState(s.whisperLanguage);
         setInstructionState(s.instruction);
@@ -509,6 +514,35 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     };
     loadSettings();
   }, []);
+
+  //all reachable models, one row each
+  useEffect(() => {
+    if (activeSubPage !== "general") return;
+    let cancelled = false;
+    (async () => {
+      const sources = buildSources(localAvailable);
+      const rows: SelectorOption[] = [{ id: "", label: "Same as main model" }];
+      //query all sources in parallel
+      const modelsBySource = await Promise.all(sources.map((source) => AIModule.getModelsFor(source.service, source.url)));
+      sources.forEach((source, i) => {
+        for (const model of [...modelsBySource[i]].sort((a, b) => a.localeCompare(b))) {
+          rows.push({
+            id: quickFlowOptionId(source.service, source.url, model),
+            //source only matters when multiple
+            label: sources.length > 1 ? `${model} — ${source.label}` : model,
+          });
+        }
+      });
+      if (!cancelled) setQuickFlowOptions(rows);
+    })();
+    return () => { cancelled = true; };
+  }, [activeSubPage, localAvailable, ollamaUrls, enabledProviders]);
+
+  const handleSelectQuickFlow = (id: string) => {
+    setQuickFlowIdState(id);
+    const { service, url, model } = parseQuickFlowOptionId(id);
+    Settings.setMany({ quickFlowService: service, quickFlowUrl: url, quickFlowModel: model });
+  };
 
   //load plugin states when settings tab opens
   useEffect(() => {
@@ -1259,6 +1293,22 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             ? "Process audio transcriptions locally on your device instead of using the selected model."
             : "Use your device's built-in speech recognition instead of the selected model."}
         </Text>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Quick flow</Text>
+        <Text style={[styles.helpText, { marginBottom: 10 }]}>
+          The model powering the small automatic touches: conversation titles, reply suggestions, and some tools. A small, fast model is recommended.
+        </Text>
+        <Group>
+          <Selector
+            options={quickFlowOptions}
+            selectedValue={quickFlowId}
+            onSelect={handleSelectQuickFlow}
+            title="Select Quick flow Model"
+            fullWidth
+          />
+        </Group>
       </View>
     </View>
   );

@@ -11,6 +11,9 @@ export type AppSettings = {
   ollamaModel: string;
   ollamaContextLength: number;
   ollamaKeepAlive: number;
+  quickFlowService: string;
+  quickFlowUrl: string;
+  quickFlowModel: string;
   whisperModel: string;
   whisperLanguage: string;
   instruction: string;
@@ -37,6 +40,10 @@ const DEFAULTS: AppSettings = {
   ollamaModel: '',
   ollamaContextLength: 8192,
   ollamaKeepAlive: 300,
+  //empty means chores use main model
+  quickFlowService: '',
+  quickFlowUrl: '',
+  quickFlowModel: '',
   whisperModel: 'base',
   whisperLanguage: (() => {
     try {
@@ -87,6 +94,9 @@ class SettingsService {
         ollamaModel: parsed.ollamaModel ?? DEFAULTS.ollamaModel,
         ollamaContextLength: typeof parsed.ollamaContextLength === 'number' ? parsed.ollamaContextLength : DEFAULTS.ollamaContextLength,
         ollamaKeepAlive: typeof parsed.ollamaKeepAlive === 'number' ? parsed.ollamaKeepAlive : DEFAULTS.ollamaKeepAlive,
+        quickFlowService: parsed.quickFlowService ?? DEFAULTS.quickFlowService,
+        quickFlowUrl: parsed.quickFlowUrl ?? DEFAULTS.quickFlowUrl,
+        quickFlowModel: parsed.quickFlowModel ?? DEFAULTS.quickFlowModel,
         whisperModel: parsed.whisperModel ?? DEFAULTS.whisperModel,
         whisperLanguage: parsed.whisperLanguage ?? DEFAULTS.whisperLanguage,
         instruction: parsed.instruction ?? DEFAULTS.instruction,

@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Vibration,
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardAvoidingView, KeyboardProvider, useGenericKeyboardHandler } from 'react-native-keyboard-controller';
 import Reanimated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -603,131 +604,133 @@ function AssistantOverlay() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior="height"
-      enabled={phase === 'respond'}
-    >
-      <Animated.View
-        style={[styles.phaseContainer, { opacity: mountOpacity }]}
+    <GestureHandlerRootView style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior="height"
+        enabled={phase === 'respond'}
       >
-        {phase === 'select' ? (
-          <SelectionLayer
-            selection={selection}
-            onChange={select}
-            onVibrate={() => Vibration.vibrate(10)}
-            onDrawingChange={setIsDrawingSelection}
-            onDismiss={closeOverlay}
-            detections={detections}
-          />
-        ) : (
-          <Animated.View style={[styles.phaseContainer, { opacity: responseOpacity }]} pointerEvents="box-none">
-            <LinearGradient
-              colors={['rgba(0,0,0,0.60)', 'rgba(0,0,0,1)']}
-              style={styles.chatViewWrapper}
-              pointerEvents="box-none"
-            >
-              <ChatView
-                messages={lastMsg ? [lastMsg] : []}
-                conversation={activeConversation}
-                contentTopPadding={insets.top + 56}
-                contentBottomPadding={insets.bottom + 96}
-                hideHeader={true}
-                hideGradients={true}
-                generatingMessageId={generatingMessageId}
-                speakerEnabled={true}
-                canThink={modelCapabilities.includes('thinking') && selectedReflection !== 'none'}
-                dark={true}
-                alignBottom={true}
-                onOpenInApp={(item) => openConversationInApp(item.conversationId)}
-              />
-            </LinearGradient>
-          </Animated.View>
-        )}
-
-        {/* model selector top center, hidden while drawing a lasso */}
         <Animated.View
-          style={[styles.topBar, { paddingTop: insets.top + 16, transform: [{ translateY: topBarEntry }] }, isDrawingSelection && styles.hiddenBar]}
-          pointerEvents={isDrawingSelection ? 'none' : 'box-none'}
+          style={[styles.phaseContainer, { opacity: mountOpacity }]}
         >
-          <ModelSelectorTrigger
-            selectedModel={selectedModel}
-            onPress={() => setModelSelectorVisible(v => !v)}
-          />
+          {phase === 'select' ? (
+            <SelectionLayer
+              selection={selection}
+              onChange={select}
+              onVibrate={() => Vibration.vibrate(10)}
+              onDrawingChange={setIsDrawingSelection}
+              onDismiss={closeOverlay}
+              detections={detections}
+            />
+          ) : (
+            <Animated.View style={[styles.phaseContainer, { opacity: responseOpacity }]} pointerEvents="box-none">
+              <LinearGradient
+                colors={['rgba(0,0,0,0.60)', 'rgba(0,0,0,1)']}
+                style={styles.chatViewWrapper}
+                pointerEvents="box-none"
+              >
+                <ChatView
+                  messages={lastMsg ? [lastMsg] : []}
+                  conversation={activeConversation}
+                  contentTopPadding={insets.top + 56}
+                  contentBottomPadding={insets.bottom + 96}
+                  hideHeader={true}
+                  hideGradients={true}
+                  generatingMessageId={generatingMessageId}
+                  speakerEnabled={true}
+                  canThink={modelCapabilities.includes('thinking') && selectedReflection !== 'none'}
+                  dark={true}
+                  alignBottom={true}
+                  onOpenInApp={(item) => openConversationInApp(item.conversationId)}
+                />
+              </LinearGradient>
+            </Animated.View>
+          )}
+
+          {/* model selector top center, hidden while drawing a lasso */}
+          <Animated.View
+            style={[styles.topBar, { paddingTop: insets.top + 16, transform: [{ translateY: topBarEntry }] }, isDrawingSelection && styles.hiddenBar]}
+            pointerEvents={isDrawingSelection ? 'none' : 'box-none'}
+          >
+            <ModelSelectorTrigger
+              selectedModel={selectedModel}
+              onPress={() => setModelSelectorVisible(v => !v)}
+            />
+          </Animated.View>
+
+          <Reanimated.View
+            style={[styles.bottomBarOverlay, isLargeScreen && styles.bottomBarOverlayLarge, bottomBarStyle, isDrawingSelection && styles.hiddenBar]}
+            pointerEvents={isDrawingSelection ? 'none' : 'box-none'}
+          >
+            <ChatBar
+              ref={chatBarRef}
+              onSend={handleSend}
+              incognito={false}
+              isGenerating={!!generatingConvId}
+              onStop={handleStop}
+              onTranscribe={handleTranscribe}
+              canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes('audio') && !!selectedModel}
+              supportsFiles={modelCapabilities.includes('vision') || modelCapabilities.includes('audio')}
+              onOpenSettings={() => { }}
+              enabled={true}
+              autoStartMic={shouldAutoStartMic}
+              selection={attachment}
+              onSelectionRemove={clearSelection}
+              appContextChip={Settings.getCached().useAppContext !== false && !appContextDismissed && appIconInfo ? { icon: appIconInfo.icon, label: appIconInfo.label } : null}
+              onAppContextRemove={() => setAppContextDismissed(true)}
+            />
+          </Reanimated.View>
         </Animated.View>
 
-        <Reanimated.View
-          style={[styles.bottomBarOverlay, isLargeScreen && styles.bottomBarOverlayLarge, bottomBarStyle, isDrawingSelection && styles.hiddenBar]}
-          pointerEvents={isDrawingSelection ? 'none' : 'box-none'}
-        >
-          <ChatBar
-            ref={chatBarRef}
-            onSend={handleSend}
-            incognito={false}
-            isGenerating={!!generatingConvId}
-            onStop={handleStop}
-            onTranscribe={handleTranscribe}
-            canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes('audio') && !!selectedModel}
-            supportsFiles={modelCapabilities.includes('vision') || modelCapabilities.includes('audio')}
-            onOpenSettings={() => { }}
-            enabled={true}
-            autoStartMic={shouldAutoStartMic}
-            selection={attachment}
-            onSelectionRemove={clearSelection}
-            appContextChip={Settings.getCached().useAppContext !== false && !appContextDismissed && appIconInfo ? { icon: appIconInfo.icon, label: appIconInfo.label } : null}
-            onAppContextRemove={() => setAppContextDismissed(true)}
-          />
-        </Reanimated.View>
-      </Animated.View>
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: haloOpacity }]} pointerEvents="none">
+          <LinearGradient colors={[Colors.overlayHalo, Colors.overlayHaloClear]} style={styles.haloTop} />
+          <LinearGradient colors={[Colors.overlayHaloClear, Colors.overlayHalo]} style={styles.haloBottom} />
+          <LinearGradient colors={[Colors.overlayHalo, Colors.overlayHaloClear]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloLeft} />
+          <LinearGradient colors={[Colors.overlayHaloClear, Colors.overlayHalo]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloRight} />
+        </Animated.View>
 
-      <Animated.View style={[StyleSheet.absoluteFill, { opacity: haloOpacity }]} pointerEvents="none">
-        <LinearGradient colors={[Colors.overlayHalo, Colors.overlayHaloClear]} style={styles.haloTop} />
-        <LinearGradient colors={[Colors.overlayHaloClear, Colors.overlayHalo]} style={styles.haloBottom} />
-        <LinearGradient colors={[Colors.overlayHalo, Colors.overlayHaloClear]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloLeft} />
-        <LinearGradient colors={[Colors.overlayHaloClear, Colors.overlayHalo]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloRight} />
-      </Animated.View>
+        <NotificationModal
+          visible={modalVisible}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          buttons={modalConfig.buttons}
+          onClose={() => setModalVisible(false)}
+        />
 
-      <NotificationModal
-        visible={modalVisible}
-        title={modalConfig.title}
-        message={modalConfig.message}
-        buttons={modalConfig.buttons}
-        onClose={() => setModalVisible(false)}
-      />
+        <ModelSelectorDrawer
+          visible={modelSelectorVisible}
+          onClose={() => setModelSelectorVisible(false)}
+          progress={modelSelectorProgress}
+          selectedModel={selectedModel}
+          selectedReflection={selectedReflection}
+          showReflection={modelCapabilities.includes('thinking')}
+          aiService={aiService}
+          ollamaUrl={ollamaUrl}
+          onServiceChange={(service, url) => {
+            setAiService(service);
+            setOllamaUrl(url);
+            Settings.set('aiService', service);
+            Settings.set('ollamaUrl', url);
+            AIModule.setMode(service);
+            if (service === 'ollama') {
+              const cached = Settings.getCached();
+              AIModule.configure(url, cached.ollamaContextLength, cached.ollamaKeepAlive);
+            }
+          }}
+          onModelChange={model => {
+            setSelectedModel(model);
+            selectedModelRef.current = model;
+            Settings.set('ollamaModel', model);
+            //preload newly selected model
+            AIModule.preloadModel(model).catch(() => { });
+          }}
+          onReflectionChange={setReflection}
+          isLargeScreen={isLargeScreen}
+        />
 
-      <ModelSelectorDrawer
-        visible={modelSelectorVisible}
-        onClose={() => setModelSelectorVisible(false)}
-        progress={modelSelectorProgress}
-        selectedModel={selectedModel}
-        selectedReflection={selectedReflection}
-        showReflection={modelCapabilities.includes('thinking')}
-        aiService={aiService}
-        ollamaUrl={ollamaUrl}
-        onServiceChange={(service, url) => {
-          setAiService(service);
-          setOllamaUrl(url);
-          Settings.set('aiService', service);
-          Settings.set('ollamaUrl', url);
-          AIModule.setMode(service);
-          if (service === 'ollama') {
-            const cached = Settings.getCached();
-            AIModule.configure(url, cached.ollamaContextLength, cached.ollamaKeepAlive);
-          }
-        }}
-        onModelChange={model => {
-          setSelectedModel(model);
-          selectedModelRef.current = model;
-          Settings.set('ollamaModel', model);
-          //preload newly selected model
-          AIModule.preloadModel(model).catch(() => { });
-        }}
-        onReflectionChange={setReflection}
-        isLargeScreen={isLargeScreen}
-      />
-
-      <HeadlessWebView />
-    </KeyboardAvoidingView>
+        <HeadlessWebView />
+      </KeyboardAvoidingView>
+    </GestureHandlerRootView>
   );
 }
 

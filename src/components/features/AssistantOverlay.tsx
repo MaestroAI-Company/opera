@@ -18,6 +18,8 @@ import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { Colors } from '../../../constants/theme';
 import { AIModule } from '../../services/ai/AIModule';
 import { buildSystemPrompt, streamAssistantReply } from '../../services/ai/generation/chatGeneration';
+import { generateSuggestions, Suggestion } from '../../services/ai/generation/suggestions';
+import { resolveQuickFlow } from '../../services/ai/quickFlow';
 import { arrayBufferToBase64 } from '../../services/ai/utils/base64';
 import { CloudSync } from '../../services/CloudSyncService';
 import { Conversation, DB, Message } from '../../services/db/DatabaseService';
@@ -62,6 +64,8 @@ function AssistantOverlay() {
 
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  //tied to the reply they were generated for
+  const [suggestions, setSuggestions] = useState<{ msgId: string; items: Suggestion[] } | null>(null);
 
   //ref mirror for fresh messages
   const messagesRef = useRef<Message[]>([]);
@@ -390,8 +394,8 @@ function AssistantOverlay() {
   const generateTitle = useCallback(async (convId: string, userMessage: string, images?: string[]) => {
     try {
       let title = '';
-      await AIModule.sendMessage(
-        selectedModelRef.current,
+      await AIModule.sendOn(
+        resolveQuickFlow(selectedModelRef.current),
         SYSTEM_PROMPTS.SUMMARIZE,
         [{ role: 'user', content: userMessage, images }],
         chunk => { title += chunk; },
@@ -491,6 +495,7 @@ function AssistantOverlay() {
     AIModule.SharedGenerationState.abort = () => abortControllerRef.current?.abort();
 
     let isError = false;
+    let isAborted = false;
     let messageSources: Message['sources'];
 
     if (!model) {
@@ -518,6 +523,7 @@ function AssistantOverlay() {
           isError = true;
           streamingContentRef.current = `Error during generation: ${outcome.error ?? 'unknown error'}`;
         } else {
+          isAborted = outcome.status === 'aborted';
           streamingContentRef.current = outcome.content;
         }
         messageSources = outcome.sources;
@@ -539,6 +545,19 @@ function AssistantOverlay() {
     }
 
     if (isFirstMessage && !isError) generateTitle(conv.id, text, images);
+
+    //propose follow-ups once the reply landed whole
+    if (!isError && !isAborted && model) {
+      generateSuggestions({
+        model,
+        userMessage: text,
+        assistantMessage: streamingContentRef.current,
+        //show each pill once complete
+        onPartial: items => setSuggestions({ msgId: assistantMsg.id, items }),
+      }).then(items => {
+        if (items.length > 0) setSuggestions({ msgId: assistantMsg.id, items });
+      });
+    }
 
     //auto-read the reply aloud when it was requested via voice
     if (viaVoice && !isError && Settings.getCached().autoSpeak) {
@@ -676,6 +695,8 @@ function AssistantOverlay() {
                   dark={true}
                   alignBottom={true}
                   onOpenInApp={(item) => openConversationInApp(item.conversationId)}
+                  suggestions={suggestions && lastMsg && suggestions.msgId === lastMsg.id ? suggestions.items : undefined}
+                  onSuggestionPress={handleSend}
                 />
               </LinearGradient>
             </Animated.View>

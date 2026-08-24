@@ -168,8 +168,15 @@ function AssistantOverlay() {
 
   //activation rim fades out
   const haloOpacity = useAnimatedValue(0);
+  //exit runs once, a second dismiss must not cut it short
+  const closingRef = useRef(false);
 
-  useEffect(() => {
+  //replayed when the activity is reused instead of remounted
+  const playEntry = useCallback(() => {
+    mountOpacity.setValue(0);
+    topBarEntry.setValue(-BAR_ENTRY);
+    haloOpacity.setValue(0);
+    bottomBarEntry.value = BAR_ENTRY;
     Animated.spring(mountOpacity, { toValue: 1, useNativeDriver: true, bounciness: 0, speed: 20 }).start();
     //bars return to their edges
     Animated.spring(topBarEntry, { toValue: 0, useNativeDriver: true, bounciness: 9, speed: 14 }).start();
@@ -180,6 +187,16 @@ function AssistantOverlay() {
       Animated.timing(haloOpacity, { toValue: 0, delay: 160, duration: 760, useNativeDriver: true }),
     ]).start();
   }, [mountOpacity, topBarEntry, bottomBarEntry, haloOpacity]);
+
+  //same springs as the entry, played back toward the offscreen start
+  const playExit = useCallback((done: () => void) => {
+    Animated.spring(topBarEntry, { toValue: -BAR_ENTRY, useNativeDriver: true, bounciness: 9, speed: 14 }).start();
+    bottomBarEntry.value = withSpring(BAR_ENTRY, { duration: 500, dampingRatio: 0.65 });
+    //fade owns the timing, everything is hidden once it lands
+    Animated.spring(mountOpacity, { toValue: 0, useNativeDriver: true, bounciness: 0, speed: 20 }).start(() => done());
+  }, [mountOpacity, topBarEntry, bottomBarEntry]);
+
+  useEffect(() => { playEntry(); }, [playEntry]);
 
   //capture app context for the ai
   //defer assist and icon reads
@@ -302,36 +319,53 @@ function AssistantOverlay() {
   //hardware back
   useEffect(() => {
     const handler = BackHandler.addEventListener('hardwareBackPress', () => {
-      resetOverlay();
-      setTimeout(() => BackHandler.exitApp(), 100);
+      if (closingRef.current) return true;
+      closingRef.current = true;
+      playExit(() => {
+        resetOverlay();
+        BackHandler.exitApp();
+      });
       return true;
     });
     return () => handler.remove();
-  }, [resetOverlay]);
+  }, [resetOverlay, playExit]);
 
   //reopen via same activity instance
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener(AppEvents.overlayReopened, () => {
+      closingRef.current = false;
       resetOverlay();
       //settings may have changed while closed
       reloadSettings();
+      //values were left at their exit end, wind them back
+      playEntry();
     });
     return () => sub.remove();
-  }, [resetOverlay, reloadSettings]);
+  }, [resetOverlay, reloadSettings, playEntry]);
 
   //close overlay but keep app alive
   const closeOverlay = useCallback(() => {
-    resetOverlay();
-    setTimeout(() => ScreenCapture.close(), 100);
-  }, [resetOverlay]);
+    if (closingRef.current) return;
+    closingRef.current = true;
+    //reset only once hidden, so the content does not blank mid exit
+    playExit(() => {
+      resetOverlay();
+      ScreenCapture.close();
+    });
+  }, [playExit, resetOverlay]);
 
   //hand off conversation then close
   const openConversationInApp = useCallback((convId: string) => {
+    //app launches while the overlay plays out
     Linking.openURL(`opera://?convId=${convId}`).catch(() => { });
-    resetOverlay();
-    //close overlay only
-    setTimeout(() => ScreenCapture.close(), 100);
-  }, [resetOverlay]);
+    if (closingRef.current) return;
+    closingRef.current = true;
+    playExit(() => {
+      resetOverlay();
+      //close overlay only
+      ScreenCapture.close();
+    });
+  }, [playExit, resetOverlay]);
 
   //model capabilities for mic auto-start
   useEffect(() => {

@@ -31,6 +31,7 @@ export type AppSettings = {
   useAppContext: boolean;
   shakeToReport: boolean;
   assistantPromptDismissed: boolean;
+  hasSeenAssistantOverlay: boolean;
 };
 
 const DEFAULTS: AppSettings = {
@@ -68,6 +69,7 @@ const DEFAULTS: AppSettings = {
   useAppContext: true,
   shakeToReport: true,
   assistantPromptDismissed: false,
+  hasSeenAssistantOverlay: false,
 };
 
 const SETTINGS_UPDATED_AT_KEY = '__settings_updated_at';
@@ -85,6 +87,7 @@ const BOOLEAN_KEYS = [
   'useAppContext',
   'shakeToReport',
   'assistantPromptDismissed',
+  'hasSeenAssistantOverlay',
 ] as const;
 
 const NUMBER_KEYS = [

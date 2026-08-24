@@ -28,6 +28,7 @@ export type AppSettings = {
   useAppContext: boolean;
   shakeToReport: boolean;
   assistantPromptDismissed: boolean;
+  hasSeenAssistantOverlay: boolean;
 };
 
 const DEFAULTS: AppSettings = {
@@ -64,6 +65,7 @@ const DEFAULTS: AppSettings = {
   useAppContext: true,
   shakeToReport: true,
   assistantPromptDismissed: false,
+  hasSeenAssistantOverlay: false,
 };
 
 class SettingsService {
@@ -111,6 +113,7 @@ class SettingsService {
         useAppContext: typeof parsed.useAppContext === 'boolean' ? parsed.useAppContext : DEFAULTS.useAppContext,
         shakeToReport: typeof parsed.shakeToReport === 'boolean' ? parsed.shakeToReport : DEFAULTS.shakeToReport,
         assistantPromptDismissed: typeof parsed.assistantPromptDismissed === 'boolean' ? parsed.assistantPromptDismissed : DEFAULTS.assistantPromptDismissed,
+        hasSeenAssistantOverlay: typeof parsed.hasSeenAssistantOverlay === 'boolean' ? parsed.hasSeenAssistantOverlay : DEFAULTS.hasSeenAssistantOverlay,
       };
       
       this.cache = settings;

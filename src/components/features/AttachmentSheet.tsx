@@ -55,7 +55,7 @@ export default function AttachmentSheet({
     <DrawerSheet
       visible={visible}
       mode={ATTACHMENT_SHEET_LIFTS ? "lift" : "overlay"}
-      //inset real below, sheet self-pads
+      //sheet pads its own safe area and overlaps the inset below
       liftOffset={bottomInset}
       onClose={onClose}
       handleContainerStyle={styles.sheetHandleContainer}
@@ -63,7 +63,7 @@ export default function AttachmentSheet({
       sheetStyle={[
         styles.sheet,
         incognito && styles.inlineSheetIncognito,
-        { paddingBottom: (Platform.OS === 'ios' ? 20 : 10) + (ATTACHMENT_SHEET_LIFTS ? 0 : bottomInset) },
+        { paddingBottom: (Platform.OS === 'ios' ? 20 : 10) + bottomInset },
       ]}
     >
       <View style={styles.sheetButtonsRow}>

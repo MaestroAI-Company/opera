@@ -41,6 +41,8 @@ import { useColors, useThemedStyles } from "../hooks/useTheme";
 import { CloudSync } from "../services/CloudSyncService";
 import { AIModule } from "../services/ai/AIModule";
 import { buildSystemPrompt, streamAssistantReply } from "../services/ai/generation/chatGeneration";
+import { generateSuggestions, Suggestion } from "../services/ai/generation/suggestions";
+import { resolveQuickFlow } from "../services/ai/quickFlow";
 import { arrayBufferToBase64 } from "../services/ai/utils/base64";
 import { Conversation, DB, Message, MessageMetrics } from "../services/db/DatabaseService";
 import {
@@ -191,6 +193,23 @@ export default function Index() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  //per conversation, tied to their reply
+  const [suggestionsByConv, setSuggestionsByConv] = useState<Record<string, { msgId: string; items: Suggestion[] }>>({});
+  const setSuggestions = useCallback((convId: string, value: { msgId: string; items: Suggestion[] }) => {
+    setSuggestionsByConv((prev) => ({ ...prev, [convId]: value }));
+  }, []);
+
+  //only match the newest reply
+  const activeSuggestions = useMemo(() => {
+    const suggestions = activeConversation ? suggestionsByConv[activeConversation.id] : undefined;
+    if (!suggestions) return undefined;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") {
+        return messages[i].id === suggestions.msgId ? suggestions.items : undefined;
+      }
+    }
+    return undefined;
+  }, [messages, suggestionsByConv, activeConversation]);
 
   //ref serves streaming callbacks
   const streamingMsgIdRef = useRef<string | null>(null);
@@ -767,8 +786,8 @@ export default function Index() {
         //title prompt only needs doc names
         const { names, text } = splitDocumentBlocks(userMessage);
         const summarized = names.length > 0 ? `${names.join(', ')}\n${text}` : text;
-        await AIModule.sendMessage(
-          selectedModel,
+        await AIModule.sendOn(
+          resolveQuickFlow(selectedModel),
           SYSTEM_PROMPTS.SUMMARIZE,
           [{ role: "user", content: summarized, images }],
           (chunk) => { title += chunk; },
@@ -883,6 +902,7 @@ export default function Index() {
         abortControllerRef.current = new AbortController();
 
         let isError = false;
+        let isAborted = false;
         let messageMetrics: MessageMetrics | undefined;
         let messageSources: Message['sources'];
 
@@ -916,6 +936,7 @@ export default function Index() {
               isError = true;
               streamingContentRef.current = `Error during generation: ${outcome.error ?? "unknown error"}`;
             } else {
+              isAborted = outcome.status === "aborted";
               streamingContentRef.current = outcome.content;
             }
             messageSources = outcome.sources;
@@ -946,6 +967,19 @@ export default function Index() {
         //generate AI title for new conversations
         if (isFirstMessage && !isIncognitoTask && !isError) {
           generateTitle(taskConv.id, text, images);
+        }
+
+        //propose follow-ups once the reply landed whole
+        if (!isError && !isAborted && taskSelectedModel) {
+          generateSuggestions({
+            model: taskSelectedModel,
+            userMessage: text,
+            assistantMessage: streamingContentRef.current,
+            //show each pill once complete
+            onPartial: (items) => setSuggestions(taskConv.id, { msgId: assistantMsg.id, items }),
+          }).then((items) => {
+            if (items.length > 0) setSuggestions(taskConv.id, { msgId: assistantMsg.id, items });
+          });
         }
 
         //auto-read the reply aloud when it was requested via voice
@@ -1077,6 +1111,7 @@ export default function Index() {
       streamingContentRef.current = "";
       abortControllerRef.current = new AbortController();
       let isError = false;
+      let isAborted = false;
       let messageMetrics: MessageMetrics | undefined;
       let messageSources: Message['sources'];
 
@@ -1109,6 +1144,7 @@ export default function Index() {
             isError = true;
             streamingContentRef.current = `Error during generation: ${outcome.error ?? "unknown error"}`;
           } else {
+            isAborted = outcome.status === "aborted";
             streamingContentRef.current = outcome.content;
           }
           messageSources = outcome.sources;
@@ -1133,6 +1169,20 @@ export default function Index() {
           }
           await loadConversations();
         }
+      }
+
+      //the reply changed, so do the follow-ups
+      const lastUser = [...taskHistory].reverse().find((m) => m.role === "user");
+      if (!isError && !isAborted && taskSelectedModel && lastUser) {
+        generateSuggestions({
+          model: taskSelectedModel,
+          userMessage: lastUser.content,
+          assistantMessage: streamingContentRef.current,
+          //show each pill once complete
+          onPartial: (items) => setSuggestions(taskConv.id, { msgId: assistantMsg.id, items }),
+        }).then((items) => {
+          if (items.length > 0) setSuggestions(taskConv.id, { msgId: assistantMsg.id, items });
+        });
       }
     };
 
@@ -1316,6 +1366,8 @@ export default function Index() {
 
             {activeConversation && (
               <ChatView
+                suggestions={activeSuggestions}
+                onSuggestionPress={handleSend}
                 messages={messages}
                 conversation={activeConversation}
                 contentTopPadding={insets.top + 72}

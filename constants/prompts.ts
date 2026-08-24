@@ -114,6 +114,60 @@ Response: "Developer cover letter"
 Input: "hi"
 Response: "User greetings"`,
 
+  SUGGESTIONS: `# Role
+
+You propose the next messages the USER could send, based on the last exchange. You write as the user, never as the assistant.
+
+# Input
+
+You receive the user's last message, then the assistant's reply.
+
+# Output — STRICT
+
+Respond with a JSON array of objects and nothing else. No preamble, no markdown, no code fence.
+
+Each object has exactly two fields:
+- \`label\`: the text printed on the button. **5 words maximum.** It must stand on its own: someone who sees only the label, without the message behind it, must understand what tapping it will send. Keep the words that carry the meaning and drop the filler — never cut a phrase mid-way.
+- \`message\`: the complete message actually sent when the button is tapped. A full, natural sentence the user would type.
+
+- 1 to 3 objects.
+- Respond with \`[]\` when no suggestion is genuinely useful. An empty array is a valid, expected answer — prefer it over filler.
+- **Language**: write both fields strictly in the language of the user's last message.
+
+# When to suggest
+
+Suggest only when the exchange has an obvious next step:
+- The assistant asked a question with a small set of plausible answers.
+- The assistant offered options or proposed to go further.
+- A natural follow-up exists (go deeper, ask for an example, move to the next step).
+
+Return \`[]\` when:
+- The assistant fully answered a closed question and nothing obvious follows.
+- The exchange is a greeting, a thank-you, or a goodbye.
+- The assistant asked for specific information only the user knows (a name, a key, a path) — a canned reply cannot fill that in.
+
+# Rules
+
+- \`message\` is a natural message the user would actually type. \`label\` is its readable short form — never a category name like "Option 1" or "Answer".
+- A label of one bare word is almost always too vague. Prefer 3 to 5 words that name the actual intent.
+- Each suggestion must lead somewhere different — no rephrasings of one another.
+- Never propose a suggestion the assistant already answered in its reply.
+- No emojis, no trailing punctuation, no quotation marks inside the strings.
+
+# Examples (internal reference, keep the response language aligned with the input)
+
+Assistant: "Do you want me to set it up with Docker or directly on the host?"
+Response: [{"label": "Configure avec Docker", "message": "Configure-le avec Docker"}, {"label": "Installe sur l'hôte", "message": "Installe-le directement sur l'hôte"}, {"label": "Compare les deux", "message": "Quelle est la différence entre les deux approches"}]
+
+Assistant: "Paris is the capital of France."
+Response: []
+
+Assistant: "I created the file. Want me to add the tests too?"
+Response: [{"label": "Ajoute les tests", "message": "Oui, ajoute les tests aussi"}, {"label": "Montre-moi le fichier", "message": "Montre-moi le contenu du fichier"}, {"label": "Non, ça suffit", "message": "Non, ça ira comme ça"}]
+
+Assistant: "What's the path to your config file?"
+Response: []`,
+
   TRANSCRIBE: `# Role
 
 You are an assistant specialized in correcting and formatting raw audio transcriptions (Voice-to-Text). Your goal is to make the text fluent, readable, and perfectly spelled without altering its original meaning.

@@ -22,6 +22,7 @@ import { Conversation, Message, MessageSource } from "../../services/db/Database
 import { splitDocumentBlocks } from "../../services/documents/DocumentService";
 import { Settings } from "../../services/settings/SettingsService";
 import { TTS } from "../../services/speech/TTSService";
+import IconButton from "../ui/IconButton";
 import { deriveChatDisplay, renderMarkdown } from "../ui/MarkdownText";
 
 const butterflyImage = require("../../../assets/images/butterfly5.png");
@@ -293,47 +294,48 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
           {!isUser && !isCurrentlyThinking && !isGenerating && (
             <View style={styles.aiToolbar}>
               {speakerEnabled && (
-                <Pressable
+                <IconButton
+                  icon={speakerIcon}
                   onPress={() => onSpeak?.(item)}
-                  style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
-                >
-                  <Image source={speakerIcon} style={{ width: 22, height: 22, tintColor: isSpeaking ? Colors.primary : (dark ? Colors.surface : Colors.textMuted) }} />
-                </Pressable>
+                  containerSize={32}
+                  pressedColor={Colors.surfacePressed}
+                  tintColor={isSpeaking ? Colors.primary : (dark ? Colors.surface : Colors.textMuted)}
+                />
               )}
-              <Pressable
+              <IconButton
+                icon={reloadIcon}
                 onPress={() => onRegenerate?.(item.id)}
                 disabled={isChatGenerating}
-                style={({ pressed, hovered }) => [
-                  styles.toolbarIconContainer,
-                  (pressed || hovered) && { backgroundColor: Colors.surfacePressed },
-                  isChatGenerating && { opacity: 0.3 }
-                ]}
-              >
-                <Image source={reloadIcon} style={{ width: 22, height: 22, tintColor: dark ? Colors.surface : Colors.textMuted }} />
-              </Pressable>
-              <Pressable
+                containerSize={32}
+                pressedColor={Colors.surfacePressed}
+                tintColor={dark ? Colors.surface : Colors.textMuted}
+              />
+              <IconButton
+                icon={copyIcon}
                 onPress={() => copyToClipboard(item.content, false)}
                 onLongPress={() => copyToClipboard(item.content, true)}
                 delayLongPress={500}
-                style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
-              >
-                <Image source={copyIcon} style={{ width: 22, height: 22, tintColor: dark ? Colors.surface : Colors.textMuted }} />
-              </Pressable>
+                containerSize={32}
+                pressedColor={Colors.surfacePressed}
+                tintColor={dark ? Colors.surface : Colors.textMuted}
+              />
               {!!onOpenInApp && (
-                <Pressable
+                <IconButton
+                  icon={chatIcon}
                   onPress={() => onOpenInApp(item)}
-                  style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
-                >
-                  <Image source={chatIcon} style={{ width: 22, height: 22, tintColor: dark ? Colors.surface : Colors.textMuted }} />
-                </Pressable>
+                  containerSize={32}
+                  pressedColor={Colors.surfacePressed}
+                  tintColor={dark ? Colors.surface : Colors.textMuted}
+                />
               )}
               {showMetrics && (
-                <Pressable
+                <IconButton
+                  icon={infoIcon}
                   onPress={() => setShowDetails(prev => !prev)}
-                  style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
-                >
-                  <Image source={infoIcon} style={{ width: 22, height: 22, tintColor: showDetails ? (incognito ? Colors.incognito : Colors.primary) : (dark ? Colors.surface : Colors.textMuted) }} />
-                </Pressable>
+                  containerSize={32}
+                  pressedColor={Colors.surfacePressed}
+                  tintColor={showDetails ? (incognito ? Colors.incognito : Colors.primary) : (dark ? Colors.surface : Colors.textMuted)}
+                />
               )}
             </View>
           )}
@@ -630,13 +632,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     alignItems: "center",
     marginTop: 8,
     gap: 16,
-  },
-  toolbarIconContainer: {
-    width: 32,
-    height: 32,
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: Radius.huge,
   },
   metricsCard: {
     marginTop: 4,

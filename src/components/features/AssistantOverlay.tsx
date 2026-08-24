@@ -4,6 +4,7 @@ import {
   Animated,
   BackHandler,
   DeviceEventEmitter,
+  ImageSourcePropType,
   InteractionManager,
   Linking,
   Platform,
@@ -45,6 +46,7 @@ import '../../services/widgets/registerWidgets';
 const BAR_ENTRY = 120;
 //thickness of the activation rim
 const HALO_SIZE = 88;
+const assistantInfoImage = require('../../../assets/images/ImageCard/AssistantInfo.png');
 
 export default function AssistantOverlayWrapper() {
   return (
@@ -102,7 +104,7 @@ function AssistantOverlay() {
 
   //modal state for whisper errors
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalConfig, setModalConfig] = useState<{ title: string, message: string, buttons?: any[] }>({ title: '', message: '' });
+  const [modalConfig, setModalConfig] = useState<{ title: string, message: string, image?: ImageSourcePropType, buttons?: any[] }>({ title: '', message: '' });
 
   //state re-renders while a tool runs
   const [, setActiveTool] = useState<{ name: string | null, args: any | null }>({ name: null, args: null });
@@ -266,6 +268,18 @@ function AssistantOverlay() {
         await Promise.all([DB.init(), Settings.init()]);
         const s = await Settings.load();
         applySettings(s);
+
+        //show once, first time this overlay is opened
+        if (!s.hasSeenAssistantOverlay) {
+          Settings.set('hasSeenAssistantOverlay', true);
+          setModalConfig({
+            title: 'Welcome to the Assistant View',
+            message: "This is your floating assistant. You can Circle To Ask on your screen with any content. It's here to help you across your usage.",
+            image: assistantInfoImage,
+            buttons: [{ text: 'OK', onPress: () => setModalVisible(false), style: 'primary' }]
+          });
+          setModalVisible(true);
+        }
 
         //defer model preload past animation
         if (s.ollamaModel) {
@@ -726,6 +740,7 @@ function AssistantOverlay() {
         <NotificationModal
           visible={modalVisible}
           title={modalConfig.title}
+          image={modalConfig.image}
           message={modalConfig.message}
           buttons={modalConfig.buttons}
           onClose={() => setModalVisible(false)}

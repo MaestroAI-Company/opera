@@ -5,7 +5,6 @@ import {
   DeviceEventEmitter,
   Image,
   LayoutChangeEvent,
-  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -17,7 +16,8 @@ import {
   View,
   ViewStyle,
 } from "react-native";
-import Reanimated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Reanimated, { interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
@@ -54,8 +54,11 @@ const ANCHOR_GAP = 8;
 const ANCHOR_MARGIN = 8;
 const DESKTOP_CARD_WIDTH = 320;
 
+type RowLayout = { y: number; height: number } | null;
+
 //rubber-band curve for vertical pull
 const rubberBand = (d: number, dim: number) => {
+  "worklet";
   if (dim <= 0) return 0;
   const sign = d < 0 ? -1 : 1;
   return sign * dim * (1 - 1 / (1 + Math.abs(d) / dim));
@@ -286,8 +289,6 @@ export function ModelSelectorDrawer({
   }, [models]);
 
   const selectedIndex = isBrowsingActive ? displayModels.findIndex((m) => m === selectedModel) : -1;
-  const selectedIndexRef = useRef(selectedIndex);
-  selectedIndexRef.current = selectedIndex;
 
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [rowLayoutsVersion, setRowLayoutsVersion] = useState(0);
@@ -296,22 +297,13 @@ export function ModelSelectorDrawer({
   const pillHeight = useSharedValue(0);
   const pillScale = useSharedValue(1);
   const pillLit = useSharedValue(0);
+  const dragStartY = useSharedValue(0);
+  const dragIndex = useSharedValue(0);
 
   const rowLayoutsRef = useRef<({ y: number; height: number } | undefined)[]>([]);
-  const armedRef = useRef(false);
-  const startYRef = useRef(0);
-  const previewIndexRef = useRef<number | null>(null);
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeIndex = previewIndex ?? (selectedIndex >= 0 ? selectedIndex : 0);
   const hasPill = isBrowsingActive && selectedIndex >= 0;
-
-  const clearLongPressTimer = () => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-  };
 
   const handleRowLayout = (index: number) => (e: LayoutChangeEvent) => {
     const { y, height } = e.nativeEvent.layout;
@@ -338,91 +330,80 @@ export function ModelSelectorDrawer({
     pillHeight.value = withTiming(layout.height, { duration: 180 });
   }, [selectedModel, rowLayoutsVersion, visible, selectedIndex, displayModels.length, pillY, pillHeight]);
 
-  const latestModelsRef = useRef(displayModels);
-  latestModelsRef.current = displayModels;
+  //dense snapshot the drag worklet can read
+  const rowLayouts = useMemo<RowLayout[]>(
+    () => Array.from({ length: displayModels.length }, (_, i) => rowLayoutsRef.current[i] ?? null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- version tracks the mutable ref
+    [displayModels.length, rowLayoutsVersion]
+  );
 
-  const pillPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => {
-        armedRef.current = false;
-        startYRef.current = pillY.value;
-        previewIndexRef.current = selectedIndexRef.current;
-        clearLongPressTimer();
-        //require hold before drag
-        longPressTimerRef.current = setTimeout(() => {
-          armedRef.current = true;
-          pillScale.value = withTiming(1.04, { duration: 120 });
-          pillLit.value = withTiming(1, { duration: 120 });
-        }, LONG_PRESS_DELAY);
-      },
-      onPanResponderMove: (_e, gestureState) => {
-        if (!armedRef.current) return;
-        const layouts = rowLayoutsRef.current;
-        const maxIndex = latestModelsRef.current.length - 1;
+  const previewCrossed = (index: number) => {
+    setPreviewIndex(index);
+    Vibration.vibrate(10);
+  };
 
-        let anchor = previewIndexRef.current ?? selectedIndexRef.current;
-        if (!layouts[anchor]) return;
-        const rawY = startYRef.current + gestureState.dy;
+  const commitDrag = (index: number) => {
+    setPreviewIndex(null);
+    const model = displayModels[index];
+    if (model) handleSelectModel(model);
+  };
 
-        let d = rawY - layouts[anchor]!.y;
-        let slot = layouts[anchor]!.height + ROW_GAP;
-        while (Math.abs(d) >= slot * BREAK_RATIO) {
-          const dir = d > 0 ? 1 : -1;
-          const next = anchor + dir;
-          if (next < 0 || next > maxIndex) break;
-          anchor = next;
-          d = rawY - layouts[anchor]!.y;
-          slot = layouts[anchor]!.height + ROW_GAP;
-        }
-
-        if (anchor !== previewIndexRef.current) {
-          previewIndexRef.current = anchor;
-          setPreviewIndex(anchor);
-          Vibration.vibrate(10);
-        }
-
-        pillY.value = layouts[anchor]!.y + rubberBand(d, slot);
-        pillHeight.value = withTiming(layouts[anchor]!.height, { duration: 100 });
-      },
-      onPanResponderRelease: () => {
-        clearLongPressTimer();
-        if (armedRef.current) {
-          const idx = previewIndexRef.current ?? selectedIndexRef.current;
-          const layout = rowLayoutsRef.current[idx];
-          pillScale.value = withTiming(1, { duration: 150 });
-          pillLit.value = withTiming(0, { duration: 150 });
-          if (layout) {
-            pillY.value = withTiming(layout.y, { duration: 150 });
-            pillHeight.value = withTiming(layout.height, { duration: 150 });
-          }
-          armedRef.current = false;
-          previewIndexRef.current = null;
-          setPreviewIndex(null);
-          const newModel = latestModelsRef.current[idx];
-          if (newModel) {
-            handleSelectModel(newModel);
-          }
-        }
-      },
-      onPanResponderTerminate: () => {
-        clearLongPressTimer();
-        if (armedRef.current) {
-          const layout = rowLayoutsRef.current[selectedIndexRef.current];
-          pillScale.value = withTiming(1, { duration: 150 });
-          pillLit.value = withTiming(0, { duration: 150 });
-          if (layout) {
-            pillY.value = withTiming(layout.y, { duration: 150 });
-            pillHeight.value = withTiming(layout.height, { duration: 150 });
-          }
-        }
-        armedRef.current = false;
-        previewIndexRef.current = null;
-        setPreviewIndex(null);
-      },
+  //long press arms the drag, so the list still scrolls under a plain swipe
+  const pillPan = Gesture.Pan()
+    .activateAfterLongPress(LONG_PRESS_DELAY)
+    .onStart(() => {
+      dragStartY.value = pillY.value;
+      dragIndex.value = selectedIndex;
+      pillScale.value = withTiming(1.04, { duration: 120 });
+      pillLit.value = withTiming(1, { duration: 120 });
     })
-  ).current;
+    .onUpdate((e) => {
+      let anchor = dragIndex.value;
+      const current = rowLayouts[anchor];
+      if (!current) return;
+      const rawY = dragStartY.value + e.translationY;
+
+      let d = rawY - current.y;
+      let slot = current.height + ROW_GAP;
+      while (Math.abs(d) >= slot * BREAK_RATIO) {
+        const next = anchor + (d > 0 ? 1 : -1);
+        const nextLayout = rowLayouts[next];
+        if (!nextLayout) break;
+        anchor = next;
+        d = rawY - nextLayout.y;
+        slot = nextLayout.height + ROW_GAP;
+      }
+
+      if (anchor !== dragIndex.value) {
+        dragIndex.value = anchor;
+        runOnJS(previewCrossed)(anchor);
+      }
+
+      const layout = rowLayouts[anchor]!;
+      pillY.value = layout.y + rubberBand(d, slot);
+      pillHeight.value = withTiming(layout.height, { duration: 100 });
+    })
+    .onEnd(() => {
+      const layout = rowLayouts[dragIndex.value];
+      if (layout) {
+        pillY.value = withTiming(layout.y, { duration: 150 });
+        pillHeight.value = withTiming(layout.height, { duration: 150 });
+      }
+      runOnJS(commitDrag)(dragIndex.value);
+    })
+    .onFinalize((_e, success) => {
+      pillScale.value = withTiming(1, { duration: 150 });
+      pillLit.value = withTiming(0, { duration: 150 });
+      //cancelled mid-drag, snap back to the selected row
+      if (!success) {
+        const layout = rowLayouts[selectedIndex];
+        if (layout) {
+          pillY.value = withTiming(layout.y, { duration: 150 });
+          pillHeight.value = withTiming(layout.height, { duration: 150 });
+        }
+        runOnJS(setPreviewIndex)(null);
+      }
+    });
 
   const pillAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: pillY.value }, { scale: pillScale.value }],
@@ -506,11 +487,13 @@ export function ModelSelectorDrawer({
                 );
               })}
               {hasPill && rowLayoutsRef.current[activeIndex] && (
-                <Reanimated.View style={[styles.pill, pillAnimatedStyle]} {...pillPanResponder.panHandlers}>
-                  <Text style={[styles.optionText, styles.optionTextSelected]} numberOfLines={1}>
-                    {displayName(displayModels[activeIndex])}
-                  </Text>
-                </Reanimated.View>
+                <GestureDetector gesture={pillPan}>
+                  <Reanimated.View style={[styles.pill, pillAnimatedStyle]}>
+                    <Text style={[styles.optionText, styles.optionTextSelected]} numberOfLines={1}>
+                      {displayName(displayModels[activeIndex])}
+                    </Text>
+                  </Reanimated.View>
+                </GestureDetector>
               )}
             </View>
           )}

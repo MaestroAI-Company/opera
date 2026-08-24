@@ -8,6 +8,7 @@ import { CloudSync } from "../../services/CloudSyncService";
 import { Conversation, DB } from "../../services/db/DatabaseService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
+import IconButton from "../ui/IconButton";
 import NotificationModal from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
 import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, playPageTransition, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
@@ -213,18 +214,22 @@ export default function ConversationsDrawer({
         <View style={styles.rowActions}>
           {isSelected ? (
             <>
-              <Pressable
+              <IconButton
+                icon={conv.pinned ? unpinIcon : pinIcon}
                 onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
-                style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlayHover }]}
-              >
-                <Image source={conv.pinned ? unpinIcon : pinIcon} style={styles.actionIcon} tintColor={Colors.textOnPrimary} />
-              </Pressable>
-              <Pressable
+                size={22}
+                tintColor={Colors.textOnPrimary}
+                containerSize={32}
+                pressedColor={Colors.overlayHover}
+              />
+              <IconButton
+                icon={deleteIcon}
                 onPress={() => setDeleteConfirmId(conv.id)}
-                style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlayHover }]}
-              >
-                <Image source={deleteIcon} style={styles.actionIcon} tintColor={Colors.textOnPrimary} />
-              </Pressable>
+                size={22}
+                tintColor={Colors.textOnPrimary}
+                containerSize={32}
+                pressedColor={Colors.overlayHover}
+              />
             </>
           ) : (
             conv.pinned ? (
@@ -290,18 +295,22 @@ export default function ConversationsDrawer({
                 <View style={styles.rowActions}>
                   {isSelected ? (
                     <>
-                      <Pressable
+                      <IconButton
+                        icon={conv.pinned ? unpinIcon : pinIcon}
                         onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
-                        style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlayHover }]}
-                      >
-                        <Image source={conv.pinned ? unpinIcon : pinIcon} style={styles.actionIcon} tintColor={Colors.textOnPrimary} />
-                      </Pressable>
-                      <Pressable
+                        size={22}
+                        tintColor={Colors.textOnPrimary}
+                        containerSize={32}
+                        pressedColor={Colors.overlayHover}
+                      />
+                      <IconButton
+                        icon={deleteIcon}
                         onPress={() => setDeleteConfirmId(conv.id)}
-                        style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlayHover }]}
-                      >
-                        <Image source={deleteIcon} style={styles.actionIcon} tintColor={Colors.textOnPrimary} />
-                      </Pressable>
+                        size={22}
+                        tintColor={Colors.textOnPrimary}
+                        containerSize={32}
+                        pressedColor={Colors.overlayHover}
+                      />
                     </>
                   ) : (
                     <Text style={{ fontSize: FontSizes.label, color: Colors.textMuted, fontFamily: Fonts.mono }}>
@@ -567,25 +576,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     alignItems: "center",
     gap: 4,
   },
-  actionIconButton: {
-    width: 32,
-    height: 32,
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: Radius.huge,
-  },
-  actionIcon: {
-    width: 18,
-    height: 18,
-  },
   pinnedIndicator: {
     paddingHorizontal: 4,
     justifyContent: "center",
     alignItems: "center",
   },
   pinnedIcon: {
-    width: 18,
-    height: 18,
+    width: 22,
+    height: 22,
     opacity: 0.5,
   },
 });

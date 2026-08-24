@@ -6,7 +6,7 @@ import * as Location from "expo-location";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, ImageSourcePropType, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import { getLocalProviderLabel } from "../../services/ai/providers/LocalProvider";
@@ -29,6 +29,7 @@ import DownloadProgress from "../ui/DownloadProgress";
 import Group from "../ui/Group";
 import NotificationBanner from "../ui/NotificationBanner";
 import NotificationCard from "../ui/NotificationCard";
+import IconButton from "../ui/IconButton";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import Selector from "../ui/Selector";
 import Slider from "../ui/Slider";
@@ -73,6 +74,10 @@ const binIcon = require("../../../assets/icons/bin.png");
 const exportIcon = require("../../../assets/icons/export.png");
 const messageIcon = require("../../../assets/icons/message.png");
 const timeIcon = require("../../../assets/icons/time.png");
+const errorIcon = require("../../../assets/icons/error.png");
+const ollamaErrorImage = require("../../../assets/images/ImageCard/OllamaError.png");
+const ollamaInfoImage = require("../../../assets/images/ImageCard/OllamaInfo.png");
+const questionIcon = require("../../../assets/icons/question.png");
 const hyperlinkIcon = require("../../../assets/images/hyperlink2.png");
 const assistantImage = require("../../../assets/images/icon_nobg.png");
 
@@ -188,6 +193,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [alertConfig, setAlertConfig] = useState<{
     title: string,
     message: string,
+    icon?: ImageSourcePropType,
+    image?: ImageSourcePropType,
+    messageAlign?: "left" | "center",
     buttons?: ModalButton[],
     showInput?: boolean,
     inputValue?: string,
@@ -1379,10 +1387,25 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         {/* ollama servers section */}
         <View style={styles.toggleRow}>
           <Text style={styles.settingLabel}>Ollama</Text>
-          <Toggle
-            checked={enabledProviders.includes("ollama")}
-            onToggle={(v) => setProviderEnabled("ollama", v)}
-          />
+          <View style={styles.toggleRight}>
+            <IconButton
+              icon={questionIcon}
+              size={22}
+              tintColor={Colors.textMuted}
+              containerSize={32}
+              pressedColor={Colors.surfacePressed}
+              onPress={() => showAlert(
+                "Ollama",
+                "Ollama lets you run AI models on your own computer or server instead of the cloud. Add your Ollama server's URL below to connect Opera to it.",
+                undefined,
+                { image: ollamaInfoImage, messageAlign: "left" },
+              )}
+            />
+            <Toggle
+              checked={enabledProviders.includes("ollama")}
+              onToggle={(v) => setProviderEnabled("ollama", v)}
+            />
+          </View>
         </View>
         <Text style={[styles.helpText, { marginBottom: 10 }]}>Use your Ollama servers to run powerful AI models at home.</Text>
 
@@ -1397,10 +1420,14 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                     value={url}
                     onChangeText={(v) => setOllamaUrlAt(index, v)}
                     onBlur={() => handleOllamaUrlBlur(index)}
+                    rightIcon={serverErrors[url.trim()] ? errorIcon : undefined}
+                    onRightIconPress={() => showAlert(
+                      "Server unreachable",
+                      "This server could not be reached.\n\n- Check that the server is running.\n- Check the server's network connection.\n- Make sure the URL and port are correct.",
+                      undefined,
+                      { image: ollamaErrorImage, messageAlign: "left" },
+                    )}
                   />
-                  {serverErrors[url.trim()] ? (
-                    <Text style={[styles.errorText, { paddingHorizontal: 12 }]}>This server is unreachable</Text>
-                  ) : null}
                 </View>
               ))}
             </Group>
@@ -1842,7 +1869,10 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <NotificationModal
         visible={alertModalVisible}
         title={alertConfig.title}
+        icon={alertConfig.icon}
+        image={alertConfig.image}
         message={alertConfig.message}
+        messageAlign={alertConfig.messageAlign}
         onClose={() => setAlertModalVisible(false)}
         buttons={alertConfig.buttons}
         showInput={alertConfig.showInput}
@@ -2097,16 +2127,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     alignItems: "center",
     marginTop: 8,
   },
+  toggleRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
   checkboxRow: {
     flex: 1,
     justifyContent: "space-between",
-  },
-  errorText: {
-    fontSize: FontSizes.caption,
-    color: Colors.primary,
-    fontFamily: Fonts.body,
-    marginTop: 8,
-    marginBottom: 0,
   },
   downloadOption: {
     flexDirection: "row",

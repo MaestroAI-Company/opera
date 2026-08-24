@@ -544,8 +544,9 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       closeSheet();
     } else {
       Keyboard.dismiss();
-      const { status } = await MediaLibrary.getPermissionsAsync();
-      if (status !== 'granted') {
+      const { granted, canAskAgain } = await MediaLibrary.getPermissionsAsync();
+      //a refusal sticks, only prompt while the os still allows it
+      if (!granted && canAskAgain) {
         await MediaLibrary.requestPermissionsAsync();
       }
       setIsAttachmentSheetVisible(true);
@@ -948,6 +949,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       setText("");
       setSelectedFiles([]);
       documentsRef.current.clear();
+      Keyboard.dismiss();
     } else if (voiceText === null && wasRecording && autoStartMic) {
       onTranscribeError?.();
     }

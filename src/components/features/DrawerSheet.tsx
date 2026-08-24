@@ -140,7 +140,8 @@ export default function DrawerSheet({
           measuring
             ? styles.measuring
             : {
-              marginBottom: progress.interpolate({ inputRange: [0, 1], outputRange: [-contentHeight, 0] }),
+              //open state eats the safe area below so the sheet reaches the screen edge
+              marginBottom: progress.interpolate({ inputRange: [0, 1], outputRange: [-contentHeight, -liftOffset] }),
               transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [liftOffset, 0] }) }],
             }
         }

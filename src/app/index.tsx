@@ -1390,9 +1390,7 @@ export default function Index() {
 
             <View style={[styles.topBarOverlay, {
               paddingTop: insets.top + (
-                (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window)
-                  ? (navigator.userAgent.includes("Linux") && !navigator.userAgent.includes("Android") ? 0 : 32)
-                  : 0
+                (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) ? 32 : 0
               ),
               zIndex: attachmentSheetVisible ? 200 : undefined,
             }]} pointerEvents="box-none">

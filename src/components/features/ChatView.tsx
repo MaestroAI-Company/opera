@@ -31,6 +31,8 @@ import SuggestionPill from "../ui/SuggestionPill";
 const butterflyImage = require("../../../assets/images/butterfly5.png");
 const butterflyGreyImage = require("../../../assets/images/butterfly2_grey.png");
 const loadingAnimation = require("../../../assets/animations/loading.json");
+//web lottie reads size from webStyle
+const thinkingIconSize = { width: 35, height: 35 };
 const speakerIcon = require("../../../assets/icons/speaker.png");
 const reloadIcon = require("../../../assets/icons/reload.png");
 const copyIcon = require("../../../assets/icons/copy.png");
@@ -285,7 +287,8 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                 source={loadingAnimation}
                 autoPlay
                 loop
-                style={styles.thinkingIcon}
+                style={thinkingIconSize}
+                webStyle={thinkingIconSize}
               />
               {!!disp.currentThought && <FlashingText text={disp.currentThought} />}
             </View>
@@ -645,10 +648,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-  },
-  thinkingIcon: {
-    width: 35,
-    height: 35,
   },
   flashingText: {
     color: Colors.textSecondary,

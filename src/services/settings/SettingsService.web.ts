@@ -1,5 +1,6 @@
 import { DeviceEventEmitter } from 'react-native';
 import { AppEvents } from '../events';
+import { DEFAULT_OLLAMA_URL } from '../ai/utils/imageToBase64';
 
 export type AppSettings = {
   language: string;
@@ -35,7 +36,7 @@ const DEFAULTS: AppSettings = {
   language: 'fr',
   theme: 'system',
   aiService: 'ollama',
-  ollamaUrl: '',
+  ollamaUrl: DEFAULT_OLLAMA_URL,
   ollamaUrls: '[]',
   enabledProviders: 'local,ollama',
   ollamaModel: '',

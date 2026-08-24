@@ -8,6 +8,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState, type ReactNode } from "react";
 import { Platform } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import SiteHead from "../components/SiteHead";
 import SplashScreenComponent from "../components/ui/SplashScreen";
@@ -97,10 +98,12 @@ export default function RootLayout() {
   }
 
   return (
-    <KeyboardProvider>
-      <TauriTitleBar />
-      <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
-      <StatusBar style={isDark ? "light" : "dark"} />
-    </KeyboardProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <KeyboardProvider>
+        <TauriTitleBar />
+        <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
+        <StatusBar style={isDark ? "light" : "dark"} />
+      </KeyboardProvider>
+    </GestureHandlerRootView>
   );
 }

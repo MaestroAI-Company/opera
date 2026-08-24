@@ -2,13 +2,16 @@ import { FontSizes, Fonts, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { Image, ImageSourcePropType, Pressable, StyleProp, StyleSheet, TextInput, TextInputProps, ViewStyle } from "react-native";
 import { useRef, useState } from "react";
+import IconButton from "./IconButton";
 
 interface TextInputFieldProps extends TextInputProps {
   icon?: ImageSourcePropType;
   containerStyle?: StyleProp<ViewStyle>;
+  rightIcon?: ImageSourcePropType;
+  onRightIconPress?: () => void;
 }
 
-export default function TextInputField({ icon, style, containerStyle, onFocus, onBlur, ...props }: TextInputFieldProps) {
+export default function TextInputField({ icon, style, containerStyle, onFocus, onBlur, rightIcon, onRightIconPress, ...props }: TextInputFieldProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const inputRef = useRef<TextInput>(null);
@@ -28,6 +31,17 @@ export default function TextInputField({ icon, style, containerStyle, onFocus, o
         onBlur={(e) => { setFocused(false); onBlur?.(e); }}
         {...props}
       />
+      {rightIcon && (
+        <IconButton
+          icon={rightIcon}
+          onPress={onRightIconPress}
+          size={22}
+          tintColor={Colors.error}
+          containerSize={32}
+          pressedColor={Colors.surfacePressed}
+          style={styles.rightIconButton}
+        />
+      )}
     </Pressable>
   );
 }
@@ -49,6 +63,10 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     height: 18,
     marginRight: 10,
     tintColor: Colors.textPrimary,
+  },
+  rightIconButton: {
+    alignSelf: "center",
+    marginLeft: 10,
   },
   input: {
     flex: 1,

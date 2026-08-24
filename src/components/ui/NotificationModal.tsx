@@ -3,6 +3,7 @@ import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constan
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import Checkbox from "./Checkbox";
 import Group from "./Group";
+import ImageCard from "./ImageCard";
 import TextInputField from "./TextInputField";
 
 export type ModalButton = {
@@ -23,7 +24,9 @@ export type NotificationModalProps = {
   visible: boolean;
   title?: string;
   icon?: ImageSourcePropType;
+  image?: ImageSourcePropType;
   message?: string;
+  messageAlign?: "left" | "center";
 
   //optional text input
   showInput?: boolean;
@@ -43,7 +46,9 @@ export default function NotificationModal({
   visible,
   title,
   icon,
+  image,
   message,
+  messageAlign = "left",
   showInput,
   inputValue,
   onInputChange,
@@ -72,6 +77,12 @@ export default function NotificationModal({
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.container} onPress={() => { }}>
 
+          {image && (
+            <View style={styles.imageContainer}>
+              <ImageCard source={image} width="100%" />
+            </View>
+          )}
+
           {(title || icon) && (
             <View style={styles.header}>
               {icon && <Image source={icon} style={styles.icon} tintColor={Colors.textPrimary} />}
@@ -79,7 +90,7 @@ export default function NotificationModal({
             </View>
           )}
 
-          {message && <Text style={styles.message}>{message}</Text>}
+          {message && <Text style={[styles.message, { textAlign: messageAlign }]}>{message}</Text>}
 
           {showInput && (
             <View style={styles.inputContainer}>
@@ -174,6 +185,10 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     maxWidth: 400,
     boxShadow: `0px 4px 12px ${Colors.overlay}`,
     elevation: 8,
+  },
+  imageContainer: {
+    alignItems: "center",
+    marginBottom: 16,
   },
   header: {
     flexDirection: "row",

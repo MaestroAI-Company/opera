@@ -35,9 +35,59 @@ export type SyncTombstone = {
   deletedAt: number;
 };
 
+const DB_NAME = 'opera';
+const DB_VERSION = 1;
+const STORE = 'kv';
+
+type StoreKey = 'conversations' | 'messages' | 'tombstones';
+
+//legacy keys kept for migration
+const LEGACY_KEYS: Record<StoreKey, string> = {
+  conversations: 'opera_conversations',
+  messages: 'opera_messages',
+  tombstones: 'opera_tombstones',
+};
+
+//indexeddb exceeds localstorage quota
+function openDatabase(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbGet<T>(db: IDBDatabase, key: StoreKey): Promise<T | undefined> {
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(key);
+    req.onsuccess = () => resolve(req.result as T | undefined);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbPut(db: IDBDatabase, entries: [StoreKey, unknown][]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    for (const [key, value] of entries) tx.objectStore(STORE).put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
 class DatabaseService {
   private conversations: Conversation[] = [];
   private messages: Message[] = [];
+  private tombstones: SyncTombstone[] = [];
+  private db: IDBDatabase | null = null;
+  //keys waiting to be written
+  private dirty = new Set<StoreKey>();
+  private flushScheduled = false;
+  //serializes writes so batches never overlap
+  private writeChain: Promise<void> = Promise.resolve();
   //batch writes count above zero
   private silentDepth = 0;
 
@@ -59,39 +109,90 @@ class DatabaseService {
   // init database
   async init(): Promise<void> {
     try {
-      const storedConvs = localStorage.getItem('opera_conversations');
-      const storedMsgs = localStorage.getItem('opera_messages');
-      
-      this.conversations = storedConvs ? JSON.parse(storedConvs) : [];
-      this.messages = storedMsgs ? JSON.parse(storedMsgs) : [];
+      this.db = await openDatabase();
+      const [convs, msgs, tombs] = await Promise.all([
+        idbGet<Conversation[]>(this.db, 'conversations'),
+        idbGet<Message[]>(this.db, 'messages'),
+        idbGet<SyncTombstone[]>(this.db, 'tombstones'),
+      ]);
+
+      if (convs === undefined && msgs === undefined) {
+        await this.migrateFromLocalStorage();
+        return;
+      }
+
+      this.conversations = convs ?? [];
+      this.messages = msgs ?? [];
+      this.tombstones = tombs ?? [];
     } catch (e) {
       console.error('database init failed', e);
     }
   }
 
-  // save conversations to localstorage
+  //migrate data and free quota
+  private async migrateFromLocalStorage(): Promise<void> {
+    const read = <T>(key: StoreKey): T[] => {
+      try {
+        const stored = localStorage.getItem(LEGACY_KEYS[key]);
+        return stored ? JSON.parse(stored) : [];
+      } catch {
+        return [];
+      }
+    };
+
+    this.conversations = read<Conversation>('conversations');
+    this.messages = read<Message>('messages');
+    this.tombstones = read<SyncTombstone>('tombstones');
+
+    await this.flushNow(['conversations', 'messages', 'tombstones']);
+    for (const key of Object.values(LEGACY_KEYS)) localStorage.removeItem(key);
+  }
+
+  //write current state for keys
+  private async flushNow(keys: StoreKey[]): Promise<void> {
+    if (!this.db || keys.length === 0) return;
+    const values: Record<StoreKey, unknown> = {
+      conversations: this.conversations,
+      messages: this.messages,
+      tombstones: this.tombstones,
+    };
+    await idbPut(this.db, keys.map(k => [k, values[k]] as [StoreKey, unknown]));
+  }
+
+  //one transaction per batch
+  private scheduleSave(key: StoreKey): void {
+    this.dirty.add(key);
+    if (this.flushScheduled) return;
+    this.flushScheduled = true;
+    setTimeout(() => {
+      this.flushScheduled = false;
+      const keys = Array.from(this.dirty);
+      this.dirty.clear();
+      this.writeChain = this.writeChain
+        .then(() => this.flushNow(keys))
+        .catch(e => console.error('database write failed', e));
+    }, 0);
+  }
+
+  //save conversations
   private saveConversations(): void {
-    localStorage.setItem('opera_conversations', JSON.stringify(this.conversations));
+    this.scheduleSave('conversations');
   }
 
-  // save messages to localstorage
+  //save messages
   private saveMessages(): void {
-    localStorage.setItem('opera_messages', JSON.stringify(this.messages));
+    this.scheduleSave('messages');
   }
 
-  //get tombstones from localstorage
+  //get tombstones
   async getTombstones(): Promise<SyncTombstone[]> {
-    try {
-      const stored = localStorage.getItem('opera_tombstones');
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
+    return this.tombstones;
   }
 
   //replace local tombstone registry
   async setTombstones(items: SyncTombstone[]): Promise<void> {
-    localStorage.setItem('opera_tombstones', JSON.stringify(items));
+    this.tombstones = items;
+    this.scheduleSave('tombstones');
   }
 
   //merge items into the local tombstone registry (keep newest deletedAt)
@@ -109,7 +210,8 @@ class DatabaseService {
 
   //clear all tombstones
   async clearTombstones(): Promise<void> {
-    localStorage.removeItem('opera_tombstones');
+    this.tombstones = [];
+    this.scheduleSave('tombstones');
   }
 
   //check saved data for inconsistencies that can appear after an update or partial import

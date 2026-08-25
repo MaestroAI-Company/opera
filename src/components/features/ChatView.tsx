@@ -1,6 +1,5 @@
 import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
-import LottieView from "lottie-react-native";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -27,12 +26,10 @@ import IconButton from "../ui/IconButton";
 import { deriveChatDisplay, renderMarkdown } from "../ui/MarkdownText";
 import SuggestionBar from "../ui/SuggestionBar";
 import SuggestionPill from "../ui/SuggestionPill";
+import ThinkingIcon from "../ui/ThinkingIcon";
 
 const butterflyImage = require("../../../assets/images/butterfly5.png");
 const butterflyGreyImage = require("../../../assets/images/butterfly2_grey.png");
-const loadingAnimation = require("../../../assets/animations/loading.json");
-//web lottie reads size from webStyle
-const thinkingIconSize = { width: 35, height: 35 };
 const speakerIcon = require("../../../assets/icons/speaker.png");
 const reloadIcon = require("../../../assets/icons/reload.png");
 const copyIcon = require("../../../assets/icons/copy.png");
@@ -283,13 +280,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
         <View style={styles.aiContainer}>
           {isCurrentlyThinking && (
             <View style={styles.thinkingContainer}>
-              <LottieView
-                source={loadingAnimation}
-                autoPlay
-                loop
-                style={thinkingIconSize}
-                webStyle={thinkingIconSize}
-              />
+              <ThinkingIcon />
               {!!disp.currentThought && <FlashingText text={disp.currentThought} />}
             </View>
           )}

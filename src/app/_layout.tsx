@@ -13,6 +13,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import SiteHead from "../components/SiteHead";
 import SplashScreenComponent from "../components/ui/SplashScreen";
 import TauriTitleBar from "../components/features/TauriTitleBar";
+import { Radius } from "../../constants/theme";
 import { initTheme, useIsDark } from "../hooks/useTheme";
 import { installCrashHandler } from "../services/logging/CrashReporter";
 import { installLogger } from "../services/logging/Logger";
@@ -42,6 +43,7 @@ if (typeof window !== "undefined") {
 installLogger();
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+const isLinux = isTauri && navigator.userAgent.includes("Linux") && !navigator.userAgent.includes("Android");
 
 const screenLayout = ({ children }: { children: ReactNode }) => (
   <>
@@ -64,6 +66,15 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
+
+  useEffect(() => {
+    //rounds the window during splash, before TauriTitleBar mounts
+    if (!isLinux) return;
+    const style = document.createElement('style');
+    style.textContent = `#root{border-radius:${Radius.window}px;overflow:hidden}`;
+    document.head.appendChild(style);
+    return () => style.remove();
+  }, []);
 
   useEffect(() => {
     async function lockMobileOrientation() {

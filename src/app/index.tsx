@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { useQuickActionCallback } from "expo-quick-actions/hooks";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -21,27 +22,35 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import HeadlessWebView from "../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../constants/theme";
-import { useColors, useThemedStyles } from "../hooks/useTheme";
+import BugReportSheet from "../components/features/BugReportSheet";
 import ChatBar from "../components/features/ChatBar";
 import ChatView from "../components/features/ChatView";
 import ConversationsDrawer from "../components/features/ConversationsDrawer";
 import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, settingsProgress, settleDrawer } from "../components/features/drawerAnimation";
-import ModelSelector from "../components/features/ModelSelector";
+import { ModelSelectorDrawer, ModelSelectorTrigger } from "../components/features/ModelSelector";
 import SettingsDrawer from "../components/features/SettingsDrawer";
 import TopBar from "../components/features/TopBar";
 import NotificationModal from "../components/ui/NotificationModal";
 import { hasOpenOverlaySheet } from "../components/ui/SheetSurface";
+import { useAnimatedValue } from "../hooks/useAnimatedValue";
+import { useBugReportTrigger } from "../hooks/useBugReportTrigger";
+import { takePendingCrash, type Crash } from "../services/logging/CrashReporter";
+import { captureScreen } from "../services/logging/ReportScreenshot";
 import { useResponsive } from "../hooks/useResponsive";
+import { useColors, useThemedStyles } from "../hooks/useTheme";
+import { CloudSync } from "../services/CloudSyncService";
 import { AIModule } from "../services/ai/AIModule";
 import { buildSystemPrompt, streamAssistantReply } from "../services/ai/generation/chatGeneration";
+import { generateSuggestions, Suggestion } from "../services/ai/generation/suggestions";
+import { resolveQuickFlow } from "../services/ai/quickFlow";
 import { arrayBufferToBase64 } from "../services/ai/utils/base64";
 import { Conversation, DB, Message, MessageMetrics } from "../services/db/DatabaseService";
-import { splitDocumentBlocks } from "../services/documents/DocumentService";
 import {
   getInitialDeepLink,
   subscribeToDeepLinks,
   type DeepLinkRoute,
 } from "../services/deeplinks/DeepLinkService";
+import { splitDocumentBlocks } from "../services/documents/DocumentService";
 import { AppEvents } from "../services/events";
 import { LocationService } from "../services/location/LocationService";
 import { PluginRegistry } from "../services/plugins/PluginRegistry";
@@ -57,6 +66,9 @@ const settingsIcon = require("../../assets/icons/settings.png");
 
 //matches welcomeText's lineHeight, reserved upfront so the second line doesn't shift layout
 const WELCOME_LINE_HEIGHT = 40;
+
+//swipe-up distance that fully drags the model selector into view
+const MODEL_SELECTOR_DRAG_DISTANCE = 280;
 
 //time-of-day greeting shown on the home screen
 function getGreeting(): string {
@@ -140,7 +152,10 @@ export default function Index() {
   const [selectedReflection, setSelectedReflection] = useState("none");
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
-  const [settingsInitialSubPage, setSettingsInitialSubPage] = useState<"main" | "general" | "confidentiality" | "tools">("main");
+  const [modelSelectorVisible, setModelSelectorVisible] = useState(false);
+  //shared with the panResponder below so the swipe-up gesture can drag it live
+  const modelSelectorProgress = useAnimatedValue(0);
+  const [settingsInitialSubPage, setSettingsInitialSubPage] = useState<"main" | "general" | "confidentiality" | "tools" | "reports">("main");
   const [dbReady, setDbReady] = useState(false);
   const [dbFailed, setDbFailed] = useState(false);
   const [showDataWarning, setShowDataWarning] = useState(false);
@@ -154,6 +169,14 @@ export default function Index() {
   useEffect(() => {
     settingsDrawerVisibleRef.current = settingsDrawerVisible;
   }, [settingsDrawerVisible]);
+
+  //desktop: opening discussions or settings closes the model dropdown behind it
+  useEffect(() => {
+    if (isDesktop && (drawerVisible || settingsDrawerVisible)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- closes a sibling panel on desktop
+      setModelSelectorVisible(false);
+    }
+  }, [drawerVisible, settingsDrawerVisible, isDesktop]);
 
   const [incognitoMode, setIncognitoMode] = useState(false);
   const [userName, setUserName] = useState("");
@@ -170,6 +193,23 @@ export default function Index() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  //per conversation, tied to their reply
+  const [suggestionsByConv, setSuggestionsByConv] = useState<Record<string, { msgId: string; items: Suggestion[] }>>({});
+  const setSuggestions = useCallback((convId: string, value: { msgId: string; items: Suggestion[] }) => {
+    setSuggestionsByConv((prev) => ({ ...prev, [convId]: value }));
+  }, []);
+
+  //only match the newest reply
+  const activeSuggestions = useMemo(() => {
+    const suggestions = activeConversation ? suggestionsByConv[activeConversation.id] : undefined;
+    if (!suggestions) return undefined;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") {
+        return messages[i].id === suggestions.msgId ? suggestions.items : undefined;
+      }
+    }
+    return undefined;
+  }, [messages, suggestionsByConv, activeConversation]);
 
   //ref serves streaming callbacks
   const streamingMsgIdRef = useRef<string | null>(null);
@@ -232,6 +272,32 @@ export default function Index() {
     });
   }, []);
 
+  //desktop panel hangs under this button
+  const modelTriggerRef = useRef<View | null>(null);
+
+  //reopen crash report from last run
+  const [pendingCrash, setPendingCrash] = useState<Crash | null>(takePendingCrash);
+  const [bugReportVisible, setBugReportVisible] = useState(pendingCrash !== null);
+  const [screenshot, setScreenshot] = useState<string | null>(null);
+  const rootRef = useRef<View>(null);
+
+  const bugReportVisibleRef = useRef(bugReportVisible);
+  useEffect(() => {
+    bugReportVisibleRef.current = bugReportVisible;
+  }, [bugReportVisible]);
+
+  const openBugReport = useCallback(async () => {
+    //shakes ignored while sheet is open
+    if (bugReportVisibleRef.current) return;
+    if (!Settings.getCached().shakeToReport) return;
+    Vibration.vibrate(30);
+    //capture first or sheet shoots itself
+    setScreenshot(await captureScreen(rootRef));
+    openDrawerSafely(() => setBugReportVisible(true));
+  }, [openDrawerSafely]);
+
+  useBugReportTrigger(openBugReport);
+
   const [pendingConvIds, setPendingConvIds] = useState<string[]>([]);
   const requestQueueRef = useRef<{ convId: string, task: () => Promise<void>, assistantMsgId: string, isIncognito: boolean }[]>([]);
   const isProcessingRef = useRef(false);
@@ -242,30 +308,60 @@ export default function Index() {
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
         //a sheet floats over the ui, it owns the gesture
-        if (hasOpenOverlaySheet()) return false;
+        if (hasOpenOverlaySheet() || modelSelectorVisible) return false;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-        if (!isHorizontal || Math.abs(gestureState.dx) <= 10) return false;
+        if (isHorizontal) {
+          if (Math.abs(gestureState.dx) <= 10) return false;
+          if (settingsDrawerVisible && gestureState.dx > 0) return true;
+          if (drawerVisible && gestureState.dx < 0) return true;
 
-        if (settingsDrawerVisible && gestureState.dx > 0) return true;
-        if (drawerVisible && gestureState.dx < 0) return true;
+          const isLeftEdge = gestureState.x0 < 40;
+          if (isLeftEdge && gestureState.dx > 0) return true;
+          return gestureState.dx < 0;
+        }
 
-        const isLeftEdge = gestureState.x0 < 40;
-        if (isLeftEdge && gestureState.dx > 0) return true;
-        return gestureState.dx < 0;
+        //swipe up on homepage opens model selector
+        if (!drawerVisible && !settingsDrawerVisible && !modelSelectorVisible && !activeConversation) {
+          return gestureState.dy < -15;
+        }
+
+        return false;
       },
       onPanResponderGrant: () => {
         //retract before keyboard shrinks panel
-        if (!drawerVisible && !settingsDrawerVisible) KeyboardController.dismiss();
+        if (!drawerVisible && !settingsDrawerVisible && !modelSelectorVisible) KeyboardController.dismiss();
       },
       onPanResponderMove: (evt, gestureState) => {
         //gesture drives panel directly
-        if (drawerVisible || settingsDrawerVisible) return;
-        const ratio = Math.min(1, Math.abs(gestureState.dx) / dragWidth);
-        //crossing start leaves other panel out
-        dragDrawer(conversationsProgress, gestureState.dx > 0 ? ratio : 0);
-        dragDrawer(settingsProgress, gestureState.dx > 0 ? 0 : ratio);
+        if (drawerVisible || settingsDrawerVisible || modelSelectorVisible) return;
+        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        if (isHorizontal) {
+          const ratio = Math.min(1, Math.abs(gestureState.dx) / dragWidth);
+          //crossing start leaves other panel out
+          dragDrawer(conversationsProgress, gestureState.dx > 0 ? ratio : 0);
+          dragDrawer(settingsProgress, gestureState.dx > 0 ? 0 : ratio);
+        } else if (gestureState.dy < 0 && !activeConversation) {
+          //carries the model selector up with the finger, same as the horizontal drawers
+          const ratio = Math.min(1, Math.abs(gestureState.dy) / MODEL_SELECTOR_DRAG_DISTANCE);
+          dragDrawer(modelSelectorProgress, ratio);
+        }
       },
       onPanResponderRelease: (evt, gestureState) => {
+        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        if (!isHorizontal) {
+          if (!drawerVisible && !settingsDrawerVisible && !modelSelectorVisible && !activeConversation) {
+            const velocity = -gestureVelocity(gestureState.vy, MODEL_SELECTOR_DRAG_DISTANCE);
+            if (gestureState.dy < -40 || gestureState.vy < -0.5) {
+              settleDrawer(modelSelectorProgress, true, velocity);
+              setModelSelectorVisible(true);
+            } else {
+              //send peeked panel back off
+              settleDrawer(modelSelectorProgress, false, velocity);
+            }
+          }
+          return;
+        }
+
         const velocity = gestureVelocity(gestureState.vx, dragWidth);
         //short flicks still commit
         const opensLeft = gestureState.dx > 40 || gestureState.vx > 0.5;
@@ -292,12 +388,13 @@ export default function Index() {
         }
       },
       onPanResponderTerminate: () => {
-        if (drawerVisible || settingsDrawerVisible) return;
+        if (drawerVisible || settingsDrawerVisible || modelSelectorVisible) return;
         settleDrawer(conversationsProgress, false);
         settleDrawer(settingsProgress, false);
+        settleDrawer(modelSelectorProgress, false);
       },
     })
-    , [drawerVisible, settingsDrawerVisible, dragWidth]);
+    , [drawerVisible, settingsDrawerVisible, modelSelectorVisible, dragWidth, activeConversation, modelSelectorProgress]);
 
   //trackpad two-finger horizontal swipe like mobile gesture
   useEffect(() => {
@@ -494,6 +591,8 @@ export default function Index() {
         if ((await DB.detectDataIssues()) && !s.dataWarningDismissed) {
           setShowDataWarning(true);
         }
+        //arms background sync at launch
+        CloudSync.init().catch((e) => console.warn("Could not start cloud sync:", e));
         await PluginRegistry.init();
         await PluginRegistry.loadAll();
 
@@ -579,13 +678,17 @@ export default function Index() {
       setOllamaUrl(Settings.getCached().ollamaUrl);
       setUserName(Settings.getCached().name);
     });
+    const modelSelectorSub = DeviceEventEmitter.addListener(AppEvents.openModelSelector, () => {
+      openDrawerSafely(() => setModelSelectorVisible(true));
+    });
 
     return () => {
       if (reloadTimer) clearTimeout(reloadTimer);
       conversationsSub.remove();
       settingsSub.remove();
+      modelSelectorSub.remove();
     };
-  }, [dbReady, loadConversations]);
+  }, [dbReady, loadConversations, openDrawerSafely]);
 
   //load messages when a conversation is selected
   const selectConversation = useCallback(async (conv: Conversation) => {
@@ -683,8 +786,8 @@ export default function Index() {
         //title prompt only needs doc names
         const { names, text } = splitDocumentBlocks(userMessage);
         const summarized = names.length > 0 ? `${names.join(', ')}\n${text}` : text;
-        await AIModule.sendMessage(
-          selectedModel,
+        await AIModule.sendOn(
+          resolveQuickFlow(selectedModel),
           SYSTEM_PROMPTS.SUMMARIZE,
           [{ role: "user", content: summarized, images }],
           (chunk) => { title += chunk; },
@@ -799,6 +902,7 @@ export default function Index() {
         abortControllerRef.current = new AbortController();
 
         let isError = false;
+        let isAborted = false;
         let messageMetrics: MessageMetrics | undefined;
         let messageSources: Message['sources'];
 
@@ -832,6 +936,7 @@ export default function Index() {
               isError = true;
               streamingContentRef.current = `Error during generation: ${outcome.error ?? "unknown error"}`;
             } else {
+              isAborted = outcome.status === "aborted";
               streamingContentRef.current = outcome.content;
             }
             messageSources = outcome.sources;
@@ -862,6 +967,19 @@ export default function Index() {
         //generate AI title for new conversations
         if (isFirstMessage && !isIncognitoTask && !isError) {
           generateTitle(taskConv.id, text, images);
+        }
+
+        //propose follow-ups once the reply landed whole
+        if (!isError && !isAborted && taskSelectedModel) {
+          generateSuggestions({
+            model: taskSelectedModel,
+            userMessage: text,
+            assistantMessage: streamingContentRef.current,
+            //show each pill once complete
+            onPartial: (items) => setSuggestions(taskConv.id, { msgId: assistantMsg.id, items }),
+          }).then((items) => {
+            if (items.length > 0) setSuggestions(taskConv.id, { msgId: assistantMsg.id, items });
+          });
         }
 
         //auto-read the reply aloud when it was requested via voice
@@ -993,6 +1111,7 @@ export default function Index() {
       streamingContentRef.current = "";
       abortControllerRef.current = new AbortController();
       let isError = false;
+      let isAborted = false;
       let messageMetrics: MessageMetrics | undefined;
       let messageSources: Message['sources'];
 
@@ -1025,6 +1144,7 @@ export default function Index() {
             isError = true;
             streamingContentRef.current = `Error during generation: ${outcome.error ?? "unknown error"}`;
           } else {
+            isAborted = outcome.status === "aborted";
             streamingContentRef.current = outcome.content;
           }
           messageSources = outcome.sources;
@@ -1049,6 +1169,20 @@ export default function Index() {
           }
           await loadConversations();
         }
+      }
+
+      //the reply changed, so do the follow-ups
+      const lastUser = [...taskHistory].reverse().find((m) => m.role === "user");
+      if (!isError && !isAborted && taskSelectedModel && lastUser) {
+        generateSuggestions({
+          model: taskSelectedModel,
+          userMessage: lastUser.content,
+          assistantMessage: streamingContentRef.current,
+          //show each pill once complete
+          onPartial: (items) => setSuggestions(taskConv.id, { msgId: assistantMsg.id, items }),
+        }).then((items) => {
+          if (items.length > 0) setSuggestions(taskConv.id, { msgId: assistantMsg.id, items });
+        });
       }
     };
 
@@ -1148,16 +1282,32 @@ export default function Index() {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} ref={rootRef} collapsable={false}>
       <ImageBackground
         source={texture2}
-        style={StyleSheet.absoluteFill}
-        imageStyle={styles.backgroundTexture} resizeMode="cover"
+        style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
+        imageStyle={styles.backgroundTexture}
+        resizeMode="cover"
+      />
+      <LinearGradient
+        colors={[
+          Colors.background,
+          `${Colors.background}D9`,
+          `${Colors.background}BF`,
+          `${Colors.background}A6`,
+          `${Colors.background}4D`,
+          `${Colors.background}1A`,
+          "transparent",
+        ]}
+        locations={[0, 0.2, 0.5, 0.75, 0.85, 0.95, 1]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
       />
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: "transparent" }]}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        enabled={!drawerVisible && !settingsDrawerVisible}
+        enabled={!drawerVisible && !settingsDrawerVisible && !bugReportVisible}
         {...(isLargeScreen ? {} : panResponder.panHandlers)}
       >
 
@@ -1216,6 +1366,8 @@ export default function Index() {
 
             {activeConversation && (
               <ChatView
+                suggestions={activeSuggestions}
+                onSuggestionPress={handleSend}
                 messages={messages}
                 conversation={activeConversation}
                 contentTopPadding={insets.top + 72}
@@ -1238,9 +1390,7 @@ export default function Index() {
 
             <View style={[styles.topBarOverlay, {
               paddingTop: insets.top + (
-                (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window)
-                  ? (navigator.userAgent.includes("Linux") && !navigator.userAgent.includes("Android") ? 0 : 32)
-                  : 0
+                (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) ? 32 : 0
               ),
               zIndex: attachmentSheetVisible ? 200 : undefined,
             }]} pointerEvents="box-none">
@@ -1253,19 +1403,13 @@ export default function Index() {
                 isLargeScreen={isLargeScreen}
                 isDesktop={isDesktop}
                 centerElement={
-                  <ModelSelector
+                  <ModelSelectorTrigger
+                    viewRef={modelTriggerRef}
                     selectedModel={selectedModel}
-                    selectedReflection={selectedReflection}
-                    showReflection={modelCapabilities.includes("thinking")}
-                    aiService={aiService}
-                    ollamaUrl={ollamaUrl}
-                    onServiceChange={handleServiceChange}
-                    onModelChange={(model) => {
-                      setSelectedModel(model);
-                      Settings.set("ollamaModel", model);
+                    onPress={() => {
+                      if (!isDesktop && (drawerVisible || settingsDrawerVisible)) return;
+                      openDrawerSafely(() => setModelSelectorVisible(prev => !prev));
                     }}
-                    onReflectionChange={setSelectedReflection}
-                    closeSignal={isDesktop ? `${drawerVisible}:${settingsDrawerVisible}` : undefined}
                   />
                 }
                 rightElement={
@@ -1340,6 +1484,40 @@ export default function Index() {
       {isDesktop ? null : conversationsDrawer}
       {isDesktop ? null : settingsDrawer}
 
+      <BugReportSheet
+        visible={bugReportVisible}
+        crash={pendingCrash}
+        screenshot={screenshot}
+        onClose={() => {
+          setBugReportVisible(false);
+          setPendingCrash(null);
+          setScreenshot(null);
+        }}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        bottomInset={insets.bottom}
+      />
+
+      <ModelSelectorDrawer
+        visible={modelSelectorVisible}
+        onClose={() => setModelSelectorVisible(false)}
+        progress={modelSelectorProgress}
+        selectedModel={selectedModel}
+        selectedReflection={selectedReflection}
+        showReflection={modelCapabilities.includes("thinking")}
+        aiService={aiService}
+        ollamaUrl={ollamaUrl}
+        onServiceChange={handleServiceChange}
+        onModelChange={(model) => {
+          setSelectedModel(model);
+          Settings.set("ollamaModel", model);
+        }}
+        onReflectionChange={setSelectedReflection}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        triggerRef={modelTriggerRef}
+      />
+
       <HeadlessWebView />
 
       <NotificationModal
@@ -1367,6 +1545,7 @@ export default function Index() {
           },
         ]}
       />
+
     </View>
   );
 }

@@ -1,6 +1,5 @@
 import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
-import LottieView from "lottie-react-native";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -18,15 +17,19 @@ import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme"
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { AIModule } from "../../services/ai/AIModule";
+import { Suggestion } from "../../services/ai/generation/suggestions";
 import { Conversation, Message, MessageSource } from "../../services/db/DatabaseService";
 import { splitDocumentBlocks } from "../../services/documents/DocumentService";
 import { Settings } from "../../services/settings/SettingsService";
 import { TTS } from "../../services/speech/TTSService";
+import IconButton from "../ui/IconButton";
 import { deriveChatDisplay, renderMarkdown } from "../ui/MarkdownText";
+import SuggestionBar from "../ui/SuggestionBar";
+import SuggestionPill from "../ui/SuggestionPill";
+import ThinkingIcon from "../ui/ThinkingIcon";
 
 const butterflyImage = require("../../../assets/images/butterfly5.png");
 const butterflyGreyImage = require("../../../assets/images/butterfly2_grey.png");
-const loadingAnimation = require("../../../assets/animations/loading.json");
 const speakerIcon = require("../../../assets/icons/speaker.png");
 const reloadIcon = require("../../../assets/icons/reload.png");
 const copyIcon = require("../../../assets/icons/copy.png");
@@ -35,6 +38,7 @@ const chatIcon = require("../../../assets/icons/chat.png");
 const appSourceIcon = require("../../../assets/icons/tool.png");
 const imageSourceIcon = require("../../../assets/icons/photo.png");
 const linkSourceIcon = require("../../../assets/icons/hyperlink.png");
+const arrowIcon = require("../../../assets/icons/arrow.png");
 
 //last title segment after separator
 function sourceLabel(source: MessageSource): string {
@@ -116,6 +120,9 @@ type ChatViewProps = {
   dark?: boolean;
   alignBottom?: boolean;
   onOpenInApp?: (item: Message) => void;
+  //shown under the last assistant message only
+  suggestions?: Suggestion[];
+  onSuggestionPress?: (text: string) => void;
 };
 
 const stripMarkdown = (md: string) => {
@@ -157,7 +164,7 @@ const FlashingText = ({ text }: { text: string }) => {
   );
 };
 
-const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isChatGenerating, showMetrics, fallbackModel, canThink, dark, onOpenInApp }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string; canThink?: boolean; dark?: boolean; onOpenInApp?: (item: Message) => void }) => {
+const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isChatGenerating, showMetrics, fallbackModel, canThink, dark, onOpenInApp, suggestions, onSuggestionPress }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string; canThink?: boolean; dark?: boolean; onOpenInApp?: (item: Message) => void; suggestions?: Suggestion[]; onSuggestionPress?: (text: string) => void }) => {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const isUser = item.role === "user";
@@ -273,12 +280,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
         <View style={styles.aiContainer}>
           {isCurrentlyThinking && (
             <View style={styles.thinkingContainer}>
-              <LottieView
-                source={loadingAnimation}
-                autoPlay
-                loop
-                style={styles.thinkingIcon}
-              />
+              <ThinkingIcon />
               {!!disp.currentThought && <FlashingText text={disp.currentThought} />}
             </View>
           )}
@@ -293,49 +295,62 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
           {!isUser && !isCurrentlyThinking && !isGenerating && (
             <View style={styles.aiToolbar}>
               {speakerEnabled && (
-                <Pressable
+                <IconButton
+                  icon={speakerIcon}
                   onPress={() => onSpeak?.(item)}
-                  style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
-                >
-                  <Image source={speakerIcon} style={{ width: 22, height: 22, tintColor: isSpeaking ? Colors.primary : (dark ? Colors.surface : Colors.textMuted) }} />
-                </Pressable>
+                  containerSize={32}
+                  pressedColor={Colors.surfacePressed}
+                  tintColor={isSpeaking ? Colors.primary : (dark ? Colors.surface : Colors.textMuted)}
+                />
               )}
-              <Pressable
+              <IconButton
+                icon={reloadIcon}
                 onPress={() => onRegenerate?.(item.id)}
                 disabled={isChatGenerating}
-                style={({ pressed, hovered }) => [
-                  styles.toolbarIconContainer,
-                  (pressed || hovered) && { backgroundColor: Colors.surfacePressed },
-                  isChatGenerating && { opacity: 0.3 }
-                ]}
-              >
-                <Image source={reloadIcon} style={{ width: 22, height: 22, tintColor: dark ? Colors.surface : Colors.textMuted }} />
-              </Pressable>
-              <Pressable
+                containerSize={32}
+                pressedColor={Colors.surfacePressed}
+                tintColor={dark ? Colors.surface : Colors.textMuted}
+              />
+              <IconButton
+                icon={copyIcon}
                 onPress={() => copyToClipboard(item.content, false)}
                 onLongPress={() => copyToClipboard(item.content, true)}
                 delayLongPress={500}
-                style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
-              >
-                <Image source={copyIcon} style={{ width: 22, height: 22, tintColor: dark ? Colors.surface : Colors.textMuted }} />
-              </Pressable>
+                containerSize={32}
+                pressedColor={Colors.surfacePressed}
+                tintColor={dark ? Colors.surface : Colors.textMuted}
+              />
               {!!onOpenInApp && (
-                <Pressable
+                <IconButton
+                  icon={chatIcon}
                   onPress={() => onOpenInApp(item)}
-                  style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
-                >
-                  <Image source={chatIcon} style={{ width: 22, height: 22, tintColor: dark ? Colors.surface : Colors.textMuted }} />
-                </Pressable>
+                  containerSize={32}
+                  pressedColor={Colors.surfacePressed}
+                  tintColor={dark ? Colors.surface : Colors.textMuted}
+                />
               )}
               {showMetrics && (
-                <Pressable
+                <IconButton
+                  icon={infoIcon}
                   onPress={() => setShowDetails(prev => !prev)}
-                  style={({ pressed, hovered }) => [styles.toolbarIconContainer, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
-                >
-                  <Image source={infoIcon} style={{ width: 22, height: 22, tintColor: showDetails ? (incognito ? Colors.incognito : Colors.primary) : (dark ? Colors.surface : Colors.textMuted) }} />
-                </Pressable>
+                  containerSize={32}
+                  pressedColor={Colors.surfacePressed}
+                  tintColor={showDetails ? (incognito ? Colors.incognito : Colors.primary) : (dark ? Colors.surface : Colors.textMuted)}
+                />
               )}
             </View>
+          )}
+          {!isCurrentlyThinking && !isGenerating && !isChatGenerating && !!suggestions && suggestions.length > 0 && (
+            <SuggestionBar align="right">
+              {suggestions.map((suggestion) => (
+                <SuggestionPill
+                  key={suggestion.message}
+                  icon={arrowIcon}
+                  label={suggestion.label}
+                  onPress={() => onSuggestionPress?.(suggestion.message)}
+                />
+              ))}
+            </SuggestionBar>
           )}
           {showMetrics && showDetails && (
             <View style={styles.metricsCard}>
@@ -367,14 +382,16 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   prev.showMetrics === next.showMetrics &&
   prev.canThink === next.canThink &&
   prev.dark === next.dark &&
+  prev.suggestions === next.suggestions &&
   //stable callbacks avoid stale closures
   prev.onSpeak === next.onSpeak &&
   prev.onRegenerate === next.onRegenerate &&
   prev.showSnackbar === next.showSnackbar &&
-  prev.onOpenInApp === next.onOpenInApp);
+  prev.onOpenInApp === next.onOpenInApp &&
+  prev.onSuggestionPress === next.onSuggestionPress);
 MessageItem.displayName = "MessageItem";
 
-export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp }: ChatViewProps) {
+export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp, suggestions, onSuggestionPress }: ChatViewProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const listRef = useRef<FlatList>(null);
@@ -433,9 +450,17 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
     }
   };
 
+  //suggestions belong to the newest assistant message
+  const lastAssistantId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") return messages[i].id;
+    }
+    return null;
+  }, [messages]);
+
   const renderItem = useCallback(({ item }: { item: Message }) => {
-    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} />;
-  }, [incognito, onRegenerate, speakerEnabled, handleSpeak, speakingMessageId, generatingMessageId, showMetrics, conversation?.model, canThink, dark, onOpenInApp]);
+    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} suggestions={item.id === lastAssistantId ? suggestions : undefined} onSuggestionPress={onSuggestionPress} />;
+  }, [incognito, onRegenerate, speakerEnabled, handleSpeak, speakingMessageId, generatingMessageId, showMetrics, conversation?.model, canThink, dark, onOpenInApp, lastAssistantId, suggestions, onSuggestionPress]);
 
   return (
     <View style={styles.container}>
@@ -615,10 +640,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  thinkingIcon: {
-    width: 70,
-    height: 35,
-  },
   flashingText: {
     color: Colors.textSecondary,
     fontSize: FontSizes.bodyMd,
@@ -630,13 +651,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     alignItems: "center",
     marginTop: 8,
     gap: 16,
-  },
-  toolbarIconContainer: {
-    width: 32,
-    height: 32,
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: Radius.huge,
   },
   metricsCard: {
     marginTop: 4,

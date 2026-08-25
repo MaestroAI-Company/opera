@@ -1,5 +1,6 @@
 import { DeviceEventEmitter } from 'react-native';
 import { AppEvents } from '../events';
+import { DEFAULT_OLLAMA_URL } from '../ai/utils/imageToBase64';
 
 export type AppSettings = {
   language: string;
@@ -11,6 +12,9 @@ export type AppSettings = {
   ollamaModel: string;
   ollamaContextLength: number;
   ollamaKeepAlive: number;
+  quickFlowService: string;
+  quickFlowUrl: string;
+  quickFlowModel: string;
   whisperModel: string;
   whisperLanguage: string;
   instruction: string;
@@ -23,18 +27,25 @@ export type AppSettings = {
   includeDateTime: boolean;
   dataWarningDismissed: boolean;
   useAppContext: boolean;
+  shakeToReport: boolean;
+  assistantPromptDismissed: boolean;
+  hasSeenAssistantOverlay: boolean;
 };
 
 const DEFAULTS: AppSettings = {
   language: 'fr',
   theme: 'system',
   aiService: 'ollama',
-  ollamaUrl: '',
+  ollamaUrl: DEFAULT_OLLAMA_URL,
   ollamaUrls: '[]',
   enabledProviders: 'local,ollama',
   ollamaModel: '',
   ollamaContextLength: 8192,
   ollamaKeepAlive: 300,
+  //empty means chores use main model
+  quickFlowService: '',
+  quickFlowUrl: '',
+  quickFlowModel: '',
   whisperModel: 'base',
   whisperLanguage: (() => {
     try {
@@ -53,6 +64,9 @@ const DEFAULTS: AppSettings = {
   includeDateTime: true,
   dataWarningDismissed: false,
   useAppContext: true,
+  shakeToReport: true,
+  assistantPromptDismissed: false,
+  hasSeenAssistantOverlay: false,
 };
 
 class SettingsService {
@@ -83,6 +97,9 @@ class SettingsService {
         ollamaModel: parsed.ollamaModel ?? DEFAULTS.ollamaModel,
         ollamaContextLength: typeof parsed.ollamaContextLength === 'number' ? parsed.ollamaContextLength : DEFAULTS.ollamaContextLength,
         ollamaKeepAlive: typeof parsed.ollamaKeepAlive === 'number' ? parsed.ollamaKeepAlive : DEFAULTS.ollamaKeepAlive,
+        quickFlowService: parsed.quickFlowService ?? DEFAULTS.quickFlowService,
+        quickFlowUrl: parsed.quickFlowUrl ?? DEFAULTS.quickFlowUrl,
+        quickFlowModel: parsed.quickFlowModel ?? DEFAULTS.quickFlowModel,
         whisperModel: parsed.whisperModel ?? DEFAULTS.whisperModel,
         whisperLanguage: parsed.whisperLanguage ?? DEFAULTS.whisperLanguage,
         instruction: parsed.instruction ?? DEFAULTS.instruction,
@@ -95,6 +112,9 @@ class SettingsService {
         includeDateTime: typeof parsed.includeDateTime === 'boolean' ? parsed.includeDateTime : DEFAULTS.includeDateTime,
         dataWarningDismissed: typeof parsed.dataWarningDismissed === 'boolean' ? parsed.dataWarningDismissed : DEFAULTS.dataWarningDismissed,
         useAppContext: typeof parsed.useAppContext === 'boolean' ? parsed.useAppContext : DEFAULTS.useAppContext,
+        shakeToReport: typeof parsed.shakeToReport === 'boolean' ? parsed.shakeToReport : DEFAULTS.shakeToReport,
+        assistantPromptDismissed: typeof parsed.assistantPromptDismissed === 'boolean' ? parsed.assistantPromptDismissed : DEFAULTS.assistantPromptDismissed,
+        hasSeenAssistantOverlay: typeof parsed.hasSeenAssistantOverlay === 'boolean' ? parsed.hasSeenAssistantOverlay : DEFAULTS.hasSeenAssistantOverlay,
       };
       
       this.cache = settings;

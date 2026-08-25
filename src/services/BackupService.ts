@@ -40,7 +40,56 @@ export type ImportInspection = {
   hasConversations: boolean;
 };
 
+//snapshots written by the app itself
+//app private storage, so the document picker can never reach these
+//todo: restore path that reads this folder directly, unreachable to users until then
+const SNAPSHOT_DIR = `${FileSystem.documentDirectory}backups/`;
+const MAX_SNAPSHOTS = 3;
+
 class BackupServiceImpl {
+  private async collectBackup(): Promise<BackupFile> {
+    return {
+      version: 2,
+      settings: Settings.getCached(),
+      settingsUpdatedAt: await Settings.getSettingsUpdatedAt(),
+      conversations: await DB.getConversations(),
+      messages: await DB.getAllMessagesAllConversations(),
+      tombstones: await DB.getTombstones(),
+    };
+  }
+
+  //silent safety copy, null on failure
+  //todo: no caller yet, kept for the next cloud envelope migration
+  async saveLocalSnapshot(label: string): Promise<string | null> {
+    try {
+      const backup = await this.collectBackup();
+      const filename = `opera_${label}_${Date.now()}.json`;
+
+      const dir = await FileSystem.getInfoAsync(SNAPSHOT_DIR);
+      if (!dir.exists) {
+        await FileSystem.makeDirectoryAsync(SNAPSHOT_DIR, { intermediates: true });
+      }
+
+      await FileSystem.writeAsStringAsync(`${SNAPSHOT_DIR}${filename}`, JSON.stringify(backup), {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      await this.pruneSnapshots();
+      return filename;
+    } catch (e) {
+      console.warn('Could not write a local snapshot', e);
+      return null;
+    }
+  }
+
+  //keep recent full copies only
+  private async pruneSnapshots(): Promise<void> {
+    const entries = await FileSystem.readDirectoryAsync(SNAPSHOT_DIR);
+    const stale = entries.filter(name => name.endsWith('.json')).sort().slice(0, -MAX_SNAPSHOTS);
+    for (const name of stale) {
+      await FileSystem.deleteAsync(`${SNAPSHOT_DIR}${name}`, { idempotent: true });
+    }
+  }
+
   async exportData(scope?: BackupScope): Promise<boolean> {
     try {
       const includeSettings = scope?.includeSettings ?? true;
@@ -122,11 +171,8 @@ class BackupServiceImpl {
     };
   }
 
-  async importData(scope?: BackupScope, backup?: BackupFile): Promise<ImportResult> {
+  async importData(backup?: BackupFile): Promise<ImportResult> {
     try {
-      const includeSettings = scope?.includeSettings ?? true;
-      const includeConversations = scope?.includeConversations ?? true;
-
       if (!backup) {
         const inspection = await this.pickAndReadBackup();
         if (!inspection) {
@@ -135,16 +181,16 @@ class BackupServiceImpl {
         backup = inspection.backup;
       }
 
-      if (includeSettings && !backup.settings) {
-        throw new Error('Backup file contains no settings');
-      }
-      if (includeConversations && (!backup.conversations || !backup.messages)) {
-        throw new Error('Backup file contains no conversations');
+      const hasSettings = !!backup.settings;
+      const hasConversations = !!(backup.conversations && backup.messages);
+
+      if (!hasSettings && !hasConversations) {
+        throw new Error('Backup file contains no valid data');
       }
 
       //check internal consistency of imported json (warn but still import)
       let warning: string | undefined;
-      if (includeConversations && backup.conversations && backup.messages) {
+      if (hasConversations && backup.conversations && backup.messages) {
         const convIds = new Set(backup.conversations.map(c => c.id));
         const orphans = backup.messages.filter(m => !convIds.has(m.conversationId));
         if (orphans.length > 0) {
@@ -153,12 +199,12 @@ class BackupServiceImpl {
       }
 
       //restore settings
-      if (includeSettings && backup.settings) {
+      if (hasSettings && backup.settings) {
         await Settings.setMany(backup.settings);
       }
 
       //restore conversations and messages
-      if (includeConversations && backup.conversations && backup.messages) {
+      if (hasConversations && backup.conversations && backup.messages) {
         await DB.importBackup(backup.conversations, backup.messages, backup.tombstones ?? []);
       }
 

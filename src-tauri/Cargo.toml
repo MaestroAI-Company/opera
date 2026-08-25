@@ -28,3 +28,6 @@ tauri-plugin-http = { version = "2", features = ["unsafe-headers"] }
 tauri-plugin-oauth = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }

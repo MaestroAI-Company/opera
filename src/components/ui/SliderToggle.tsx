@@ -1,8 +1,8 @@
-import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
-import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useEffect, useRef, useState } from "react";
 import { Image, ImageSourcePropType, LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 
 //load theme icons
 const autoIcon = require("../../../assets/icons/auto.png");
@@ -29,7 +29,7 @@ const defaultOptions: SliderToggleOption[] = [
 
 const GAP = 4;
 const LONG_PRESS_DELAY = 180;
-const BREAK_RATIO = 0.85; // fraction of a slot the finger must pull past to break free toward the next anchor
+const BREAK_RATIO = 0.85;
 
 // rubber-band curve: approaches but never exceeds `dim`, resisting harder the further it's pulled
 const rubberBand = (d: number, dim: number) => {
@@ -96,14 +96,12 @@ export default function SliderToggle({
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      //keep gesture when drawer scrolls
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
         armedRef.current = false;
         startXRef.current = pillX.value;
         previewIndexRef.current = selectedIndexRef.current;
         clearLongPressTimer();
-        //require hold before drag
         longPressTimerRef.current = setTimeout(() => {
           armedRef.current = true;
           scale.value = withTiming(1.2, { duration: 120 });
@@ -204,9 +202,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.surface,
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
     height: 44,
     paddingLeft: 12,
     paddingRight: 4,
@@ -229,7 +224,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   optionButton: {
     flex: 1,
-    height: 32,
+    height: 34,
     justifyContent: "center",
     alignItems: "center",
     borderRadius: Radius.md,
@@ -238,13 +233,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     position: "absolute",
     left: 0,
     top: "50%",
-    marginTop: -16,
-    height: 32,
+    marginTop: -18,
+    height: 36,
     justifyContent: "center",
     alignItems: "center",
     borderRadius: Radius.md,
     borderWidth: 2,
     borderColor: Colors.borderOnPrimary,
+    paddingHorizontal: 6,
   },
   optionText: {
     fontFamily: Fonts.mono,

@@ -1,18 +1,21 @@
 import * as Calendar from "expo-calendar";
+import Constants from "expo-constants";
 import * as Contacts from "expo-contacts";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, ImageSourcePropType, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import { getLocalProviderLabel } from "../../services/ai/providers/LocalProvider";
-import { getEnabledProviders, getOllamaUrls, serializeOllamaUrls, serializeProviders } from "../../services/ai/providers/sources";
+import { buildSources, getEnabledProviders, getOllamaUrls, serializeOllamaUrls, serializeProviders } from "../../services/ai/providers/sources";
+import { parseQuickFlowOptionId, quickFlowOptionId } from "../../services/ai/quickFlow";
+import { isDefaultAssistant, openAssistantSettings } from "../../services/assistant/DefaultAssistant";
 import { ITool } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
-import { BackupService, ImportInspection } from "../../services/BackupService";
+import { BackupService } from "../../services/BackupService";
 import { CloudUserInfo } from "../../services/cloud/CloudProvider";
 import { CLOUD_PROVIDERS, getCloudProviderDefinition } from "../../services/cloud/registry";
 import { CloudSync } from "../../services/CloudSyncService";
@@ -21,17 +24,26 @@ import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { Settings } from "../../services/settings/SettingsService";
 import { WhisperSTT } from "../../services/speech/STTService";
 import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
+import ActionButton from "../ui/ActionButton";
+import Checkbox from "../ui/Checkbox";
 import DownloadProgress from "../ui/DownloadProgress";
+import Group from "../ui/Group";
+import NotificationBanner from "../ui/NotificationBanner";
+import NotificationCard from "../ui/NotificationCard";
+import IconButton from "../ui/IconButton";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
-import Selector from "../ui/Selector";
+import Selector, { SelectorOption } from "../ui/Selector";
+import Slider from "../ui/Slider";
 import SliderToggle from "../ui/SliderToggle";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 import CloudSyncBox from "./CloudSyncBox";
 
 import { useResponsive } from "../../hooks/useResponsive";
+import { useSettingsNotices } from "../../hooks/useSettingsNotices";
 
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { REPORT_CONSENT, useBugReport } from "../../hooks/useBugReport";
 import { setThemeMode, useColors, useThemedStyles } from "../../hooks/useTheme";
 import { dragDrawer, drawerWidthFor, gestureVelocity, playPageTransition, settingsProgress, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
 
@@ -47,7 +59,13 @@ const generalIcon = require("../../../assets/icons/general.png");
 const serverIcon = require("../../../assets/icons/server.png");
 const toolIcon = require("../../../assets/icons/tool.png");
 const confidentialityIcon = require("../../../assets/icons/confidentiality.png");
+const reportsIcon = require("../../../assets/icons/bug.png");
+const supportIcon = require("../../../assets/icons/support.png");
 const socialIcon = require("../../../assets/icons/social.png");
+const informationIcon = require("../../../assets/icons/information.png");
+const githubIcon = require("../../../assets/icons/github.png");
+const operaIcon = require("../../../assets/icons/operaicon.png");
+const instagramIcon = require("../../../assets/icons/instagram.png");
 const micIcon = require("../../../assets/icons/microphone.png");
 const cameraIcon = require("../../../assets/icons/camera.png");
 const photoIcon = require("../../../assets/icons/photo.png");
@@ -55,8 +73,18 @@ const locationIcon = require("../../../assets/icons/location.png");
 const calendarIcon = require("../../../assets/icons/calendar.png");
 const binIcon = require("../../../assets/icons/bin.png");
 const exportIcon = require("../../../assets/icons/export.png");
+const messageIcon = require("../../../assets/icons/message.png");
+const timeIcon = require("../../../assets/icons/time.png");
+const errorIcon = require("../../../assets/icons/error.png");
+const ollamaErrorImage = require("../../../assets/images/ImageCard/OllamaError.png");
+const ollamaInfoImage = require("../../../assets/images/ImageCard/OllamaInfo.png");
+const questionIcon = require("../../../assets/icons/question.png");
+const hyperlinkIcon = require("../../../assets/images/hyperlink2.png");
+const assistantImage = require("../../../assets/images/icon_nobg.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
+
+const appVersion = Constants.expoConfig?.version ?? "1.0.0";
 
 const MOBILE_TOOL_NAMES = new Set([
   "contact",
@@ -77,7 +105,7 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "assistantoverlay" | "service" | "confidentiality" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions";
+type SubPage = "main" | "general" | "assistantoverlay" | "service" | "confidentiality" | "reports" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "sociallinks";
 
 export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
   const Colors = useColors();
@@ -162,13 +190,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [exportScopeVisible, setExportScopeVisible] = useState(false);
-  const [importScopeVisible, setImportScopeVisible] = useState(false);
   const [exportSelection, setExportSelection] = useState({ settings: true, conversations: true });
-  const [importSelection, setImportSelection] = useState({ settings: true, conversations: true });
-  const [importInspection, setImportInspection] = useState<ImportInspection | null>(null);
   const [alertConfig, setAlertConfig] = useState<{
     title: string,
     message: string,
+    icon?: ImageSourcePropType,
+    image?: ImageSourcePropType,
+    messageAlign?: "left" | "center",
     buttons?: ModalButton[],
     showInput?: boolean,
     inputValue?: string,
@@ -182,6 +210,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     setAlertConfig({ title, message, buttons, ...extraProps });
     setAlertModalVisible(true);
   };
+  //empty id means chores follow the main model
+  const [quickFlowId, setQuickFlowIdState] = useState("");
+  const [quickFlowOptions, setQuickFlowOptions] = useState<SelectorOption[]>([]);
   const [whisperModel, setWhisperModelState] = useState("none");
   const [, setWhisperInstalled] = useState<boolean>(false);
   const [installedWhisperModels, setInstalledWhisperModels] = useState<Record<string, boolean>>({});
@@ -194,6 +225,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       return "auto";
     }
   });
+  const notices = useSettingsNotices(visible);
+  const report = useBugReport(showAlert);
   const [instruction, setInstructionState] = useState("");
   const [name, setNameState] = useState("");
   const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
@@ -231,12 +264,25 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   ];
 
   const ollamaKeepAliveOptions = [
-    { id: "300", label: "5 minutes" },
-    { id: "600", label: "10 minutes" },
-    { id: "1800", label: "30 minutes" },
-    { id: "3600", label: "1 hour" },
-    { id: "7200", label: "2 hours" },
-    { id: "-1", label: "Infinite" },
+    { id: "300", label: "5m" },
+    { id: "600", label: "10m" },
+    { id: "1800", label: "30m" },
+    { id: "3600", label: "1h" },
+    { id: "7200", label: "2h" },
+    { id: "18000", label: "5h" },
+    { id: "43200", label: "12h" },
+    { id: "86400", label: "24h" },
+    { id: "-1", label: "∞" },
+  ];
+
+  const ollamaContextLengthOptions = [
+    { id: "8192", label: "8k" },
+    { id: "16384", label: "16k" },
+    { id: "32768", label: "32k" },
+    { id: "65536", label: "64k" },
+    { id: "131072", label: "128k" },
+    { id: "262144", label: "256k" },
+    { id: "524288", label: "512k" },
   ];
 
   type PermissionState = "granted" | "denied" | "undetermined";
@@ -278,6 +324,23 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     return () => sub.remove();
   }, [visible, activeSubPage, refreshPermissionStatuses]);
 
+  //null means no assistant role here
+  const [assistantStatus, setAssistantStatus] = useState<boolean | null>(null);
+
+  const refreshAssistantStatus = useCallback(() => {
+    isDefaultAssistant().then(setAssistantStatus).catch(() => { });
+  }, []);
+
+  //recheck after returning from system settings
+  useEffect(() => {
+    if (!visible || activeSubPage !== "assistantoverlay") return;
+    refreshAssistantStatus();
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") refreshAssistantStatus();
+    });
+    return () => sub.remove();
+  }, [visible, activeSubPage, refreshAssistantStatus]);
+
   const renderPermissionBadge = (status: PermissionState) => (
     <View style={[styles.permissionBadge, status === "granted" && styles.permissionBadgeAllowed]}>
       <Text style={[styles.permissionBadgeText, status === "granted" && styles.permissionBadgeTextAllowed]}>
@@ -302,28 +365,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   };
 
   const handleImportData = async () => {
-    setImportInspection(null);
     try {
-      const inspection = await BackupService.pickAndReadBackup();
-      if (!inspection) return;
-      setImportInspection(inspection);
-      setImportSelection({
-        settings: inspection.hasSettings,
-        conversations: inspection.hasConversations,
-      });
-      setImportScopeVisible(true);
-    } catch {
-      showAlert("Error", "Failed to read the backup file.");
-    }
-  };
-
-  const runImport = async (includeSettings: boolean, includeConversations: boolean) => {
-    setImportScopeVisible(false);
-    try {
-      const result = await BackupService.importData(
-        { includeSettings, includeConversations },
-        importInspection?.backup
-      );
+      const result = await BackupService.importData();
       if (result.success) {
         onDataChanged?.();
         showAlert("Import", result.warning ?? "Data imported successfully.");
@@ -433,6 +476,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setEnabledProvidersState(getEnabledProviders());
         setOllamaContextLengthState(s.ollamaContextLength && s.ollamaContextLength !== 8192 ? String(s.ollamaContextLength) : "");
         setOllamaKeepAliveState(String(s.ollamaKeepAlive ?? 300));
+        setQuickFlowIdState(s.quickFlowModel ? quickFlowOptionId(s.quickFlowService, s.quickFlowUrl, s.quickFlowModel) : "");
         setWhisperModelState(s.whisperModel);
         setWhisperLanguageState(s.whisperLanguage);
         setInstructionState(s.instruction);
@@ -478,6 +522,35 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     };
     loadSettings();
   }, []);
+
+  //all reachable models, one row each
+  useEffect(() => {
+    if (activeSubPage !== "general") return;
+    let cancelled = false;
+    (async () => {
+      const sources = buildSources(localAvailable);
+      const rows: SelectorOption[] = [{ id: "", label: "Same as main model" }];
+      //query all sources in parallel
+      const modelsBySource = await Promise.all(sources.map((source) => AIModule.getModelsFor(source.service, source.url)));
+      sources.forEach((source, i) => {
+        for (const model of [...modelsBySource[i]].sort((a, b) => a.localeCompare(b))) {
+          rows.push({
+            id: quickFlowOptionId(source.service, source.url, model),
+            //source only matters when multiple
+            label: sources.length > 1 ? `${model} — ${source.label}` : model,
+          });
+        }
+      });
+      if (!cancelled) setQuickFlowOptions(rows);
+    })();
+    return () => { cancelled = true; };
+  }, [activeSubPage, localAvailable, ollamaUrls, enabledProviders]);
+
+  const handleSelectQuickFlow = (id: string) => {
+    setQuickFlowIdState(id);
+    const { service, url, model } = parseQuickFlowOptionId(id);
+    Settings.setMany({ quickFlowService: service, quickFlowUrl: url, quickFlowModel: model });
+  };
 
   //load plugin states when settings tab opens
   useEffect(() => {
@@ -958,104 +1031,178 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.menuContainer}>
       <Text style={styles.title}>Settings</Text>
 
+      {notices.assistant && (
+        <NotificationCard
+          image={assistantImage}
+          title="Add Opera as an assistant"
+          description="Set Opera as your default assistant to call Maestro from anywhere."
+          onPress={notices.openAssistant}
+          onDismiss={notices.closeAssistant}
+          style={styles.groupSpacing}
+        />
+      )}
+
+      {!!notices.update && (
+        <NotificationBanner
+          icon={downloadIcon}
+          label={`Opera ${notices.update.version} is available`}
+          onPress={notices.openUpdate}
+          style={styles.groupSpacing}
+        />
+      )}
+
       {/* profile section */}
-      <View style={styles.groupShadowLayer}>
-        <View style={styles.groupBox}>
-          <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-            onPress={() => setActiveSubPage("profile")}
-          >
-            <Image source={profilIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>{name || "Profil"}</Text>
-              <Text style={styles.navSubtitle}>Name</Text>
-            </View>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-            onPress={() => setActiveSubPage("cloud")}
-          >
-            <Image source={cloudIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>Cloud</Text>
-              <Text style={styles.navSubtitle}>Cloud storage, Backup</Text>
-            </View>
-          </Pressable>
-        </View>
-      </View>
-
-      <View style={styles.groupShadowLayer}>
-        <View style={styles.groupBox}>
-          <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-            onPress={() => setActiveSubPage("general")}
-          >
-            <Image source={generalIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>General</Text>
-              <Text style={styles.navSubtitle}>Language, Theme</Text>
-            </View>
-          </Pressable>
-
-          {!isDesktop && (
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-              onPress={() => setActiveSubPage("assistantoverlay")}
-            >
-              <Image source={micIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <View style={styles.navTextContainer}>
-                <Text style={styles.navTitle}>Assistant Overlay</Text>
-                <Text style={styles.navSubtitle}>Voice, Screen context</Text>
-              </View>
-            </Pressable>
-          )}
-
-          <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-            onPress={() => setActiveSubPage("service")}
-          >
-            <Image source={linkIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>Service</Text>
-              <Text style={styles.navSubtitle}>AI Service, Ollama server</Text>
-            </View>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-            onPress={() => setActiveSubPage("tools")}
-          >
-            <Image source={toolIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>Tools</Text>
-              <Text style={styles.navSubtitle}>{isDesktop ? "Assistant Tools, Widgets" : "Assistant Tools, Widgets, Mobile actions"}</Text>
-            </View>
-          </Pressable>
-        </View>
-      </View>
-
-      <View style={styles.groupShadowLayer}>
-        <View style={styles.groupBox}>
-          <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-            onPress={() => setActiveSubPage("confidentiality")}
-          >
-            <Image source={confidentialityIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>Confidentiality</Text>
-              <Text style={styles.navSubtitle}>Data privacy, Usage analytics</Text>
-            </View>
-          </Pressable>
-
-          <View style={[styles.navItem, styles.navItemLast]}>
-            <Image source={socialIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>Social Links</Text>
-              <Text style={styles.navSubtitle}>Github, Instagram, Website</Text>
-            </View>
+      <Group style={styles.groupSpacing}>
+        <Pressable
+          style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+          onPress={() => setActiveSubPage("profile")}
+        >
+          <Image source={profilIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>{name || "Profil"}</Text>
+            <Text style={styles.navSubtitle}>Name</Text>
           </View>
-        </View>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+          onPress={() => setActiveSubPage("cloud")}
+        >
+          <Image source={cloudIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>Cloud</Text>
+            <Text style={styles.navSubtitle}>Cloud storage, Backup</Text>
+          </View>
+        </Pressable>
+      </Group>
+
+      <Group style={styles.groupSpacing}>
+        <Pressable
+          style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+          onPress={() => setActiveSubPage("general")}
+        >
+          <Image source={generalIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>General</Text>
+            <Text style={styles.navSubtitle}>Language, Theme</Text>
+          </View>
+        </Pressable>
+
+        {!isDesktop && (
+          <Pressable
+            style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("assistantoverlay")}
+          >
+            <Image source={micIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>Assistant Overlay</Text>
+              <Text style={styles.navSubtitle}>Voice, Screen context</Text>
+            </View>
+          </Pressable>
+        )}
+
+        <Pressable
+          style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+          onPress={() => setActiveSubPage("service")}
+        >
+          <Image source={linkIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>Service</Text>
+            <Text style={styles.navSubtitle}>AI Service, Ollama server</Text>
+          </View>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+          onPress={() => setActiveSubPage("tools")}
+        >
+          <Image source={toolIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>Tools</Text>
+            <Text style={styles.navSubtitle}>{isDesktop ? "Assistant Tools, Widgets" : "Assistant Tools, Widgets, Mobile actions"}</Text>
+          </View>
+        </Pressable>
+      </Group>
+
+      <Group style={styles.groupSpacing}>
+        <Pressable
+          style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+          onPress={() => setActiveSubPage("confidentiality")}
+        >
+          <Image source={confidentialityIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>Confidentiality</Text>
+            <Text style={styles.navSubtitle}>Data privacy, Usage analytics</Text>
+          </View>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+          onPress={() => setActiveSubPage("reports")}
+        >
+          <Image source={reportsIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>Support</Text>
+            <Text style={styles.navSubtitle}>Send an issue, contact support</Text>
+          </View>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+          onPress={() => setActiveSubPage("sociallinks")}
+        >
+          <Image source={informationIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>Informations</Text>
+            <Text style={styles.navSubtitle}>Version App, Github, Instagram</Text>
+          </View>
+        </Pressable>
+      </Group>
+
+    </View>
+  );
+
+  // social links subpage content
+  const renderSocialLinksSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("Informations")}
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Version</Text>
+        <Text style={styles.helpText}>
+          Opera Beta v{appVersion}
+        </Text>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Links</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          Find Opera online, follow our updates, and contribute to the project.
+        </Text>
+
+        <Group>
+          <ActionButton
+            icon={operaIcon}
+            label="Website"
+            onPress={() => Linking.openURL("https://maestroai.company").catch(() => { })}
+          />
+          <ActionButton
+            icon={githubIcon}
+            label="Github"
+            onPress={() => Linking.openURL("https://github.com/MaestroAI-Company/opera").catch(() => { })}
+          />
+          <ActionButton
+            icon={instagramIcon}
+            label="Instagram"
+            onPress={() => Linking.openURL("https://www.instagram.com/maestroai.company?igsh=MWF4dmZvMXl1ZmdzeA==").catch(() => { })}
+          />
+        </Group>
+      </View>
+
+      <View style={{ flex: 1, justifyContent: "flex-end" }}>
+        <Text style={[styles.helpText, { textAlign: "center" }]}>
+          Maestroai.Company
+        </Text>
       </View>
     </View>
   );
@@ -1067,22 +1214,26 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={styles.settingRowVertical}>
         <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Name</Text>
-        <TextInputField
-          icon={penPlaceholderIcon}
-          placeholder="Enter your name"
-          value={name}
-          onChangeText={setName}
-        />
+        <Group>
+          <TextInputField
+            icon={penPlaceholderIcon}
+            placeholder="Enter your name"
+            value={name}
+            onChangeText={setName}
+          />
+        </Group>
       </View>
 
       <View style={styles.settingRowVertical}>
         <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Write your instructions to AI</Text>
-        <TextInputField
-          icon={penPlaceholderIcon}
-          placeholder="write"
-          value={instruction}
-          onChangeText={setInstruction}
-        />
+        <Group>
+          <TextInputField
+            icon={penPlaceholderIcon}
+            placeholder="write"
+            value={instruction}
+            onChangeText={setInstruction}
+          />
+        </Group>
       </View>
     </View>
   );
@@ -1094,21 +1245,25 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
         <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Language</Text>
-        <Selector
-          options={languageOptions}
-          selectedValue={language}
-          onSelect={setLanguage}
-          title="Select Language"
-          fullWidth
-        />
+        <Group>
+          <Selector
+            options={languageOptions}
+            selectedValue={language}
+            onSelect={setLanguage}
+            title="Select Language"
+            fullWidth
+          />
+        </Group>
       </View>
 
       <View style={styles.settingRowVertical}>
         <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Theme app</Text>
-        <SliderToggle
-          selectedValue={theme}
-          onSelect={setTheme}
-        />
+        <Group>
+          <SliderToggle
+            selectedValue={theme}
+            onSelect={setTheme}
+          />
+        </Group>
       </View>
 
       <View style={styles.settingRowVertical}>
@@ -1132,6 +1287,37 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </View>
         <Text style={styles.helpText}>Speak the answer aloud when you ask by voice.</Text>
       </View>
+
+      <View style={[styles.settingRowVertical, Platform.OS === "web" && { marginTop: 10 }]}>
+        <View style={styles.toggleRow}>
+          <Text style={styles.settingLabel}>Always Transcribe Locally</Text>
+          <Toggle
+            checked={alwaysWhisper}
+            onToggle={setAlwaysWhisper}
+          />
+        </View>
+        <Text style={styles.helpText}>
+          {Platform.OS === "web"
+            ? "Process audio transcriptions locally on your device instead of using the selected model."
+            : "Use your device's built-in speech recognition instead of the selected model."}
+        </Text>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Quick flow</Text>
+        <Text style={[styles.helpText, { marginBottom: 10 }]}>
+          The model powering the small automatic touches: conversation titles, reply suggestions, and some tools. A small, fast model is recommended.
+        </Text>
+        <Group>
+          <Selector
+            options={quickFlowOptions}
+            selectedValue={quickFlowId}
+            onSelect={handleSelectQuickFlow}
+            title="Select Quick flow Model"
+            fullWidth
+          />
+        </Group>
+      </View>
     </View>
   );
 
@@ -1140,7 +1326,30 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("Assistant Overlay")}
 
-      <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
+      {assistantStatus !== null && (
+        <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
+          <Text style={styles.settingLabel}>Default assistant</Text>
+          <Text style={styles.helpText}>
+            Get help from Opera anywhere on your device, from any app.
+          </Text>
+          <Text style={[styles.assistantStatusText, assistantStatus ? styles.assistantStatusOn : styles.assistantStatusOff]}>
+            {assistantStatus
+              ? "Opera is set as your default assistant."
+              : "Opera is not set as your default assistant."}
+          </Text>
+          {!assistantStatus && (
+            <Group>
+              <ActionButton
+                icon={operaIcon}
+                label="Set as default assistant"
+                onPress={openAssistantSettings}
+              />
+            </Group>
+          )}
+        </View>
+      )}
+
+      <View style={[styles.settingRowVertical, assistantStatus === null && { marginTop: 0 }]}>
         <View style={styles.toggleRow}>
           <Text style={styles.settingLabel}>Auto-start microphone</Text>
           <Toggle
@@ -1173,13 +1382,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
         <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Cloud storage</Text>
-        <Selector
-          options={cloudStorageOptions}
-          selectedValue={cloudProvider}
-          onSelect={handleSetCloudProvider}
-          title="Select Cloud Storage"
-          fullWidth
-        />
+        <Group>
+          <Selector
+            options={cloudStorageOptions}
+            selectedValue={cloudProvider}
+            onSelect={handleSetCloudProvider}
+            title="Select Cloud Storage"
+            fullWidth
+          />
+        </Group>
         {cloudProvider !== "none" && !cloudUserInfo && (() => {
           const def = getCloudProviderDefinition(cloudProvider);
           if (!def?.SetupComponent) return null;
@@ -1226,56 +1437,79 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         {/* ollama servers section */}
         <View style={styles.toggleRow}>
           <Text style={styles.settingLabel}>Ollama</Text>
-          <Toggle
-            checked={enabledProviders.includes("ollama")}
-            onToggle={(v) => setProviderEnabled("ollama", v)}
-          />
+          <View style={styles.toggleRight}>
+            <IconButton
+              icon={questionIcon}
+              size={22}
+              tintColor={Colors.textMuted}
+              containerSize={32}
+              pressedColor={Colors.surfacePressed}
+              onPress={() => showAlert(
+                "Ollama",
+                "Ollama lets you run AI models on your own computer or server instead of the cloud. Add your Ollama server's URL below to connect Opera to it.",
+                undefined,
+                { image: ollamaInfoImage, messageAlign: "left" },
+              )}
+            />
+            <Toggle
+              checked={enabledProviders.includes("ollama")}
+              onToggle={(v) => setProviderEnabled("ollama", v)}
+            />
+          </View>
         </View>
         <Text style={[styles.helpText, { marginBottom: 10 }]}>Use your Ollama servers to run powerful AI models at home.</Text>
 
         {enabledProviders.includes("ollama") && (
           <>
-            {ollamaUrls.map((url, index) => (
-              <View key={index} style={{ marginBottom: 10 }}>
-                <TextInputField
-                  icon={linkIcon}
-                  placeholder="server link"
-                  value={url}
-                  onChangeText={(v) => setOllamaUrlAt(index, v)}
-                  onBlur={() => handleOllamaUrlBlur(index)}
-                />
-                {serverErrors[url.trim()] ? (
-                  <Text style={styles.errorText}>This server is unreachable</Text>
-                ) : null}
-              </View>
-            ))}
+            <Group style={styles.groupSpacingTight}>
+              {ollamaUrls.map((url, index) => (
+                <View key={index}>
+                  <TextInputField
+                    icon={linkIcon}
+                    placeholder="server link"
+                    value={url}
+                    onChangeText={(v) => setOllamaUrlAt(index, v)}
+                    onBlur={() => handleOllamaUrlBlur(index)}
+                    rightIcon={serverErrors[url.trim()] ? errorIcon : undefined}
+                    onRightIconPress={() => showAlert(
+                      "Server unreachable",
+                      "This server could not be reached.\n\n- Check that the server is running.\n- Check the server's network connection.\n- Make sure the URL and port are correct.",
+                      undefined,
+                      { image: ollamaErrorImage, messageAlign: "left" },
+                    )}
+                  />
+                </View>
+              ))}
+            </Group>
 
-            <Pressable
-              onPress={() => saveOllamaUrls([...ollamaUrls, ""])}
-              style={({ pressed, hovered }) => [styles.addServerButton, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
-            >
-              <Image source={addIcon} style={styles.addServerIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.addServerText}>Add server link</Text>
-            </Pressable>
+            <Group style={styles.groupSpacing}>
+              <ActionButton
+                icon={addIcon}
+                label="Add server link"
+                onPress={() => saveOllamaUrls([...ollamaUrls, ""])}
+              />
+            </Group>
 
             <Text style={[styles.settingLabel, { marginTop: 20 }]}>Context Length</Text>
             <Text style={[styles.helpText, { marginBottom: 10 }]}>Maximum number of tokens the model can use.</Text>
-            <TextInputField
-              icon={serverIcon}
-              placeholder="8192"
-              keyboardType="number-pad"
-              value={ollamaContextLength}
-              onChangeText={setOllamaContextLength}
-            />
+            <Group>
+              <Slider
+                icon={messageIcon}
+                options={ollamaContextLengthOptions}
+                selectedValue={String(effectiveContextLength())}
+                onSelect={setOllamaContextLength}
+              />
+            </Group>
             <Text style={[styles.settingLabel, { marginTop: 20 }]}>Model Keep Alive</Text>
             <Text style={[styles.helpText, { marginBottom: 10 }]}>How long the model stays loaded in memory after a request.</Text>
-            <Selector
-              options={ollamaKeepAliveOptions}
-              selectedValue={ollamaKeepAlive}
-              onSelect={setOllamaKeepAlive}
-              title="Select Keep Alive"
-              fullWidth
-            />
+            <Group>
+              <Slider
+                icon={timeIcon}
+                options={ollamaKeepAliveOptions}
+                selectedValue={ollamaKeepAlive}
+                onSelect={setOllamaKeepAlive}
+              />
+            </Group>
           </>
         )}
       </View>
@@ -1285,13 +1519,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           <View style={[styles.settingRowVertical, { zIndex: 9 }]}>
             <Text style={styles.settingLabel}>Whisper Model</Text>
             <Text style={[styles.helpText, { marginBottom: 10 }]}>The larger size, the longer the processing will take.</Text>
-            <Selector
-              options={whisperModelOptions}
-              selectedValue={whisperModel}
-              onSelect={handleSelectWhisperModel}
-              title="Select Whisper Model"
-              fullWidth
-            />
+            <Group>
+              <Selector
+                options={whisperModelOptions}
+                selectedValue={whisperModel}
+                onSelect={handleSelectWhisperModel}
+                title="Select Whisper Model"
+                fullWidth
+              />
+            </Group>
             {isDownloadingWhisper && (
               <View style={{ marginTop: 10 }}>
                 <DownloadProgress
@@ -1305,21 +1541,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           </View>
         </>
       )}
-
-      <View style={[styles.settingRowVertical, Platform.OS === "web" && { marginTop: 10 }]}>
-        <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>Always Transcribe Locally</Text>
-          <Toggle
-            checked={alwaysWhisper}
-            onToggle={setAlwaysWhisper}
-          />
-        </View>
-        <Text style={styles.helpText}>
-          {Platform.OS === "web"
-            ? "Process audio transcriptions locally on your device instead of using the selected model."
-            : "Use your device's built-in speech recognition instead of the selected model."}
-        </Text>
-      </View>
     </View>
   );
 
@@ -1336,9 +1557,16 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <Text style={styles.helpText}>
           Local Storage: All your data, searches, and settings stay strictly on your device.
         </Text>
-        <Text style={[styles.helpText, { marginTop: 4 }]}>
+        <Text style={[styles.helpText, { marginTop: 4, marginBottom: 12 }]}>
           No Tracking: We do not collect personal info, analytics, or crash reports. Your privacy is fully protected.
         </Text>
+        <Group>
+          <ActionButton
+            icon={hyperlinkIcon}
+            label="Privacy Policy"
+            onPress={() => Linking.openURL("https://maestroai.company/privacy.html").catch(() => { })}
+          />
+        </Group>
       </View>
 
       <View style={styles.settingRowVertical}>
@@ -1349,67 +1577,53 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             : "Opera needs a few permissions to work at its best. You can change them in your device settings."}
         </Text>
 
-        <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
-          <View style={styles.groupBox}>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-              onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
-              disabled={Platform.OS === "web"}
-            >
-              <Image source={micIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>Microphone</Text>
-              {Platform.OS !== "web" && renderPermissionBadge(permissionStatuses.microphone)}
-            </Pressable>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-              onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
-              disabled={Platform.OS === "web"}
-            >
-              <Image source={cameraIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>Camera</Text>
-              {Platform.OS !== "web" && renderPermissionBadge(permissionStatuses.camera)}
-            </Pressable>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, Platform.OS === "web" && styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-              onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
-              disabled={Platform.OS === "web"}
-            >
-              <Image source={locationIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>Location</Text>
-              {Platform.OS !== "web" && renderPermissionBadge(permissionStatuses.location)}
-            </Pressable>
-            {Platform.OS !== "web" && (
-              <Pressable
-                style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-                onPress={() => Linking.openSettings()}
-              >
-                <Image source={photoIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-                <Text style={styles.navLabel}>Photos</Text>
-                {renderPermissionBadge(permissionStatuses.photos)}
-              </Pressable>
-            )}
-            {Platform.OS !== "web" && (
-              <Pressable
-                style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-                onPress={() => Linking.openSettings()}
-              >
-                <Image source={profilIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-                <Text style={styles.navLabel}>Contacts</Text>
-                {renderPermissionBadge(permissionStatuses.contacts)}
-              </Pressable>
-            )}
-            {Platform.OS !== "web" && (
-              <Pressable
-                style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-                onPress={() => Linking.openSettings()}
-              >
-                <Image source={calendarIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-                <Text style={styles.navLabel}>Calendar</Text>
-                {renderPermissionBadge(permissionStatuses.calendar)}
-              </Pressable>
-            )}
-          </View>
-        </View>
+        <Group>
+          <ActionButton
+            icon={micIcon}
+            label="Microphone"
+            onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+            disabled={Platform.OS === "web"}
+            rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.microphone) : undefined}
+          />
+          <ActionButton
+            icon={cameraIcon}
+            label="Camera"
+            onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+            disabled={Platform.OS === "web"}
+            rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.camera) : undefined}
+          />
+          <ActionButton
+            icon={locationIcon}
+            label="Location"
+            onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+            disabled={Platform.OS === "web"}
+            rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.location) : undefined}
+          />
+          {Platform.OS !== "web" && (
+            <ActionButton
+              icon={photoIcon}
+              label="Photos"
+              onPress={() => Linking.openSettings()}
+              rightElement={renderPermissionBadge(permissionStatuses.photos)}
+            />
+          )}
+          {Platform.OS !== "web" && (
+            <ActionButton
+              icon={profilIcon}
+              label="Contacts"
+              onPress={() => Linking.openSettings()}
+              rightElement={renderPermissionBadge(permissionStatuses.contacts)}
+            />
+          )}
+          {Platform.OS !== "web" && (
+            <ActionButton
+              icon={calendarIcon}
+              label="Calendar"
+              onPress={() => Linking.openSettings()}
+              rightElement={renderPermissionBadge(permissionStatuses.calendar)}
+            />
+          )}
+        </Group>
       </View>
 
       <View style={styles.settingRowVertical}>
@@ -1418,31 +1632,102 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           Manage your conversations and settings data locally.
         </Text>
 
-        <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
-          <View style={styles.groupBox}>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-              onPress={handleExportData}
-            >
-              <Image source={exportIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>Export data</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
-              onPress={handleImportData}
-            >
-              <Image source={downloadIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>Import data</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-              onPress={handleDeleteAllConversations}
-            >
-              <Image source={binIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>Delete all conversations</Text>
-            </Pressable>
-          </View>
+        <Group>
+          <ActionButton
+            icon={exportIcon}
+            label="Export data"
+            onPress={handleExportData}
+          />
+          <ActionButton
+            icon={downloadIcon}
+            label="Import data"
+            onPress={handleImportData}
+          />
+          <ActionButton
+            icon={binIcon}
+            label="Delete all conversations"
+            onPress={handleDeleteAllConversations}
+          />
+        </Group>
+      </View>
+    </View>
+  );
+
+  //fresh draft on every visit
+  useEffect(() => {
+    if (activeSubPage === "reports") report.reset();
+  }, [activeSubPage]);
+
+  // reports subpage content
+  const renderReportsSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("Support")}
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Report</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          Describe the issue you encountered.
+        </Text>
+        <Group style={styles.groupSpacingTight}>
+          <TextInputField
+            icon={penPlaceholderIcon}
+            placeholder="Describe the issue"
+            value={report.text}
+            onChangeText={report.setText}
+          />
+        </Group>
+
+        <View style={styles.toggleRow}>
+          <Checkbox
+            label={`Attach lastest log lines`}
+            checked={report.logs !== null}
+            onToggle={report.toggleLogs}
+            labelFirst
+            style={styles.checkboxRow}
+          />
         </View>
+
+        <Text style={[styles.helpText, { marginTop: 12, marginBottom: 12 }]}>{REPORT_CONSENT}</Text>
+
+        <Group>
+          <ActionButton
+            icon={arrowIcon}
+            label="Send my issue"
+            onPress={() => report.send()}
+          />
+        </Group>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Need more help</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          Contact our support team for additional assistance and resources.
+        </Text>
+        <Group>
+          <ActionButton
+            icon={supportIcon}
+            label="Contact support"
+            onPress={() => Linking.openURL("https://maestroai.company/contact.html").catch(() => { })}
+          />
+        </Group>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Testing</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          Crashes the app on purpose to test the crash report screen.
+        </Text>
+        <Group style={styles.dangerGroup}>
+          <ActionButton
+            icon={deleteIcon}
+            label="Trigger a test crash"
+            iconTintColor={Colors.textOnPrimary}
+            labelColor={Colors.textOnPrimary}
+            onPress={() => {
+              throw new Error("Test crash triggered from Report a bug settings");
+            }}
+          />
+        </Group>
       </View>
     </View>
   );
@@ -1486,17 +1771,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           Structured results the assistant can display: {allWidgets.map(w => w.name).join(", ")}.
         </Text>
 
-        <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
-          <View style={styles.groupBox}>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-              onPress={() => setActiveSubPage("widgets")}
-            >
-              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>See widgets</Text>
-            </Pressable>
-          </View>
-        </View>
+        <Group>
+          <Pressable
+            style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("widgets")}
+          >
+            <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+            <Text style={styles.navLabel}>See widgets</Text>
+          </Pressable>
+        </Group>
       </View>
 
       {/* mobile actions block, last: points to a deeper subpage instead of toggling in place. desktop has no mobile apps to open, so it's hidden there */}
@@ -1507,17 +1790,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             Allow the assistant to integrate with installed apps: {mobileTools.map(t => t.displayName ?? t.definition.function.name).join(", ")}.
           </Text>
 
-          <View style={[styles.groupShadowLayer, { marginBottom: 0 }]}>
-            <View style={styles.groupBox}>
-              <Pressable
-                style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-                onPress={() => setActiveSubPage("mobileactions")}
-              >
-                <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-                <Text style={styles.navLabel}>See mobile actions</Text>
-              </Pressable>
-            </View>
-          </View>
+          <Group>
+            <Pressable
+              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+              onPress={() => setActiveSubPage("mobileactions")}
+            >
+              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <Text style={styles.navLabel}>See mobile actions</Text>
+            </Pressable>
+          </Group>
         </View>
       )}
     </View>
@@ -1598,12 +1879,16 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return renderServiceSubPage();
       case "confidentiality":
         return renderConfidentialitySubPage();
+      case "reports":
+        return renderReportsSubPage();
       case "tools":
         return renderToolsSubPage();
       case "widgets":
         return renderWidgetsSubPage();
       case "mobileactions":
         return renderMobileActionsSubPage();
+      case "sociallinks":
+        return renderSocialLinksSubPage();
       case "main":
       default:
         return renderMainPage();
@@ -1612,7 +1897,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const innerContent = (
     <ScrollView contentContainerStyle={{ paddingTop: isDesktop ? 0 : 60, paddingBottom: 40, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-      <Animated.View style={{ opacity: pageAnim, transform: [{ translateY: pageAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
+      <Animated.View style={{ flex: 1, opacity: pageAnim, transform: [{ translateY: pageAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
         {getSubPageContent()}
       </Animated.View>
     </ScrollView>
@@ -1634,7 +1919,10 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <NotificationModal
         visible={alertModalVisible}
         title={alertConfig.title}
+        icon={alertConfig.icon}
+        image={alertConfig.image}
         message={alertConfig.message}
+        messageAlign={alertConfig.messageAlign}
         onClose={() => setAlertModalVisible(false)}
         buttons={alertConfig.buttons}
         showInput={alertConfig.showInput}
@@ -1669,35 +1957,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             onPress: () => runExport(exportSelection.settings, exportSelection.conversations),
           },
           { text: "Cancel", style: "secondary", onPress: () => setExportScopeVisible(false) },
-        ]}
-      />
-      <NotificationModal
-        visible={importScopeVisible}
-        title="Import data"
-        message="Select what would you like to import. This will replace the selected data."
-        onClose={() => setImportScopeVisible(false)}
-        options={[
-          {
-            label: "Conversations",
-            checked: importSelection.conversations,
-            disabled: !(importInspection?.hasConversations ?? true),
-            onToggle: (checked) => setImportSelection(prev => ({ ...prev, conversations: checked })),
-          },
-          {
-            label: "Settings",
-            checked: importSelection.settings,
-            disabled: !(importInspection?.hasSettings ?? true),
-            onToggle: (checked) => setImportSelection(prev => ({ ...prev, settings: checked })),
-          },
-        ]}
-        buttons={[
-          {
-            text: "Import",
-            style: "primary",
-            disabled: !importSelection.settings && !importSelection.conversations,
-            onPress: () => runImport(importSelection.settings, importSelection.conversations),
-          },
-          { text: "Cancel", style: "secondary", onPress: () => setImportScopeVisible(false) },
         ]}
       />
     </>
@@ -1840,18 +2099,11 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     height: 18,
     transform: [{ rotate: "-180deg" }],
   },
-  groupShadowLayer: {
-    position: "relative",
+  groupSpacing: {
     marginBottom: 20,
   },
-  groupBox: {
-    position: "relative",
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: Radius.xxl,
-    backgroundColor: Colors.surface,
-    zIndex: 1,
-    overflow: "hidden",
+  groupSpacingTight: {
+    marginBottom: 8,
   },
   navItem: {
     flexDirection: "row",
@@ -1925,32 +2177,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     alignItems: "center",
     marginTop: 8,
   },
-  errorText: {
-    fontSize: FontSizes.caption,
-    color: Colors.primary,
-    fontFamily: Fonts.body,
-    marginTop: 8,
-    marginBottom: 0,
-  },
-  addServerButton: {
+  toggleRight: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: Radius.xxl,
-    backgroundColor: Colors.surface,
-    paddingVertical: 12,
+    gap: 14,
   },
-  addServerIcon: {
-    width: 18,
-    height: 18,
-  },
-  addServerText: {
-    fontSize: FontSizes.body,
-    color: Colors.textPrimary,
-    fontFamily: Fonts.mono,
+  checkboxRow: {
+    flex: 1,
+    justifyContent: "space-between",
   },
   downloadOption: {
     flexDirection: "row",
@@ -1980,6 +2214,23 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     marginTop: 4,
     lineHeight: 20,
   },
+  assistantStatusText: {
+    fontSize: FontSizes.bodyMd,
+    fontFamily: Fonts.body,
+    marginTop: 6,
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  assistantStatusOn: {
+    color: Colors.primary,
+  },
+  assistantStatusOff: {
+    color: Colors.textMuted,
+  },
+  dangerGroup: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.borderOnPrimary,
+  },
   sectionTitle: {
     fontSize: 13,
     fontFamily: Fonts.mono,
@@ -1988,5 +2239,13 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 10,
     marginTop: 4,
+  },
+  versionText: {
+    textAlign: "center",
+    fontSize: FontSizes.label,
+    fontFamily: Fonts.mono,
+    color: Colors.textMuted,
+    marginTop: "auto",
+    paddingTop: 16,
   },
 });

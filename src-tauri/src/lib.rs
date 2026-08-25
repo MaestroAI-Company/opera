@@ -20,6 +20,37 @@ pub fn run() {
                 window.set_decorations(false).unwrap();
             }
 
+            //webkitgtk denies permissions by default
+            #[cfg(target_os = "linux")]
+            {
+                use tauri::Manager;
+                let window = app.get_webview_window("main").unwrap();
+                window.with_webview(|webview| {
+                    use webkit2gtk::glib::object::ObjectExt;
+                    use webkit2gtk::{
+                        GeolocationPermissionRequest, NotificationPermissionRequest,
+                        PermissionRequestExt, SettingsExt, UserMediaPermissionRequest, WebViewExt,
+                    };
+
+                    let webview = webview.inner();
+                    //expose getusermedia on old webkitgtk
+                    if let Some(settings) = WebViewExt::settings(&webview) {
+                        settings.set_enable_media_stream(true);
+                    }
+
+                    webview.connect_permission_request(|_, request| {
+                        let known = request.is::<UserMediaPermissionRequest>()
+                            || request.is::<GeolocationPermissionRequest>()
+                            || request.is::<NotificationPermissionRequest>();
+                        if known {
+                            //os prompt is the real gate
+                            request.allow();
+                        }
+                        known
+                    });
+                })?;
+            }
+
             #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;

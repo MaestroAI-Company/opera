@@ -1,4 +1,5 @@
 import 'react-native-get-random-values';
+import { gunzipSync, gzipSync, strFromU8, strToU8 } from 'fflate';
 import { BackupCryptoImpl } from './crypto/backupCrypto';
 import { BackupData } from './BackupService';
 import { DB, Conversation, Message, SyncTombstone } from './db/DatabaseService';
@@ -14,22 +15,29 @@ const CLOUD_PROVIDER_KEY = 'cloud_provider';
 const SYNC_PIN_KEY = 'cloud_sync_pin';
 const LAST_SYNC_TIME_KEY = 'cloud_sync_last_time';
 const LAST_SYNC_SIZE_KEY = 'cloud_sync_last_size';
-const SEEN_AUTHENTICATED_KEY = 'cloud_sync_seen_v3';
+const SYNC_PAUSED_KEY = 'cloud_sync_paused';
+const REMOTE_STATE_KEY = 'cloud_sync_remote_state';
 
-//v3 authenticates v2 stays readable
-const ENC_VERSION = 3;
-const LEGACY_ENC_VERSION = 2;
+//a full migration flow (prompt, gating, local snapshot) lives in 78bd429
+const ENC_VERSION = 1;
 const PBKDF2_ITERATIONS = 50000;
 const AES_KEY_BYTES = 32;
 const IV_BYTES = 16;
 const SALT_BYTES = 16;
 
-type SyncOutcome = { success: boolean; error?: string };
+const RETRY_BASE_DELAY_MS = 15000;
+const RETRY_MAX_DELAY_MS = 5 * 60 * 1000;
+const MAX_RETRY_ATTEMPTS = 5;
+
+type SyncOutcome = { success: boolean; error?: string; retryable?: boolean };
+
+//tag and hash of last upload
+type RemoteState = { tag: string; hash: string };
+
+type DecryptOutcome = { text: string | null; unsupportedVersion?: boolean };
 
 //separate keys from one pbkdf2 pass
 type DerivedKeys = {
-  //v2 raw key opens legacy files
-  legacyKey: string;
   encryptionKey: string;
   macKey: string;
 };
@@ -44,8 +52,11 @@ class CloudSyncServiceImpl {
   private initialized: boolean = false;
   private keyCache = new Map<string, DerivedKeys>();
   private lastSaltB64: string | null = null;
-  //blocks v2 once authenticated seen
-  private hasSeenAuthenticatedBackup = false;
+  //account stays linked while sync is off
+  private paused: boolean = false;
+  //lets sync skip when nothing moved
+  private remoteState: RemoteState | null = null;
+  private retryAttempt = 0;
 
   private async setStorageItem(key: string, value: string | null) {
     if (Platform.OS === 'web') {
@@ -75,15 +86,14 @@ class CloudSyncServiceImpl {
     if (this.initialized) return;
     this.initialized = true;
 
-    await this.loadAuthenticatedBackupFlag();
+    this.remoteState = await this.loadRemoteState();
+    this.paused = (await this.getStorageItem(SYNC_PAUSED_KEY)) === 'true';
 
     const providerName = await this.getStorageItem(CLOUD_PROVIDER_KEY);
-    const savedPin = await this.getStorageItem(SYNC_PIN_KEY);
-    if (savedPin) {
-      this.pin = savedPin;
-    }
 
     if (providerName && providerName !== 'none') {
+      await this.migrateSharedPin(providerName);
+      await this.loadPinFor(providerName);
       const def = getCloudProviderDefinition(providerName);
       if (def) {
         const provider = def.create();
@@ -115,7 +125,7 @@ class CloudSyncServiceImpl {
   }
 
   requestAutoSync(delay = 5000) {
-    if (!this.provider || !this.pin) return;
+    if (this.paused || !this.provider || !this.pin) return;
     
     if (this.syncTimeout) clearTimeout(this.syncTimeout);
     this.syncTimeout = setTimeout(() => {
@@ -143,15 +153,14 @@ class CloudSyncServiceImpl {
 
   async setProvider(providerName: string): Promise<boolean> {
     if (providerName === 'none') {
-      if (this.provider) {
-        await this.provider.logout();
-      }
-      this.provider = null;
-      this.keyCache.clear();
-      this.lastSaltB64 = null;
-      await this.setStorageItem(CLOUD_PROVIDER_KEY, null);
-      await this.setStorageItem(LAST_SYNC_SIZE_KEY, null);
-      await this.clearPin();
+      await this.setPaused(true);
+      return true;
+    }
+
+    //same account still linked just turn sync back on
+    if (this.provider?.getId() === providerName) {
+      await this.setStorageItem(CLOUD_PROVIDER_KEY, providerName);
+      await this.setPaused(false);
       return true;
     }
 
@@ -163,12 +172,48 @@ class CloudSyncServiceImpl {
     if (success) {
       this.provider = newProvider;
       await this.setStorageItem(CLOUD_PROVIDER_KEY, providerName);
+      await this.loadPinFor(providerName);
+      //another account, another remote file
+      await this.setRemoteState(null);
+      this.retryAttempt = 0;
+      await this.setPaused(false);
       return true;
     }
     return false;
   }
 
+  //unlinks the account for good
+  async disconnect(): Promise<void> {
+    await this.clearPin();
+    if (this.provider) {
+      await this.provider.logout();
+    }
+    this.provider = null;
+    this.keyCache.clear();
+    this.lastSaltB64 = null;
+    this.retryAttempt = 0;
+    await this.setRemoteState(null);
+    await this.setStorageItem(CLOUD_PROVIDER_KEY, null);
+    await this.setStorageItem(LAST_SYNC_SIZE_KEY, null);
+    await this.setPaused(false);
+  }
+
+  private async setPaused(paused: boolean): Promise<void> {
+    this.paused = paused;
+    if (paused && this.syncTimeout) {
+      clearTimeout(this.syncTimeout);
+      this.syncTimeout = null;
+    }
+    await this.setStorageItem(SYNC_PAUSED_KEY, paused ? 'true' : null);
+    if (!paused) {
+      this.retryAttempt = 0;
+      this.requestAutoSync(0);
+    }
+  }
+
   getProviderName(): string {
+    //paused reads as none so the ui shows sync off
+    if (this.paused) return 'none';
     return this.provider?.getId() ?? 'none';
   }
 
@@ -181,18 +226,45 @@ class CloudSyncServiceImpl {
     this.pin = pin;
     this.keyCache.clear();
     this.lastSaltB64 = null;
-    await this.setStorageItem(SYNC_PIN_KEY, pin);
+    //new pin rewrites envelope, stale tag
+    await this.setRemoteState(null);
+    const providerName = this.provider?.getId();
+    if (providerName) {
+      await this.setStorageItem(this.pinKey(providerName), pin);
+    }
   }
 
   hasPin(): boolean {
     return !!this.pin;
   }
 
+  //each account encrypts its backup with its own pin
+  private pinKey(providerName: string): string {
+    return `${SYNC_PIN_KEY}_${providerName}`;
+  }
+
+  private async loadPinFor(providerName: string): Promise<void> {
+    this.pin = await this.getStorageItem(this.pinKey(providerName));
+    this.keyCache.clear();
+    this.lastSaltB64 = null;
+  }
+
+  //older builds kept one pin for every provider
+  private async migrateSharedPin(providerName: string): Promise<void> {
+    const sharedPin = await this.getStorageItem(SYNC_PIN_KEY);
+    if (!sharedPin) return;
+    const key = this.pinKey(providerName);
+    if (!(await this.getStorageItem(key))) {
+      await this.setStorageItem(key, sharedPin);
+    }
+    await this.setStorageItem(SYNC_PIN_KEY, null);
+  }
+
   async hasCloudBackup(): Promise<boolean> {
     if (!this.provider) return false;
     try {
-      const data = await this.provider.downloadFile(SYNC_FILE_NAME);
-      return data !== null;
+      const download = await this.provider.downloadFile(SYNC_FILE_NAME);
+      return download.status === 'ok';
     } catch (e) {
       console.warn('Could not check for a cloud backup:', e);
       return false;
@@ -202,11 +274,11 @@ class CloudSyncServiceImpl {
   async verifyAndSetPin(pin: string): Promise<boolean> {
     if (!this.provider) return false;
     try {
-      const data = await this.provider.downloadFile(SYNC_FILE_NAME);
-      if (!data) return false;
+      const download = await this.provider.downloadFile(SYNC_FILE_NAME);
+      if (download.status !== 'ok') return false;
 
-      const decrypted = await this.decrypt(data, pin);
-      if (decrypted) {
+      const decrypted = await this.decrypt(download.content, pin);
+      if (decrypted.text) {
         //decrypt already validated json
         await this.setPin(pin);
         return true;
@@ -225,24 +297,42 @@ class CloudSyncServiceImpl {
     await this.setStorageItem(LAST_SYNC_SIZE_KEY, null);
   }
 
-  //flag must survive restarts
-  private async loadAuthenticatedBackupFlag(): Promise<void> {
-    this.hasSeenAuthenticatedBackup = (await this.getStorageItem(SEEN_AUTHENTICATED_KEY)) === 'true';
-  }
-
-  private rememberAuthenticatedBackup(): void {
-    if (this.hasSeenAuthenticatedBackup) return;
-    this.hasSeenAuthenticatedBackup = true;
-    this.setStorageItem(SEEN_AUTHENTICATED_KEY, 'true').catch((e) =>
-      console.warn('Could not persist the authenticated-backup flag:', e)
-    );
-  }
-
   private async clearPin(): Promise<void> {
     this.pin = null;
     this.keyCache.clear();
     this.lastSaltB64 = null;
-    await this.setStorageItem(SYNC_PIN_KEY, null);
+    await this.setRemoteState(null);
+    const providerName = this.provider?.getId();
+    if (providerName) {
+      await this.setStorageItem(this.pinKey(providerName), null);
+    }
+  }
+
+  private async loadRemoteState(): Promise<RemoteState | null> {
+    const raw = await this.getStorageItem(REMOTE_STATE_KEY);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed?.tag === 'string' && typeof parsed?.hash === 'string') return parsed;
+    } catch (e) {
+      console.warn('Could not read the stored sync state:', e);
+    }
+    return null;
+  }
+
+  //written only after successful uploads
+  private async setRemoteState(state: RemoteState | null): Promise<void> {
+    this.remoteState = state;
+    await this.setStorageItem(REMOTE_STATE_KEY, state ? JSON.stringify(state) : null);
+  }
+
+
+  private scheduleRetry(): void {
+    if (this.retryAttempt >= MAX_RETRY_ATTEMPTS) return;
+    const delay = Math.min(RETRY_BASE_DELAY_MS * 2 ** this.retryAttempt, RETRY_MAX_DELAY_MS);
+    this.retryAttempt++;
+    //jitter avoids lockstep retries
+    this.requestAutoSync(delay + Math.random() * 1000);
   }
 
   //one pbkdf2 pass expands into subkeys
@@ -253,7 +343,6 @@ class CloudSyncServiceImpl {
     if (!keys) {
       const master = await BackupCryptoImpl.pbkdf2Sha256B64(pin, saltB64, iterations, AES_KEY_BYTES);
       keys = {
-        legacyKey: master,
         encryptionKey: await BackupCryptoImpl.hmacSha256B64(master, 'opera-encryption'),
         macKey: await BackupCryptoImpl.hmacSha256B64(master, 'opera-authentication'),
       };
@@ -272,7 +361,9 @@ class CloudSyncServiceImpl {
     this.lastSaltB64 = saltB64;
     const keys = await this.deriveKeys(pin, saltB64, PBKDF2_ITERATIONS);
     const ivB64 = await BackupCryptoImpl.randomBytesB64(IV_BYTES);
-    const ctB64 = await BackupCryptoImpl.aesCbcEncryptB64(keys.encryptionKey, ivB64, data);
+    //gzip shrinks chat json about fivefold
+    const payload = gzipSync(strToU8(data), { mtime: 0 });
+    const ctB64 = await BackupCryptoImpl.aesCbcEncryptBytesB64(keys.encryptionKey, ivB64, payload);
     return JSON.stringify({
       v: ENC_VERSION,
       kdf: 'pbkdf2-sha256',
@@ -284,52 +375,44 @@ class CloudSyncServiceImpl {
     });
   }
 
-  private async decrypt(data: string, pin: string): Promise<string | null> {
+  private async decrypt(data: string, pin: string): Promise<DecryptOutcome> {
     try {
       const env = JSON.parse(data);
-      if (!env || env.kdf !== 'pbkdf2-sha256') return null;
+      if (!env || env.kdf !== 'pbkdf2-sha256') return { text: null };
+
+      if (env.v !== ENC_VERSION) {
+        //pin fine, file written by another version
+        console.warn(`Unsupported cloud backup version: ${env.v}`);
+        return { text: null, unsupportedVersion: true };
+      }
 
       const iterations = typeof env.iter === 'number' ? env.iter : PBKDF2_ITERATIONS;
       const keys = await this.deriveKeys(pin, env.salt, iterations);
 
-      if (env.v === ENC_VERSION) {
-        const expectedMac = await this.computeMac(keys.macKey, env.v, iterations, env.salt, env.iv, env.ct);
-        if (env.mac !== expectedMac) {
-          console.warn('Cloud backup failed its integrity check, refusing to import it');
-          return null;
-        }
-      } else if (env.v === LEGACY_ENC_VERSION) {
-        //rejects forged unauthenticated backups
-        if (this.hasSeenAuthenticatedBackup) {
-          console.warn('Refusing a v2 backup: this account already uses the authenticated format');
-          return null;
-        }
-      } else {
-        //written by a newer version
-        console.warn(`Unsupported cloud backup version: ${env.v}`);
-        return null;
+      const expectedMac = await this.computeMac(keys.macKey, env.v, iterations, env.salt, env.iv, env.ct);
+      if (env.mac !== expectedMac) {
+        console.warn('Cloud backup failed its integrity check, refusing to import it');
+        return { text: null };
       }
 
       this.lastSaltB64 = env.salt;
-      const aesKey = env.v === LEGACY_ENC_VERSION ? keys.legacyKey : keys.encryptionKey;
       //wrong pin throws padding error
-      const decrypted = await BackupCryptoImpl.aesCbcDecryptUtf8(aesKey, env.iv, env.ct);
-      if (!decrypted) return null;
+      const decrypted = strFromU8(gunzipSync(await BackupCryptoImpl.aesCbcDecryptBytes(keys.encryptionKey, env.iv, env.ct)));
+      if (!decrypted) return { text: null };
       JSON.parse(decrypted); //ensure valid json
 
-      //remember only once payload readable
-      if (env.v === ENC_VERSION) {
-        this.rememberAuthenticatedBackup();
-      }
-      return decrypted;
+      return { text: decrypted };
     } catch (e) {
       //caller decides what to report
       console.warn('Could not decrypt cloud payload:', e);
     }
-    return null;
+    return { text: null };
   }
 
   async sync(isBackground = false): Promise<SyncOutcome> {
+    if (this.paused) {
+      return { success: false, error: 'Sync is turned off' };
+    }
     if (!this.provider || !this.pin) {
       return { success: false, error: 'Provider or PIN not configured' };
     }
@@ -343,7 +426,13 @@ class CloudSyncServiceImpl {
     const thisSync = this.runSyncAfter(this.runningSync);
     this.runningSync = thisSync;
     try {
-      return await thisSync;
+      const outcome = await thisSync;
+      if (outcome.success) {
+        this.retryAttempt = 0;
+      } else if (outcome.retryable) {
+        this.scheduleRetry();
+      }
+      return outcome;
     } finally {
       if (this.runningSync === thisSync) {
         this.runningSync = null;
@@ -367,20 +456,30 @@ class CloudSyncServiceImpl {
     const pin = this.pin;
 
     try {
-      //1. download cloud backup
-      const encryptedCloudData = await provider.downloadFile(SYNC_FILE_NAME);
+      //1. download unless unchanged since upload
+      const knownState = this.remoteState;
+      const download = await provider.downloadFile(SYNC_FILE_NAME, knownState?.tag ?? null);
+      if (download.status === 'error') {
+        //blind upload would drop remote changes
+        return { success: false, error: 'Could not reach the cloud.', retryable: true };
+      }
+
       let cloudBackup: BackupData | null = null;
 
-      if (encryptedCloudData) {
-        const decryptedStr = await this.decrypt(encryptedCloudData, pin);
-        if (!decryptedStr) {
+      if (download.status === 'ok') {
+        const decrypted = await this.decrypt(download.content, pin);
+        if (decrypted.unsupportedVersion) {
+          //newer build wrote it, leave untouched
+          return { success: false, error: 'Cloud backup was written by a newer version of Opera.' };
+        }
+        if (!decrypted.text) {
           //code no longer valid, clear stored pin
           await this.clearPin();
           DeviceEventEmitter.emit(AppEvents.syncPinInvalidated);
           return { success: false, error: 'Invalid PIN. Could not decrypt cloud backup.' };
         }
         try {
-          const parsed = JSON.parse(decryptedStr);
+          const parsed = JSON.parse(decrypted.text);
           if (!parsed || typeof parsed !== 'object' || !parsed.settings || !Array.isArray(parsed.conversations) || !Array.isArray(parsed.messages)) {
             throw new Error('Invalid backup structure');
           }
@@ -418,22 +517,33 @@ class CloudSyncServiceImpl {
         tombstones,
       };
 
-      //4. encrypt and upload
+      //4. nothing moved, no transfer needed
       const jsonStr = JSON.stringify(newBackup);
-      const encryptedToUpload = await this.encrypt(jsonStr, pin);
-      const uploadSuccess = await provider.uploadFile(SYNC_FILE_NAME, encryptedToUpload);
-
-      if (!uploadSuccess) {
-        return { success: false, error: 'Failed to upload sync data to cloud.' };
+      const hash = await BackupCryptoImpl.sha256B64(jsonStr);
+      if (download.status === 'unchanged' && knownState?.hash === hash) {
+        await this.setStorageItem(LAST_SYNC_TIME_KEY, Date.now().toString());
+        DeviceEventEmitter.emit(AppEvents.syncCompleted);
+        return { success: true };
       }
 
+      //5. compress, encrypt and upload
+      const encryptedToUpload = await this.encrypt(jsonStr, pin);
+      const upload = await provider.uploadFile(SYNC_FILE_NAME, encryptedToUpload);
+
+      if (!upload.ok) {
+        await this.setRemoteState(null);
+        return { success: false, error: 'Failed to upload sync data to cloud.', retryable: true };
+      }
+
+      //no tag means redownload next sync
+      await this.setRemoteState(upload.tag ? { tag: upload.tag, hash } : null);
       await this.setStorageItem(LAST_SYNC_TIME_KEY, Date.now().toString());
       await this.setStorageItem(LAST_SYNC_SIZE_KEY, encryptedToUpload.length.toString());
       DeviceEventEmitter.emit(AppEvents.syncCompleted);
       return { success: true };
     } catch (e) {
       console.error('Sync failed:', e);
-      return { success: false, error: String(e) };
+      return { success: false, error: String(e), retryable: true };
     }
   }
 

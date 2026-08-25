@@ -4,12 +4,14 @@ import {
   Animated,
   BackHandler,
   DeviceEventEmitter,
+  ImageSourcePropType,
   InteractionManager,
   Linking,
   Platform,
   StyleSheet,
   Vibration,
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardAvoidingView, KeyboardProvider, useGenericKeyboardHandler } from 'react-native-keyboard-controller';
 import Reanimated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +19,8 @@ import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { Colors } from '../../../constants/theme';
 import { AIModule } from '../../services/ai/AIModule';
 import { buildSystemPrompt, streamAssistantReply } from '../../services/ai/generation/chatGeneration';
+import { generateSuggestions, Suggestion } from '../../services/ai/generation/suggestions';
+import { resolveQuickFlow } from '../../services/ai/quickFlow';
 import { arrayBufferToBase64 } from '../../services/ai/utils/base64';
 import { CloudSync } from '../../services/CloudSyncService';
 import { Conversation, DB, Message } from '../../services/db/DatabaseService';
@@ -27,7 +31,7 @@ import { TTS } from '../../services/speech/TTSService';
 import NotificationModal from '../ui/NotificationModal';
 import ChatBar, { ChatBarHandle } from './ChatBar';
 import ChatView from './ChatView';
-import ModelSelector from './ModelSelector';
+import { ModelSelectorDrawer, ModelSelectorTrigger } from './ModelSelector';
 import SelectionLayer from './SelectionLayer';
 
 import { useResponsive } from '../../hooks/useResponsive';
@@ -44,6 +48,7 @@ import '../../services/widgets/registerWidgets';
 const BAR_ENTRY = 120;
 //thickness of the activation rim
 const HALO_SIZE = 88;
+const assistantInfoImage = require('../../../assets/images/ImageCard/AssistantInfo.png');
 
 export default function AssistantOverlayWrapper() {
   return (
@@ -61,6 +66,8 @@ function AssistantOverlay() {
 
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  //tied to the reply they were generated for
+  const [suggestions, setSuggestions] = useState<{ msgId: string; items: Suggestion[] } | null>(null);
 
   //ref mirror for fresh messages
   const messagesRef = useRef<Message[]>([]);
@@ -69,6 +76,8 @@ function AssistantOverlay() {
   const [selectedModel, setSelectedModel] = useState('');
   const [aiService, setAiService] = useState('ollama');
   const [ollamaUrl, setOllamaUrl] = useState('');
+  const [modelSelectorVisible, setModelSelectorVisible] = useState(false);
+  const modelSelectorProgress = useAnimatedValue(0);
   const [userInstruction, setUserInstruction] = useState('');
   const [alwaysWhisper, setAlwaysWhisper] = useState(false);
   //autoStartMic setting from db
@@ -99,7 +108,7 @@ function AssistantOverlay() {
 
   //modal state for whisper errors
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalConfig, setModalConfig] = useState<{ title: string, message: string, buttons?: any[] }>({ title: '', message: '' });
+  const [modalConfig, setModalConfig] = useState<{ title: string, message: string, image?: ImageSourcePropType, buttons?: any[] }>({ title: '', message: '' });
 
   //state re-renders while a tool runs
   const [, setActiveTool] = useState<{ name: string | null, args: any | null }>({ name: null, args: null });
@@ -165,8 +174,15 @@ function AssistantOverlay() {
 
   //activation rim fades out
   const haloOpacity = useAnimatedValue(0);
+  //exit runs once, a second dismiss must not cut it short
+  const closingRef = useRef(false);
 
-  useEffect(() => {
+  //replayed when the activity is reused instead of remounted
+  const playEntry = useCallback(() => {
+    mountOpacity.setValue(0);
+    topBarEntry.setValue(-BAR_ENTRY);
+    haloOpacity.setValue(0);
+    bottomBarEntry.value = BAR_ENTRY;
     Animated.spring(mountOpacity, { toValue: 1, useNativeDriver: true, bounciness: 0, speed: 20 }).start();
     //bars return to their edges
     Animated.spring(topBarEntry, { toValue: 0, useNativeDriver: true, bounciness: 9, speed: 14 }).start();
@@ -177,6 +193,16 @@ function AssistantOverlay() {
       Animated.timing(haloOpacity, { toValue: 0, delay: 160, duration: 760, useNativeDriver: true }),
     ]).start();
   }, [mountOpacity, topBarEntry, bottomBarEntry, haloOpacity]);
+
+  //same springs as the entry, played back toward the offscreen start
+  const playExit = useCallback((done: () => void) => {
+    Animated.spring(topBarEntry, { toValue: -BAR_ENTRY, useNativeDriver: true, bounciness: 9, speed: 14 }).start();
+    bottomBarEntry.value = withSpring(BAR_ENTRY, { duration: 500, dampingRatio: 0.65 });
+    //fade owns the timing, everything is hidden once it lands
+    Animated.spring(mountOpacity, { toValue: 0, useNativeDriver: true, bounciness: 0, speed: 20 }).start(() => done());
+  }, [mountOpacity, topBarEntry, bottomBarEntry]);
+
+  useEffect(() => { playEntry(); }, [playEntry]);
 
   //capture app context for the ai
   //defer assist and icon reads
@@ -247,6 +273,18 @@ function AssistantOverlay() {
         const s = await Settings.load();
         applySettings(s);
 
+        //show once, first time this overlay is opened
+        if (!s.hasSeenAssistantOverlay) {
+          Settings.set('hasSeenAssistantOverlay', true);
+          setModalConfig({
+            title: 'Welcome to the Assistant View',
+            message: "This is your floating assistant. You can Circle To Ask on your screen with any content. It's here to help you across your usage.",
+            image: assistantInfoImage,
+            buttons: [{ text: 'OK', onPress: () => setModalVisible(false), style: 'primary' }]
+          });
+          setModalVisible(true);
+        }
+
         //defer model preload past animation
         if (s.ollamaModel) {
           InteractionManager.runAfterInteractions(() => {
@@ -299,36 +337,53 @@ function AssistantOverlay() {
   //hardware back
   useEffect(() => {
     const handler = BackHandler.addEventListener('hardwareBackPress', () => {
-      resetOverlay();
-      setTimeout(() => BackHandler.exitApp(), 100);
+      if (closingRef.current) return true;
+      closingRef.current = true;
+      playExit(() => {
+        resetOverlay();
+        BackHandler.exitApp();
+      });
       return true;
     });
     return () => handler.remove();
-  }, [resetOverlay]);
+  }, [resetOverlay, playExit]);
 
   //reopen via same activity instance
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener(AppEvents.overlayReopened, () => {
+      closingRef.current = false;
       resetOverlay();
       //settings may have changed while closed
       reloadSettings();
+      //values were left at their exit end, wind them back
+      playEntry();
     });
     return () => sub.remove();
-  }, [resetOverlay, reloadSettings]);
+  }, [resetOverlay, reloadSettings, playEntry]);
 
   //close overlay but keep app alive
   const closeOverlay = useCallback(() => {
-    resetOverlay();
-    setTimeout(() => ScreenCapture.close(), 100);
-  }, [resetOverlay]);
+    if (closingRef.current) return;
+    closingRef.current = true;
+    //reset only once hidden, so the content does not blank mid exit
+    playExit(() => {
+      resetOverlay();
+      ScreenCapture.close();
+    });
+  }, [playExit, resetOverlay]);
 
   //hand off conversation then close
   const openConversationInApp = useCallback((convId: string) => {
+    //app launches while the overlay plays out
     Linking.openURL(`opera://?convId=${convId}`).catch(() => { });
-    resetOverlay();
-    //close overlay only
-    setTimeout(() => ScreenCapture.close(), 100);
-  }, [resetOverlay]);
+    if (closingRef.current) return;
+    closingRef.current = true;
+    playExit(() => {
+      resetOverlay();
+      //close overlay only
+      ScreenCapture.close();
+    });
+  }, [playExit, resetOverlay]);
 
   //model capabilities for mic auto-start
   useEffect(() => {
@@ -353,8 +408,8 @@ function AssistantOverlay() {
   const generateTitle = useCallback(async (convId: string, userMessage: string, images?: string[]) => {
     try {
       let title = '';
-      await AIModule.sendMessage(
-        selectedModelRef.current,
+      await AIModule.sendOn(
+        resolveQuickFlow(selectedModelRef.current),
         SYSTEM_PROMPTS.SUMMARIZE,
         [{ role: 'user', content: userMessage, images }],
         chunk => { title += chunk; },
@@ -454,6 +509,7 @@ function AssistantOverlay() {
     AIModule.SharedGenerationState.abort = () => abortControllerRef.current?.abort();
 
     let isError = false;
+    let isAborted = false;
     let messageSources: Message['sources'];
 
     if (!model) {
@@ -481,6 +537,7 @@ function AssistantOverlay() {
           isError = true;
           streamingContentRef.current = `Error during generation: ${outcome.error ?? 'unknown error'}`;
         } else {
+          isAborted = outcome.status === 'aborted';
           streamingContentRef.current = outcome.content;
         }
         messageSources = outcome.sources;
@@ -502,6 +559,19 @@ function AssistantOverlay() {
     }
 
     if (isFirstMessage && !isError) generateTitle(conv.id, text, images);
+
+    //propose follow-ups once the reply landed whole
+    if (!isError && !isAborted && model) {
+      generateSuggestions({
+        model,
+        userMessage: text,
+        assistantMessage: streamingContentRef.current,
+        //show each pill once complete
+        onPartial: items => setSuggestions({ msgId: assistantMsg.id, items }),
+      }).then(items => {
+        if (items.length > 0) setSuggestions({ msgId: assistantMsg.id, items });
+      });
+    }
 
     //auto-read the reply aloud when it was requested via voice
     if (viaVoice && !isError && Settings.getCached().autoSpeak) {
@@ -601,122 +671,136 @@ function AssistantOverlay() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior="height"
-      enabled={phase === 'respond'}
-    >
-      <Animated.View
-        style={[styles.phaseContainer, { opacity: mountOpacity }]}
+    <GestureHandlerRootView style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior="height"
+        enabled={phase === 'respond'}
       >
-        {phase === 'select' ? (
-          <SelectionLayer
-            selection={selection}
-            onChange={select}
-            onVibrate={() => Vibration.vibrate(10)}
-            onDrawingChange={setIsDrawingSelection}
-            onDismiss={closeOverlay}
-            detections={detections}
-          />
-        ) : (
-          <Animated.View style={[styles.phaseContainer, { opacity: responseOpacity }]} pointerEvents="box-none">
-            <LinearGradient
-              colors={['rgba(0,0,0,0.60)', 'rgba(0,0,0,1)']}
-              style={styles.chatViewWrapper}
-              pointerEvents="box-none"
-            >
-              <ChatView
-                messages={lastMsg ? [lastMsg] : []}
-                conversation={activeConversation}
-                contentTopPadding={insets.top + 56}
-                contentBottomPadding={insets.bottom + 96}
-                hideHeader={true}
-                hideGradients={true}
-                generatingMessageId={generatingMessageId}
-                speakerEnabled={true}
-                canThink={modelCapabilities.includes('thinking') && selectedReflection !== 'none'}
-                dark={true}
-                alignBottom={true}
-                onOpenInApp={(item) => openConversationInApp(item.conversationId)}
-              />
-            </LinearGradient>
-          </Animated.View>
-        )}
-
-        {/* model selector top center, hidden while drawing a lasso */}
         <Animated.View
-          style={[styles.topBar, { paddingTop: insets.top + 16, transform: [{ translateY: topBarEntry }] }, isDrawingSelection && styles.hiddenBar]}
-          pointerEvents={isDrawingSelection ? 'none' : 'box-none'}
+          style={[styles.phaseContainer, { opacity: mountOpacity }]}
         >
-          <ModelSelector
-            selectedModel={selectedModel}
-            selectedReflection={selectedReflection}
-            showReflection={modelCapabilities.includes('thinking')}
-            aiService={aiService}
-            ollamaUrl={ollamaUrl}
-            onServiceChange={(service, url) => {
-              setAiService(service);
-              setOllamaUrl(url);
-              Settings.set('aiService', service);
-              Settings.set('ollamaUrl', url);
-              AIModule.setMode(service);
-              if (service === 'ollama') {
-                const cached = Settings.getCached();
-                AIModule.configure(url, cached.ollamaContextLength, cached.ollamaKeepAlive);
-              }
-            }}
-            onModelChange={model => {
-              setSelectedModel(model);
-              selectedModelRef.current = model;
-              Settings.set('ollamaModel', model);
-              //preload newly selected model
-              AIModule.preloadModel(model).catch(() => { });
-            }}
-            onReflectionChange={setReflection}
-          />
+          {phase === 'select' ? (
+            <SelectionLayer
+              selection={selection}
+              onChange={select}
+              onVibrate={() => Vibration.vibrate(10)}
+              onDrawingChange={setIsDrawingSelection}
+              onDismiss={closeOverlay}
+              detections={detections}
+            />
+          ) : (
+            <Animated.View style={[styles.phaseContainer, { opacity: responseOpacity }]} pointerEvents="box-none">
+              <LinearGradient
+                colors={['rgba(0,0,0,0.60)', 'rgba(0,0,0,1)']}
+                style={styles.chatViewWrapper}
+                pointerEvents="box-none"
+              >
+                <ChatView
+                  messages={lastMsg ? [lastMsg] : []}
+                  conversation={activeConversation}
+                  contentTopPadding={insets.top + 56}
+                  contentBottomPadding={insets.bottom + 96}
+                  hideHeader={true}
+                  hideGradients={true}
+                  generatingMessageId={generatingMessageId}
+                  speakerEnabled={true}
+                  canThink={modelCapabilities.includes('thinking') && selectedReflection !== 'none'}
+                  dark={true}
+                  alignBottom={true}
+                  onOpenInApp={(item) => openConversationInApp(item.conversationId)}
+                  suggestions={suggestions && lastMsg && suggestions.msgId === lastMsg.id ? suggestions.items : undefined}
+                  onSuggestionPress={handleSend}
+                />
+              </LinearGradient>
+            </Animated.View>
+          )}
+
+          {/* model selector top center, hidden while drawing a lasso */}
+          <Animated.View
+            style={[styles.topBar, { paddingTop: insets.top + 16, transform: [{ translateY: topBarEntry }] }, isDrawingSelection && styles.hiddenBar]}
+            pointerEvents={isDrawingSelection ? 'none' : 'box-none'}
+          >
+            <ModelSelectorTrigger
+              selectedModel={selectedModel}
+              onPress={() => setModelSelectorVisible(v => !v)}
+            />
+          </Animated.View>
+
+          <Reanimated.View
+            style={[styles.bottomBarOverlay, isLargeScreen && styles.bottomBarOverlayLarge, bottomBarStyle, isDrawingSelection && styles.hiddenBar]}
+            pointerEvents={isDrawingSelection ? 'none' : 'box-none'}
+          >
+            <ChatBar
+              ref={chatBarRef}
+              onSend={handleSend}
+              incognito={false}
+              isGenerating={!!generatingConvId}
+              onStop={handleStop}
+              onTranscribe={handleTranscribe}
+              canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes('audio') && !!selectedModel}
+              supportsFiles={modelCapabilities.includes('vision') || modelCapabilities.includes('audio')}
+              onOpenSettings={() => { }}
+              enabled={true}
+              autoStartMic={shouldAutoStartMic}
+              selection={attachment}
+              onSelectionRemove={clearSelection}
+              appContextChip={Settings.getCached().useAppContext !== false && !appContextDismissed && appIconInfo ? { icon: appIconInfo.icon, label: appIconInfo.label } : null}
+              onAppContextRemove={() => setAppContextDismissed(true)}
+            />
+          </Reanimated.View>
         </Animated.View>
 
-        <Reanimated.View
-          style={[styles.bottomBarOverlay, isLargeScreen && styles.bottomBarOverlayLarge, bottomBarStyle, isDrawingSelection && styles.hiddenBar]}
-          pointerEvents={isDrawingSelection ? 'none' : 'box-none'}
-        >
-          <ChatBar
-            ref={chatBarRef}
-            onSend={handleSend}
-            incognito={false}
-            isGenerating={!!generatingConvId}
-            onStop={handleStop}
-            onTranscribe={handleTranscribe}
-            canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes('audio') && !!selectedModel}
-            supportsFiles={modelCapabilities.includes('vision') || modelCapabilities.includes('audio')}
-            onOpenSettings={() => { }}
-            enabled={true}
-            autoStartMic={shouldAutoStartMic}
-            selection={attachment}
-            onSelectionRemove={clearSelection}
-            appContextChip={Settings.getCached().useAppContext !== false && !appContextDismissed && appIconInfo ? { icon: appIconInfo.icon, label: appIconInfo.label } : null}
-            onAppContextRemove={() => setAppContextDismissed(true)}
-          />
-        </Reanimated.View>
-      </Animated.View>
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: haloOpacity }]} pointerEvents="none">
+          <LinearGradient colors={[Colors.overlayHalo, Colors.overlayHaloClear]} style={styles.haloTop} />
+          <LinearGradient colors={[Colors.overlayHaloClear, Colors.overlayHalo]} style={styles.haloBottom} />
+          <LinearGradient colors={[Colors.overlayHalo, Colors.overlayHaloClear]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloLeft} />
+          <LinearGradient colors={[Colors.overlayHaloClear, Colors.overlayHalo]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloRight} />
+        </Animated.View>
 
-      <Animated.View style={[StyleSheet.absoluteFill, { opacity: haloOpacity }]} pointerEvents="none">
-        <LinearGradient colors={[Colors.overlayHalo, Colors.overlayHaloClear]} style={styles.haloTop} />
-        <LinearGradient colors={[Colors.overlayHaloClear, Colors.overlayHalo]} style={styles.haloBottom} />
-        <LinearGradient colors={[Colors.overlayHalo, Colors.overlayHaloClear]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloLeft} />
-        <LinearGradient colors={[Colors.overlayHaloClear, Colors.overlayHalo]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloRight} />
-      </Animated.View>
+        <NotificationModal
+          visible={modalVisible}
+          title={modalConfig.title}
+          image={modalConfig.image}
+          message={modalConfig.message}
+          buttons={modalConfig.buttons}
+          onClose={() => setModalVisible(false)}
+        />
 
-      <NotificationModal
-        visible={modalVisible}
-        title={modalConfig.title}
-        message={modalConfig.message}
-        buttons={modalConfig.buttons}
-        onClose={() => setModalVisible(false)}
-      />
+        <ModelSelectorDrawer
+          visible={modelSelectorVisible}
+          onClose={() => setModelSelectorVisible(false)}
+          progress={modelSelectorProgress}
+          selectedModel={selectedModel}
+          selectedReflection={selectedReflection}
+          showReflection={modelCapabilities.includes('thinking')}
+          aiService={aiService}
+          ollamaUrl={ollamaUrl}
+          onServiceChange={(service, url) => {
+            setAiService(service);
+            setOllamaUrl(url);
+            Settings.set('aiService', service);
+            Settings.set('ollamaUrl', url);
+            AIModule.setMode(service);
+            if (service === 'ollama') {
+              const cached = Settings.getCached();
+              AIModule.configure(url, cached.ollamaContextLength, cached.ollamaKeepAlive);
+            }
+          }}
+          onModelChange={model => {
+            setSelectedModel(model);
+            selectedModelRef.current = model;
+            Settings.set('ollamaModel', model);
+            //preload newly selected model
+            AIModule.preloadModel(model).catch(() => { });
+          }}
+          onReflectionChange={setReflection}
+          isLargeScreen={isLargeScreen}
+        />
 
-      <HeadlessWebView />
-    </KeyboardAvoidingView>
+        <HeadlessWebView />
+      </KeyboardAvoidingView>
+    </GestureHandlerRootView>
   );
 }
 

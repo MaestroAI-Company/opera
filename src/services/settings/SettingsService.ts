@@ -13,6 +13,9 @@ export type AppSettings = {
   ollamaModel: string;
   ollamaContextLength: number;
   ollamaKeepAlive: number;
+  quickFlowService: string;
+  quickFlowUrl: string;
+  quickFlowModel: string;
   whisperModel: string;
   whisperLanguage: string;
   instruction: string;
@@ -26,6 +29,9 @@ export type AppSettings = {
   showTechnicalDetails: boolean;
   dataWarningDismissed: boolean;
   useAppContext: boolean;
+  shakeToReport: boolean;
+  assistantPromptDismissed: boolean;
+  hasSeenAssistantOverlay: boolean;
 };
 
 const DEFAULTS: AppSettings = {
@@ -38,6 +44,10 @@ const DEFAULTS: AppSettings = {
   ollamaModel: '',
   ollamaContextLength: 8192,
   ollamaKeepAlive: 300,
+  //empty means chores use main model
+  quickFlowService: '',
+  quickFlowUrl: '',
+  quickFlowModel: '',
   whisperModel: 'base',
   whisperLanguage: (() => {
     try {
@@ -57,6 +67,9 @@ const DEFAULTS: AppSettings = {
   showTechnicalDetails: false,
   dataWarningDismissed: false,
   useAppContext: true,
+  shakeToReport: true,
+  assistantPromptDismissed: false,
+  hasSeenAssistantOverlay: false,
 };
 
 const SETTINGS_UPDATED_AT_KEY = '__settings_updated_at';
@@ -72,6 +85,9 @@ const BOOLEAN_KEYS = [
   'showTechnicalDetails',
   'dataWarningDismissed',
   'useAppContext',
+  'shakeToReport',
+  'assistantPromptDismissed',
+  'hasSeenAssistantOverlay',
 ] as const;
 
 const NUMBER_KEYS = [

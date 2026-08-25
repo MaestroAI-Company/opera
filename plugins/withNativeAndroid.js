@@ -136,6 +136,7 @@ function withNativeAndroid(config) {
       copyTemplate('src/ScreenshotHolder.kt', path.join(javaDir, 'ScreenshotHolder.kt'), packageName);
       copyTemplate('src/ScreenCaptureModule.kt', path.join(javaDir, 'ScreenCaptureModule.kt'), packageName);
       copyTemplate('src/MaestroOverlayPackage.kt', path.join(javaDir, 'MaestroOverlayPackage.kt'), packageName);
+      copyTemplate('src/AssistantModule.kt', path.join(javaDir, 'AssistantModule.kt'), packageName);
 
       // AICore (ML Kit GenAI) modules
       copyTemplate('src/AICorePackage.kt', path.join(javaDir, 'AICorePackage.kt'), packageName);
@@ -221,6 +222,23 @@ function withNativeAndroid(config) {
       'dependencies {\n' +
       '    implementation("com.google.mlkit:genai-prompt:1.0.0-beta4")\n' +
       '    implementation("com.google.mlkit:genai-speech-recognition:1.0.0-alpha1")'
+    );
+    config.modResults.contents = contents;
+    return config;
+  });
+
+  //sign with upload keystore in ci else debug
+  config = withAppBuildGradle(config, (config) => {
+    let contents = config.modResults.contents;
+    if (contents.includes('UPLOAD_STORE_FILE')) return config;
+
+    contents = contents.replace(
+      "    signingConfigs {\n        debug {\n            storeFile file('debug.keystore')\n            storePassword 'android'\n            keyAlias 'androiddebugkey'\n            keyPassword 'android'\n        }\n    }",
+      "    signingConfigs {\n        debug {\n            storeFile file('debug.keystore')\n            storePassword 'android'\n            keyAlias 'androiddebugkey'\n            keyPassword 'android'\n        }\n        release {\n            def uploadStoreFile = System.getenv('UPLOAD_STORE_FILE')\n            if (uploadStoreFile) {\n                storeFile file(uploadStoreFile)\n                storePassword System.getenv('UPLOAD_STORE_PASSWORD')\n                keyAlias System.getenv('UPLOAD_KEY_ALIAS')\n                keyPassword System.getenv('UPLOAD_KEY_PASSWORD')\n            }\n        }\n    }"
+    );
+    contents = contents.replace(
+      "        release {\n            // Caution! In production, you need to generate your own keystore file.\n            // see https://reactnative.dev/docs/signed-apk-android.\n            signingConfig signingConfigs.debug",
+      "        release {\n            // Caution! In production, you need to generate your own keystore file.\n            // see https://reactnative.dev/docs/signed-apk-android.\n            //debug key without an upload keystore\n            signingConfig System.getenv('UPLOAD_STORE_FILE') ? signingConfigs.release : signingConfigs.debug"
     );
     config.modResults.contents = contents;
     return config;

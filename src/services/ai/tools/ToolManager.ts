@@ -11,9 +11,12 @@ import { CalendarTool } from './CalendarTool';
 import { SystemSettingsTool } from './SystemSettingsTool';
 import { AlarmTool } from './AlarmTool';
 import { PluginRegistry } from '../../plugins/PluginRegistry';
+import type { McpTool } from '../../mcp/McpTool';
 
 class ToolManagerService {
   private tools: Map<string, ITool> = new Map();
+  //track mcp tools for cleanup
+  private mcpToolNames: Set<string> = new Set();
 
   constructor() {
     //register built-in tools
@@ -46,9 +49,24 @@ class ToolManagerService {
     return !tool.platforms || tool.platforms.includes(this.getCurrentPlatform());
   }
 
+  //swap entire mcp tool set
+  setMcpTools(tools: McpTool[]): void {
+    for (const name of this.mcpToolNames) this.tools.delete(name);
+    this.mcpToolNames.clear();
+    for (const tool of tools) {
+      this.register(tool);
+      this.mcpToolNames.add(tool.definition.function.name);
+    }
+  }
+
   //get tools for ui
   getAllTools(): ITool[] {
     return Array.from(this.tools.values());
+  }
+
+  //built-in tools only
+  getBuiltInTools(): ITool[] {
+    return this.getAllTools().filter(t => !this.mcpToolNames.has(t.definition.function.name));
   }
 
   //get enabled tools

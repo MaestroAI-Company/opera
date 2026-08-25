@@ -7,7 +7,7 @@ import * as MediaLibrary from "expo-media-library/legacy";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, ImageSourcePropType, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme";
+import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import { getLocalProviderLabel } from "../../services/ai/providers/LocalProvider";
 import { buildSources, getEnabledProviders, getOllamaUrls, serializeOllamaUrls, serializeProviders } from "../../services/ai/providers/sources";
@@ -21,6 +21,9 @@ import { CLOUD_PROVIDERS, getCloudProviderDefinition } from "../../services/clou
 import { CloudSync } from "../../services/CloudSyncService";
 import { AppEvents } from "../../services/events";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
+import { McpService } from "../../services/mcp/McpService";
+import { McpServerConfig } from "../../services/mcp/types";
+import { describeImport } from "../../services/mcp/config";
 import { Settings } from "../../services/settings/SettingsService";
 import { WhisperSTT } from "../../services/speech/STTService";
 import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
@@ -79,6 +82,8 @@ const errorIcon = require("../../../assets/icons/error.png");
 const ollamaErrorImage = require("../../../assets/images/ImageCard/OllamaError.png");
 const ollamaInfoImage = require("../../../assets/images/ImageCard/OllamaInfo.png");
 const questionIcon = require("../../../assets/icons/question.png");
+const reloadIcon = require("../../../assets/icons/reload.png");
+const keyIcon = require("../../../assets/icons/pin.png");
 const hyperlinkIcon = require("../../../assets/images/hyperlink2.png");
 const assistantImage = require("../../../assets/images/icon_nobg.png");
 
@@ -105,7 +110,7 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "assistantoverlay" | "service" | "confidentiality" | "reports" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "sociallinks";
+type SubPage = "main" | "general" | "assistantoverlay" | "service" | "confidentiality" | "reports" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "mcpservers" | "mcpserver" | "sociallinks";
 
 export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
   const Colors = useColors();
@@ -240,7 +245,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   //plugin enabled states (tool name or widget id -> bool)
   const [pluginStates, setPluginStates] = useState<Record<string, boolean>>({});
 
-  const allTools: ITool[] = ToolManager.getAllTools();
+  const [mcpServers, setMcpServers] = useState<McpServerConfig[]>([]);
+  //mirrored from secret store for editing
+  const [mcpHeaderValues, setMcpHeaderValues] = useState<Record<string, string>>({});
+  const [mcpConnecting, setMcpConnecting] = useState<Record<string, boolean>>({});
+  const [mcpConfigText, setMcpConfigText] = useState("");
+  //active detail server
+  const [mcpDetailId, setMcpDetailId] = useState<string | null>(null);
+  const [mcpAdding, setMcpAdding] = useState(false);
+  const [mcpAdvancedOpen, setMcpAdvancedOpen] = useState(false);
+  //triggers repaint on connection change
+  const [mcpTick, setMcpTick] = useState(0);
+
+  const allTools: ITool[] = ToolManager.getBuiltInTools();
   const generalTools = allTools.filter(t => !MOBILE_TOOL_NAMES.has(t.definition.function.name));
   const mobileTools = allTools.filter(t => MOBILE_TOOL_NAMES.has(t.definition.function.name));
   const allWidgets: IWidget[] = WidgetManager.getAllWidgets();
@@ -554,7 +571,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   //load plugin states when settings tab opens
   useEffect(() => {
-    if (activeSubPage !== 'tools' && activeSubPage !== 'widgets' && activeSubPage !== 'mobileactions') return;
+    if (activeSubPage !== 'tools' && activeSubPage !== 'widgets' && activeSubPage !== 'mobileactions' && activeSubPage !== 'mcpserver') return;
     const states: Record<string, boolean> = {};
     for (const tool of ToolManager.getAllTools()) {
       const name = tool.definition.function.name;
@@ -564,7 +581,119 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       states[`widget:${widget.id}`] = PluginRegistry.isEnabled('widget', widget.id, widget.enabledByDefault ?? false);
     }
     setPluginStates(states);
+  }, [activeSubPage, mcpTick]);
+
+  //sync list when connections change
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(AppEvents.mcpServersChanged, () => {
+      setMcpServers([...McpService.getServers()]);
+      setMcpTick((t) => t + 1);
+    });
+    return () => sub.remove();
+  }, []);
+
+  //read from secret store on mount
+  useEffect(() => {
+    if (activeSubPage !== 'mcpservers' && activeSubPage !== 'mcpserver') return;
+    const servers = McpService.getServers();
+    //avoid flash of missing headers
+    Promise.all(servers.map(async (server) => [server.id, await McpService.getHeaderValue(server.id)] as const))
+      .then((entries) => {
+        setMcpServers([...servers]);
+        setMcpHeaderValues(Object.fromEntries(entries));
+      })
+      .catch(() => setMcpServers([...servers]));
   }, [activeSubPage]);
+
+  //local spinner while connecting
+  const connectMcpServer = async (id: string) => {
+    setMcpConnecting((prev) => ({ ...prev, [id]: true }));
+    try {
+      const server = McpService.getServers().find((s) => s.id === id);
+      //check if server needs oauth
+      if (McpService.getStatus(id).state === 'needs_auth') await McpService.authorize(id);
+      else if (server?.url.trim()) await McpService.connect(id);
+    } finally {
+      setMcpConnecting((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
+  //shared label for list and detail
+  //use registry for accurate count
+  const mcpEnabledCount = (id: string): number =>
+    McpService.getTools(id).filter((tool) =>
+      PluginRegistry.isEnabled('tool', tool.definition.function.name, tool.enabledByDefault ?? false),
+    ).length;
+
+  const mcpStatusLabel = (id: string): string => {
+    if (mcpConnecting[id]) return "Connecting...";
+    const status = McpService.getStatus(id);
+    if (status.state === "connected") {
+      const total = status.toolCount;
+      if (total === 0) return "No tools";
+      const enabled = mcpEnabledCount(id);
+      //skip count when all enabled
+      if (enabled === total) return `${total} tool${total === 1 ? "" : "s"}`;
+      return `${enabled} of ${total} tools`;
+    }
+    if (status.state === "needs_auth") return "Sign in required";
+    if (status.state === "error") return "Unreachable";
+    return "Not connected";
+  };
+
+  const refreshMcpHeaders = async () => {
+    const entries = await Promise.all(
+      McpService.getServers().map(async (server) => [server.id, await McpService.getHeaderValue(server.id)] as const),
+    );
+    setMcpHeaderValues(Object.fromEntries(entries));
+  };
+
+  //import mcp.json from another app
+  const importMcpConfig = async () => {
+    try {
+      const { added, skipped } = await McpService.importConfig(mcpConfigText);
+      setMcpServers([...McpService.getServers()]);
+      await refreshMcpHeaders();
+      if (added.length > 0) {
+        setMcpConfigText("");
+        setMcpAdding(false);
+      }
+      //single add opens detail directly
+      if (added.length === 1 && skipped.length === 0) {
+        setMcpDetailId(added[0].id);
+        setActiveSubPage("mcpserver");
+        return;
+      }
+      showAlert("Import", describeImport(added, skipped), undefined, { messageAlign: "left" });
+    } catch (e: any) {
+      showAlert("Import failed", e?.message || "This configuration could not be read.", undefined, { messageAlign: "left" });
+    }
+  };
+
+  const saveMcpServer = async (id: string, patch: Partial<McpServerConfig>) => {
+    await McpService.updateServer(id, patch);
+    setMcpServers([...McpService.getServers()]);
+  };
+
+  const removeMcpServer = (id: string, label: string) => {
+    showAlert(
+      "Remove server",
+      `Remove ${label}? Its tools and its saved connection will be deleted.`,
+      [
+        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: "Remove",
+          style: "danger",
+          onPress: async () => {
+            setAlertModalVisible(false);
+            await McpService.removeServer(id);
+            setMcpServers([...McpService.getServers()]);
+            setActiveSubPage("mcpservers");
+          },
+        },
+      ],
+    );
+  };
 
   //save helpers
   const setLanguage = (v: string) => {
@@ -1782,6 +1911,24 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </Group>
       </View>
 
+      {/* mcp block: remote servers add their own tools, configured in a subpage */}
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>MCP servers</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          Connect Opera to external MCP servers so the assistant can use their tools.
+        </Text>
+
+        <Group>
+          <Pressable
+            style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("mcpservers")}
+          >
+            <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+            <Text style={styles.navLabel}>See MCP servers</Text>
+          </Pressable>
+        </Group>
+      </View>
+
       {/* mobile actions block, last: points to a deeper subpage instead of toggling in place. desktop has no mobile apps to open, so it's hidden there */}
       {!isDesktop && (
         <View style={styles.settingRowVertical}>
@@ -1803,6 +1950,218 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       )}
     </View>
   );
+
+  //mcp list page
+  const renderMcpServersSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("MCP servers", "tools")}
+
+      <View style={styles.settingRowVertical}>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          Connect Opera to external MCP servers so the assistant can use their tools.
+        </Text>
+
+        {mcpServers.length > 0 && (
+          <Group style={styles.groupSpacingTight}>
+            {mcpServers.map((server, index) => {
+              return (
+                <Pressable
+                  key={server.id}
+                  style={({ pressed, hovered }) => [
+                    styles.navItem,
+                    index === mcpServers.length - 1 && styles.navItemLast,
+                    (pressed || hovered) && styles.navItemPressed,
+                  ]}
+                  onPress={() => { setMcpDetailId(server.id); setMcpAdvancedOpen(false); setActiveSubPage("mcpserver"); }}
+                >
+                  <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+                  <Text style={styles.navLabel}>{server.name}</Text>
+                  <Text style={styles.navStatus}>{mcpStatusLabel(server.id)}</Text>
+                </Pressable>
+              );
+            })}
+          </Group>
+        )}
+
+        {mcpAdding ? (
+          <>
+            <Group style={styles.groupSpacing}>
+              <TextInputField
+                multiline
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder={'Paste a link or an mcp.json block'}
+                value={mcpConfigText}
+                onChangeText={setMcpConfigText}
+                containerStyle={styles.configInput}
+                style={styles.configInputText}
+              />
+            </Group>
+            <Group style={styles.groupSpacingTight}>
+              <ActionButton
+                icon={addIcon}
+                label="Add"
+                disabled={!mcpConfigText.trim()}
+                onPress={importMcpConfig}
+              />
+              <ActionButton
+                icon={arrowIcon}
+                label="Cancel"
+                onPress={() => { setMcpAdding(false); setMcpConfigText(""); }}
+              />
+            </Group>
+          </>
+        ) : (
+          <Group style={styles.groupSpacing}>
+            <ActionButton icon={addIcon} label="Add server" onPress={() => setMcpAdding(true)} />
+          </Group>
+        )}
+      </View>
+    </View>
+  );
+
+  //server detail page
+  const renderMcpServerSubPage = () => {
+    const server = mcpServers.find((s) => s.id === mcpDetailId);
+    if (!server) return renderMcpServersSubPage();
+
+    const status = McpService.getStatus(server.id);
+    const tools = McpService.getTools(server.id);
+    const busy = mcpConnecting[server.id];
+
+    return (
+      <View style={styles.subPageContainer}>
+        {renderSubPageHeader(server.name, "mcpservers")}
+
+        <View style={styles.settingRowVertical}>
+          <Text style={styles.helpText}>{mcpStatusLabel(server.id)}</Text>
+          {status.error ? (
+            <Text style={[styles.helpText, { marginTop: 6, color: Colors.error }]}>{status.error}</Text>
+          ) : null}
+        </View>
+
+        <View style={styles.settingRowVertical}>
+          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Link</Text>
+          <Group>
+            <TextInputField
+              icon={linkIcon}
+              placeholder="server link"
+              autoCapitalize="none"
+              value={server.url}
+              onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, url: v } : s))}
+              onBlur={() => saveMcpServer(server.id, { url: server.url })}
+            />
+          </Group>
+          <Group style={styles.groupSpacing}>
+            <ActionButton
+              icon={status.state === "needs_auth" ? keyIcon : reloadIcon}
+              label={status.state === "needs_auth" ? "Sign in to this server" : busy ? "Connecting..." : "Reconnect"}
+              disabled={busy || !server.url.trim()}
+              onPress={() => connectMcpServer(server.id)}
+            />
+          </Group>
+          {status.state === "needs_auth" && (
+            <Text style={[styles.helpText, { marginTop: 10 }]}>
+              Some servers, GitHub among them, do not offer a sign-in to apps like Opera. For those, add an access token under Advanced instead.
+            </Text>
+          )}
+        </View>
+
+        {tools.length > 0 && (
+          <View style={styles.settingRowVertical}>
+            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Tools ({tools.length})</Text>
+            {tools.map((tool) => {
+              const name = tool.definition.function.name;
+              const key = `tool:${name}`;
+              const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
+              return (
+                <View key={name} style={{ marginBottom: 16 }}>
+                  <View style={styles.toggleRow}>
+                    <Text style={styles.settingLabel}>{tool.displayName}</Text>
+                    <Toggle
+                      checked={enabled}
+                      onToggle={async (v) => {
+                        setPluginStates(prev => ({ ...prev, [key]: v }));
+                        await PluginRegistry.setEnabled('tool', name, v);
+                      }}
+                    />
+                  </View>
+                  {tool.displayDescription ? (
+                    <Text style={styles.helpText}>{tool.displayDescription}</Text>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        <View style={styles.settingRowVertical}>
+          <Group>
+            <Pressable
+              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+              onPress={() => setMcpAdvancedOpen((v) => !v)}
+            >
+              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <Text style={styles.navLabel}>Advanced</Text>
+            </Pressable>
+          </Group>
+
+          {mcpAdvancedOpen && (
+            <>
+              <Text style={[styles.helpText, { marginTop: 12, marginBottom: 10 }]}>
+                A header sent with every request, for servers that take an access token instead of a sign-in. For GitHub, use Authorization and Bearer followed by your token.
+              </Text>
+              <Group style={styles.groupSpacingTight}>
+                <TextInputField
+                  icon={keyIcon}
+                  placeholder="header name"
+                  autoCapitalize="none"
+                  value={server.headerName}
+                  onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, headerName: v } : s))}
+                  onBlur={() => saveMcpServer(server.id, { headerName: server.headerName })}
+                />
+                <TextInputField
+                  icon={keyIcon}
+                  placeholder="header value"
+                  autoCapitalize="none"
+                  secureTextEntry
+                  value={mcpHeaderValues[server.id] ?? ""}
+                  onChangeText={(v) => setMcpHeaderValues(prev => ({ ...prev, [server.id]: v }))}
+                  onBlur={() => McpService.setHeaderValue(server.id, mcpHeaderValues[server.id] ?? "")}
+                />
+              </Group>
+
+              <Text style={[styles.helpText, { marginTop: 16, marginBottom: 10 }]}>
+                Only needed when a server offers a sign-in but will not register Opera on its own. Leave empty otherwise.
+              </Text>
+              <Group style={styles.groupSpacingTight}>
+                <TextInputField
+                  icon={keyIcon}
+                  placeholder="oauth client id"
+                  autoCapitalize="none"
+                  value={server.clientId ?? ""}
+                  onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, clientId: v } : s))}
+                  onBlur={() => saveMcpServer(server.id, { clientId: server.clientId ?? "" })}
+                />
+              </Group>
+            </>
+          )}
+        </View>
+
+        <View style={styles.settingRowVertical}>
+          <Group style={styles.dangerGroup}>
+            <ActionButton
+              icon={deleteIcon}
+              label="Remove server"
+              variant="highlight"
+              onPress={() => removeMcpServer(server.id, server.name)}
+            />
+          </Group>
+        </View>
+      </View>
+    );
+  };
+
 
   // widgets subpage content
   const renderWidgetsSubPage = () => (
@@ -1887,6 +2246,10 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return renderWidgetsSubPage();
       case "mobileactions":
         return renderMobileActionsSubPage();
+      case "mcpservers":
+        return renderMcpServersSubPage();
+      case "mcpserver":
+        return renderMcpServerSubPage();
       case "sociallinks":
         return renderSocialLinksSubPage();
       case "main":
@@ -2226,6 +2589,23 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   assistantStatusOff: {
     color: Colors.textMuted,
+  },
+  navStatus: {
+    marginLeft: "auto",
+    fontFamily: Fonts.body,
+    fontSize: FontSizes.caption,
+    color: Colors.textMuted,
+  },
+  configInput: {
+    height: 140,
+    alignItems: "flex-start",
+    paddingTop: Spacing.lg2,
+  },
+  configInputText: {
+    height: "100%",
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.code,
+    textAlignVertical: "top",
   },
   dangerGroup: {
     backgroundColor: Colors.primary,

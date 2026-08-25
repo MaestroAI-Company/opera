@@ -45,24 +45,19 @@ class CentralWidgetManager {
     if (enabledWidgets.length === 0) return '';
 
     let prompt = `\n\n## WIDGET SYSTEM\n`;
-    prompt += `You can display interactive UI widgets to the user by returning a special fenced code block in your response. The widget will be parsed and rendered natively.\n`;
-    prompt += `To use a widget, output exactly this syntax:\n\n`;
+    prompt += `Display interactive UI widgets by outputting a fenced code block:\n\n`;
     prompt += `\`\`\`widget id="WIDGET_ID" title="OPTIONAL_TITLE"\n`;
     prompt += `{ "your": "json data" }\n`;
     prompt += `\`\`\`\n\n`;
-    prompt += `Only use the title attribute if the widget's aiDefinesTitle is true. The json data must conform to the widget's schema.\n`;
-    prompt += `CRITICAL: The JSON data must be strictly valid. Do NOT use actual newlines inside strings (use \\n instead).\n`;
-    prompt += `CRITICAL: The WIDGET_ID MUST be one of the widget IDs listed below EXACTLY. Tool names (e.g. math_calculate, web_search, fetch_pages) are NOT widgets and must NEVER be used as a widget ID. Widgets and tools are two SEPARATE systems: tools are called through the tool-calling mechanism, never through a widget block. If a tool could help, call the tool instead of emitting a widget block.\n`;
-    prompt += `Available Widgets (You MUST use the exact ID provided below as WIDGET_ID):\n`;
+    prompt += `Rules: title attribute only when aiDefinesTitle is true. JSON must be strictly valid (use \\n in strings). WIDGET_ID must match an ID below exactly. Tools and widgets are separate systems: use tool-call JSON for tools, widget blocks only for widgets below.\n`;
+    prompt += `Available Widgets:\n`;
 
     for (const widget of enabledWidgets) {
-      prompt += `- Widget ID: **${widget.id}**\n`;
-      prompt += `  - Name: ${widget.name}\n`;
-      prompt += `  - Description: ${widget.description}\n`;
+      prompt += `- **${widget.id}** (${widget.name}): ${widget.description}\n`;
       if (widget.aiDefinesTitle) {
-        prompt += `  - Requires title: YES (Add title="YOUR_TITLE" to the block)\n`;
+        prompt += `  Requires title="CITY_NAME"\n`;
       }
-      prompt += `  - Schema: ${widget.schema}\n`;
+      prompt += `  Schema: ${widget.schema}\n`;
     }
 
     return prompt;

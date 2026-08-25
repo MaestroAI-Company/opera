@@ -10,6 +10,8 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 const DOUBLE_TAP_MS = 220;
 const DRAG_TOL = 10;
 const HANDLE_HIT = 56;
+//half the handle hit box, used to test proximity to a corner
+const CORNER_HIT = HANDLE_HIT / 2;
 //length of each angle arm
 const HANDLE_ARM = 26;
 const HANDLE_STROKE = 6;
@@ -169,6 +171,27 @@ function snap(rect: Rect, rects: Rect[], tolerance: number = SNAP_DIST): Rect {
   };
 }
 
+//closest corner of rect to a point, within the handle's hit zone
+function nearestCorner(rect: Rect, x: number, y: number): Corner | null {
+  const anchors: [Corner, Point][] = [
+    ['tl', { x: rect.x1, y: rect.y1 }],
+    ['tr', { x: rect.x2, y: rect.y1 }],
+    ['bl', { x: rect.x1, y: rect.y2 }],
+    ['br', { x: rect.x2, y: rect.y2 }],
+  ];
+
+  let best: Corner | null = null;
+  let bestDist = CORNER_HIT;
+  for (const [corner, p] of anchors) {
+    const dist = Math.max(Math.abs(x - p.x), Math.abs(y - p.y));
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = corner;
+    }
+  }
+  return best;
+}
+
 function toRegion(rect: Rect, size: Size): SelectionRegion {
   const { x1, y1, x2, y2 } = clampRect(rect, size);
   const x = x1 / size.w;
@@ -271,73 +294,10 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
     commit(clampRect(hit ?? snap(inflate(bounds, PATH_INFLATE), state.rects, LASSO_SNAP_DIST), state.size));
   };
 
-  //handlers need the live gesture state, so they close over the refs
-  const backdrop = useMemo(() =>
-    // eslint-disable-next-line react-hooks/refs
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt, gesture) => {
-        const { locationX, locationY } = evt.nativeEvent;
-        //page coords stay valid over child views
-        pageOffset.current = { x: gesture.x0 - locationX, y: gesture.y0 - locationY };
-        strokeRef.current = [{ x: locationX, y: locationY }];
-        committedPath.current = `M ${locationX} ${locationY}`;
-        pendingPoint.current = null;
-        strokeD.value = '';
-        drawingRef.current = false;
-        //second touch within window taps
-        if (tapTimer.current) {
-          clearTimeout(tapTimer.current);
-          tapTimer.current = null;
-          onDoubleTap();
-          return;
-        }
-        tapTimer.current = setTimeout(() => {
-          tapTimer.current = null;
-          onTap();
-        }, DOUBLE_TAP_MS);
-      },
-      onPanResponderMove: (_evt, gesture) => {
-        if (Math.abs(gesture.dx) <= DRAG_TOL && Math.abs(gesture.dy) <= DRAG_TOL) return;
-        if (tapTimer.current) {
-          clearTimeout(tapTimer.current);
-          tapTimer.current = null;
-        }
-        if (!drawingRef.current) {
-          drawingRef.current = true;
-          setDrawing(true);
-          latest.current.onDrawingChange?.(true);
-        }
-        const locationX = gesture.moveX - pageOffset.current.x;
-        const locationY = gesture.moveY - pageOffset.current.y;
-        const points = strokeRef.current;
-        const last = points[points.length - 1];
-        //drop points too close to matter
-        if (last && Math.hypot(locationX - last.x, locationY - last.y) < MIN_DRAW_DIST) return;
-        points.push({ x: locationX, y: locationY });
-        //extend path by one point without rebuilding it
-        if (pendingPoint.current) {
-          const prev = pendingPoint.current;
-          committedPath.current += ` Q ${prev.x} ${prev.y} ${(prev.x + locationX) / 2} ${(prev.y + locationY) / 2}`;
-        }
-        pendingPoint.current = { x: locationX, y: locationY };
-        strokeD.value = `${committedPath.current} L ${locationX} ${locationY}`;
-      },
-      onPanResponderRelease: () => {
-        strokeD.value = '';
-        finishStroke();
-      },
-      onPanResponderTerminate: () => {
-        strokeD.value = '';
-        finishStroke();
-      },
-    })
-    //gestures read latest mirror
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    , []);
-
   const dragStart = useRef<Rect | null>(null);
   const dragCurrent = useRef<Rect | null>(null);
+  //which corner the active touch is resizing, if any
+  const resizeCorner = useRef<Corner | null>(null);
 
   //active handle grows while dragged
   const handleScales = {
@@ -366,53 +326,126 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
     state.onChange({ kind: 'box', region: toRegion(settled, state.size) });
   };
 
-  const makeCornerResponder = (corner: Corner) =>
+  //single full-screen responder: decides at touch-down whether it's a corner
+  //resize or a fresh draw, instead of overlapping sibling views fighting for the touch
+  const backdrop = useMemo(() =>
+    // eslint-disable-next-line react-hooks/refs
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
+      onPanResponderGrant: (evt, gesture) => {
+        const { locationX, locationY } = evt.nativeEvent;
+        //page coords stay valid over child views
+        pageOffset.current = { x: gesture.x0 - locationX, y: gesture.y0 - locationY };
+
         const state = latest.current;
-        const base = state.selection.kind === 'box'
-          ? toPixels(state.selection.region, state.size)
-          : { x1: 0, y1: 0, x2: state.size.w, y2: state.size.h };
-        dragStart.current = base;
-        dragCurrent.current = base;
-        setResizing(true);
-        handleScales[corner].value = withTiming(1.2, { duration: 150 });
-        state.onVibrate?.();
+        const box = state.selection.kind === 'box' ? toPixels(state.selection.region, state.size) : null;
+        const corner = box ? nearestCorner(box, locationX, locationY) : null;
+
+        //touch near an existing corner resizes it, everything else draws fresh
+        if (corner) {
+          resizeCorner.current = corner;
+          dragStart.current = box;
+          dragCurrent.current = box;
+          setResizing(true);
+          handleScales[corner].value = withTiming(1.2, { duration: 150 });
+          state.onVibrate?.();
+          return;
+        }
+        resizeCorner.current = null;
+
+        strokeRef.current = [{ x: locationX, y: locationY }];
+        committedPath.current = `M ${locationX} ${locationY}`;
+        pendingPoint.current = null;
+        strokeD.value = '';
+        drawingRef.current = false;
+        //second touch within window taps
+        if (tapTimer.current) {
+          clearTimeout(tapTimer.current);
+          tapTimer.current = null;
+          onDoubleTap();
+          return;
+        }
+        tapTimer.current = setTimeout(() => {
+          tapTimer.current = null;
+          onTap();
+        }, DOUBLE_TAP_MS);
       },
       onPanResponderMove: (_evt, gesture) => {
-        const base = dragStart.current;
-        if (!base) return;
-        const state = latest.current;
+        if (resizeCorner.current) {
+          const corner = resizeCorner.current;
+          const base = dragStart.current;
+          if (!base) return;
+          const state = latest.current;
 
-        //corner never crosses opposite edge
-        const minW = Math.min(MIN_BOX, base.x2 - base.x1);
-        const minH = Math.min(MIN_BOX, base.y2 - base.y1);
-        const moved = {
-          x1: corner[1] === 'l' ? Math.min(base.x2 - minW, base.x1 + gesture.dx) : base.x1,
-          y1: corner[0] === 't' ? Math.min(base.y2 - minH, base.y1 + gesture.dy) : base.y1,
-          x2: corner[1] === 'r' ? Math.max(base.x1 + minW, base.x2 + gesture.dx) : base.x2,
-          y2: corner[0] === 'b' ? Math.max(base.y1 + minH, base.y2 + gesture.dy) : base.y2,
-        };
-        const rect = clampRect(moved, state.size);
-        dragCurrent.current = rect;
+          //corner never crosses opposite edge
+          const minW = Math.min(MIN_BOX, base.x2 - base.x1);
+          const minH = Math.min(MIN_BOX, base.y2 - base.y1);
+          const moved = {
+            x1: corner[1] === 'l' ? Math.min(base.x2 - minW, base.x1 + gesture.dx) : base.x1,
+            y1: corner[0] === 't' ? Math.min(base.y2 - minH, base.y1 + gesture.dy) : base.y1,
+            x2: corner[1] === 'r' ? Math.max(base.x1 + minW, base.x2 + gesture.dx) : base.x2,
+            y2: corner[0] === 'b' ? Math.max(base.y1 + minH, base.y2 + gesture.dy) : base.y2,
+          };
+          const rect = clampRect(moved, state.size);
+          dragCurrent.current = rect;
 
-        //write to ui thread directly
-        x1.value = rect.x1;
-        y1.value = rect.y1;
-        x2.value = rect.x2;
-        y2.value = rect.y2;
+          //write to ui thread directly
+          x1.value = rect.x1;
+          y1.value = rect.y1;
+          x2.value = rect.x2;
+          y2.value = rect.y2;
+          return;
+        }
+
+        if (Math.abs(gesture.dx) <= DRAG_TOL && Math.abs(gesture.dy) <= DRAG_TOL) return;
+        if (tapTimer.current) {
+          clearTimeout(tapTimer.current);
+          tapTimer.current = null;
+        }
+        if (!drawingRef.current) {
+          drawingRef.current = true;
+          setDrawing(true);
+          latest.current.onDrawingChange?.(true);
+        }
+        const locationX = gesture.moveX - pageOffset.current.x;
+        const locationY = gesture.moveY - pageOffset.current.y;
+        const points = strokeRef.current;
+        const last = points[points.length - 1];
+        //drop points too close to matter
+        if (last && Math.hypot(locationX - last.x, locationY - last.y) < MIN_DRAW_DIST) return;
+        points.push({ x: locationX, y: locationY });
+        //extend path by one point without rebuilding it
+        if (pendingPoint.current) {
+          const prev = pendingPoint.current;
+          committedPath.current += ` Q ${prev.x} ${prev.y} ${(prev.x + locationX) / 2} ${(prev.y + locationY) / 2}`;
+        }
+        pendingPoint.current = { x: locationX, y: locationY };
+        strokeD.value = `${committedPath.current} L ${locationX} ${locationY}`;
       },
-      onPanResponderRelease: () => finishResize(corner),
-      onPanResponderTerminate: () => finishResize(corner),
-    });
-
-  const cornerResponders = useMemo(
-    // eslint-disable-next-line react-hooks/refs
-    () => ({ tl: makeCornerResponder('tl'), tr: makeCornerResponder('tr'), bl: makeCornerResponder('bl'), br: makeCornerResponder('br') }),
+      onPanResponderRelease: () => {
+        if (resizeCorner.current) {
+          const corner = resizeCorner.current;
+          resizeCorner.current = null;
+          finishResize(corner);
+          return;
+        }
+        strokeD.value = '';
+        finishStroke();
+      },
+      onPanResponderTerminate: () => {
+        if (resizeCorner.current) {
+          const corner = resizeCorner.current;
+          resizeCorner.current = null;
+          finishResize(corner);
+          return;
+        }
+        strokeD.value = '';
+        finishStroke();
+      },
+    })
+    //gestures read latest mirror
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
+    , []);
 
   //single source of truth for the pop, computed once per frame and reused everywhere below
   const bounds = useDerivedValue(() => {
@@ -460,29 +493,14 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
         </View>
       )}
 
-      <View style={StyleSheet.absoluteFill} {...backdrop.panHandlers} />
-
-      {drawing && (
-        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-          <AnimatedPath
-            animatedProps={strokePathProps}
-            stroke={Colors.selectionOutline}
-            strokeWidth={STROKE_WIDTH}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-          />
-        </Svg>
-      )}
-
       {showBox && (
-        <Animated.View style={[styles.group, groupStyle]}>
+        <Animated.View style={[styles.group, groupStyle]} pointerEvents="none">
           <View style={styles.box} pointerEvents="none" />
           {CORNERS.map(corner => (
             <Animated.View
               key={corner}
               style={[styles.handleHit, cornerStyles[corner]]}
-              {...cornerResponders[corner].panHandlers}
+              pointerEvents="none"
             >
               <Svg width={HANDLE_HIT} height={HANDLE_HIT}>
                 <Path
@@ -498,6 +516,22 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
           ))}
         </Animated.View>
       )}
+
+      {drawing && (
+        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+          <AnimatedPath
+            animatedProps={strokePathProps}
+            stroke={Colors.selectionOutline}
+            strokeWidth={STROKE_WIDTH}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </Svg>
+      )}
+
+      {/* topmost so a touch starting over the box still draws, box and handles are only painted */}
+      <View style={StyleSheet.absoluteFill} {...backdrop.panHandlers} />
     </View>
   );
 }

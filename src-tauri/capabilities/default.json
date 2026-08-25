@@ -13,6 +13,7 @@
     "core:window:allow-unmaximize",
     "core:window:allow-maximize",
     "core:window:allow-close",
+    "core:window:allow-set-focus",
     "deep-link:default",
     "oauth:allow-start",
     "oauth:allow-cancel",

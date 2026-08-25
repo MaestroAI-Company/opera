@@ -9,6 +9,7 @@ import { MessageMetrics } from '../db/DatabaseService';
 import { LocationService } from '../location/LocationService';
 import { Settings } from '../settings/SettingsService';
 import { DEFAULT_OLLAMA_URL, imageToBase64 } from './utils/imageToBase64';
+import { resolveQuickFlow, QuickFlowTarget } from './quickFlow';
 
 const DEFAULT_URL = DEFAULT_OLLAMA_URL;
 
@@ -208,6 +209,24 @@ class CentralAIModule {
     await provider.sendMessage(modelName, enhancedPrompt, processedMessages, onChunk, signal, options, onMetrics);
   }
 
+  //one-shot call, provider from target
+  async sendOn(
+    target: QuickFlowTarget,
+    systemPrompt: string,
+    messages: { role: string; content: string; images?: string[] }[],
+    onChunk: (chunk: string) => void,
+    signal?: AbortSignal,
+    options?: { think?: boolean | string }
+  ): Promise<void> {
+    const provider = target.service
+      ? this.providerFor(target.service, target.url)
+      : this.getActiveProvider();
+    if (!provider) throw new Error(`No AI provider for quick flow source: ${target.service}`);
+    const processedMessages = await this.processImages(messages);
+    const enhancedPrompt = systemPrompt + (await this.buildContextBlock());
+    await provider.sendMessage(target.model, enhancedPrompt, processedMessages, onChunk, signal, options);
+  }
+
   //send message with tool support (checks model capabilities)
   async sendMessageWithTools(
     modelName: string,
@@ -259,8 +278,11 @@ class CentralAIModule {
     //isolated call, system prompt is overridable
     const summarize = async (text: string, systemPrompt?: string): Promise<string> => {
       let summary = '';
-      await provider.sendMessage(
-        modelName, systemPrompt ?? SYSTEM_PROMPTS.SEARCH_SUMMARIZE,
+      //chores use the quick flow model
+      const target = resolveQuickFlow(modelName);
+      const choreProvider = target.service ? this.providerFor(target.service, target.url) ?? provider : provider;
+      await choreProvider.sendMessage(
+        target.model, systemPrompt ?? SYSTEM_PROMPTS.SEARCH_SUMMARIZE,
         [{ role: 'user', content: text }],
         chunk => { summary += chunk; },
         signal,

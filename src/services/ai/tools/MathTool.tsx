@@ -373,11 +373,10 @@ export class MathTool implements ITool {
     function: {
       name: 'math_calculate',
       description:
-        'Compute the exact numeric result of a mathematical expression. Use this for any calculation the user asks about: arithmetic, algebra, trigonometry, roots, logarithms, factorials, percentages, gcd/lcm, statistics. ' +
-        'This is a TOOL, NOT a widget: call it through the tool-calling mechanism and never emit it as a widget block. ' +
-        'Supports + - * /, ^ or ** for power, % for modulo, parentheses, and implicit multiplication (2pi, 3(4+5)). ' +
-        'Use the degree symbol ° for angles in degrees: sin(30°). Constants: pi, e, tau, phi, sqrt2, ln2, ln10. ' +
-        'Functions: sqrt, cbrt, root(x,n), sin, cos, tan, asin, acos, atan, atan2(y,x), sinh, cosh, tanh, exp, ln, log (base 10), log(x,base), log2, abs, sign, floor, ceil, round, trunc, min, max, hypot, mean, pow, mod, clamp, gcd, lcm, fact. ' +
+        'Compute the exact numeric result of a mathematical expression. Use for any calculation: arithmetic, algebra, trigonometry, roots, logarithms, factorials, statistics, percentages. ' +
+        'Supports + - * /, ^ or ** for power, % for modulo, parentheses, implicit multiplication (2pi). ' +
+        'Use ° for angles in degrees: sin(30°). Constants: pi, e. ' +
+        'Functions: sqrt, sin, cos, tan, asin, acos, atan, ln, log, abs, floor, ceil, round, min, max, gcd, lcm, fact, mean, sum. ' +
         'Postfix ! computes factorial. Return only the numeric result.',
       parameters: {
         type: 'object',

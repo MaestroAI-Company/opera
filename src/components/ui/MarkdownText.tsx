@@ -1,15 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Animated, Linking, StyleSheet, Text, View, Image } from "react-native";
+import { Animated, Image, Linking, StyleSheet, Text, View } from "react-native";
 import AutoHeightWebView from "react-native-autoheight-webview";
 import CodeHighlighter from "react-native-code-highlighter";
 import { vs2015 } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
-import { getColors, getThemedStyles, useColors, useThemedStyles } from "../../hooks/useTheme";
-import { ensureKatexStylesheet, getKatexCss, KATEX_STYLESHEET_NAME } from "./katexStylesheet";
-import { WidgetManager } from "../../services/widgets/WidgetManager";
-import { ToolManager } from "../../services/ai/tools/ToolManager";
-import WidgetWrapper from "../widgets/WidgetWrapper";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { getColors, getThemedStyles, useColors, useThemedStyles } from "../../hooks/useTheme";
+import { ToolManager } from "../../services/ai/tools/ToolManager";
+import { WidgetManager } from "../../services/widgets/WidgetManager";
+import WidgetWrapper from "../widgets/WidgetWrapper";
+import { ensureKatexStylesheet, getKatexCss, KATEX_STYLESHEET_NAME } from "./katexStylesheet";
 
 const toolIcon = require("../../../assets/icons/tool.png");
 
@@ -73,8 +73,9 @@ const makeS = (Colors: ThemeColors) => StyleSheet.create({
   spacing: { height: 8 },
   strike: { textDecorationLine: "line-through" },
   link: { color: Colors.primary, textDecorationLine: "underline" },
-  tableCell: { fontSize: FontSizes.lg, lineHeight: 25, color: Colors.textPrimary, fontFamily: Fonts.body },
-  tableCellBox: { flex: 1, paddingHorizontal: 8, paddingVertical: 6 },
+  tableCell: { fontSize: FontSizes.body, lineHeight: 21, color: Colors.textPrimary, fontFamily: Fonts.body },
+  tableHeaderCell: { fontSize: FontSizes.labelSm, lineHeight: 14, color: Colors.textMuted, fontFamily: Fonts.mono, letterSpacing: 0.4, textTransform: "uppercase" },
+  tableCellBox: { flex: 1, paddingHorizontal: Spacing.lg2, paddingVertical: Spacing.md },
   inlineRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },
   toolCallBubble: {
     flexDirection: "row",
@@ -217,7 +218,7 @@ function renderTokens(tokens: Token[], keyBase: number): React.ReactNode[] {
         return <Text key={key} style={s.strike}>{renderTokens(t.children, keyBase + i)}</Text>;
       case "link":
         return (
-          <Text key={key} style={s.link} onPress={() => { Linking.openURL(t.url).catch(() => {}); }}>
+          <Text key={key} style={s.link} onPress={() => { Linking.openURL(t.url).catch(() => { }); }}>
             {renderTokens(t.children, keyBase + i)}
           </Text>
         );
@@ -237,7 +238,7 @@ function pushRawToolCallBlocks(md: string, from: number, to: number, blocks: Too
   while (true) {
     const start = md.indexOf('{', searchIndex);
     if (start === -1 || start >= to) break;
-    
+
     let braces = 0;
     let endIndex = -1;
     let inString = false;
@@ -253,17 +254,17 @@ function pushRawToolCallBlocks(md: string, from: number, to: number, blocks: Too
       }
       if (braces === 0 && j > start) { endIndex = j; break; }
     }
-    
+
     const isPartial = endIndex === -1 && allowPartial;
     const blockEnd = endIndex !== -1 ? endIndex + 1 : to;
     const blockText = md.substring(start, blockEnd);
-    
+
     const cleanBlockText = blockText.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '');
-    
+
     //accept open block as tool call
     const looksLikeTool = /^\{\s*"?\s*(?:tool[\s\n]*_[\s\n]*calls|name|function)\s*"?\s*:/i.test(cleanBlockText);
     const partialLooksLikeTool = isPartial && /^\{\s*"?\s*(?:tool[\s\n]*_[\s\n]*calls|name|function)/i.test(cleanBlockText);
-    
+
     if (looksLikeTool || partialLooksLikeTool) {
       blocks.push({ start, end: blockEnd, json: blockText });
       searchIndex = blockEnd;
@@ -604,7 +605,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
   const headingColor = dark ? Colors.responseTextStrong : undefined;
   const mutedColor = dark ? Colors.responseTextMuted : Colors.textMuted;
   const borderColor = dark ? Colors.responseBorder : Colors.codeBlockText;
-  
+
   //wrap toolcall blocks for bubble rendering
   let processedMd = md;
   const blocks = findToolCallBlocks(processedMd, isGenerating);
@@ -638,13 +639,13 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
         codeLines.push(lines[i]);
         i++;
       }
-      
+
       if (language === "widget") {
         const idMatch = header.match(/id="([^"]+)"/);
         const titleMatch = header.match(/title="([^"]+)"/);
         const widgetId = idMatch ? idMatch[1] : null;
         const widgetTitle = titleMatch ? titleMatch[1] : undefined;
-        
+
         const widget = widgetId ? WidgetManager.getWidget(widgetId) : undefined;
         if (widget) {
           if (!isClosed) {
@@ -753,7 +754,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
         }
         if (i < lines.length) {
           mathLines.push(lines[i]);
-          i++; //skip closing $$
+          i++;
         }
       }
 
@@ -800,24 +801,40 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
         while (out.length < colCount) out.push("");
         return out;
       };
-      const borderColor = incognito ? Colors.incognito : (dark ? Colors.responseBorder : Colors.codeBlockText);
-      const headerBg = incognito ? Colors.incognitoHeader : (dark ? Colors.whiteFaint : Colors.primaryHeader);
+      const borderColor = incognito ? Colors.incognito : (dark ? Colors.responseBorder : Colors.border);
+      const headerBg = incognito ? Colors.incognito : (dark ? Colors.whiteFaint : Colors.primary);
+      const headerTextColor = incognito ? Colors.textOnPrimary : (dark ? textColor : Colors.textOnPrimary);
+      const headerBorderColor = dark ? borderColor : Colors.borderOnPrimary;
+      const cardStyle = incognito || dark
+        ? { borderWidth: 2, borderColor }
+        : {
+          backgroundColor: Colors.surface,
+          borderWidth: 2,
+          borderColor,
+          shadowColor: Colors.shadowInk,
+          shadowOffset: { width: -3, height: 3 },
+          shadowOpacity: 1,
+          shadowRadius: 0,
+          elevation: 2,
+        };
 
       elements.push(
-        <View key={`table-${i}`} style={{ borderWidth: 1, borderColor, borderRadius: Radius.lg, overflow: "hidden", marginVertical: 6 }}>
+        <View key={`table-${i}`} style={[{ borderRadius: Radius.xxl, overflow: "hidden", marginVertical: Spacing.lg }, cardStyle]}>
           {headerCells && (
-            <View style={{ flexDirection: "row", backgroundColor: headerBg }}>
-              {padCell(headerCells).map((c, ci) => (
-                <View key={`h-${ci}`} style={[s.tableCellBox, ci < colCount - 1 && { borderRightWidth: 1, borderRightColor: borderColor }, { borderBottomWidth: 1, borderBottomColor: borderColor }]}>
-                  {wrapContent(c, `hc-${ci}`, [s.tableCell, s.bold, textColor && { color: textColor }], ci, incognito, selColor)}
-                </View>
-              ))}
+            <View style={{ padding: Spacing.sm }}>
+              <View style={{ flexDirection: "row", backgroundColor: headerBg, borderRadius: Radius.md, borderWidth: 2, borderColor: headerBorderColor, overflow: "hidden" }}>
+                {padCell(headerCells).map((c, ci) => (
+                  <View key={`h-${ci}`} style={s.tableCellBox}>
+                    {wrapContent(c, `hc-${ci}`, [s.tableHeaderCell, headerTextColor && { color: headerTextColor }], ci, incognito, selColor)}
+                  </View>
+                ))}
+              </View>
             </View>
           )}
           {bodyRows.map((row, ri) => (
             <View key={`r-${ri}`} style={{ flexDirection: "row", backgroundColor: ri % 2 === 1 ? (incognito ? Colors.incognitoStripe : (dark ? Colors.overlaySubtle : Colors.overlayFaint)) : "transparent" }}>
               {padCell(row).map((c, ci) => (
-                <View key={`b-${ri}-${ci}`} style={[s.tableCellBox, ci < colCount - 1 && { borderRightWidth: 1, borderRightColor: borderColor }, { borderTopWidth: 1, borderTopColor: borderColor }]}>
+                <View key={`b-${ri}-${ci}`} style={s.tableCellBox}>
                   {wrapContent(c, `bc-${ri}-${ci}`, [s.tableCell, textColor && { color: textColor }], ci, incognito, selColor)}
                 </View>
               ))}
@@ -927,7 +944,6 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
         wrapContent(paraLines.join("\n"), `p-${i}`, [s.base, s.paragraph, textColor && { color: textColor }], i, incognito, selColor)
       );
     } else {
-      //safety fallback prevent infinite loop
       i++;
     }
   }

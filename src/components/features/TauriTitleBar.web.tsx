@@ -1,31 +1,45 @@
 import { useEffect, useState } from 'react';
 import { View, Pressable, StyleSheet, Image } from 'react-native';
 import Svg, { Path, Line, Rect } from 'react-native-svg';
-import { FontSizes, Fonts, ThemeColors } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 
 // detect the tauri desktop shell and its host os
 function detectShell() {
   if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) {
-    return { isTauri: false, isMac: false };
+    return { isTauri: false, isMac: false, isLinux: false };
   }
-  const isWindowsOS = navigator.userAgent.includes("Windows") || navigator.userAgent.includes("Win32");
   const isMacOS = navigator.userAgent.includes("Mac");
-  return { isTauri: isWindowsOS || isMacOS, isMac: isMacOS };
+  const isLinuxOS = navigator.userAgent.includes("Linux") && !navigator.userAgent.includes("Android");
+  return { isTauri: true, isMac: isMacOS, isLinux: isLinuxOS };
 }
 
 export default function TauriTitleBar() {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
-  const [{ isTauri, isMac }] = useState(detectShell);
+  const [{ isTauri, isMac, isLinux }] = useState(detectShell);
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
     if (!isTauri || isMac) return;
-    import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
-      getCurrentWindow().isMaximized().then(setIsMaximized);
+    let unlisten: (() => void) | undefined;
+    import('@tauri-apps/api/window').then(async ({ getCurrentWindow }) => {
+      const win = getCurrentWindow();
+      setIsMaximized(await win.isMaximized());
+      //resize is the only maximize signal
+      unlisten = await win.onResized(async () => setIsMaximized(await win.isMaximized()));
     });
+    return () => unlisten?.();
   }, [isTauri, isMac]);
+
+  //css replaces the gtk corner rounding
+  useEffect(() => {
+    if (!isTauri || !isLinux) return;
+    const style = document.createElement('style');
+    style.textContent = `#root{border-radius:${isMaximized ? 0 : Radius.window}px;overflow:hidden}`;
+    document.head.appendChild(style);
+    return () => style.remove();
+  }, [isTauri, isLinux, isMaximized]);
 
   if (!isTauri) {
     return null;

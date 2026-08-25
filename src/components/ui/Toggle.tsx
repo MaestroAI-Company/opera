@@ -105,7 +105,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   trackUnchecked: {
     backgroundColor: Colors.surface,
-    borderColor: Colors.surfaceCode,
+    borderColor: Colors.border,
   },
   thumb: {
     width: 16,

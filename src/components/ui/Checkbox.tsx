@@ -1,6 +1,6 @@
+import { Pressable, StyleProp, StyleSheet, Text, Vibration, View, ViewStyle } from "react-native";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
-import { Pressable, StyleSheet, Text, View } from "react-native";
 
 type CheckboxProps = {
   label: string;
@@ -8,37 +8,46 @@ type CheckboxProps = {
   onToggle: (value: boolean) => void;
   disabled?: boolean;
   labelFirst?: boolean;
+  style?: StyleProp<ViewStyle>;
 };
 
-export default function Checkbox({ label, checked, onToggle, disabled = false, labelFirst = false }: CheckboxProps) {
+export default function Checkbox({ label, checked, onToggle, disabled = false, labelFirst = false, style }: CheckboxProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
-  return (
+  const box = (
     <Pressable
       style={({ pressed, hovered }) => [
-        styles.container,
-        (pressed || hovered) && !disabled && { opacity: 0.7 },
+        styles.box,
+        checked && styles.boxChecked,
+        (pressed || hovered) && !disabled && (checked ? styles.boxCheckedActive : styles.boxActive),
         disabled && { opacity: 0.5 },
       ]}
-      onPress={() => !disabled && onToggle(!checked)}
+      onPress={() => {
+        if (!disabled) {
+          Vibration.vibrate(10);
+          onToggle(!checked);
+        }
+      }}
       disabled={disabled}
     >
+      {checked}
+    </Pressable>
+  );
+
+  return (
+    <View style={[styles.container, style]}>
       {labelFirst ? (
         <>
           <Text style={styles.label}>{label}</Text>
-          <View style={[styles.box, checked && styles.boxChecked]}>
-            {checked}
-          </View>
+          {box}
         </>
       ) : (
         <>
-          <View style={[styles.box, checked && styles.boxChecked]}>
-            {checked}
-          </View>
+          {box}
           <Text style={styles.label}>{label}</Text>
         </>
       )}
-    </Pressable>
+    </View>
   );
 }
 
@@ -60,7 +69,13 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   boxChecked: {
     backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    borderColor: Colors.borderOnPrimary,
+  },
+  boxActive: {
+    backgroundColor: Colors.surfacePressed,
+  },
+  boxCheckedActive: {
+    backgroundColor: Colors.primaryPressed,
   },
   checkmark: {
     color: Colors.textOnPrimary,
@@ -69,8 +84,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     lineHeight: 16,
   },
   label: {
-    fontSize: FontSizes.bodyMd,
-    color: Colors.textSecondary,
+    fontSize: FontSizes.body,
+    color: Colors.textPrimary,
     fontFamily: Fonts.mono,
     flex: 1,
   },

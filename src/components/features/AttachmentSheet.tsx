@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import SheetSurface from "../ui/SheetSurface";
+import DrawerSheet from "./DrawerSheet";
 
 const cameraIcon = require("../../../assets/icons/camera.png");
 const fileIcon = require("../../../assets/icons/file.png");
@@ -52,16 +52,18 @@ export default function AttachmentSheet({
   const styles = useThemedStyles(makeStyles);
 
   return (
-    <SheetSurface
+    <DrawerSheet
       visible={visible}
-      lift={ATTACHMENT_SHEET_LIFTS}
-      //inset real below, sheet self-pads
+      mode={ATTACHMENT_SHEET_LIFTS ? "lift" : "overlay"}
+      //sheet pads its own safe area and overlaps the inset below
       liftOffset={bottomInset}
       onClose={onClose}
-      handleStyle={incognito ? styles.sheetHandleIncognito : undefined}
+      handleContainerStyle={styles.sheetHandleContainer}
+      handleStyle={[styles.sheetHandle, incognito && styles.sheetHandleIncognito]}
       sheetStyle={[
+        styles.sheet,
         incognito && styles.inlineSheetIncognito,
-        { paddingBottom: (Platform.OS === 'ios' ? 20 : 10) + (ATTACHMENT_SHEET_LIFTS ? 0 : bottomInset) },
+        { paddingBottom: (Platform.OS === 'ios' ? 20 : 10) + bottomInset },
       ]}
     >
       <View style={styles.sheetButtonsRow}>
@@ -106,17 +108,36 @@ export default function AttachmentSheet({
           ))}
         </ScrollView>
       )}
-    </SheetSurface>
+    </DrawerSheet>
   );
 }
 
 const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
+  sheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.huge2,
+    borderTopRightRadius: Radius.huge2,
+    paddingTop: 12,
+    width: '100%',
+  },
   inlineSheetIncognito: {
     backgroundColor: Colors.incognitoSurface,
     borderTopWidth: 0,
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderColor: Colors.incognitoPressed,
+  },
+  sheetHandleContainer: {
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingVertical: 10,
+    marginTop: -10,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: Radius.xxl,
+    backgroundColor: Colors.textMuted,
   },
   sheetHandleIncognito: {
     backgroundColor: Colors.incognito,

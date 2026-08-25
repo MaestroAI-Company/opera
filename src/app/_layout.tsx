@@ -7,12 +7,16 @@ import * as ScreenOrientation from "expo-screen-orientation";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState, type ReactNode } from "react";
-import { Animated, Platform, StyleSheet } from "react-native";
+import { Platform } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import SiteHead from "../components/SiteHead";
 import SplashScreenComponent from "../components/ui/SplashScreen";
 import TauriTitleBar from "../components/features/TauriTitleBar";
-import { initTheme, useIsDark, useThemeVeil } from "../hooks/useTheme";
+import { Radius } from "../../constants/theme";
+import { initTheme, useIsDark } from "../hooks/useTheme";
+import { installCrashHandler } from "../services/logging/CrashReporter";
+import { installLogger } from "../services/logging/Logger";
 import { setupQuickActions } from "../services/quickActions/QuickActionsService";
 import "../services/widgets/registerWidgets";
 
@@ -26,10 +30,20 @@ if (!(globalThis as any).Buffer) {
 WebBrowser.maybeCompleteAuthSession();
 SplashScreen.preventAutoHideAsync();
 
-//resolve the palette before the first paint
-initTheme();
+//expo static analysis runs without window
+if (typeof window !== "undefined") {
+  //resolve palette before first paint
+  initTheme();
+
+  //crash reported on next launch
+  installCrashHandler();
+}
+
+//bug reports carry console output
+installLogger();
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+const isLinux = isTauri && navigator.userAgent.includes("Linux") && !navigator.userAgent.includes("Android");
 
 const screenLayout = ({ children }: { children: ReactNode }) => (
   <>
@@ -37,17 +51,6 @@ const screenLayout = ({ children }: { children: ReactNode }) => (
     {children}
   </>
 );
-
-//isolated to skip navigator re-renders
-function ThemeVeil() {
-  const { color, opacity } = useThemeVeil();
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={[StyleSheet.absoluteFill, { backgroundColor: color, opacity, zIndex: 10 }]}
-    />
-  );
-}
 
 export default function RootLayout() {
   const isDark = useIsDark();
@@ -63,6 +66,15 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
+
+  useEffect(() => {
+    //rounds the window during splash, before TauriTitleBar mounts
+    if (!isLinux) return;
+    const style = document.createElement('style');
+    style.textContent = `#root{border-radius:${Radius.window}px;overflow:hidden}`;
+    document.head.appendChild(style);
+    return () => style.remove();
+  }, []);
 
   useEffect(() => {
     async function lockMobileOrientation() {
@@ -100,11 +112,12 @@ export default function RootLayout() {
   }
 
   return (
-    <KeyboardProvider>
-      <TauriTitleBar />
-      <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
-      <ThemeVeil />
-      <StatusBar style={isDark ? "light" : "dark"} />
-    </KeyboardProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <KeyboardProvider>
+        <TauriTitleBar />
+        <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
+        <StatusBar style={isDark ? "light" : "dark"} />
+      </KeyboardProvider>
+    </GestureHandlerRootView>
   );
 }

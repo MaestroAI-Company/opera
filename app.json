@@ -2,7 +2,7 @@
   "expo": {
     "name": "Opera",
     "slug": "opera",
-    "version": "1.0.0",
+    "version": "0.9.12",
     "orientation": "default",
     "icon": "./assets/icons/opera.png",
     "scheme": [
@@ -25,6 +25,7 @@
       },
       "predictiveBackGestureEnabled": true,
       "package": "ai.maestro.opera",
+      "versionCode": 1,
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.FOREGROUND_SERVICE",

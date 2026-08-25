@@ -1,12 +1,16 @@
-import { useEffect, useState, useMemo, useRef } from "react";
-import { Animated, BackHandler, Image, Keyboard, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { useResponsive } from "../../hooks/useResponsive";
-import { Conversation, DB } from "../../services/db/DatabaseService";
-import { CloudSync } from "../../services/CloudSyncService";
-import NotificationModal from "../ui/NotificationModal";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Animated, BackHandler, Image, Keyboard, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
-import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { useResponsive } from "../../hooks/useResponsive";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { CloudSync } from "../../services/CloudSyncService";
+import { Conversation, DB } from "../../services/db/DatabaseService";
+import ActionButton from "../ui/ActionButton";
+import Group from "../ui/Group";
+import IconButton from "../ui/IconButton";
+import NotificationModal from "../ui/NotificationModal";
+import TextInputField from "../ui/TextInputField";
 import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, playPageTransition, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
 
 const searchIcon = require("../../../assets/icons/search.png");
@@ -84,18 +88,14 @@ export default function ConversationsDrawer({
   const pageAnim = useAnimatedValue(1);
 
   useEffect(() => {
-    //reset only when needed
     if (!visible && (isSearching || searchQuery !== "" || selectedSearchId !== null)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsSearching(false);
       setSearchQuery("");
       setSearchResults([]);
       setSelectedSearchId(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  //fade/slide on every real navigation (forward or back), but not just on open/reopen
   const prevSearchingRef = useRef(isSearching);
   useEffect(() => {
     if (visible && isSearching !== prevSearchingRef.current) {
@@ -122,28 +122,23 @@ export default function ConversationsDrawer({
 
   useEffect(() => {
     if (!isSearching || searchQuery.trim().length === 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearchResults([]);
       return;
     }
-    //debounce full-text queries
     const timer = setTimeout(() => {
       DB.searchConversations(searchQuery).then(setSearchResults).catch(console.error);
     }, 250);
     return () => clearTimeout(timer);
   }, [searchQuery, isSearching]);
-  //useMemo read during render
   const panResponder = useMemo(() =>
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
         return gestureState.dx < -10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
       },
       onPanResponderMove: (_, gestureState) => {
-        //panel tracks the finger
         dragDrawer(progress, Math.max(0, Math.min(1, 1 + gestureState.dx / drawerWidth)));
       },
       onPanResponderRelease: (_, gestureState) => {
-        //settle here keeps flick speed
         const velocity = gestureVelocity(gestureState.vx, drawerWidth);
         if (gestureState.dx < -drawerWidth * 0.35 || gestureState.vx < -0.5) {
           settleDrawer(progress, false, velocity);
@@ -156,7 +151,7 @@ export default function ConversationsDrawer({
         settleDrawer(progress, true);
       },
     })
-  , [onClose, drawerWidth, progress]);
+    , [onClose, drawerWidth, progress]);
 
   const largeScreenAnim = useAnimatedValue(visible ? 1 : 0);
 
@@ -219,23 +214,27 @@ export default function ConversationsDrawer({
         <View style={styles.rowActions}>
           {isSelected ? (
             <>
-              <Pressable
+              <IconButton
+                icon={conv.pinned ? unpinIcon : pinIcon}
                 onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
-                style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlayHover }]}
-              >
-                <Image source={conv.pinned ? unpinIcon : pinIcon} style={styles.actionIcon} tintColor={Colors.textOnPrimary} />
-              </Pressable>
-              <Pressable
+                size={22}
+                tintColor={Colors.textOnPrimary}
+                containerSize={32}
+                pressedColor={Colors.overlayHover}
+              />
+              <IconButton
+                icon={deleteIcon}
                 onPress={() => setDeleteConfirmId(conv.id)}
-                style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlayHover }]}
-              >
-                <Image source={deleteIcon} style={styles.actionIcon} tintColor={Colors.textOnPrimary} />
-              </Pressable>
+                size={22}
+                tintColor={Colors.textOnPrimary}
+                containerSize={32}
+                pressedColor={Colors.overlayHover}
+              />
             </>
           ) : (
             conv.pinned ? (
-              <View style={styles.actionIconButton}>
-                <Image source={pinIcon} style={[styles.actionIcon, { opacity: 0.5 }]} tintColor={Colors.textMuted} />
+              <View style={styles.pinnedIndicator}>
+                <Image source={pinIcon} style={styles.pinnedIcon} tintColor={Colors.textMuted} />
               </View>
             ) : null
           )}
@@ -255,16 +254,16 @@ export default function ConversationsDrawer({
           <Image source={arrowIcon} style={{ width: 18, height: 18, transform: [{ rotate: '-180deg' }] }} tintColor={Colors.textPrimary} />
         </Pressable>
 
-        <View style={styles.searchInputContainer}>
-          <Image source={searchIcon} style={{ width: 16, height: 16, tintColor: Colors.textPrimary }} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search conversations"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoFocus
-            placeholderTextColor={Colors.textMuted}
-          />
+        <View style={{ flex: 1 }}>
+          <Group>
+            <TextInputField
+              icon={searchIcon}
+              placeholder="Search conversations"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoFocus
+            />
+          </Group>
         </View>
       </View>
 
@@ -296,18 +295,22 @@ export default function ConversationsDrawer({
                 <View style={styles.rowActions}>
                   {isSelected ? (
                     <>
-                      <Pressable
+                      <IconButton
+                        icon={conv.pinned ? unpinIcon : pinIcon}
                         onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
-                        style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlayHover }]}
-                      >
-                        <Image source={conv.pinned ? unpinIcon : pinIcon} style={styles.actionIcon} tintColor={Colors.textOnPrimary} />
-                      </Pressable>
-                      <Pressable
+                        size={22}
+                        tintColor={Colors.textOnPrimary}
+                        containerSize={32}
+                        pressedColor={Colors.overlayHover}
+                      />
+                      <IconButton
+                        icon={deleteIcon}
                         onPress={() => setDeleteConfirmId(conv.id)}
-                        style={({ pressed, hovered }) => [styles.actionIconButton, (pressed || hovered) && { backgroundColor: Colors.overlayHover }]}
-                      >
-                        <Image source={deleteIcon} style={styles.actionIcon} tintColor={Colors.textOnPrimary} />
-                      </Pressable>
+                        size={22}
+                        tintColor={Colors.textOnPrimary}
+                        containerSize={32}
+                        pressedColor={Colors.overlayHover}
+                      />
                     </>
                   ) : (
                     <Text style={{ fontSize: FontSizes.label, color: Colors.textMuted, fontFamily: Fonts.mono }}>
@@ -327,27 +330,21 @@ export default function ConversationsDrawer({
     <>
       <Text style={styles.title}>Discussions</Text>
 
-      <View style={styles.quickActionsShadowLayer}>
-        <View style={styles.quickActionsBox}>
-          <Pressable
-            onPress={() => {
-              onNewConversation();
-              if (!isDesktop) onClose();
-            }}
-            style={({ pressed, hovered }) => [styles.quickActionItem, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
-          >
-            <Image source={newIcon} style={styles.quickActionIcon} tintColor={Colors.textPrimary} />
-            <Text style={styles.quickActionLabel}>New discussion</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setIsSearching(true)}
-            style={({ pressed, hovered }) => [styles.quickActionItem, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
-          >
-            <Image source={searchIcon} style={styles.quickActionIcon} tintColor={Colors.textPrimary} />
-            <Text style={styles.quickActionLabel}>Search</Text>
-          </Pressable>
-        </View>
-      </View>
+      <Group style={styles.quickActionsSpacing}>
+        <ActionButton
+          icon={newIcon}
+          label="New discussion"
+          onPress={() => {
+            onNewConversation();
+            if (!isDesktop) onClose();
+          }}
+        />
+        <ActionButton
+          icon={searchIcon}
+          label="Search"
+          onPress={() => setIsSearching(true)}
+        />
+      </Group>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {conversations.length === 0 && (
@@ -523,34 +520,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     marginBottom: 24,
     fontFamily: Fonts.display,
   },
-  quickActionsShadowLayer: {
-    position: "relative",
-    marginBottom: 24,
-  },
-  quickActionsBox: {
-    position: "relative",
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: Radius.xxl,
-    backgroundColor: Colors.surface,
-    zIndex: 1,
-    overflow: "hidden",
-  },
-  quickActionItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    gap: 10,
-  },
-  quickActionIcon: {
-    width: 18,
-    height: 18,
-  },
-  quickActionLabel: {
-    fontSize: FontSizes.body,
-    color: Colors.textPrimary,
-    fontFamily: Fonts.mono,
+  quickActionsSpacing: {
+    marginBottom: 12,
   },
   scrollContent: {
     paddingBottom: 40,
@@ -563,7 +534,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     color: Colors.textMuted,
     fontFamily: Fonts.body,
     textTransform: "uppercase",
-    letterSpacing: 1,
     marginBottom: 8,
   },
   emptyText: {
@@ -577,17 +547,17 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 5,
+    paddingVertical: 8,
     paddingHorizontal: 8,
     borderRadius: Radius.xxl,
     marginBottom: 2,
-    //keep the 2px box so selecting doesn't shift layout, just hide it
     borderWidth: 2,
     borderColor: "transparent",
   },
   discussionRowSelected: {
     backgroundColor: Colors.primary,
     borderColor: Colors.borderOnPrimary,
+    paddingVertical: 4,
   },
   discussionTextContainer: {
     flex: 1,
@@ -606,32 +576,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     alignItems: "center",
     gap: 4,
   },
-  actionIconButton: {
-    width: 32,
-    height: 32,
+  pinnedIndicator: {
+    paddingHorizontal: 4,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: Radius.huge,
   },
-  actionIcon: {
-    width: 18,
-    height: 18,
-  },
-  searchInputContainer: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surface,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: Radius.xl,
-    paddingHorizontal: 12,
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: FontSizes.md,
-    fontFamily: Fonts.mono,
-    color: Colors.textPrimary,
+  pinnedIcon: {
+    width: 22,
+    height: 22,
+    opacity: 0.5,
   },
 });

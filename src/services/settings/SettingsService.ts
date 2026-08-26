@@ -32,6 +32,7 @@ export type AppSettings = {
   shakeToReport: boolean;
   assistantPromptDismissed: boolean;
   hasSeenAssistantOverlay: boolean;
+  shareInstanceUrl: string;
 };
 
 const DEFAULTS: AppSettings = {
@@ -70,6 +71,8 @@ const DEFAULTS: AppSettings = {
   shakeToReport: true,
   assistantPromptDismissed: false,
   hasSeenAssistantOverlay: false,
+  //empty means the built-in privatebin instance
+  shareInstanceUrl: '',
 };
 
 const SETTINGS_UPDATED_AT_KEY = '__settings_updated_at';

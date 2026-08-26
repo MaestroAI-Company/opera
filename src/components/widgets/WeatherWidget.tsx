@@ -46,7 +46,7 @@ export const WeatherWidget: IWidget<WeatherWidgetData> = {
   aiDefinesTitle: true,
   enabledByDefault: true,
   icon: ICONS.clear_day,
-  description: 'Displays a single weather card combining current conditions and a 4-item forecast. REQUIRED title="CITY": the title attribute MUST contain ONLY the city name (e.g. title="Paris"), never add other words like "Weather", "Forecast", "Météo" or the date. REQUIRED "description": a short weather condition (e.g. "Sunny", "Partly cloudy"), written in the same language as your reply. "now" is the current conditions (exactly 1 item, REQUIRED max/min for the day). "forecast" is exactly 4 items, each with icon, temp, AND max/min, either the NEXT 4 HOURS or the NEXT 4 DAYS — choose exactly one granularity, never mix, never more or fewer than 4. The label is the hour ("14:00", "Now") for an hourly forecast and the day ("Today", "Tomorrow", "Friday") for a daily forecast. You do not know the weather: get it with the search tools first, then render this widget.',
+  description: 'Weather card with current conditions and forecast. title="CITY" (city name only). "description": condition text (e.g. "Sunny"). "now": 1 item with temp, max, min for the day. "forecast": exactly 4 items (hours OR days, never mixed), each with icon, temp, max, min. Search for weather data first, then render this widget.',
   schema: `{
     "description": "Sunny",
     "unit": "C",

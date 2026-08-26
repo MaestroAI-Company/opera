@@ -8,6 +8,7 @@ export type AppSettings = {
   aiService: string;
   ollamaUrl: string;
   ollamaUrls: string;
+  mcpServers: string;
   enabledProviders: string;
   ollamaModel: string;
   ollamaContextLength: number;
@@ -38,6 +39,7 @@ const DEFAULTS: AppSettings = {
   aiService: 'ollama',
   ollamaUrl: DEFAULT_OLLAMA_URL,
   ollamaUrls: '[]',
+  mcpServers: '[]',
   enabledProviders: 'local,ollama',
   ollamaModel: '',
   ollamaContextLength: 8192,
@@ -93,6 +95,7 @@ class SettingsService {
         aiService: parsed.aiService ?? DEFAULTS.aiService,
         ollamaUrl: parsed.ollamaUrl ?? DEFAULTS.ollamaUrl,
         ollamaUrls: parsed.ollamaUrls ?? DEFAULTS.ollamaUrls,
+        mcpServers: parsed.mcpServers ?? DEFAULTS.mcpServers,
         enabledProviders: parsed.enabledProviders ?? DEFAULTS.enabledProviders,
         ollamaModel: parsed.ollamaModel ?? DEFAULTS.ollamaModel,
         ollamaContextLength: typeof parsed.ollamaContextLength === 'number' ? parsed.ollamaContextLength : DEFAULTS.ollamaContextLength,

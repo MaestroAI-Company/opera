@@ -58,6 +58,7 @@ import { splitDocumentBlocks } from "../services/documents/DocumentService";
 import { AppEvents } from "../services/events";
 import { LocationService } from "../services/location/LocationService";
 import { PluginRegistry } from "../services/plugins/PluginRegistry";
+import { McpService } from "../services/mcp/McpService";
 import { NEW_CHAT_ACTION_ID } from "../services/quickActions/QuickActionsService";
 import { clearShareFromUrl, fetchSharedConversation, resolvePasteHost, shareConversation, tryOpenSharedInApp, usesDefaultPasteHost } from "../services/share/ShareService";
 import { Settings } from "../services/settings/SettingsService";
@@ -631,6 +632,10 @@ export default function Index() {
         CloudSync.init().catch((e) => console.warn("Could not start cloud sync:", e));
         await PluginRegistry.init();
         await PluginRegistry.loadAll();
+        //mcp tools register as servers connect
+        McpService.init()
+          .then(() => McpService.connectAll())
+          .catch((e) => console.warn("Could not connect MCP servers:", e));
 
         //onboarding flow is native/desktop only, browser web skips straight to the app
         const isBrowserWeb = Platform.OS === "web" && !(typeof window !== "undefined" && "__TAURI_INTERNALS__" in window);

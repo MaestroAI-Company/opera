@@ -8,6 +8,17 @@ export interface ToolCall {
   };
 }
 
+//json schema subset for mcp
+export interface ToolParameterSchema {
+  type?: string | string[];
+  description?: string;
+  enum?: any[];
+  items?: ToolParameterSchema;
+  properties?: Record<string, ToolParameterSchema>;
+  required?: string[];
+  [key: string]: any;
+}
+
 //tool definition in ollama format
 export interface ToolDefinition {
   type: 'function';
@@ -16,7 +27,7 @@ export interface ToolDefinition {
     description: string;
     parameters: {
       type: 'object';
-      properties: Record<string, { type: string; description: string; enum?: string[]; items?: { type: string } }>;
+      properties: Record<string, ToolParameterSchema>;
       required: string[];
     };
   };

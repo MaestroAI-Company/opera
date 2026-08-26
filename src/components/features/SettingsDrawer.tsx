@@ -69,6 +69,7 @@ const informationIcon = require("../../../assets/icons/information.png");
 const githubIcon = require("../../../assets/icons/github.png");
 const operaIcon = require("../../../assets/icons/operaicon.png");
 const instagramIcon = require("../../../assets/icons/instagram.png");
+const tiktokIcon = require("../../../assets/icons/tiktok.png");
 const micIcon = require("../../../assets/icons/microphone.png");
 const cameraIcon = require("../../../assets/icons/camera.png");
 const photoIcon = require("../../../assets/icons/photo.png");
@@ -85,7 +86,6 @@ const questionIcon = require("../../../assets/icons/question.png");
 const infoIcon = require("../../../assets/icons/info.png");
 const reconnectIcon = require("../../../assets/icons/reconnect.png");
 const hyperlinkIcon = require("../../../assets/images/hyperlink2.png");
-const assistantImage = require("../../../assets/images/icon_nobg.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
 
@@ -263,7 +263,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [mcpHeaderValues, setMcpHeaderValues] = useState<Record<string, string>>({});
   const [mcpConnecting, setMcpConnecting] = useState<Record<string, boolean>>({});
   //one draft line per pending link or config block
-  const [mcpDrafts, setMcpDrafts] = useState<string[]>([""]);
+  const [mcpDrafts, setMcpDrafts] = useState<string[]>([]);
   //active detail server
   const [mcpDetailId, setMcpDetailId] = useState<string | null>(null);
   const [mcpAdvancedOpen, setMcpAdvancedOpen] = useState(false);
@@ -680,14 +680,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     setMcpHeaderValues(Object.fromEntries(entries));
   };
 
-  //exactly one empty line at the end, whatever happened before
-  const normalizeMcpDrafts = (drafts: string[]): string[] => [...drafts.filter(d => d.trim()), ""];
-
   //leaving the field imports the draft, no confirmation button
   const handleMcpDraftBlur = async (index: number) => {
     const text = (mcpDrafts[index] ?? "").trim();
     if (!text) {
-      setMcpDrafts(normalizeMcpDrafts);
+      setMcpDrafts(prev => prev.filter((_, i) => i !== index));
       return;
     }
     try {
@@ -699,7 +696,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         showAlert("Import", describeImport(added, skipped), undefined, { messageAlign: "left" });
         return;
       }
-      setMcpDrafts(prev => normalizeMcpDrafts(prev.filter((_, i) => i !== index)));
+      setMcpDrafts(prev => prev.filter((_, i) => i !== index));
       //single add opens detail directly
       if (added.length === 1 && skipped.length === 0) {
         setMcpDetailId(added[0].id);
@@ -1209,9 +1206,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       {notices.assistant && (
         <NotificationCard
-          image={assistantImage}
+          image={operaIcon}
+          tintColor={Colors.textPrimary}
           title="Add Opera as an assistant"
-          description="Set Opera as your default assistant to call Maestro from anywhere."
           onPress={notices.openAssistant}
           onDismiss={notices.closeAssistant}
           style={styles.groupSpacing}
@@ -1330,7 +1327,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           <Image source={informationIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
           <View style={styles.navTextContainer}>
             <Text style={styles.navTitle}>Informations</Text>
-            <Text style={styles.navSubtitle}>Version App, Github, Instagram</Text>
+            <Text style={styles.navSubtitle}>Version App, Github, Instagram, TikTok</Text>
           </View>
         </Pressable>
       </Group>
@@ -1371,6 +1368,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             icon={instagramIcon}
             label="Instagram"
             onPress={() => Linking.openURL("https://www.instagram.com/maestroai.company?igsh=MWF4dmZvMXl1ZmdzeA==").catch(() => { })}
+          />
+          <ActionButton
+            icon={tiktokIcon}
+            label="TikTok"
+            onPress={() => Linking.openURL("https://www.tiktok.com/@maestroai.company?_r=1&_t=ZG-99DGujxTPEn").catch(() => { })}
           />
         </Group>
       </View>
@@ -1637,26 +1639,28 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
         {enabledProviders.includes("ollama") && (
           <>
-            <Group style={styles.groupSpacingTight}>
-              {ollamaUrls.map((url, index) => (
-                <View key={index}>
-                  <TextInputField
-                    icon={linkIcon}
-                    placeholder="server link"
-                    value={url}
-                    onChangeText={(v) => setOllamaUrlAt(index, v)}
-                    onBlur={() => handleOllamaUrlBlur(index)}
-                    rightIcon={serverErrors[url.trim()] ? errorIcon : undefined}
-                    onRightIconPress={() => showAlert(
-                      "Server unreachable",
-                      "This server could not be reached.\n\n- Check that the server is running.\n- Check the server's network connection.\n- Make sure the URL and port are correct.",
-                      undefined,
-                      { image: ollamaErrorImage, messageAlign: "left" },
-                    )}
-                  />
-                </View>
-              ))}
-            </Group>
+            {ollamaUrls.length > 0 && (
+              <Group style={styles.groupSpacingTight}>
+                {ollamaUrls.map((url, index) => (
+                  <View key={index}>
+                    <TextInputField
+                      icon={linkIcon}
+                      placeholder="server link"
+                      value={url}
+                      onChangeText={(v) => setOllamaUrlAt(index, v)}
+                      onBlur={() => handleOllamaUrlBlur(index)}
+                      rightIcon={serverErrors[url.trim()] ? errorIcon : undefined}
+                      onRightIconPress={() => showAlert(
+                        "Server unreachable",
+                        "This server could not be reached.\n\n- Check that the server is running.\n- Check the server's network connection.\n- Make sure the URL and port are correct.",
+                        undefined,
+                        { image: ollamaErrorImage, messageAlign: "left" },
+                      )}
+                    />
+                  </View>
+                ))}
+              </Group>
+            )}
 
             <Group style={styles.groupSpacing}>
               <ActionButton
@@ -2029,46 +2033,48 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           Connect Opera to external MCP servers so the assistant can use their tools.
         </Text>
 
-        <Group style={styles.groupSpacingTight}>
-          {mcpServers.map((server) => (
-            <Pressable
-              key={server.id}
-              style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
-              onPress={() => { setMcpDetailId(server.id); setMcpAdvancedOpen(false); setActiveSubPage("mcpserver"); }}
-            >
-              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>{server.name}</Text>
-              {mcpNeedsAuth(server.id) ? (
-                <IconButton
-                  icon={infoIcon}
-                  size={22}
-                  tintColor={Colors.textMuted}
-                  containerSize={32}
-                  pressedColor={Colors.surfacePressed}
-                  style={styles.navStatusIcon}
-                  onPress={() => showMcpAuthInfo(server.id)}
-                />
-              ) : (
-                <Text style={styles.navStatus}>{mcpStatusLabel(server.id)}</Text>
-              )}
-            </Pressable>
-          ))}
-          {mcpDrafts.map((draft, index) => (
-            <TextInputField
-              key={index}
-              icon={penPlaceholderIcon}
-              autoCapitalize="none"
-              autoCorrect={false}
-              placeholder="Paste a link or an mcp.json block"
-              value={draft}
-              onChangeText={(v) => setMcpDrafts(prev => prev.map((d, i) => (i === index ? v : d)))}
-              onBlur={() => handleMcpDraftBlur(index)}
-            />
-          ))}
-        </Group>
+        {(mcpServers.length > 0 || mcpDrafts.length > 0) && (
+          <Group style={styles.groupSpacingTight}>
+            {mcpServers.map((server) => (
+              <Pressable
+                key={server.id}
+                style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
+                onPress={() => { setMcpDetailId(server.id); setMcpAdvancedOpen(false); setActiveSubPage("mcpserver"); }}
+              >
+                <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+                <Text style={styles.navLabel}>{server.name}</Text>
+                {mcpNeedsAuth(server.id) ? (
+                  <IconButton
+                    icon={infoIcon}
+                    size={22}
+                    tintColor={Colors.textMuted}
+                    containerSize={32}
+                    pressedColor={Colors.surfacePressed}
+                    style={styles.navStatusIcon}
+                    onPress={() => showMcpAuthInfo(server.id)}
+                  />
+                ) : (
+                  <Text style={styles.navStatus}>{mcpStatusLabel(server.id)}</Text>
+                )}
+              </Pressable>
+            ))}
+            {mcpDrafts.map((draft, index) => (
+              <TextInputField
+                key={index}
+                icon={penPlaceholderIcon}
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder="Paste a link or an mcp.json block"
+                value={draft}
+                onChangeText={(v) => setMcpDrafts(prev => prev.map((d, i) => (i === index ? v : d)))}
+                onBlur={() => handleMcpDraftBlur(index)}
+              />
+            ))}
+          </Group>
+        )}
 
         <Group style={styles.groupSpacing}>
-          <ActionButton icon={addIcon} label="Add server" onPress={() => setMcpDrafts(normalizeMcpDrafts)} />
+          <ActionButton icon={addIcon} label="Add server" onPress={() => setMcpDrafts(prev => [...prev.filter(d => d.trim()), ""])} />
         </Group>
       </View>
     </View>

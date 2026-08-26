@@ -1,8 +1,10 @@
 import { Linking, Platform } from "react-native";
+import { SHARE_QUERY_PARAM } from "../share/shareLink";
 
 export type DeepLinkRoute =
   | { type: "new-chat" }
   | { type: "conversation"; convId: string }
+  | { type: "shared"; pasteId: string; secret: string }
   | { type: "unknown" };
 
 const isTauri =
@@ -13,7 +15,11 @@ export function parseDeepLink(url: string): DeepLinkRoute {
     const parsed = new URL(url);
     const target = parsed.hostname || parsed.pathname.replace(/^\/+/, "");
     const convId = parsed.searchParams.get("convId");
+    //key stays in fragment, invisible to server
+    const pasteId = parsed.searchParams.get(SHARE_QUERY_PARAM);
+    const secret = parsed.hash.replace(/^#/, "");
     if (target === "new") return { type: "new-chat" };
+    if (pasteId && secret) return { type: "shared", pasteId, secret };
     if (convId) return { type: "conversation", convId };
     return { type: "unknown" };
   } catch {
@@ -32,7 +38,10 @@ export async function getInitialDeepLink(): Promise<DeepLinkRoute | null> {
     }
     return null;
   }
-  if (Platform.OS === "web") return null;
+  //browser url serves as deep link
+  if (Platform.OS === "web") {
+    return typeof window === "undefined" ? null : parseDeepLink(window.location.href);
+  }
   try {
     const url = await Linking.getInitialURL();
     return url ? parseDeepLink(url) : null;

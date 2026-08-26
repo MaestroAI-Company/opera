@@ -1,11 +1,12 @@
 import { ReactNode } from "react";
-import { Image, ImageSourcePropType, Pressable, StyleProp, StyleSheet, Text, ViewStyle } from "react-native";
+import { Image, ImageSourcePropType, Pressable, StyleProp, StyleSheet, Text, TextStyle, ViewStyle } from "react-native";
 import { FontSizes, Fonts, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 
 export type ActionButtonProps = {
   icon?: ImageSourcePropType;
   label: string;
+  labelStyle?: StyleProp<TextStyle>;
   rightElement?: ReactNode;
   onPress?: () => void;
   disabled?: boolean;
@@ -18,6 +19,7 @@ export type ActionButtonProps = {
 export default function ActionButton({
   icon,
   label,
+  labelStyle,
   rightElement,
   onPress,
   disabled = false,
@@ -39,7 +41,7 @@ export default function ActionButton({
       disabled={disabled || !onPress}
     >
       {icon && <Image source={icon} style={styles.menuIcon} tintColor={isHighlight ? Colors.textOnPrimary : Colors.textPrimary} />}
-      <Text style={[styles.navLabel, isHighlight && { color: Colors.textOnPrimary }]} numberOfLines={1} ellipsizeMode="tail">{label}</Text>
+      <Text style={[styles.navLabel, isHighlight && { color: Colors.textOnPrimary }, labelStyle]} numberOfLines={1} ellipsizeMode="tail">{label}</Text>
       {rightElement}
     </Pressable>
   );

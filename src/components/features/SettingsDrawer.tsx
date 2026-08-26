@@ -235,6 +235,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [useAppContext, setUseAppContextState] = useState(true);
   const [autoStartMic, setAutoStartMicState] = useState(true);
   const [usageAnalytics, setUsageAnalyticsState] = useState(true);
+  const [shareInstanceUrl, setShareInstanceUrlState] = useState("");
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   //plugin enabled states (tool name or widget id -> bool)
@@ -485,6 +486,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setAutoSpeakState(s.autoSpeak);
         setShowTechnicalDetailsState(s.showTechnicalDetails);
         setUseAppContextState(s.useAppContext);
+        setShareInstanceUrlState(s.shareInstanceUrl || "");
         //apply to services
         AIModule.configure(s.ollamaUrl, s.ollamaContextLength, s.ollamaKeepAlive);
         AIModule.setMode(s.aiService);
@@ -678,6 +680,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const setName = (v: string) => {
     setNameState(v);
     Settings.set("name", v);
+  };
+
+  const setShareInstanceUrl = (v: string) => {
+    setShareInstanceUrlState(v);
+    Settings.set("shareInstanceUrl", v.trim());
   };
 
   const setAlwaysWhisper = (v: boolean) => {
@@ -1623,6 +1630,27 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               rightElement={renderPermissionBadge(permissionStatuses.calendar)}
             />
           )}
+        </Group>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Conversation sharing</Text>
+        <Text style={[styles.helpText, { marginBottom: 6 }]}>
+          Shared conversations are encrypted on your device before they are uploaded, and the decryption key travels only in the link, never to the server.
+        </Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          They are stored on a PrivateBin instance. Leave this empty to use privatebin.net, or enter the address of another instance, including one you host yourself. The address is carried inside the links you create, so the people you share with reach the right server on their own.
+        </Text>
+
+        <Group>
+          <TextInputField
+            icon={serverIcon}
+            placeholder="https://privatebin.net/"
+            value={shareInstanceUrl}
+            onChangeText={setShareInstanceUrl}
+            autoCapitalize="none"
+            keyboardType="url"
+          />
         </Group>
       </View>
 

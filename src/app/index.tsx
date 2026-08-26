@@ -1,3 +1,4 @@
+import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
 import { useQuickActionCallback } from "expo-quick-actions/hooks";
 import { useRouter } from "expo-router";
@@ -12,6 +13,7 @@ import {
   PanResponder,
   Platform,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   Vibration,
@@ -30,6 +32,8 @@ import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, set
 import { ModelSelectorDrawer, ModelSelectorTrigger } from "../components/features/ModelSelector";
 import SettingsDrawer from "../components/features/SettingsDrawer";
 import TopBar from "../components/features/TopBar";
+import ActionButton from "../components/ui/ActionButton";
+import Group from "../components/ui/Group";
 import NotificationModal from "../components/ui/NotificationModal";
 import { hasOpenOverlaySheet } from "../components/ui/SheetSurface";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
@@ -55,6 +59,7 @@ import { AppEvents } from "../services/events";
 import { LocationService } from "../services/location/LocationService";
 import { PluginRegistry } from "../services/plugins/PluginRegistry";
 import { NEW_CHAT_ACTION_ID } from "../services/quickActions/QuickActionsService";
+import { clearShareFromUrl, fetchSharedConversation, resolvePasteHost, shareConversation, tryOpenSharedInApp, usesDefaultPasteHost } from "../services/share/ShareService";
 import { Settings } from "../services/settings/SettingsService";
 import { STT, WhisperSTT } from "../services/speech/STTService";
 import { TTS } from "../services/speech/TTSService";
@@ -63,6 +68,29 @@ const butterflyImage = require("../../assets/images/butterfly5.png");
 const butterflyGrey = require("../../assets/images/butterfly2_grey.png");
 const texture2 = require("../../assets/images/texture2.png");
 const settingsIcon = require("../../assets/icons/settings.png");
+const addIcon = require("../../assets/icons/add.png");
+
+function shareConsentMessage(): string {
+  const host = resolvePasteHost().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  const retention = usesDefaultPasteHost()
+    ? "The link expires after 3 days and cannot be revoked before then."
+    : "The link expires according to that instance's own retention policy, and cannot be revoked before then.";
+  return (
+    `Opera encrypts this conversation on your device, then uploads the encrypted copy to ${host}. ` +
+    "The decryption key stays inside the link and is never sent to any server.\n\n" +
+    "Anyone holding the link can read the whole conversation, attached images included. " +
+    retention +
+    "\n\nYou can point Opera at another PrivateBin instance, including your own, in Settings > Confidentiality."
+  );
+}
+
+//unified modal for both directions
+type ShareNotice =
+  | { kind: "confirm"; conv: Conversation }
+  | { kind: "creating" }
+  | { kind: "link"; link: string }
+  | { kind: "opening" }
+  | { kind: "error"; message: string };
 
 //matches welcomeText's lineHeight, reserved upfront so the second line doesn't shift layout
 const WELCOME_LINE_HEIGHT = 40;
@@ -195,6 +223,14 @@ export default function Index() {
   const [messages, setMessages] = useState<Message[]>([]);
   //per conversation, tied to their reply
   const [suggestionsByConv, setSuggestionsByConv] = useState<Record<string, { msgId: string; items: Suggestion[] }>>({});
+  //held in memory until reader saves it
+  const [sharedPreviewId, setSharedPreviewId] = useState<string | null>(null);
+  const sharedPreviewIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    sharedPreviewIdRef.current = sharedPreviewId;
+  }, [sharedPreviewId]);
+  const [shareNotice, setShareNotice] = useState<ShareNotice | null>(null);
+
   const setSuggestions = useCallback((convId: string, value: { msgId: string; items: Suggestion[] }) => {
     setSuggestionsByConv((prev) => ({ ...prev, [convId]: value }));
   }, []);
@@ -642,7 +678,7 @@ export default function Index() {
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       if (nextAppState === "active" && dbReady) {
         loadConversations();
-        if (activeConversationRef.current) {
+        if (activeConversationRef.current && activeConversationRef.current.id !== sharedPreviewIdRef.current) {
           DB.getMessages(activeConversationRef.current.id).then((msgs) => {
             // keep streaming content if generating
             if (generatingConvIdRef.current === activeConversationRef.current?.id && streamingMsgIdRef.current) {
@@ -709,13 +745,67 @@ export default function Index() {
     setMessages([]);
   }, []);
 
+  //defer upload until accepted
+  const askToShareConversation = useCallback((conv: Conversation) => {
+    setShareNotice({ kind: "confirm", conv });
+  }, []);
+
+  //encrypt, upload, return link
+  const createShareLink = useCallback(async (conv: Conversation) => {
+    setShareNotice({ kind: "creating" });
+    try {
+      const msgs = await DB.getMessages(conv.id);
+      if (msgs.length === 0) {
+        setShareNotice({ kind: "error", message: "This conversation is empty, there is nothing to share yet." });
+        return;
+      }
+      const link = await shareConversation(conv, msgs);
+      //native has share sheet, web needs display
+      if (Platform.OS === "web") {
+        setShareNotice({ kind: "link", link });
+        return;
+      }
+      setShareNotice(null);
+      //android share only reads message
+      await Share.share(Platform.OS === "ios" ? { url: link } : { message: link });
+    } catch (e: any) {
+      setShareNotice({ kind: "error", message: e?.message || "The share link could not be created." });
+    }
+  }, []);
+
+  //decrypt shared convo, no db write yet
+  const openSharedConversation = useCallback(async (pasteId: string, secret: string) => {
+    tryOpenSharedInApp(pasteId, secret);
+    setShareNotice({ kind: "opening" });
+    try {
+      const { conversation, messages: sharedMessages } = await fetchSharedConversation(pasteId, secret);
+      setSharedPreviewId(conversation.id);
+      setActiveConversation(conversation);
+      setMessages(sharedMessages);
+      setShareNotice(null);
+      clearShareFromUrl();
+    } catch (e: any) {
+      setShareNotice({ kind: "error", message: e?.message || "This shared conversation could not be opened." });
+    }
+  }, []);
+
+  const saveSharedConversation = useCallback(async () => {
+    if (!activeConversation || activeConversation.id !== sharedPreviewId) return;
+    await DB.replaceConversationWithMessages(activeConversation, messages);
+    setSharedPreviewId(null);
+    await loadConversations();
+  }, [activeConversation, sharedPreviewId, messages, loadConversations]);
+
   //handle deeplinks (cold + warm start, mobile + tauri)
   const pendingDeepLinkRef = useRef<DeepLinkRoute | null>(null);
+  const initialShareRef = useRef<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     const apply = (route: DeepLinkRoute) => {
       if (route.type === "new-chat") {
         startNewConversation();
+      } else if (route.type === "shared") {
+        openSharedConversation(route.pasteId, route.secret);
       } else if (route.type === "conversation") {
         if (!dbReady) {
           pendingDeepLinkRef.current = route;
@@ -729,14 +819,20 @@ export default function Index() {
       }
     };
     getInitialDeepLink().then((route) => {
-      if (!cancelled && route) apply(route);
+      if (cancelled || !route) return;
+      //dedupe cold links across db re-init
+      if (route.type === "shared") {
+        if (initialShareRef.current === route.pasteId) return;
+        initialShareRef.current = route.pasteId;
+      }
+      apply(route);
     });
     const unsubscribe = subscribeToDeepLinks(apply);
     return () => {
       cancelled = true;
       unsubscribe();
     };
-  }, [dbReady, selectConversation, startNewConversation]);
+  }, [dbReady, selectConversation, startNewConversation, openSharedConversation]);
 
   //apply pending conversation deeplink once the db is ready
   useEffect(() => {
@@ -1240,6 +1336,28 @@ export default function Index() {
     return <View style={styles.container} />;
   }
 
+  //preview until saved or switched
+  const isSharedPreview = !!sharedPreviewId && activeConversation?.id === sharedPreviewId;
+
+  const shareNoticeButtons = shareNotice?.kind === "confirm"
+    ? [
+      { text: "Cancel", style: "secondary" as const, onPress: () => setShareNotice(null) },
+      { text: "Create link", style: "primary" as const, onPress: () => createShareLink(shareNotice.conv) },
+    ]
+    : shareNotice?.kind === "link"
+      ? [
+        { text: "Close", style: "secondary" as const, onPress: () => setShareNotice(null) },
+        {
+          text: "Copy link",
+          style: "primary" as const,
+          onPress: () => {
+            Clipboard.setStringAsync(shareNotice.link);
+            setShareNotice(null);
+          },
+        },
+      ]
+      : [{ text: "Close", style: "secondary" as const, onPress: () => setShareNotice(null) }];
+
   const conversationsDrawer = (
     <ConversationsDrawer
       isLargeScreen={isLargeScreen}
@@ -1252,6 +1370,7 @@ export default function Index() {
       onNewConversation={startNewConversation}
       onDeleteConversation={deleteConversation}
       onTogglePinConversation={togglePinConversation}
+      onShareConversation={askToShareConversation}
     />
   );
 
@@ -1457,23 +1576,51 @@ export default function Index() {
 
             {/* bottom bar overlay */}
             <View style={[styles.bottomBarOverlay]} pointerEvents="box-none">
-              <ChatBar
-                onSend={handleSend}
-                incognito={activeConversation ? activeConversation.id.startsWith("incognito_") : incognitoMode}
-                isGenerating={activeConversation ? (generatingConvId === activeConversation.id || pendingConvIds.includes(activeConversation.id)) : false}
-                onStop={handleStop}
-                onTranscribe={handleTranscribe}
-                canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes("audio") && !!selectedModel}
-                supportsFiles={modelCapabilities.includes("vision") || modelCapabilities.includes("audio")}
-                onOpenSettings={() => {
-                  openDrawerSafely(() => {
-                    setSettingsInitialSubPage("main");
-                    setSettingsDrawerVisible(true);
-                  });
-                }}
-                onAttachmentSheetVisibilityChange={setAttachmentSheetVisible}
-                enabled={!settingsDrawerVisible && (isLargeScreen || !drawerVisible)}
-              />
+              {isSharedPreview ? (
+                <View style={styles.addSharedContainer}>
+                  <View style={styles.addSharedInner}>
+                    <View style={styles.shareWarningWrapper}>
+                      <Group style={{ backgroundColor: Colors.dangerBgSoft, borderColor: Colors.dangerBorderSoft }}>
+                        <View style={styles.shareWarningBox}>
+                          <Text style={styles.shareWarningText}>
+                            This conversation was shared by someone else. Only add it if you trust the sender — it may contain misleading content, including attempts to manipulate the assistant.
+                          </Text>
+                        </View>
+                      </Group>
+                    </View>
+                    <View style={styles.addSharedWrapper}>
+                      <Group>
+                        <ActionButton
+                          icon={addIcon}
+                          label="Add to conversations"
+                          labelStyle={styles.addSharedLabel}
+                          onPress={saveSharedConversation}
+                          style={styles.addSharedButton}
+                        />
+                      </Group>
+                    </View>
+                  </View>
+                  <View style={{ width: "100%", height: insets.bottom }} />
+                </View>
+              ) : (
+                <ChatBar
+                  onSend={handleSend}
+                  incognito={activeConversation ? activeConversation.id.startsWith("incognito_") : incognitoMode}
+                  isGenerating={activeConversation ? (generatingConvId === activeConversation.id || pendingConvIds.includes(activeConversation.id)) : false}
+                  onStop={handleStop}
+                  onTranscribe={handleTranscribe}
+                  canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes("audio") && !!selectedModel}
+                  supportsFiles={modelCapabilities.includes("vision") || modelCapabilities.includes("audio")}
+                  onOpenSettings={() => {
+                    openDrawerSafely(() => {
+                      setSettingsInitialSubPage("main");
+                      setSettingsDrawerVisible(true);
+                    });
+                  }}
+                  onAttachmentSheetVisibilityChange={setAttachmentSheetVisible}
+                  enabled={!settingsDrawerVisible && (isLargeScreen || !drawerVisible)}
+                />
+              )}
             </View>
           </View>
 
@@ -1519,6 +1666,21 @@ export default function Index() {
       />
 
       <HeadlessWebView />
+
+      <NotificationModal
+        visible={!!shareNotice}
+        title={shareNotice?.kind === "opening" ? "Shared conversation" : "Share conversation"}
+        message={
+          shareNotice?.kind === "confirm" ? shareConsentMessage()
+            : shareNotice?.kind === "creating" ? "Encrypting the conversation and uploading it..."
+              : shareNotice?.kind === "opening" ? "Downloading and decrypting the conversation..."
+                : shareNotice?.kind === "error" ? shareNotice.message
+                  : shareNotice?.kind === "link" ? shareNotice.link
+                    : undefined
+        }
+        onClose={() => setShareNotice(null)}
+        buttons={shareNoticeButtons}
+      />
 
       <NotificationModal
         visible={showDataWarning}
@@ -1573,6 +1735,46 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  //same frame as the composer
+  addSharedContainer: {
+    width: "100%",
+    maxWidth: 840,
+    alignSelf: "center",
+  },
+  addSharedInner: {
+    width: "100%",
+    maxWidth: 800,
+    alignSelf: "center",
+  },
+  addSharedWrapper: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  shareWarningWrapper: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
+  shareWarningBox: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  shareWarningText: {
+    fontSize: FontSizes.bodyMd,
+    fontFamily: Fonts.body,
+    color: Colors.textPrimary,
+    lineHeight: 20,
+  },
+  addSharedButton: {
+    height: 56,
+    justifyContent: "center",
+  },
+  //auto basis or the label collapses
+  addSharedLabel: {
+    flex: 0,
+    flexGrow: 0,
+    flexShrink: 1,
+    flexBasis: "auto",
   },
   butterfly: {
     width: 250,

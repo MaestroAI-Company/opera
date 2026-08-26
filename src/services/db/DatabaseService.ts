@@ -106,7 +106,7 @@ class DatabaseService {
           pinned INTEGER DEFAULT 0
         )`
       );
-      
+
       try {
         await this.db.runAsync('ALTER TABLE conversations ADD COLUMN pinned INTEGER DEFAULT 0');
       } catch {

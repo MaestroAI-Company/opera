@@ -9,6 +9,7 @@ export type AppSettings = {
   aiService: string;
   ollamaUrl: string;
   ollamaUrls: string;
+  mcpServers: string;
   enabledProviders: string;
   ollamaModel: string;
   ollamaContextLength: number;
@@ -41,6 +42,7 @@ const DEFAULTS: AppSettings = {
   aiService: 'ollama',
   ollamaUrl: '',
   ollamaUrls: '[]',
+  mcpServers: '[]',
   enabledProviders: 'local,ollama',
   ollamaModel: '',
   ollamaContextLength: 8192,

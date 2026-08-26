@@ -42,6 +42,7 @@ import { useScreenSelection } from '../../services/overlay/useScreenSelection';
 import HeadlessWebView from '../../../components/HeadlessWebView';
 import { useAnimatedValue } from '../../hooks/useAnimatedValue';
 import { PluginRegistry } from '../../services/plugins/PluginRegistry';
+import { McpService } from '../../services/mcp/McpService';
 import '../../services/widgets/registerWidgets';
 
 //how far bars start offscreen
@@ -297,6 +298,7 @@ function AssistantOverlay() {
       //only needed once tools are used
       InteractionManager.runAfterInteractions(() => {
         PluginRegistry.init().then(() => PluginRegistry.loadAll()).catch(() => { });
+        McpService.init().then(() => McpService.connectAll()).catch(() => { });
       });
     };
     init();

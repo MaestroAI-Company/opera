@@ -5,6 +5,7 @@ import Group from "./Group";
 
 export type NotificationCardProps = {
   image: ImageSourcePropType;
+  tintColor?: string;
   title: string;
   description?: string;
   onPress?: () => void;
@@ -15,6 +16,7 @@ export type NotificationCardProps = {
 //image left, text right, closable
 export default function NotificationCard({
   image,
+  tintColor,
   title,
   description,
   onPress,
@@ -30,7 +32,7 @@ export default function NotificationCard({
         onPress={onPress}
         disabled={!onPress}
       >
-        <Image source={image} style={styles.image} resizeMode="contain" />
+        <Image source={image} style={styles.image} tintColor={tintColor} resizeMode="contain" />
         <View style={styles.textContainer}>
           <Text style={styles.title} numberOfLines={2}>{title}</Text>
           {!!description && <Text style={styles.description} numberOfLines={3}>{description}</Text>}
@@ -63,8 +65,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     backgroundColor: Colors.surfacePressed,
   },
   image: {
-    width: 64,
-    height: 64,
+    width: 18,
+    height: 18,
   },
   textContainer: {
     flex: 1,

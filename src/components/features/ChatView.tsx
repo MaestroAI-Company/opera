@@ -9,11 +9,12 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme";
+import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { AIModule } from "../../services/ai/AIModule";
@@ -24,7 +25,6 @@ import { Settings } from "../../services/settings/SettingsService";
 import { TTS } from "../../services/speech/TTSService";
 import IconButton from "../ui/IconButton";
 import { deriveChatDisplay, renderMarkdown } from "../ui/MarkdownText";
-import SuggestionBar from "../ui/SuggestionBar";
 import SuggestionPill from "../ui/SuggestionPill";
 import ThinkingIcon from "../ui/ThinkingIcon";
 
@@ -38,7 +38,7 @@ const chatIcon = require("../../../assets/icons/chat.png");
 const appSourceIcon = require("../../../assets/icons/tool.png");
 const imageSourceIcon = require("../../../assets/icons/photo.png");
 const linkSourceIcon = require("../../../assets/icons/hyperlink.png");
-const arrowIcon = require("../../../assets/icons/arrow.png");
+const arrowIcon = require("../../../assets/icons/return.png");
 
 //last title segment after separator
 function sourceLabel(source: MessageSource): string {
@@ -169,6 +169,8 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   const styles = useThemedStyles(makeStyles);
   const isUser = item.role === "user";
   const [showDetails, setShowDetails] = useState(false);
+  //suggestion cards take half the visible row
+  const [suggestionBarWidth, setSuggestionBarWidth] = useState(0);
 
   const [activeTool, setActiveTool] = useState<{ name: string | null, args: any | null }>({ name: null, args: null });
   useEffect(() => {
@@ -341,16 +343,23 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
             </View>
           )}
           {!isCurrentlyThinking && !isGenerating && !isChatGenerating && !!suggestions && suggestions.length > 0 && (
-            <SuggestionBar align="right">
-              {suggestions.map((suggestion) => (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              onLayout={(e) => setSuggestionBarWidth(e.nativeEvent.layout.width)}
+              style={styles.suggestionBar}
+              contentContainerStyle={styles.suggestionContent}
+            >
+              {suggestionBarWidth > 0 && suggestions.map((suggestion) => (
                 <SuggestionPill
                   key={suggestion.message}
                   icon={arrowIcon}
                   label={suggestion.label}
+                  width={suggestionBarWidth / 2}
                   onPress={() => onSuggestionPress?.(suggestion.message)}
                 />
               ))}
-            </SuggestionBar>
+            </ScrollView>
           )}
           {showMetrics && showDetails && (
             <View style={styles.metricsCard}>
@@ -651,6 +660,20 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     alignItems: "center",
     marginTop: 8,
     gap: 16,
+  },
+  suggestionBar: {
+    marginTop: Spacing.md,
+    //row sizes itself inside column
+    flexGrow: 0,
+  },
+  suggestionContent: {
+    flexDirection: "row",
+    gap: Spacing.md,
+    //every card matches the tallest one
+    alignItems: "stretch",
+    //cards hug the right edge when sparse
+    flexGrow: 1,
+    justifyContent: "flex-end",
   },
   metricsCard: {
     marginTop: 4,

@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { ScrollView, StyleProp, StyleSheet, ViewStyle } from "react-native";
+import { Spacing } from "../../../constants/theme";
 
 export type SuggestionBarProps = {
   children: ReactNode;
@@ -24,14 +25,13 @@ export default function SuggestionBar({ children, align = "right", style }: Sugg
 
 const styles = StyleSheet.create({
   bar: {
-    marginTop: 8,
-    //row sizes itself inside column
+    marginTop: Spacing.md,
     flexGrow: 0,
   },
   content: {
     flexDirection: "row",
-    gap: 8,
-    //pills hug one edge when sparse
+    gap: Spacing.md,
+    alignItems: "stretch",
     flexGrow: 1,
   },
   right: {

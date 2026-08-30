@@ -2,6 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  AppState,
   BackHandler,
   DeviceEventEmitter,
   ImageSourcePropType,
@@ -18,7 +19,8 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { Colors } from '../../../constants/theme';
 import { AIModule } from '../../services/ai/AIModule';
-import { buildSystemPrompt, streamAssistantReply } from '../../services/ai/generation/chatGeneration';
+import { buildSystemPrompt } from '../../services/ai/generation/chatGeneration';
+import { GenerationService } from '../../services/ai/generation/GenerationService';
 import { generateSuggestions, Suggestion } from '../../services/ai/generation/suggestions';
 import { resolveQuickFlow } from '../../services/ai/quickFlow';
 import { arrayBufferToBase64 } from '../../services/ai/utils/base64';
@@ -33,16 +35,19 @@ import ChatBar, { ChatBarHandle } from './ChatBar';
 import ChatView from './ChatView';
 import { ModelSelectorDrawer, ModelSelectorTrigger } from './ModelSelector';
 import SelectionLayer from './SelectionLayer';
+import TextLayer from './TextLayer';
 
 import { useResponsive } from '../../hooks/useResponsive';
 import { AppContext, AppIcon, ScreenCapture } from '../../services/overlay/screenCapture';
 import { useScreenDetections } from '../../services/overlay/useScreenDetections';
 import { useScreenSelection } from '../../services/overlay/useScreenSelection';
+import { useScreenText } from '../../services/overlay/useScreenText';
 
 import HeadlessWebView from '../../../components/HeadlessWebView';
 import { useAnimatedValue } from '../../hooks/useAnimatedValue';
 import { PluginRegistry } from '../../services/plugins/PluginRegistry';
 import { McpService } from '../../services/mcp/McpService';
+import { BackgroundGeneration } from '../../services/notifications/BackgroundGeneration';
 import '../../services/widgets/registerWidgets';
 
 //how far bars start offscreen
@@ -102,9 +107,11 @@ function AssistantOverlay() {
   useEffect(() => { userInstructionRef.current = userInstruction; }, [userInstruction]);
 
   const [generatingConvId, setGeneratingConvId] = useState<string | null>(null);
+  const generatingConvIdRef = useRef<string | null>(null);
+  useEffect(() => { generatingConvIdRef.current = generatingConvId; }, [generatingConvId]);
   const streamingMsgIdRef = useRef<string | null>(null);
   const streamingContentRef = useRef<string>('');
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const screenContextSegmentsRef = useRef<Record<string, string>>({});
   const chatBarRef = useRef<ChatBarHandle>(null);
 
   //modal state for whisper errors
@@ -131,12 +138,18 @@ function AssistantOverlay() {
     requestAnimationFrame(() => {
       rafPendingRef.current = false;
       const content = streamingContentRef.current;
-      //notify shared state with render flush
-      AIModule.SharedGenerationState.content = content;
-      AIModule.SharedGenerationState.notify();
       setMessages(prev => prev.map(m => (m.id === msgId ? { ...m, content } : m)));
     });
   }, []);
+
+  //render at the service cadence
+  useEffect(() => {
+    return GenerationService.subscribe(run => {
+      if (run.status !== 'streaming') return;
+      streamingContentRef.current = run.content;
+      scheduleFlush(run.msgId);
+    });
+  }, [scheduleFlush]);
 
   //overlay phases select and respond
   const [phase, setPhase] = useState<'select' | 'respond'>('select');
@@ -145,6 +158,7 @@ function AssistantOverlay() {
   const { selection, select, clear: clearSelection, attachment } = useScreenSelection(session);
   //selection works without it
   const detections = useScreenDetections(session);
+  const screenText = useScreenText(session);
   //foreground app and screen text
   const appContextRef = useRef<AppContext | null>(null);
   //chip icon and label state
@@ -235,6 +249,7 @@ function AssistantOverlay() {
   const goToRespond = useCallback(() => {
     setPhase('respond');
     clearSelection();
+    ScreenCapture.clearText();
     responseOpacity.setValue(0);
     Animated.timing(responseOpacity, {
       toValue: 1,
@@ -312,28 +327,27 @@ function AssistantOverlay() {
 
   //full overlay reset on close/reopen
   const resetOverlay = useCallback(() => {
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = null;
-    streamingMsgIdRef.current = null;
-    streamingContentRef.current = '';
     chatBarRef.current?.stopRecording();
     chatBarRef.current?.clear();
+    screenContextSegmentsRef.current = {};
+    ScreenCapture.clearText();
     if (Platform.OS !== 'web') STT.abort();
     setActiveConversation(null);
     activeConversationRef.current = null;
     setMessages([]);
     setPhase('select');
     setGeneratingConvId(null);
+    generatingConvIdRef.current = null;
     appContextRef.current = null;
     setAppIconInfo(null);
     setAppContextDismissed(false);
     //reset capture and selection
     setSession(s => s + 1);
-    AIModule.SharedGenerationState.activeConvId = null;
-    AIModule.SharedGenerationState.activeMsgId = null;
-    AIModule.SharedGenerationState.content = '';
-    AIModule.SharedGenerationState.abort = () => { };
-    AIModule.SharedGenerationState.notify();
+  }, []);
+
+  //let the reply finish in background
+  const handOffGeneration = useCallback(() => {
+    return BackgroundGeneration.begin(generatingConvIdRef.current ?? '');
   }, []);
 
   //hardware back
@@ -341,6 +355,7 @@ function AssistantOverlay() {
     const handler = BackHandler.addEventListener('hardwareBackPress', () => {
       if (closingRef.current) return true;
       closingRef.current = true;
+      handOffGeneration();
       playExit(() => {
         resetOverlay();
         BackHandler.exitApp();
@@ -348,7 +363,20 @@ function AssistantOverlay() {
       return true;
     });
     return () => handler.remove();
-  }, [resetOverlay, playExit]);
+  }, [resetOverlay, playExit, handOffGeneration]);
+
+  //reply continues in a notification
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => {
+      //a dismiss already handed it off
+      if (state === 'background' && !closingRef.current) {
+        handOffGeneration();
+      } else if (state === 'active' && generatingConvIdRef.current) {
+        BackgroundGeneration.cancel();
+      }
+    });
+    return () => sub.remove();
+  }, [handOffGeneration]);
 
   //reopen via same activity instance
   useEffect(() => {
@@ -367,12 +395,13 @@ function AssistantOverlay() {
   const closeOverlay = useCallback(() => {
     if (closingRef.current) return;
     closingRef.current = true;
+    handOffGeneration();
     //reset only once hidden, so the content does not blank mid exit
     playExit(() => {
       resetOverlay();
       ScreenCapture.close();
     });
-  }, [playExit, resetOverlay]);
+  }, [playExit, resetOverlay, handOffGeneration]);
 
   //hand off conversation then close
   const openConversationInApp = useCallback((convId: string) => {
@@ -496,69 +525,33 @@ function AssistantOverlay() {
     setAppContextDismissed(true);
 
     const taskSystemPrompt = buildSystemPrompt(instruction, screenContextSegment);
+    screenContextSegmentsRef.current[userMsg.id] = screenContextSegment;
 
     const assistantMsg = await DB.addMessage(conv.id, 'assistant', '…');
     setMessages(prev => [...prev, assistantMsg]);
 
     setGeneratingConvId(conv.id);
+    generatingConvIdRef.current = conv.id;
     streamingMsgIdRef.current = assistantMsg.id;
     streamingContentRef.current = '';
-    abortControllerRef.current = new AbortController();
 
-    AIModule.SharedGenerationState.activeConvId = conv.id;
-    AIModule.SharedGenerationState.activeMsgId = assistantMsg.id;
-    AIModule.SharedGenerationState.content = '';
-    AIModule.SharedGenerationState.abort = () => abortControllerRef.current?.abort();
+    const run = await GenerationService.start({
+      convId: conv.id,
+      msgId: assistantMsg.id,
+      prompt: text,
+      model,
+      systemPrompt: taskSystemPrompt,
+      history: taskHistory,
+      think: reflection === 'none' ? false : reflection,
+    });
 
-    let isError = false;
-    let isAborted = false;
-    let messageSources: Message['sources'];
-
-    if (!model) {
-      isError = true;
-      streamingContentRef.current = 'Please select a model in the main app settings.';
-      setMessages(prev => prev.map(m =>
-        m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current } : m
-      ));
-      abortControllerRef.current = null;
-    } else {
-      try {
-        const outcome = await streamAssistantReply({
-          model,
-          systemPrompt: taskSystemPrompt,
-          history: taskHistory,
-          think: reflection === 'none' ? false : reflection,
-          signal: abortControllerRef.current.signal,
-          onContent: (content) => {
-            streamingContentRef.current = content;
-            scheduleFlush(assistantMsg.id);
-          },
-        });
-
-        if (outcome.status === 'error') {
-          isError = true;
-          streamingContentRef.current = `Error during generation: ${outcome.error ?? 'unknown error'}`;
-        } else {
-          isAborted = outcome.status === 'aborted';
-          streamingContentRef.current = outcome.content;
-        }
-        messageSources = outcome.sources;
-        setMessages(prev => prev.map(m =>
-          m.id === assistantMsg.id ? { ...m, content: streamingContentRef.current, sources: messageSources ?? m.sources } : m
-        ));
-      } finally {
-        abortControllerRef.current = null;
-      }
-    }
-
-    //keep partial text on error
-    await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
-    if (!isError) {
-      if (messageSources && messageSources.length > 0) {
-        await DB.updateMessageSources(assistantMsg.id, messageSources);
-      }
-      CloudSync.requestAutoSync(0); //push completed ai message right away
-    }
+    const isError = run.status === 'error';
+    const isAborted = run.status === 'aborted';
+    streamingContentRef.current = run.content;
+    setMessages(prev => prev.map(m =>
+      m.id === assistantMsg.id ? { ...m, content: run.content, sources: run.sources ?? m.sources } : m
+    ));
+    if (!isError) CloudSync.requestAutoSync(0); //push completed ai message right away
 
     if (isFirstMessage && !isError) generateTitle(conv.id, text, images);
 
@@ -580,17 +573,101 @@ function AssistantOverlay() {
       TTS.speak(streamingContentRef.current, { language: Settings.getCached().language, id: assistantMsg.id });
     }
 
-    setGeneratingConvId(null);
-    streamingMsgIdRef.current = null;
-
-    AIModule.SharedGenerationState.activeConvId = null;
-    AIModule.SharedGenerationState.activeMsgId = null;
-    AIModule.SharedGenerationState.notify();
-  }, [scheduleFlush, generateTitle, goToRespond, appContextDismissed, appIconInfo]);
+    //a newer run may own it
+    if (streamingMsgIdRef.current === assistantMsg.id) {
+      setGeneratingConvId(null);
+      generatingConvIdRef.current = null;
+      streamingMsgIdRef.current = null;
+    }
+  }, [generateTitle, goToRespond, appContextDismissed, appIconInfo]);
 
   const handleStop = useCallback(() => {
-    abortControllerRef.current?.abort();
+    const convId = activeConversationRef.current?.id;
+    if (convId) GenerationService.stop(convId);
   }, []);
+
+  const handleRegenerate = useCallback(async (aiMessageId: string) => {
+    const conv = activeConversationRef.current;
+    if (!conv) return;
+
+    if (generatingConvId) {
+      GenerationService.stop(conv.id);
+    }
+
+    const msgIndex = messagesRef.current.findIndex(m => m.id === aiMessageId);
+    if (msgIndex === -1) return;
+
+    const historyUpToHere = messagesRef.current.slice(0, msgIndex);
+    const taskHistory = historyUpToHere
+      .filter(m => m.content !== '…')
+      .map(m => ({ role: m.role, content: m.content, images: m.images }));
+
+    const messagesToDelete = messagesRef.current.slice(msgIndex);
+    for (const m of messagesToDelete) {
+      await DB.deleteMessage(m.id);
+    }
+    setMessages([...historyUpToHere]);
+    setSuggestions(null);
+
+    //last user prompt drives system prompt
+    let regenSegment = '';
+    let regenUserText = '';
+    for (let i = historyUpToHere.length - 1; i >= 0; i--) {
+      if (historyUpToHere[i].role === 'user') {
+        regenUserText = historyUpToHere[i].content;
+        regenSegment = screenContextSegmentsRef.current[historyUpToHere[i].id] ?? '';
+        break;
+      }
+    }
+
+    const model = selectedModelRef.current;
+    const instruction = userInstructionRef.current;
+    const reflection = selectedReflectionRef.current;
+
+    const assistantMsg = await DB.addMessage(conv.id, 'assistant', '…');
+    setMessages(prev => [...prev, assistantMsg]);
+
+    setGeneratingConvId(conv.id);
+    generatingConvIdRef.current = conv.id;
+    streamingMsgIdRef.current = assistantMsg.id;
+    streamingContentRef.current = '';
+
+    const run = await GenerationService.start({
+      convId: conv.id,
+      msgId: assistantMsg.id,
+      prompt: regenUserText,
+      model,
+      systemPrompt: buildSystemPrompt(instruction, regenSegment),
+      history: taskHistory,
+      think: reflection === 'none' ? false : reflection,
+    });
+
+    const isError = run.status === 'error';
+    const isAborted = run.status === 'aborted';
+    streamingContentRef.current = run.content;
+    setMessages(prev => prev.map(m =>
+      m.id === assistantMsg.id ? { ...m, content: run.content, sources: run.sources ?? m.sources } : m
+    ));
+    if (!isError) CloudSync.requestAutoSync(0); //push completed ai message right away
+
+    if (!isError && !isAborted && model && regenUserText) {
+      generateSuggestions({
+        model,
+        userMessage: regenUserText,
+        assistantMessage: streamingContentRef.current,
+        onPartial: items => setSuggestions({ msgId: assistantMsg.id, items }),
+      }).then(items => {
+        if (items.length > 0) setSuggestions({ msgId: assistantMsg.id, items });
+      });
+    }
+
+    //a newer run may own it
+    if (streamingMsgIdRef.current === assistantMsg.id) {
+      setGeneratingConvId(null);
+      generatingConvIdRef.current = null;
+      streamingMsgIdRef.current = null;
+    }
+  }, [generatingConvId]);
 
   //native transcript used instead of whisper
   const handleTranscribe = useCallback(async (wavBuffer: ArrayBuffer, localFallback?: string | null): Promise<string | null> => {
@@ -683,14 +760,20 @@ function AssistantOverlay() {
           style={[styles.phaseContainer, { opacity: mountOpacity }]}
         >
           {phase === 'select' ? (
-            <SelectionLayer
-              selection={selection}
-              onChange={select}
-              onVibrate={() => Vibration.vibrate(10)}
-              onDrawingChange={setIsDrawingSelection}
-              onDismiss={closeOverlay}
-              detections={detections}
-            />
+            <>
+              <SelectionLayer
+                selection={selection}
+                onChange={select}
+                onVibrate={() => Vibration.vibrate(10)}
+                onDrawingChange={setIsDrawingSelection}
+                onDismiss={closeOverlay}
+                detections={detections}
+              />
+              <TextLayer
+                codes={screenText.codes}
+                onVibrate={() => Vibration.vibrate(10)}
+              />
+            </>
           ) : (
             <Animated.View style={[styles.phaseContainer, { opacity: responseOpacity }]} pointerEvents="box-none">
               <LinearGradient
@@ -707,6 +790,7 @@ function AssistantOverlay() {
                   hideGradients={true}
                   generatingMessageId={generatingMessageId}
                   speakerEnabled={true}
+                  onRegenerate={handleRegenerate}
                   canThink={modelCapabilities.includes('thinking') && selectedReflection !== 'none'}
                   dark={true}
                   alignBottom={true}

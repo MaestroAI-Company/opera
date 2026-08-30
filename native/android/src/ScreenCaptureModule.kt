@@ -8,6 +8,8 @@ import android.graphics.Rect
 import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.os.Handler
+import android.os.Looper
 import android.util.Base64
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -16,6 +18,12 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -170,6 +178,94 @@ class ScreenCaptureModule(context: ReactApplicationContext) : ReactContextBaseJa
         putInt("contentHeight", contentHeight)
       })
     }
+  }
+
+  @ReactMethod
+  fun showTextLayer(promise: Promise) {
+    val capture = ScreenshotHolder.getUsable()
+    if (capture == null) {
+      promise.reject(NOT_READY, NOT_READY_MESSAGE)
+      return
+    }
+
+    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    recognizer.process(InputImage.fromBitmap(capture, 0))
+      .addOnSuccessListener { text ->
+        //each block keeps its own paragraph
+        val blocks = text.textBlocks.mapNotNull { block ->
+          val bounds = block.boundingBox ?: return@mapNotNull null
+          val value = block.text?.trim() ?: return@mapNotNull null
+          if (value.isEmpty()) return@mapNotNull null
+          TextSelectionLayer.Block(
+            bounds.left, bounds.top, bounds.width(), bounds.height(),
+            value, block.lines.size
+          )
+        }
+        recognizer.close()
+        //overlay views mutate on ui thread
+        Handler(Looper.getMainLooper()).post {
+          reactApplicationContext.currentActivity?.let { activity ->
+            TextSelectionLayer.show(activity, blocks)
+          }
+        }
+        promise.resolve(null)
+      }
+      .addOnFailureListener { e ->
+        recognizer.close()
+        promise.reject("OCR_FAILED", e.message ?: "ocr failed")
+      }
+  }
+
+  @ReactMethod
+  fun clearTextLayer() {
+    Handler(Looper.getMainLooper()).post { TextSelectionLayer.hide() }
+  }
+
+  @ReactMethod
+  fun scanCodes(promise: Promise) {
+    val capture = ScreenshotHolder.getUsable()
+    if (capture == null) {
+      promise.reject(NOT_READY, NOT_READY_MESSAGE)
+      return
+    }
+
+    val scanner = BarcodeScanning.getClient(
+      BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
+    )
+    scanner.process(InputImage.fromBitmap(capture, 0))
+      .addOnSuccessListener { codes ->
+        val found = Arguments.createArray()
+        for (code in codes) {
+          val value = code.rawValue ?: continue
+          //whole qr from its corner points
+          val corners = code.cornerPoints ?: continue
+          var left = Int.MAX_VALUE
+          var top = Int.MAX_VALUE
+          var right = Int.MIN_VALUE
+          var bottom = Int.MIN_VALUE
+          for (point in corners) {
+            left = minOf(left, point.x)
+            top = minOf(top, point.y)
+            right = maxOf(right, point.x)
+            bottom = maxOf(bottom, point.y)
+          }
+          val bounds = Rect(left, top, right, bottom)
+          found.pushMap(region(bounds, capture).apply { putString("value", value) })
+        }
+        scanner.close()
+        promise.resolve(found)
+      }
+      .addOnFailureListener { e ->
+        scanner.close()
+        promise.reject("SCAN_FAILED", e.message ?: "scan failed")
+      }
+  }
+
+  private fun region(bounds: Rect, capture: Bitmap): WritableMap = Arguments.createMap().apply {
+    putDouble("x", bounds.left.toDouble() / capture.width)
+    putDouble("y", bounds.top.toDouble() / capture.height)
+    putDouble("w", bounds.width().toDouble() / capture.width)
+    putDouble("h", bounds.height().toDouble() / capture.height)
   }
 
   //foreground package and assist screen text

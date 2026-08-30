@@ -1,4 +1,3 @@
-import { Buffer } from 'buffer';
 import { CaptureRegion, DetectionInput, ScreenCapture } from './screenCapture';
 
 //graph fixed at 640 input
@@ -60,11 +59,28 @@ async function load(): Promise<Model | null> {
   return null;
 }
 
-//bytes to graph floats
+//base64 alphabet to 6-bit values
+const B64_VALUES = (() => {
+  const table = new Uint8Array(128);
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  for (let i = 0; i < alphabet.length; i++) table[alphabet.charCodeAt(i)] = i;
+  return table;
+})();
+
+//decode and normalize in one pass
 function toInputTensor(data: string): Float32Array {
-  const bytes = Buffer.from(data, 'base64');
-  const floats = new Float32Array(bytes.length);
-  for (let i = 0; i < bytes.length; i++) floats[i] = bytes[i] / 255;
+  const length = data.length;
+  const floats = new Float32Array((length >> 2) * 3);
+  let out = 0;
+  for (let i = 0; i < length; i += 4) {
+    const a = B64_VALUES[data.charCodeAt(i)];
+    const b = B64_VALUES[data.charCodeAt(i + 1)];
+    const c = B64_VALUES[data.charCodeAt(i + 2)];
+    const d = B64_VALUES[data.charCodeAt(i + 3)];
+    floats[out++] = ((a << 2) | (b >> 4)) / 255;
+    floats[out++] = (((b & 15) << 4) | (c >> 2)) / 255;
+    floats[out++] = (((c & 3) << 6) | d) / 255;
+  }
   return floats;
 }
 

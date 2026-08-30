@@ -26,6 +26,7 @@ export type AppSettings = {
   hasSeenOnboarding: boolean;
   name: string;
   includeDateTime: boolean;
+  advancedMode: boolean;
   dataWarningDismissed: boolean;
   useAppContext: boolean;
   shakeToReport: boolean;
@@ -64,6 +65,7 @@ const DEFAULTS: AppSettings = {
   hasSeenOnboarding: false,
   name: '',
   includeDateTime: true,
+  advancedMode: false,
   dataWarningDismissed: false,
   useAppContext: true,
   shakeToReport: true,
@@ -113,6 +115,7 @@ class SettingsService {
         hasSeenOnboarding: typeof parsed.hasSeenOnboarding === 'boolean' ? parsed.hasSeenOnboarding : DEFAULTS.hasSeenOnboarding,
         name: parsed.name ?? DEFAULTS.name,
         includeDateTime: typeof parsed.includeDateTime === 'boolean' ? parsed.includeDateTime : DEFAULTS.includeDateTime,
+        advancedMode: typeof parsed.advancedMode === 'boolean' ? parsed.advancedMode : DEFAULTS.advancedMode,
         dataWarningDismissed: typeof parsed.dataWarningDismissed === 'boolean' ? parsed.dataWarningDismissed : DEFAULTS.dataWarningDismissed,
         useAppContext: typeof parsed.useAppContext === 'boolean' ? parsed.useAppContext : DEFAULTS.useAppContext,
         shakeToReport: typeof parsed.shakeToReport === 'boolean' ? parsed.shakeToReport : DEFAULTS.shakeToReport,

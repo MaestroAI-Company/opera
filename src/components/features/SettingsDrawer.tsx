@@ -36,7 +36,6 @@ import NotificationCard from "../ui/NotificationCard";
 import IconButton from "../ui/IconButton";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import Selector, { SelectorOption } from "../ui/Selector";
-import Slider from "../ui/Slider";
 import SliderToggle from "../ui/SliderToggle";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
@@ -59,6 +58,7 @@ const profilIcon = require("../../../assets/icons/profil.png");
 const cloudIcon = require("../../../assets/icons/cloud.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
 const generalIcon = require("../../../assets/icons/general.png");
+const advancedIcon = require("../../../assets/icons/settings.png");
 const serverIcon = require("../../../assets/icons/server.png");
 const toolIcon = require("../../../assets/icons/tool.png");
 const confidentialityIcon = require("../../../assets/icons/confidentiality.png");
@@ -110,12 +110,13 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "assistantoverlay" | "service" | "confidentiality" | "reports" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "mcpservers" | "mcpserver" | "sociallinks";
+type SubPage = "main" | "general" | "advanced" | "assistantoverlay" | "service" | "confidentiality" | "reports" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "mcpservers" | "mcpserver" | "sociallinks";
 
 //page a subpage steps back to, followed by the header arrow and the android back button
 const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   main: "main",
   general: "main",
+  advanced: "main",
   assistantoverlay: "main",
   service: "main",
   confidentiality: "main",
@@ -249,6 +250,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
   const [autoSpeak, setAutoSpeakState] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(false);
+  const [advancedMode, setAdvancedModeState] = useState(false);
   const [useAppContext, setUseAppContextState] = useState(true);
   const [autoStartMic, setAutoStartMicState] = useState(true);
   const [usageAnalytics, setUsageAnalyticsState] = useState(true);
@@ -291,28 +293,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const cloudStorageOptions = [
     { id: "none", label: "None" },
     ...CLOUD_PROVIDERS.map(def => ({ id: def.id, label: def.label })),
-  ];
-
-  const ollamaKeepAliveOptions = [
-    { id: "300", label: "5m" },
-    { id: "600", label: "10m" },
-    { id: "1800", label: "30m" },
-    { id: "3600", label: "1h" },
-    { id: "7200", label: "2h" },
-    { id: "18000", label: "5h" },
-    { id: "43200", label: "12h" },
-    { id: "86400", label: "24h" },
-    { id: "-1", label: "∞" },
-  ];
-
-  const ollamaContextLengthOptions = [
-    { id: "8192", label: "8k" },
-    { id: "16384", label: "16k" },
-    { id: "32768", label: "32k" },
-    { id: "65536", label: "64k" },
-    { id: "131072", label: "128k" },
-    { id: "262144", label: "256k" },
-    { id: "524288", label: "512k" },
   ];
 
   type PermissionState = "granted" | "denied" | "undetermined";
@@ -514,6 +494,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setAlwaysWhisperState(s.alwaysWhisper);
         setAutoSpeakState(s.autoSpeak);
         setShowTechnicalDetailsState(s.showTechnicalDetails);
+        setAdvancedModeState(s.advancedMode);
         setUseAppContextState(s.useAppContext);
         setShareInstanceUrlState(s.shareInstanceUrl || "");
         //apply to services
@@ -556,7 +537,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   //all reachable models, one row each
   useEffect(() => {
-    if (activeSubPage !== "general") return;
+    if (activeSubPage !== "advanced") return;
     let cancelled = false;
     (async () => {
       const sources = buildSources(localAvailable);
@@ -782,15 +763,18 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   };
 
   const setOllamaContextLength = (v: string) => {
-    setOllamaContextLengthState(v);
-    Settings.set("ollamaContextLength", effectiveContextLength(v));
-    AIModule.configure(ollamaUrl, effectiveContextLength(v), effectiveKeepAlive());
+    const next = v.replace(/[^0-9]/g, "");
+    setOllamaContextLengthState(next);
+    Settings.set("ollamaContextLength", effectiveContextLength(next));
+    AIModule.configure(ollamaUrl, effectiveContextLength(next), effectiveKeepAlive());
   };
 
+  //leading minus keeps -1 typable
   const setOllamaKeepAlive = (v: string) => {
-    setOllamaKeepAliveState(v);
-    Settings.set("ollamaKeepAlive", effectiveKeepAlive(v));
-    AIModule.configure(ollamaUrl, effectiveContextLength(), effectiveKeepAlive(v));
+    const next = (v.startsWith("-") ? "-" : "") + v.replace(/[^0-9]/g, "");
+    setOllamaKeepAliveState(next);
+    Settings.set("ollamaKeepAlive", effectiveKeepAlive(next));
+    AIModule.configure(ollamaUrl, effectiveContextLength(), effectiveKeepAlive(next));
   };
 
   //drop server on empty field
@@ -866,6 +850,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const setShowTechnicalDetails = (v: boolean) => {
     setShowTechnicalDetailsState(v);
     Settings.set("showTechnicalDetails", v);
+  };
+
+  const setAdvancedMode = (v: boolean) => {
+    setAdvancedModeState(v);
+    Settings.set("advancedMode", v);
   };
 
   const setUseAppContext = (v: boolean) => {
@@ -1286,7 +1275,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </Pressable>
 
         <Pressable
-          style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+          style={({ pressed, hovered }) => [styles.navItem, !advancedMode && styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
           onPress={() => setActiveSubPage("tools")}
         >
           <Image source={toolIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
@@ -1295,6 +1284,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             <Text style={styles.navSubtitle}>{isDesktop ? "Assistant Tools, Widgets" : "Assistant Tools, Widgets, Mobile actions"}</Text>
           </View>
         </Pressable>
+
+        {advancedMode && (
+          <Pressable
+            style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("advanced")}
+          >
+            <Image source={advancedIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>Advanced</Text>
+              <Text style={styles.navSubtitle}>Quick flow, Transcription, Sharing</Text>
+            </View>
+          </Pressable>
+        )}
       </Group>
 
       <Group style={styles.groupSpacing}>
@@ -1468,6 +1470,39 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={[styles.settingRowVertical, Platform.OS === "web" && { marginTop: 10 }]}>
         <View style={styles.toggleRow}>
+          <Text style={styles.settingLabel}>Advanced mode</Text>
+          <Toggle
+            checked={advancedMode}
+            onToggle={setAdvancedMode}
+          />
+        </View>
+        <Text style={styles.helpText}>Add an Advanced section to the menu with the more technical settings.</Text>
+      </View>
+    </View>
+  );
+
+  const renderAdvancedSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("Advanced")}
+
+      <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
+        <Text style={styles.settingLabel}>Quick flow</Text>
+        <Text style={[styles.helpText, { marginBottom: 10 }]}>
+          The model powering the small automatic touches: conversation titles, reply suggestions, and some tools. A small, fast model is recommended.
+        </Text>
+        <Group>
+          <Selector
+            options={quickFlowOptions}
+            selectedValue={quickFlowId}
+            onSelect={handleSelectQuickFlow}
+            title="Select Quick flow Model"
+            fullWidth
+          />
+        </Group>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <View style={styles.toggleRow}>
           <Text style={styles.settingLabel}>Always Transcribe Locally</Text>
           <Toggle
             checked={alwaysWhisper}
@@ -1482,17 +1517,22 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       </View>
 
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Quick flow</Text>
-        <Text style={[styles.helpText, { marginBottom: 10 }]}>
-          The model powering the small automatic touches: conversation titles, reply suggestions, and some tools. A small, fast model is recommended.
+        <Text style={styles.settingLabel}>Conversation sharing</Text>
+        <Text style={[styles.helpText, { marginBottom: 6 }]}>
+          Shared conversations are encrypted on your device before they are uploaded, and the decryption key travels only in the link, never to the server.
         </Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          They are stored on a PrivateBin instance. Leave this empty to use privatebin.net, or enter the address of another instance, including one you host yourself. The address is carried inside the links you create, so the people you share with reach the right server on their own.
+        </Text>
+
         <Group>
-          <Selector
-            options={quickFlowOptions}
-            selectedValue={quickFlowId}
-            onSelect={handleSelectQuickFlow}
-            title="Select Quick flow Model"
-            fullWidth
+          <TextInputField
+            icon={serverIcon}
+            placeholder="https://privatebin.net/"
+            value={shareInstanceUrl}
+            onChangeText={setShareInstanceUrl}
+            autoCapitalize="none"
+            keyboardType="url"
           />
         </Group>
       </View>
@@ -1673,21 +1713,23 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             <Text style={[styles.settingLabel, { marginTop: 20 }]}>Context Length</Text>
             <Text style={[styles.helpText, { marginBottom: 10 }]}>Maximum number of tokens the model can use.</Text>
             <Group>
-              <Slider
+              <TextInputField
                 icon={messageIcon}
-                options={ollamaContextLengthOptions}
-                selectedValue={String(effectiveContextLength())}
-                onSelect={setOllamaContextLength}
+                placeholder="8192"
+                value={ollamaContextLength}
+                onChangeText={setOllamaContextLength}
+                keyboardType="numeric"
               />
             </Group>
             <Text style={[styles.settingLabel, { marginTop: 20 }]}>Model Keep Alive</Text>
-            <Text style={[styles.helpText, { marginBottom: 10 }]}>How long the model stays loaded in memory after a request.</Text>
+            <Text style={[styles.helpText, { marginBottom: 10 }]}>How long the model stays loaded in memory after a request, in seconds. Use -1 to keep it loaded forever.</Text>
             <Group>
-              <Slider
+              <TextInputField
                 icon={timeIcon}
-                options={ollamaKeepAliveOptions}
-                selectedValue={ollamaKeepAlive}
-                onSelect={setOllamaKeepAlive}
+                placeholder="300"
+                value={ollamaKeepAlive}
+                onChangeText={setOllamaKeepAlive}
+                keyboardType="numeric"
               />
             </Group>
           </>
@@ -1807,27 +1849,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       </View>
 
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Conversation sharing</Text>
-        <Text style={[styles.helpText, { marginBottom: 6 }]}>
-          Shared conversations are encrypted on your device before they are uploaded, and the decryption key travels only in the link, never to the server.
-        </Text>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          They are stored on a PrivateBin instance. Leave this empty to use privatebin.net, or enter the address of another instance, including one you host yourself. The address is carried inside the links you create, so the people you share with reach the right server on their own.
-        </Text>
-
-        <Group>
-          <TextInputField
-            icon={serverIcon}
-            placeholder="https://privatebin.net/"
-            value={shareInstanceUrl}
-            onChangeText={setShareInstanceUrl}
-            autoCapitalize="none"
-            keyboardType="url"
-          />
-        </Group>
-      </View>
-
-      <View style={styles.settingRowVertical}>
         <Text style={styles.settingLabel}>Data management</Text>
         <Text style={[styles.helpText, { marginBottom: 12 }]}>
           Manage your conversations and settings data locally.
@@ -1922,8 +1943,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           <ActionButton
             icon={deleteIcon}
             label="Trigger a test crash"
-            iconTintColor={Colors.textOnPrimary}
-            labelColor={Colors.textOnPrimary}
+            variant="highlight"
             onPress={() => {
               throw new Error("Test crash triggered from Report a bug settings");
             }}
@@ -2298,6 +2318,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return renderServiceSubPage();
       case "confidentiality":
         return renderConfidentialitySubPage();
+      case "advanced":
+        return renderAdvancedSubPage();
       case "reports":
         return renderReportsSubPage();
       case "tools":

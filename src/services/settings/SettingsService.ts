@@ -28,6 +28,7 @@ export type AppSettings = {
   name: string;
   includeDateTime: boolean;
   showTechnicalDetails: boolean;
+  advancedMode: boolean;
   dataWarningDismissed: boolean;
   useAppContext: boolean;
   shakeToReport: boolean;
@@ -68,6 +69,7 @@ const DEFAULTS: AppSettings = {
   name: '',
   includeDateTime: true,
   showTechnicalDetails: false,
+  advancedMode: false,
   dataWarningDismissed: false,
   useAppContext: true,
   shakeToReport: true,
@@ -88,6 +90,7 @@ const BOOLEAN_KEYS = [
   'hasSeenOnboarding',
   'includeDateTime',
   'showTechnicalDetails',
+  'advancedMode',
   'dataWarningDismissed',
   'useAppContext',
   'shakeToReport',

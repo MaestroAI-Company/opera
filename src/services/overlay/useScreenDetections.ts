@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { InteractionManager } from 'react-native';
+import { AppState, InteractionManager } from 'react-native';
 import { ObjectDetector } from './objectDetector';
 import { CaptureRegion, ScreenCapture } from './screenCapture';
 
@@ -11,19 +11,23 @@ export function useScreenDetections(session: number): CaptureRegion[] {
 
   useEffect(() => {
     let cancelled = false;
-    //cold load overlaps capture wait
-    ObjectDetector.prepare();
+    //boxes unread when overlay hidden
+    const appState = AppState.addEventListener('change', state => {
+      if (state !== 'active') cancelled = true;
+    });
 
     const task = InteractionManager.runAfterInteractions(async () => {
       //one analysis after capture lands
       const size = await ScreenCapture.waitForSize(() => cancelled);
       if (!size || cancelled) return;
+      ObjectDetector.prepare();
       const boxes = await ObjectDetector.detect();
-      if (boxes && !cancelled) setFound({ session, boxes });
+      if (boxes && boxes.length > 0 && !cancelled) setFound({ session, boxes });
     });
 
     return () => {
       cancelled = true;
+      appState.remove();
       task.cancel();
     };
   }, [session]);

@@ -5,6 +5,7 @@ export type DeepLinkRoute =
   | { type: "new-chat" }
   | { type: "conversation"; convId: string }
   | { type: "shared"; pasteId: string; secret: string }
+  | { type: "settings" }
   | { type: "unknown" };
 
 const isTauri =
@@ -12,13 +13,19 @@ const isTauri =
 
 export function parseDeepLink(url: string): DeepLinkRoute {
   try {
-    const parsed = new URL(url);
-    const target = parsed.hostname || parsed.pathname.replace(/^\/+/, "");
-    const convId = parsed.searchParams.get("convId");
+    const hashIndex = url.indexOf("#");
     //key stays in fragment, invisible to server
-    const pasteId = parsed.searchParams.get(SHARE_QUERY_PARAM);
-    const secret = parsed.hash.replace(/^#/, "");
+    const secret = hashIndex === -1 ? "" : url.slice(hashIndex + 1);
+    const beforeHash = hashIndex === -1 ? url : url.slice(0, hashIndex);
+    const queryIndex = beforeHash.indexOf("?");
+    const query = queryIndex === -1 ? "" : beforeHash.slice(queryIndex + 1);
+    const path = queryIndex === -1 ? beforeHash : beforeHash.slice(0, queryIndex);
+    const target = path.replace(/^[a-zA-Z][a-zA-Z\d+.-]*:\/*/, "").split("/")[0];
+    const params = new URLSearchParams(query);
+    const convId = params.get("convId");
+    const pasteId = params.get(SHARE_QUERY_PARAM);
     if (target === "new") return { type: "new-chat" };
+    if (target === "settings") return { type: "settings" };
     if (pasteId && secret) return { type: "shared", pasteId, secret };
     if (convId) return { type: "conversation", convId };
     return { type: "unknown" };

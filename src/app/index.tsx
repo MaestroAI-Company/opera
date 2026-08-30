@@ -44,16 +44,21 @@ import { useResponsive } from "../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
 import { CloudSync } from "../services/CloudSyncService";
 import { AIModule } from "../services/ai/AIModule";
-import { buildSystemPrompt, streamAssistantReply } from "../services/ai/generation/chatGeneration";
+import { buildSystemPrompt } from "../services/ai/generation/chatGeneration";
+import { GenerationService } from "../services/ai/generation/GenerationService";
 import { generateSuggestions, Suggestion } from "../services/ai/generation/suggestions";
 import { resolveQuickFlow } from "../services/ai/quickFlow";
 import { arrayBufferToBase64 } from "../services/ai/utils/base64";
-import { Conversation, DB, Message, MessageMetrics } from "../services/db/DatabaseService";
+import { Conversation, DB, Message } from "../services/db/DatabaseService";
 import {
   getInitialDeepLink,
   subscribeToDeepLinks,
   type DeepLinkRoute,
 } from "../services/deeplinks/DeepLinkService";
+import {
+  subscribeToNotificationPress,
+  takePendingNotificationConvId,
+} from "../services/notifications/NotificationService";
 import { splitDocumentBlocks } from "../services/documents/DocumentService";
 import { AppEvents } from "../services/events";
 import { LocationService } from "../services/location/LocationService";
@@ -258,7 +263,6 @@ export default function Index() {
   const streamingContentRef = useRef<string>("");
 
   const [generatingConvId, setGeneratingConvId] = useState<string | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
 
   //refs for background processing
   const activeConversationRef = useRef<Conversation | null>(null);
@@ -552,47 +556,34 @@ export default function Index() {
     setMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, content } : m)));
   }, []);
 
-  //one render per frame of tokens
-  const rafPendingRef = useRef(false);
-  const scheduleFlush = useCallback((msgId: string, convId: string) => {
-    if (rafPendingRef.current) return;
-    rafPendingRef.current = true;
-    requestAnimationFrame(() => {
-      rafPendingRef.current = false;
-      if (activeConversationRef.current?.id !== convId) return;
-      const content = streamingContentRef.current;
-      setMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, content } : m)));
-    });
-  }, []);
-
-  //sync with shared generation from overlay
+  //follow any run, whichever surface started it
   useEffect(() => {
-    return AIModule.SharedGenerationState.subscribe(() => {
-      const activeState = AIModule.SharedGenerationState;
-      if (activeState.activeConvId && activeConversationRef.current?.id === activeState.activeConvId) {
-        if (generatingConvIdRef.current !== activeState.activeConvId) {
-          setGeneratingConvId(activeState.activeConvId);
-          generatingConvIdRef.current = activeState.activeConvId;
-          setStreamingMessageId(activeState.activeMsgId);
+    return GenerationService.subscribe((run) => {
+      if (activeConversationRef.current?.id !== run.convId) return;
+
+      if (run.status === "streaming") {
+        if (generatingConvIdRef.current !== run.convId) {
+          setGeneratingConvId(run.convId);
+          generatingConvIdRef.current = run.convId;
         }
-        streamingContentRef.current = activeState.content;
-        setMessages((prev) => {
-          const msgExists = prev.some(m => m.id === activeState.activeMsgId);
-          if (!msgExists) return prev;
-          return prev.map((m) =>
-            m.id === activeState.activeMsgId
-              ? { ...m, content: activeState.content }
-              : m
-          );
-        });
-      } else if (!activeState.activeConvId && generatingConvIdRef.current === activeConversationRef.current?.id && !isProcessingRef.current) {
-        setGeneratingConvId(null);
-        generatingConvIdRef.current = null;
-        setStreamingMessageId(null);
-        if (activeConversationRef.current) {
-          DB.getMessages(activeConversationRef.current.id).then(setMessages);
-        }
+        //the spinner needs this even when the conversation did not change
+        if (streamingMsgIdRef.current !== run.msgId) setStreamingMessageId(run.msgId);
+        streamingContentRef.current = run.content;
+        setMessages((prev) =>
+          prev.some((m) => m.id === run.msgId)
+            ? prev.map((m) => (m.id === run.msgId ? { ...m, content: run.content } : m))
+            : prev
+        );
+        return;
       }
+
+      //the queue clears its own state once it drains
+      if (isProcessingRef.current) return;
+      setGeneratingConvId(null);
+      generatingConvIdRef.current = null;
+      setStreamingMessageId(null);
+      //incognito runs have no db row to read back
+      if (run.persist) DB.getMessages(run.convId).then(setMessages);
     });
   }, [setStreamingMessageId]);
 
@@ -821,6 +812,11 @@ export default function Index() {
           const target = convs.find((c) => c.id === route.convId);
           if (target) selectConversation(target);
         });
+      } else if (route.type === "settings") {
+        openDrawerSafely(() => {
+          setSettingsInitialSubPage("main");
+          setSettingsDrawerVisible(true);
+        });
       }
     };
     getInitialDeepLink().then((route) => {
@@ -833,11 +829,25 @@ export default function Index() {
       apply(route);
     });
     const unsubscribe = subscribeToDeepLinks(apply);
+    //a finished background generation opens its conversation
+    const drainNotification = () => {
+      takePendingNotificationConvId().then((convId) => {
+        if (!cancelled && convId) apply({ type: "conversation", convId });
+      });
+    };
+    const unsubscribeNotification = subscribeToNotificationPress(drainNotification);
+    //a tap from the background may land before or after the app is back
+    const resumeSub = AppState.addEventListener("change", (state) => {
+      if (state === "active") drainNotification();
+    });
+    drainNotification();
     return () => {
       cancelled = true;
       unsubscribe();
+      unsubscribeNotification();
+      resumeSub.remove();
     };
-  }, [dbReady, selectConversation, startNewConversation, openSharedConversation]);
+  }, [dbReady, selectConversation, startNewConversation, openSharedConversation, openDrawerSafely]);
 
   //apply pending conversation deeplink once the db is ready
   useEffect(() => {
@@ -1000,70 +1010,29 @@ export default function Index() {
         setStreamingMessageId(assistantMsg.id);
         streamingContentRef.current = "";
 
-        abortControllerRef.current = new AbortController();
+        const run = await GenerationService.start({
+          convId: taskConv.id,
+          msgId: assistantMsg.id,
+          prompt: text,
+          model: taskSelectedModel,
+          systemPrompt: taskSystemPrompt,
+          history: taskHistory,
+          think: taskReflection === "none" ? false : taskReflection,
+          persist: !isIncognitoTask,
+          noModelMessage: "Please select a model from the top menu before sending a message.",
+        });
 
-        let isError = false;
-        let isAborted = false;
-        let messageMetrics: MessageMetrics | undefined;
-        let messageSources: Message['sources'];
-
-        //send to AI and stream chunks
-        if (!taskSelectedModel) {
-          isError = true;
-          streamingContentRef.current = "Please select a model from the top menu before sending a message.";
-          showAssistantContent(assistantMsg.id, taskConv.id, streamingContentRef.current);
-          abortControllerRef.current = null;
-        } else {
-          try {
-            const outcome = await streamAssistantReply({
-              model: taskSelectedModel,
-              systemPrompt: taskSystemPrompt,
-              history: taskHistory,
-              think: taskReflection === "none" ? false : taskReflection,
-              signal: abortControllerRef.current.signal,
-              onContent: (content) => {
-                streamingContentRef.current = content;
-                scheduleFlush(assistantMsg.id, taskConv.id);
-              },
-              onMetrics: (m) => {
-                messageMetrics = m;
-                if (activeConversationRef.current?.id === taskConv.id) {
-                  setMessages((prev) => prev.map((msg) => msg.id === assistantMsg.id ? { ...msg, metrics: m } : msg));
-                }
-              },
-            });
-
-            if (outcome.status === "error") {
-              isError = true;
-              streamingContentRef.current = `Error during generation: ${outcome.error ?? "unknown error"}`;
-            } else {
-              isAborted = outcome.status === "aborted";
-              streamingContentRef.current = outcome.content;
-            }
-            messageSources = outcome.sources;
-            showAssistantContent(assistantMsg.id, taskConv.id, streamingContentRef.current);
-            if (messageSources && messageSources.length > 0 && activeConversationRef.current?.id === taskConv.id) {
-              setMessages((prev) => prev.map((msg) => msg.id === assistantMsg.id ? { ...msg, sources: messageSources } : msg));
-            }
-          } finally {
-            abortControllerRef.current = null;
-          }
+        const isError = run.status === "error";
+        const isAborted = run.status === "aborted";
+        streamingContentRef.current = run.content;
+        showAssistantContent(assistantMsg.id, taskConv.id, run.content);
+        if (activeConversationRef.current?.id === taskConv.id) {
+          setMessages((prev) => prev.map((msg) => msg.id === assistantMsg.id
+            ? { ...msg, sources: run.sources ?? msg.sources, metrics: run.metrics ?? msg.metrics }
+            : msg));
         }
-
-        if (!isIncognitoTask) {
-          //keep partial text on error
-          await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
-          if (!isError) {
-            if (messageMetrics) {
-              await DB.updateMessageMetrics(assistantMsg.id, messageMetrics);
-            }
-            if (messageSources && messageSources.length > 0) {
-              await DB.updateMessageSources(assistantMsg.id, messageSources);
-            }
-            //refresh conversation list (updatedAt changed)
-            await loadConversations();
-          }
-        }
+        //refresh conversation list (updatedAt changed)
+        if (!isIncognitoTask && !isError) await loadConversations();
 
         //generate AI title for new conversations
         if (isFirstMessage && !isIncognitoTask && !isError) {
@@ -1100,7 +1069,7 @@ export default function Index() {
     },
     //processQueue is recreated every render, keeping it out avoids churn
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [dbReady, incognitoMode, activeConversation, selectedModel, selectedReflection, generateTitle, userInstruction, aiService, ollamaUrl, scheduleFlush]
+    [dbReady, incognitoMode, activeConversation, selectedModel, selectedReflection, generateTitle, userInstruction, aiService, ollamaUrl]
   );
 
   //switch active provider or server
@@ -1164,7 +1133,7 @@ export default function Index() {
     if (!activeConversation) return;
 
     if (generatingConvId === activeConversation.id) {
-      abortControllerRef.current?.abort();
+      GenerationService.stop(activeConversation.id);
     }
 
     const msgIndex = messagesRef.current.findIndex(m => m.id === aiMessageId);
@@ -1210,70 +1179,32 @@ export default function Index() {
       generatingConvIdRef.current = taskConv.id;
       setStreamingMessageId(assistantMsg.id);
       streamingContentRef.current = "";
-      abortControllerRef.current = new AbortController();
-      let isError = false;
-      let isAborted = false;
-      let messageMetrics: MessageMetrics | undefined;
-      let messageSources: Message['sources'];
-
-      if (!taskSelectedModel) {
-        isError = true;
-        streamingContentRef.current = "Please select a model from the top menu before sending a message.";
-        showAssistantContent(assistantMsg.id, taskConv.id, streamingContentRef.current);
-        abortControllerRef.current = null;
-      } else {
-        try {
-          const outcome = await streamAssistantReply({
-            model: taskSelectedModel,
-            systemPrompt: taskSystemPrompt,
-            history: taskHistory,
-            think: taskReflection === "none" ? false : taskReflection,
-            signal: abortControllerRef.current.signal,
-            onContent: (content) => {
-              streamingContentRef.current = content;
-              scheduleFlush(assistantMsg.id, taskConv.id);
-            },
-            onMetrics: (m) => {
-              messageMetrics = m;
-              if (activeConversationRef.current?.id === taskConv.id) {
-                setMessages((prev) => prev.map((msg) => msg.id === assistantMsg.id ? { ...msg, metrics: m } : msg));
-              }
-            },
-          });
-
-          if (outcome.status === "error") {
-            isError = true;
-            streamingContentRef.current = `Error during generation: ${outcome.error ?? "unknown error"}`;
-          } else {
-            isAborted = outcome.status === "aborted";
-            streamingContentRef.current = outcome.content;
-          }
-          messageSources = outcome.sources;
-          showAssistantContent(assistantMsg.id, taskConv.id, streamingContentRef.current);
-          if (messageSources && messageSources.length > 0 && activeConversationRef.current?.id === taskConv.id) {
-            setMessages((prev) => prev.map((msg) => msg.id === assistantMsg.id ? { ...msg, sources: messageSources } : msg));
-          }
-        } finally {
-          abortControllerRef.current = null;
-        }
-      }
-
-      if (!isIncognitoTask) {
-        //keep partial text on error
-        await DB.updateMessageContent(assistantMsg.id, streamingContentRef.current);
-        if (!isError) {
-          if (messageMetrics) {
-            await DB.updateMessageMetrics(assistantMsg.id, messageMetrics);
-          }
-          if (messageSources && messageSources.length > 0) {
-            await DB.updateMessageSources(assistantMsg.id, messageSources);
-          }
-          await loadConversations();
-        }
-      }
 
       //the reply changed, so do the follow-ups
       const lastUser = [...taskHistory].reverse().find((m) => m.role === "user");
+
+      const run = await GenerationService.start({
+        convId: taskConv.id,
+        msgId: assistantMsg.id,
+        prompt: lastUser?.content ?? "",
+        model: taskSelectedModel,
+        systemPrompt: taskSystemPrompt,
+        history: taskHistory,
+        think: taskReflection === "none" ? false : taskReflection,
+        persist: !isIncognitoTask,
+        noModelMessage: "Please select a model from the top menu before sending a message.",
+      });
+
+      const isError = run.status === "error";
+      const isAborted = run.status === "aborted";
+      streamingContentRef.current = run.content;
+      showAssistantContent(assistantMsg.id, taskConv.id, run.content);
+      if (activeConversationRef.current?.id === taskConv.id) {
+        setMessages((prev) => prev.map((msg) => msg.id === assistantMsg.id
+          ? { ...msg, sources: run.sources ?? msg.sources, metrics: run.metrics ?? msg.metrics }
+          : msg));
+      }
+      if (!isIncognitoTask && !isError) await loadConversations();
       if (!isError && !isAborted && taskSelectedModel && lastUser) {
         generateSuggestions({
           model: taskSelectedModel,
@@ -1298,14 +1229,14 @@ export default function Index() {
 
     //processQueue is recreated every render, keeping it out avoids churn
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeConversation, generatingConvId, incognitoMode, selectedModel, ollamaUrl, aiService, userInstruction, selectedReflection, scheduleFlush]);
+  }, [activeConversation, generatingConvId, incognitoMode, selectedModel, ollamaUrl, aiService, userInstruction, selectedReflection]);
 
   const handleStop = useCallback(async () => {
     const currentConvId = activeConversation?.id;
     if (!currentConvId) return;
 
     if (generatingConvId === currentConvId) {
-      abortControllerRef.current?.abort();
+      GenerationService.stop(currentConvId);
     } else if (pendingConvIds.includes(currentConvId)) {
       //cancel all pending tasks for this conversation
       const tasksToCancel = requestQueueRef.current.filter(i => i.convId === currentConvId);

@@ -1,7 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
-import { useEffect, useMemo, useState } from 'react';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
-import { Colors, Radius } from '../../../constants/theme';
+import { useMemo, useState } from 'react';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Colors, Fonts, FontSizes, Radius, Spacing } from '../../../constants/theme';
 import { ScreenCode } from '../../services/overlay/screenCapture';
 
 type Size = { w: number; h: number };
@@ -28,6 +28,11 @@ const frame = (rect: { x1: number; y1: number; x2: number; y2: number }) => ({
   height: rect.y2 - rect.y1,
 });
 
+//truncate preview past 10 characters
+function truncate(value: string) {
+  return value.length > 20 ? `${value.slice(0, 20)}...` : value;
+}
+
 //qr only ocr text is native
 export default function TextLayer({ codes, onVibrate }: Props) {
   const [size, setSize] = useState<Size>({ w: 1, h: 1 });
@@ -51,7 +56,15 @@ export default function TextLayer({ codes, onVibrate }: Props) {
       onLayout={e => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
     >
       {codeRects.map((rect, i) => (
-        <Pressable key={`code-${i}`} style={[styles.code, frame(rect)]} onPress={() => openCode(codes[i].value)} />
+        <Pressable key={`code-${i}`} style={[styles.code, frame(rect)]} onPress={() => openCode(codes[i].value)}>
+          <View style={styles.badgeWrapper} pointerEvents="none">
+            <View style={styles.badge}>
+              <Text style={styles.label}>
+                {truncate(codes[i].value)}
+              </Text>
+            </View>
+          </View>
+        </Pressable>
       ))}
     </View>
   );
@@ -64,5 +77,31 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
     borderRadius: Radius.xxl,
     backgroundColor: Colors.primaryHeader,
+    overflow: 'visible',
+  },
+  badgeWrapper: {
+    position: 'absolute',
+    left: -1000,
+    right: -1000,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badge: {
+    backgroundColor: Colors.surface,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    borderRadius: Radius.xxl,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  label: {
+    fontFamily: Fonts.body,
+    fontSize: FontSizes.xs,
+    color: Colors.textPrimary,
   },
 });

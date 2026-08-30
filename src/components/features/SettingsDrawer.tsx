@@ -36,6 +36,7 @@ import NotificationCard from "../ui/NotificationCard";
 import IconButton from "../ui/IconButton";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import Selector, { SelectorOption } from "../ui/Selector";
+import Slider from "../ui/Slider";
 import SliderToggle from "../ui/SliderToggle";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
@@ -293,6 +294,28 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const cloudStorageOptions = [
     { id: "none", label: "None" },
     ...CLOUD_PROVIDERS.map(def => ({ id: def.id, label: def.label })),
+  ];
+
+  const ollamaKeepAliveOptions = [
+    { id: "300", label: "5m" },
+    { id: "600", label: "10m" },
+    { id: "1800", label: "30m" },
+    { id: "3600", label: "1h" },
+    { id: "7200", label: "2h" },
+    { id: "18000", label: "5h" },
+    { id: "43200", label: "12h" },
+    { id: "86400", label: "24h" },
+    { id: "-1", label: "∞" },
+  ];
+
+  const ollamaContextLengthOptions = [
+    { id: "8192", label: "8k" },
+    { id: "16384", label: "16k" },
+    { id: "32768", label: "32k" },
+    { id: "65536", label: "64k" },
+    { id: "131072", label: "128k" },
+    { id: "262144", label: "256k" },
+    { id: "524288", label: "512k" },
   ];
 
   type PermissionState = "granted" | "denied" | "undetermined";
@@ -1713,24 +1736,46 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             <Text style={[styles.settingLabel, { marginTop: 20 }]}>Context Length</Text>
             <Text style={[styles.helpText, { marginBottom: 10 }]}>Maximum number of tokens the model can use.</Text>
             <Group>
-              <TextInputField
-                icon={messageIcon}
-                placeholder="8192"
-                value={ollamaContextLength}
-                onChangeText={setOllamaContextLength}
-                keyboardType="numeric"
-              />
+              {advancedMode ? (
+                <TextInputField
+                  icon={messageIcon}
+                  placeholder="8192"
+                  value={ollamaContextLength}
+                  onChangeText={setOllamaContextLength}
+                  keyboardType="numeric"
+                />
+              ) : (
+                <Slider
+                  icon={messageIcon}
+                  options={ollamaContextLengthOptions}
+                  selectedValue={String(effectiveContextLength())}
+                  onSelect={setOllamaContextLength}
+                />
+              )}
             </Group>
             <Text style={[styles.settingLabel, { marginTop: 20 }]}>Model Keep Alive</Text>
-            <Text style={[styles.helpText, { marginBottom: 10 }]}>How long the model stays loaded in memory after a request, in seconds. Use -1 to keep it loaded forever.</Text>
+            <Text style={[styles.helpText, { marginBottom: 10 }]}>
+              {advancedMode
+                ? "How long the model stays loaded in memory after a request, in seconds. Use -1 to keep it loaded forever."
+                : "How long the model stays loaded in memory after a request."}
+            </Text>
             <Group>
-              <TextInputField
-                icon={timeIcon}
-                placeholder="300"
-                value={ollamaKeepAlive}
-                onChangeText={setOllamaKeepAlive}
-                keyboardType="numeric"
-              />
+              {advancedMode ? (
+                <TextInputField
+                  icon={timeIcon}
+                  placeholder="300"
+                  value={ollamaKeepAlive}
+                  onChangeText={setOllamaKeepAlive}
+                  keyboardType="numeric"
+                />
+              ) : (
+                <Slider
+                  icon={timeIcon}
+                  options={ollamaKeepAliveOptions}
+                  selectedValue={ollamaKeepAlive}
+                  onSelect={setOllamaKeepAlive}
+                />
+              )}
             </Group>
           </>
         )}

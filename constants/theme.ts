@@ -168,9 +168,11 @@ export const FontSizes = {
   code: 13,
   //additional sizes in use
   xxs: 8,
+  xs: 10,
   md: 16,
   lg: 18,
   xl: 19,
+  xL: 19,
   xxxl: 32,
 } as const;
 

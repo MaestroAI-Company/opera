@@ -239,5 +239,6 @@ export function tryOpenSharedInApp(pasteId: string, secret: string): void {
   } catch {
     return;
   }
-  window.location.href = `opera://share?${SHARE_QUERY_PARAM}=${encodeURIComponent(pasteId)}#${secret}`;
+
+  window.location.href = `opera://?${SHARE_QUERY_PARAM}=${encodeURIComponent(pasteId)}#${secret}`;
 }

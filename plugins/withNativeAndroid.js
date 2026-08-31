@@ -102,6 +102,15 @@ function withNativeAndroid(config) {
       });
     }
 
+    //expo-sensors pedometer permission unused by app
+    manifestDoc.manifest['uses-permission'] = (manifestDoc.manifest['uses-permission'] || []).filter(
+      (p) => p.$['android:name'] !== 'android.permission.ACTIVITY_RECOGNITION'
+    );
+    //merger re-adds library permissions unless forced off
+    manifestDoc.manifest['uses-permission'].push({
+      $: { 'android:name': 'android.permission.ACTIVITY_RECOGNITION', 'tools:node': 'remove' },
+    });
+
     //expose app settings to the system
     if (!application.activity.some(a => a.$['android:name'] === '.SettingsActivity')) {
       application.activity.push({

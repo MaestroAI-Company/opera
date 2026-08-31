@@ -55,6 +55,10 @@ jobs:
       - name: Prebuild Android project
         run: npx expo prebuild --platform android
 
+      # r8 oom without a bigger heap
+      - name: Increase Gradle daemon heap
+        run: echo "org.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m" >> android/gradle.properties
+
       - uses: gradle/actions/setup-gradle@v4
 
       # absent on push-to-main builds, so those stay signed with the debug key
@@ -67,9 +71,9 @@ jobs:
 
       - name: Build release APK and AAB
         env:
-          # x86/x86_64 are emulator-only ABIs; skipping them avoids an NDK 27
-          # clang crash compiling reanimated for x86 and halves build time
-          ORG_GRADLE_PROJECT_reactNativeArchitectures: arm64-v8a,armeabi-v7a
+          # x86 abis crash on ndk27 clang
+          # armeabi-v7a unsupported by executorch
+          ORG_GRADLE_PROJECT_reactNativeArchitectures: arm64-v8a
           UPLOAD_STORE_PASSWORD: ${{ secrets.UPLOAD_STORE_PASSWORD }}
           UPLOAD_KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
           UPLOAD_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
@@ -82,13 +86,6 @@ jobs:
         with:
           name: app-release.apk
           path: android/app/build/outputs/apk/release/app-release.apk
-          retention-days: 7
-
-      # only correctly signed when the upload keystore secrets are set, needed for Play Store uploads
-      - uses: actions/upload-artifact@v4
-        with:
-          name: app-release.aab
-          path: android/app/build/outputs/bundle/release/app-release.aab
           retention-days: 7
 
       - name: Publish beta release

@@ -2,6 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import { DeviceEventEmitter } from 'react-native';
 import { AppEvents } from '../events';
 import { openSharedDatabase } from '../db/sqlite';
+import { defaultLocale } from '../../i18n/catalogs';
 
 export type AppSettings = {
   language: string;
@@ -38,7 +39,7 @@ export type AppSettings = {
 };
 
 const DEFAULTS: AppSettings = {
-  language: 'fr',
+  language: defaultLocale(),
   theme: 'system',
   aiService: 'ollama',
   ollamaUrl: '',

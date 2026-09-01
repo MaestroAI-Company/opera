@@ -1,6 +1,7 @@
 import { DeviceEventEmitter } from 'react-native';
 import { AppEvents } from '../events';
 import { DEFAULT_OLLAMA_URL } from '../ai/utils/imageToBase64';
+import { defaultLocale } from '../../i18n/catalogs';
 
 export type AppSettings = {
   language: string;
@@ -35,7 +36,7 @@ export type AppSettings = {
 };
 
 const DEFAULTS: AppSettings = {
-  language: 'fr',
+  language: defaultLocale(),
   theme: 'system',
   aiService: 'ollama',
   ollamaUrl: DEFAULT_OLLAMA_URL,

@@ -14,6 +14,7 @@ import SiteHead from "../components/SiteHead";
 import SplashScreenComponent from "../components/ui/SplashScreen";
 import TauriTitleBar from "../components/features/TauriTitleBar";
 import { Radius } from "../../constants/theme";
+import { initI18n } from "../i18n";
 import { initTheme, useIsDark } from "../hooks/useTheme";
 import { installCrashHandler } from "../services/logging/CrashReporter";
 import { installLogger } from "../services/logging/Logger";
@@ -34,6 +35,9 @@ SplashScreen.preventAutoHideAsync();
 if (typeof window !== "undefined") {
   //resolve palette before first paint
   initTheme();
+
+  //resolve locale before first paint
+  initI18n();
 
   //crash reported on next launch
   installCrashHandler();

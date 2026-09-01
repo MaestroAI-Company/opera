@@ -4,6 +4,7 @@ import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme"
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useResponsive } from "../../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useT, type TranslationFn } from "../../i18n";
 import { CloudSync } from "../../services/CloudSyncService";
 import { Conversation, DB } from "../../services/db/DatabaseService";
 import ActionButton from "../ui/ActionButton";
@@ -38,19 +39,17 @@ type ConversationsDrawerProps = {
 };
 
 //format group title based on date
-function getGroupTitle(timestamp: number): string {
+function getGroupTitle(timestamp: number, t: TranslationFn): string {
   const date = new Date(timestamp);
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const diffTime = startOfToday - timestamp;
 
-  if (diffTime <= 0) return "LAST DISCUSSION";
+  if (diffTime <= 0) return t("conversations.group.last");
 
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-  if (diffDays === 1) return "1 day ago";
-  if (diffDays === 2) return "2 day ago";
-  if (diffDays === 3) return "3 day ago";
+  if (diffDays <= 3) return t("conversations.group.daysAgo", { count: diffDays });
 
   const dd = String(date.getDate()).padStart(2, '0');
   const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -78,6 +77,7 @@ export default function ConversationsDrawer({
 }: ConversationsDrawerProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const { width } = useResponsive();
   const drawerWidth = drawerWidthFor(width);
 
@@ -184,7 +184,7 @@ export default function ConversationsDrawer({
     const groupMap = new Map<string, Conversation[]>();
 
     conversations.forEach(c => {
-      const title = getGroupTitle(c.updatedAt);
+      const title = getGroupTitle(c.updatedAt, t);
       if (!groupMap.has(title)) {
         groupMap.set(title, []);
         grouped.push({ title, data: groupMap.get(title)! });
@@ -193,7 +193,7 @@ export default function ConversationsDrawer({
     });
 
     return { pinnedConversations: pinned, groups: grouped };
-  }, [conversations]);
+  }, [conversations, t]);
 
   const renderConversationRow = (conv: Conversation) => {
     const isSelected = conv.id === selectedConversationId;
@@ -257,7 +257,7 @@ export default function ConversationsDrawer({
   const searchContent = (
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Text style={styles.title}>Search</Text>
+        <Text style={styles.title}>{t("conversations.search.title")}</Text>
       </View>
 
       <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24, gap: 12 }}>
@@ -269,7 +269,7 @@ export default function ConversationsDrawer({
           <Group>
             <TextInputField
               icon={searchIcon}
-              placeholder="Search conversations"
+              placeholder={t("conversations.search.placeholder")}
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoFocus
@@ -279,9 +279,9 @@ export default function ConversationsDrawer({
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.sectionTitle}>RESULTS</Text>
+        <Text style={styles.sectionTitle}>{t("conversations.search.results")}</Text>
         {searchResults.length === 0 && searchQuery.length > 0 ? (
-          <Text style={styles.emptyText}>No results found</Text>
+          <Text style={styles.emptyText}>{t("conversations.search.empty")}</Text>
         ) : (
           searchResults.map((conv) => {
             const isSelected = conv.id === selectedSearchId;
@@ -347,12 +347,12 @@ export default function ConversationsDrawer({
 
   const innerContent = (
     <>
-      <Text style={styles.title}>Discussions</Text>
+      <Text style={styles.title}>{t("conversations.title")}</Text>
 
       <Group style={styles.quickActionsSpacing}>
         <ActionButton
           icon={newIcon}
-          label="New discussion"
+          label={t("conversations.new")}
           onPress={() => {
             onNewConversation();
             if (!isDesktop) onClose();
@@ -360,19 +360,19 @@ export default function ConversationsDrawer({
         />
         <ActionButton
           icon={searchIcon}
-          label="Search"
+          label={t("conversations.search.action")}
           onPress={() => setIsSearching(true)}
         />
       </Group>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {conversations.length === 0 && (
-          <Text style={styles.emptyText}>No conversation</Text>
+          <Text style={styles.emptyText}>{t("conversations.empty")}</Text>
         )}
 
         {pinnedConversations.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>PINS</Text>
+            <Text style={styles.sectionTitle}>{t("conversations.pins")}</Text>
             {pinnedConversations.map(renderConversationRow)}
           </View>
         )}
@@ -390,12 +390,12 @@ export default function ConversationsDrawer({
   const notificationModal = (
     <NotificationModal
       visible={!!deleteConfirmId}
-      title="Delete Conversation"
-      message="Are you sure you want to delete this conversation? This action cannot be undone."
+      title={t("conversations.delete.title")}
+      message={t("conversations.delete.message")}
       onClose={() => setDeleteConfirmId(null)}
       buttons={[
         {
-          text: "Delete",
+          text: t("common.delete"),
           style: "secondary",
           onPress: () => {
             if (deleteConfirmId) {
@@ -405,7 +405,7 @@ export default function ConversationsDrawer({
           }
         },
         {
-          text: "Cancel",
+          text: t("common.cancel"),
           style: "danger",
           onPress: () => setDeleteConfirmId(null)
         },

@@ -1,6 +1,7 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useT } from "../../i18n";
 import { CloudUserInfo } from '../../services/cloud/CloudProvider';
 
 type CloudSyncBoxProps = {
@@ -36,6 +37,7 @@ export default function CloudSyncBox({
 }: CloudSyncBoxProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   if (!userInfo) return null;
 
   const locked = status === "locked";
@@ -56,7 +58,7 @@ export default function CloudSyncBox({
 
       <View style={styles.statusRow}>
         <Text style={styles.statusText}>
-          {locked ? "Setup not finished" : lastSyncTime ? `Last synced: ${new Date(lastSyncTime).toLocaleString()}` : "Ready to sync"}
+          {locked ? t("cloudSync.setupIncomplete") : lastSyncTime ? t("cloudSync.lastSynced", { date: new Date(lastSyncTime).toLocaleString() }) : t("cloudSync.ready")}
         </Text>
         {!locked && lastSyncTime && lastSyncSize != null && (
           <Text style={styles.statusText}>
@@ -69,21 +71,21 @@ export default function CloudSyncBox({
         {locked ? (
           hasBackup ? (
             <Pressable style={({ pressed, hovered }) => [styles.actionBtn, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]} onPress={onEnterPin}>
-              <Text style={styles.actionBtnText}>Enter PIN</Text>
+              <Text style={styles.actionBtnText}>{t("cloudSync.enterPin")}</Text>
             </Pressable>
           ) : (
             <Pressable style={({ pressed, hovered }) => [styles.actionBtn, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]} onPress={onCreatePin}>
-              <Text style={styles.actionBtnText}>Create PIN</Text>
+              <Text style={styles.actionBtnText}>{t("cloudSync.createPin")}</Text>
             </Pressable>
           )
         ) : (
           <>
             <Pressable style={({ pressed, hovered }) => [styles.actionBtn, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]} onPress={onDisconnect}>
-              <Text style={styles.actionBtnText}>Disconnect</Text>
+              <Text style={styles.actionBtnText}>{t("cloudSync.disconnect")}</Text>
             </Pressable>
             <Pressable style={({ pressed, hovered }) => [styles.actionBtn, styles.syncBtn, (pressed || hovered) && { backgroundColor: Colors.primaryPressed }]} onPress={onSync} disabled={isSyncing}>
               <Text style={[styles.actionBtnText, { color: Colors.textOnPrimary }]}>
-                {isSyncing ? "Syncing..." : "Sync Now"}
+                {isSyncing ? t("cloudSync.syncing") : t("cloudSync.syncNow")}
               </Text>
             </Pressable>
           </>

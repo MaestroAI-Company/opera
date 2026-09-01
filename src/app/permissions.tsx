@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useResponsive } from "../hooks/useResponsive";
+import { useT, type TranslationKey } from "../i18n";
 import { STT } from "../services/speech/STTService";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../constants/theme";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
@@ -33,8 +34,8 @@ const calendarIcon = require("../../assets/icons/calendar.png");
 type Permission = {
   id: string;
   icon: any;
-  label: string;
-  description: string;
+  labelKey: TranslationKey;
+  descriptionKey: TranslationKey;
   status: "idle" | "granted" | "denied";
   request: () => Promise<boolean>;
 };
@@ -45,8 +46,8 @@ const WEB_PERMISSIONS: Permission[] = [
   {
     id: "microphone",
     icon: micIcon,
-    label: "Microphone",
-    description: "To dictate your messages by voice.",
+    labelKey: "permissions.microphone.label",
+    descriptionKey: "permissions.microphone.description",
     status: "idle",
     request: async () => {
       try {
@@ -61,8 +62,8 @@ const WEB_PERMISSIONS: Permission[] = [
   {
     id: "camera",
     icon: cameraIcon,
-    label: "Camera",
-    description: "To photograph and analyze documents.",
+    labelKey: "permissions.camera.label",
+    descriptionKey: "permissions.camera.description",
     status: "idle",
     request: async () => {
       try {
@@ -77,8 +78,8 @@ const WEB_PERMISSIONS: Permission[] = [
   {
     id: "location",
     icon: locationIcon,
-    label: "Location",
-    description: "To give the assistant local context for more relevant answers.",
+    labelKey: "permissions.location.label",
+    descriptionKey: "permissions.location.description",
     status: "idle",
     request: async () => {
       const granted = await LocationService.requestPermission();
@@ -95,8 +96,8 @@ const NATIVE_PERMISSIONS: Permission[] = [
   {
     id: "microphone",
     icon: micIcon,
-    label: "Microphone",
-    description: "To dictate your messages by voice.",
+    labelKey: "permissions.microphone.label",
+    descriptionKey: "permissions.microphone.description",
     status: "idle",
     request: async () => {
       return await STT.requestPermissions();
@@ -105,8 +106,8 @@ const NATIVE_PERMISSIONS: Permission[] = [
   {
     id: "camera",
     icon: cameraIcon,
-    label: "Camera",
-    description: "To photograph and analyze documents.",
+    labelKey: "permissions.camera.label",
+    descriptionKey: "permissions.camera.description",
     status: "idle",
     request: async () => {
       const { granted } = await ImagePicker.requestCameraPermissionsAsync();
@@ -116,8 +117,8 @@ const NATIVE_PERMISSIONS: Permission[] = [
   {
     id: "photos",
     icon: photoIcon,
-    label: "Photos",
-    description: "To share images from your gallery.",
+    labelKey: "permissions.photos.label",
+    descriptionKey: "permissions.photos.description",
     status: "idle",
     request: async () => {
       const { granted } = await MediaLibrary.requestPermissionsAsync();
@@ -127,8 +128,8 @@ const NATIVE_PERMISSIONS: Permission[] = [
   {
     id: "contacts",
     icon: contactIcon,
-    label: "Contacts",
-    description: "To search your contacts for phone numbers and emails.",
+    labelKey: "permissions.contacts.label",
+    descriptionKey: "permissions.contacts.description",
     status: "idle",
     request: async () => {
       return await ContactsService.requestPermission();
@@ -137,8 +138,8 @@ const NATIVE_PERMISSIONS: Permission[] = [
   {
     id: "calendar",
     icon: calendarIcon,
-    label: "Calendar",
-    description: "To read and manage events on your calendar.",
+    labelKey: "permissions.calendar.label",
+    descriptionKey: "permissions.calendar.description",
     status: "idle",
     request: async () => {
       return await CalendarService.requestPermission();
@@ -147,8 +148,8 @@ const NATIVE_PERMISSIONS: Permission[] = [
   {
     id: "location",
     icon: locationIcon,
-    label: "Location",
-    description: "To give the assistant local context for more relevant answers.",
+    labelKey: "permissions.location.label",
+    descriptionKey: "permissions.location.description",
     status: "idle",
     request: async () => {
       const granted = await LocationService.requestPermission();
@@ -164,6 +165,7 @@ const NATIVE_PERMISSIONS: Permission[] = [
 export default function PermissionsPage() {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isLargeScreen } = useResponsive();
@@ -200,13 +202,13 @@ export default function PermissionsPage() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={isLargeScreen && styles.pageContentLarge}>
           <View style={styles.header}>
-          <Text style={styles.title}>Permissions</Text>
+          <Text style={styles.title}>{t("permissions.title")}</Text>
           <Text style={styles.subtitle}>
             {isWeb
-              ? "Opera needs a few permissions to work at its best. You can manage them at any time from your browser's site settings."
-              : <>Opera needs a few permissions to work at its best. You can change them at any time in your device{" "}
+              ? t("permissions.subtitle.web")
+              : <>{t("permissions.subtitle.native")}{" "}
                 <Text style={styles.settingsLink} onPress={() => Linking.openSettings()}>
-                  settings ↗
+                  {t("permissions.subtitle.settingsLink")}
                 </Text>
                 .</>}
           </Text>
@@ -226,8 +228,8 @@ export default function PermissionsPage() {
                   />
                 </View>
                 <View style={styles.permissionText}>
-                  <Text style={styles.permissionLabel}>{perm.label}</Text>
-                  <Text style={styles.permissionDesc}>{perm.description}</Text>
+                  <Text style={styles.permissionLabel}>{t(perm.labelKey)}</Text>
+                  <Text style={styles.permissionDesc}>{t(perm.descriptionKey)}</Text>
                 </View>
                 <Pressable
                   style={({ pressed, hovered }) => [
@@ -244,7 +246,7 @@ export default function PermissionsPage() {
                     isGranted && styles.permissionBtnTextGranted,
                     isDenied && styles.permissionBtnTextDenied,
                   ]}>
-                    {isGranted ? "Allowed" : isDenied ? "Denied" : "Allow"}
+                    {isGranted ? t("permissions.allowed") : isDenied ? t("permissions.denied") : t("permissions.allow")}
                   </Text>
                 </Pressable>
               </View>
@@ -259,10 +261,10 @@ export default function PermissionsPage() {
           style={({ pressed }) => [styles.button, isLargeScreen && styles.buttonLarge, pressed && styles.buttonPressed]}
           onPress={handleContinue}
         >
-          <Text style={styles.buttonText}>Continue</Text>
+          <Text style={styles.buttonText}>{t("permissions.continue")}</Text>
         </Pressable>
         <Pressable onPress={handleContinue} style={({ pressed }) => [pressed && { opacity: 0.5 }]}>
-          <Text style={styles.skipText}>Skip this step</Text>
+          <Text style={styles.skipText}>{t("permissions.skip")}</Text>
         </Pressable>
       </View>
     </View>

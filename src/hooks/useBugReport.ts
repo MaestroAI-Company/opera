@@ -4,6 +4,7 @@ import { Linking, Platform } from 'react-native';
 import { buildIssueUrl } from '../services/github/GitHubIssues';
 import type { Crash } from '../services/logging/CrashReporter';
 import { getRelevantLogs } from '../services/logging/Logger';
+import { t } from '../i18n';
 import { copyScreenshot } from '../services/logging/ReportScreenshot';
 
 export type NotifyFn = (title: string, message: string, buttons?: { text: string; onPress: () => void }[]) => void;
@@ -11,9 +12,7 @@ export type NotifyFn = (title: string, message: string, buttons?: { text: string
 //log lines attached per report
 export const REPORT_LOG_LINES = 20;
 
-//consent text lists shared data
-export const REPORT_CONSENT =
-  "Posted publicly on GitHub: your description, these logs, your device and app version, and your GitHub username.";
+
 
 //shared by shake sheet and settings
 export function useBugReport(notify: NotifyFn) {
@@ -37,7 +36,7 @@ export function useBugReport(notify: NotifyFn) {
 
   const send = useCallback(async (onSent?: () => void) => {
     if (!text.trim() && !crash) {
-      notify("Nothing to send", "Describe the issue first.");
+      notify(t("bugReport.empty.title"), t("bugReport.empty.message"));
       return;
     }
     //clipboard set before github opens
@@ -49,7 +48,7 @@ export function useBugReport(notify: NotifyFn) {
       crash,
       deviceInfo: `${Platform.OS} ${Platform.Version} — Opera ${Constants.expoConfig?.version ?? "?"}`,
     });
-    Linking.openURL(url).catch(() => notify("Could not open GitHub", "Please try again."));
+    Linking.openURL(url).catch(() => notify(t("bugReport.githubFailed.title"), t("bugReport.githubFailed.message")));
     reset();
     onSent?.();
   }, [text, logs, crash, screenshot, notify, reset]);

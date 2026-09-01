@@ -6,6 +6,7 @@ import { vs2015 } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { getColors, getThemedStyles, useColors, useThemedStyles } from "../../hooks/useTheme";
+import { t } from "../../i18n";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { WidgetManager } from "../../services/widgets/WidgetManager";
 import WidgetWrapper from "../widgets/WidgetWrapper";
@@ -37,7 +38,7 @@ const ToolCallBubble = ({ toolName, isGenerating }: { toolName: string, isGenera
     <View style={s.toolCallBubble}>
       <Image source={toolIcon} style={s.toolCallIcon} />
       <Animated.Text style={[s.toolCallLabel, { opacity }]}>
-        {isGenerating ? `Using tool: ${toolName}...` : `Used tool: ${toolName}`}
+        {isGenerating ? t("markdown.tool.using", { name: toolName }) : t("markdown.tool.used", { name: toolName })}
       </Animated.Text>
     </View>
   );
@@ -403,10 +404,10 @@ export function deriveChatDisplay(raw: string, isGenerating: boolean, liveTool: 
       currentThought = extractThinkStep(thinkingText);
     } else if (liveName) {
       currentThought = liveName === 'web_search'
-        ? `Searching the web for "${liveTool?.args?.query || ''}"...`
-        : `Running tool: ${liveName}...`;
+        ? t('markdown.tool.searching', { query: liveTool?.args?.query || '' })
+        : t('markdown.tool.running', { name: liveName });
     } else if (canThink) {
-      currentThought = 'Thinking...';
+      currentThought = t('markdown.thinking');
     }
   }
 

@@ -3,6 +3,7 @@ import { LayoutChangeEvent, LayoutRectangle, Modal, PanResponder, Pressable, Scr
 import Animated, { interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useT } from "../../i18n";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const arrowDownIcon = require("../../../assets/icons/down_arrow.png");
@@ -41,12 +42,13 @@ export default function Selector({
   options,
   selectedValue,
   onSelect,
-  placeholder = "Select...",
+  placeholder,
   title,
   fullWidth = false,
 }: SelectorProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const [visible, setVisible] = useState(false);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const progress = useSharedValue(0);
@@ -299,7 +301,7 @@ export default function Selector({
       >
         <Animated.Image source={arrowDownIcon} style={[styles.icon, iconStyle]} />
         <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
-          {selectedOption ? selectedOption.label : placeholder}
+          {selectedOption ? selectedOption.label : placeholder ?? t("selector.placeholder")}
         </Text>
       </Pressable>
 

@@ -46,7 +46,8 @@ import { useResponsive } from "../../hooks/useResponsive";
 import { useSettingsNotices } from "../../hooks/useSettingsNotices";
 
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
-import { REPORT_CONSENT, useBugReport } from "../../hooks/useBugReport";
+import { useBugReport } from "../../hooks/useBugReport";
+import { useT } from "../../i18n";
 import { setThemeMode, useColors, useThemedStyles } from "../../hooks/useTheme";
 import { dragDrawer, drawerWidthFor, gestureVelocity, playPageTransition, settingsProgress, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
 
@@ -135,6 +136,7 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
 export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const { width } = useResponsive();
   const drawerWidth = drawerWidthFor(width);
   const progress = settingsProgress;
@@ -292,7 +294,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   ];
 
   const cloudStorageOptions = [
-    { id: "none", label: "None" },
+    { id: "none", label: t("settings.cloud.none") },
     ...CLOUD_PROVIDERS.map(def => ({ id: def.id, label: def.label })),
   ];
 
@@ -377,7 +379,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const renderPermissionBadge = (status: PermissionState) => (
     <View style={[styles.permissionBadge, status === "granted" && styles.permissionBadgeAllowed]}>
       <Text style={[styles.permissionBadgeText, status === "granted" && styles.permissionBadgeTextAllowed]}>
-        {status === "granted" ? "Allowed" : status === "denied" ? "Denied" : "Not defined"}
+        {status === "granted" ? t("permissions.allowed") : status === "denied" ? t("permissions.denied") : t("permissions.undefined")}
       </Text>
     </View>
   );
@@ -391,9 +393,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     setExportScopeVisible(false);
     try {
       const ok = await BackupService.exportData({ includeSettings, includeConversations });
-      if (ok) showAlert("Export", "Data exported successfully.");
+      if (ok) showAlert(t("settings.data.export"), t("settings.data.exportSuccess"));
     } catch {
-      showAlert("Error", "Failed to export data.");
+      showAlert(t("common.error"), t("settings.data.exportFailed"));
     }
   };
 
@@ -402,34 +404,34 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       const result = await BackupService.importData();
       if (result.success) {
         onDataChanged?.();
-        showAlert("Import", result.warning ?? "Data imported successfully.");
+        showAlert(t("settings.data.import"), result.warning ?? t("settings.data.importSuccess"));
       }
     } catch (e) {
-      const message = e instanceof Error && e.message ? e.message : "Failed to import data.";
-      showAlert("Error", message);
+      const message = e instanceof Error && e.message ? e.message : t("settings.data.importFailed");
+      showAlert(t("common.error"), message);
     }
   };
 
   const handleDeleteAllConversations = () => {
     showAlert(
-      "Delete All Conversations",
-      "This will permanently delete all conversations. This action cannot be undone.",
+      t("settings.data.deleteAll.title"),
+      t("settings.data.deleteAll.message"),
       [
         {
-          text: "Delete All",
+          text: t("settings.data.deleteAll.confirm"),
           style: "secondary",
           onPress: async () => {
             setAlertModalVisible(false);
             try {
               await BackupService.deleteAllConversations();
               onDataChanged?.();
-              showAlert("Done", "All conversations deleted.");
+              showAlert(t("common.done"), t("settings.data.deleteAll.success"));
             } catch {
-              showAlert("Error", "Failed to delete conversations.");
+              showAlert(t("common.error"), t("settings.data.deleteAll.failed"));
             }
           },
         },
-        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "danger" },
+        { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "danger" },
       ]
     );
   };
@@ -437,12 +439,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const handleDeleteWhisper = () => {
     if (whisperModel === "none") return;
     showAlert(
-      "Delete Whisper Model",
-      `Are you sure you want to delete the Whisper ${whisperModel} model?`,
+      t("settings.whisper.delete.title"),
+      t("settings.whisper.delete.message", { model: whisperModel }),
       [
-        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+        { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" },
         {
-          text: "Delete",
+          text: t("common.delete"),
           style: "danger",
           onPress: async () => {
             setAlertModalVisible(false);
@@ -460,10 +462,10 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   };
 
   const whisperModelOptions = [
-    { id: "none", label: "None" },
+    { id: "none", label: t("settings.whisper.none") },
     {
       id: "tiny",
-      label: "Tiny",
+      label: t("settings.whisper.tiny"),
       isDownload: !installedWhisperModels["tiny"],
       ...(installedWhisperModels["tiny"] && whisperModel === "tiny"
         ? { rightIcon: deleteIcon, rightIconTintColor: Colors.surface, onRightIconPress: handleDeleteWhisper }
@@ -471,7 +473,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     },
     {
       id: "base",
-      label: "Base",
+      label: t("settings.whisper.base"),
       isDownload: !installedWhisperModels["base"],
       ...(installedWhisperModels["base"] && whisperModel === "base"
         ? { rightIcon: deleteIcon, rightIconTintColor: Colors.surface, onRightIconPress: handleDeleteWhisper }
@@ -479,7 +481,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     },
     {
       id: "small",
-      label: "Small",
+      label: t("settings.whisper.small"),
       isDownload: !installedWhisperModels["small"],
       ...(installedWhisperModels["small"] && whisperModel === "small"
         ? { rightIcon: deleteIcon, rightIconTintColor: Colors.surface, onRightIconPress: handleDeleteWhisper }
@@ -564,7 +566,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     let cancelled = false;
     (async () => {
       const sources = buildSources(localAvailable);
-      const rows: SelectorOption[] = [{ id: "", label: "Same as main model" }];
+      const rows: SelectorOption[] = [{ id: "", label: t("settings.quickFlow.sameAsMain") }];
       //query all sources in parallel
       const modelsBySource = await Promise.all(sources.map((source) => AIModule.getModelsFor(source.service, source.url)));
       sources.forEach((source, i) => {
@@ -579,7 +581,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       if (!cancelled) setQuickFlowOptions(rows);
     })();
     return () => { cancelled = true; };
-  }, [activeSubPage, localAvailable, ollamaUrls, enabledProviders]);
+  }, [activeSubPage, localAvailable, ollamaUrls, enabledProviders, t]);
 
   const handleSelectQuickFlow = (id: string) => {
     setQuickFlowIdState(id);
@@ -644,19 +646,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     ).length;
 
   const mcpStatusLabel = (id: string): string => {
-    if (mcpConnecting[id]) return "Connecting...";
+    if (mcpConnecting[id]) return t("settings.mcp.connecting");
     const status = McpService.getStatus(id);
     if (status.state === "connected") {
       const total = status.toolCount;
-      if (total === 0) return "No tools";
+      if (total === 0) return t("settings.mcp.noTools");
       const enabled = mcpEnabledCount(id);
       //skip count when all enabled
       if (enabled === total) return `${total} tool${total === 1 ? "" : "s"}`;
       return `${enabled} of ${total} tools`;
     }
-    if (status.state === "needs_auth") return "Sign in required";
-    if (status.state === "error") return "Unreachable";
-    return "Not connected";
+    if (status.state === "needs_auth") return t("settings.mcp.signInRequired");
+    if (status.state === "error") return t("settings.mcp.unreachable");
+    return t("settings.mcp.notConnected");
   };
 
   //the sign-in state shows an icon instead of a label
@@ -665,12 +667,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   //the overlay carries the sign-in itself
   const showMcpAuthInfo = (id: string) => showAlert(
-    "Sign in required",
-    "Opera needs you to sign in to this server before it can use its tools.\n\nSome servers, GitHub among them, do not offer a sign-in to apps like Opera. For those, add an access token under More instead.",
+    t("settings.mcp.signInRequired"),
+    t("settings.mcp.signInInfo"),
     [
-      { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+      { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" },
       {
-        text: "Sign in",
+        text: t("settings.mcp.signIn"),
         onPress: () => { setAlertModalVisible(false); connectMcpServer(id); },
       },
     ],
@@ -697,7 +699,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       await refreshMcpHeaders();
       //keep the text so the failing entry can be fixed
       if (added.length === 0) {
-        showAlert("Import", describeImport(added, skipped), undefined, { messageAlign: "left" });
+        showAlert(t("settings.data.import"), describeImport(added, skipped), undefined, { messageAlign: "left" });
         return;
       }
       setMcpDrafts(prev => prev.filter((_, i) => i !== index));
@@ -707,9 +709,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setActiveSubPage("mcpserver");
         return;
       }
-      showAlert("Import", describeImport(added, skipped), undefined, { messageAlign: "left" });
+      showAlert(t("settings.data.import"), describeImport(added, skipped), undefined, { messageAlign: "left" });
     } catch (e: any) {
-      showAlert("Import failed", e?.message || "This configuration could not be read.", undefined, { messageAlign: "left" });
+      showAlert(t("settings.mcp.importFailed"), e?.message || t("settings.mcp.unreadableConfig"), undefined, { messageAlign: "left" });
     }
   };
 
@@ -720,12 +722,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const removeMcpServer = (id: string, label: string) => {
     showAlert(
-      "Remove server",
-      `Remove ${label}? Its tools and its saved connection will be deleted.`,
+      t("settings.mcp.remove.title"),
+      t("settings.mcp.remove.message", { name: label }),
       [
-        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+        { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" },
         {
-          text: "Remove",
+          text: t("common.remove"),
           style: "danger",
           onPress: async () => {
             setAlertModalVisible(false);
@@ -833,7 +835,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         if (installed) {
           WhisperSTT.init(v).then((success) => {
             if (!success) {
-              showAlert("Error", `Failed to load Whisper model ${v}. It might be corrupted.`);
+              showAlert(t("common.error"), t("settings.whisper.loadFailed", { model: v }));
               setWhisperInstalled(false);
               setInstalledWhisperModels(prev => ({ ...prev, [v]: false }));
             }
@@ -921,7 +923,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     } else {
       setCloudProvider("none");
       setCloudUserInfo(null);
-      showAlert("Connection Error", `Could not connect to ${getCloudProviderDefinition(providerName)?.label ?? providerName}. Check your settings and try again.`);
+      showAlert(t("settings.cloud.connectionError"), t("settings.cloud.connectFailed", { provider: getCloudProviderDefinition(providerName)?.label ?? providerName }));
     }
   };
 
@@ -954,23 +956,23 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const handleDisconnectCloud = () => {
     const label = getCloudProviderDefinition(cloudProvider)?.label ?? "cloud storage";
-    showAlert(`Disconnect ${label}?`, "Your account will be unlinked and automatic backups will stop. Your existing cloud backup won't be deleted.", [
+    showAlert(t("settings.cloud.disconnect.title", { name: label }), t("settings.cloud.disconnect.message"), [
       {
-        text: "Disconnect", style: "secondary", onPress: async () => {
+        text: t("cloudSync.disconnect"), style: "secondary", onPress: async () => {
           setAlertModalVisible(false);
           await handleSetCloudProvider("none");
         }
       },
-      { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "primary" },
+      { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "primary" },
     ]);
   };
 
   const handleCreateSyncPin = () => {
     let currentInput = "";
-    showAlert("Create Sync PIN", "No cloud backup found. Create a 4 to 6 digit PIN. If you forget this PIN, you will lose access to your cloud backups.", [
-      { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+    showAlert(t("settings.pin.create.title"), t("settings.pin.create.message"), [
+      { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" },
       {
-        text: "Create", style: "primary", onPress: async () => {
+        text: t("settings.pin.create.confirm"), style: "primary", onPress: async () => {
           if (currentInput.length >= 4 && currentInput.length <= 6) {
             await CloudSync.setPin(currentInput);
             setHasSyncPin(true);
@@ -978,13 +980,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             handleSyncNow();
           } else {
             setAlertModalVisible(false);
-            setTimeout(() => showAlert("Error", "PIN must be 4 to 6 digits."), 300);
+            setTimeout(() => showAlert(t("common.error"), t("settings.pin.invalid")), 300);
           }
         }
       }
     ], {
       showInput: true,
-      inputPlaceholder: "Enter 4-6 digits",
+      inputPlaceholder: t("settings.pin.placeholder"),
       inputSecureTextEntry: true,
       inputKeyboardType: "numeric",
       onInputChange: (text: string) => {
@@ -996,26 +998,26 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const handleUnlockSyncPin = () => {
     let currentInput = "";
-    showAlert("Unlock Cloud Backup", "A cloud backup was found. Enter your PIN to unlock it and resume sync.", [
-      { text: "Forgot Code", onPress: handleForgetSyncPin, style: "secondary" },
+    showAlert(t("settings.pin.unlock.title"), t("settings.pin.unlock.message"), [
+      { text: t("settings.pin.forgot"), onPress: handleForgetSyncPin, style: "secondary" },
       {
-        text: "Unlock", style: "primary", onPress: async () => {
+        text: t("settings.pin.unlock.confirm"), style: "primary", onPress: async () => {
           setAlertModalVisible(false);
           const success = await CloudSync.verifyAndSetPin(currentInput);
           if (success) {
             setHasSyncPin(true);
-            setTimeout(() => showAlert("Success", "Backup unlocked successfully!"), 300);
+            setTimeout(() => showAlert(t("common.success"), t("settings.pin.unlockSuccess")), 300);
           } else {
-            setTimeout(() => showAlert("Error", "Incorrect PIN. Could not decrypt backup.", [
-              { text: "Try Again", onPress: handleUnlockSyncPin, style: "primary" },
-              { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" }
+            setTimeout(() => showAlert(t("common.error"), t("settings.pin.incorrect"), [
+              { text: t("settings.pin.tryAgain"), onPress: handleUnlockSyncPin, style: "primary" },
+              { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" }
             ]), 300);
           }
         }
       }
     ], {
       showInput: true,
-      inputPlaceholder: "Enter 4-6 digits",
+      inputPlaceholder: t("settings.pin.placeholder"),
       inputSecureTextEntry: true,
       inputKeyboardType: "numeric",
       onInputChange: (text: string) => {
@@ -1026,8 +1028,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   };
 
   const handleForgetSyncPin = () => {
-    showAlert("Reset Backup?", "This will permanently delete your existing cloud backup so you can create a new PIN. Are you sure?", [
-      { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+    showAlert(t("settings.pin.reset.title"), t("settings.pin.reset.message"), [
+      { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" },
       {
         text: "Delete & Reset", style: "danger", onPress: async () => {
           await CloudSync.forgetCode();
@@ -1046,9 +1048,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     if (result.success) {
       onDataChanged?.();
       await refreshLastSync();
-      showAlert("Success", "Data synchronized successfully.");
+      showAlert(t("common.success"), t("settings.cloud.syncSuccess"));
     } else {
-      showAlert("Sync Error", result.error || "Unknown error occurred.");
+      showAlert(t("settings.cloud.syncError"), result.error || t("settings.cloud.unknownError"));
     }
   };
 
@@ -1128,7 +1130,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       }
     } catch (e) {
       console.error("Failed to download gemma4", e);
-      showAlert("Error", "Failed to download model.");
+      showAlert(t("common.error"), t("settings.model.downloadFailed"));
     } finally {
       setIsDownloading(false);
       setGemmaDownloadProgress(null);
@@ -1147,10 +1149,10 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       setWhisperInstalled(true);
       setInstalledWhisperModels(prev => ({ ...prev, [model]: true }));
       setWhisperModel(model);
-      showAlert("Success", `Whisper ${model} model downloaded successfully.`);
+      showAlert(t("common.success"), t("settings.whisper.downloadSuccess", { model }));
     } catch (e) {
       console.error("Failed to download whisper model", e);
-      showAlert("Error", "Failed to download Whisper model.");
+      showAlert(t("common.error"), t("settings.whisper.downloadFailed"));
     } finally {
       setIsDownloadingWhisper(false);
       setWhisperDownloadProgress(null);
@@ -1163,12 +1165,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       return;
     }
     showAlert(
-      "Download Whisper Model",
-      `Are you sure you want to download the Whisper ${v} model (${getWhisperSize(v)})?`,
+      t("settings.whisper.download.title"),
+      t("settings.whisper.download.message", { model: v, size: getWhisperSize(v) }),
       [
-        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+        { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" },
         {
-          text: "Download",
+          text: t("settings.whisper.download.confirm"),
           onPress: () => {
             setAlertModalVisible(false);
             handleDownloadWhisper(v);
@@ -1214,13 +1216,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   // main navigation page content
   const renderMainPage = () => (
     <View style={styles.menuContainer}>
-      <Text style={styles.title}>Settings</Text>
+      <Text style={styles.title}>{t("settings.title")}</Text>
 
       {notices.assistant && (
         <NotificationCard
           image={operaIcon}
           tintColor={Colors.textPrimary}
-          title="Add Opera as an assistant"
+          title={t("settings.notice.assistant")}
           onPress={notices.openAssistant}
           onDismiss={notices.closeAssistant}
           style={styles.groupSpacing}
@@ -1230,7 +1232,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {!!notices.update && (
         <NotificationBanner
           icon={downloadIcon}
-          label={`Opera ${notices.update.version} is available`}
+          label={t("settings.notice.update", { version: notices.update.version })}
           onPress={notices.openUpdate}
           style={styles.groupSpacing}
         />
@@ -1244,8 +1246,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         >
           <Image source={profilIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
           <View style={styles.navTextContainer}>
-            <Text style={styles.navTitle}>{name || "Profil"}</Text>
-            <Text style={styles.navSubtitle}>Name</Text>
+            <Text style={styles.navTitle}>{name || t("settings.nav.profile.title")}</Text>
+            <Text style={styles.navSubtitle}>{t("settings.nav.profile.subtitle")}</Text>
           </View>
         </Pressable>
 
@@ -1255,8 +1257,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         >
           <Image source={cloudIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
           <View style={styles.navTextContainer}>
-            <Text style={styles.navTitle}>Cloud</Text>
-            <Text style={styles.navSubtitle}>Cloud storage, Backup</Text>
+            <Text style={styles.navTitle}>{t("settings.nav.cloud.title")}</Text>
+            <Text style={styles.navSubtitle}>{t("settings.nav.cloud.subtitle")}</Text>
           </View>
         </Pressable>
       </Group>
@@ -1268,8 +1270,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         >
           <Image source={generalIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
           <View style={styles.navTextContainer}>
-            <Text style={styles.navTitle}>General</Text>
-            <Text style={styles.navSubtitle}>Language, Theme</Text>
+            <Text style={styles.navTitle}>{t("settings.nav.general.title")}</Text>
+            <Text style={styles.navSubtitle}>{t("settings.nav.general.subtitle")}</Text>
           </View>
         </Pressable>
 
@@ -1280,8 +1282,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           >
             <Image source={micIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
             <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>Assistant Overlay</Text>
-              <Text style={styles.navSubtitle}>Voice, Screen context</Text>
+              <Text style={styles.navTitle}>{t("settings.nav.overlay.title")}</Text>
+              <Text style={styles.navSubtitle}>{t("settings.nav.overlay.subtitle")}</Text>
             </View>
           </Pressable>
         )}
@@ -1292,8 +1294,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         >
           <Image source={linkIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
           <View style={styles.navTextContainer}>
-            <Text style={styles.navTitle}>Service</Text>
-            <Text style={styles.navSubtitle}>AI Service, Ollama server</Text>
+            <Text style={styles.navTitle}>{t("settings.nav.service.title")}</Text>
+            <Text style={styles.navSubtitle}>{t("settings.nav.service.subtitle")}</Text>
           </View>
         </Pressable>
 
@@ -1303,8 +1305,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         >
           <Image source={toolIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
           <View style={styles.navTextContainer}>
-            <Text style={styles.navTitle}>Tools</Text>
-            <Text style={styles.navSubtitle}>{isDesktop ? "Assistant Tools, Widgets" : "Assistant Tools, Widgets, Mobile actions"}</Text>
+            <Text style={styles.navTitle}>{t("settings.nav.tools.title")}</Text>
+            <Text style={styles.navSubtitle}>{isDesktop ? t("settings.nav.tools.subtitleDesktop") : t("settings.nav.tools.subtitle")}</Text>
           </View>
         </Pressable>
 
@@ -1315,8 +1317,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           >
             <Image source={advancedIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
             <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>Advanced</Text>
-              <Text style={styles.navSubtitle}>Quick flow, Transcription, Sharing</Text>
+              <Text style={styles.navTitle}>{t("settings.nav.advanced.title")}</Text>
+              <Text style={styles.navSubtitle}>{t("settings.nav.advanced.subtitle")}</Text>
             </View>
           </Pressable>
         )}
@@ -1329,8 +1331,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         >
           <Image source={confidentialityIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
           <View style={styles.navTextContainer}>
-            <Text style={styles.navTitle}>Confidentiality</Text>
-            <Text style={styles.navSubtitle}>Data privacy, Usage analytics</Text>
+            <Text style={styles.navTitle}>{t("settings.nav.privacy.title")}</Text>
+            <Text style={styles.navSubtitle}>{t("settings.nav.privacy.subtitle")}</Text>
           </View>
         </Pressable>
 
@@ -1340,8 +1342,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         >
           <Image source={reportsIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
           <View style={styles.navTextContainer}>
-            <Text style={styles.navTitle}>Support</Text>
-            <Text style={styles.navSubtitle}>Send an issue, contact support</Text>
+            <Text style={styles.navTitle}>{t("settings.nav.support.title")}</Text>
+            <Text style={styles.navSubtitle}>{t("settings.nav.support.subtitle")}</Text>
           </View>
         </Pressable>
 
@@ -1351,8 +1353,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         >
           <Image source={informationIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
           <View style={styles.navTextContainer}>
-            <Text style={styles.navTitle}>Informations</Text>
-            <Text style={styles.navSubtitle}>Version App, Github, Instagram, TikTok</Text>
+            <Text style={styles.navTitle}>{t("settings.nav.info.title")}</Text>
+            <Text style={styles.navSubtitle}>{t("settings.nav.info.subtitle")}</Text>
           </View>
         </Pressable>
       </Group>
@@ -1363,25 +1365,25 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   // social links subpage content
   const renderSocialLinksSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Informations")}
+      {renderSubPageHeader(t("settings.nav.info.title"))}
 
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Version</Text>
+        <Text style={styles.settingLabel}>{t("settings.info.version")}</Text>
         <Text style={styles.helpText}>
           Opera Beta v{appVersion}
         </Text>
       </View>
 
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Links</Text>
+        <Text style={styles.settingLabel}>{t("settings.info.links")}</Text>
         <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          Find Opera online, follow our updates, and contribute to the project.
+          {t("settings.info.linksHelp")}
         </Text>
 
         <Group>
           <ActionButton
             icon={operaIcon}
-            label="Website"
+            label={t("settings.info.website")}
             onPress={() => Linking.openURL("https://maestroai.company").catch(() => { })}
           />
           <ActionButton
@@ -1413,14 +1415,14 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   // profile subpage
   const renderProfileSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Profile")}
+      {renderSubPageHeader(t("settings.nav.profile.title"))}
 
       <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Name</Text>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.profile.name")}</Text>
         <Group>
           <TextInputField
             icon={penPlaceholderIcon}
-            placeholder="Enter your name"
+            placeholder={t("onboarding.name.placeholder")}
             value={name}
             onChangeText={setName}
           />
@@ -1428,11 +1430,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       </View>
 
       <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Write your instructions to AI</Text>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.profile.instructions")}</Text>
         <Group>
           <TextInputField
             icon={penPlaceholderIcon}
-            placeholder="write"
+            placeholder={t("settings.profile.instructionsPlaceholder")}
             value={instruction}
             onChangeText={setInstruction}
           />
@@ -1444,23 +1446,23 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   // general subpage
   const renderGeneralSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("General")}
+      {renderSubPageHeader(t("settings.nav.general.title"))}
 
       <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Language</Text>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.general.language")}</Text>
         <Group>
           <Selector
             options={languageOptions}
             selectedValue={language}
             onSelect={setLanguage}
-            title="Select Language"
+            title={t("settings.general.selectLanguage")}
             fullWidth
           />
         </Group>
       </View>
 
       <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Theme app</Text>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.general.theme")}</Text>
         <Group>
           <SliderToggle
             selectedValue={theme}
@@ -1471,54 +1473,54 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={styles.settingRowVertical}>
         <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>Show technical details</Text>
+          <Text style={styles.settingLabel}>{t("settings.general.technicalDetails")}</Text>
           <Toggle
             checked={showTechnicalDetails}
             onToggle={setShowTechnicalDetails}
           />
         </View>
-        <Text style={styles.helpText}>Add an info button below answers to inspect AI technical data.</Text>
+        <Text style={styles.helpText}>{t("settings.general.technicalDetailsHelp")}</Text>
       </View>
 
       <View style={styles.settingRowVertical}>
         <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>Auto-read replies</Text>
+          <Text style={styles.settingLabel}>{t("settings.general.autoRead")}</Text>
           <Toggle
             checked={autoSpeak}
             onToggle={setAutoSpeak}
           />
         </View>
-        <Text style={styles.helpText}>Speak the answer aloud when you ask by voice.</Text>
+        <Text style={styles.helpText}>{t("settings.general.autoReadHelp")}</Text>
       </View>
 
       <View style={[styles.settingRowVertical, Platform.OS === "web" && { marginTop: 10 }]}>
         <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>Advanced mode</Text>
+          <Text style={styles.settingLabel}>{t("settings.general.advancedMode")}</Text>
           <Toggle
             checked={advancedMode}
             onToggle={setAdvancedMode}
           />
         </View>
-        <Text style={styles.helpText}>Add an Advanced section to the menu with the more technical settings.</Text>
+        <Text style={styles.helpText}>{t("settings.general.advancedModeHelp")}</Text>
       </View>
     </View>
   );
 
   const renderAdvancedSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Advanced")}
+      {renderSubPageHeader(t("settings.nav.advanced.title"))}
 
       <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
-        <Text style={styles.settingLabel}>Quick flow</Text>
+        <Text style={styles.settingLabel}>{t("settings.quickFlow.label")}</Text>
         <Text style={[styles.helpText, { marginBottom: 10 }]}>
-          The model powering the small automatic touches: conversation titles, reply suggestions, and some tools. A small, fast model is recommended.
+          {t("settings.quickFlow.help")}
         </Text>
         <Group>
           <Selector
             options={quickFlowOptions}
             selectedValue={quickFlowId}
             onSelect={handleSelectQuickFlow}
-            title="Select Quick flow Model"
+            title={t("settings.quickFlow.select")}
             fullWidth
           />
         </Group>
@@ -1526,7 +1528,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={styles.settingRowVertical}>
         <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>Always Transcribe Locally</Text>
+          <Text style={styles.settingLabel}>{t("settings.transcribeLocally.label")}</Text>
           <Toggle
             checked={alwaysWhisper}
             onToggle={setAlwaysWhisper}
@@ -1534,18 +1536,18 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </View>
         <Text style={styles.helpText}>
           {Platform.OS === "web"
-            ? "Process audio transcriptions locally on your device instead of using the selected model."
-            : "Use your device's built-in speech recognition instead of the selected model."}
+            ? t("settings.transcribeLocally.helpWeb")
+            : t("settings.transcribeLocally.help")}
         </Text>
       </View>
 
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Conversation sharing</Text>
+        <Text style={styles.settingLabel}>{t("settings.sharing.label")}</Text>
         <Text style={[styles.helpText, { marginBottom: 6 }]}>
-          Shared conversations are encrypted on your device before they are uploaded, and the decryption key travels only in the link, never to the server.
+          {t("settings.sharing.help")}
         </Text>
         <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          They are stored on a PrivateBin instance. Leave this empty to use privatebin.net, or enter the address of another instance, including one you host yourself. The address is carried inside the links you create, so the people you share with reach the right server on their own.
+          {t("settings.sharing.instanceHelp")}
         </Text>
 
         <Group>
@@ -1565,24 +1567,24 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   // assistant overlay subpage
   const renderAssistantOverlaySubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Assistant Overlay")}
+      {renderSubPageHeader(t("settings.nav.overlay.title"))}
 
       {assistantStatus !== null && (
         <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
-          <Text style={styles.settingLabel}>Default assistant</Text>
+          <Text style={styles.settingLabel}>{t("settings.overlay.default")}</Text>
           <Text style={styles.helpText}>
-            Get help from Opera anywhere on your device, from any app.
+            {t("settings.overlay.defaultHelp")}
           </Text>
           <Text style={[styles.assistantStatusText, assistantStatus ? styles.assistantStatusOn : styles.assistantStatusOff]}>
             {assistantStatus
-              ? "Opera is set as your default assistant."
-              : "Opera is not set as your default assistant."}
+              ? t("settings.overlay.isDefault")
+              : t("settings.overlay.isNotDefault")}
           </Text>
           {!assistantStatus && (
             <Group>
               <ActionButton
                 icon={operaIcon}
-                label="Set as default assistant"
+                label={t("settings.overlay.setDefault")}
                 onPress={openAssistantSettings}
               />
             </Group>
@@ -1592,25 +1594,25 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={[styles.settingRowVertical, assistantStatus === null && { marginTop: 0 }]}>
         <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>Auto-start microphone</Text>
+          <Text style={styles.settingLabel}>{t("settings.overlay.autoMic")}</Text>
           <Toggle
             checked={autoStartMic}
             onToggle={setAutoStartMic}
           />
         </View>
-        <Text style={styles.helpText}>Automatically activate the microphone as soon as the assistant opens.</Text>
+        <Text style={styles.helpText}>{t("settings.overlay.autoMicHelp")}</Text>
       </View>
 
       {Platform.OS === 'android' && (
         <View style={styles.settingRowVertical}>
           <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>Use app context</Text>
+            <Text style={styles.settingLabel}>{t("settings.overlay.appContext")}</Text>
             <Toggle
               checked={useAppContext}
               onToggle={setUseAppContext}
             />
           </View>
-          <Text style={styles.helpText}>Send the foreground app and on-screen text to the assistant when using the overlay</Text>
+          <Text style={styles.helpText}>{t("settings.overlay.appContextHelp")}</Text>
         </View>
       )}
     </View>
@@ -1619,16 +1621,16 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   // cloud subpage
   const renderCloudSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Cloud")}
+      {renderSubPageHeader(t("settings.nav.cloud.title"))}
 
       <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Cloud storage</Text>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.cloud.storage")}</Text>
         <Group>
           <Selector
             options={cloudStorageOptions}
             selectedValue={cloudProvider}
             onSelect={handleSetCloudProvider}
-            title="Select Cloud Storage"
+            title={t("settings.cloud.selectStorage")}
             fullWidth
           />
         </Group>
@@ -1659,7 +1661,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   // service subpage content
   const renderServiceSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Service")}
+      {renderSubPageHeader(t("settings.nav.service.title"))}
 
       {localAvailable && (
         <View style={styles.settingRowVertical}>
@@ -1670,14 +1672,14 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               onToggle={(v) => setProviderEnabled("local", v)}
             />
           </View>
-          <Text style={styles.helpText}>Runs the local model directly on this device. No server needed.</Text>
+          <Text style={styles.helpText}>{t("settings.service.localHelp")}</Text>
         </View>
       )}
 
       <View style={styles.settingRowVertical}>
         {/* ollama servers section */}
         <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>Ollama</Text>
+          <Text style={styles.settingLabel}>{t("settings.service.ollama")}</Text>
           <View style={styles.toggleRight}>
             <IconButton
               icon={questionIcon}
@@ -1686,8 +1688,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               containerSize={32}
               pressedColor={Colors.surfacePressed}
               onPress={() => showAlert(
-                "Ollama",
-                "Ollama lets you run AI models on your own computer or server instead of the cloud. Add your Ollama server's URL below to connect Opera to it.",
+                t("settings.service.ollama"),
+                t("settings.service.ollamaInfo"),
                 undefined,
                 { image: ollamaInfoImage, messageAlign: "left" },
               )}
@@ -1698,7 +1700,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             />
           </View>
         </View>
-        <Text style={[styles.helpText, { marginBottom: 10 }]}>Use your Ollama servers to run powerful AI models at home.</Text>
+        <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.service.ollamaHelp")}</Text>
 
         {enabledProviders.includes("ollama") && (
           <>
@@ -1708,14 +1710,14 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                   <View key={index}>
                     <TextInputField
                       icon={linkIcon}
-                      placeholder="server link"
+                      placeholder={t("settings.service.serverLink")}
                       value={url}
                       onChangeText={(v) => setOllamaUrlAt(index, v)}
                       onBlur={() => handleOllamaUrlBlur(index)}
                       rightIcon={serverErrors[url.trim()] ? errorIcon : undefined}
                       onRightIconPress={() => showAlert(
-                        "Server unreachable",
-                        "This server could not be reached.\n\n- Check that the server is running.\n- Check the server's network connection.\n- Make sure the URL and port are correct.",
+                        t("settings.service.unreachable.title"),
+                        t("settings.service.unreachable.message"),
                         undefined,
                         { image: ollamaErrorImage, messageAlign: "left" },
                       )}
@@ -1728,13 +1730,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             <Group style={styles.groupSpacing}>
               <ActionButton
                 icon={addIcon}
-                label="Add server link"
+                label={t("settings.service.addServer")}
                 onPress={() => saveOllamaUrls([...ollamaUrls, ""])}
               />
             </Group>
 
-            <Text style={[styles.settingLabel, { marginTop: 20 }]}>Context Length</Text>
-            <Text style={[styles.helpText, { marginBottom: 10 }]}>Maximum number of tokens the model can use.</Text>
+            <Text style={[styles.settingLabel, { marginTop: 20 }]}>{t("settings.service.contextLength")}</Text>
+            <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.service.contextLengthHelp")}</Text>
             <Group>
               {advancedMode ? (
                 <TextInputField
@@ -1753,11 +1755,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 />
               )}
             </Group>
-            <Text style={[styles.settingLabel, { marginTop: 20 }]}>Model Keep Alive</Text>
+            <Text style={[styles.settingLabel, { marginTop: 20 }]}>{t("settings.service.keepAlive")}</Text>
             <Text style={[styles.helpText, { marginBottom: 10 }]}>
               {advancedMode
-                ? "How long the model stays loaded in memory after a request, in seconds. Use -1 to keep it loaded forever."
-                : "How long the model stays loaded in memory after a request."}
+                ? t("settings.service.keepAliveHelpAdvanced")
+                : t("settings.service.keepAliveHelp")}
             </Text>
             <Group>
               {advancedMode ? (
@@ -1784,21 +1786,21 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {Platform.OS === "web" && (
         <>
           <View style={[styles.settingRowVertical, { zIndex: 9 }]}>
-            <Text style={styles.settingLabel}>Whisper Model</Text>
-            <Text style={[styles.helpText, { marginBottom: 10 }]}>The larger size, the longer the processing will take.</Text>
+            <Text style={styles.settingLabel}>{t("settings.whisper.label")}</Text>
+            <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.whisper.help")}</Text>
             <Group>
               <Selector
                 options={whisperModelOptions}
                 selectedValue={whisperModel}
                 onSelect={handleSelectWhisperModel}
-                title="Select Whisper Model"
+                title={t("settings.whisper.select")}
                 fullWidth
               />
             </Group>
             {isDownloadingWhisper && (
               <View style={{ marginTop: 10 }}>
                 <DownloadProgress
-                  title={`Downloading Whisper ${whisperModel}...`}
+                  title={t("settings.whisper.downloading", { model: whisperModel })}
                   progress={whisperDownloadProgress?.progress || 0}
                   sizeStr={whisperDownloadProgress?.sizeStr}
                   etaSeconds={whisperDownloadProgress?.etaSeconds}
@@ -1814,54 +1816,54 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   // confidentiality subpage content
   const renderConfidentialitySubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Confidentiality")}
+      {renderSubPageHeader(t("settings.nav.privacy.title"))}
 
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Data privacy</Text>
+        <Text style={styles.settingLabel}>{t("settings.privacy.data")}</Text>
         <Text style={[styles.helpText, { marginBottom: 6 }]}>
-          Designed for privacy, Opera keeps all your data and searches entirely on your device.
+          {t("settings.privacy.intro")}
         </Text>
         <Text style={styles.helpText}>
-          Local Storage: All your data, searches, and settings stay strictly on your device.
+          {t("settings.privacy.localStorage")}
         </Text>
         <Text style={[styles.helpText, { marginTop: 4, marginBottom: 12 }]}>
-          No Tracking: We do not collect personal info, analytics, or crash reports. Your privacy is fully protected.
+          {t("settings.privacy.noTracking")}
         </Text>
         <Group>
           <ActionButton
             icon={hyperlinkIcon}
-            label="Privacy Policy"
+            label={t("settings.privacy.policy")}
             onPress={() => Linking.openURL("https://maestroai.company/privacy.html").catch(() => { })}
           />
         </Group>
       </View>
 
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Permissions</Text>
+        <Text style={styles.settingLabel}>{t("permissions.title")}</Text>
         <Text style={[styles.helpText, { marginBottom: 12 }]}>
           {Platform.OS === "web"
-            ? "Opera needs a few permissions to work at its best. You can manage them from your browser's site settings."
-            : "Opera needs a few permissions to work at its best. You can change them in your device settings."}
+            ? t("settings.privacy.permissionsWeb")
+            : t("settings.privacy.permissionsNative")}
         </Text>
 
         <Group>
           <ActionButton
             icon={micIcon}
-            label="Microphone"
+            label={t("permissions.microphone.label")}
             onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
             disabled={Platform.OS === "web"}
             rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.microphone) : undefined}
           />
           <ActionButton
             icon={cameraIcon}
-            label="Camera"
+            label={t("permissions.camera.label")}
             onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
             disabled={Platform.OS === "web"}
             rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.camera) : undefined}
           />
           <ActionButton
             icon={locationIcon}
-            label="Location"
+            label={t("permissions.location.label")}
             onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
             disabled={Platform.OS === "web"}
             rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.location) : undefined}
@@ -1869,7 +1871,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           {Platform.OS !== "web" && (
             <ActionButton
               icon={photoIcon}
-              label="Photos"
+              label={t("permissions.photos.label")}
               onPress={() => Linking.openSettings()}
               rightElement={renderPermissionBadge(permissionStatuses.photos)}
             />
@@ -1877,7 +1879,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           {Platform.OS !== "web" && (
             <ActionButton
               icon={profilIcon}
-              label="Contacts"
+              label={t("permissions.contacts.label")}
               onPress={() => Linking.openSettings()}
               rightElement={renderPermissionBadge(permissionStatuses.contacts)}
             />
@@ -1885,7 +1887,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           {Platform.OS !== "web" && (
             <ActionButton
               icon={calendarIcon}
-              label="Calendar"
+              label={t("permissions.calendar.label")}
               onPress={() => Linking.openSettings()}
               rightElement={renderPermissionBadge(permissionStatuses.calendar)}
             />
@@ -1894,25 +1896,25 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       </View>
 
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Data management</Text>
+        <Text style={styles.settingLabel}>{t("settings.data.management")}</Text>
         <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          Manage your conversations and settings data locally.
+          {t("settings.data.managementHelp")}
         </Text>
 
         <Group>
           <ActionButton
             icon={exportIcon}
-            label="Export data"
+            label={t("settings.data.exportAction")}
             onPress={handleExportData}
           />
           <ActionButton
             icon={downloadIcon}
-            label="Import data"
+            label={t("settings.data.importAction")}
             onPress={handleImportData}
           />
           <ActionButton
             icon={binIcon}
-            label="Delete all conversations"
+            label={t("settings.data.deleteAllAction")}
             onPress={handleDeleteAllConversations}
           />
         </Group>
@@ -1928,17 +1930,17 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   // reports subpage content
   const renderReportsSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Support")}
+      {renderSubPageHeader(t("settings.nav.support.title"))}
 
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Report</Text>
+        <Text style={styles.settingLabel}>{t("settings.support.report")}</Text>
         <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          Describe the issue you encountered.
+          {t("settings.support.reportHelp")}
         </Text>
         <Group style={styles.groupSpacingTight}>
           <TextInputField
             icon={penPlaceholderIcon}
-            placeholder="Describe the issue"
+            placeholder={t("bugReport.placeholder")}
             value={report.text}
             onChangeText={report.setText}
           />
@@ -1946,7 +1948,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
         <View style={styles.toggleRow}>
           <Checkbox
-            label={`Attach lastest log lines`}
+            label={t("bugReport.attachLogs")}
             checked={report.logs !== null}
             onToggle={report.toggleLogs}
             labelFirst
@@ -1954,40 +1956,40 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           />
         </View>
 
-        <Text style={[styles.helpText, { marginTop: 12, marginBottom: 12 }]}>{REPORT_CONSENT}</Text>
+        <Text style={[styles.helpText, { marginTop: 12, marginBottom: 12 }]}>{t("bugReport.consent")}</Text>
 
         <Group>
           <ActionButton
             icon={arrowIcon}
-            label="Send my issue"
+            label={t("bugReport.send")}
             onPress={() => report.send()}
           />
         </Group>
       </View>
 
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Need more help</Text>
+        <Text style={styles.settingLabel}>{t("settings.support.more")}</Text>
         <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          Contact our support team for additional assistance and resources.
+          {t("settings.support.moreHelp")}
         </Text>
         <Group>
           <ActionButton
             icon={supportIcon}
-            label="Contact support"
+            label={t("settings.support.contact")}
             onPress={() => Linking.openURL("https://maestroai.company/contact.html").catch(() => { })}
           />
         </Group>
       </View>
 
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Testing</Text>
+        <Text style={styles.settingLabel}>{t("settings.support.testing")}</Text>
         <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          Crashes the app on purpose to test the crash report screen.
+          {t("settings.support.testingHelp")}
         </Text>
         <Group style={styles.dangerGroup}>
           <ActionButton
             icon={deleteIcon}
-            label="Trigger a test crash"
+            label={t("settings.support.testCrash")}
             variant="highlight"
             onPress={() => {
               throw new Error("Test crash triggered from Report a bug settings");
@@ -2001,7 +2003,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   // tools subpage content: assistant tools stay inline, widgets and mobile actions link out
   const renderToolsSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Tools")}
+      {renderSubPageHeader(t("settings.nav.tools.title"))}
 
       {generalTools.map((tool) => {
         const name = tool.definition.function.name;
@@ -2032,9 +2034,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       {/* widgets block: links out, same pattern as mobile actions below */}
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Widgets</Text>
+        <Text style={styles.settingLabel}>{t("settings.tools.widgets.title")}</Text>
         <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          Structured results the assistant can display: {allWidgets.map(w => w.name).join(", ")}.
+          {t("settings.tools.widgets.help", { list: allWidgets.map(w => w.name).join(", ") })}
         </Text>
 
         <Group>
@@ -2043,16 +2045,16 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             onPress={() => setActiveSubPage("widgets")}
           >
             <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <Text style={styles.navLabel}>See widgets</Text>
+            <Text style={styles.navLabel}>{t("settings.tools.widgets.see")}</Text>
           </Pressable>
         </Group>
       </View>
 
       {/* mcp block: remote servers add their own tools, configured in a subpage */}
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>MCP Servers</Text>
+        <Text style={styles.settingLabel}>{t("settings.tools.mcp.title")}</Text>
         <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          Connect Opera to external MCP servers so the assistant can use their tools.
+          {t("settings.tools.mcp.help")}
         </Text>
 
         <Group>
@@ -2061,7 +2063,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             onPress={() => setActiveSubPage("mcpservers")}
           >
             <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <Text style={styles.navLabel}>See MCP Servers</Text>
+            <Text style={styles.navLabel}>{t("settings.tools.mcp.see")}</Text>
           </Pressable>
         </Group>
       </View>
@@ -2069,9 +2071,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {/* mobile actions block, last: points to a deeper subpage instead of toggling in place. desktop has no mobile apps to open, so it's hidden there */}
       {!isDesktop && (
         <View style={styles.settingRowVertical}>
-          <Text style={styles.settingLabel}>Mobile actions</Text>
+          <Text style={styles.settingLabel}>{t("settings.tools.mobile.title")}</Text>
           <Text style={[styles.helpText, { marginBottom: 12 }]}>
-            Allow the assistant to integrate with installed apps: {mobileTools.map(t => t.displayName ?? t.definition.function.name).join(", ")}.
+            {t("settings.tools.mobile.help", { list: mobileTools.map(tool => tool.displayName ?? tool.definition.function.name).join(", ") })}
           </Text>
 
           <Group>
@@ -2080,7 +2082,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               onPress={() => setActiveSubPage("mobileactions")}
             >
               <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>See mobile actions</Text>
+              <Text style={styles.navLabel}>{t("settings.tools.mobile.see")}</Text>
             </Pressable>
           </Group>
         </View>
@@ -2091,11 +2093,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   //mcp list page
   const renderMcpServersSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("MCP Servers", "tools")}
+      {renderSubPageHeader(t("settings.tools.mcp.title"), "tools")}
 
       <View style={styles.settingRowVertical}>
         <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          Connect Opera to external MCP servers so the assistant can use their tools.
+          {t("settings.tools.mcp.help")}
         </Text>
 
         {(mcpServers.length > 0 || mcpDrafts.length > 0) && (
@@ -2129,7 +2131,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 icon={penPlaceholderIcon}
                 autoCapitalize="none"
                 autoCorrect={false}
-                placeholder="Paste a link or an mcp.json block"
+                placeholder={t("settings.mcp.draftPlaceholder")}
                 value={draft}
                 onChangeText={(v) => setMcpDrafts(prev => prev.map((d, i) => (i === index ? v : d)))}
                 onBlur={() => handleMcpDraftBlur(index)}
@@ -2139,7 +2141,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         )}
 
         <Group style={styles.groupSpacing}>
-          <ActionButton icon={addIcon} label="Add server" onPress={() => setMcpDrafts(prev => [...prev.filter(d => d.trim()), ""])} />
+          <ActionButton icon={addIcon} label={t("settings.mcp.addServer")} onPress={() => setMcpDrafts(prev => [...prev.filter(d => d.trim()), ""])} />
         </Group>
       </View>
     </View>
@@ -2169,11 +2171,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         )}
 
         <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Link</Text>
+          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.mcp.link")}</Text>
           <Group>
             <TextInputField
               icon={linkIcon}
-              placeholder="server link"
+              placeholder={t("settings.service.serverLink")}
               autoCapitalize="none"
               value={server.url}
               onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, url: v } : s))}
@@ -2184,7 +2186,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             />
             <ActionButton
               icon={reconnectIcon}
-              label={busy ? "Connecting..." : "Reconnect"}
+              label={busy ? t("settings.mcp.connecting") : t("settings.mcp.reconnect")}
               disabled={busy || !server.url.trim()}
               onPress={() => connectMcpServer(server.id)}
               style={styles.mcpGroupRow}
@@ -2194,7 +2196,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
         {tools.length > 0 && (
           <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Tools ({tools.length})</Text>
+            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.mcp.tools", { count: tools.length })}</Text>
             {tools.map((tool, index) => {
               const name = tool.definition.function.name;
               const key = `tool:${name}`;
@@ -2227,19 +2229,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               onPress={() => setMcpAdvancedOpen((v) => !v)}
             >
               <Image source={addIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>More</Text>
+              <Text style={styles.navLabel}>{t("settings.mcp.more")}</Text>
             </Pressable>
           </Group>
 
           {mcpAdvancedOpen && (
             <>
               <Text style={[styles.helpText, { marginTop: 12, marginBottom: 10 }]}>
-                A header sent with every request, for servers that take an access token instead of a sign-in. For GitHub, use Authorization and Bearer followed by your token.
+                {t("settings.mcp.headerHelp")}
               </Text>
               <Group style={styles.groupSpacingTight}>
                 <TextInputField
                   icon={penPlaceholderIcon}
-                  placeholder="header name"
+                  placeholder={t("settings.mcp.headerName")}
                   autoCapitalize="none"
                   value={server.headerName}
                   onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, headerName: v } : s))}
@@ -2247,7 +2249,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 />
                 <TextInputField
                   icon={penPlaceholderIcon}
-                  placeholder="header value"
+                  placeholder={t("settings.mcp.headerValue")}
                   autoCapitalize="none"
                   secureTextEntry
                   value={mcpHeaderValues[server.id] ?? ""}
@@ -2257,12 +2259,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               </Group>
 
               <Text style={[styles.helpText, { marginTop: 16, marginBottom: 10 }]}>
-                Only needed when a server offers a sign-in but will not register Opera on its own. Leave empty otherwise.
+                {t("settings.mcp.clientIdHelp")}
               </Text>
               <Group style={styles.groupSpacingTight}>
                 <TextInputField
                   icon={penPlaceholderIcon}
-                  placeholder="oauth client id"
+                  placeholder={t("settings.mcp.clientId")}
                   autoCapitalize="none"
                   value={server.clientId ?? ""}
                   onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, clientId: v } : s))}
@@ -2277,7 +2279,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           <Group style={styles.dangerGroup}>
             <ActionButton
               icon={binIcon}
-              label="Remove server"
+              label={t("settings.mcp.remove.action")}
               variant="highlight"
               onPress={() => removeMcpServer(server.id, server.name)}
             />
@@ -2291,7 +2293,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   // widgets subpage content
   const renderWidgetsSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Widgets", "tools")}
+      {renderSubPageHeader(t("settings.tools.widgets.title"), "tools")}
 
       {allWidgets.map((widget) => {
         const key = `widget:${widget.id}`;
@@ -2318,7 +2320,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   // mobile actions subpage content
   const renderMobileActionsSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Mobile actions", "tools")}
+      {renderSubPageHeader(t("settings.tools.mobile.title"), "tools")}
 
       {mobileTools.map((tool) => {
         const name = tool.definition.function.name;
@@ -2397,13 +2399,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <>
       <NotificationModal
         visible={downloadModalVisible}
-        title="Download Gemma4"
+        title={t("modelSelector.download.title")}
         icon={downloadIcon}
-        message="Do you want to download the Gemma4 model to your Ollama server? This model is several GB in size."
+        message={t("modelSelector.download.message")}
         onClose={() => setDownloadModalVisible(false)}
         buttons={[
-          { text: "Cancel", onPress: () => setDownloadModalVisible(false), style: "secondary" },
-          { text: "Download", onPress: handleDownloadGemma, style: "primary" },
+          { text: t("common.cancel"), onPress: () => setDownloadModalVisible(false), style: "secondary" },
+          { text: t("modelSelector.download.confirm"), onPress: handleDownloadGemma, style: "primary" },
         ]}
       />
       <NotificationModal
@@ -2424,29 +2426,29 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       />
       <NotificationModal
         visible={exportScopeVisible}
-        title="Export data"
-        message="Select what would you like to export."
+        title={t("settings.data.exportAction")}
+        message={t("settings.data.exportScope")}
         onClose={() => setExportScopeVisible(false)}
         options={[
           {
-            label: "Conversations",
+            label: t("settings.data.conversations"),
             checked: exportSelection.conversations,
             onToggle: (checked) => setExportSelection(prev => ({ ...prev, conversations: checked })),
           },
           {
-            label: "Settings",
+            label: t("settings.title"),
             checked: exportSelection.settings,
             onToggle: (checked) => setExportSelection(prev => ({ ...prev, settings: checked })),
           },
         ]}
         buttons={[
           {
-            text: "Export",
+            text: t("settings.data.export"),
             style: "primary",
             disabled: !exportSelection.settings && !exportSelection.conversations,
             onPress: () => runExport(exportSelection.settings, exportSelection.conversations),
           },
-          { text: "Cancel", style: "secondary", onPress: () => setExportScopeVisible(false) },
+          { text: t("common.cancel"), style: "secondary", onPress: () => setExportScopeVisible(false) },
         ]}
       />
     </>

@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Image, ImageSourcePropType, LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useT } from "../../i18n";
 
 //load theme icons
 const autoIcon = require("../../../assets/icons/auto.png");
@@ -21,11 +22,7 @@ type SliderToggleProps = {
   options?: SliderToggleOption[];
 };
 
-const defaultOptions: SliderToggleOption[] = [
-  { id: "system", label: "Auto", icon: autoIcon },
-  { id: "light", label: "Light", icon: lightIcon },
-  { id: "dark", label: "Dark", icon: darkIcon },
-];
+const THEME_ICONS = { system: autoIcon, light: lightIcon, dark: darkIcon };
 
 const GAP = 4;
 const LONG_PRESS_DELAY = 180;
@@ -42,10 +39,24 @@ const rubberBand = (d: number, dim: number) => {
 export default function SliderToggle({
   selectedValue,
   onSelect,
-  options = defaultOptions,
+  options: optionsProp,
 }: SliderToggleProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
+
+  //default set is the theme labels
+  const options = useMemo(
+    () =>
+      optionsProp ??
+      (["system", "light", "dark"] as const).map((id) => ({
+        id,
+        label: t(`theme.${id}`),
+        icon: THEME_ICONS[id],
+      })),
+    [optionsProp, t]
+  );
+
   const optionsRef = useRef(options);
   optionsRef.current = options;
   const onSelectRef = useRef(onSelect);

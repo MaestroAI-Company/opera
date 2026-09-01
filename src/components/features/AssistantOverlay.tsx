@@ -27,6 +27,7 @@ import { arrayBufferToBase64 } from '../../services/ai/utils/base64';
 import { CloudSync } from '../../services/CloudSyncService';
 import { Conversation, DB, Message } from '../../services/db/DatabaseService';
 import { AppEvents } from '../../services/events';
+import { initI18n, useT } from '../../i18n';
 import { AppSettings, Settings } from '../../services/settings/SettingsService';
 import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { TTS } from '../../services/speech/TTSService';
@@ -56,6 +57,9 @@ const BAR_ENTRY = 120;
 const HALO_SIZE = 88;
 const assistantInfoImage = require('../../../assets/images/ImageCard/AssistantInfo.png');
 
+//the router layout never mounts here
+initI18n();
+
 export default function AssistantOverlayWrapper() {
   return (
     <SafeAreaProvider>
@@ -67,6 +71,7 @@ export default function AssistantOverlayWrapper() {
 }
 
 function AssistantOverlay() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const { isLargeScreen } = useResponsive();
 
@@ -293,10 +298,10 @@ function AssistantOverlay() {
         if (!s.hasSeenAssistantOverlay) {
           Settings.set('hasSeenAssistantOverlay', true);
           setModalConfig({
-            title: 'Welcome to the Assistant View',
-            message: "This is your floating assistant. You can Circle To Ask on your screen with any content. It's here to help you across your usage.",
+            title: t('overlay.welcome.title'),
+            message: t('overlay.welcome.message'),
             image: assistantInfoImage,
-            buttons: [{ text: 'OK', onPress: () => setModalVisible(false), style: 'primary' }]
+            buttons: [{ text: t('common.ok'), onPress: () => setModalVisible(false), style: 'primary' }]
           });
           setModalVisible(true);
         }
@@ -317,7 +322,7 @@ function AssistantOverlay() {
       });
     };
     init();
-  }, [applySettings]);
+  }, [applySettings, t]);
 
   //settings edited elsewhere in this process
   useEffect(() => {
@@ -700,8 +705,8 @@ function AssistantOverlay() {
       const whisperModelName = Settings.getCached().whisperModel || "base";
       if (whisperModelName === "none") {
         setModalConfig({
-          title: "Whisper Not Configured",
-          message: "You have disabled on-device transcription. Please select a Whisper model in settings to enable it.",
+          title: t("whisper.notConfigured.title"),
+          message: t("whisper.notConfigured.message"),
           buttons: [{ text: "OK", onPress: () => setModalVisible(false), style: "primary" }]
         });
         setModalVisible(true);
@@ -711,8 +716,8 @@ function AssistantOverlay() {
       const isInstalled = await WhisperSTT.isModelInstalled(whisperModelName);
       if (!isInstalled) {
         setModalConfig({
-          title: "Whisper Not Installed",
-          message: `The Whisper ${whisperModelName} model is required for on-device transcription. Please install it in the main app settings.`,
+          title: t("whisper.notInstalled.title"),
+          message: t("whisper.notInstalled.messageMainApp", { model: whisperModelName }),
           buttons: [{ text: "OK", onPress: () => setModalVisible(false), style: "primary" }]
         });
         setModalVisible(true);
@@ -722,8 +727,8 @@ function AssistantOverlay() {
       const initialized = await WhisperSTT.init(whisperModelName);
       if (!initialized) {
         setModalConfig({
-          title: "Initialization Error",
-          message: `Failed to load the Whisper ${whisperModelName} model.`,
+          title: t("whisper.initError.title"),
+          message: t("whisper.initError.message", { model: whisperModelName }),
           buttons: [{ text: "OK", onPress: () => setModalVisible(false), style: "primary" }]
         });
         setModalVisible(true);
@@ -735,7 +740,7 @@ function AssistantOverlay() {
       console.error("Whisper transcription failed:", e);
       return null;
     }
-  }, [alwaysWhisper, modelCapabilities]);
+  }, [alwaysWhisper, modelCapabilities, t]);
 
   //refs drive the render here, they are written from the async generation flow
   /* eslint-disable react-hooks/refs */

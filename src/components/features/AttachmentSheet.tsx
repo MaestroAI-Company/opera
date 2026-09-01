@@ -1,5 +1,6 @@
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useT } from "../../i18n";
 import {
   Image,
   Platform,
@@ -50,6 +51,7 @@ export default function AttachmentSheet({
 }: AttachmentSheetProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
 
   return (
     <DrawerSheet
@@ -69,15 +71,15 @@ export default function AttachmentSheet({
       <View style={styles.sheetButtonsRow}>
         <Pressable style={({ pressed, hovered }) => [styles.sheetIconButton, incognito && styles.sheetIconButtonIncognito, (pressed || hovered) && { backgroundColor: incognito ? Colors.incognito : Colors.surfacePressed }]} onPress={onCamera}>
           <Image source={cameraIcon} style={[styles.sheetIcon, incognito && styles.sheetIconIncognito]} />
-          <Text style={[styles.sheetIconText, incognito && styles.sheetTextIncognito]}>Camera</Text>
+          <Text style={[styles.sheetIconText, incognito && styles.sheetTextIncognito]}>{t("attachment.camera")}</Text>
         </Pressable>
         <Pressable style={({ pressed, hovered }) => [styles.sheetIconButton, incognito && styles.sheetIconButtonIncognito, (pressed || hovered) && { backgroundColor: incognito ? Colors.incognito : Colors.surfacePressed }]} onPress={onPickFiles}>
           <Image source={fileIcon} style={[styles.sheetIcon, incognito && styles.sheetIconIncognito]} />
-          <Text style={[styles.sheetIconText, incognito && styles.sheetTextIncognito]}>File</Text>
+          <Text style={[styles.sheetIconText, incognito && styles.sheetTextIncognito]}>{t("attachment.file")}</Text>
         </Pressable>
         <Pressable style={({ pressed, hovered }) => [styles.sheetIconButton, incognito && styles.sheetIconButtonIncognito, (pressed || hovered) && { backgroundColor: incognito ? Colors.incognito : Colors.surfacePressed }]} onPress={onPhotos}>
           <Image source={photoIcon} style={[styles.sheetIcon, incognito && styles.sheetIconIncognito]} />
-          <Text style={[styles.sheetIconText, incognito && styles.sheetTextIncognito]}>Photos</Text>
+          <Text style={[styles.sheetIconText, incognito && styles.sheetTextIncognito]}>{t("attachment.photos")}</Text>
         </Pressable>
       </View>
 

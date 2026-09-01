@@ -42,6 +42,7 @@ import { takePendingCrash, type Crash } from "../services/logging/CrashReporter"
 import { captureScreen } from "../services/logging/ReportScreenshot";
 import { useResponsive } from "../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
+import { t, useT, type TranslationFn } from "../i18n";
 import { CloudSync } from "../services/CloudSyncService";
 import { AIModule } from "../services/ai/AIModule";
 import { buildSystemPrompt } from "../services/ai/generation/chatGeneration";
@@ -79,15 +80,9 @@ const addIcon = require("../../assets/icons/add.png");
 function shareConsentMessage(): string {
   const host = resolvePasteHost().replace(/^https?:\/\//, "").replace(/\/+$/, "");
   const retention = usesDefaultPasteHost()
-    ? "The link expires after 3 days and cannot be revoked before then."
-    : "The link expires according to that instance's own retention policy, and cannot be revoked before then.";
-  return (
-    `Opera encrypts this conversation on your device, then uploads the encrypted copy to ${host}. ` +
-    "The decryption key stays inside the link and is never sent to any server.\n\n" +
-    "Anyone holding the link can read the whole conversation, attached images included. " +
-    retention +
-    "\n\nYou can point Opera at another PrivateBin instance, including your own, in Settings > Confidentiality."
-  );
+    ? t("share.consent.retentionDefault")
+    : t("share.consent.retentionCustom");
+  return t("share.consent.body", { host, retention });
 }
 
 //unified modal for both directions
@@ -105,11 +100,11 @@ const WELCOME_LINE_HEIGHT = 40;
 const MODEL_SELECTOR_DRAG_DISTANCE = 280;
 
 //time-of-day greeting shown on the home screen
-function getGreeting(): string {
+function getGreeting(t: TranslationFn): string {
   const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
+  if (hour < 12) return t("home.greeting.morning");
+  if (hour < 18) return t("home.greeting.afternoon");
+  return t("home.greeting.evening");
 }
 
 //fades in then types out text character by character, like a typewriter
@@ -175,13 +170,14 @@ function DissolveIn({ delay, style, children }: { delay: number; style?: any; ch
 export default function Index() {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { width, isLargeScreen, isDesktop } = useResponsive();
   //edge drag maps to drawer progress
   const dragWidth = drawerWidthFor(width);
   //computed once per mount so it doesn't shift mid-session
-  const greeting = useMemo(() => getGreeting(), []);
+  const greeting = useMemo(() => getGreeting(t), [t]);
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedReflection, setSelectedReflection] = useState("none");
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -752,7 +748,7 @@ export default function Index() {
     try {
       const msgs = await DB.getMessages(conv.id);
       if (msgs.length === 0) {
-        setShareNotice({ kind: "error", message: "This conversation is empty, there is nothing to share yet." });
+        setShareNotice({ kind: "error", message: t("share.error.empty") });
         return;
       }
       const link = await shareConversation(conv, msgs);
@@ -765,9 +761,9 @@ export default function Index() {
       //android share only reads message
       await Share.share(Platform.OS === "ios" ? { url: link } : { message: link });
     } catch (e: any) {
-      setShareNotice({ kind: "error", message: e?.message || "The share link could not be created." });
+      setShareNotice({ kind: "error", message: e?.message || t("share.error.create") });
     }
-  }, []);
+  }, [t]);
 
   //decrypt shared convo, no db write yet
   const openSharedConversation = useCallback(async (pasteId: string, secret: string) => {
@@ -781,9 +777,9 @@ export default function Index() {
       setShareNotice(null);
       clearShareFromUrl();
     } catch (e: any) {
-      setShareNotice({ kind: "error", message: e?.message || "This shared conversation could not be opened." });
+      setShareNotice({ kind: "error", message: e?.message || t("share.error.open") });
     }
-  }, []);
+  }, [t]);
 
   const saveSharedConversation = useCallback(async () => {
     if (!activeConversation || activeConversation.id !== sharedPreviewId) return;
@@ -1019,7 +1015,7 @@ export default function Index() {
           history: taskHistory,
           think: taskReflection === "none" ? false : taskReflection,
           persist: !isIncognitoTask,
-          noModelMessage: "Please select a model from the top menu before sending a message.",
+          noModelMessage: t("chat.noModel"),
         });
 
         const isError = run.status === "error";
@@ -1192,7 +1188,7 @@ export default function Index() {
         history: taskHistory,
         think: taskReflection === "none" ? false : taskReflection,
         persist: !isIncognitoTask,
-        noModelMessage: "Please select a model from the top menu before sending a message.",
+        noModelMessage: t("chat.noModel"),
       });
 
       const isError = run.status === "error";
@@ -1260,9 +1256,9 @@ export default function Index() {
   if (dbFailed) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.welcomeText}>Something went wrong</Text>
+        <Text style={styles.welcomeText}>{t("home.dbFailed.title")}</Text>
         <Text style={styles.incognitoDescription}>
-          Opera could not open its local database. Please restart the app. If the problem persists, reinstall it.
+          {t("home.dbFailed.message")}
         </Text>
       </View>
     );
@@ -1277,14 +1273,14 @@ export default function Index() {
 
   const shareNoticeButtons = shareNotice?.kind === "confirm"
     ? [
-      { text: "Cancel", style: "secondary" as const, onPress: () => setShareNotice(null) },
-      { text: "Create link", style: "primary" as const, onPress: () => createShareLink(shareNotice.conv) },
+      { text: t("common.cancel"), style: "secondary" as const, onPress: () => setShareNotice(null) },
+      { text: t("share.createLink"), style: "primary" as const, onPress: () => createShareLink(shareNotice.conv) },
     ]
     : shareNotice?.kind === "link"
       ? [
-        { text: "Close", style: "secondary" as const, onPress: () => setShareNotice(null) },
+        { text: t("common.close"), style: "secondary" as const, onPress: () => setShareNotice(null) },
         {
-          text: "Copy link",
+          text: t("share.copyLink"),
           style: "primary" as const,
           onPress: () => {
             Clipboard.setStringAsync(shareNotice.link);
@@ -1292,7 +1288,7 @@ export default function Index() {
           },
         },
       ]
-      : [{ text: "Close", style: "secondary" as const, onPress: () => setShareNotice(null) }];
+      : [{ text: t("common.close"), style: "secondary" as const, onPress: () => setShareNotice(null) }];
 
   const conversationsDrawer = (
     <ConversationsDrawer
@@ -1403,8 +1399,8 @@ export default function Index() {
                       ]}
                     >
                       {incognitoMode
-                        ? "Disable incognito mode"
-                        : "Enable incognito mode"}
+                        ? t("home.incognito.disable")
+                        : t("home.incognito.enable")}
                     </Text>
                   </Pressable>
                 </DissolveIn>
@@ -1502,7 +1498,7 @@ export default function Index() {
                         style={[styles.settingsIcon, !isDesktop && { marginRight: 0 }]}
                       />
                       {isDesktop && (
-                        <Text style={styles.settingsButtonText}>Settings</Text>
+                        <Text style={styles.settingsButtonText}>{t("home.settings")}</Text>
                       )}
                     </Pressable>
                   </View>
@@ -1519,7 +1515,7 @@ export default function Index() {
                       <Group style={{ backgroundColor: Colors.dangerBgSoft, borderColor: Colors.dangerBorderSoft }}>
                         <View style={styles.shareWarningBox}>
                           <Text style={styles.shareWarningText}>
-                            This conversation was shared by someone else. Only add it if you trust the sender — it may contain misleading content, including attempts to manipulate the assistant.
+                            {t("share.preview.warning")}
                           </Text>
                         </View>
                       </Group>
@@ -1528,7 +1524,7 @@ export default function Index() {
                       <Group>
                         <ActionButton
                           icon={addIcon}
-                          label="Add to conversations"
+                          label={t("share.preview.add")}
                           labelStyle={styles.addSharedLabel}
                           onPress={saveSharedConversation}
                           style={styles.addSharedButton}
@@ -1605,11 +1601,11 @@ export default function Index() {
 
       <NotificationModal
         visible={!!shareNotice}
-        title={shareNotice?.kind === "opening" ? "Shared conversation" : "Share conversation"}
+        title={shareNotice?.kind === "opening" ? t("share.modal.openTitle") : t("share.modal.title")}
         message={
           shareNotice?.kind === "confirm" ? shareConsentMessage()
-            : shareNotice?.kind === "creating" ? "Encrypting the conversation and uploading it..."
-              : shareNotice?.kind === "opening" ? "Downloading and decrypting the conversation..."
+            : shareNotice?.kind === "creating" ? t("share.modal.creating")
+              : shareNotice?.kind === "opening" ? t("share.modal.opening")
                 : shareNotice?.kind === "error" ? shareNotice.message
                   : shareNotice?.kind === "link" ? shareNotice.link
                     : undefined
@@ -1620,12 +1616,12 @@ export default function Index() {
 
       <NotificationModal
         visible={showDataWarning}
-        title="Possible data inconsistency"
-        message="After this update, some saved data may be inconsistent. If you encounter any problems, go to Settings → Confidentiality to export your data or delete all conversations."
+        title={t("home.dataWarning.title")}
+        message={t("home.dataWarning.message")}
         onClose={() => setShowDataWarning(false)}
         buttons={[
           {
-            text: "Go to Settings",
+            text: t("home.dataWarning.goToSettings"),
             style: "primary",
             onPress: () => {
               setShowDataWarning(false);
@@ -1636,7 +1632,7 @@ export default function Index() {
             },
           },
           {
-            text: "Later", style: "secondary", onPress: () => {
+            text: t("home.dataWarning.later"), style: "secondary", onPress: () => {
               Settings.set("dataWarningDismissed", true);
               setShowDataWarning(false);
             }

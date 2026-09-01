@@ -17,6 +17,7 @@ import {
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { t } from "../../i18n";
 import { AIModule } from "../../services/ai/AIModule";
 import { Suggestion } from "../../services/ai/generation/suggestions";
 import { Conversation, Message, MessageSource } from "../../services/db/DatabaseService";
@@ -219,7 +220,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   const copyToClipboard = async (text: string, isMarkdown: boolean) => {
     const contentToCopy = isMarkdown ? text : stripMarkdown(text);
     await Clipboard.setStringAsync(contentToCopy);
-    showSnackbar(isMarkdown ? "Markdown copied to clipboard" : "Copied to clipboard");
+    showSnackbar(isMarkdown ? t("chat.copiedMarkdown") : t("chat.copied"));
   };
 
   return (

@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useResponsive } from "../hooks/useResponsive";
+import { useT } from "../i18n";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../constants/theme";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
@@ -19,15 +20,15 @@ const butterflyImage = require("../../assets/images/butterfly2.png");
 const texture2 = require("../../assets/images/texture2.png");
 const logoImage = require("../../assets/icons/opera.png");
 
-const FULL_TEXT = "AI for all,\nprivacy for freedom";
-
 export default function StartingPage() {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isLargeScreen } = useResponsive();
 
+  const fullText = t("onboarding.start.tagline");
   const [displayedText, setDisplayedText] = useState("");
 
   const logoOpacity = useAnimatedValue(0);
@@ -76,9 +77,9 @@ export default function StartingPage() {
 
     const startDelay = setTimeout(() => {
       timer = setInterval(() => {
-        if (currentIndex < FULL_TEXT.length) {
+        if (currentIndex < fullText.length) {
           currentIndex++;
-          setDisplayedText(FULL_TEXT.slice(0, currentIndex));
+          setDisplayedText(fullText.slice(0, currentIndex));
         } else {
           clearInterval(timer);
           // 3. Trigger button appearance when typing completes
@@ -103,6 +104,7 @@ export default function StartingPage() {
       if (timer) clearInterval(timer);
     };
   }, [
+    fullText,
     logoOpacity,
     logoTranslateY,
     butterflyOpacity,
@@ -154,7 +156,7 @@ export default function StartingPage() {
         <View style={styles.titleWrapper}>
           {/* Reserve layout dimensions to prevent any layout shifts */}
           <Text style={[styles.title, isLargeScreen && styles.titleLarge, { opacity: 0 }]}>
-            {FULL_TEXT}
+            {fullText}
           </Text>
           {/* Typewriter text overlay */}
           <Text style={[styles.title, isLargeScreen && styles.titleLarge, styles.titleOverlay]}>
@@ -177,7 +179,7 @@ export default function StartingPage() {
           style={({ pressed, hovered }) => [styles.button, isLargeScreen && styles.buttonLarge, (pressed || hovered) && styles.buttonPressed]}
           onPress={handleContinue}
         >
-          <Text style={styles.buttonText}>Get started</Text>
+          <Text style={styles.buttonText}>{t("onboarding.start.cta")}</Text>
         </Pressable>
       </Animated.View>
     </View>

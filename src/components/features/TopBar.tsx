@@ -1,5 +1,6 @@
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useT } from "../../i18n";
 import { Image, Platform, Pressable, StyleSheet, View, Text } from "react-native";
 
 const moreIcon = require("../../../assets/icons/More.png");
@@ -17,6 +18,7 @@ type TopBarProps = {
 export default function TopBar({ onMenuPress, onNewPress, centerElement, rightElement, isLargeScreen, isDesktop }: TopBarProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const showDesktopButtons = isDesktop;
   const showNewButton = !showDesktopButtons || Platform.OS === "web";
 
@@ -32,7 +34,7 @@ export default function TopBar({ onMenuPress, onNewPress, centerElement, rightEl
               style={({ pressed, hovered }) => [styles.soloButton, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
             >
               <Image source={moreIcon} style={styles.buttonIcon} resizeMode="contain" tintColor={Colors.textPrimary} />
-              <Text style={styles.buttonText}>Discussions</Text>
+              <Text style={styles.buttonText}>{t("topbar.discussions")}</Text>
             </Pressable>
           </View>
           {showNewButton && (
@@ -43,7 +45,7 @@ export default function TopBar({ onMenuPress, onNewPress, centerElement, rightEl
                 style={({ pressed, hovered }) => [styles.soloButton, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
               >
                 <Image source={addIcon} style={styles.buttonIcon} resizeMode="contain" tintColor={Colors.textPrimary} />
-                <Text style={styles.buttonText}>New</Text>
+                <Text style={styles.buttonText}>{t("topbar.new")}</Text>
               </Pressable>
             </View>
           )}

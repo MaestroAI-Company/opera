@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useT } from "../../i18n";
 import { loadNextcloudConfig, runNextcloudLoginFlow } from "../../services/cloud/NextcloudProvider";
 import Group from "../ui/Group";
 import TextInputField from "../ui/TextInputField";
@@ -16,6 +17,7 @@ type NextcloudSetupProps = {
 export default function NextcloudSetup({ onDone }: NextcloudSetupProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
 
   const [serverUrl, setServerUrl] = useState("");
   const [connecting, setConnecting] = useState(false);
@@ -80,7 +82,7 @@ export default function NextcloudSetup({ onDone }: NextcloudSetupProps) {
 
       {connecting ? (
         <>
-          <Text style={styles.statusText}>Waiting for you to approve it in your browser...</Text>
+          <Text style={styles.statusText}>{t("nextcloud.waiting")}</Text>
           <Pressable
             style={({ pressed, hovered }) => [
               styles.cancelBtn,
@@ -88,7 +90,7 @@ export default function NextcloudSetup({ onDone }: NextcloudSetupProps) {
             ]}
             onPress={handleCancel}
           >
-            <Text style={styles.cancelBtnText}>Cancel</Text>
+            <Text style={styles.cancelBtnText}>{t("common.cancel")}</Text>
           </Pressable>
         </>
       ) : (
@@ -101,11 +103,11 @@ export default function NextcloudSetup({ onDone }: NextcloudSetupProps) {
           onPress={handleConnect}
           disabled={!serverUrl.trim()}
         >
-          <Text style={styles.connectBtnText}>Connect</Text>
+          <Text style={styles.connectBtnText}>{t("nextcloud.connect")}</Text>
         </Pressable>
       )}
 
-      {failed && <Text style={styles.errorText}>Login failed or timed out. Check the address and try again.</Text>}
+      {failed && <Text style={styles.errorText}>{t("nextcloud.failed")}</Text>}
     </View>
   );
 }

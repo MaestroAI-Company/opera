@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Group from "../components/ui/Group";
 import TextInputField from "../components/ui/TextInputField";
 import { useResponsive } from "../hooks/useResponsive";
+import { useT } from "../i18n";
 import { Settings } from "../services/settings/SettingsService";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../constants/theme";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
@@ -22,6 +23,7 @@ const profilIcon = require("../../assets/icons/pencil.png");
 export default function NamePage() {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isLargeScreen } = useResponsive();
@@ -47,9 +49,9 @@ export default function NamePage() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={isLargeScreen && styles.pageContentLarge}>
           <View style={styles.header}>
-            <Text style={styles.title}>What should we call you?</Text>
+            <Text style={styles.title}>{t("onboarding.name.title")}</Text>
             <Text style={styles.subtitle}>
-              Enter your name to personalize your experience with Opera.
+              {t("onboarding.name.subtitle")}
             </Text>
           </View>
 
@@ -59,7 +61,7 @@ export default function NamePage() {
                 icon={profilIcon}
                 value={name}
                 onChangeText={setName}
-                placeholder="Enter your name"
+                placeholder={t("onboarding.name.placeholder")}
                 autoFocus
               />
             </Group>
@@ -72,10 +74,10 @@ export default function NamePage() {
           style={({ pressed, hovered }) => [styles.button, isLargeScreen && styles.buttonLarge, (pressed || hovered) && styles.buttonPressed]}
           onPress={handleFinish}
         >
-          <Text style={styles.buttonText}>Continue</Text>
+          <Text style={styles.buttonText}>{t("onboarding.name.continue")}</Text>
         </Pressable>
         <Pressable onPress={handleFinish} style={({ pressed, hovered }) => [(pressed || hovered) && { opacity: 0.5 }]}>
-          <Text style={styles.skipText}>Skip this step</Text>
+          <Text style={styles.skipText}>{t("onboarding.name.skip")}</Text>
         </Pressable>
       </View>
     </View>

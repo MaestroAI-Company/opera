@@ -15,10 +15,13 @@ import {
 export type { SupportedLocale, TranslationKey } from './catalogs';
 
 export type TranslationParams = Record<string, string | number>;
+export type TranslationFn = (key: TranslationKey, params?: TranslationParams) => string;
 
 //shared by the separate overlay entry
 let locale: SupportedLocale = defaultLocale();
 let catalog: Translations = CATALOGS[locale];
+//per-locale identity for memo deps
+let bound: TranslationFn = (key, params) => t(key, params);
 const listeners = new Set<() => void>();
 let started = false;
 
@@ -28,6 +31,7 @@ export function setLocale(next: string): void {
 
   locale = resolved;
   catalog = CATALOGS[resolved];
+  bound = (key, params) => t(key, params);
   for (const listener of listeners) listener();
 }
 
@@ -77,12 +81,11 @@ function subscribe(callback: () => void): () => void {
   };
 }
 
-function getSnapshot(): SupportedLocale {
-  return locale;
+function getSnapshot(): TranslationFn {
+  return bound;
 }
 
 //re-renders on locale change
-export function useT(): typeof t {
-  useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  return t;
+export function useT(): TranslationFn {
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }

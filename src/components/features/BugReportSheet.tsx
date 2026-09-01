@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useKeyboardAnimation, useKeyboardState } from "react-native-keyboard-controller";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
-import { REPORT_CONSENT, useBugReport } from "../../hooks/useBugReport";
+import { useBugReport } from "../../hooks/useBugReport";
+import { useT } from "../../i18n";
 import { useThemedStyles } from "../../hooks/useTheme";
 import type { Crash } from "../../services/logging/CrashReporter";
 import ActionButton from "../ui/ActionButton";
@@ -31,6 +32,7 @@ type BugReportSheetProps = {
 //opens on shake or after crash
 export default function BugReportSheet({ visible, onClose, crash = null, screenshot = null, isLargeScreen = false, isDesktop = false, bottomInset = 0 }: BugReportSheetProps) {
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{ title: string; message: string; buttons?: ModalButton[] }>({ title: "", message: "" });
   //fluid, native-driven keyboard height, same source as the chatbar's KeyboardAvoidingView
@@ -74,11 +76,11 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
         desktopStyle={[styles.desktopCard, centeredStyle]}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={styles.title}>{crash ? "Opera closed unexpectedly" : "Report a bug"}</Text>
+          <Text style={styles.title}>{crash ? t("bugReport.crashTitle") : t("bugReport.title")}</Text>
 
           {crash && (
             <Text style={[styles.help, styles.consent]}>
-              The error was saved. Tell us what you were doing, it helps us find it.
+              {t("bugReport.crashHelp")}
             </Text>
           )}
 
@@ -86,7 +88,7 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
             <Group>
               <TextInputField
                 icon={penPlaceholderIcon}
-                placeholder={crash ? "What were you doing?" : "Describe the issue"}
+                placeholder={crash ? t("bugReport.crashPlaceholder") : t("bugReport.placeholder")}
                 value={report.text}
                 onChangeText={report.setText}
               />
@@ -96,7 +98,7 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
           <View style={styles.settingRowVertical}>
             <View style={styles.toggleRow}>
               <Checkbox
-                label="Attach lastest log lines"
+                label={t("bugReport.attachLogs")}
                 checked={report.logs !== null}
                 onToggle={report.toggleLogs}
                 labelFirst
@@ -109,7 +111,7 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
             <View style={styles.settingRowVertical}>
               <View style={styles.toggleRow}>
                 <Checkbox
-                  label="Attach a screenshot"
+                  label={t("bugReport.attachScreenshot")}
                   checked={report.screenshot !== null}
                   onToggle={(v) => report.setScreenshot(v ? screenshot : null)}
                   labelFirst
@@ -120,14 +122,14 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
           )}
 
           <Text style={[styles.help, styles.consent]}>
-            {REPORT_CONSENT}
-            {report.screenshot ? " The screenshot taken when you shook the phone goes to your clipboard, paste it into the issue if it helps." : ""}
+            {t("bugReport.consent")}
+            {report.screenshot ? " " + t("bugReport.consentScreenshot") : ""}
           </Text>
 
           <Group style={styles.highlightGroup}>
             <ActionButton
               icon={arrowIcon}
-              label="Send my issue"
+              label={t("bugReport.send")}
               onPress={() => report.send(onClose)}
               variant="highlight"
             />

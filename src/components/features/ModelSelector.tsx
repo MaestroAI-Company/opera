@@ -29,6 +29,7 @@ import Group from "../ui/Group";
 import DrawerSheet from "./DrawerSheet";
 import NotificationModal from "../ui/NotificationModal";
 import SliderToggle, { SliderToggleOption } from "../ui/SliderToggle";
+import { useT } from "../../i18n";
 import { settleDrawer } from "./drawerAnimation";
 
 const botIcon = require("../../../assets/icons/bot.png");
@@ -38,11 +39,7 @@ const lowIcon = require("../../../assets/icons/Low.png");
 const highIcon = require("../../../assets/icons/High.png");
 const loadingAnimation = require("../../../assets/animations/loading.json");
 
-const REFLECTIONS: SliderToggleOption[] = [
-  { id: "none", label: "Quick", icon: quickIcon },
-  { id: "low", label: "Low", icon: lowIcon },
-  { id: "high", label: "High", icon: highIcon },
-];
+const REFLECTION_ICONS = { none: quickIcon, low: lowIcon, high: highIcon };
 
 const LONG_PRESS_DELAY = 180;
 const BREAK_RATIO = 0.85;
@@ -146,8 +143,20 @@ export function ModelSelectorDrawer({
 }: ModelSelectorDrawerProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
+
+  //reflection labels follow the locale
+  const reflections: SliderToggleOption[] = useMemo(
+    () =>
+      (["none", "low", "high"] as const).map((id) => ({
+        id,
+        label: t(`reflection.${id}`),
+        icon: REFLECTION_ICONS[id],
+      })),
+    [t]
+  );
 
   //anchor must match drawersheet layout
   const anchored = isDesktop || isLargeScreen;
@@ -446,12 +455,12 @@ export function ModelSelectorDrawer({
           ) : loading && models.length === 0 ? (
             <View style={styles.loadingRow}>
               <LottieView source={loadingAnimation} autoPlay loop style={{ width: 24, height: 16 }} />
-              <Text style={styles.modelStatus}>Loading...</Text>
+              <Text style={styles.modelStatus}>{t("modelSelector.loading")}</Text>
             </View>
           ) : models.length === 0 ? (
             <View>
               <Text style={styles.emptyText}>
-                {isAvailable ? "No models found" : "Unable to fetch models / server unreachable"}
+                {isAvailable ? t("modelSelector.noModels") : t("modelSelector.unreachable")}
               </Text>
               {isAvailable && isBrowsingActive && (
                 <Pressable
@@ -460,7 +469,7 @@ export function ModelSelectorDrawer({
                 >
                   <Image source={downloadIcon} style={styles.downloadIcon} />
                   <Text style={styles.downloadText}>
-                    {isDownloading ? "Downloading..." : "gemma4"}
+                    {isDownloading ? t("modelSelector.downloading") : "gemma4"}
                   </Text>
                 </Pressable>
               )}
@@ -510,7 +519,7 @@ export function ModelSelectorDrawer({
             <SliderToggle
               selectedValue={selectedReflection}
               onSelect={onReflectionChange}
-              options={REFLECTIONS}
+              options={reflections}
             />
           </Group>
         </View>
@@ -549,13 +558,13 @@ export function ModelSelectorDrawer({
 
       <NotificationModal
         visible={downloadModalVisible}
-        title="Download Gemma4"
+        title={t("modelSelector.download.title")}
         icon={downloadIcon}
-        message="Do you want to download the Gemma4 model to your Ollama server? This model is several GB in size."
+        message={t("modelSelector.download.message")}
         onClose={() => setDownloadModalVisible(false)}
         buttons={[
-          { text: "Cancel", onPress: () => setDownloadModalVisible(false), style: "secondary" },
-          { text: "Download", onPress: handlePullModel, style: "primary" },
+          { text: t("common.cancel"), onPress: () => setDownloadModalVisible(false), style: "secondary" },
+          { text: t("modelSelector.download.confirm"), onPress: handlePullModel, style: "primary" },
         ]}
       />
     </>

@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useT } from "../../i18n";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import {
   DOCUMENT_MIME_TYPES,
@@ -202,7 +203,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   onStop,
   onTranscribe,
   onTranscribeError,
-  placeholder = "Ask",
+  placeholder,
   incognito = false,
   isGenerating = false,
   supportsFiles = false,
@@ -218,6 +219,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 }, ref) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const insets = useSafeAreaInsets();
   const bottomInsetToFill = insets.bottom + 16;
   const [text, setText] = useState("");
@@ -253,12 +255,12 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
           documentsRef.current.delete(file.uri);
           if (cancelled) return;
           setSelectedFiles(prev => prev.filter(f => f.uri !== file.uri));
-          setModalConfig({ title: "Unreadable Document", message: `${file.name}: ${e.message}` });
+          setModalConfig({ title: t("chatbar.unreadableDocument"), message: `${file.name}: ${e.message}` });
           setModalVisible(true);
         });
       });
     return () => { cancelled = true; };
-  }, [selectedFiles]);
+  }, [selectedFiles, t]);
 
   useImperativeHandle(ref, () => ({
     stopRecording: () => {
@@ -409,8 +411,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       if (!granted) {
         setIsRecording(false);
         setModalConfig({
-          title: "Microphone Permission",
-          message: "Microphone access is required for voice input. Please enable it in your device settings.",
+          title: t("chatbar.micPermission.title"),
+          message: t("chatbar.micPermission.message"),
           buttons: [{ text: "OK", onPress: () => setModalVisible(false), style: "primary" }]
         });
         setModalVisible(true);
@@ -573,7 +575,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const handleCamera = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
     if (permissionResult.granted === false) {
-      setModalConfig({ title: "Permission Denied", message: "You've refused to allow this app to access your camera!" });
+      setModalConfig({ title: t("chatbar.permissionDenied"), message: t("chatbar.cameraDenied") });
       setModalVisible(true);
       return;
     }
@@ -595,7 +597,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const handlePhotos = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (permissionResult.granted === false) {
-      setModalConfig({ title: "Permission Denied", message: "You've refused to allow this app to access your photos!" });
+      setModalConfig({ title: t("chatbar.permissionDenied"), message: t("chatbar.photosDenied") });
       setModalVisible(true);
       return;
     }
@@ -777,7 +779,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         }
 
         if (hasInvalidFile) {
-          setModalConfig({ title: "Unsupported Format", message: "Audio must be WAV or MP3. Documents must be PDF, Word or plain text." });
+          setModalConfig({ title: t("chatbar.unsupportedFormat"), message: t("chatbar.unsupportedAudio") });
           setModalVisible(true);
         }
 
@@ -796,12 +798,12 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       const modelName = Settings.getCached().whisperModel || "base";
       if (modelName === "none") {
         setModalConfig({
-          title: "Whisper Not Configured",
-          message: "You have disabled on-device transcription. Please select a Whisper model in settings to enable it.",
+          title: t("whisper.notConfigured.title"),
+          message: t("whisper.notConfigured.message"),
           buttons: [
-            { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
+            { text: t("common.cancel"), onPress: () => setModalVisible(false), style: "secondary" },
             {
-              text: "Settings", onPress: () => {
+              text: t("chatbar.settings"), onPress: () => {
                 setModalVisible(false);
                 if (onOpenSettings) onOpenSettings();
               }, style: "primary"
@@ -816,12 +818,12 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       const isInstalled = await WhisperSTT.isModelInstalled(modelName);
       if (!isInstalled) {
         setModalConfig({
-          title: "Whisper Not Installed",
-          message: `The Whisper ${modelName} model is required for on-device transcription. Would you like to install it?`,
+          title: t("whisper.notInstalled.title"),
+          message: t("whisper.notInstalled.messageInstall", { model: modelName }),
           buttons: [
-            { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
+            { text: t("common.cancel"), onPress: () => setModalVisible(false), style: "secondary" },
             {
-              text: "Install", onPress: () => {
+              text: t("chatbar.install"), onPress: () => {
                 setModalVisible(false);
                 if (onOpenSettings) onOpenSettings();
               }, style: "primary"
@@ -836,12 +838,12 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       const initialized = await WhisperSTT.init(modelName);
       if (!initialized) {
         setModalConfig({
-          title: "Initialization Error",
-          message: `Failed to load the Whisper ${modelName} model. It might be corrupted or incompatible. Please try reinstalling it from the settings.`,
+          title: t("whisper.initError.title"),
+          message: t("whisper.initError.messageReinstall", { model: modelName }),
           buttons: [
-            { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
+            { text: t("common.cancel"), onPress: () => setModalVisible(false), style: "secondary" },
             {
-              text: "Settings", onPress: () => {
+              text: t("chatbar.settings"), onPress: () => {
                 setModalVisible(false);
                 if (onOpenSettings) onOpenSettings();
               }, style: "primary"
@@ -936,7 +938,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       try {
         documents = await Promise.all(selectedFiles.filter(f => f.type === 'document').map(readDocument));
       } catch (e: any) {
-        setModalConfig({ title: "Unreadable Document", message: e.message });
+        setModalConfig({ title: t("chatbar.unreadableDocument"), message: e.message });
         setModalVisible(true);
         return;
       }
@@ -999,7 +1001,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
           const validFiles = results.filter(r => r !== null) as SelectedFile[];
 
           if (validFiles.length < pastedFiles.length) {
-            setModalConfig({ title: "Unsupported Format", message: "Only images, WAV/MP3 audio and PDF, Word or plain text documents are supported." });
+            setModalConfig({ title: t("chatbar.unsupportedFormat"), message: t("chatbar.unsupportedFile") });
             setModalVisible(true);
           }
 
@@ -1012,7 +1014,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
     window.addEventListener('paste', handleGlobalPaste);
     return () => window.removeEventListener('paste', handleGlobalPaste);
-  }, [supportsFiles]);
+  }, [supportsFiles, t]);
 
   return (
     <KeyboardAvoidingView
@@ -1063,7 +1065,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                       ))}
                       <Text style={[styles.filesAddedText, incognito && { color: Colors.textMuted }]}>
                         {(() => {
-                          const filesPart = attachments.length > 0 ? `${attachments.length} File${attachments.length !== 1 ? 's' : ''}` : '';
+                          const filesPart = attachments.length > 0 ? t(attachments.length === 1 ? 'chatbar.fileCount.one' : 'chatbar.fileCount.other', { count: attachments.length }) : '';
                           const appPart = appContextChip ? 'App context' : '';
                           if (filesPart && appPart) return `${filesPart} and app context Added`;
                           if (filesPart) return `${filesPart} Added`;
@@ -1118,9 +1120,9 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                           { maxHeight: 36, minHeight: 36, lineHeight: 20 },
                           Platform.OS === 'web' && { outlineStyle: 'none', margin: 0, paddingHorizontal: 0, overflow: 'hidden' } as any
                         ]}
-                        value={isTranscribing ? "Transcribing..." : text}
+                        value={isTranscribing ? t("chatbar.transcribing") : text}
                         onChangeText={isTranscribing ? undefined : setText}
-                        placeholder={placeholder}
+                        placeholder={placeholder ?? t("chatbar.placeholder")}
                         placeholderTextColor={Colors.whiteSoft}
                         multiline={true}
                         numberOfLines={1}

@@ -186,6 +186,15 @@ class SettingsService {
     this.save();
   }
 
+  //local-only, excluded from sync
+  async getLocal(key: string): Promise<string | null> {
+    return localStorage.getItem(`opera_local_${key}`);
+  }
+
+  async setLocal(key: string, value: string): Promise<void> {
+    localStorage.setItem(`opera_local_${key}`, value);
+  }
+
   // get cached settings
   getCached(): AppSettings {
     return this.cache ?? { ...DEFAULTS };

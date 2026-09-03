@@ -229,6 +229,18 @@ class SettingsService {
     );
   }
 
+  //local-only, excluded from sync
+  async getLocal(key: string): Promise<string | null> {
+    const db = this.getDb();
+    const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM settings WHERE key = ?', [`__${key}`]);
+    return row ? row.value : null;
+  }
+
+  async setLocal(key: string, value: string): Promise<void> {
+    const db = this.getDb();
+    await db.runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [`__${key}`, value]);
+  }
+
   //get cached settings (after load)
   getCached(): AppSettings {
     return this.cache ?? { ...DEFAULTS };

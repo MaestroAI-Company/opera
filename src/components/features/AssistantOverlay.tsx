@@ -9,6 +9,7 @@ import {
   InteractionManager,
   Linking,
   Platform,
+  Pressable,
   StyleSheet,
   Vibration,
 } from 'react-native';
@@ -40,6 +41,7 @@ import TextLayer from './TextLayer';
 
 import { useResponsive } from '../../hooks/useResponsive';
 import { AppContext, AppIcon, ScreenCapture } from '../../services/overlay/screenCapture';
+import { useScreenAccess } from '../../services/overlay/useScreenAccess';
 import { useScreenDetections } from '../../services/overlay/useScreenDetections';
 import { useScreenSelection } from '../../services/overlay/useScreenSelection';
 import { useScreenText } from '../../services/overlay/useScreenText';
@@ -160,10 +162,12 @@ function AssistantOverlay() {
   const [phase, setPhase] = useState<'select' | 'respond'>('select');
   //bump forces fresh screenshot analysis
   const [session, setSession] = useState(0);
-  const { selection, select, clear: clearSelection, attachment } = useScreenSelection(session);
+  //android settings gate every screen feature
+  const screenAccess = useScreenAccess(session);
+  const { selection, select, clear: clearSelection, attachment } = useScreenSelection(session, screenAccess);
   //selection works without it
-  const detections = useScreenDetections(session);
-  const screenText = useScreenText(session);
+  const detections = useScreenDetections(session, screenAccess);
+  const screenText = useScreenText(session, screenAccess);
   //foreground app and screen text
   const appContextRef = useRef<AppContext | null>(null);
   //chip icon and label state
@@ -765,20 +769,25 @@ function AssistantOverlay() {
           style={[styles.phaseContainer, { opacity: mountOpacity }]}
         >
           {phase === 'select' ? (
-            <>
-              <SelectionLayer
-                selection={selection}
-                onChange={select}
-                onVibrate={() => Vibration.vibrate(10)}
-                onDrawingChange={setIsDrawingSelection}
-                onDismiss={closeOverlay}
-                detections={detections}
-              />
-              <TextLayer
-                codes={screenText.codes}
-                onVibrate={() => Vibration.vibrate(10)}
-              />
-            </>
+            screenAccess ? (
+              <>
+                <SelectionLayer
+                  selection={selection}
+                  onChange={select}
+                  onVibrate={() => Vibration.vibrate(10)}
+                  onDrawingChange={setIsDrawingSelection}
+                  onDismiss={closeOverlay}
+                  detections={detections}
+                />
+                <TextLayer
+                  codes={screenText.codes}
+                  onVibrate={() => Vibration.vibrate(10)}
+                />
+              </>
+            ) : (
+              /* nothing to select without screen access, a tap still leaves */
+              <Pressable style={StyleSheet.absoluteFill} onPress={closeOverlay} />
+            )
           ) : (
             <Animated.View style={[styles.phaseContainer, { opacity: responseOpacity }]} pointerEvents="box-none">
               <LinearGradient

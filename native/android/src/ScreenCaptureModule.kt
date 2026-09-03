@@ -105,6 +105,12 @@ class ScreenCaptureModule(context: ReactApplicationContext) : ReactContextBaseJa
     })
   }
 
+  //settings may forbid reading the screen
+  @ReactMethod
+  fun isScreenAccessAllowed(promise: Promise) {
+    promise.resolve(ScreenshotHolder.isScreenAccessAllowed())
+  }
+
   //region as jpeg data uri
   @ReactMethod
   fun cropRegion(x: Double, y: Double, w: Double, h: Double, promise: Promise) {

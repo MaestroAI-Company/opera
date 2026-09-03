@@ -101,20 +101,28 @@ class CentralAIModule {
 
   async isSourceAvailable(mode: string, ollamaUrl?: string): Promise<boolean> {
     const provider = this.providerFor(mode, ollamaUrl);
-    if (!provider) return false;
+    if (!provider) {
+      console.warn(`[AIModule] no provider for source ${mode} ${ollamaUrl ?? ''}`);
+      return false;
+    }
     try {
       return await provider.isAvailable();
-    } catch {
+    } catch (error) {
+      console.warn(`[AIModule] availability check threw for ${mode} ${ollamaUrl ?? ''}:`, error);
       return false;
     }
   }
 
   async getModelsFor(mode: string, ollamaUrl?: string): Promise<string[]> {
     const provider = this.providerFor(mode, ollamaUrl);
-    if (!provider) return [];
+    if (!provider) {
+      console.warn(`[AIModule] no provider for source ${mode} ${ollamaUrl ?? ''}`);
+      return [];
+    }
     try {
       return await provider.getAvailableModels();
-    } catch {
+    } catch (error) {
+      console.warn(`[AIModule] model listing threw for ${mode} ${ollamaUrl ?? ''}:`, error);
       return [];
     }
   }

@@ -23,6 +23,7 @@ import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constan
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { AIModule } from "../../services/ai/AIModule";
 import { getAICoreModelLabel } from "../../services/ai/providers/AICoreProvider";
+import { getCachedModels, hydrateModelCache, setCachedModels } from "../../services/ai/providers/modelCache";
 import { buildSources, ModelSource } from "../../services/ai/providers/sources";
 import { AppEvents } from "../../services/events";
 import Group from "../ui/Group";
@@ -221,10 +222,17 @@ export function ModelSelectorDrawer({
     setBrowsedKey(null);
   }, [aiService, ollamaUrl]);
 
-  //switching source or refreshing only drops what disappeared and appends what is new
-  const applyModels = (next: string[]) => {
+  //source of visible rows
+  const shownKey = useRef<string | null>(null);
+  //source of pending fetch
+  const pendingKey = useRef<string | null>(null);
+
+  //refresh keeps seen rows, switch restarts
+  const applyModels = (next: string[], sourceKey: string) => {
+    const sameSource = shownKey.current === sourceKey;
+    shownKey.current = sourceKey;
     setModels((prev) => {
-      const kept = prev.filter((m) => next.includes(m));
+      const kept = sameSource ? prev.filter((m) => next.includes(m)) : [];
       const merged = [...kept, ...next.filter((m) => !kept.includes(m))];
       //nothing moved, keep the same list so the rows are not touched
       const same = merged.length === prev.length && merged.every((m, i) => m === prev[i]);
@@ -234,21 +242,38 @@ export function ModelSelectorDrawer({
 
   const fetchModels = useCallback(async (source?: ModelSource) => {
     if (!source) {
-      applyModels([]);
+      pendingKey.current = null;
+      applyModels([], "");
       setIsAvailable(false);
       setHasFetched(true);
       return;
     }
+    const key = source.key;
+    pendingKey.current = key;
     setLoading(true);
+    //stale result must not blank the list
+    setHasFetched(false);
+    //cache paints while the server answers
+    await hydrateModelCache();
+    if (pendingKey.current !== key) return;
+    applyModels(getCachedModels(key), key);
     try {
       const available = await AIModule.isSourceAvailable(source.service, source.url);
+      if (pendingKey.current !== key) return;
       setIsAvailable(available);
-      applyModels(available ? await AIModule.getModelsFor(source.service, source.url) : []);
-    } catch {
-      applyModels([]);
+      const fetched = available ? await AIModule.getModelsFor(source.service, source.url) : [];
+      if (pendingKey.current !== key) return;
+      applyModels(fetched, key);
+      if (available) setCachedModels(key, fetched);
+    } catch (error) {
+      console.warn(`[ModelSelector] refresh failed for ${key}:`, error);
+      if (pendingKey.current !== key) return;
+      applyModels([], key);
     } finally {
-      setLoading(false);
-      setHasFetched(true);
+      if (pendingKey.current === key) {
+        setLoading(false);
+        setHasFetched(true);
+      }
     }
   }, []);
 

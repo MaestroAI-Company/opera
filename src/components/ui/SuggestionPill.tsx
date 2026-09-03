@@ -1,22 +1,23 @@
 import { useEffect } from "react";
 import { Animated, Easing, Image, ImageSourcePropType, Pressable, StyleSheet, Text } from "react-native";
-import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 
-const ENTRANCE_DURATION = 180;
-//how far the pill rises into place
-const ENTRANCE_RISE = 8;
+const ENTRANCE_DURATION = 260;
+const ENTRANCE_SCALE = 0.1;
+const ENTRANCE_BOUNCE = 1;
 
 export type SuggestionPillProps = {
   icon: ImageSourcePropType;
   label: string;
   onPress: () => void;
+  width?: number;
   disabled?: boolean;
 };
 
 //mirror of the source pill
-export default function SuggestionPill({ icon, label, onPress, disabled = false }: SuggestionPillProps) {
+export default function SuggestionPill({ icon, label, onPress, width, disabled = false }: SuggestionPillProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
 
@@ -26,7 +27,7 @@ export default function SuggestionPill({ icon, label, onPress, disabled = false 
     const animation = Animated.timing(entrance, {
       toValue: 1,
       duration: ENTRANCE_DURATION,
-      easing: Easing.out(Easing.quad),
+      easing: Easing.out(Easing.back(ENTRANCE_BOUNCE)),
       useNativeDriver: true,
     });
     animation.start();
@@ -36,9 +37,10 @@ export default function SuggestionPill({ icon, label, onPress, disabled = false 
   return (
     <Animated.View
       style={{
-        opacity: entrance,
+        width,
+        opacity: entrance.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: "clamp" }),
         transform: [
-          { translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [ENTRANCE_RISE, 0] }) },
+          { scale: entrance.interpolate({ inputRange: [0, 1], outputRange: [ENTRANCE_SCALE, 1] }) },
         ],
       }}
     >
@@ -52,7 +54,7 @@ export default function SuggestionPill({ icon, label, onPress, disabled = false 
         ]}
       >
         <Image source={icon} style={styles.icon} tintColor={Colors.textMuted} />
-        <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">{label}</Text>
+        <Text style={styles.label}>{label}</Text>
       </Pressable>
     </Animated.View>
   );
@@ -60,18 +62,14 @@ export default function SuggestionPill({ icon, label, onPress, disabled = false 
 
 const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   pill: {
-    flexDirection: "row",
-    alignItems: "center",
+    flex: 1,
+    alignItems: "flex-start",
     backgroundColor: Colors.surface,
     borderWidth: 2,
     borderColor: Colors.border,
     borderRadius: Radius.xxl,
-    paddingLeft: 6,
-    paddingRight: 10,
-    paddingVertical: 6,
-    gap: 6,
-    //fits a five word label
-    maxWidth: 300,
+    padding: Spacing.lg,
+    gap: Spacing.md,
   },
   icon: {
     width: 20,
@@ -81,6 +79,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     color: Colors.textSecondary,
     fontFamily: Fonts.mono,
     fontSize: FontSizes.label,
-    flexShrink: 1,
+    lineHeight: 17,
   },
 });

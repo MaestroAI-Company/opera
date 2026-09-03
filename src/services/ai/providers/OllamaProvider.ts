@@ -4,6 +4,10 @@ import { NotificationService } from '../../notifications/NotificationService';
 import { MessageMetrics } from '../../db/DatabaseService';
 import { universalFetch } from '../utils/universalFetch';
 
+//unreachable ip blocks the socket
+const PROBE_TIMEOUT_MS = 6000;
+const TAGS_TIMEOUT_MS = 10000;
+
 export class OllamaProvider implements IAIProvider {
   private baseUrl: string;
   private defaultHeaders: Record<string, string>;
@@ -21,13 +25,28 @@ export class OllamaProvider implements IAIProvider {
     return this.baseUrl.length > 0;
   }
 
+  //probe timeout gates the model list
+  private async fetchWithTimeout(url: string, init: any, timeoutMs: number): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await universalFetch(url, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async isAvailable(): Promise<boolean> {
     if (!this.isConfigured()) return false;
     try {
       //check root endpoint
-      const response = await universalFetch(this.baseUrl, { headers: this.defaultHeaders });
+      const response = await this.fetchWithTimeout(this.baseUrl, { headers: this.defaultHeaders }, PROBE_TIMEOUT_MS);
+      if (!response.ok) {
+        console.warn(`[Ollama] ${this.baseUrl} answered ${response.status} on the root probe`);
+      }
       return response.ok;
-    } catch {
+    } catch (error) {
+      console.warn(`[Ollama] probe failed for ${this.baseUrl}:`, error);
       return false;
     }
   }
@@ -35,15 +54,20 @@ export class OllamaProvider implements IAIProvider {
   async getAvailableModels(): Promise<string[]> {
     if (!this.isConfigured()) return [];
     try {
-      const response = await universalFetch(`${this.baseUrl}/api/tags`, { headers: this.defaultHeaders });
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/api/tags`, { headers: this.defaultHeaders }, TAGS_TIMEOUT_MS);
       if (!response.ok) {
         const text = await response.text();
         throw new Error(`Failed to fetch models: ${response.status} - ${text}`);
       }
       const data = await response.json();
-      return data.models.map((m: any) => m.name);
+      if (!Array.isArray(data?.models)) {
+        throw new Error(`Unexpected /api/tags payload: ${JSON.stringify(data).slice(0, 200)}`);
+      }
+      const models = data.models.map((m: any) => m.name);
+      console.log(`[Ollama] ${this.baseUrl} listed ${models.length} models`);
+      return models;
     } catch (error) {
-      console.warn('Could not fetch available models from Ollama (is it running?):', error);
+      console.warn(`[Ollama] could not list models from ${this.baseUrl}:`, error);
       return [];
     }
   }

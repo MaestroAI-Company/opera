@@ -5,17 +5,23 @@ type Level = "log" | "warn" | "error";
 const buffer: string[] = [];
 let installed = false;
 
+//errors serialize to {} through json
+function format(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value instanceof Error) {
+    const cause = (value as { cause?: unknown }).cause;
+    const stack = value.stack ? `\n${value.stack}` : "";
+    return `${value.name}: ${value.message}${cause ? ` (cause: ${format(cause)})` : ""}${stack}`;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
 function push(level: Level, args: unknown[]) {
-  const text = args
-    .map((a) => {
-      if (typeof a === "string") return a;
-      try {
-        return JSON.stringify(a);
-      } catch {
-        return String(a);
-      }
-    })
-    .join(" ");
+  const text = args.map(format).join(" ");
   buffer.push(`${new Date().toISOString()} [${level}] ${text}`);
   if (buffer.length > MAX_LINES) buffer.shift();
 }
@@ -33,8 +39,34 @@ export function installLogger() {
   });
 }
 
+//short hash keeps servers anonymous
+function hostTag(host: string): string {
+  let hash = 0;
+  for (let i = 0; i < host.length; i++) hash = (hash * 31 + host.charCodeAt(i)) | 0;
+  //low bits avoid ip collisions
+  return Math.abs(hash).toString(36).slice(-4);
+}
+
+//anonymize urls for public reports
+function redactUrls(line: string): string {
+  return line.replace(/\bhttps?:\/\/\S+/gi, (match) => {
+    //strip trailing punctuation from url
+    const trailing = match.match(/[:,.;)\]]+$/)?.[0] ?? "";
+    const url = match.slice(0, match.length - trailing.length);
+    const scheme = url.slice(0, url.indexOf("//") + 2);
+    const rest = url.slice(scheme.length);
+    const authority = rest.split(/[/?#]/)[0];
+    const path = rest.slice(authority.length).split(/[?#]/)[0];
+    //strip creds and query params
+    const host = authority.split("@").pop() ?? authority;
+    const port = host.match(/:\d+$/)?.[0] ?? "";
+    const query = rest.length > authority.length + path.length ? "?…" : "";
+    return `${scheme}host-${hostTag(host.slice(0, host.length - port.length))}${port}${path}${query}${trailing}`;
+  });
+}
+
 export function getRecentLogs(limit?: number): string[] {
-  return limit ? buffer.slice(-limit) : [...buffer];
+  return (limit ? buffer.slice(-limit) : buffer).map(redactUrls);
 }
 
 //post error share of window
@@ -49,9 +81,9 @@ export function getRelevantLogs(limit: number): string[] {
       break;
     }
   }
-  if (errorAt === -1) return buffer.slice(-limit);
+  if (errorAt === -1) return buffer.slice(-limit).map(redactUrls);
 
   const tail = Math.min(buffer.length - errorAt - 1, Math.floor(limit / TAIL_RATIO));
   const end = errorAt + 1 + tail;
-  return buffer.slice(Math.max(0, end - limit), end);
+  return buffer.slice(Math.max(0, end - limit), end).map(redactUrls);
 }

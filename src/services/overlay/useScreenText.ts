@@ -6,10 +6,12 @@ const NO_CODES: ScreenCode[] = [];
 
 type Found = { session: number; codes: ScreenCode[] };
 
-export function useScreenText(session: number) {
+export function useScreenText(session: number, enabled: boolean) {
   const [found, setFound] = useState<Found | null>(null);
 
   useEffect(() => {
+    //no screen access no ocr
+    if (!enabled) return;
     let cancelled = false;
     //codes unread when overlay hidden
     const appState = AppState.addEventListener('change', state => {
@@ -36,7 +38,7 @@ export function useScreenText(session: number) {
       appState.remove();
       task.cancel();
     };
-  }, [session]);
+  }, [session, enabled]);
 
   //stale capture text dropped
   const current = found?.session === session ? found : null;

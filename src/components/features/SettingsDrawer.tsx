@@ -21,6 +21,9 @@ import { CLOUD_PROVIDERS, getCloudProviderDefinition } from "../../services/clou
 import { CloudSync } from "../../services/CloudSyncService";
 import { AppEvents } from "../../services/events";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
+import { McpService } from "../../services/mcp/McpService";
+import { McpServerConfig } from "../../services/mcp/types";
+import { describeImport } from "../../services/mcp/config";
 import { Settings } from "../../services/settings/SettingsService";
 import { WhisperSTT } from "../../services/speech/STTService";
 import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
@@ -56,6 +59,7 @@ const profilIcon = require("../../../assets/icons/profil.png");
 const cloudIcon = require("../../../assets/icons/cloud.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
 const generalIcon = require("../../../assets/icons/general.png");
+const advancedIcon = require("../../../assets/icons/settings.png");
 const serverIcon = require("../../../assets/icons/server.png");
 const toolIcon = require("../../../assets/icons/tool.png");
 const confidentialityIcon = require("../../../assets/icons/confidentiality.png");
@@ -66,6 +70,7 @@ const informationIcon = require("../../../assets/icons/information.png");
 const githubIcon = require("../../../assets/icons/github.png");
 const operaIcon = require("../../../assets/icons/operaicon.png");
 const instagramIcon = require("../../../assets/icons/instagram.png");
+const tiktokIcon = require("../../../assets/icons/tiktok.png");
 const micIcon = require("../../../assets/icons/microphone.png");
 const cameraIcon = require("../../../assets/icons/camera.png");
 const photoIcon = require("../../../assets/icons/photo.png");
@@ -79,8 +84,9 @@ const errorIcon = require("../../../assets/icons/error.png");
 const ollamaErrorImage = require("../../../assets/images/ImageCard/OllamaError.png");
 const ollamaInfoImage = require("../../../assets/images/ImageCard/OllamaInfo.png");
 const questionIcon = require("../../../assets/icons/question.png");
+const infoIcon = require("../../../assets/icons/info.png");
+const reconnectIcon = require("../../../assets/icons/reconnect.png");
 const hyperlinkIcon = require("../../../assets/images/hyperlink2.png");
-const assistantImage = require("../../../assets/images/icon_nobg.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
 
@@ -105,7 +111,26 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "assistantoverlay" | "service" | "confidentiality" | "reports" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "sociallinks";
+type SubPage = "main" | "general" | "advanced" | "assistantoverlay" | "service" | "confidentiality" | "reports" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "mcpservers" | "mcpserver" | "sociallinks";
+
+//page a subpage steps back to, followed by the header arrow and the android back button
+const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
+  main: "main",
+  general: "main",
+  advanced: "main",
+  assistantoverlay: "main",
+  service: "main",
+  confidentiality: "main",
+  reports: "main",
+  tools: "main",
+  profile: "main",
+  cloud: "main",
+  sociallinks: "main",
+  widgets: "tools",
+  mobileactions: "tools",
+  mcpservers: "tools",
+  mcpserver: "mcpservers",
+};
 
 export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
   const Colors = useColors();
@@ -157,15 +182,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   useEffect(() => {
     if (!visible) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (activeSubPage === "mobileactions" || activeSubPage === "widgets") {
-        setActiveSubPage("tools");
-        return true;
-      }
-      if (activeSubPage !== "main") {
-        setActiveSubPage("main");
-        return true;
-      }
-      return false;
+      if (activeSubPage === "main") return false;
+      setActiveSubPage(SUB_PAGE_PARENT[activeSubPage]);
+      return true;
     });
     return () => sub.remove();
   }, [visible, activeSubPage]);
@@ -232,15 +251,29 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
   const [autoSpeak, setAutoSpeakState] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(false);
+  const [advancedMode, setAdvancedModeState] = useState(false);
   const [useAppContext, setUseAppContextState] = useState(true);
   const [autoStartMic, setAutoStartMicState] = useState(true);
   const [usageAnalytics, setUsageAnalyticsState] = useState(true);
+  const [shareInstanceUrl, setShareInstanceUrlState] = useState("");
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   //plugin enabled states (tool name or widget id -> bool)
   const [pluginStates, setPluginStates] = useState<Record<string, boolean>>({});
 
-  const allTools: ITool[] = ToolManager.getAllTools();
+  const [mcpServers, setMcpServers] = useState<McpServerConfig[]>([]);
+  //mirrored from secret store for editing
+  const [mcpHeaderValues, setMcpHeaderValues] = useState<Record<string, string>>({});
+  const [mcpConnecting, setMcpConnecting] = useState<Record<string, boolean>>({});
+  //one draft line per pending link or config block
+  const [mcpDrafts, setMcpDrafts] = useState<string[]>([]);
+  //active detail server
+  const [mcpDetailId, setMcpDetailId] = useState<string | null>(null);
+  const [mcpAdvancedOpen, setMcpAdvancedOpen] = useState(false);
+  //triggers repaint on connection change
+  const [mcpTick, setMcpTick] = useState(0);
+
+  const allTools: ITool[] = ToolManager.getBuiltInTools();
   const generalTools = allTools.filter(t => !MOBILE_TOOL_NAMES.has(t.definition.function.name));
   const mobileTools = allTools.filter(t => MOBILE_TOOL_NAMES.has(t.definition.function.name));
   const allWidgets: IWidget[] = WidgetManager.getAllWidgets();
@@ -484,7 +517,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setAlwaysWhisperState(s.alwaysWhisper);
         setAutoSpeakState(s.autoSpeak);
         setShowTechnicalDetailsState(s.showTechnicalDetails);
+        setAdvancedModeState(s.advancedMode);
         setUseAppContextState(s.useAppContext);
+        setShareInstanceUrlState(s.shareInstanceUrl || "");
         //apply to services
         AIModule.configure(s.ollamaUrl, s.ollamaContextLength, s.ollamaKeepAlive);
         AIModule.setMode(s.aiService);
@@ -525,7 +560,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   //all reachable models, one row each
   useEffect(() => {
-    if (activeSubPage !== "general") return;
+    if (activeSubPage !== "advanced") return;
     let cancelled = false;
     (async () => {
       const sources = buildSources(localAvailable);
@@ -554,7 +589,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   //load plugin states when settings tab opens
   useEffect(() => {
-    if (activeSubPage !== 'tools' && activeSubPage !== 'widgets' && activeSubPage !== 'mobileactions') return;
+    if (activeSubPage !== 'tools' && activeSubPage !== 'widgets' && activeSubPage !== 'mobileactions' && activeSubPage !== 'mcpserver') return;
     const states: Record<string, boolean> = {};
     for (const tool of ToolManager.getAllTools()) {
       const name = tool.definition.function.name;
@@ -564,7 +599,144 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       states[`widget:${widget.id}`] = PluginRegistry.isEnabled('widget', widget.id, widget.enabledByDefault ?? false);
     }
     setPluginStates(states);
+  }, [activeSubPage, mcpTick]);
+
+  //sync list when connections change
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(AppEvents.mcpServersChanged, () => {
+      setMcpServers([...McpService.getServers()]);
+      setMcpTick((t) => t + 1);
+    });
+    return () => sub.remove();
+  }, []);
+
+  //read from secret store on mount
+  useEffect(() => {
+    if (activeSubPage !== 'mcpservers' && activeSubPage !== 'mcpserver') return;
+    const servers = McpService.getServers();
+    //avoid flash of missing headers
+    Promise.all(servers.map(async (server) => [server.id, await McpService.getHeaderValue(server.id)] as const))
+      .then((entries) => {
+        setMcpServers([...servers]);
+        setMcpHeaderValues(Object.fromEntries(entries));
+      })
+      .catch(() => setMcpServers([...servers]));
   }, [activeSubPage]);
+
+  //local spinner while connecting
+  const connectMcpServer = async (id: string) => {
+    setMcpConnecting((prev) => ({ ...prev, [id]: true }));
+    try {
+      const server = McpService.getServers().find((s) => s.id === id);
+      //check if server needs oauth
+      if (McpService.getStatus(id).state === 'needs_auth') await McpService.authorize(id);
+      else if (server?.url.trim()) await McpService.connect(id);
+    } finally {
+      setMcpConnecting((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
+  //shared label for list and detail
+  //use registry for accurate count
+  const mcpEnabledCount = (id: string): number =>
+    McpService.getTools(id).filter((tool) =>
+      PluginRegistry.isEnabled('tool', tool.definition.function.name, tool.enabledByDefault ?? false),
+    ).length;
+
+  const mcpStatusLabel = (id: string): string => {
+    if (mcpConnecting[id]) return "Connecting...";
+    const status = McpService.getStatus(id);
+    if (status.state === "connected") {
+      const total = status.toolCount;
+      if (total === 0) return "No tools";
+      const enabled = mcpEnabledCount(id);
+      //skip count when all enabled
+      if (enabled === total) return `${total} tool${total === 1 ? "" : "s"}`;
+      return `${enabled} of ${total} tools`;
+    }
+    if (status.state === "needs_auth") return "Sign in required";
+    if (status.state === "error") return "Unreachable";
+    return "Not connected";
+  };
+
+  //the sign-in state shows an icon instead of a label
+  const mcpNeedsAuth = (id: string): boolean =>
+    !mcpConnecting[id] && McpService.getStatus(id).state === "needs_auth";
+
+  //the overlay carries the sign-in itself
+  const showMcpAuthInfo = (id: string) => showAlert(
+    "Sign in required",
+    "Opera needs you to sign in to this server before it can use its tools.\n\nSome servers, GitHub among them, do not offer a sign-in to apps like Opera. For those, add an access token under More instead.",
+    [
+      { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+      {
+        text: "Sign in",
+        onPress: () => { setAlertModalVisible(false); connectMcpServer(id); },
+      },
+    ],
+    { messageAlign: "left" },
+  );
+
+  const refreshMcpHeaders = async () => {
+    const entries = await Promise.all(
+      McpService.getServers().map(async (server) => [server.id, await McpService.getHeaderValue(server.id)] as const),
+    );
+    setMcpHeaderValues(Object.fromEntries(entries));
+  };
+
+  //leaving the field imports the draft, no confirmation button
+  const handleMcpDraftBlur = async (index: number) => {
+    const text = (mcpDrafts[index] ?? "").trim();
+    if (!text) {
+      setMcpDrafts(prev => prev.filter((_, i) => i !== index));
+      return;
+    }
+    try {
+      const { added, skipped } = await McpService.importConfig(text);
+      setMcpServers([...McpService.getServers()]);
+      await refreshMcpHeaders();
+      //keep the text so the failing entry can be fixed
+      if (added.length === 0) {
+        showAlert("Import", describeImport(added, skipped), undefined, { messageAlign: "left" });
+        return;
+      }
+      setMcpDrafts(prev => prev.filter((_, i) => i !== index));
+      //single add opens detail directly
+      if (added.length === 1 && skipped.length === 0) {
+        setMcpDetailId(added[0].id);
+        setActiveSubPage("mcpserver");
+        return;
+      }
+      showAlert("Import", describeImport(added, skipped), undefined, { messageAlign: "left" });
+    } catch (e: any) {
+      showAlert("Import failed", e?.message || "This configuration could not be read.", undefined, { messageAlign: "left" });
+    }
+  };
+
+  const saveMcpServer = async (id: string, patch: Partial<McpServerConfig>) => {
+    await McpService.updateServer(id, patch);
+    setMcpServers([...McpService.getServers()]);
+  };
+
+  const removeMcpServer = (id: string, label: string) => {
+    showAlert(
+      "Remove server",
+      `Remove ${label}? Its tools and its saved connection will be deleted.`,
+      [
+        { text: "Cancel", onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: "Remove",
+          style: "danger",
+          onPress: async () => {
+            setAlertModalVisible(false);
+            await McpService.removeServer(id);
+            setMcpServers([...McpService.getServers()]);
+            setActiveSubPage("mcpservers");
+          },
+        },
+      ],
+    );
+  };
 
   //save helpers
   const setLanguage = (v: string) => {
@@ -614,15 +786,18 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   };
 
   const setOllamaContextLength = (v: string) => {
-    setOllamaContextLengthState(v);
-    Settings.set("ollamaContextLength", effectiveContextLength(v));
-    AIModule.configure(ollamaUrl, effectiveContextLength(v), effectiveKeepAlive());
+    const next = v.replace(/[^0-9]/g, "");
+    setOllamaContextLengthState(next);
+    Settings.set("ollamaContextLength", effectiveContextLength(next));
+    AIModule.configure(ollamaUrl, effectiveContextLength(next), effectiveKeepAlive());
   };
 
+  //leading minus keeps -1 typable
   const setOllamaKeepAlive = (v: string) => {
-    setOllamaKeepAliveState(v);
-    Settings.set("ollamaKeepAlive", effectiveKeepAlive(v));
-    AIModule.configure(ollamaUrl, effectiveContextLength(), effectiveKeepAlive(v));
+    const next = (v.startsWith("-") ? "-" : "") + v.replace(/[^0-9]/g, "");
+    setOllamaKeepAliveState(next);
+    Settings.set("ollamaKeepAlive", effectiveKeepAlive(next));
+    AIModule.configure(ollamaUrl, effectiveContextLength(), effectiveKeepAlive(next));
   };
 
   //drop server on empty field
@@ -680,6 +855,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     Settings.set("name", v);
   };
 
+  const setShareInstanceUrl = (v: string) => {
+    setShareInstanceUrlState(v);
+    Settings.set("shareInstanceUrl", v.trim());
+  };
+
   const setAlwaysWhisper = (v: boolean) => {
     setAlwaysWhisperState(v);
     Settings.set("alwaysWhisper", v);
@@ -693,6 +873,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const setShowTechnicalDetails = (v: boolean) => {
     setShowTechnicalDetailsState(v);
     Settings.set("showTechnicalDetails", v);
+  };
+
+  const setAdvancedMode = (v: boolean) => {
+    setAdvancedModeState(v);
+    Settings.set("advancedMode", v);
   };
 
   const setUseAppContext = (v: boolean) => {
@@ -1013,7 +1198,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   }, [visible, isDesktop, largeScreenAnim, progress]);
 
   // back header for subpages
-  const renderSubPageHeader = (title: string, backTo: SubPage = "main") => (
+  const renderSubPageHeader = (title: string, backTo: SubPage = SUB_PAGE_PARENT[activeSubPage]) => (
     <View style={styles.subPageHeader}>
       <Text style={[styles.title, { marginBottom: 12 }]}>{title}</Text>
       <Pressable
@@ -1033,9 +1218,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       {notices.assistant && (
         <NotificationCard
-          image={assistantImage}
+          image={operaIcon}
+          tintColor={Colors.textPrimary}
           title="Add Opera as an assistant"
-          description="Set Opera as your default assistant to call Maestro from anywhere."
           onPress={notices.openAssistant}
           onDismiss={notices.closeAssistant}
           style={styles.groupSpacing}
@@ -1113,7 +1298,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </Pressable>
 
         <Pressable
-          style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+          style={({ pressed, hovered }) => [styles.navItem, !advancedMode && styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
           onPress={() => setActiveSubPage("tools")}
         >
           <Image source={toolIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
@@ -1122,6 +1307,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             <Text style={styles.navSubtitle}>{isDesktop ? "Assistant Tools, Widgets" : "Assistant Tools, Widgets, Mobile actions"}</Text>
           </View>
         </Pressable>
+
+        {advancedMode && (
+          <Pressable
+            style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("advanced")}
+          >
+            <Image source={advancedIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>Advanced</Text>
+              <Text style={styles.navSubtitle}>Quick flow, Transcription, Sharing</Text>
+            </View>
+          </Pressable>
+        )}
       </Group>
 
       <Group style={styles.groupSpacing}>
@@ -1154,7 +1352,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           <Image source={informationIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
           <View style={styles.navTextContainer}>
             <Text style={styles.navTitle}>Informations</Text>
-            <Text style={styles.navSubtitle}>Version App, Github, Instagram</Text>
+            <Text style={styles.navSubtitle}>Version App, Github, Instagram, TikTok</Text>
           </View>
         </Pressable>
       </Group>
@@ -1195,6 +1393,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             icon={instagramIcon}
             label="Instagram"
             onPress={() => Linking.openURL("https://www.instagram.com/maestroai.company?igsh=MWF4dmZvMXl1ZmdzeA==").catch(() => { })}
+          />
+          <ActionButton
+            icon={tiktokIcon}
+            label="TikTok"
+            onPress={() => Linking.openURL("https://www.tiktok.com/@maestroai.company?_r=1&_t=ZG-99DGujxTPEn").catch(() => { })}
           />
         </Group>
       </View>
@@ -1290,6 +1493,39 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={[styles.settingRowVertical, Platform.OS === "web" && { marginTop: 10 }]}>
         <View style={styles.toggleRow}>
+          <Text style={styles.settingLabel}>Advanced mode</Text>
+          <Toggle
+            checked={advancedMode}
+            onToggle={setAdvancedMode}
+          />
+        </View>
+        <Text style={styles.helpText}>Add an Advanced section to the menu with the more technical settings.</Text>
+      </View>
+    </View>
+  );
+
+  const renderAdvancedSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("Advanced")}
+
+      <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
+        <Text style={styles.settingLabel}>Quick flow</Text>
+        <Text style={[styles.helpText, { marginBottom: 10 }]}>
+          The model powering the small automatic touches: conversation titles, reply suggestions, and some tools. A small, fast model is recommended.
+        </Text>
+        <Group>
+          <Selector
+            options={quickFlowOptions}
+            selectedValue={quickFlowId}
+            onSelect={handleSelectQuickFlow}
+            title="Select Quick flow Model"
+            fullWidth
+          />
+        </Group>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <View style={styles.toggleRow}>
           <Text style={styles.settingLabel}>Always Transcribe Locally</Text>
           <Toggle
             checked={alwaysWhisper}
@@ -1304,17 +1540,22 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       </View>
 
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Quick flow</Text>
-        <Text style={[styles.helpText, { marginBottom: 10 }]}>
-          The model powering the small automatic touches: conversation titles, reply suggestions, and some tools. A small, fast model is recommended.
+        <Text style={styles.settingLabel}>Conversation sharing</Text>
+        <Text style={[styles.helpText, { marginBottom: 6 }]}>
+          Shared conversations are encrypted on your device before they are uploaded, and the decryption key travels only in the link, never to the server.
         </Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          They are stored on a PrivateBin instance. Leave this empty to use privatebin.net, or enter the address of another instance, including one you host yourself. The address is carried inside the links you create, so the people you share with reach the right server on their own.
+        </Text>
+
         <Group>
-          <Selector
-            options={quickFlowOptions}
-            selectedValue={quickFlowId}
-            onSelect={handleSelectQuickFlow}
-            title="Select Quick flow Model"
-            fullWidth
+          <TextInputField
+            icon={serverIcon}
+            placeholder="https://privatebin.net/"
+            value={shareInstanceUrl}
+            onChangeText={setShareInstanceUrl}
+            autoCapitalize="none"
+            keyboardType="url"
           />
         </Group>
       </View>
@@ -1461,26 +1702,28 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
         {enabledProviders.includes("ollama") && (
           <>
-            <Group style={styles.groupSpacingTight}>
-              {ollamaUrls.map((url, index) => (
-                <View key={index}>
-                  <TextInputField
-                    icon={linkIcon}
-                    placeholder="server link"
-                    value={url}
-                    onChangeText={(v) => setOllamaUrlAt(index, v)}
-                    onBlur={() => handleOllamaUrlBlur(index)}
-                    rightIcon={serverErrors[url.trim()] ? errorIcon : undefined}
-                    onRightIconPress={() => showAlert(
-                      "Server unreachable",
-                      "This server could not be reached.\n\n- Check that the server is running.\n- Check the server's network connection.\n- Make sure the URL and port are correct.",
-                      undefined,
-                      { image: ollamaErrorImage, messageAlign: "left" },
-                    )}
-                  />
-                </View>
-              ))}
-            </Group>
+            {ollamaUrls.length > 0 && (
+              <Group style={styles.groupSpacingTight}>
+                {ollamaUrls.map((url, index) => (
+                  <View key={index}>
+                    <TextInputField
+                      icon={linkIcon}
+                      placeholder="server link"
+                      value={url}
+                      onChangeText={(v) => setOllamaUrlAt(index, v)}
+                      onBlur={() => handleOllamaUrlBlur(index)}
+                      rightIcon={serverErrors[url.trim()] ? errorIcon : undefined}
+                      onRightIconPress={() => showAlert(
+                        "Server unreachable",
+                        "This server could not be reached.\n\n- Check that the server is running.\n- Check the server's network connection.\n- Make sure the URL and port are correct.",
+                        undefined,
+                        { image: ollamaErrorImage, messageAlign: "left" },
+                      )}
+                    />
+                  </View>
+                ))}
+              </Group>
+            )}
 
             <Group style={styles.groupSpacing}>
               <ActionButton
@@ -1493,22 +1736,46 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             <Text style={[styles.settingLabel, { marginTop: 20 }]}>Context Length</Text>
             <Text style={[styles.helpText, { marginBottom: 10 }]}>Maximum number of tokens the model can use.</Text>
             <Group>
-              <Slider
-                icon={messageIcon}
-                options={ollamaContextLengthOptions}
-                selectedValue={String(effectiveContextLength())}
-                onSelect={setOllamaContextLength}
-              />
+              {advancedMode ? (
+                <TextInputField
+                  icon={messageIcon}
+                  placeholder="8192"
+                  value={ollamaContextLength}
+                  onChangeText={setOllamaContextLength}
+                  keyboardType="numeric"
+                />
+              ) : (
+                <Slider
+                  icon={messageIcon}
+                  options={ollamaContextLengthOptions}
+                  selectedValue={String(effectiveContextLength())}
+                  onSelect={setOllamaContextLength}
+                />
+              )}
             </Group>
             <Text style={[styles.settingLabel, { marginTop: 20 }]}>Model Keep Alive</Text>
-            <Text style={[styles.helpText, { marginBottom: 10 }]}>How long the model stays loaded in memory after a request.</Text>
+            <Text style={[styles.helpText, { marginBottom: 10 }]}>
+              {advancedMode
+                ? "How long the model stays loaded in memory after a request, in seconds. Use -1 to keep it loaded forever."
+                : "How long the model stays loaded in memory after a request."}
+            </Text>
             <Group>
-              <Slider
-                icon={timeIcon}
-                options={ollamaKeepAliveOptions}
-                selectedValue={ollamaKeepAlive}
-                onSelect={setOllamaKeepAlive}
-              />
+              {advancedMode ? (
+                <TextInputField
+                  icon={timeIcon}
+                  placeholder="300"
+                  value={ollamaKeepAlive}
+                  onChangeText={setOllamaKeepAlive}
+                  keyboardType="numeric"
+                />
+              ) : (
+                <Slider
+                  icon={timeIcon}
+                  options={ollamaKeepAliveOptions}
+                  selectedValue={ollamaKeepAlive}
+                  onSelect={setOllamaKeepAlive}
+                />
+              )}
             </Group>
           </>
         )}
@@ -1721,8 +1988,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           <ActionButton
             icon={deleteIcon}
             label="Trigger a test crash"
-            iconTintColor={Colors.textOnPrimary}
-            labelColor={Colors.textOnPrimary}
+            variant="highlight"
             onPress={() => {
               throw new Error("Test crash triggered from Report a bug settings");
             }}
@@ -1782,6 +2048,24 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </Group>
       </View>
 
+      {/* mcp block: remote servers add their own tools, configured in a subpage */}
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>MCP Servers</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          Connect Opera to external MCP servers so the assistant can use their tools.
+        </Text>
+
+        <Group>
+          <Pressable
+            style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+            onPress={() => setActiveSubPage("mcpservers")}
+          >
+            <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+            <Text style={styles.navLabel}>See MCP Servers</Text>
+          </Pressable>
+        </Group>
+      </View>
+
       {/* mobile actions block, last: points to a deeper subpage instead of toggling in place. desktop has no mobile apps to open, so it's hidden there */}
       {!isDesktop && (
         <View style={styles.settingRowVertical}>
@@ -1803,6 +2087,206 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       )}
     </View>
   );
+
+  //mcp list page
+  const renderMcpServersSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("MCP Servers", "tools")}
+
+      <View style={styles.settingRowVertical}>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          Connect Opera to external MCP servers so the assistant can use their tools.
+        </Text>
+
+        {(mcpServers.length > 0 || mcpDrafts.length > 0) && (
+          <Group style={styles.groupSpacingTight}>
+            {mcpServers.map((server) => (
+              <Pressable
+                key={server.id}
+                style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
+                onPress={() => { setMcpDetailId(server.id); setMcpAdvancedOpen(false); setActiveSubPage("mcpserver"); }}
+              >
+                <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+                <Text style={styles.navLabel}>{server.name}</Text>
+                {mcpNeedsAuth(server.id) ? (
+                  <IconButton
+                    icon={infoIcon}
+                    size={22}
+                    tintColor={Colors.textMuted}
+                    containerSize={32}
+                    pressedColor={Colors.surfacePressed}
+                    style={styles.navStatusIcon}
+                    onPress={() => showMcpAuthInfo(server.id)}
+                  />
+                ) : (
+                  <Text style={styles.navStatus}>{mcpStatusLabel(server.id)}</Text>
+                )}
+              </Pressable>
+            ))}
+            {mcpDrafts.map((draft, index) => (
+              <TextInputField
+                key={index}
+                icon={penPlaceholderIcon}
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder="Paste a link or an mcp.json block"
+                value={draft}
+                onChangeText={(v) => setMcpDrafts(prev => prev.map((d, i) => (i === index ? v : d)))}
+                onBlur={() => handleMcpDraftBlur(index)}
+              />
+            ))}
+          </Group>
+        )}
+
+        <Group style={styles.groupSpacing}>
+          <ActionButton icon={addIcon} label="Add server" onPress={() => setMcpDrafts(prev => [...prev.filter(d => d.trim()), ""])} />
+        </Group>
+      </View>
+    </View>
+  );
+
+  //server detail page
+  const renderMcpServerSubPage = () => {
+    const server = mcpServers.find((s) => s.id === mcpDetailId);
+    if (!server) return renderMcpServersSubPage();
+
+    const status = McpService.getStatus(server.id);
+    const tools = McpService.getTools(server.id);
+    const busy = mcpConnecting[server.id];
+
+    return (
+      <View style={styles.subPageContainer}>
+        {renderSubPageHeader(server.name, "mcpservers")}
+
+        {/* sign-in state speaks through the icon inside the link field instead */}
+        {!mcpNeedsAuth(server.id) && (
+          <View style={styles.settingRowVertical}>
+            <Text style={styles.helpText}>{mcpStatusLabel(server.id)}</Text>
+            {status.error ? (
+              <Text style={[styles.helpText, { marginTop: 6, color: Colors.error }]}>{status.error}</Text>
+            ) : null}
+          </View>
+        )}
+
+        <View style={styles.settingRowVertical}>
+          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Link</Text>
+          <Group>
+            <TextInputField
+              icon={linkIcon}
+              placeholder="server link"
+              autoCapitalize="none"
+              value={server.url}
+              onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, url: v } : s))}
+              onBlur={() => saveMcpServer(server.id, { url: server.url })}
+              rightIcon={mcpNeedsAuth(server.id) ? infoIcon : undefined}
+              rightIconTint={Colors.textMuted}
+              onRightIconPress={() => showMcpAuthInfo(server.id)}
+            />
+            <ActionButton
+              icon={reconnectIcon}
+              label={busy ? "Connecting..." : "Reconnect"}
+              disabled={busy || !server.url.trim()}
+              onPress={() => connectMcpServer(server.id)}
+              style={styles.mcpGroupRow}
+            />
+          </Group>
+        </View>
+
+        {tools.length > 0 && (
+          <View style={styles.settingRowVertical}>
+            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>Tools ({tools.length})</Text>
+            {tools.map((tool, index) => {
+              const name = tool.definition.function.name;
+              const key = `tool:${name}`;
+              const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
+              return (
+                <View key={name} style={index < tools.length - 1 && { marginBottom: 16 }}>
+                  <View style={styles.toggleRow}>
+                    <Text style={styles.settingLabel}>{tool.displayName}</Text>
+                    <Toggle
+                      checked={enabled}
+                      onToggle={async (v) => {
+                        setPluginStates(prev => ({ ...prev, [key]: v }));
+                        await PluginRegistry.setEnabled('tool', name, v);
+                      }}
+                    />
+                  </View>
+                  {tool.displayDescription ? (
+                    <Text style={styles.helpText}>{tool.displayDescription}</Text>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        <View style={styles.settingRowVertical}>
+          <Group>
+            <Pressable
+              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+              onPress={() => setMcpAdvancedOpen((v) => !v)}
+            >
+              <Image source={addIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <Text style={styles.navLabel}>More</Text>
+            </Pressable>
+          </Group>
+
+          {mcpAdvancedOpen && (
+            <>
+              <Text style={[styles.helpText, { marginTop: 12, marginBottom: 10 }]}>
+                A header sent with every request, for servers that take an access token instead of a sign-in. For GitHub, use Authorization and Bearer followed by your token.
+              </Text>
+              <Group style={styles.groupSpacingTight}>
+                <TextInputField
+                  icon={penPlaceholderIcon}
+                  placeholder="header name"
+                  autoCapitalize="none"
+                  value={server.headerName}
+                  onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, headerName: v } : s))}
+                  onBlur={() => saveMcpServer(server.id, { headerName: server.headerName })}
+                />
+                <TextInputField
+                  icon={penPlaceholderIcon}
+                  placeholder="header value"
+                  autoCapitalize="none"
+                  secureTextEntry
+                  value={mcpHeaderValues[server.id] ?? ""}
+                  onChangeText={(v) => setMcpHeaderValues(prev => ({ ...prev, [server.id]: v }))}
+                  onBlur={() => McpService.setHeaderValue(server.id, mcpHeaderValues[server.id] ?? "")}
+                />
+              </Group>
+
+              <Text style={[styles.helpText, { marginTop: 16, marginBottom: 10 }]}>
+                Only needed when a server offers a sign-in but will not register Opera on its own. Leave empty otherwise.
+              </Text>
+              <Group style={styles.groupSpacingTight}>
+                <TextInputField
+                  icon={penPlaceholderIcon}
+                  placeholder="oauth client id"
+                  autoCapitalize="none"
+                  value={server.clientId ?? ""}
+                  onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, clientId: v } : s))}
+                  onBlur={() => saveMcpServer(server.id, { clientId: server.clientId ?? "" })}
+                />
+              </Group>
+            </>
+          )}
+        </View>
+
+        <View style={styles.settingRowVertical}>
+          <Group style={styles.dangerGroup}>
+            <ActionButton
+              icon={binIcon}
+              label="Remove server"
+              variant="highlight"
+              onPress={() => removeMcpServer(server.id, server.name)}
+            />
+          </Group>
+        </View>
+      </View>
+    );
+  };
+
 
   // widgets subpage content
   const renderWidgetsSubPage = () => (
@@ -1879,6 +2363,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return renderServiceSubPage();
       case "confidentiality":
         return renderConfidentialitySubPage();
+      case "advanced":
+        return renderAdvancedSubPage();
       case "reports":
         return renderReportsSubPage();
       case "tools":
@@ -1887,6 +2373,10 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return renderWidgetsSubPage();
       case "mobileactions":
         return renderMobileActionsSubPage();
+      case "mcpservers":
+        return renderMcpServersSubPage();
+      case "mcpserver":
+        return renderMcpServerSubPage();
       case "sociallinks":
         return renderSocialLinksSubPage();
       case "main":
@@ -2226,6 +2716,21 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   assistantStatusOff: {
     color: Colors.textMuted,
+  },
+  //aligns a row with the input fields sharing its group
+  mcpGroupRow: {
+    height: 44,
+    paddingVertical: 0,
+    gap: 10,
+  },
+  navStatus: {
+    marginLeft: "auto",
+    fontFamily: Fonts.body,
+    fontSize: FontSizes.caption,
+    color: Colors.textMuted,
+  },
+  navStatusIcon: {
+    marginLeft: "auto",
   },
   dangerGroup: {
     backgroundColor: Colors.primary,

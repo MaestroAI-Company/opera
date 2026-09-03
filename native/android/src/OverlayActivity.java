@@ -33,6 +33,7 @@ public class OverlayActivity extends ReactActivity {
 
     @Override
     protected void onDestroy() {
+        TextSelectionLayer.INSTANCE.hide();
         if (sInstance == this) sInstance = null;
         super.onDestroy();
     }

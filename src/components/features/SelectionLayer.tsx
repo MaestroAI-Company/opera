@@ -28,6 +28,8 @@ const ENCLOSED_MIN = 0.45;
 const MAGNET_MIN = 0.55;
 //padding around detected elements
 const DETECTION_INFLATE = 1.2;
+//paint what selection snaps to
+const DEBUG_DETECTIONS = false;
 const STROKE_WIDTH = 7;
 const SETTLE_MS = 300;
 
@@ -530,6 +532,22 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
         </Svg>
       )}
 
+      {__DEV__ && DEBUG_DETECTIONS && (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          {rects.map((rect, i) => (
+            <View
+              key={i}
+              style={[styles.debugRect, {
+                left: rect.x1,
+                top: rect.y1,
+                width: rect.x2 - rect.x1,
+                height: rect.y2 - rect.y1,
+              }]}
+            />
+          ))}
+        </View>
+      )}
+
       {/* topmost so a touch starting over the box still draws, box and handles are only painted */}
       <View style={StyleSheet.absoluteFill} {...backdrop.panHandlers} />
     </View>
@@ -554,6 +572,11 @@ const styles = StyleSheet.create({
     borderColor: Colors.selectionOutline,
     borderRadius: Radius.xxl,
     boxShadow: `0px 0px 54px ${Colors.primary}`,
+  },
+  debugRect: {
+    position: 'absolute',
+    borderWidth: 1,
+    borderColor: Colors.primary,
   },
   handleHit: {
     position: 'absolute',

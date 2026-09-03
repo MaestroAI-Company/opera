@@ -102,6 +102,31 @@ function withNativeAndroid(config) {
       });
     }
 
+    //expo-sensors pedometer permission unused by app
+    manifestDoc.manifest['uses-permission'] = (manifestDoc.manifest['uses-permission'] || []).filter(
+      (p) => p.$['android:name'] !== 'android.permission.ACTIVITY_RECOGNITION'
+    );
+    //merger re-adds library permissions unless forced off
+    manifestDoc.manifest['uses-permission'].push({
+      $: { 'android:name': 'android.permission.ACTIVITY_RECOGNITION', 'tools:node': 'remove' },
+    });
+
+    //expose app settings to the system
+    if (!application.activity.some(a => a.$['android:name'] === '.SettingsActivity')) {
+      application.activity.push({
+        $: {
+          'android:name': '.SettingsActivity',
+          'android:exported': 'true',
+          'android:theme': '@style/Theme.OverlayTranslucent',
+          'android:excludeFromRecents': 'true',
+        },
+        'intent-filter': [{
+          action: [{ $: { 'android:name': 'android.intent.action.APPLICATION_PREFERENCES' } }],
+          category: [{ $: { 'android:name': 'android.intent.category.DEFAULT' } }]
+        }]
+      });
+    }
+
     return config;
   });
 
@@ -131,10 +156,12 @@ function withNativeAndroid(config) {
       copyTemplate('src/MaestroSession.java', path.join(javaDir, 'MaestroSession.java'), packageName);
       copyTemplate('src/MaestroRecognitionService.java', path.join(javaDir, 'MaestroRecognitionService.java'), packageName);
       copyTemplate('src/OverlayActivity.java', path.join(javaDir, 'OverlayActivity.java'), packageName);
+      copyTemplate('src/SettingsActivity.java', path.join(javaDir, 'SettingsActivity.java'), packageName);
 
       // copy Kotlin sources
       copyTemplate('src/ScreenshotHolder.kt', path.join(javaDir, 'ScreenshotHolder.kt'), packageName);
       copyTemplate('src/ScreenCaptureModule.kt', path.join(javaDir, 'ScreenCaptureModule.kt'), packageName);
+      copyTemplate('src/TextSelectionLayer.kt', path.join(javaDir, 'TextSelectionLayer.kt'), packageName);
       copyTemplate('src/MaestroOverlayPackage.kt', path.join(javaDir, 'MaestroOverlayPackage.kt'), packageName);
       copyTemplate('src/AssistantModule.kt', path.join(javaDir, 'AssistantModule.kt'), packageName);
 
@@ -201,7 +228,6 @@ function withNativeAndroid(config) {
     return config;
   });
 
-  // 4. add ML Kit GenAI (AICore) dependencies
   config = withAppBuildGradle(config, (config) => {
     let contents = config.modResults.contents;
     //mlkit compiled with newer kotlin, skip version check
@@ -216,13 +242,20 @@ function withNativeAndroid(config) {
         '    }'
       );
     }
-    if (contents.includes('genai-prompt')) return config;
-    contents = contents.replace(
-      'dependencies {',
-      'dependencies {\n' +
-      '    implementation("com.google.mlkit:genai-prompt:1.0.0-beta4")\n' +
-      '    implementation("com.google.mlkit:genai-speech-recognition:1.0.0-alpha1")'
-    );
+    const mlkit = [
+      'com.google.mlkit:genai-prompt:1.0.0-beta4',
+      'com.google.mlkit:genai-speech-recognition:1.0.0-alpha1',
+      //bundled models for ocr and qr
+      'com.google.mlkit:text-recognition:16.0.1',
+      'com.google.mlkit:barcode-scanning:17.3.0',
+    ];
+    const missing = mlkit.filter(dep => !contents.includes(dep.split(':').slice(0, 2).join(':')));
+    if (missing.length) {
+      contents = contents.replace(
+        'dependencies {',
+        'dependencies {\n' + missing.map(dep => `    implementation("${dep}")`).join('\n')
+      );
+    }
     config.modResults.contents = contents;
     return config;
   });

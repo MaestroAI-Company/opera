@@ -1,5 +1,12 @@
-import { Redirect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback } from "react";
 
 export default function NotFound() {
-  return <Redirect href="/" />;
+  const router = useRouter();
+  useFocusEffect(
+    useCallback(() => {
+      router.dismissTo("/");
+    }, [router])
+  );
+  return null;
 }

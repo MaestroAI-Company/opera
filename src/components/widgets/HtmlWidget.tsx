@@ -16,7 +16,7 @@ export const HtmlWidget: IWidget<HtmlWidgetData> = {
   hasBorder: true,
   aiDefinesTitle: true,
   enabledByDefault: true,
-  description: 'Displays a web page (URL) or raw HTML. CRITICAL DESIGN RULES FOR RAW HTML: You MUST use modern CSS matching the app: font-family: "Figtree", system-ui, sans-serif; text color: #333333; primary accent color: #FF1A1A (red); backgrounds: #F9F9F9; rounded corners (12px); clean flexbox layouts with padding.',
+  description: 'Displays a web page (URL) or raw HTML. For raw HTML, use font-family: "Figtree", system-ui; text: #333; accent: #FF1A1A; background: #F9F9F9; border-radius: 12px.',
   schema: `{
     "html": "<html>...</html>",
     "url": "https://example.com",

@@ -562,6 +562,11 @@ class CloudSyncServiceImpl {
         useAppContext: cloudBackup.settings.useAppContext,
         hasSeenOnboarding: cloudBackup.settings.hasSeenOnboarding,
       };
+      //account-level links stay on device
+      //legacy backup may lack this key
+      if (typeof cloudBackup.settings.mcpServers === 'string') {
+        mergedSettings.mcpServers = cloudBackup.settings.mcpServers;
+      }
       await Settings.applyCloudSettings(mergedSettings);
       mergedSettingsUpdatedAt = cloudSettingsUpdatedAt;
     }

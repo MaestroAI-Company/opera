@@ -14,13 +14,10 @@ import { resolveQuickFlow, QuickFlowTarget } from './quickFlow';
 const DEFAULT_URL = DEFAULT_OLLAMA_URL;
 
 class CentralAIModule {
+  //state tracks tools only
   public SharedGenerationState = {
-    activeConvId: null as string | null,
-    activeMsgId: null as string | null,
     activeToolName: null as string | null,
     activeToolArgs: null as any | null,
-    content: '',
-    abort: () => {},
     listeners: new Set<() => void>(),
     subscribe(cb: () => void) {
       // add listener for shared state

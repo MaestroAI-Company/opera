@@ -61,7 +61,6 @@ public class MaestroSession extends VoiceInteractionSession {
             Log.d(TAG, "onHandleAssist: current package = " + pkg);
             ScreenshotHolder.setAppPackage(pkg);
 
-            //flatten assist structure for text
             String screenText = flattenStructure(structure);
             ScreenshotHolder.setScreenText(screenText);
             Log.d(TAG, "onHandleAssist: extracted " + screenText.length() + " chars of screen text");
@@ -83,18 +82,23 @@ public class MaestroSession extends VoiceInteractionSession {
             WindowNode windowNode = structure.getWindowNodeAt(i);
             ViewNode rootView = windowNode.getRootViewNode();
             if (rootView != null) {
-                flattenViewNode(rootView, sb);
+                //window origin anchors the subtree
+                flattenViewNode(rootView, sb, windowNode.getLeft(), windowNode.getTop());
             }
         }
         return sb.toString().trim();
     }
 
-    private void flattenViewNode(ViewNode node, StringBuilder sb) {
+    private void flattenViewNode(ViewNode node, StringBuilder sb, int originX, int originY) {
         //skip invisible nodes
         int visibility = node.getVisibility();
         if (visibility != android.view.View.VISIBLE) {
             return;
         }
+
+        //offsets relative to the parent
+        int left = originX + node.getLeft();
+        int top = originY + node.getTop();
 
         CharSequence text = node.getText();
         if (text != null && text.length() > 0) {
@@ -113,11 +117,14 @@ public class MaestroSession extends VoiceInteractionSession {
             }
         }
 
+        //children live in the scrolled box
+        int childX = left - node.getScrollX();
+        int childY = top - node.getScrollY();
         int childCount = node.getChildCount();
         for (int i = 0; i < childCount; i++) {
             ViewNode child = node.getChildAt(i);
             if (child != null) {
-                flattenViewNode(child, sb);
+                flattenViewNode(child, sb, childX, childY);
             }
         }
     }

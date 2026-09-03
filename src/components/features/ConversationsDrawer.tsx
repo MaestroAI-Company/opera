@@ -16,6 +16,7 @@ import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, pla
 const searchIcon = require("../../../assets/icons/search.png");
 const newIcon = require("../../../assets/icons/add.png");
 const deleteIcon = require("../../../assets/icons/delete.png");
+const shareIcon = require("../../../assets/icons/share.png");
 const pinIcon = require("../../../assets/icons/pin.png");
 const unpinIcon = require("../../../assets/icons/unpin.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
@@ -31,6 +32,7 @@ type ConversationsDrawerProps = {
   onNewConversation: () => void;
   onDeleteConversation?: (id: string) => void;
   onTogglePinConversation?: (id: string, pinned: boolean) => void;
+  onShareConversation?: (conv: Conversation) => void;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
 };
@@ -70,6 +72,7 @@ export default function ConversationsDrawer({
   onNewConversation,
   onDeleteConversation,
   onTogglePinConversation,
+  onShareConversation,
   isLargeScreen = false,
   isDesktop = false,
 }: ConversationsDrawerProps) {
@@ -215,6 +218,14 @@ export default function ConversationsDrawer({
           {isSelected ? (
             <>
               <IconButton
+                icon={shareIcon}
+                onPress={() => onShareConversation?.(conv)}
+                size={22}
+                tintColor={Colors.textOnPrimary}
+                containerSize={32}
+                pressedColor={Colors.overlayHover}
+              />
+              <IconButton
                 icon={conv.pinned ? unpinIcon : pinIcon}
                 onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
                 size={22}
@@ -295,6 +306,14 @@ export default function ConversationsDrawer({
                 <View style={styles.rowActions}>
                   {isSelected ? (
                     <>
+                      <IconButton
+                        icon={shareIcon}
+                        onPress={() => onShareConversation?.(conv)}
+                        size={22}
+                        tintColor={Colors.textOnPrimary}
+                        containerSize={32}
+                        pressedColor={Colors.overlayHover}
+                      />
                       <IconButton
                         icon={conv.pinned ? unpinIcon : pinIcon}
                         onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}

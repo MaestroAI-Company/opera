@@ -14,7 +14,7 @@ export class SearchTool implements ITool {
     type: 'function',
     function: {
       name: 'web_search',
-      description: 'Search the web for current information. Use this whenever facts may have changed since your training (news, prices, releases, scores, weather, schedules, versions, laws, availability), when the answer needs a source, citation, URL, number, name, date, or quote, or when the topic depends on the user location (restaurants, shops, events, transit, weather, opening hours — include the city in the query). Do not ask permission or announce your intention; just call this tool. Returns a list of web pages with short snippets.IMPORTANT: You MUST use the fetch_pages tool afterwards to read the full content of the most relevant sources.',
+      description: 'Search the web for current information. Use when facts may have changed since training (news, prices, weather, versions, availability) or when you need a source. Include the city for location-dependent queries. After searching, call fetch_pages on the most relevant URLs to read their full content.',
       parameters: {
         type: 'object',
         properties: {
@@ -91,7 +91,7 @@ export class SearchTool implements ITool {
         return `### Result ${i + 1}: ${r.title}\n**URL:** ${r.url}\n**Snippet:** ${r.snippet || 'No snippet available.'}`;
       });
 
-      return `Search results for "${query}":\n\n${formatted.join('\n\n---\n\n')}\n\nCRITICAL INSTRUCTION: You MUST NOT answer the user's question yet based only on these short snippets. You MUST call the fetch_pages tool on up to 2 of the most relevant URLs above to read their full contents first. Always prioritize well-known, highly trusted, and official sources over obscure blogs or unreliable sites.`;
+      return `Search results for "${query}":\n\n${formatted.join('\n\n---\n\n')}\n\nNow call fetch_pages on up to 2 of the most relevant URLs above to read their full contents. Prioritize official and trusted sources.`;
     } catch (e: any) {
       console.error('[SearchTool] error:', e?.message || e);
       return `Search failed: ${e.message}`;

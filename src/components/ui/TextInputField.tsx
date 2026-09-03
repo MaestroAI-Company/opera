@@ -8,10 +8,11 @@ interface TextInputFieldProps extends TextInputProps {
   icon?: ImageSourcePropType;
   containerStyle?: StyleProp<ViewStyle>;
   rightIcon?: ImageSourcePropType;
+  rightIconTint?: string;
   onRightIconPress?: () => void;
 }
 
-export default function TextInputField({ icon, style, containerStyle, onFocus, onBlur, rightIcon, onRightIconPress, ...props }: TextInputFieldProps) {
+export default function TextInputField({ icon, style, containerStyle, onFocus, onBlur, rightIcon, rightIconTint, onRightIconPress, ...props }: TextInputFieldProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const inputRef = useRef<TextInput>(null);
@@ -36,7 +37,7 @@ export default function TextInputField({ icon, style, containerStyle, onFocus, o
           icon={rightIcon}
           onPress={onRightIconPress}
           size={22}
-          tintColor={Colors.error}
+          tintColor={rightIconTint ?? Colors.error}
           containerSize={32}
           pressedColor={Colors.surfacePressed}
           style={styles.rightIconButton}

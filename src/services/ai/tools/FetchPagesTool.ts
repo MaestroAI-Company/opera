@@ -17,7 +17,7 @@ export class FetchPagesTool implements ITool {
     type: 'function',
     function: {
       name: 'fetch_pages',
-      description: 'Fetch the full markdown content of up to 2 web pages. Use this after web_search to read the sources you selected.',
+      description: 'Fetch the full content of up to 2 web pages. Use after web_search to read the sources you selected.',
       parameters: {
         type: 'object',
         properties: {

@@ -19,14 +19,18 @@ export async function sendMessageWithToolPrompt(
   tools: ToolDefinition[] = [],
 ): Promise<{ toolCalls?: ToolCall[]; content?: string }> {
   const effectiveSystemPrompt = buildToolSystemPrompt(systemPrompt, tools);
+  //preserve role structure for small models
   const prompt = messages
     .filter((m) => m.role !== "tool")
-    .map((m) => m.content)
+    .map((m) => {
+      const label = m.role === "assistant" ? "Assistant" : "User";
+      return `${label}: ${m.content}`;
+    })
     .filter((s) => s && s.trim().length > 0)
     .join("\n\n");
   const toolResults = messages
     .filter((m) => m.role === "tool")
-    .map((m) => `[SYSTEM: Automated Tool Execution Result]\n${m.content}`);
+    .map((m) => `[Tool Result]\n${m.content}`);
   const fullPrompt = buildToolResultsPrompt(prompt, toolResults);
   const images = messages.flatMap((m) => m.images ?? []);
 

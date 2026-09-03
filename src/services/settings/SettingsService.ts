@@ -9,6 +9,7 @@ export type AppSettings = {
   aiService: string;
   ollamaUrl: string;
   ollamaUrls: string;
+  mcpServers: string;
   enabledProviders: string;
   ollamaModel: string;
   ollamaContextLength: number;
@@ -27,11 +28,13 @@ export type AppSettings = {
   name: string;
   includeDateTime: boolean;
   showTechnicalDetails: boolean;
+  advancedMode: boolean;
   dataWarningDismissed: boolean;
   useAppContext: boolean;
   shakeToReport: boolean;
   assistantPromptDismissed: boolean;
   hasSeenAssistantOverlay: boolean;
+  shareInstanceUrl: string;
 };
 
 const DEFAULTS: AppSettings = {
@@ -40,6 +43,7 @@ const DEFAULTS: AppSettings = {
   aiService: 'ollama',
   ollamaUrl: '',
   ollamaUrls: '[]',
+  mcpServers: '[]',
   enabledProviders: 'local,ollama',
   ollamaModel: '',
   ollamaContextLength: 8192,
@@ -65,11 +69,14 @@ const DEFAULTS: AppSettings = {
   name: '',
   includeDateTime: true,
   showTechnicalDetails: false,
+  advancedMode: false,
   dataWarningDismissed: false,
   useAppContext: true,
   shakeToReport: true,
   assistantPromptDismissed: false,
   hasSeenAssistantOverlay: false,
+  //empty means the built-in privatebin instance
+  shareInstanceUrl: '',
 };
 
 const SETTINGS_UPDATED_AT_KEY = '__settings_updated_at';
@@ -83,6 +90,7 @@ const BOOLEAN_KEYS = [
   'hasSeenOnboarding',
   'includeDateTime',
   'showTechnicalDetails',
+  'advancedMode',
   'dataWarningDismissed',
   'useAppContext',
   'shakeToReport',

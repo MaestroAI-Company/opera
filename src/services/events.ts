@@ -9,4 +9,6 @@ export const AppEvents = {
   overlayReopened: 'OVERLAY_REOPENED',
   openModelSelector: 'OPEN_MODEL_SELECTOR',
   openBugReport: 'OPEN_BUG_REPORT',
+  //mcp server state changed
+  mcpServersChanged: 'MCP_SERVERS_CHANGED',
 } as const;

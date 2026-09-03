@@ -5,6 +5,7 @@ export type CaptureSize = { width: number; height: number };
 export type CaptureRegion = { x: number; y: number; w: number; h: number };
 export type AppContext = { appPackage: string | null; screenText: string | null };
 export type AppIcon = { icon: string; label: string };
+export type ScreenCode = CaptureRegion & { value: string };
 //square letterboxed rgb bytes
 export type DetectionInput = {
   data: string;
@@ -18,9 +19,12 @@ type NativeCapture = {
   getScreenshotInfo(): Promise<CaptureSize>;
   cropRegion(x: number, y: number, w: number, h: number): Promise<string>;
   getDetectionInput?(size: number): Promise<DetectionInput>;
+  showTextLayer?(): Promise<void>;
+  scanCodes?(): Promise<ScreenCode[]>;
   getAppContext?(): Promise<AppContext>;
   getAppIcon?(pkg: string): Promise<AppIcon>;
   closeOverlay(): void;
+  clearTextLayer?(): void;
 };
 
 const Native: NativeCapture | undefined =
@@ -74,6 +78,17 @@ export const ScreenCapture = {
     return attempt('getDetectionInput', n => n.getDetectionInput!(size));
   },
 
+  //native selectable blocks over the capture
+  async showTextLayer(): Promise<void> {
+    if (typeof Native?.showTextLayer !== 'function') return;
+    await attempt('showTextLayer', n => n.showTextLayer!());
+  },
+
+  async scanCodes(): Promise<ScreenCode[] | null> {
+    if (typeof Native?.scanCodes !== 'function') return null;
+    return attempt('scanCodes', n => n.scanCodes!());
+  },
+
   //foreground package and accessibility text
   async getAppContext(): Promise<AppContext | null> {
     if (typeof Native?.getAppContext !== 'function') return null;
@@ -87,6 +102,14 @@ export const ScreenCapture = {
     } catch {
       //package likely gone
       return null;
+    }
+  },
+
+  clearText(): void {
+    try {
+      Native?.clearTextLayer?.();
+    } catch (e) {
+      console.warn('[ScreenCapture] clearText failed:', e);
     }
   },
 

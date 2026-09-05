@@ -164,11 +164,14 @@ class CentralAIModule {
         const base64Images = await Promise.all(
           msg.images.map(async (uri) => {
             try {
-              if (uri.startsWith('data:')) return uri.split(',')[1];
-              return await imageToBase64(uri);
+              //picker query param breaks blob and data uris
+              const clean = uri.split('?name=')[0];
+              if (clean.startsWith('data:')) return clean.split(',')[1];
+              return await imageToBase64(clean);
             } catch (e) {
               console.error('Failed to read image as base64:', e);
-              return uri;
+              //sending the raw uri would fail as invalid base64 server side
+              throw new Error('failed to read an attachment');
             }
           })
         );

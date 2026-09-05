@@ -1542,7 +1542,7 @@ export default function Index() {
                   onStop={handleStop}
                   onTranscribe={handleTranscribe}
                   canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes("audio") && !!selectedModel}
-                  supportsFiles={modelCapabilities.includes("vision") || modelCapabilities.includes("audio")}
+                  modelCapabilities={modelCapabilities}
                   onOpenSettings={() => {
                     openDrawerSafely(() => {
                       setSettingsInitialSubPage("main");

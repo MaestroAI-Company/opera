@@ -1473,17 +1473,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={styles.settingRowVertical}>
         <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>{t("settings.general.technicalDetails")}</Text>
-          <Toggle
-            checked={showTechnicalDetails}
-            onToggle={setShowTechnicalDetails}
-          />
-        </View>
-        <Text style={styles.helpText}>{t("settings.general.technicalDetailsHelp")}</Text>
-      </View>
-
-      <View style={styles.settingRowVertical}>
-        <View style={styles.toggleRow}>
           <Text style={styles.settingLabel}>{t("settings.general.autoRead")}</Text>
           <Toggle
             checked={autoSpeak}
@@ -1539,6 +1528,17 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             ? t("settings.transcribeLocally.helpWeb")
             : t("settings.transcribeLocally.help")}
         </Text>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <View style={styles.toggleRow}>
+          <Text style={styles.settingLabel}>{t("settings.general.technicalDetails")}</Text>
+          <Toggle
+            checked={showTechnicalDetails}
+            onToggle={setShowTechnicalDetails}
+          />
+        </View>
+        <Text style={styles.helpText}>{t("settings.general.technicalDetailsHelp")}</Text>
       </View>
 
       <View style={styles.settingRowVertical}>

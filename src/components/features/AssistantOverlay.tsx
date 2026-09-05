@@ -7,6 +7,7 @@ import {
   DeviceEventEmitter,
   ImageSourcePropType,
   InteractionManager,
+  Keyboard,
   Linking,
   Platform,
   Pressable,
@@ -823,7 +824,10 @@ function AssistantOverlay() {
           >
             <ModelSelectorTrigger
               selectedModel={selectedModel}
-              onPress={() => setModelSelectorVisible(v => !v)}
+              onPress={() => {
+                Keyboard.dismiss();
+                setModelSelectorVisible(v => !v);
+              }}
             />
           </Animated.View>
 
@@ -839,7 +843,7 @@ function AssistantOverlay() {
               onStop={handleStop}
               onTranscribe={handleTranscribe}
               canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes('audio') && !!selectedModel}
-              supportsFiles={modelCapabilities.includes('vision') || modelCapabilities.includes('audio')}
+              modelCapabilities={modelCapabilities}
               onOpenSettings={() => { }}
               enabled={true}
               autoStartMic={shouldAutoStartMic}

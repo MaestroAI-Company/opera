@@ -315,7 +315,6 @@ export function ModelSelectorDrawer({
     const source = browsedSource;
     if (source && !isBrowsingActive) onServiceChange(source.service, source.url);
     onModelChange(model);
-    dismiss();
   };
 
   //friendly label for aicore variants

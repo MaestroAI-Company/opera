@@ -1,0 +1,3 @@
+• Ollama model lists now load faster and are cached per server
+• Network errors while loading models are shown instead of being silently dropped
+• Smaller download, and the app no longer requests permissions it does not use

@@ -399,7 +399,8 @@ export function deriveChatDisplay(raw: string, isGenerating: boolean, liveTool: 
   let showThinkingRow = false;
   let currentThought = '';
   if (isGenerating) {
-    showThinkingRow = thinkingText.length > 0 || (!hasConvText && !hasTool);
+    //hide the thinking row as soon as real text streams in
+    showThinkingRow = !hasConvText && (thinkingText.length > 0 || !hasTool);
     if (thinkingText.length > 0) {
       currentThought = extractThinkStep(thinkingText);
     } else if (liveName) {

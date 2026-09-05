@@ -2,8 +2,6 @@ name: Build Android APK
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
   workflow_dispatch: {}
@@ -14,6 +12,10 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # the secrets context is rejected in step-level if, so hoist the checks here
+    env:
+      HAS_KEYSTORE: ${{ secrets.UPLOAD_KEYSTORE_BASE64 != '' }}
+      HAS_PLAY_SA: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -55,15 +57,33 @@ jobs:
       - name: Prebuild Android project
         run: npx expo prebuild --platform android
 
-      # r8 oom without a bigger heap
-      - name: Increase Gradle daemon heap
-        run: echo "org.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m" >> android/gradle.properties
+      # the private-repo runner is 2 vcpu / 8gb and the image ships no swap
+      - name: Add swap
+        run: |
+          sudo fallocate -l 8G /mnt/swapfile
+          sudo chmod 600 /mnt/swapfile
+          sudo mkswap /mnt/swapfile
+          sudo swapon /mnt/swapfile
+          free -h
+
+      # 6g fits in 8gb of ram once the swapfile absorbs the r8 and bundletool peaks
+      - name: Tune Gradle memory
+        run: |
+          {
+            echo "org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g"
+            echo "org.gradle.parallel=false"
+            echo "org.gradle.workers.max=1"
+          } >> android/gradle.properties
+
+      # lintVital ooms on AICoreModule.kt and competes with r8 for the same heap
+      - name: Disable release lint
+        run: echo 'android { lint { checkReleaseBuilds false } }' >> android/app/build.gradle
 
       - uses: gradle/actions/setup-gradle@v4
 
       # absent on push-to-main builds, so those stay signed with the debug key
       - name: Decode upload keystore
-        if: ${{ secrets.UPLOAD_KEYSTORE_BASE64 != '' }}
+        if: env.HAS_KEYSTORE == 'true'
         run: |
           keystore_path="$RUNNER_TEMP/upload-keystore.jks"
           echo "${{ secrets.UPLOAD_KEYSTORE_BASE64 }}" | base64 -d > "$keystore_path"
@@ -80,7 +100,10 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease bundleRelease
+          ./gradlew assembleRelease
+          # bundletool ooms on the 59mb model if it inherits r8's retained heap
+          ./gradlew --stop
+          ./gradlew bundleRelease
 
       - uses: actions/upload-artifact@v4
         with:
@@ -115,12 +138,14 @@ jobs:
 
       # requires the very first release to have been uploaded manually through
       # the Play Console; the API can't create that initial listing
-      - name: Upload to Play Store internal track
-        if: ${{ github.ref_type == 'tag' && secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+      - name: Upload to Play Store closed alpha track
+        if: github.ref_type == 'tag' && env.HAS_PLAY_SA == 'true'
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: ai.maestro.opera
           releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
-          track: internal
+          # singular track is deprecated by the action
+          tracks: alpha
           status: completed
+          releaseName: ${{ github.ref_name }}

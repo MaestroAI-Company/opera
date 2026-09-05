@@ -40,6 +40,7 @@ const appSourceIcon = require("../../../assets/icons/tool.png");
 const imageSourceIcon = require("../../../assets/icons/photo.png");
 const linkSourceIcon = require("../../../assets/icons/hyperlink.png");
 const arrowIcon = require("../../../assets/icons/return.png");
+const fileIcon = require("../../../assets/icons/file.png");
 
 //last title segment after separator
 function sourceLabel(source: MessageSource): string {
@@ -101,6 +102,34 @@ const SourcePill = ({ source }: { source: MessageSource }) => {
         onError={() => setFaviconFailed(true)}
       />
     </Pressable>
+  );
+};
+
+//readable name from a data uri or path
+function attachmentFilename(path: string): string {
+  if (path.startsWith('data:')) return 'Audio Recording.wav';
+  if (path.includes('?name=')) {
+    try {
+      return decodeURIComponent(path.split('?name=')[1]);
+    } catch {
+      return 'Audio Recording.wav';
+    }
+  }
+  try {
+    return decodeURIComponent(path.split('/').pop() || 'Audio File');
+  } catch {
+    return path.split('/').pop() || 'Audio File';
+  }
+}
+
+//attached file inside a user bubble
+const AttachmentChip = ({ icon, label }: { icon: any; label: string }) => {
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <View style={styles.attachmentChip}>
+      <Image source={icon} style={styles.attachmentIcon} />
+      <Text style={styles.attachmentLabel} numberOfLines={1} ellipsizeMode="middle">{label}</Text>
+    </View>
   );
 };
 
@@ -192,10 +221,12 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   }, [isGenerating]);
 
   //documents live in the message text
-  const visibleContent = useMemo(
-    () => (isUser ? splitDocumentBlocks(item.content).text : item.content),
+  const userDocuments = useMemo(
+    () => (isUser ? splitDocumentBlocks(item.content) : null),
     [isUser, item.content]
   );
+  const documentNames = userDocuments?.names ?? [];
+  const visibleContent = userDocuments ? userDocuments.text : item.content;
 
   //reparse only when deps move
   const disp = useMemo(
@@ -235,38 +266,19 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               )}
             </View>
           )}
-          {item.images && item.images.length > 0 && (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
-              {item.images.map((uri, i) => {
-                const isAudioPath = uri.toLowerCase().match(/\.(wav|mp3|m4a|aac|flac|ogg)(?:\?.*)?$/);
-                const isAudioData = uri.startsWith('data:audio');
-                const isAudio = isAudioPath || isAudioData;
-
-                const getFilename = (path: string) => {
-                  if (path.startsWith('data:')) return 'Audio Recording.wav';
-                  if (path.includes('?name=')) {
-                    try {
-                      return decodeURIComponent(path.split('?name=')[1]);
-                    } catch {
-                      return 'Audio Recording.wav';
-                    }
-                  }
-                  try {
-                    return decodeURIComponent(path.split('/').pop() || 'Audio File');
-                  } catch {
-                    return path.split('/').pop() || 'Audio File';
-                  }
-                };
-
+          {((item.images && item.images.length > 0) || documentNames.length > 0) && (
+            <View style={styles.attachmentsRow}>
+              {item.images?.map((uri, i) => {
+                const isAudio = uri.startsWith('data:audio') || /\.(wav|mp3|m4a|aac|flac|ogg)(?:\?.*)?$/i.test(uri);
                 return isAudio ? (
-                  <View key={i} style={styles.audioAttachmentBubble}>
-                    <Image source={speakerIcon} style={{ width: 14, height: 14, tintColor: Colors.surface, marginRight: 6 }} />
-                    <Text style={styles.audioAttachmentText} numberOfLines={1} ellipsizeMode="middle">{getFilename(uri)}</Text>
-                  </View>
+                  <AttachmentChip key={i} icon={speakerIcon} label={attachmentFilename(uri)} />
                 ) : (
                   <Image key={i} source={{ uri }} style={styles.messageImage} />
                 );
               })}
+              {documentNames.map((name, i) => (
+                <AttachmentChip key={`doc-${i}`} icon={fileIcon} label={name} />
+              ))}
             </View>
           )}
           {!!visibleContent && (
@@ -779,18 +791,36 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     fontSize: FontSizes.label,
     flexShrink: 1,
   },
-  audioAttachmentBubble: {
-    backgroundColor: Colors.whiteFaint,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: Radius.huge,
+  attachmentsRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
   },
-  audioAttachmentText: {
-    color: 'white',
+  attachmentChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.whiteFaint,
+    borderWidth: 2,
+    borderColor: Colors.borderOnPrimary,
+    borderRadius: Radius.xxl,
+    paddingLeft: 8,
+    paddingRight: 10,
+    paddingVertical: 6,
+    gap: 6,
+    maxWidth: 220,
+  },
+  attachmentIcon: {
+    width: 14,
+    height: 14,
+    tintColor: Colors.textOnPrimary,
+  },
+  attachmentLabel: {
+    color: Colors.textOnPrimary,
+    fontFamily: Fonts.mono,
     fontSize: FontSizes.label,
+    flexShrink: 1,
   },
   disclaimerContainer: {
     flexDirection: 'row',

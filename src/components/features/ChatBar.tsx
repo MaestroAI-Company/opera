@@ -96,7 +96,7 @@ type ChatInputBarProps = {
   placeholder?: string;
   incognito?: boolean;
   isGenerating?: boolean;
-  supportsFiles?: boolean;
+  modelCapabilities?: string[];
   canTranscribeRemotely?: boolean;
   onOpenSettings?: () => void;
   onAttachmentSheetVisibilityChange?: (visible: boolean) => void;
@@ -206,7 +206,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   placeholder,
   incognito = false,
   isGenerating = false,
-  supportsFiles = false,
+  modelCapabilities = [],
   canTranscribeRemotely = false,
   onOpenSettings,
   onAttachmentSheetVisibilityChange,
@@ -221,6 +221,9 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const insets = useSafeAreaInsets();
+  const supportsImages = modelCapabilities.includes('vision');
+  const supportsAudio = modelCapabilities.includes('audio');
+  const supportsFiles = supportsImages || supportsAudio;
   const bottomInsetToFill = insets.bottom + 16;
   const [text, setText] = useState("");
   const [, setWhisperAvailable] = useState(false);
@@ -235,6 +238,14 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const transcribeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   //cache extraction so send stays instant
   const documentsRef = useRef(new Map<string, Promise<ExtractedDocument>>());
+
+  //the picker rejects the format, the model rejects what it cannot read
+  const attachmentError = (kind: AttachmentKind, formatMessage: string) => {
+    if (kind === 'unsupported') return { title: t("chatbar.unsupportedFormat"), message: formatMessage };
+    if (kind === 'image' && !supportsImages) return { title: t("chatbar.unsupportedByModel"), message: t("chatbar.modelNoImages") };
+    if (kind === 'audio' && !supportsAudio) return { title: t("chatbar.unsupportedByModel"), message: t("chatbar.modelNoAudio") };
+    return null;
+  };
 
   const readDocument = (file: SelectedFile): Promise<ExtractedDocument> => {
     let pending = documentsRef.current.get(file.uri);
@@ -767,19 +778,20 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       });
       if (!result.canceled && result.assets) {
         const validFiles: SelectedFile[] = [];
-        let hasInvalidFile = false;
+        let rejection: { title: string; message: string } | null = null;
 
         for (const a of result.assets) {
           const kind = classifyAttachment(a.name, a.mimeType);
-          if (kind === 'unsupported') {
-            hasInvalidFile = true;
+          const error = attachmentError(kind, t("chatbar.unsupportedAudio"));
+          if (error) {
+            rejection = error;
             continue;
           }
           validFiles.push({ uri: a.uri, type: kind, name: a.name, mimeType: a.mimeType ?? undefined });
         }
 
-        if (hasInvalidFile) {
-          setModalConfig({ title: t("chatbar.unsupportedFormat"), message: t("chatbar.unsupportedAudio") });
+        if (rejection) {
+          setModalConfig(rejection);
           setModalVisible(true);
         }
 
@@ -934,6 +946,16 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     }
     const finalText = (voiceText ?? text).trim();
     if ((finalText || attachments.length > 0) && onSend) {
+      //camera and gallery never pass through the picker checks
+      const blocked = selectedFiles
+        .map(f => attachmentError(f.type as AttachmentKind, t("chatbar.unsupportedFile")))
+        .find(e => e !== null);
+      if (blocked) {
+        setModalConfig(blocked);
+        setModalVisible(true);
+        return;
+      }
+
       let documents: ExtractedDocument[];
       try {
         documents = await Promise.all(selectedFiles.filter(f => f.type === 'document').map(readDocument));
@@ -979,15 +1001,18 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       if (pastedFiles.length > 0) {
         e.preventDefault();
 
-        const promises = pastedFiles.map(file => {
+        let rejection: { title: string; message: string } | null = null;
+        const readable = pastedFiles.filter(file => {
+          const kind = classifyAttachment(file.name || "pasted_file", file.type);
+          const error = attachmentError(kind, t("chatbar.unsupportedFile"));
+          if (error) rejection = error;
+          return !error;
+        });
+
+        const promises = readable.map(file => {
           return new Promise<SelectedFile | null>((resolve) => {
             const name = file.name || "pasted_file";
             const kind = classifyAttachment(name, file.type);
-            if (kind === 'unsupported') {
-              resolve(null);
-              return;
-            }
-
             const reader = new FileReader();
             reader.onload = (ev) => {
               resolve({ uri: ev.target?.result as string, type: kind, name, mimeType: file.type });
@@ -1000,8 +1025,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         Promise.all(promises).then(results => {
           const validFiles = results.filter(r => r !== null) as SelectedFile[];
 
-          if (validFiles.length < pastedFiles.length) {
-            setModalConfig({ title: t("chatbar.unsupportedFormat"), message: t("chatbar.unsupportedFile") });
+          if (rejection) {
+            setModalConfig(rejection);
             setModalVisible(true);
           }
 
@@ -1014,7 +1039,17 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
     window.addEventListener('paste', handleGlobalPaste);
     return () => window.removeEventListener('paste', handleGlobalPaste);
-  }, [supportsFiles, t]);
+  }, [supportsImages, supportsAudio, t]);
+
+  //camera, gallery and a model switch can leave an unreadable file attached
+  useEffect(() => {
+    const blocked = selectedFiles
+      .map(f => attachmentError(f.type as AttachmentKind, t("chatbar.unsupportedFile")))
+      .find(e => e !== null);
+    if (!blocked) return;
+    setModalConfig(blocked);
+    setModalVisible(true);
+  }, [selectedFiles, supportsImages, supportsAudio, t]);
 
   return (
     <KeyboardAvoidingView
@@ -1104,7 +1139,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                   <View style={{ flex: 1, marginLeft: 8, justifyContent: 'center' }}>
                     <TextInputWrapper
                       onPaste={(payload) => {
-                        if (supportsFiles && payload.type === "images") {
+                        if (supportsImages && payload.type === "images") {
                           const newFiles = payload.uris.map(uri => ({
                             uri,
                             type: "image",

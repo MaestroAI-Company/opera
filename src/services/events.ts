@@ -7,6 +7,8 @@ export const AppEvents = {
   syncCompleted: 'SYNC_COMPLETED',
   syncPinInvalidated: 'SYNC_PIN_INVALIDATED',
   overlayReopened: 'OVERLAY_REOPENED',
+  //a screen text selection is being dragged
+  textSelectionDrag: 'TEXT_SELECTION_DRAG',
   openModelSelector: 'OPEN_MODEL_SELECTOR',
   openBugReport: 'OPEN_BUG_REPORT',
   //mcp server state changed

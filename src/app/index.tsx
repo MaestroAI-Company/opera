@@ -36,6 +36,7 @@ import ActionButton from "../components/ui/ActionButton";
 import Group from "../components/ui/Group";
 import NotificationModal from "../components/ui/NotificationModal";
 import { hasOpenOverlaySheet } from "../components/ui/SheetSurface";
+import { isWidgetTouchActive } from "../components/widgets/WidgetTouchArea";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
 import { useBugReportTrigger } from "../hooks/useBugReportTrigger";
 import { takePendingCrash, type Crash } from "../services/logging/CrashReporter";
@@ -343,6 +344,8 @@ export default function Index() {
   const requestQueueRef = useRef<{ convId: string, task: () => Promise<void>, assistantMsgId: string, isIncognito: boolean }[]>([]);
   const isProcessingRef = useRef(false);
   const generatingConvIdRef = useRef<string | null>(null);
+  //composer owns its own drags, text selection is not a swipe
+  const touchInComposerRef = useRef(false);
 
   //state read lets compiler memoize
   const panResponder = useMemo(() =>
@@ -350,6 +353,8 @@ export default function Index() {
       onMoveShouldSetPanResponder: (evt, gestureState) => {
         //a sheet floats over the ui, it owns the gesture
         if (hasOpenOverlaySheet() || modelSelectorVisible) return false;
+        //an interactive widget owns the gesture it started
+        if (isWidgetTouchActive()) return false;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
         if (isHorizontal) {
           if (Math.abs(gestureState.dx) <= 10) return false;
@@ -360,6 +365,8 @@ export default function Index() {
           if (isLeftEdge && gestureState.dx > 0) return true;
           return gestureState.dx < 0;
         }
+
+        if (touchInComposerRef.current) return false;
 
         //swipe up on homepage opens model selector
         if (!drawerVisible && !settingsDrawerVisible && !modelSelectorVisible && !activeConversation) {
@@ -1511,7 +1518,13 @@ export default function Index() {
             </View>
 
             {/* bottom bar overlay */}
-            <View style={[styles.bottomBarOverlay]} pointerEvents="box-none">
+            <View
+              style={[styles.bottomBarOverlay]}
+              pointerEvents="box-none"
+              onTouchStart={() => { touchInComposerRef.current = true; }}
+              onTouchEnd={() => { touchInComposerRef.current = false; }}
+              onTouchCancel={() => { touchInComposerRef.current = false; }}
+            >
               {isSharedPreview ? (
                 <View style={styles.addSharedContainer}>
                   <View style={styles.addSharedInner}>

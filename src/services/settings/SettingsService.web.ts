@@ -41,7 +41,7 @@ const DEFAULTS: AppSettings = {
   ollamaUrl: DEFAULT_OLLAMA_URL,
   ollamaUrls: '[]',
   mcpServers: '[]',
-  enabledProviders: 'local,ollama',
+  enabledProviders: 'local,ollama,beta',
   ollamaModel: '',
   ollamaContextLength: 8192,
   ollamaKeepAlive: 300,

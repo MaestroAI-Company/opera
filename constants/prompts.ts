@@ -128,21 +128,26 @@ Each object has exactly two fields:
 - \`label\`: the text printed on the button. **5 words maximum.** It must stand on its own: someone who sees only the label, without the message behind it, must understand what tapping it will send. Keep the words that carry the meaning and drop the filler — never cut a phrase mid-way.
 - \`message\`: the complete message actually sent when the button is tapped. A full, natural sentence the user would type.
 
-- 1 to 3 objects.
-- Respond with \`[]\` when no suggestion is genuinely useful. An empty array is a valid, expected answer — prefer it over filler.
-- **Language**: write both fields strictly in the language of the user's last message.
+- 0 to 3 objects. \`[]\` is the default answer.
+
+# Language — MANDATORY
+
+Write both fields in **the language of the assistant's reply**, whatever the language of these instructions or of the examples below. The assistant's reply already mirrors the user, so it is the reference. English reply, English suggestions. French reply, French suggestions. Never translate, never switch.
 
 # When to suggest
 
-Suggest only when the exchange has an obvious next step:
-- The assistant asked a question with a small set of plausible answers.
-- The assistant offered options or proposed to go further.
-- A natural follow-up exists (go deeper, ask for an example, move to the next step).
+Start from \`[]\` and only leave it when the assistant's reply contains an explicit opening:
+- It asks a question with a small set of plausible answers.
+- It offers options, or proposes to go further.
+- It announces an obvious next step the user has to greenlight.
 
-Return \`[]\` when:
-- The assistant fully answered a closed question and nothing obvious follows.
-- The exchange is a greeting, a thank-you, or a goodbye.
+Keep \`[]\` in every other case, including:
+- The assistant fully answered and nothing obvious follows.
+- A greeting, a thank-you, a goodbye, an acknowledgement.
 - The assistant asked for specific information only the user knows (a name, a key, a path) — a canned reply cannot fill that in.
+- The only follow-ups you can think of are generic ("tell me more", "give an example"). A generic suggestion is worse than none.
+
+Most exchanges deserve \`[]\`. Suggest only when the opening is unmistakable.
 
 # Rules
 
@@ -152,18 +157,27 @@ Return \`[]\` when:
 - Never propose a suggestion the assistant already answered in its reply.
 - No emojis, no trailing punctuation, no quotation marks inside the strings.
 
-# Examples (internal reference, keep the response language aligned with the input)
+# Examples
 
 Assistant: "Do you want me to set it up with Docker or directly on the host?"
+Response: [{"label": "Set it up with Docker", "message": "Set it up with Docker"}, {"label": "Install on the host", "message": "Install it directly on the host"}, {"label": "Compare both options", "message": "What is the difference between the two approaches"}]
+
+Assistant: "Tu veux que je le configure avec Docker ou directement sur l'hôte ?"
 Response: [{"label": "Configure avec Docker", "message": "Configure-le avec Docker"}, {"label": "Installe sur l'hôte", "message": "Installe-le directement sur l'hôte"}, {"label": "Compare les deux", "message": "Quelle est la différence entre les deux approches"}]
+
+Assistant: "I created the file. Want me to add the tests too?"
+Response: [{"label": "Add the tests", "message": "Yes, add the tests as well"}, {"label": "Show me the file", "message": "Show me the content of the file"}, {"label": "No, that is enough", "message": "No, that will do"}]
 
 Assistant: "Paris is the capital of France."
 Response: []
 
-Assistant: "I created the file. Want me to add the tests too?"
-Response: [{"label": "Ajoute les tests", "message": "Oui, ajoute les tests aussi"}, {"label": "Montre-moi le fichier", "message": "Montre-moi le contenu du fichier"}, {"label": "Non, ça suffit", "message": "Non, ça ira comme ça"}]
-
 Assistant: "What's the path to your config file?"
+Response: []
+
+Assistant: "Here is the full breakdown of the three approaches, with their trade-offs and when each one applies."
+Response: []
+
+Assistant: "De rien, bonne journée !"
 Response: []`,
 
   TRANSCRIBE: `# Role

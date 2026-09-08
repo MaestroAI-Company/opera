@@ -1,3 +1,4 @@
+import { Asset } from 'expo-asset';
 import { Image, ImageSourcePropType, StyleSheet, View } from 'react-native';
 import { Radius, ThemeColors } from '../../../constants/theme';
 import { useThemedStyles } from '../../hooks/useTheme';
@@ -22,6 +23,12 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
 });
 
+//expo-asset resolves on native and web, unlike Image.resolveAssetSource
+const resolveSize = (source: ImageSourcePropType) => {
+  if (typeof source === 'number') return Asset.fromModule(source);
+  return Array.isArray(source) ? undefined : source;
+};
+
 export default function ImageCard({
   source,
   width = 200,
@@ -30,7 +37,7 @@ export default function ImageCard({
 }: ImageCardProps) {
   const styles = useThemedStyles(makeStyles);
   //no explicit height: derive it from the source so the image isn't cropped
-  const resolved = height === undefined ? Image.resolveAssetSource(source) : undefined;
+  const resolved = height === undefined ? resolveSize(source) : undefined;
   const sizeStyle = height !== undefined
     ? { width, height }
     : { width, aspectRatio: resolved?.width && resolved?.height ? resolved.width / resolved.height : 1 };

@@ -1,8 +1,9 @@
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { IWidget } from '../../services/widgets/WidgetManager';
 import { Radius, ThemeColors } from '../../../constants/theme';
 import { useThemedStyles } from '../../hooks/useTheme';
+import WidgetTouchArea from './WidgetTouchArea';
 
 export interface HtmlWidgetData {
   html?: string;
@@ -28,7 +29,7 @@ export const HtmlWidget: IWidget<HtmlWidgetData> = {
     const widgetHeight = data.height || 300;
 
     return (
-      <View style={[styles.container, { height: widgetHeight }]}>
+      <WidgetTouchArea style={[styles.container, { height: widgetHeight }]}>
         {Platform.OS === 'web' ? (
           <iframe
             src={data.url}
@@ -43,9 +44,11 @@ export const HtmlWidget: IWidget<HtmlWidgetData> = {
             scrollEnabled={true}
             bounces={false}
             javaScriptEnabled={true}
+            nestedScrollEnabled={true}
+            overScrollMode="never"
           />
         )}
-      </View>
+      </WidgetTouchArea>
     );
   }
 };

@@ -9,7 +9,11 @@ export type ModelSource = {
   url: string;
 };
 
-export const PROVIDER_IDS = ['local', 'ollama'] as const;
+export const PROVIDER_IDS = ['local', 'ollama', 'beta'] as const;
+
+//shared ollama server offered during the beta
+export const BETA_PROVIDER_ID = 'beta';
+export const BETA_SERVER_URL = process.env.EXPO_PUBLIC_BETA_SERVER_URL ?? '';
 
 //stored as a json array of server urls
 export function getOllamaUrls(): string[] {
@@ -47,6 +51,9 @@ export function buildSources(localAvailable: boolean): ModelSource[] {
   const sources: ModelSource[] = [];
   if (localAvailable && enabled.includes('local')) {
     sources.push({ key: 'local', service: 'local', label: getLocalProviderLabel(), url: '' });
+  }
+  if (enabled.includes(BETA_PROVIDER_ID)) {
+    sources.push({ key: BETA_PROVIDER_ID, service: 'ollama', label: 'Opera Beta', url: BETA_SERVER_URL });
   }
   if (enabled.includes('ollama')) {
     const urls = getOllamaUrls();

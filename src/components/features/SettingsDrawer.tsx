@@ -10,7 +10,7 @@ import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, ImageSource
 import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import { getLocalProviderLabel } from "../../services/ai/providers/LocalProvider";
-import { buildSources, getEnabledProviders, getOllamaUrls, serializeOllamaUrls, serializeProviders } from "../../services/ai/providers/sources";
+import { BETA_PROVIDER_ID, BETA_SERVER_URL, buildSources, getEnabledProviders, getOllamaUrls, serializeOllamaUrls, serializeProviders } from "../../services/ai/providers/sources";
 import { parseQuickFlowOptionId, quickFlowOptionId } from "../../services/ai/quickFlow";
 import { isDefaultAssistant, openAssistantSettings } from "../../services/assistant/DefaultAssistant";
 import { ITool } from "../../services/ai/tools/ITool";
@@ -820,6 +820,28 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       setAiService(next[0]);
     } else if (enabled && !enabledProviders.includes(aiService)) {
       setAiService(id);
+    }
+  };
+
+  //the beta server is an ollama url, not a service the app can switch to
+  const setBetaEnabled = (enabled: boolean) => {
+    const next = enabled
+      ? [...enabledProviders.filter(p => p !== BETA_PROVIDER_ID), BETA_PROVIDER_ID]
+      : enabledProviders.filter(p => p !== BETA_PROVIDER_ID);
+    setEnabledProvidersState(next);
+    Settings.set("enabledProviders", serializeProviders(next));
+    //claim the active slot only when no server is set yet
+    if (enabled && !ollamaUrl.trim()) {
+      setAiService("ollama");
+      setOllamaUrlState(BETA_SERVER_URL);
+      Settings.set("ollamaUrl", BETA_SERVER_URL);
+      AIModule.configure(BETA_SERVER_URL, effectiveContextLength(), effectiveKeepAlive());
+    } else if (!enabled && ollamaUrl === BETA_SERVER_URL) {
+      //fall back on the first server the user owns
+      const fallback = ollamaUrls.map(u => u.trim()).filter(Boolean)[0] ?? "";
+      setOllamaUrlState(fallback);
+      Settings.set("ollamaUrl", fallback);
+      AIModule.configure(fallback, effectiveContextLength(), effectiveKeepAlive());
     }
   };
 
@@ -1660,6 +1682,25 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const renderServiceSubPage = () => (
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("Service")}
+
+      <View style={styles.settingRowVertical}>
+        <View style={styles.toggleRow}>
+          <Text style={styles.settingLabel}>Opera Beta server</Text>
+          <Toggle
+            checked={enabledProviders.includes(BETA_PROVIDER_ID)}
+            onToggle={setBetaEnabled}
+          />
+        </View>
+        <Text style={styles.helpText}>
+          A test server we host so you can try Opera without setting one up. Everything needed to answer goes through it: your messages, your attachments, whatever a tool reads for you (contacts, calendar, screen text), and your IP address.
+        </Text>
+        <Text style={[styles.helpText, { marginTop: 6 }]}>
+          We do not read any of it, we do not keep it, and we will never use it for anything. The server is shut down and wiped at the end of the Play Store beta.
+        </Text>
+        <Text style={[styles.helpText, { marginTop: 6 }]}>
+          It is there for testing only. For everyday use, set up your own Ollama server below and nothing leaves your network.
+        </Text>
+      </View>
 
       {localAvailable && (
         <View style={styles.settingRowVertical}>

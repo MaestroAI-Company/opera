@@ -378,6 +378,15 @@ function AssistantOverlay() {
     return () => sub.remove();
   }, [handOffGeneration]);
 
+  //text selection hides the chrome like the lasso
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      AppEvents.textSelectionDrag,
+      (e: { dragging: boolean }) => setIsDrawingSelection(e.dragging)
+    );
+    return () => sub.remove();
+  }, []);
+
   //reopen via same activity instance
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener(AppEvents.overlayReopened, () => {

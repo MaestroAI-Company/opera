@@ -191,21 +191,42 @@ class ScreenCaptureModule(context: ReactApplicationContext) : ReactContextBaseJa
     val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     recognizer.process(InputImage.fromBitmap(capture, 0))
       .addOnSuccessListener { text ->
-        //each block keeps its own paragraph
-        val blocks = text.textBlocks.mapNotNull { block ->
-          val bounds = block.boundingBox ?: return@mapNotNull null
-          val value = block.text?.trim() ?: return@mapNotNull null
-          if (value.isEmpty()) return@mapNotNull null
-          TextSelectionLayer.Block(
-            bounds.left, bounds.top, bounds.width(), bounds.height(),
-            value, block.lines.size
+        //words are the selection unit
+        val words = mutableListOf<TextSelectionLayer.Word>()
+        fun add(bounds: Rect?, value: String?, line: Int) {
+          val box = bounds ?: return
+          val token = value?.trim() ?: return
+          if (token.isEmpty()) return
+          //normalized so the layer maps onto the display
+          words.add(
+            TextSelectionLayer.Word(
+              box.left.toFloat() / capture.width,
+              box.top.toFloat() / capture.height,
+              box.width().toFloat() / capture.width,
+              box.height().toFloat() / capture.height,
+              token,
+              line
+            )
           )
+        }
+
+        var lineIndex = 0
+        for (block in text.textBlocks) {
+          for (line in block.lines) {
+            //no elements means the line is one token
+            if (line.elements.isEmpty()) {
+              add(line.boundingBox, line.text, lineIndex)
+            } else {
+              for (element in line.elements) add(element.boundingBox, element.text, lineIndex)
+            }
+            lineIndex++
+          }
         }
         recognizer.close()
         //overlay views mutate on ui thread
         Handler(Looper.getMainLooper()).post {
           reactApplicationContext.currentActivity?.let { activity ->
-            TextSelectionLayer.show(activity, blocks)
+            TextSelectionLayer.show(activity, words) { dragging -> emitTextDrag(dragging) }
           }
         }
         promise.resolve(null)
@@ -214,6 +235,13 @@ class ScreenCaptureModule(context: ReactApplicationContext) : ReactContextBaseJa
         recognizer.close()
         promise.reject("OCR_FAILED", e.message ?: "ocr failed")
       }
+  }
+
+  //chrome hides while a selection moves
+  private fun emitTextDrag(dragging: Boolean) {
+    reactApplicationContext
+      .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+      ?.emit("TEXT_SELECTION_DRAG", Arguments.createMap().apply { putBoolean("dragging", dragging) })
   }
 
   @ReactMethod

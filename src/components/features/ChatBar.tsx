@@ -1115,7 +1115,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                       <TextInput
                         style={[
                           styles.input,
-                          { maxHeight: 36, minHeight: 36, lineHeight: 20 },
+                          { maxHeight: 132, minHeight: 32, lineHeight: 20 },
                           Platform.OS === 'web' && { outlineStyle: 'none', margin: 0, paddingHorizontal: 0, overflow: 'hidden' } as any
                         ]}
                         value={isTranscribing ? "Transcribing..." : text}
@@ -1123,7 +1123,6 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                         placeholder={placeholder}
                         placeholderTextColor={Colors.whiteSoft}
                         multiline={true}
-                        numberOfLines={1}
                         editable={!isTranscribing}
                         onTouchStart={handlePressIn}
                         onTouchEnd={handlePressOut}
@@ -1195,7 +1194,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingVertical: 10,
     borderWidth: 2,
     borderColor: Colors.borderOnPrimary,
-    height: 56,
+    minHeight: 56,
     boxShadow: `2px 6px 22px ${Colors.primary}`,
     elevation: 8,
   },
@@ -1227,7 +1226,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   input: {
     color: Colors.textOnPrimary,
     fontSize: FontSizes.md,
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   voiceIndicatorContainer: {
     flex: 1,

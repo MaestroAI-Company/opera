@@ -162,6 +162,7 @@ function withNativeAndroid(config) {
       copyTemplate('src/ScreenshotHolder.kt', path.join(javaDir, 'ScreenshotHolder.kt'), packageName);
       copyTemplate('src/ScreenCaptureModule.kt', path.join(javaDir, 'ScreenCaptureModule.kt'), packageName);
       copyTemplate('src/TextSelectionLayer.kt', path.join(javaDir, 'TextSelectionLayer.kt'), packageName);
+      copyTemplate('src/TextSelectionView.kt', path.join(javaDir, 'TextSelectionView.kt'), packageName);
       copyTemplate('src/MaestroOverlayPackage.kt', path.join(javaDir, 'MaestroOverlayPackage.kt'), packageName);
       copyTemplate('src/AssistantModule.kt', path.join(javaDir, 'AssistantModule.kt'), packageName);
 

@@ -226,7 +226,7 @@ class ScreenCaptureModule(context: ReactApplicationContext) : ReactContextBaseJa
         //overlay views mutate on ui thread
         Handler(Looper.getMainLooper()).post {
           reactApplicationContext.currentActivity?.let { activity ->
-            TextSelectionLayer.show(activity, words)
+            TextSelectionLayer.show(activity, words) { dragging -> emitTextDrag(dragging) }
           }
         }
         promise.resolve(null)
@@ -235,6 +235,13 @@ class ScreenCaptureModule(context: ReactApplicationContext) : ReactContextBaseJa
         recognizer.close()
         promise.reject("OCR_FAILED", e.message ?: "ocr failed")
       }
+  }
+
+  //chrome hides while a selection moves
+  private fun emitTextDrag(dragging: Boolean) {
+    reactApplicationContext
+      .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+      ?.emit("TEXT_SELECTION_DRAG", Arguments.createMap().apply { putBoolean("dragging", dragging) })
   }
 
   @ReactMethod

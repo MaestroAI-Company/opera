@@ -99,8 +99,13 @@ function parseSuggestions(raw: string): Suggestion[] {
   return out;
 }
 
-function trimForPrompt(text: string): string {
+function trimHead(text: string): string {
   return text.length > MAX_INPUT_CHARS ? text.slice(0, MAX_INPUT_CHARS) : text;
+}
+
+//the offer or question lives at the end of a reply
+function trimTail(text: string): string {
+  return text.length > MAX_INPUT_CHARS ? text.slice(-MAX_INPUT_CHARS) : text;
 }
 
 //best-effort, an empty list means nothing worth showing
@@ -117,7 +122,7 @@ export async function generateSuggestions(params: {
 
   //attachments are noise for this prompt
   const user = splitDocumentBlocks(params.userMessage).text.trim();
-  const input = `User: ${trimForPrompt(user)}\n\nAssistant: ${trimForPrompt(assistant)}`;
+  const input = `User: ${trimHead(user)}\n\nAssistant: ${trimTail(assistant)}`;
 
   let raw = '';
   let emitted = 0;

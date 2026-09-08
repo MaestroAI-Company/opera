@@ -28,9 +28,7 @@ function save(error: Error) {
     logs: getRelevantLogs(CRASH_LOG_LINES),
   };
   try {
-    const json = JSON.stringify(crash);
-    if (Platform.OS === 'web') localStorage.setItem(WEB_KEY, json);
-    else crashFile().write(json);
+    crashFile().write(JSON.stringify(crash));
   } catch {
     //app is going down anyway
   }
@@ -41,16 +39,15 @@ let taken: Crash | null | undefined;
 
 function readCrash(): Crash | null {
   try {
-    let json: string | null = null;
+    //drop crashes left by older web builds
     if (Platform.OS === 'web') {
-      json = localStorage.getItem(WEB_KEY);
       localStorage.removeItem(WEB_KEY);
-    } else {
-      const file = crashFile();
-      if (!file.exists) return null;
-      json = file.textSync();
-      file.delete();
+      return null;
     }
+    const file = crashFile();
+    if (!file.exists) return null;
+    const json = file.textSync();
+    file.delete();
     return json ? (JSON.parse(json) as Crash) : null;
   } catch {
     return null;
@@ -65,8 +62,10 @@ export function takePendingCrash(): Crash | null {
 
 export function installCrashHandler() {
   if (Platform.OS === 'web') {
-    window.addEventListener('error', (e) => save(e.error ?? new Error(e.message)));
-    window.addEventListener('unhandledrejection', (e) => save(e.reason instanceof Error ? e.reason : new Error(String(e.reason))));
+    //the page survives js errors, so nothing to replay on reload
+    const log = (error: Error) => console.error('[uncaught]', error);
+    window.addEventListener('error', (e) => log(e.error ?? new Error(e.message)));
+    window.addEventListener('unhandledrejection', (e) => log(e.reason instanceof Error ? e.reason : new Error(String(e.reason))));
     return;
   }
 

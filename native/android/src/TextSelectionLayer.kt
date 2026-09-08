@@ -23,7 +23,7 @@ object TextSelectionLayer {
   private var layer: View? = null
 
   //attach over the react root
-  fun show(activity: Activity, words: List<Word>) {
+  fun show(activity: Activity, words: List<Word>, onDragging: (Boolean) -> Unit) {
     hide()
     if (words.isEmpty()) return
 
@@ -50,7 +50,7 @@ object TextSelectionLayer {
     Log.i(TAG, "words=${words.size} placed=${placed.size} display=${display.x}x${display.y} host=${host.width}x${host.height} origin=${origin[0]},${origin[1]}")
     if (placed.isEmpty()) return
 
-    val view = TextSelectionView(activity, placed)
+    val view = TextSelectionView(activity, readingOrder(placed), onDragging)
     host.addView(
       view,
       FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
@@ -64,6 +64,36 @@ object TextSelectionLayer {
     if (overlay != null) {
       (overlay.parent as? ViewGroup)?.removeView(overlay)
     }
+  }
+
+  //ml kit emits blocks out of reading order
+  private fun readingOrder(words: List<TextSelectionView.Word>): List<TextSelectionView.Word> {
+    val groups = words.groupBy { it.line }.values.sortedBy { group -> group.minOf { it.rect.top } }
+
+    //a group joins the row while its middle stays above the floor
+    val rows = mutableListOf<MutableList<List<TextSelectionView.Word>>>()
+    var floor = 0f
+    for (group in groups) {
+      val top = group.minOf { it.rect.top }
+      val bottom = group.maxOf { it.rect.bottom }
+      if (rows.isEmpty() || (top + bottom) / 2f > floor) {
+        rows.add(mutableListOf(group))
+        floor = bottom
+      } else {
+        rows.last().add(group)
+        floor = maxOf(floor, bottom)
+      }
+    }
+
+    val ordered = ArrayList<TextSelectionView.Word>(words.size)
+    var line = 0
+    for (row in rows) {
+      for (group in row.sortedBy { g -> g.minOf { it.rect.left } }) {
+        for (word in group.sortedBy { it.rect.left }) ordered.add(word.copy(line = line))
+        line++
+      }
+    }
+    return ordered
   }
 
   @Suppress("DEPRECATION")

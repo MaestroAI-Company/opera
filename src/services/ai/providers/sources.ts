@@ -52,7 +52,7 @@ export function buildSources(localAvailable: boolean): ModelSource[] {
   if (localAvailable && enabled.includes('local')) {
     sources.push({ key: 'local', service: 'local', label: getLocalProviderLabel(), url: '' });
   }
-  if (enabled.includes(BETA_PROVIDER_ID)) {
+  if (BETA_SERVER_URL && enabled.includes(BETA_PROVIDER_ID)) {
     sources.push({ key: BETA_PROVIDER_ID, service: 'ollama', label: 'Opera Beta', url: BETA_SERVER_URL });
   }
   if (enabled.includes('ollama')) {

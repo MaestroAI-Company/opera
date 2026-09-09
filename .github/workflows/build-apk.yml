@@ -94,6 +94,8 @@ jobs:
           # x86 abis crash on ndk27 clang
           # armeabi-v7a unsupported by executorch
           ORG_GRADLE_PROJECT_reactNativeArchitectures: arm64-v8a
+          # baked into the js bundle, so it has to be set before gradle bundles
+          EXPO_PUBLIC_BETA_SERVER_URL: ${{ secrets.EXPO_PUBLIC_BETA_SERVER_URL }}
           UPLOAD_STORE_PASSWORD: ${{ secrets.UPLOAD_STORE_PASSWORD }}
           UPLOAD_KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
           UPLOAD_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}

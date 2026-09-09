@@ -1683,24 +1683,26 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("Service")}
 
-      <View style={styles.settingRowVertical}>
-        <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>Opera Beta server</Text>
-          <Toggle
-            checked={enabledProviders.includes(BETA_PROVIDER_ID)}
-            onToggle={setBetaEnabled}
-          />
+      {!!BETA_SERVER_URL && (
+        <View style={styles.settingRowVertical}>
+          <View style={styles.toggleRow}>
+            <Text style={styles.settingLabel}>Opera Beta server</Text>
+            <Toggle
+              checked={enabledProviders.includes(BETA_PROVIDER_ID)}
+              onToggle={setBetaEnabled}
+            />
+          </View>
+          <Text style={styles.helpText}>
+            A test server we host so you can try Opera without setting one up. Everything needed to answer goes through it: your messages, your attachments, whatever a tool reads for you (contacts, calendar, screen text), and your IP address.
+          </Text>
+          <Text style={[styles.helpText, { marginTop: 6 }]}>
+            We do not read any of it, we do not keep it, and we will never use it for anything. The server is shut down and wiped at the end of the Play Store beta.
+          </Text>
+          <Text style={[styles.helpText, { marginTop: 6 }]}>
+            It is there for testing only. For everyday use, set up your own Ollama server below and nothing leaves your network.
+          </Text>
         </View>
-        <Text style={styles.helpText}>
-          A test server we host so you can try Opera without setting one up. Everything needed to answer goes through it: your messages, your attachments, whatever a tool reads for you (contacts, calendar, screen text), and your IP address.
-        </Text>
-        <Text style={[styles.helpText, { marginTop: 6 }]}>
-          We do not read any of it, we do not keep it, and we will never use it for anything. The server is shut down and wiped at the end of the Play Store beta.
-        </Text>
-        <Text style={[styles.helpText, { marginTop: 6 }]}>
-          It is there for testing only. For everyday use, set up your own Ollama server below and nothing leaves your network.
-        </Text>
-      </View>
+      )}
 
       {localAvailable && (
         <View style={styles.settingRowVertical}>

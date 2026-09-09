@@ -132,6 +132,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # a re-pushed tag rebuilds the same version, so replace the release
+          gh release delete "$GITHUB_REF_NAME" --yes || true
           gh release create "$GITHUB_REF_NAME" \
             android/app/build/outputs/apk/release/app-release.apk \
             --title "Opera ${GITHUB_REF_NAME#v}" \

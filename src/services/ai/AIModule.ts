@@ -10,6 +10,7 @@ import { LocationService } from '../location/LocationService';
 import { Settings } from '../settings/SettingsService';
 import { DEFAULT_OLLAMA_URL, imageToBase64 } from './utils/imageToBase64';
 import { resolveQuickFlow, QuickFlowTarget } from './quickFlow';
+import { BETA_SERVER_URL } from './providers/sources';
 
 const DEFAULT_URL = DEFAULT_OLLAMA_URL;
 
@@ -42,6 +43,8 @@ class CentralAIModule {
     this.providers.set('OLLAMA', new OllamaProvider(DEFAULT_URL));
     //universal on-device provider (routes to the platform local backend)
     this.providers.set('LOCAL', new LocalProvider());
+    //hosted beta server, its own provider even though it speaks ollama
+    if (BETA_SERVER_URL) this.providers.set('BETA', new OllamaProvider(BETA_SERVER_URL));
   }
 
   //switch active provider from settings
@@ -55,6 +58,8 @@ class CentralAIModule {
   configure(ollamaUrl: string, contextLength?: number, keepAlive?: number): void {
     const url = ollamaUrl.trim().length > 0 ? ollamaUrl.trim() : DEFAULT_URL;
     this.providers.set('OLLAMA', new OllamaProvider(url, {}, contextLength, keepAlive));
+    //beta shares the tuning, never the url
+    if (BETA_SERVER_URL) this.providers.set('BETA', new OllamaProvider(BETA_SERVER_URL, {}, contextLength, keepAlive));
     //new server can serve different models
     this.capabilitiesCache.clear();
   }

@@ -823,28 +823,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     }
   };
 
-  //the beta server is an ollama url, not a service the app can switch to
-  const setBetaEnabled = (enabled: boolean) => {
-    const next = enabled
-      ? [...enabledProviders.filter(p => p !== BETA_PROVIDER_ID), BETA_PROVIDER_ID]
-      : enabledProviders.filter(p => p !== BETA_PROVIDER_ID);
-    setEnabledProvidersState(next);
-    Settings.set("enabledProviders", serializeProviders(next));
-    //claim the active slot only when no server is set yet
-    if (enabled && !ollamaUrl.trim()) {
-      setAiService("ollama");
-      setOllamaUrlState(BETA_SERVER_URL);
-      Settings.set("ollamaUrl", BETA_SERVER_URL);
-      AIModule.configure(BETA_SERVER_URL, effectiveContextLength(), effectiveKeepAlive());
-    } else if (!enabled && ollamaUrl === BETA_SERVER_URL) {
-      //fall back on the first server the user owns
-      const fallback = ollamaUrls.map(u => u.trim()).filter(Boolean)[0] ?? "";
-      setOllamaUrlState(fallback);
-      Settings.set("ollamaUrl", fallback);
-      AIModule.configure(fallback, effectiveContextLength(), effectiveKeepAlive());
-    }
-  };
-
   const setWhisperModel = (v: string) => {
     setWhisperModelState(v);
     Settings.set("whisperModel", v);
@@ -1689,7 +1667,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             <Text style={styles.settingLabel}>Opera Beta server</Text>
             <Toggle
               checked={enabledProviders.includes(BETA_PROVIDER_ID)}
-              onToggle={setBetaEnabled}
+              onToggle={(v) => setProviderEnabled(BETA_PROVIDER_ID, v)}
             />
           </View>
           <Text style={styles.helpText}>

@@ -45,6 +45,7 @@ import { useResponsive } from "../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
 import { CloudSync } from "../services/CloudSyncService";
 import { AIModule } from "../services/ai/AIModule";
+import { migrateModelSources } from "../services/ai/providers/sources";
 import { buildSystemPrompt } from "../services/ai/generation/chatGeneration";
 import { GenerationService } from "../services/ai/generation/GenerationService";
 import { generateSuggestions, Suggestion } from "../services/ai/generation/suggestions";
@@ -622,7 +623,7 @@ export default function Index() {
       //load and apply settings
       try {
         await Settings.init();
-        const s = await Settings.load();
+        const s = migrateModelSources(await Settings.load());
         if ((await DB.detectDataIssues()) && !s.dataWarningDismissed) {
           setShowDataWarning(true);
         }

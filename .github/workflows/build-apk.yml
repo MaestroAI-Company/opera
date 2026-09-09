@@ -142,7 +142,7 @@ jobs:
 
       # requires the very first release to have been uploaded manually through
       # the Play Console; the API can't create that initial listing
-      - name: Upload to Play Store closed alpha track
+      - name: Upload the bundle to the Play Console as a draft
         if: github.ref_type == 'tag' && env.HAS_PLAY_SA == 'true'
         uses: r0adkll/upload-google-play@v1
         with:
@@ -151,6 +151,7 @@ jobs:
           releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
           # singular track is deprecated by the action
           tracks: alpha
-          status: completed
+          # draft leaves the rollout to the Play Console
+          status: draft
           releaseName: ${{ github.ref_name }}
           whatsNewDirectory: distribution/whatsnew

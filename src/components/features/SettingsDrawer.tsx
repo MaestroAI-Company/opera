@@ -10,7 +10,7 @@ import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, ImageSource
 import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import { getLocalProviderLabel } from "../../services/ai/providers/LocalProvider";
-import { BETA_PROVIDER_ID, BETA_SERVER_URL, buildSources, getEnabledProviders, getOllamaUrls, serializeOllamaUrls, serializeProviders } from "../../services/ai/providers/sources";
+import { BETA_PROVIDER_ID, BETA_SERVER_URL, buildSources, getEnabledProviders, getOllamaServers, getOllamaTuning, OllamaServer, serializeOllamaServers, serializeProviders } from "../../services/ai/providers/sources";
 import { parseQuickFlowOptionId, quickFlowOptionId } from "../../services/ai/quickFlow";
 import { isDefaultAssistant, openAssistantSettings } from "../../services/assistant/DefaultAssistant";
 import { ITool } from "../../services/ai/tools/ITool";
@@ -23,7 +23,6 @@ import { AppEvents } from "../../services/events";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { McpService } from "../../services/mcp/McpService";
 import { McpServerConfig } from "../../services/mcp/types";
-import { describeImport } from "../../services/mcp/config";
 import { Settings } from "../../services/settings/SettingsService";
 import { WhisperSTT } from "../../services/speech/STTService";
 import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
@@ -112,7 +111,7 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "advanced" | "assistantoverlay" | "service" | "beta" | "local" | "ollama" | "confidentiality" | "reports" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "mcpservers" | "mcpserver" | "sociallinks";
+type SubPage = "main" | "general" | "advanced" | "assistantoverlay" | "service" | "beta" | "local" | "ollama" | "ollamaserver" | "ollamaserversettings" | "ollamaserveradd" | "confidentiality" | "reports" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "mcpservers" | "mcpserver" | "mcpserversettings" | "mcpserveradd" | "sociallinks";
 
 //page a subpage steps back to, followed by the header arrow and the android back button
 const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
@@ -124,6 +123,9 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   beta: "service",
   local: "service",
   ollama: "service",
+  ollamaserver: "ollama",
+  ollamaserversettings: "ollamaserver",
+  ollamaserveradd: "ollama",
   confidentiality: "main",
   reports: "main",
   tools: "main",
@@ -134,6 +136,8 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   mobileactions: "tools",
   mcpservers: "tools",
   mcpserver: "mcpservers",
+  mcpserversettings: "mcpserver",
+  mcpserveradd: "mcpservers",
 };
 
 export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
@@ -199,16 +203,20 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [aiService, setAiServiceState] = useState("ollama");
   const [localAvailable, setLocalAvailable] = useState(false);
   const [ollamaUrl, setOllamaUrlState] = useState("");
-  const [ollamaUrls, setOllamaUrlsState] = useState<string[]>([]);
+  const [ollamaServers, setOllamaServersState] = useState<OllamaServer[]>([]);
   const [enabledProviders, setEnabledProvidersState] = useState<string[]>([]);
-  const [ollamaContextLength, setOllamaContextLengthState] = useState("");
-  const [ollamaKeepAlive, setOllamaKeepAliveState] = useState("300");
+  const [modelFailover, setModelFailoverState] = useState(true);
   //unreachable server url
   const [serverErrors, setServerErrors] = useState<Record<string, boolean>>({});
-  const [downloadModalVisible, setDownloadModalVisible] = useState(false);
-  const [, setIsDownloading] = useState(false);
-  const [, setGemmaDownloadProgress] = useState<{ progress: number, etaSeconds: number, speedStr: string, sizeStr: string } | null>(null);
-
+  //opened server index in the list
+  const [ollamaDetailIndex, setOllamaDetailIndex] = useState<number | null>(null);
+  //raw text of the tuning fields
+  const [ollamaContextDraft, setOllamaContextDraft] = useState("");
+  const [ollamaKeepAliveDraft, setOllamaKeepAliveDraft] = useState("");
+  const [ollamaModels, setOllamaModels] = useState<string[]>([]);
+  const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
+  //ignore stale server answers
+  const ollamaModelsRequest = useRef(0);
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const [lastSyncSize, setLastSyncSize] = useState<number | null>(null);
 
@@ -270,11 +278,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   //mirrored from secret store for editing
   const [mcpHeaderValues, setMcpHeaderValues] = useState<Record<string, string>>({});
   const [mcpConnecting, setMcpConnecting] = useState<Record<string, boolean>>({});
-  //one draft line per pending link or config block
-  const [mcpDrafts, setMcpDrafts] = useState<string[]>([]);
+  //shared draft for the add form
+  const [serverDraft, setServerDraft] = useState({ name: "", url: "", headerName: "", headerValue: "", clientId: "" });
+  const [serverDraftBusy, setServerDraftBusy] = useState(false);
   //active detail server
   const [mcpDetailId, setMcpDetailId] = useState<string | null>(null);
-  const [mcpAdvancedOpen, setMcpAdvancedOpen] = useState(false);
   //triggers repaint on connection change
   const [mcpTick, setMcpTick] = useState(0);
 
@@ -288,8 +296,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [hasSyncPin, setHasSyncPin] = useState(false);
   const [hasCloudBackup, setHasCloudBackup] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-
-  const [, setOllamaModelOptions] = useState<{ id: string, label: string }[]>([]);
 
   const languageOptions = [
     { id: "en", label: "English" },
@@ -510,10 +516,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setThemeState(s.theme);
         setAiServiceState(s.aiService);
         setOllamaUrlState(s.ollamaUrl);
-        setOllamaUrlsState(getOllamaUrls());
+        setOllamaServersState(getOllamaServers());
         setEnabledProvidersState(getEnabledProviders());
-        setOllamaContextLengthState(s.ollamaContextLength && s.ollamaContextLength !== 8192 ? String(s.ollamaContextLength) : "");
-        setOllamaKeepAliveState(String(s.ollamaKeepAlive ?? 300));
         setQuickFlowIdState(s.quickFlowModel ? quickFlowOptionId(s.quickFlowService, s.quickFlowUrl, s.quickFlowModel) : "");
         setWhisperModelState(s.whisperModel);
         setWhisperLanguageState(s.whisperLanguage);
@@ -524,9 +528,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setShowTechnicalDetailsState(s.showTechnicalDetails);
         setAdvancedModeState(s.advancedMode);
         setUseAppContextState(s.useAppContext);
+        setModelFailoverState(s.modelFailover);
         setShareInstanceUrlState(s.shareInstanceUrl || "");
         //apply to services
-        AIModule.configure(s.ollamaUrl, s.ollamaContextLength, s.ollamaKeepAlive);
+        const tuning = getOllamaTuning(s.ollamaUrl);
+        AIModule.configure(s.ollamaUrl, tuning.contextLength, tuning.keepAlive);
         AIModule.setMode(s.aiService);
         const localModeAvailable = await AIModule.isModeAvailable("local");
         setLocalAvailable(localModeAvailable);
@@ -584,7 +590,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       if (!cancelled) setQuickFlowOptions(rows);
     })();
     return () => { cancelled = true; };
-  }, [activeSubPage, localAvailable, ollamaUrls, enabledProviders, t]);
+  }, [activeSubPage, localAvailable, ollamaServers, enabledProviders, t]);
 
   const handleSelectQuickFlow = (id: string) => {
     setQuickFlowIdState(id);
@@ -689,38 +695,73 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     setMcpHeaderValues(Object.fromEntries(entries));
   };
 
-  //leaving the field imports the draft, no confirmation button
-  const handleMcpDraftBlur = async (index: number) => {
-    const text = (mcpDrafts[index] ?? "").trim();
-    if (!text) {
-      setMcpDrafts(prev => prev.filter((_, i) => i !== index));
+  //server joins only once it answers
+  const openServerDraft = (page: SubPage) => {
+    setServerDraft({ name: "", url: "", headerName: "", headerValue: "", clientId: "" });
+    setServerDraftBusy(false);
+    setActiveSubPage(page);
+  };
+
+  const submitMcpDraft = async () => {
+    const url = serverDraft.url.trim();
+    if (mcpServers.some(s => s.url.trim() === url)) {
+      showAlert(t("settings.server.addFailed"), t("settings.server.duplicate"));
       return;
     }
+    setServerDraftBusy(true);
     try {
-      const { added, skipped } = await McpService.importConfig(text);
+      await McpService.addServer(serverDraft);
       setMcpServers([...McpService.getServers()]);
       await refreshMcpHeaders();
-      //keep the text so the failing entry can be fixed
-      if (added.length === 0) {
-        showAlert(t("settings.data.import"), describeImport(added, skipped), undefined, { messageAlign: "left" });
-        return;
-      }
-      setMcpDrafts(prev => prev.filter((_, i) => i !== index));
-      //single add opens detail directly
-      if (added.length === 1 && skipped.length === 0) {
-        setMcpDetailId(added[0].id);
-        setActiveSubPage("mcpserver");
-        return;
-      }
-      showAlert(t("settings.data.import"), describeImport(added, skipped), undefined, { messageAlign: "left" });
+      setActiveSubPage("mcpservers");
     } catch (e: any) {
-      showAlert(t("settings.mcp.importFailed"), e?.message || t("settings.mcp.unreadableConfig"), undefined, { messageAlign: "left" });
+      showAlert(t("settings.server.addFailed"), e?.message || t("settings.mcp.unreachable"), undefined, { messageAlign: "left" });
+    } finally {
+      setServerDraftBusy(false);
+    }
+  };
+
+  const submitOllamaDraft = async () => {
+    const url = serverDraft.url.trim();
+    if (ollamaServers.some(s => s.url.trim() === url)) {
+      showAlert(t("settings.server.addFailed"), t("settings.server.duplicate"));
+      return;
+    }
+    setServerDraftBusy(true);
+    try {
+      if (!await AIModule.isSourceAvailable("ollama", url)) {
+        showAlert(
+          t("settings.ollama.unreachableTitle"),
+          t("settings.ollama.unreachableInfo"),
+          undefined,
+          { image: ollamaErrorImage, messageAlign: "left" },
+        );
+        return;
+      }
+      saveOllamaServers([...ollamaServers, { url, name: serverDraft.name.trim() }]);
+      //skip waiting for the next sweep
+      setServerErrors(prev => ({ ...prev, [url]: false }));
+      setActiveSubPage("ollama");
+    } finally {
+      setServerDraftBusy(false);
     }
   };
 
   const saveMcpServer = async (id: string, patch: Partial<McpServerConfig>) => {
     await McpService.updateServer(id, patch);
     setMcpServers([...McpService.getServers()]);
+  };
+
+  //empty link drops the server
+  const handleMcpUrlBlur = async (id: string, url: string) => {
+    if (!url.trim()) {
+      await McpService.removeServer(id);
+      setMcpServers([...McpService.getServers()]);
+      setMcpDetailId(null);
+      setActiveSubPage("mcpservers");
+      return;
+    }
+    await saveMcpServer(id, { url });
   };
 
   const removeMcpServer = (id: string, label: string) => {
@@ -762,56 +803,133 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     AIModule.setMode(v);
   };
 
-  //fallback when caller did not change value
-  const effectiveContextLength = (raw: string = ollamaContextLength) => {
-    const parsed = parseInt(raw, 10);
-    return isNaN(parsed) || parsed <= 0 ? 8192 : parsed;
-  };
+  //prefer the given name
+  const ollamaServerLabel = (server: OllamaServer): string =>
+    server.name.trim() || server.url.trim().replace(/^https?:\/\//, "").replace(/\/+$/, "") || t("settings.ollama.newServer");
 
-  const effectiveKeepAlive = (raw: string = ollamaKeepAlive) => {
-    const parsed = parseInt(raw, 10);
-    return isNaN(parsed) ? 300 : parsed;
+  //undefined falls back to global
+  const serverContextLength = (server: OllamaServer) =>
+    server.contextLength && server.contextLength > 0 ? server.contextLength : Settings.getCached().ollamaContextLength;
+
+  const serverKeepAlive = (server: OllamaServer) =>
+    server.keepAlive ?? Settings.getCached().ollamaKeepAlive;
+
+  //unknown until the first ping answers
+  const ollamaStatusLabel = (server: OllamaServer): string => {
+    const url = server.url.trim();
+    if (!url) return t("settings.ollama.noLink");
+    const failed = serverErrors[url];
+    if (failed === undefined) return t("settings.ollama.checking");
+    return failed ? t("settings.ollama.unreachable") : t("settings.ollama.connected");
   };
 
   //keep active server in the list
-  const saveOllamaUrls = (urls: string[]) => {
-    setOllamaUrlsState(urls);
-    const filled = urls.map(u => u.trim()).filter(Boolean);
-    const activeUrl = filled.includes(ollamaUrl.trim()) ? ollamaUrl : (filled[0] ?? "");
-    Settings.set("ollamaUrls", serializeOllamaUrls(urls));
-    if (activeUrl !== ollamaUrl) {
-      setOllamaUrlState(activeUrl);
-      Settings.set("ollamaUrl", activeUrl);
-      AIModule.configure(activeUrl, effectiveContextLength(), effectiveKeepAlive());
+  const saveOllamaServers = (servers: OllamaServer[]) => {
+    setOllamaServersState(servers);
+    Settings.set("ollamaUrls", serializeOllamaServers(servers));
+    const filled = servers.filter(s => s.url.trim().length > 0);
+    const active = filled.find(s => s.url.trim() === ollamaUrl.trim()) ?? filled[0];
+    const activeUrl = active?.url.trim() ?? "";
+    if (activeUrl === ollamaUrl) return;
+    setOllamaUrlState(activeUrl);
+    Settings.set("ollamaUrl", activeUrl);
+    if (active) AIModule.configure(activeUrl, serverContextLength(active), serverKeepAlive(active));
+  };
+
+  const patchOllamaServer = (index: number, patch: Partial<OllamaServer>) => {
+    saveOllamaServers(ollamaServers.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+  };
+
+  //tune only the active server
+  const tuneOllamaServer = (index: number, patch: Partial<OllamaServer>) => {
+    const next = ollamaServers.map((s, i) => (i === index ? { ...s, ...patch } : s));
+    saveOllamaServers(next);
+    const server = next[index];
+    if (server.url.trim() === ollamaUrl.trim()) {
+      AIModule.configure(server.url.trim(), serverContextLength(server), serverKeepAlive(server));
     }
   };
 
-  const setOllamaUrlAt = (index: number, value: string) => {
-    saveOllamaUrls(ollamaUrls.map((url, i) => (i === index ? value : url)));
-  };
-
-  const setOllamaContextLength = (v: string) => {
+  const setOllamaServerContext = (index: number, v: string) => {
     const next = v.replace(/[^0-9]/g, "");
-    setOllamaContextLengthState(next);
-    Settings.set("ollamaContextLength", effectiveContextLength(next));
-    AIModule.configure(ollamaUrl, effectiveContextLength(next), effectiveKeepAlive());
+    setOllamaContextDraft(next);
+    const parsed = parseInt(next, 10);
+    tuneOllamaServer(index, { contextLength: isNaN(parsed) ? undefined : parsed });
   };
 
   //leading minus keeps -1 typable
-  const setOllamaKeepAlive = (v: string) => {
+  const setOllamaServerKeepAlive = (index: number, v: string) => {
     const next = (v.startsWith("-") ? "-" : "") + v.replace(/[^0-9]/g, "");
-    setOllamaKeepAliveState(next);
-    Settings.set("ollamaKeepAlive", effectiveKeepAlive(next));
-    AIModule.configure(ollamaUrl, effectiveContextLength(), effectiveKeepAlive(next));
+    setOllamaKeepAliveDraft(next);
+    const parsed = parseInt(next, 10);
+    tuneOllamaServer(index, { keepAlive: isNaN(parsed) ? undefined : parsed });
   };
 
-  //drop server on empty field
+  const loadOllamaModels = async (url: string) => {
+    const target = url.trim();
+    const request = ++ollamaModelsRequest.current;
+    if (!target) {
+      setOllamaModels([]);
+      return;
+    }
+    setOllamaModelsLoading(true);
+    try {
+      const models = await AIModule.getModelsFor("ollama", target);
+      if (ollamaModelsRequest.current === request) setOllamaModels(models);
+    } catch {
+      if (ollamaModelsRequest.current === request) setOllamaModels([]);
+    } finally {
+      if (ollamaModelsRequest.current === request) setOllamaModelsLoading(false);
+    }
+  };
+
+  const openOllamaServer = (index: number) => {
+    const server = ollamaServers[index];
+    setOllamaDetailIndex(index);
+    setOllamaContextDraft(server?.contextLength != null ? String(server.contextLength) : "");
+    setOllamaKeepAliveDraft(server?.keepAlive != null ? String(server.keepAlive) : "");
+    setOllamaModels([]);
+    loadOllamaModels(server?.url ?? "");
+    setActiveSubPage("ollamaserver");
+  };
+
+  const removeOllamaServer = (index: number) => {
+    const server = ollamaServers[index];
+    showAlert(
+      t("settings.ollama.remove.title"),
+      t("settings.ollama.remove.message", { name: ollamaServerLabel(server) }),
+      [
+        { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: t("common.remove"),
+          style: "danger",
+          onPress: () => {
+            setAlertModalVisible(false);
+            saveOllamaServers(ollamaServers.filter((_, i) => i !== index));
+            setOllamaDetailIndex(null);
+            setActiveSubPage("ollama");
+          },
+        },
+      ],
+    );
+  };
+
+  //empty link drops the server
   const handleOllamaUrlBlur = (index: number) => {
-    if (!ollamaUrls[index]?.trim()) {
-      saveOllamaUrls(ollamaUrls.filter((_, i) => i !== index));
+    const url = ollamaServers[index]?.url.trim() ?? "";
+    if (!url) {
+      saveOllamaServers(ollamaServers.filter((_, i) => i !== index));
+      setOllamaDetailIndex(null);
+      setActiveSubPage("ollama");
       return;
     }
     checkOllamaServers();
+    loadOllamaModels(url);
+  };
+
+  const reconnectOllamaServer = async (index: number) => {
+    await checkOllamaServers();
+    await loadOllamaModels(ollamaServers[index]?.url ?? "");
   };
 
   const setProviderEnabled = (id: string, enabled: boolean) => {
@@ -883,6 +1001,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const setAdvancedMode = (v: boolean) => {
     setAdvancedModeState(v);
     Settings.set("advancedMode", v);
+  };
+
+  const setModelFailover = (v: boolean) => {
+    setModelFailoverState(v);
+    Settings.set("modelFailover", v);
   };
 
   const setUseAppContext = (v: boolean) => {
@@ -1090,12 +1213,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   //ping every configured server
   const checkOllamaServers = useCallback(async () => {
     if (!settingsLoaded) return;
-    const urls = ollamaUrls.map(u => u.trim()).filter(Boolean);
+    const urls = ollamaServers.map(s => s.url.trim()).filter(Boolean);
     const results = await Promise.all(urls.map(url => AIModule.isSourceAvailable("ollama", url)));
     const errors: Record<string, boolean> = {};
     urls.forEach((url, i) => { errors[url] = !results[i]; });
     setServerErrors(errors);
-  }, [settingsLoaded, ollamaUrls]);
+  }, [settingsLoaded, ollamaServers]);
 
   useEffect(() => {
     if (visible) {
@@ -1114,31 +1237,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       }, 300);
     }
   }, [visible, checkOllamaServers, whisperModel]);
-
-  const handleDownloadGemma = async () => {
-    setDownloadModalVisible(false);
-    setIsDownloading(true);
-    setGemmaDownloadProgress(null);
-    try {
-      await AIModule.downloadService("gemma4", (progress, etaSeconds, speedStr, sizeStr) => {
-        setGemmaDownloadProgress({ progress, etaSeconds, speedStr, sizeStr });
-      });
-      const fetchedModels = await AIModule.getAvailableModels();
-      if (fetchedModels && fetchedModels.length > 0) {
-        const options = fetchedModels.map((m: string) => ({
-          id: m,
-          label: m,
-        }));
-        setOllamaModelOptions(options);
-      }
-    } catch (e) {
-      console.error("Failed to download gemma4", e);
-      showAlert(t("common.error"), t("settings.model.downloadFailed"));
-    } finally {
-      setIsDownloading(false);
-      setGemmaDownloadProgress(null);
-    }
-  };
 
   const handleDownloadWhisper = async (modelToDownload?: string) => {
     const model = modelToDownload || whisperModel;
@@ -1739,7 +1837,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <Group>
           <ActionButton
             icon={arrowIcon}
-            label="See Ollama settings"
+            label={t("settings.ollama.see")}
             onPress={() => setActiveSubPage("ollama")}
           />
         </Group>
@@ -1812,97 +1910,339 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     </View>
   );
 
-  //ollama provider settings subpage
+  //ollama server list subpage
   const renderOllamaSubPage = () => (
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("Ollama", "service")}
 
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Ollama servers</Text>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>Add your Ollama server links to connect Opera to them.</Text>
+        <Text style={styles.settingLabel}>{t("settings.ollama.title")}</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>{t("settings.ollama.help")}</Text>
 
-        {ollamaUrls.length > 0 && (
+        {ollamaServers.length > 0 && (
           <Group style={styles.groupSpacingTight}>
-            {ollamaUrls.map((url, index) => (
-              <TextInputField
+            {ollamaServers.map((server, index) => (
+              <Pressable
                 key={index}
-                icon={linkIcon}
-                placeholder="server link"
-                value={url}
-                onChangeText={(v) => setOllamaUrlAt(index, v)}
-                onBlur={() => handleOllamaUrlBlur(index)}
-                rightIcon={serverErrors[url.trim()] ? errorIcon : undefined}
-                onRightIconPress={() => showAlert(
-                  "Server unreachable",
-                  "This server could not be reached.\n\n- Check that the server is running.\n- Check the server's network connection.\n- Make sure the URL and port are correct.",
-                  undefined,
-                  { image: ollamaErrorImage, messageAlign: "left" },
-                )}
-              />
+                style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
+                onPress={() => openOllamaServer(index)}
+              >
+                <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+                <Text style={styles.navLabel}>{ollamaServerLabel(server)}</Text>
+                <Text style={styles.navStatus}>{ollamaStatusLabel(server)}</Text>
+              </Pressable>
             ))}
           </Group>
         )}
 
-        <Group>
+        <Group style={styles.groupSpacing}>
           <ActionButton
             icon={addIcon}
-            label="Add server link"
-            onPress={() => saveOllamaUrls([...ollamaUrls, ""])}
+            label={t("settings.server.add")}
+            onPress={() => openServerDraft("ollamaserveradd")}
           />
         </Group>
       </View>
 
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Context Length</Text>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>Maximum number of tokens the model can use.</Text>
+        <View style={styles.toggleRow}>
+          <Text style={styles.settingLabel}>{t("settings.service.failover")}</Text>
+          <Toggle
+            checked={modelFailover}
+            onToggle={setModelFailover}
+          />
+        </View>
+        <Text style={styles.helpText}>{t("settings.service.failoverHelp")}</Text>
+      </View>
+    </View>
+  );
+
+  //mcp add server form
+  const renderMcpServerAddSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader(t("settings.server.add"), "mcpservers")}
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>{t("settings.server.name")}</Text>
+        <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.server.nameHelp")}</Text>
         <Group>
-          {advancedMode ? (
-            <TextInputField
-              icon={messageIcon}
-              placeholder="8192"
-              value={ollamaContextLength}
-              onChangeText={setOllamaContextLength}
-              keyboardType="numeric"
-            />
-          ) : (
-            <Slider
-              icon={messageIcon}
-              options={ollamaContextLengthOptions}
-              selectedValue={String(effectiveContextLength())}
-              onSelect={setOllamaContextLength}
-            />
-          )}
+          <TextInputField
+            icon={penPlaceholderIcon}
+            placeholder={t("settings.server.namePlaceholder")}
+            value={serverDraft.name}
+            onChangeText={(v) => setServerDraft(prev => ({ ...prev, name: v }))}
+          />
         </Group>
       </View>
 
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Model Keep Alive</Text>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          {advancedMode
-            ? "How long the model stays loaded in memory after a request, in seconds. Use -1 to keep it loaded forever."
-            : "How long the model stays loaded in memory after a request."}
-        </Text>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.server.link")}</Text>
         <Group>
-          {advancedMode ? (
-            <TextInputField
-              icon={timeIcon}
-              placeholder="300"
-              value={ollamaKeepAlive}
-              onChangeText={setOllamaKeepAlive}
-              keyboardType="numeric"
-            />
-          ) : (
-            <Slider
-              icon={timeIcon}
-              options={ollamaKeepAliveOptions}
-              selectedValue={ollamaKeepAlive}
-              onSelect={setOllamaKeepAlive}
-            />
-          )}
+          <TextInputField
+            icon={linkIcon}
+            placeholder={t("settings.service.serverLink")}
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={serverDraft.url}
+            onChangeText={(v) => setServerDraft(prev => ({ ...prev, url: v }))}
+          />
+        </Group>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.mcp.headerHelp")}</Text>
+        <Group>
+          <TextInputField
+            icon={penPlaceholderIcon}
+            placeholder={t("settings.mcp.headerName")}
+            autoCapitalize="none"
+            value={serverDraft.headerName}
+            onChangeText={(v) => setServerDraft(prev => ({ ...prev, headerName: v }))}
+          />
+          <TextInputField
+            icon={penPlaceholderIcon}
+            placeholder={t("settings.mcp.headerValue")}
+            autoCapitalize="none"
+            secureTextEntry
+            value={serverDraft.headerValue}
+            onChangeText={(v) => setServerDraft(prev => ({ ...prev, headerValue: v }))}
+          />
+        </Group>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.mcp.clientIdHelp")}</Text>
+        <Group>
+          <TextInputField
+            icon={penPlaceholderIcon}
+            placeholder={t("settings.mcp.clientId")}
+            autoCapitalize="none"
+            value={serverDraft.clientId}
+            onChangeText={(v) => setServerDraft(prev => ({ ...prev, clientId: v }))}
+          />
+        </Group>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <Group>
+          <ActionButton
+            icon={addIcon}
+            label={serverDraftBusy ? t("settings.server.checking") : t("settings.server.add")}
+            disabled={serverDraftBusy || !serverDraft.url.trim()}
+            onPress={submitMcpDraft}
+          />
         </Group>
       </View>
     </View>
   );
+
+  //ollama add server form
+  const renderOllamaServerAddSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader(t("settings.server.add"), "ollama")}
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>{t("settings.server.name")}</Text>
+        <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.server.nameHelp")}</Text>
+        <Group>
+          <TextInputField
+            icon={penPlaceholderIcon}
+            placeholder={t("settings.server.namePlaceholder")}
+            value={serverDraft.name}
+            onChangeText={(v) => setServerDraft(prev => ({ ...prev, name: v }))}
+          />
+        </Group>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.server.link")}</Text>
+        <Group>
+          <TextInputField
+            icon={linkIcon}
+            placeholder={t("settings.service.serverLink")}
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={serverDraft.url}
+            onChangeText={(v) => setServerDraft(prev => ({ ...prev, url: v }))}
+          />
+        </Group>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <Group>
+          <ActionButton
+            icon={addIcon}
+            label={serverDraftBusy ? t("settings.server.checking") : t("settings.server.add")}
+            disabled={serverDraftBusy || !serverDraft.url.trim()}
+            onPress={submitOllamaDraft}
+          />
+        </Group>
+      </View>
+    </View>
+  );
+
+  //ollama server detail page
+  const renderOllamaServerSubPage = () => {
+    const index = ollamaDetailIndex ?? -1;
+    const server = ollamaServers[index];
+    if (!server) return renderOllamaSubPage();
+
+    const url = server.url.trim();
+    const connected = url.length > 0 && serverErrors[url] === false;
+
+    return (
+      <View style={styles.subPageContainer}>
+        {renderSubPageHeader(ollamaServerLabel(server), "ollama")}
+
+        <View style={styles.settingRowVertical}>
+          <Text style={styles.helpText}>{ollamaStatusLabel(server)}</Text>
+        </View>
+
+        <View style={styles.settingRowVertical}>
+          <Group style={styles.groupSpacingTight}>
+            <TextInputField
+              icon={penPlaceholderIcon}
+              placeholder={t("settings.server.namePlaceholder")}
+              value={server.name}
+              onChangeText={(v) => patchOllamaServer(index, { name: v })}
+            />
+            <Pressable
+              style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
+              onPress={() => setActiveSubPage("ollamaserversettings")}
+            >
+              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <Text style={styles.navLabel}>{t("settings.server.settings")}</Text>
+            </Pressable>
+          </Group>
+
+          {/* reconnect only while offline */}
+          {!connected && (
+            <Group>
+              <ActionButton
+                icon={reconnectIcon}
+                label={ollamaModelsLoading ? t("settings.ollama.connecting") : t("settings.ollama.reconnect")}
+                disabled={ollamaModelsLoading || url.length === 0}
+                onPress={() => reconnectOllamaServer(index)}
+                style={styles.mcpGroupRow}
+              />
+            </Group>
+          )}
+        </View>
+
+        <View style={styles.settingRowVertical}>
+          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>
+            {ollamaModels.length > 0 ? t("settings.ollama.modelsCount", { count: ollamaModels.length }) : t("settings.ollama.models")}
+          </Text>
+          {ollamaModels.length > 0 ? (
+            <Group>
+              {ollamaModels.map((model) => (
+                <View key={model} style={[styles.navItem, styles.mcpGroupRow]}>
+                  <Text style={styles.navLabel} numberOfLines={1}>{model}</Text>
+                </View>
+              ))}
+            </Group>
+          ) : (
+            <Text style={styles.helpText}>
+              {ollamaModelsLoading ? t("settings.ollama.modelsLoading") : t("settings.ollama.noModels")}
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.settingRowVertical}>
+          <Group style={styles.dangerGroup}>
+            <ActionButton
+              icon={binIcon}
+              label={t("settings.ollama.remove.action")}
+              variant="highlight"
+              onPress={() => removeOllamaServer(index)}
+            />
+          </Group>
+        </View>
+      </View>
+    );
+  };
+
+  //ollama server settings subpage
+  const renderOllamaServerSettingsSubPage = () => {
+    const index = ollamaDetailIndex ?? -1;
+    const server = ollamaServers[index];
+    if (!server) return renderOllamaSubPage();
+
+    return (
+      <View style={styles.subPageContainer}>
+        {renderSubPageHeader(t("settings.server.settings"), "ollamaserver")}
+
+        <View style={styles.settingRowVertical}>
+          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.server.link")}</Text>
+          <Group>
+            <TextInputField
+              icon={linkIcon}
+              placeholder={t("settings.service.serverLink")}
+              autoCapitalize="none"
+              value={server.url}
+              onChangeText={(v) => patchOllamaServer(index, { url: v })}
+              onBlur={() => handleOllamaUrlBlur(index)}
+              rightIcon={serverErrors[server.url.trim()] ? errorIcon : undefined}
+              onRightIconPress={() => showAlert(
+                t("settings.ollama.unreachableTitle"),
+                t("settings.ollama.unreachableInfo"),
+                undefined,
+                { image: ollamaErrorImage, messageAlign: "left" },
+              )}
+            />
+          </Group>
+        </View>
+
+        <View style={styles.settingRowVertical}>
+          <Text style={styles.settingLabel}>{t("settings.ollama.contextLength")}</Text>
+          <Text style={[styles.helpText, { marginBottom: 12 }]}>{t("settings.ollama.contextHelp")}</Text>
+          <Group>
+            {advancedMode ? (
+              <TextInputField
+                icon={messageIcon}
+                placeholder="8192"
+                value={ollamaContextDraft}
+                onChangeText={(v) => setOllamaServerContext(index, v)}
+                keyboardType="numeric"
+              />
+            ) : (
+              <Slider
+                icon={messageIcon}
+                options={ollamaContextLengthOptions}
+                selectedValue={String(serverContextLength(server))}
+                onSelect={(v) => setOllamaServerContext(index, v)}
+              />
+            )}
+          </Group>
+        </View>
+
+        <View style={styles.settingRowVertical}>
+          <Text style={styles.settingLabel}>{t("settings.ollama.keepAlive")}</Text>
+          <Text style={[styles.helpText, { marginBottom: 12 }]}>
+            {advancedMode ? t("settings.ollama.keepAliveHelpAdvanced") : t("settings.ollama.keepAliveHelp")}
+          </Text>
+          <Group>
+            {advancedMode ? (
+              <TextInputField
+                icon={timeIcon}
+                placeholder="300"
+                value={ollamaKeepAliveDraft}
+                onChangeText={(v) => setOllamaServerKeepAlive(index, v)}
+                keyboardType="numeric"
+              />
+            ) : (
+              <Slider
+                icon={timeIcon}
+                options={ollamaKeepAliveOptions}
+                selectedValue={String(serverKeepAlive(server))}
+                onSelect={(v) => setOllamaServerKeepAlive(index, v)}
+              />
+            )}
+          </Group>
+        </View>
+      </View>
+    );
+  };
 
   // confidentiality subpage content
   const renderConfidentialitySubPage = () => (
@@ -2191,13 +2531,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           {t("settings.tools.mcp.help")}
         </Text>
 
-        {(mcpServers.length > 0 || mcpDrafts.length > 0) && (
+        {mcpServers.length > 0 && (
           <Group style={styles.groupSpacingTight}>
             {mcpServers.map((server) => (
               <Pressable
                 key={server.id}
                 style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
-                onPress={() => { setMcpDetailId(server.id); setMcpAdvancedOpen(false); setActiveSubPage("mcpserver"); }}
+                onPress={() => { setMcpDetailId(server.id); setActiveSubPage("mcpserver"); }}
               >
                 <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
                 <Text style={styles.navLabel}>{server.name}</Text>
@@ -2216,23 +2556,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 )}
               </Pressable>
             ))}
-            {mcpDrafts.map((draft, index) => (
-              <TextInputField
-                key={index}
-                icon={penPlaceholderIcon}
-                autoCapitalize="none"
-                autoCorrect={false}
-                placeholder={t("settings.mcp.draftPlaceholder")}
-                value={draft}
-                onChangeText={(v) => setMcpDrafts(prev => prev.map((d, i) => (i === index ? v : d)))}
-                onBlur={() => handleMcpDraftBlur(index)}
-              />
-            ))}
           </Group>
         )}
 
         <Group style={styles.groupSpacing}>
-          <ActionButton icon={addIcon} label={t("settings.mcp.addServer")} onPress={() => setMcpDrafts(prev => [...prev.filter(d => d.trim()), ""])} />
+          <ActionButton icon={addIcon} label={t("settings.server.add")} onPress={() => openServerDraft("mcpserveradd")} />
         </Group>
       </View>
     </View>
@@ -2251,38 +2579,37 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <View style={styles.subPageContainer}>
         {renderSubPageHeader(server.name, "mcpservers")}
 
-        {/* sign-in state speaks through the icon inside the link field instead */}
-        {!mcpNeedsAuth(server.id) && (
-          <View style={styles.settingRowVertical}>
-            <Text style={styles.helpText}>{mcpStatusLabel(server.id)}</Text>
-            {status.error ? (
-              <Text style={[styles.helpText, { marginTop: 6, color: Colors.error }]}>{status.error}</Text>
-            ) : null}
-          </View>
-        )}
+        <View style={styles.settingRowVertical}>
+          <Text style={styles.helpText}>{mcpStatusLabel(server.id)}</Text>
+          {status.error ? (
+            <Text style={[styles.helpText, { marginTop: 6, color: Colors.error }]}>{status.error}</Text>
+          ) : null}
+        </View>
 
         <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.mcp.link")}</Text>
-          <Group>
-            <TextInputField
-              icon={linkIcon}
-              placeholder={t("settings.service.serverLink")}
-              autoCapitalize="none"
-              value={server.url}
-              onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, url: v } : s))}
-              onBlur={() => saveMcpServer(server.id, { url: server.url })}
-              rightIcon={mcpNeedsAuth(server.id) ? infoIcon : undefined}
-              rightIconTint={Colors.textMuted}
-              onRightIconPress={() => showMcpAuthInfo(server.id)}
-            />
-            <ActionButton
-              icon={reconnectIcon}
-              label={busy ? t("settings.mcp.connecting") : t("settings.mcp.reconnect")}
-              disabled={busy || !server.url.trim()}
-              onPress={() => connectMcpServer(server.id)}
-              style={styles.mcpGroupRow}
-            />
+          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{server.name}</Text>
+          <Group style={styles.groupSpacingTight}>
+            <Pressable
+              style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
+              onPress={() => setActiveSubPage("mcpserversettings")}
+            >
+              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <Text style={styles.navLabel}>{t("settings.server.settings")}</Text>
+            </Pressable>
           </Group>
+
+          {/* reconnect only while offline */}
+          {status.state !== "connected" && (
+            <Group>
+              <ActionButton
+                icon={reconnectIcon}
+                label={busy ? t("settings.mcp.connecting") : t("settings.mcp.reconnect")}
+                disabled={busy || !server.url.trim()}
+                onPress={() => connectMcpServer(server.id)}
+                style={styles.mcpGroupRow}
+              />
+            </Group>
+          )}
         </View>
 
         {tools.length > 0 && (
@@ -2314,59 +2641,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         )}
 
         <View style={styles.settingRowVertical}>
-          <Group>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-              onPress={() => setMcpAdvancedOpen((v) => !v)}
-            >
-              <Image source={addIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>{t("settings.mcp.more")}</Text>
-            </Pressable>
-          </Group>
-
-          {mcpAdvancedOpen && (
-            <>
-              <Text style={[styles.helpText, { marginTop: 12, marginBottom: 10 }]}>
-                {t("settings.mcp.headerHelp")}
-              </Text>
-              <Group style={styles.groupSpacingTight}>
-                <TextInputField
-                  icon={penPlaceholderIcon}
-                  placeholder={t("settings.mcp.headerName")}
-                  autoCapitalize="none"
-                  value={server.headerName}
-                  onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, headerName: v } : s))}
-                  onBlur={() => saveMcpServer(server.id, { headerName: server.headerName })}
-                />
-                <TextInputField
-                  icon={penPlaceholderIcon}
-                  placeholder={t("settings.mcp.headerValue")}
-                  autoCapitalize="none"
-                  secureTextEntry
-                  value={mcpHeaderValues[server.id] ?? ""}
-                  onChangeText={(v) => setMcpHeaderValues(prev => ({ ...prev, [server.id]: v }))}
-                  onBlur={() => McpService.setHeaderValue(server.id, mcpHeaderValues[server.id] ?? "")}
-                />
-              </Group>
-
-              <Text style={[styles.helpText, { marginTop: 16, marginBottom: 10 }]}>
-                {t("settings.mcp.clientIdHelp")}
-              </Text>
-              <Group style={styles.groupSpacingTight}>
-                <TextInputField
-                  icon={penPlaceholderIcon}
-                  placeholder={t("settings.mcp.clientId")}
-                  autoCapitalize="none"
-                  value={server.clientId ?? ""}
-                  onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, clientId: v } : s))}
-                  onBlur={() => saveMcpServer(server.id, { clientId: server.clientId ?? "" })}
-                />
-              </Group>
-            </>
-          )}
-        </View>
-
-        <View style={styles.settingRowVertical}>
           <Group style={styles.dangerGroup}>
             <ActionButton
               icon={binIcon}
@@ -2380,6 +2654,71 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     );
   };
 
+  //server settings subpage
+  const renderMcpServerSettingsSubPage = () => {
+    const server = mcpServers.find((s) => s.id === mcpDetailId);
+    if (!server) return renderMcpServersSubPage();
+
+    return (
+      <View style={styles.subPageContainer}>
+        {renderSubPageHeader(t("settings.server.settings"), "mcpserver")}
+
+        <View style={styles.settingRowVertical}>
+          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.server.link")}</Text>
+          <Group>
+            <TextInputField
+              icon={linkIcon}
+              placeholder={t("settings.service.serverLink")}
+              autoCapitalize="none"
+              value={server.url}
+              onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, url: v } : s))}
+              onBlur={() => handleMcpUrlBlur(server.id, server.url)}
+              rightIcon={mcpNeedsAuth(server.id) ? infoIcon : undefined}
+              rightIconTint={Colors.textMuted}
+              onRightIconPress={() => showMcpAuthInfo(server.id)}
+            />
+          </Group>
+        </View>
+
+        <View style={styles.settingRowVertical}>
+          <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.mcp.headerHelp")}</Text>
+          <Group>
+            <TextInputField
+              icon={penPlaceholderIcon}
+              placeholder={t("settings.mcp.headerName")}
+              autoCapitalize="none"
+              value={server.headerName}
+              onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, headerName: v } : s))}
+              onBlur={() => saveMcpServer(server.id, { headerName: server.headerName })}
+            />
+            <TextInputField
+              icon={penPlaceholderIcon}
+              placeholder={t("settings.mcp.headerValue")}
+              autoCapitalize="none"
+              secureTextEntry
+              value={mcpHeaderValues[server.id] ?? ""}
+              onChangeText={(v) => setMcpHeaderValues(prev => ({ ...prev, [server.id]: v }))}
+              onBlur={() => McpService.setHeaderValue(server.id, mcpHeaderValues[server.id] ?? "")}
+            />
+          </Group>
+        </View>
+
+        <View style={styles.settingRowVertical}>
+          <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.mcp.clientIdHelp")}</Text>
+          <Group>
+            <TextInputField
+              icon={penPlaceholderIcon}
+              placeholder={t("settings.mcp.clientId")}
+              autoCapitalize="none"
+              value={server.clientId ?? ""}
+              onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, clientId: v } : s))}
+              onBlur={() => saveMcpServer(server.id, { clientId: server.clientId ?? "" })}
+            />
+          </Group>
+        </View>
+      </View>
+    );
+  };
 
   // widgets subpage content
   const renderWidgetsSubPage = () => (
@@ -2460,6 +2799,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return renderLocalSubPage();
       case "ollama":
         return renderOllamaSubPage();
+      case "ollamaserver":
+        return renderOllamaServerSubPage();
+      case "ollamaserversettings":
+        return renderOllamaServerSettingsSubPage();
+      case "ollamaserveradd":
+        return renderOllamaServerAddSubPage();
       case "confidentiality":
         return renderConfidentialitySubPage();
       case "advanced":
@@ -2476,6 +2821,10 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return renderMcpServersSubPage();
       case "mcpserver":
         return renderMcpServerSubPage();
+      case "mcpserversettings":
+        return renderMcpServerSettingsSubPage();
+      case "mcpserveradd":
+        return renderMcpServerAddSubPage();
       case "sociallinks":
         return renderSocialLinksSubPage();
       case "main":
@@ -2494,17 +2843,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const notificationModal = (
     <>
-      <NotificationModal
-        visible={downloadModalVisible}
-        title={t("modelSelector.download.title")}
-        icon={downloadIcon}
-        message={t("modelSelector.download.message")}
-        onClose={() => setDownloadModalVisible(false)}
-        buttons={[
-          { text: t("common.cancel"), onPress: () => setDownloadModalVisible(false), style: "secondary" },
-          { text: t("modelSelector.download.confirm"), onPress: handleDownloadGemma, style: "primary" },
-        ]}
-      />
       <NotificationModal
         visible={alertModalVisible}
         title={alertConfig.title}

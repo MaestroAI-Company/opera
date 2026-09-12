@@ -10,7 +10,8 @@ import { LocationService } from '../location/LocationService';
 import { Settings } from '../settings/SettingsService';
 import { DEFAULT_OLLAMA_URL, imageToBase64 } from './utils/imageToBase64';
 import { resolveQuickFlow, QuickFlowTarget } from './quickFlow';
-import { BETA_SERVER_URL } from './providers/sources';
+import { activeSourceKey, BETA_SERVER_URL, buildSources, getOllamaTuning, ModelSource } from './providers/sources';
+import { getCachedModels, hydrateModelCache } from './providers/modelCache';
 
 const DEFAULT_URL = DEFAULT_OLLAMA_URL;
 
@@ -132,6 +133,42 @@ class CentralAIModule {
     }
   }
 
+  //cached ollama matches are tried first
+  private async findOllamaSourceForModel(modelName: string, excludeKey?: string): Promise<ModelSource | null> {
+    if (!modelName) return null;
+    await hydrateModelCache();
+    const candidates = buildSources(false)
+      .filter((source) => source.service === 'ollama' && source.key !== excludeKey)
+      .sort((a, b) => Number(getCachedModels(b.key).includes(modelName)) - Number(getCachedModels(a.key).includes(modelName)));
+    for (const source of candidates) {
+      const models = await this.getModelsFor(source.service, source.url);
+      if (models.includes(modelName)) return source;
+    }
+    return null;
+  }
+
+  //persist the switch for both screens
+  private async switchToSource(source: ModelSource): Promise<void> {
+    this.setMode(source.service);
+    if (source.service === 'ollama') {
+      const tuning = getOllamaTuning(source.url);
+      this.configure(source.url, tuning.contextLength, tuning.keepAlive);
+    }
+    await Settings.setMany({ aiService: source.service, ollamaUrl: source.url });
+  }
+
+  //fail over to another source
+  private async failoverIfUnreachable(modelName: string): Promise<void> {
+    const settings = Settings.getCached();
+    if (!modelName || !settings.modelFailover) return;
+    if (settings.aiService !== 'ollama') return;
+    if (await this.isAvailable().catch(() => false)) return;
+    const source = await this.findOllamaSourceForModel(modelName, activeSourceKey(settings.aiService, settings.ollamaUrl));
+    if (!source) return;
+    console.warn(`[AIModule] ollama server ${settings.ollamaUrl} unreachable, ${modelName} moved to ${source.key}`);
+    await this.switchToSource(source);
+  }
+
   async preloadModel(modelName: string): Promise<void> {
     //no provider until settings land
     if (!this.modeConfigured) return;
@@ -145,6 +182,15 @@ class CentralAIModule {
       return provider.downloadService(modelName, onProgress);
     }
     throw new Error('Download service not supported by active provider');
+  }
+
+  //download without switching source
+  async downloadFor(mode: string, ollamaUrl: string | undefined, modelName: string, onProgress?: (progress: number, etaSeconds: number, speedStr: string, sizeStr: string) => void): Promise<void> {
+    const provider = this.providerFor(mode, ollamaUrl);
+    if (!provider?.downloadService) {
+      throw new Error(`Download service not supported by ${mode}`);
+    }
+    return provider.downloadService(modelName, onProgress);
   }
 
   async getModelCapabilities(modelName: string): Promise<string[]> {
@@ -216,6 +262,7 @@ class CentralAIModule {
     options?: { think?: boolean | string },
     onMetrics?: (metrics: MessageMetrics) => void
   ): Promise<void> {
+    await this.failoverIfUnreachable(modelName);
     const provider = this.getActiveProvider();
     const processedMessages = await this.processImages(messages);
     const enhancedPrompt = systemPrompt + (await this.buildContextBlock());
@@ -251,6 +298,7 @@ class CentralAIModule {
     onMetrics?: (metrics: MessageMetrics) => void,
     onSources?: (sources: ToolSource[]) => void
   ): Promise<void> {
+    await this.failoverIfUnreachable(modelName);
     const provider = this.getActiveProvider();
 
     //check if model supports tools

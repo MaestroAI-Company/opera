@@ -21,7 +21,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { Colors } from '../../../constants/theme';
 import { AIModule } from '../../services/ai/AIModule';
-import { migrateModelSources } from '../../services/ai/providers/sources';
+import { getOllamaTuning, migrateModelSources } from '../../services/ai/providers/sources';
 import { buildSystemPrompt } from '../../services/ai/generation/chatGeneration';
 import { GenerationService } from '../../services/ai/generation/GenerationService';
 import { generateSuggestions, Suggestion } from '../../services/ai/generation/suggestions';
@@ -282,7 +282,8 @@ function AssistantOverlay() {
     setAlwaysWhisper(s.alwaysWhisper);
     //store setting for later
     autoStartMicSetting.current = s.autoStartMic ?? true;
-    AIModule.configure(s.ollamaUrl, s.ollamaContextLength, s.ollamaKeepAlive);
+    const tuning = getOllamaTuning(s.ollamaUrl);
+    AIModule.configure(s.ollamaUrl, tuning.contextLength, tuning.keepAlive);
     AIModule.setMode(s.aiService);
     STT.setLanguage(s.whisperLanguage);
   }, []);
@@ -898,8 +899,8 @@ function AssistantOverlay() {
             Settings.set('ollamaUrl', url);
             AIModule.setMode(service);
             if (service === 'ollama') {
-              const cached = Settings.getCached();
-              AIModule.configure(url, cached.ollamaContextLength, cached.ollamaKeepAlive);
+              const tuning = getOllamaTuning(url);
+              AIModule.configure(url, tuning.contextLength, tuning.keepAlive);
             }
           }}
           onModelChange={model => {

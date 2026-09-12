@@ -8,6 +8,7 @@ export type AppSettings = {
   ollamaUrls: string;
   mcpServers: string;
   enabledProviders: string;
+  modelFailover: boolean;
   ollamaModel: string;
   ollamaContextLength: number;
   ollamaKeepAlive: number;
@@ -43,6 +44,7 @@ export const BASE_DEFAULTS: AppSettings = {
   ollamaUrls: '[]',
   mcpServers: '[]',
   enabledProviders: 'local,ollama,beta',
+  modelFailover: true,
   ollamaModel: '',
   ollamaContextLength: 8192,
   ollamaKeepAlive: 300,
@@ -79,6 +81,7 @@ export const BASE_DEFAULTS: AppSettings = {
 
 //text storage needs per-key readers
 const BOOLEAN_KEYS = [
+  'modelFailover',
   'speaker',
   'autoSpeak',
   'alwaysWhisper',

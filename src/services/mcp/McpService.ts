@@ -116,6 +116,30 @@ class McpServiceImpl {
     return { added, skipped: notes };
   }
 
+  //only answering servers are kept
+  async addServer(input: { name: string; url: string; headerName: string; headerValue: string; clientId: string }): Promise<McpServerConfig> {
+    const url = input.url.trim();
+    const server: McpServerConfig = {
+      id: newId(),
+      name: input.name.trim() || labelFromUrl(url),
+      url,
+      headerName: input.headerName.trim(),
+      clientId: input.clientId.trim(),
+    };
+    if (input.headerValue) await setSecret(`${server.id}_header`, input.headerValue);
+    this.servers = [...this.servers, server];
+    await this.persist();
+    await this.connect(server.id);
+    //sign-in counts as an answer
+    const status = this.getStatus(server.id);
+    if (status.state === 'error') {
+      const reason = status.error;
+      await this.removeServer(server.id);
+      throw new Error(reason || 'Connection failed');
+    }
+    return server;
+  }
+
   async updateServer(id: string, patch: Partial<McpServerConfig>): Promise<void> {
     this.servers = this.servers.map((s) => (s.id === id ? { ...s, ...patch } : s));
     await this.persist();

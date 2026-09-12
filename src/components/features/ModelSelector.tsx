@@ -23,7 +23,7 @@ import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constan
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { AIModule } from "../../services/ai/AIModule";
 import { getAICoreModelLabel } from "../../services/ai/providers/AICoreProvider";
-import { getCachedModels, hydrateModelCache, setCachedModels } from "../../services/ai/providers/modelCache";
+import { getCachedModels, getLastModel, hydrateModelCache, setCachedModels, setLastModel } from "../../services/ai/providers/modelCache";
 import { buildSources, ModelSource } from "../../services/ai/providers/sources";
 import { AppEvents } from "../../services/events";
 import Group from "../ui/Group";
@@ -175,6 +175,8 @@ export function ModelSelectorDrawer({
   const [loading, setLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  //whole percents keep the repaints down
+  const [downloadPercent, setDownloadPercent] = useState(0);
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
   const [localAvailable, setLocalAvailable] = useState(false);
@@ -286,15 +288,21 @@ export function ModelSelectorDrawer({
 
   useEffect(() => {
     //only the active source may correct the selected model
-    if (!isBrowsingActive) return;
+    if (!isBrowsingActive || !browsedSource) return;
+    //rows stay with the browsed source
+    if (shownKey.current !== browsedSource.key) return;
     if (models.length > 0) {
       if (!selectedModel || !models.includes(selectedModel)) {
-        onModelChange(models[0]);
+        const last = getLastModel(browsedSource.key);
+        onModelChange(models.includes(last) ? last : models[0]);
+      } else {
+        setLastModel(browsedSource.key, selectedModel);
       }
     } else if (hasFetched && !loading && selectedModel) {
       onModelChange("");
     }
-  }, [models, selectedModel, loading, hasFetched, isBrowsingActive, onModelChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the source key stands for browsedSource
+  }, [models, selectedModel, loading, hasFetched, isBrowsingActive, onModelChange, browsedSource?.key]);
 
   useEffect(() => {
     if (selectedModel) {
@@ -303,10 +311,13 @@ export function ModelSelectorDrawer({
   }, [selectedModel, aiService]);
 
   const handlePullModel = () => {
+    const source = browsedSource;
+    if (!source) return;
     setDownloadModalVisible(false);
     setIsDownloading(true);
-    AIModule.downloadService("gemma4")
-      .then(() => fetchModels(browsedSource))
+    setDownloadPercent(0);
+    AIModule.downloadFor(source.service, source.url, "gemma4", (progress) => setDownloadPercent(Math.round(progress * 100)))
+      .then(() => fetchModels(source))
       .catch(console.error)
       .finally(() => setIsDownloading(false));
   };
@@ -314,7 +325,17 @@ export function ModelSelectorDrawer({
   const handleSelectModel = (model: string) => {
     const source = browsedSource;
     if (source && !isBrowsingActive) onServiceChange(source.service, source.url);
+    if (source) setLastModel(source.key, model);
     onModelChange(model);
+  };
+
+  //tab switch restores its last model
+  const handleSelectSource = (source: ModelSource) => {
+    setBrowsedKey(source.key);
+    if (matchesActive(source)) return;
+    onServiceChange(source.service, source.url);
+    const last = getLastModel(source.key);
+    if (last) onModelChange(last);
   };
 
   //friendly label for aicore variants
@@ -456,7 +477,7 @@ export function ModelSelectorDrawer({
           return (
             <Pressable
               key={source.key}
-              onPress={() => setBrowsedKey(source.key)}
+              onPress={() => handleSelectSource(source)}
               style={({ pressed, hovered }) => [styles.tab, (pressed || hovered) && { backgroundColor: Colors.overlaySubtle }]}
             >
               <Text style={[styles.tabText, active && styles.tabTextActive]} numberOfLines={1}>
@@ -486,14 +507,15 @@ export function ModelSelectorDrawer({
               <Text style={styles.emptyText}>
                 {isAvailable ? t("modelSelector.noModels") : t("modelSelector.unreachable")}
               </Text>
-              {isAvailable && isBrowsingActive && (
+              {isAvailable && browsedSource?.service === "ollama" && (
                 <Pressable
+                  disabled={isDownloading}
                   onPress={() => setDownloadModalVisible(true)}
                   style={({ pressed, hovered }) => [styles.downloadOption, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
                 >
                   <Image source={downloadIcon} style={styles.downloadIcon} />
                   <Text style={styles.downloadText}>
-                    {isDownloading ? t("modelSelector.downloading") : "gemma4"}
+                    {isDownloading ? `${t("modelSelector.downloading")} ${downloadPercent}%` : "gemma4"}
                   </Text>
                 </Pressable>
               )}

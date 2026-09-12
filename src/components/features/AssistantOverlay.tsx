@@ -21,6 +21,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { Colors } from '../../../constants/theme';
 import { AIModule } from '../../services/ai/AIModule';
+import { migrateModelSources } from '../../services/ai/providers/sources';
 import { buildSystemPrompt } from '../../services/ai/generation/chatGeneration';
 import { GenerationService } from '../../services/ai/generation/GenerationService';
 import { generateSuggestions, Suggestion } from '../../services/ai/generation/suggestions';
@@ -269,7 +270,8 @@ function AssistantOverlay() {
   }, [responseOpacity, clearSelection]);
 
   //push db settings into module and local state
-  const applySettings = useCallback((s: AppSettings) => {
+  const applySettings = useCallback((loaded: AppSettings) => {
+    const s = migrateModelSources(loaded);
     setUserInstruction(s.instruction);
     if (s.ollamaModel) {
       setSelectedModel(s.ollamaModel);
@@ -387,6 +389,15 @@ function AssistantOverlay() {
     });
     return () => sub.remove();
   }, [handOffGeneration]);
+
+  //text selection hides the chrome like the lasso
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      AppEvents.textSelectionDrag,
+      (e: { dragging: boolean }) => setIsDrawingSelection(e.dragging)
+    );
+    return () => sub.remove();
+  }, []);
 
   //reopen via same activity instance
   useEffect(() => {

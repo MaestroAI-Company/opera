@@ -4,6 +4,7 @@ import { IWidget } from '../../services/widgets/WidgetManager';
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from '../../../constants/theme';
 import { useThemedStyles } from '../../hooks/useTheme';
 import { useResponsive } from '../../hooks/useResponsive';
+import WidgetTouchArea from './WidgetTouchArea';
 
 export interface MapsWidgetData {
   label?: string;
@@ -88,19 +89,11 @@ export const MapsWidget: IWidget<MapsWidgetData> = {
     const caption = data.label || data.title || data.location;
 
     return (
-      <View
-        style={styles.container}
-        //prevent parent gestures from intercepting
-        onStartShouldSetResponder={() => true}
-        onMoveShouldSetResponder={() => true}
-        onStartShouldSetResponderCapture={() => true}
-        onMoveShouldSetResponderCapture={() => true}
-        onResponderTerminationRequest={() => false}
-      >
+      <View style={styles.container}>
         {!!caption && (
           <Text style={styles.caption} numberOfLines={1}>{caption}</Text>
         )}
-        <View style={[styles.mapWrapper, isDesktop && styles.mapWrapperLarge]}>
+        <WidgetTouchArea style={[styles.mapWrapper, isDesktop && styles.mapWrapperLarge]}>
           {Platform.OS === 'web' ? (
             <iframe
               srcDoc={html}
@@ -118,7 +111,7 @@ export const MapsWidget: IWidget<MapsWidgetData> = {
               overScrollMode="never"
             />
           )}
-        </View>
+        </WidgetTouchArea>
       </View>
     );
   }

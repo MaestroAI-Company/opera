@@ -10,7 +10,7 @@ import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, ImageSource
 import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import { getLocalProviderLabel } from "../../services/ai/providers/LocalProvider";
-import { buildSources, getEnabledProviders, getOllamaUrls, serializeOllamaUrls, serializeProviders } from "../../services/ai/providers/sources";
+import { BETA_PROVIDER_ID, BETA_SERVER_URL, buildSources, getEnabledProviders, getOllamaUrls, serializeOllamaUrls, serializeProviders } from "../../services/ai/providers/sources";
 import { parseQuickFlowOptionId, quickFlowOptionId } from "../../services/ai/quickFlow";
 import { isDefaultAssistant, openAssistantSettings } from "../../services/assistant/DefaultAssistant";
 import { ITool } from "../../services/ai/tools/ITool";
@@ -112,7 +112,7 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "advanced" | "assistantoverlay" | "service" | "confidentiality" | "reports" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "mcpservers" | "mcpserver" | "sociallinks";
+type SubPage = "main" | "general" | "advanced" | "assistantoverlay" | "service" | "beta" | "local" | "ollama" | "confidentiality" | "reports" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "mcpservers" | "mcpserver" | "sociallinks";
 
 //page a subpage steps back to, followed by the header arrow and the android back button
 const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
@@ -121,6 +121,9 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   advanced: "main",
   assistantoverlay: "main",
   service: "main",
+  beta: "service",
+  local: "service",
+  ollama: "service",
   confidentiality: "main",
   reports: "main",
   tools: "main",
@@ -1663,6 +1666,29 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.service.title"))}
 
+      {!!BETA_SERVER_URL && (
+        <View style={styles.settingRowVertical}>
+          <View style={styles.toggleRow}>
+            <Text style={styles.settingLabel}>Opera Beta server</Text>
+            <Toggle
+              checked={enabledProviders.includes(BETA_PROVIDER_ID)}
+              onToggle={(v) => setProviderEnabled(BETA_PROVIDER_ID, v)}
+            />
+          </View>
+          <Text style={[styles.helpText, { marginBottom: 12 }]}>
+            A test server we host so you can try Opera without setting one up.
+          </Text>
+
+          <Group>
+            <ActionButton
+              icon={arrowIcon}
+              label="See Opera Beta details"
+              onPress={() => setActiveSubPage("beta")}
+            />
+          </Group>
+        </View>
+      )}
+
       {localAvailable && (
         <View style={styles.settingRowVertical}>
           <View style={styles.toggleRow}>
@@ -1672,7 +1698,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               onToggle={(v) => setProviderEnabled("local", v)}
             />
           </View>
-          <Text style={styles.helpText}>{t("settings.service.localHelp")}</Text>
+          <Text style={[styles.helpText, { marginBottom: 12 }]}>{t("settings.service.localHelp")}</Text>
+
+          <Group>
+            <ActionButton
+              icon={arrowIcon}
+              label={`See ${getLocalProviderLabel()} details`}
+              onPress={() => setActiveSubPage("local")}
+            />
+          </Group>
         </View>
       )}
 
@@ -1700,87 +1734,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             />
           </View>
         </View>
-        <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.service.ollamaHelp")}</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>{t("settings.service.ollamaHelp")}</Text>
 
-        {enabledProviders.includes("ollama") && (
-          <>
-            {ollamaUrls.length > 0 && (
-              <Group style={styles.groupSpacingTight}>
-                {ollamaUrls.map((url, index) => (
-                  <View key={index}>
-                    <TextInputField
-                      icon={linkIcon}
-                      placeholder={t("settings.service.serverLink")}
-                      value={url}
-                      onChangeText={(v) => setOllamaUrlAt(index, v)}
-                      onBlur={() => handleOllamaUrlBlur(index)}
-                      rightIcon={serverErrors[url.trim()] ? errorIcon : undefined}
-                      onRightIconPress={() => showAlert(
-                        t("settings.service.unreachable.title"),
-                        t("settings.service.unreachable.message"),
-                        undefined,
-                        { image: ollamaErrorImage, messageAlign: "left" },
-                      )}
-                    />
-                  </View>
-                ))}
-              </Group>
-            )}
-
-            <Group style={styles.groupSpacing}>
-              <ActionButton
-                icon={addIcon}
-                label={t("settings.service.addServer")}
-                onPress={() => saveOllamaUrls([...ollamaUrls, ""])}
-              />
-            </Group>
-
-            <Text style={[styles.settingLabel, { marginTop: 20 }]}>{t("settings.service.contextLength")}</Text>
-            <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.service.contextLengthHelp")}</Text>
-            <Group>
-              {advancedMode ? (
-                <TextInputField
-                  icon={messageIcon}
-                  placeholder="8192"
-                  value={ollamaContextLength}
-                  onChangeText={setOllamaContextLength}
-                  keyboardType="numeric"
-                />
-              ) : (
-                <Slider
-                  icon={messageIcon}
-                  options={ollamaContextLengthOptions}
-                  selectedValue={String(effectiveContextLength())}
-                  onSelect={setOllamaContextLength}
-                />
-              )}
-            </Group>
-            <Text style={[styles.settingLabel, { marginTop: 20 }]}>{t("settings.service.keepAlive")}</Text>
-            <Text style={[styles.helpText, { marginBottom: 10 }]}>
-              {advancedMode
-                ? t("settings.service.keepAliveHelpAdvanced")
-                : t("settings.service.keepAliveHelp")}
-            </Text>
-            <Group>
-              {advancedMode ? (
-                <TextInputField
-                  icon={timeIcon}
-                  placeholder="300"
-                  value={ollamaKeepAlive}
-                  onChangeText={setOllamaKeepAlive}
-                  keyboardType="numeric"
-                />
-              ) : (
-                <Slider
-                  icon={timeIcon}
-                  options={ollamaKeepAliveOptions}
-                  selectedValue={ollamaKeepAlive}
-                  onSelect={setOllamaKeepAlive}
-                />
-              )}
-            </Group>
-          </>
-        )}
+        <Group>
+          <ActionButton
+            icon={arrowIcon}
+            label="See Ollama settings"
+            onPress={() => setActiveSubPage("ollama")}
+          />
+        </Group>
       </View>
 
       {Platform.OS === "web" && (
@@ -1810,6 +1772,135 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           </View>
         </>
       )}
+    </View>
+  );
+
+  //beta provider info subpage
+  const renderBetaSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("Opera Beta", "service")}
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Opera Beta server</Text>
+        <Text style={[styles.helpText, { marginTop: 8 }]}>
+          A test server we host so you can try Opera without setting one up. Everything needed to answer goes through it: your messages, your attachments, whatever a tool reads for you (contacts, calendar, screen text), and your IP address.
+        </Text>
+        <Text style={[styles.helpText, { marginTop: 6 }]}>
+          We do not read any of it, we do not keep it, and we will never use it for anything. The server is shut down and wiped at the end of the Play Store beta.
+        </Text>
+        <Text style={[styles.helpText, { marginTop: 6 }]}>
+          It is there for testing only. For everyday use, set up your own Ollama server and nothing leaves your network.
+        </Text>
+      </View>
+    </View>
+  );
+
+  //local provider info subpage
+  const renderLocalSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader(getLocalProviderLabel(), "service")}
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>{getLocalProviderLabel()}</Text>
+        <Text style={[styles.helpText, { marginTop: 8 }]}>
+          Runs the local model directly on this device. No server needed.
+        </Text>
+        <Text style={[styles.helpText, { marginTop: 6 }]}>
+          Your prompts and messages are processed entirely on your hardware and never leave your device.
+        </Text>
+      </View>
+    </View>
+  );
+
+  //ollama provider settings subpage
+  const renderOllamaSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader("Ollama", "service")}
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Ollama servers</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>Add your Ollama server links to connect Opera to them.</Text>
+
+        {ollamaUrls.length > 0 && (
+          <Group style={styles.groupSpacingTight}>
+            {ollamaUrls.map((url, index) => (
+              <TextInputField
+                key={index}
+                icon={linkIcon}
+                placeholder="server link"
+                value={url}
+                onChangeText={(v) => setOllamaUrlAt(index, v)}
+                onBlur={() => handleOllamaUrlBlur(index)}
+                rightIcon={serverErrors[url.trim()] ? errorIcon : undefined}
+                onRightIconPress={() => showAlert(
+                  "Server unreachable",
+                  "This server could not be reached.\n\n- Check that the server is running.\n- Check the server's network connection.\n- Make sure the URL and port are correct.",
+                  undefined,
+                  { image: ollamaErrorImage, messageAlign: "left" },
+                )}
+              />
+            ))}
+          </Group>
+        )}
+
+        <Group>
+          <ActionButton
+            icon={addIcon}
+            label="Add server link"
+            onPress={() => saveOllamaUrls([...ollamaUrls, ""])}
+          />
+        </Group>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Context Length</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>Maximum number of tokens the model can use.</Text>
+        <Group>
+          {advancedMode ? (
+            <TextInputField
+              icon={messageIcon}
+              placeholder="8192"
+              value={ollamaContextLength}
+              onChangeText={setOllamaContextLength}
+              keyboardType="numeric"
+            />
+          ) : (
+            <Slider
+              icon={messageIcon}
+              options={ollamaContextLengthOptions}
+              selectedValue={String(effectiveContextLength())}
+              onSelect={setOllamaContextLength}
+            />
+          )}
+        </Group>
+      </View>
+
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>Model Keep Alive</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>
+          {advancedMode
+            ? "How long the model stays loaded in memory after a request, in seconds. Use -1 to keep it loaded forever."
+            : "How long the model stays loaded in memory after a request."}
+        </Text>
+        <Group>
+          {advancedMode ? (
+            <TextInputField
+              icon={timeIcon}
+              placeholder="300"
+              value={ollamaKeepAlive}
+              onChangeText={setOllamaKeepAlive}
+              keyboardType="numeric"
+            />
+          ) : (
+            <Slider
+              icon={timeIcon}
+              options={ollamaKeepAliveOptions}
+              selectedValue={ollamaKeepAlive}
+              onSelect={setOllamaKeepAlive}
+            />
+          )}
+        </Group>
+      </View>
     </View>
   );
 
@@ -2363,6 +2454,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return renderAssistantOverlaySubPage();
       case "service":
         return renderServiceSubPage();
+      case "beta":
+        return renderBetaSubPage();
+      case "local":
+        return renderLocalSubPage();
+      case "ollama":
+        return renderOllamaSubPage();
       case "confidentiality":
         return renderConfidentialitySubPage();
       case "advanced":

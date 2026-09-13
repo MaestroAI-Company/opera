@@ -219,6 +219,7 @@ export default function ConversationsDrawer({
             <>
               <IconButton
                 icon={shareIcon}
+                label={t("common.share")}
                 onPress={() => onShareConversation?.(conv)}
                 size={22}
                 tintColor={Colors.textOnPrimary}
@@ -227,6 +228,7 @@ export default function ConversationsDrawer({
               />
               <IconButton
                 icon={conv.pinned ? unpinIcon : pinIcon}
+                label={conv.pinned ? t("common.unpin") : t("common.pin")}
                 onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
                 size={22}
                 tintColor={Colors.textOnPrimary}
@@ -235,6 +237,7 @@ export default function ConversationsDrawer({
               />
               <IconButton
                 icon={deleteIcon}
+                label={t("common.delete")}
                 onPress={() => setDeleteConfirmId(conv.id)}
                 size={22}
                 tintColor={Colors.textOnPrimary}
@@ -308,6 +311,7 @@ export default function ConversationsDrawer({
                     <>
                       <IconButton
                         icon={shareIcon}
+                        label={t("common.share")}
                         onPress={() => onShareConversation?.(conv)}
                         size={22}
                         tintColor={Colors.textOnPrimary}
@@ -316,6 +320,7 @@ export default function ConversationsDrawer({
                       />
                       <IconButton
                         icon={conv.pinned ? unpinIcon : pinIcon}
+                        label={conv.pinned ? t("common.unpin") : t("common.pin")}
                         onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
                         size={22}
                         tintColor={Colors.textOnPrimary}
@@ -324,6 +329,7 @@ export default function ConversationsDrawer({
                       />
                       <IconButton
                         icon={deleteIcon}
+                        label={t("common.delete")}
                         onPress={() => setDeleteConfirmId(conv.id)}
                         size={22}
                         tintColor={Colors.textOnPrimary}

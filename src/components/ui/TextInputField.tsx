@@ -2,6 +2,7 @@ import { FontSizes, Fonts, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { Image, ImageSourcePropType, Pressable, StyleProp, StyleSheet, TextInput, TextInputProps, ViewStyle } from "react-native";
 import { useRef, useState } from "react";
+import { useT } from "../../i18n";
 import IconButton from "./IconButton";
 
 interface TextInputFieldProps extends TextInputProps {
@@ -9,12 +10,14 @@ interface TextInputFieldProps extends TextInputProps {
   containerStyle?: StyleProp<ViewStyle>;
   rightIcon?: ImageSourcePropType;
   rightIconTint?: string;
+  rightIconLabel?: string;
   onRightIconPress?: () => void;
 }
 
-export default function TextInputField({ icon, style, containerStyle, onFocus, onBlur, rightIcon, rightIconTint, onRightIconPress, ...props }: TextInputFieldProps) {
+export default function TextInputField({ icon, style, containerStyle, onFocus, onBlur, rightIcon, rightIconTint, rightIconLabel, onRightIconPress, ...props }: TextInputFieldProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const inputRef = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
 
@@ -35,6 +38,7 @@ export default function TextInputField({ icon, style, containerStyle, onFocus, o
       {rightIcon && (
         <IconButton
           icon={rightIcon}
+          label={rightIconLabel ?? t("common.clear")}
           onPress={onRightIconPress}
           size={22}
           tintColor={rightIconTint ?? Colors.error}

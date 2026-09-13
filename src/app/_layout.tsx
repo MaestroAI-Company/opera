@@ -13,6 +13,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import SiteHead from "../components/SiteHead";
 import SplashScreenComponent from "../components/ui/SplashScreen";
 import TauriTitleBar from "../components/features/TauriTitleBar";
+import { IconLabelProvider } from "../components/ui/IconLabel";
 import { Radius } from "../../constants/theme";
 import { initI18n } from "../i18n";
 import { initTheme, useIsDark } from "../hooks/useTheme";
@@ -118,9 +119,11 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <KeyboardProvider>
-        <TauriTitleBar />
-        <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
-        <StatusBar style={isDark ? "light" : "dark"} />
+        <IconLabelProvider>
+          <TauriTitleBar />
+          <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
+          <StatusBar style={isDark ? "light" : "dark"} />
+        </IconLabelProvider>
       </KeyboardProvider>
     </GestureHandlerRootView>
   );

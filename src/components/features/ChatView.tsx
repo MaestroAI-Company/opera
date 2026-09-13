@@ -312,6 +312,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               {speakerEnabled && (
                 <IconButton
                   icon={speakerIcon}
+                  label={isSpeaking ? t("common.stop") : t("common.listen")}
                   onPress={() => onSpeak?.(item)}
                   containerSize={32}
                   pressedColor={Colors.surfacePressed}
@@ -320,6 +321,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               )}
               <IconButton
                 icon={reloadIcon}
+                label={t("common.regenerate")}
                 onPress={() => onRegenerate?.(item.id)}
                 disabled={isChatGenerating}
                 containerSize={32}
@@ -328,6 +330,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               />
               <IconButton
                 icon={copyIcon}
+                label={t("common.copy")}
                 onPress={() => copyToClipboard(item.content, false)}
                 onLongPress={() => copyToClipboard(item.content, true)}
                 delayLongPress={500}
@@ -338,6 +341,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               {!!onOpenInApp && (
                 <IconButton
                   icon={chatIcon}
+                  label={t("common.openInApp")}
                   onPress={() => onOpenInApp(item)}
                   containerSize={32}
                   pressedColor={Colors.surfacePressed}
@@ -347,6 +351,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               {showMetrics && (
                 <IconButton
                   icon={infoIcon}
+                  label={t("common.details")}
                   onPress={() => setShowDetails(prev => !prev)}
                   containerSize={32}
                   pressedColor={Colors.surfacePressed}

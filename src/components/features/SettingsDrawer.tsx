@@ -81,6 +81,7 @@ const exportIcon = require("../../../assets/icons/export.png");
 const messageIcon = require("../../../assets/icons/message.png");
 const timeIcon = require("../../../assets/icons/time.png");
 const errorIcon = require("../../../assets/icons/error.png");
+const validIcon = require("../../../assets/icons/valid.png");
 const ollamaErrorImage = require("../../../assets/images/ImageCard/OllamaError.png");
 const ollamaInfoImage = require("../../../assets/images/ImageCard/OllamaInfo.png");
 const questionIcon = require("../../../assets/icons/question.png");
@@ -111,7 +112,7 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "advanced" | "assistantoverlay" | "service" | "beta" | "local" | "ollama" | "ollamaserver" | "ollamaserversettings" | "ollamaserveradd" | "confidentiality" | "reports" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "mcpservers" | "mcpserver" | "mcpserversettings" | "mcpserveradd" | "sociallinks";
+type SubPage = "main" | "general" | "advanced" | "assistantoverlay" | "service" | "beta" | "local" | "ollama" | "ollamaserver" | "ollamaserveradd" | "confidentiality" | "reports" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "mcpservers" | "mcpserver" | "mcpserversettings" | "mcpserveradd" | "sociallinks";
 
 //page a subpage steps back to, followed by the header arrow and the android back button
 const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
@@ -124,7 +125,6 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   local: "service",
   ollama: "service",
   ollamaserver: "ollama",
-  ollamaserversettings: "ollamaserver",
   ollamaserveradd: "ollama",
   confidentiality: "main",
   reports: "main",
@@ -1815,6 +1815,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           <View style={styles.toggleRight}>
             <IconButton
               icon={questionIcon}
+              label={t("common.info")}
               size={22}
               tintColor={Colors.textMuted}
               containerSize={32}
@@ -1921,17 +1922,44 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
         {ollamaServers.length > 0 && (
           <Group style={styles.groupSpacingTight}>
-            {ollamaServers.map((server, index) => (
-              <Pressable
-                key={index}
-                style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
-                onPress={() => openOllamaServer(index)}
-              >
-                <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-                <Text style={styles.navLabel}>{ollamaServerLabel(server)}</Text>
-                <Text style={styles.navStatus}>{ollamaStatusLabel(server)}</Text>
-              </Pressable>
-            ))}
+            {ollamaServers.map((server, index) => {
+              const url = server.url.trim();
+              const connected = url.length > 0 && serverErrors[url] === false;
+              return (
+                <Pressable
+                  key={index}
+                  style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
+                  onPress={() => openOllamaServer(index)}
+                >
+                  <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+                  <Text style={styles.navLabel}>{ollamaServerLabel(server)}</Text>
+                  <IconButton
+                    icon={connected ? validIcon : errorIcon}
+                    label={connected ? t("common.statusOk") : t("common.statusError")}
+                    size={20}
+                    tintColor={connected ? Colors.textPrimary : Colors.error}
+                    containerSize={32}
+                    pressedColor={Colors.surfacePressed}
+                    style={styles.navStatusIcon}
+                    onPress={() => {
+                      if (!connected) {
+                        showAlert(
+                          t("settings.ollama.unreachableTitle"),
+                          t("settings.ollama.unreachableInfo"),
+                          undefined,
+                          { image: ollamaErrorImage, messageAlign: "left" },
+                        );
+                      } else {
+                        showAlert(
+                          ollamaServerLabel(server),
+                          t("settings.ollama.connected"),
+                        );
+                      }
+                    }}
+                  />
+                </Pressable>
+              );
+            })}
           </Group>
         )}
 
@@ -2024,10 +2052,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       </View>
 
       <View style={styles.settingRowVertical}>
-        <Group>
+        <Group style={[styles.highlightGroup, (serverDraftBusy || !serverDraft.url.trim()) && styles.highlightGroupDisabled]}>
           <ActionButton
             icon={addIcon}
             label={serverDraftBusy ? t("settings.server.checking") : t("settings.server.add")}
+            variant="highlight"
             disabled={serverDraftBusy || !serverDraft.url.trim()}
             onPress={submitMcpDraft}
           />
@@ -2069,10 +2098,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       </View>
 
       <View style={styles.settingRowVertical}>
-        <Group>
+        <Group style={[styles.highlightGroup, (serverDraftBusy || !serverDraft.url.trim()) && styles.highlightGroupDisabled]}>
           <ActionButton
             icon={addIcon}
             label={serverDraftBusy ? t("settings.server.checking") : t("settings.server.add")}
+            variant="highlight"
             disabled={serverDraftBusy || !serverDraft.url.trim()}
             onPress={submitOllamaDraft}
           />
@@ -2099,78 +2129,16 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </View>
 
         <View style={styles.settingRowVertical}>
-          <Group style={styles.groupSpacingTight}>
+          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.server.name")}</Text>
+          <Group>
             <TextInputField
               icon={penPlaceholderIcon}
               placeholder={t("settings.server.namePlaceholder")}
               value={server.name}
               onChangeText={(v) => patchOllamaServer(index, { name: v })}
             />
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
-              onPress={() => setActiveSubPage("ollamaserversettings")}
-            >
-              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>{t("settings.server.settings")}</Text>
-            </Pressable>
-          </Group>
-
-          {/* reconnect only while offline */}
-          {!connected && (
-            <Group>
-              <ActionButton
-                icon={reconnectIcon}
-                label={ollamaModelsLoading ? t("settings.ollama.connecting") : t("settings.ollama.reconnect")}
-                disabled={ollamaModelsLoading || url.length === 0}
-                onPress={() => reconnectOllamaServer(index)}
-                style={styles.mcpGroupRow}
-              />
-            </Group>
-          )}
-        </View>
-
-        <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>
-            {ollamaModels.length > 0 ? t("settings.ollama.modelsCount", { count: ollamaModels.length }) : t("settings.ollama.models")}
-          </Text>
-          {ollamaModels.length > 0 ? (
-            <Group>
-              {ollamaModels.map((model) => (
-                <View key={model} style={[styles.navItem, styles.mcpGroupRow]}>
-                  <Text style={styles.navLabel} numberOfLines={1}>{model}</Text>
-                </View>
-              ))}
-            </Group>
-          ) : (
-            <Text style={styles.helpText}>
-              {ollamaModelsLoading ? t("settings.ollama.modelsLoading") : t("settings.ollama.noModels")}
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.settingRowVertical}>
-          <Group style={styles.dangerGroup}>
-            <ActionButton
-              icon={binIcon}
-              label={t("settings.ollama.remove.action")}
-              variant="highlight"
-              onPress={() => removeOllamaServer(index)}
-            />
           </Group>
         </View>
-      </View>
-    );
-  };
-
-  //ollama server settings subpage
-  const renderOllamaServerSettingsSubPage = () => {
-    const index = ollamaDetailIndex ?? -1;
-    const server = ollamaServers[index];
-    if (!server) return renderOllamaSubPage();
-
-    return (
-      <View style={styles.subPageContainer}>
-        {renderSubPageHeader(t("settings.server.settings"), "ollamaserver")}
 
         <View style={styles.settingRowVertical}>
           <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.server.link")}</Text>
@@ -2179,10 +2147,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               icon={linkIcon}
               placeholder={t("settings.service.serverLink")}
               autoCapitalize="none"
+              autoCorrect={false}
               value={server.url}
               onChangeText={(v) => patchOllamaServer(index, { url: v })}
               onBlur={() => handleOllamaUrlBlur(index)}
               rightIcon={serverErrors[server.url.trim()] ? errorIcon : undefined}
+              rightIconLabel={t("common.error")}
               onRightIconPress={() => showAlert(
                 t("settings.ollama.unreachableTitle"),
                 t("settings.ollama.unreachableInfo"),
@@ -2192,6 +2162,21 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             />
           </Group>
         </View>
+
+        {/* reconnect only while offline */}
+        {!connected && (
+          <View style={styles.settingRowVertical}>
+            <Group>
+              <ActionButton
+                icon={reconnectIcon}
+                label={ollamaModelsLoading ? t("settings.ollama.connecting") : t("settings.ollama.reconnect")}
+                disabled={ollamaModelsLoading || url.length === 0}
+                onPress={() => reconnectOllamaServer(index)}
+                style={styles.mcpGroupRow}
+              />
+            </Group>
+          </View>
+        )}
 
         <View style={styles.settingRowVertical}>
           <Text style={styles.settingLabel}>{t("settings.ollama.contextLength")}</Text>
@@ -2238,6 +2223,30 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 onSelect={(v) => setOllamaServerKeepAlive(index, v)}
               />
             )}
+          </Group>
+        </View>
+
+        <View style={styles.settingRowVertical}>
+          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>
+            {ollamaModels.length > 0 ? t("settings.ollama.modelsCount", { count: ollamaModels.length }) : t("settings.ollama.models")}
+          </Text>
+          <Text style={styles.helpText}>
+            {ollamaModels.length > 0
+              ? ollamaModels.join(", ")
+              : ollamaModelsLoading
+              ? t("settings.ollama.modelsLoading")
+              : t("settings.ollama.noModels")}
+          </Text>
+        </View>
+
+        <View style={styles.settingRowVertical}>
+          <Group style={styles.dangerGroup}>
+            <ActionButton
+              icon={binIcon}
+              label={t("settings.ollama.remove.action")}
+              variant="highlight"
+              onPress={() => removeOllamaServer(index)}
+            />
           </Group>
         </View>
       </View>
@@ -2544,6 +2553,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 {mcpNeedsAuth(server.id) ? (
                   <IconButton
                     icon={infoIcon}
+                    label={t("common.info")}
                     size={22}
                     tintColor={Colors.textMuted}
                     containerSize={32}
@@ -2675,6 +2685,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               onBlur={() => handleMcpUrlBlur(server.id, server.url)}
               rightIcon={mcpNeedsAuth(server.id) ? infoIcon : undefined}
               rightIconTint={Colors.textMuted}
+              rightIconLabel={t("common.info")}
               onRightIconPress={() => showMcpAuthInfo(server.id)}
             />
           </Group>
@@ -2801,8 +2812,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return renderOllamaSubPage();
       case "ollamaserver":
         return renderOllamaServerSubPage();
-      case "ollamaserversettings":
-        return renderOllamaServerSettingsSubPage();
       case "ollamaserveradd":
         return renderOllamaServerAddSubPage();
       case "confidentiality":
@@ -3172,6 +3181,13 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   dangerGroup: {
     backgroundColor: Colors.primary,
     borderColor: Colors.borderOnPrimary,
+  },
+  highlightGroup: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.borderOnPrimary,
+  },
+  highlightGroupDisabled: {
+    opacity: 0.5,
   },
   sectionTitle: {
     fontSize: 13,

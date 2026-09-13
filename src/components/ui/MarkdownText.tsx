@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Animated, Image, Linking, StyleSheet, Text, View } from "react-native";
+import * as Clipboard from "expo-clipboard";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Animated, Image, Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import AutoHeightWebView from "react-native-autoheight-webview";
 import CodeHighlighter from "react-native-code-highlighter";
 import { vs2015 } from "react-syntax-highlighter/dist/esm/styles/hljs";
@@ -10,9 +11,11 @@ import { t } from "../../i18n";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { WidgetManager } from "../../services/widgets/WidgetManager";
 import WidgetWrapper from "../widgets/WidgetWrapper";
+import IconButton from "./IconButton";
 import { ensureKatexStylesheet, getKatexCss, KATEX_STYLESHEET_NAME } from "./katexStylesheet";
 
 const toolIcon = require("../../../assets/icons/tool.png");
+const copyIcon = require("../../../assets/icons/copy.png");
 
 const ToolCallBubble = ({ toolName, isGenerating }: { toolName: string, isGenerating?: boolean }) => {
   const Colors = useColors();
@@ -65,6 +68,36 @@ const makeS = (Colors: ThemeColors) => StyleSheet.create({
     fontSize: FontSizes.caption,
     lineHeight: 18,
     marginVertical: 4,
+  },
+  codeCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    overflow: "hidden",
+    width: "100%",
+    padding: 5,
+    marginVertical: Spacing.md,
+  },
+  codeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.xs,
+    paddingBottom: Spacing.xs,
+  },
+  codeTitle: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.title,
+    color: Colors.textPrimary,
+    flex: 1,
+    marginRight: Spacing.sm,
+  },
+  codeContent: {
+    backgroundColor: Colors.codeBlockBg,
+    borderRadius: Radius.md,
+    overflow: "hidden",
   },
   h1: { fontSize: FontSizes.displaySm, fontWeight: "bold", marginTop: 8, marginBottom: 4, color: Colors.textPrimary },
   h2: { fontSize: FontSizes.xl, fontWeight: "bold", marginTop: 7, marginBottom: 3, color: Colors.textPrimary },
@@ -558,29 +591,122 @@ const LANG_ALIASES: Record<string, string> = {
   yml: "yaml", "c++": "cpp", "objective-c": "objectivec", md: "markdown",
 };
 
+const LANG_DISPLAY_NAMES: Record<string, string> = {
+  js: "JavaScript",
+  javascript: "JavaScript",
+  ts: "TypeScript",
+  typescript: "TypeScript",
+  jsx: "React JSX",
+  tsx: "React TSX",
+  py: "Python",
+  python: "Python",
+  rb: "Ruby",
+  ruby: "Ruby",
+  sh: "Bash",
+  shell: "Bash",
+  bash: "Bash",
+  zsh: "Zsh",
+  yml: "YAML",
+  yaml: "YAML",
+  json: "JSON",
+  html: "HTML",
+  css: "CSS",
+  sql: "SQL",
+  c: "C",
+  cpp: "C++",
+  "c++": "C++",
+  cs: "C#",
+  csharp: "C#",
+  go: "Go",
+  rust: "Rust",
+  rs: "Rust",
+  java: "Java",
+  kotlin: "Kotlin",
+  kt: "Kotlin",
+  swift: "Swift",
+  php: "PHP",
+  md: "Markdown",
+  markdown: "Markdown",
+  xml: "XML",
+  docker: "Dockerfile",
+  dockerfile: "Dockerfile",
+};
+
 //rehighlighting a block is costly
-const CodeBlock = React.memo(function CodeBlock({ code, language }: { code: string; language?: string }) {
+const CodeBlock = React.memo(function CodeBlock({
+  code,
+  language,
+  title,
+  dark,
+  incognito,
+}: {
+  code: string;
+  language?: string;
+  title?: string;
+  dark?: boolean;
+  incognito?: boolean;
+}) {
   const Colors = useColors();
   const s = useThemedStyles(makeS);
+
+  //copy code to clipboard
+  const handleCopy = useCallback(() => {
+    Clipboard.setStringAsync(code);
+  }, [code]);
+
   const lang = language ? LANG_ALIASES[language] ?? language : undefined;
+  const rawLang = language ? language.trim().toLowerCase() : "";
+  const displayTitle = title || (rawLang ? (LANG_DISPLAY_NAMES[rawLang] ?? (rawLang.length <= 4 ? rawLang.toUpperCase() : rawLang.charAt(0).toUpperCase() + rawLang.slice(1))) : "Code");
   const textStyle = { fontFamily: Fonts.mono, fontSize: FontSizes.code, lineHeight: 18 } as const;
-  if (!lang) {
-    return (
-      <Text style={[s.base, s.codeBlock]} selectable={true}>
-        {code}
-      </Text>
-    );
-  }
+
+  const cardBorderColor = incognito ? Colors.incognito : (dark ? Colors.responseBorder : Colors.border);
+  const cardBg = dark ? Colors.responseSurface : Colors.surface;
+  const titleColor = dark ? Colors.responseTextStrong : Colors.textPrimary;
+
   return (
-    <View style={[s.codeBlock, { backgroundColor: Colors.codeBlockBg }]}>
-      <CodeHighlighter
-        language={lang}
-        hljsStyle={vs2015}
-        textStyle={textStyle}
-        scrollViewProps={{ nestedScrollEnabled: true }}
-      >
-        {code}
-      </CodeHighlighter>
+    <View style={[s.codeCard, { borderColor: cardBorderColor, backgroundColor: cardBg }]}>
+      <View style={s.codeHeader}>
+        <Text style={[s.codeTitle, { color: titleColor }]} numberOfLines={1}>
+          {displayTitle}
+        </Text>
+        <IconButton
+          icon={copyIcon}
+          label={t("common.copy")}
+          onPress={handleCopy}
+          containerSize={28}
+          size={16}
+          pressedColor={Colors.surfacePressed}
+          tintColor={dark ? Colors.responseTextMuted : Colors.textSecondary}
+        />
+      </View>
+      <View style={[s.codeContent, { backgroundColor: Colors.codeBlockBg }]}>
+        {lang ? (
+          <CodeHighlighter
+            language={lang}
+            hljsStyle={vs2015}
+            textStyle={textStyle}
+            scrollViewProps={{
+              nestedScrollEnabled: true,
+              showsHorizontalScrollIndicator: false,
+              contentContainerStyle: { padding: Spacing.md },
+            }}
+            customStyle={{ backgroundColor: "transparent", padding: 0, margin: 0 }}
+          >
+            {code}
+          </CodeHighlighter>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            nestedScrollEnabled={true}
+            contentContainerStyle={{ padding: Spacing.md }}
+          >
+            <Text style={[textStyle, { color: Colors.codeBlockText }]} selectable={true}>
+              {code}
+            </Text>
+          </ScrollView>
+        )}
+      </View>
     </View>
   );
 });
@@ -673,11 +799,16 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
               });
               data = JSON.parse(sanitized);
             } catch {
-              // fallback to code block on parse error
+              //fallback to code block on parse error
               elements.push(
-                <Text key={`code-${i}`} style={[s.base, s.codeBlock]} selectable={true} selectionColor={selColor}>
-                  {`[Widget Data Error: ${e1.message}]\n${rawJson}`}
-                </Text>
+                <CodeBlock
+                  key={`code-${i}`}
+                  code={`[Widget Data Error: ${e1.message}]\n${rawJson}`}
+                  language="json"
+                  title="Widget Error"
+                  dark={dark}
+                  incognito={incognito}
+                />
               );
               continue;
             }
@@ -735,8 +866,19 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
         continue;
       }
 
+      //parse custom title if specified
+      const titleMatch = header.match(/(?:title|filename)="([^"]+)"/);
+      const customTitle = titleMatch ? titleMatch[1] : undefined;
+
       elements.push(
-        <CodeBlock key={`code-${i}`} code={codeLines.join("\n")} language={language} />
+        <CodeBlock
+          key={`code-${i}`}
+          code={codeLines.join("\n")}
+          language={language}
+          title={customTitle}
+          dark={dark}
+          incognito={incognito}
+        />
       );
       continue;
     }

@@ -72,7 +72,7 @@ export function buildToolSystemPrompt(systemPrompt: string, tools: ToolDefinitio
     `{"tool_calls":[{"function":{"name":"<tool_name>","arguments":{<args>}}}]}\n` +
     `Do NOT wrap the JSON in markdown backticks. Tools are NOT widgets: never emit a widget block to use a tool, and never use a tool name as a widget ID.\n` +
     `If you do not need tools, respond normally.\n\n` +
-    `[Available Tools]\n${JSON.stringify(tools, null, 2)}`;
+    `[Available Tools]\n${JSON.stringify(tools)}`;
 }
 
 //format tool results into prompt

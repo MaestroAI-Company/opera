@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
-import { Image, ImageSourcePropType, Pressable, StyleProp, StyleSheet, Text, TextStyle, ViewStyle } from "react-native";
-import { FontSizes, Fonts, ThemeColors } from "../../../constants/theme";
+import { Image, ImageSourcePropType, Pressable, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from "react-native";
+import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 
 export type ActionButtonProps = {
@@ -13,6 +13,8 @@ export type ActionButtonProps = {
   style?: StyleProp<ViewStyle>;
   //highlight: white text/icon on the brand red, meant for a <Group style={{backgroundColor: Colors.primary}}>
   variant?: "default" | "highlight";
+  //badge: icon in brand red on a tinted square, like the settings home rows
+  iconBadge?: boolean;
 };
 
 //action button for settings actions and lists, wrap in <Group> to get a shared frame
@@ -25,6 +27,7 @@ export default function ActionButton({
   disabled = false,
   style,
   variant = "default",
+  iconBadge = false,
 }: ActionButtonProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -40,7 +43,13 @@ export default function ActionButton({
       onPress={onPress}
       disabled={disabled || !onPress}
     >
-      {icon && <Image source={icon} style={styles.menuIcon} tintColor={isHighlight ? Colors.textOnPrimary : Colors.textPrimary} />}
+      {icon && (iconBadge ? (
+        <View style={styles.menuIconWrap}>
+          <Image source={icon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+        </View>
+      ) : (
+        <Image source={icon} style={styles.menuIcon} tintColor={isHighlight ? Colors.textOnPrimary : Colors.textPrimary} />
+      ))}
       <Text style={[styles.navLabel, isHighlight && { color: Colors.textOnPrimary }, labelStyle]} numberOfLines={1} ellipsizeMode="tail">{label}</Text>
       {rightElement}
     </Pressable>
@@ -61,6 +70,16 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   menuIcon: {
     width: 18,
     height: 18,
+  },
+  menuIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.xxl,
+    backgroundColor: Colors.primary,
+    borderWidth: 2,
+    borderColor: Colors.borderOnPrimary,
+    alignItems: "center",
+    justifyContent: "center",
   },
   navLabel: {
     flex: 1,

@@ -4,10 +4,11 @@ import * as Contacts from "expo-contacts";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import * as MediaLibrary from "expo-media-library/legacy";
+import { LinearGradient } from "expo-linear-gradient";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, ImageSourcePropType, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme";
+import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, ImageSourcePropType, Keyboard, Linking, NativeScrollEvent, NativeSyntheticEvent, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import { getLocalProviderLabel } from "../../services/ai/providers/LocalProvider";
 import { BETA_PROVIDER_ID, BETA_SERVER_URL, buildSources, getEnabledProviders, getOllamaServers, getOllamaTuning, OllamaServer, serializeOllamaServers, serializeProviders } from "../../services/ai/providers/sources";
@@ -58,6 +59,7 @@ const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
 const profilIcon = require("../../../assets/icons/profil.png");
 const cloudIcon = require("../../../assets/icons/cloud.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
+const cancelIcon = require("../../../assets/icons/cancel.png");
 const generalIcon = require("../../../assets/icons/general.png");
 const advancedIcon = require("../../../assets/icons/settings.png");
 const serverIcon = require("../../../assets/icons/server.png");
@@ -197,6 +199,29 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     });
     return () => sub.remove();
   }, [visible, activeSubPage]);
+
+  const [isScrolled, setIsScrolled] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+
+  const handleBack = useCallback(() => {
+    if (activeSubPage === "main") {
+      onClose();
+    } else {
+      setActiveSubPage(SUB_PAGE_PARENT[activeSubPage]);
+    }
+  }, [activeSubPage, onClose]);
+
+  useEffect(() => {
+    setIsScrolled(false);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [activeSubPage, visible]);
+
+  //detect scroll to morph button
+  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const scrolled = y > 10;
+    setIsScrolled((prev) => (prev !== scrolled ? scrolled : prev));
+  }, []);
 
   const [language, setLanguageState] = useState("en");
   const [theme, setThemeState] = useState("system");
@@ -1300,24 +1325,23 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     }
   }, [visible, isDesktop, largeScreenAnim, progress]);
 
-  // back header for subpages
-  const renderSubPageHeader = (title: string, backTo: SubPage = SUB_PAGE_PARENT[activeSubPage]) => (
-    <View style={styles.subPageHeader}>
-      <Text style={[styles.title, { marginBottom: 12 }]}>{title}</Text>
-      <Pressable
-        onPress={() => setActiveSubPage(backTo)}
-        hitSlop={12}
-        style={({ pressed, hovered }) => [styles.backButton, (pressed || hovered) && { opacity: 0.6 }]}
-      >
-        <Image source={arrowIcon} style={styles.backIcon} tintColor={Colors.textPrimary} />
-      </Pressable>
+  //back header for subpages
+  const renderSubPageHeader = (title: string, _backTo?: SubPage) => (
+    <View style={styles.header}>
+      <View style={styles.headerSpacer} />
+      <Text style={styles.title} numberOfLines={1}>{title}</Text>
+      <View style={styles.headerSpacer} />
     </View>
   );
 
-  // main navigation page content
+  //main navigation page content
   const renderMainPage = () => (
     <View style={styles.menuContainer}>
-      <Text style={styles.title}>{t("settings.title")}</Text>
+      <View style={styles.header}>
+        <View style={styles.headerSpacer} />
+        <Text style={styles.title} numberOfLines={1}>{t("settings.title")}</Text>
+        <View style={styles.headerSpacer} />
+      </View>
 
       {notices.assistant && (
         <NotificationCard
@@ -2843,11 +2867,49 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   };
 
   const innerContent = (
-    <ScrollView contentContainerStyle={{ paddingTop: isDesktop ? 0 : 60, paddingBottom: 40, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-      <Animated.View style={{ flex: 1, opacity: pageAnim, transform: [{ translateY: pageAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
-        {getSubPageContent()}
-      </Animated.View>
-    </ScrollView>
+    <View style={styles.innerContainer}>
+      <View style={[styles.fixedBackWrapper, { top: isDesktop ? 0 : 60 }]} pointerEvents="box-none">
+        {isScrolled && <View style={styles.fixedBackShadow} pointerEvents="none" />}
+        <Pressable
+          onPress={handleBack}
+          hitSlop={12}
+          style={({ pressed, hovered }) => [
+            styles.fixedBackButton,
+            isScrolled ? styles.fixedBackButtonScrolled : styles.fixedBackButtonUnscrolled,
+            (pressed || hovered) && (isScrolled ? { backgroundColor: Colors.surfacePressed } : { opacity: 0.6 }),
+          ]}
+        >
+          <Image
+            source={activeSubPage === "main" ? cancelIcon : arrowIcon}
+            style={activeSubPage === "main" ? styles.closeIcon : styles.backIcon}
+            tintColor={Colors.textPrimary}
+          />
+        </Pressable>
+      </View>
+
+      <ScrollView
+        ref={scrollRef}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        contentContainerStyle={{ paddingTop: isDesktop ? 0 : 60, paddingBottom: 40, flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View style={{ flex: 1, opacity: pageAnim, transform: [{ translateY: pageAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
+          {getSubPageContent()}
+        </Animated.View>
+      </ScrollView>
+
+      <LinearGradient
+        colors={[Colors.surface, Colors.surfaceFade, Colors.surfaceClear]}
+        style={styles.gradientTop}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={[Colors.surfaceClear, Colors.surfaceFade, Colors.surface]}
+        style={styles.gradientBottom}
+        pointerEvents="none"
+      />
+    </View>
   );
 
   const notificationModal = (
@@ -2978,7 +3040,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     bottom: 0,
     right: 0,
     backgroundColor: Colors.surface,
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.xxl2,
   },
   largeScreenContainer: {
     width: 320,
@@ -3009,11 +3071,62 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
   },
+  innerContainer: {
+    flex: 1,
+    position: "relative",
+  },
+  fixedBackWrapper: {
+    position: "absolute",
+    left: 0,
+    zIndex: 100,
+    elevation: 10,
+    width: 40,
+    height: 40,
+  },
+  fixedBackShadow: {
+    position: "absolute",
+    top: 4,
+    left: -4,
+    width: 40,
+    height: 40,
+    backgroundColor: Colors.shadowInk,
+    borderRadius: Radius.xxl,
+  },
+  fixedBackButton: {
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+    zIndex: 1,
+  },
+  fixedBackButtonScrolled: {
+    backgroundColor: Colors.surface,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    borderRadius: Radius.xxl,
+  },
+  fixedBackButtonUnscrolled: {
+    backgroundColor: "transparent",
+    borderWidth: 2,
+    borderColor: "transparent",
+    borderRadius: Radius.xxl,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.xxxl,
+    minHeight: 40,
+  },
   title: {
+    flex: 1,
     fontSize: FontSizes.xxxl,
     color: Colors.textPrimary,
-    marginBottom: 24,
     fontFamily: Fonts.display,
+    textAlign: "center",
+    includeFontPadding: false,
+    lineHeight: 40,
   },
   menuContainer: {
     flex: 1,
@@ -3021,19 +3134,34 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   subPageContainer: {
     flex: 1,
   },
-  subPageHeader: {
-    flexDirection: "column",
-    alignItems: "flex-start",
-    marginBottom: 20,
-  },
-  backButton: {
-    paddingVertical: 4,
-    paddingRight: 12,
-  },
   backIcon: {
     width: 18,
     height: 18,
     transform: [{ rotate: "-180deg" }],
+  },
+  closeIcon: {
+    width: 18,
+    height: 18,
+  },
+  gradientTop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    zIndex: 10,
+  },
+  gradientBottom: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    zIndex: 10,
+  },
+  headerSpacer: {
+    width: 40,
+    height: 40,
   },
   groupSpacing: {
     marginBottom: 20,

@@ -58,6 +58,8 @@ export const LightColors = {
   scrimModal: "rgba(0,0,0,0.4)",
   backgroundFade: "rgba(255,245,236,0.9)",
   backgroundClear: "rgba(255,245,236,0)",
+  surfaceFade: "rgba(255,255,255,0.9)",
+  surfaceClear: "rgba(255,255,255,0)",
   whiteFaint: "rgba(255,255,255,0.2)",
   whiteDim: "rgba(255,255,255,0.4)",
   whiteSoft: "rgba(255,255,255,0.6)",
@@ -137,6 +139,8 @@ export const DarkColors: ThemeColors = {
   scrimModal: "rgba(0,0,0,0.6)",
   backgroundFade: "rgba(23,23,21,0.9)",
   backgroundClear: "rgba(23,23,21,0)",
+  surfaceFade: "rgba(37,37,37,0.9)",
+  surfaceClear: "rgba(37,37,37,0)",
 };
 
 //light stays the module default so non-react code keeps working

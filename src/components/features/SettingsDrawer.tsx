@@ -41,6 +41,7 @@ import SliderToggle from "../ui/SliderToggle";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 import CloudSyncBox from "./CloudSyncBox";
+import DrawerSheet from "./DrawerSheet";
 
 import { useResponsive } from "../../hooks/useResponsive";
 import { useSettingsNotices } from "../../hooks/useSettingsNotices";
@@ -56,6 +57,7 @@ const addIcon = require("../../../assets/icons/add.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 const deleteIcon = require("../../../assets/icons/delete.png");
 const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
+const searchIcon = require("../../../assets/icons/search.png");
 const profilIcon = require("../../../assets/icons/profil.png");
 const cloudIcon = require("../../../assets/icons/cloud.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
@@ -245,6 +247,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const [lastSyncSize, setLastSyncSize] = useState<number | null>(null);
 
+  const [addModelSheetVisible, setAddModelSheetVisible] = useState(false);
+  const [hfModelInput, setHfModelInput] = useState("");
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [exportScopeVisible, setExportScopeVisible] = useState(false);
   const [exportSelection, setExportSelection] = useState({ settings: true, conversations: true });
@@ -1811,26 +1815,27 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </View>
       )}
 
-      {localAvailable && (
-        <View style={styles.settingRowVertical}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{getLocalProviderLabel()}</Text>
-            <Toggle
-              checked={enabledProviders.includes("local")}
-              onToggle={(v) => setProviderEnabled("local", v)}
-            />
-          </View>
-          <Text style={[styles.helpText, { marginBottom: 12 }]}>{t("settings.service.localHelp")}</Text>
-
-          <Group>
-            <ActionButton
-              icon={arrowIcon}
-              label={`See ${getLocalProviderLabel()} details`}
-              onPress={() => setActiveSubPage("local")}
-            />
-          </Group>
+      <View style={styles.settingRowVertical}>
+        <View style={styles.toggleRow}>
+          <Text style={styles.settingLabel}>{t("settings.service.local")}</Text>
+          <Toggle
+            checked={localAvailable && enabledProviders.includes("local")}
+            disabled={!localAvailable}
+            onToggle={(v) => {
+              if (localAvailable) setProviderEnabled("local", v);
+            }}
+          />
         </View>
-      )}
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>{t("settings.service.localHelp")}</Text>
+
+        <Group>
+          <ActionButton
+            icon={arrowIcon}
+            label={t("settings.local.see")}
+            onPress={() => setActiveSubPage("local")}
+          />
+        </Group>
+      </View>
 
       <View style={styles.settingRowVertical}>
         {/* ollama servers section */}
@@ -1921,16 +1926,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   //local provider info subpage
   const renderLocalSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(getLocalProviderLabel(), "service")}
+      {renderSubPageHeader(t("settings.service.local"), "service")}
 
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{getLocalProviderLabel()}</Text>
-        <Text style={[styles.helpText, { marginTop: 8 }]}>
-          Runs the local model directly on this device. No server needed.
-        </Text>
-        <Text style={[styles.helpText, { marginTop: 6 }]}>
-          Your prompts and messages are processed entirely on your hardware and never leave your device.
-        </Text>
+        <Text style={styles.settingLabel}>{t("settings.local.modelTitle")}</Text>
+        <Text style={[styles.helpText, { marginBottom: 12 }]}>{t("settings.local.help")}</Text>
+
+        <Group style={styles.groupSpacing}>
+          <ActionButton
+            icon={addIcon}
+            label={t("settings.local.addModel")}
+            onPress={() => setAddModelSheetVisible(true)}
+          />
+        </Group>
       </View>
     </View>
   );
@@ -2960,6 +2968,34 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     </>
   );
 
+  const addModelSheet = (
+    <DrawerSheet
+      visible={addModelSheetVisible}
+      onClose={() => setAddModelSheetVisible(false)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      sheetStyle={[
+        styles.addModelSheet,
+        { paddingBottom: Platform.OS === "ios" ? 34 : 20 },
+      ]}
+      desktopStyle={styles.addModelSheetDesktop}
+    >
+      <View style={styles.addModelSheetContent}>
+        <Group>
+          <TextInputField
+            icon={searchIcon}
+            placeholder={t("settings.local.addModelPlaceholder")}
+            value={hfModelInput}
+            onChangeText={setHfModelInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </Group>
+      </View>
+    </DrawerSheet>
+  );
+
   if (isDesktop) {
     const largeScreenWidth = largeScreenAnim.interpolate({
       inputRange: [0, 1],
@@ -2992,6 +3028,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           </View>
         </View>
         {notificationModal}
+        {addModelSheet}
       </Animated.View>
     );
   }
@@ -3018,6 +3055,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       </Animated.View>
 
       {notificationModal}
+      {addModelSheet}
     </View>
   );
 
@@ -3162,6 +3200,32 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   headerSpacer: {
     width: 40,
     height: 40,
+  },
+  addModelSheet: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.huge2,
+    borderTopRightRadius: Radius.huge2,
+    paddingTop: 12,
+  },
+  addModelSheetDesktop: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
+    elevation: 5,
+    width: 380,
+    overflow: "hidden",
+    paddingVertical: 16,
+  },
+  addModelSheetContent: {
+    paddingHorizontal: Spacing.xxl,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.lg,
   },
   groupSpacing: {
     marginBottom: 20,

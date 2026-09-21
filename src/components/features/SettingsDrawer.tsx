@@ -31,6 +31,7 @@ import ActionButton from "../ui/ActionButton";
 import Checkbox from "../ui/Checkbox";
 import DownloadProgress from "../ui/DownloadProgress";
 import Group from "../ui/Group";
+import ImageCard from "../ui/ImageCard";
 import NotificationBanner from "../ui/NotificationBanner";
 import NotificationCard from "../ui/NotificationCard";
 import IconButton from "../ui/IconButton";
@@ -86,8 +87,10 @@ const messageIcon = require("../../../assets/icons/message.png");
 const timeIcon = require("../../../assets/icons/time.png");
 const errorIcon = require("../../../assets/icons/error.png");
 const validIcon = require("../../../assets/icons/valid.png");
+const ollamaImage = require("../../../assets/images/ImageCard/Ollama.png");
 const ollamaErrorImage = require("../../../assets/images/ImageCard/OllamaError.png");
 const ollamaInfoImage = require("../../../assets/images/ImageCard/OllamaInfo.png");
+const huggingImage = require("../../../assets/images/ImageCard/Hugging.png");
 const questionIcon = require("../../../assets/icons/question.png");
 const infoIcon = require("../../../assets/icons/info.png");
 const reconnectIcon = require("../../../assets/icons/reconnect.png");
@@ -1354,7 +1357,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           title={t("settings.notice.assistant")}
           onPress={notices.openAssistant}
           onDismiss={notices.closeAssistant}
-          style={styles.groupSpacing}
+          style={[styles.groupSpacing, styles.mainPageGroup]}
         />
       )}
 
@@ -1363,12 +1366,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           icon={downloadIcon}
           label={t("settings.notice.update", { version: notices.update.version })}
           onPress={notices.openUpdate}
-          style={styles.groupSpacing}
+          style={[styles.groupSpacing, styles.mainPageGroup]}
         />
       )}
 
       {/* profile section */}
-      <Group style={styles.groupSpacing}>
+      <Group style={[styles.groupSpacing, styles.mainPageGroup]}>
         <Pressable
           style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
           onPress={() => setActiveSubPage("profile")}
@@ -1392,7 +1395,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </Pressable>
       </Group>
 
-      <Group style={styles.groupSpacing}>
+      <Group style={[styles.groupSpacing, styles.mainPageGroup]}>
         <Pressable
           style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
           onPress={() => setActiveSubPage("general")}
@@ -1453,7 +1456,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         )}
       </Group>
 
-      <Group style={styles.groupSpacing}>
+      <Group style={[styles.groupSpacing, styles.mainPageGroup]}>
         <Pressable
           style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
           onPress={() => setActiveSubPage("confidentiality")}
@@ -1496,41 +1499,43 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.info.title"))}
 
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("settings.info.version")}</Text>
-        <Text style={styles.helpText}>
-          Opera Beta v{appVersion}
-        </Text>
-      </View>
+      <View style={styles.contentCard}>
+        <View style={styles.settingRowVertical}>
+          <Text style={styles.settingLabel}>{t("settings.info.version")}</Text>
+          <Text style={styles.helpText}>
+            Opera Beta v{appVersion}
+          </Text>
+        </View>
 
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("settings.info.links")}</Text>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          {t("settings.info.linksHelp")}
-        </Text>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>{t("settings.info.links")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.info.linksHelp")}
+          </Text>
 
-        <Group>
-          <ActionButton
-            icon={operaIcon}
-            label={t("settings.info.website")}
-            onPress={() => Linking.openURL("https://maestroai.company").catch(() => { })}
-          />
-          <ActionButton
-            icon={githubIcon}
-            label="Github"
-            onPress={() => Linking.openURL("https://github.com/MaestroAI-Company/opera").catch(() => { })}
-          />
-          <ActionButton
-            icon={instagramIcon}
-            label="Instagram"
-            onPress={() => Linking.openURL("https://www.instagram.com/maestroai.company?igsh=MWF4dmZvMXl1ZmdzeA==").catch(() => { })}
-          />
-          <ActionButton
-            icon={tiktokIcon}
-            label="TikTok"
-            onPress={() => Linking.openURL("https://www.tiktok.com/@maestroai.company?_r=1&_t=ZG-99DGujxTPEn").catch(() => { })}
-          />
-        </Group>
+          <Group>
+            <ActionButton
+              icon={operaIcon}
+              label={t("settings.info.website")}
+              onPress={() => Linking.openURL("https://maestroai.company").catch(() => { })}
+            />
+            <ActionButton
+              icon={githubIcon}
+              label="Github"
+              onPress={() => Linking.openURL("https://github.com/MaestroAI-Company/opera").catch(() => { })}
+            />
+            <ActionButton
+              icon={instagramIcon}
+              label="Instagram"
+              onPress={() => Linking.openURL("https://www.instagram.com/maestroai.company?igsh=MWF4dmZvMXl1ZmdzeA==").catch(() => { })}
+            />
+            <ActionButton
+              icon={tiktokIcon}
+              label="TikTok"
+              onPress={() => Linking.openURL("https://www.tiktok.com/@maestroai.company?_r=1&_t=ZG-99DGujxTPEn").catch(() => { })}
+            />
+          </Group>
+        </View>
       </View>
 
       <View style={{ flex: 1, justifyContent: "flex-end" }}>
@@ -1546,28 +1551,30 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.profile.title"))}
 
-      <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.profile.name")}</Text>
-        <Group>
-          <TextInputField
-            icon={penPlaceholderIcon}
-            placeholder={t("onboarding.name.placeholder")}
-            value={name}
-            onChangeText={setName}
-          />
-        </Group>
-      </View>
+      <View style={styles.contentCard}>
+        <View style={styles.settingRowVertical}>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.profile.name")}</Text>
+          <Group>
+            <TextInputField
+              icon={penPlaceholderIcon}
+              placeholder={t("onboarding.name.placeholder")}
+              value={name}
+              onChangeText={setName}
+            />
+          </Group>
+        </View>
 
-      <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.profile.instructions")}</Text>
-        <Group>
-          <TextInputField
-            icon={penPlaceholderIcon}
-            placeholder={t("settings.profile.instructionsPlaceholder")}
-            value={instruction}
-            onChangeText={setInstruction}
-          />
-        </Group>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.profile.instructions")}</Text>
+          <Group>
+            <TextInputField
+              icon={penPlaceholderIcon}
+              placeholder={t("settings.profile.instructionsPlaceholder")}
+              value={instruction}
+              onChangeText={setInstruction}
+            />
+          </Group>
+        </View>
       </View>
     </View>
   );
@@ -1577,49 +1584,55 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.general.title"))}
 
-      <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.general.language")}</Text>
-        <Group>
-          <Selector
-            options={languageOptions}
-            selectedValue={language}
-            onSelect={setLanguage}
-            title={t("settings.general.selectLanguage")}
-            fullWidth
-          />
-        </Group>
-      </View>
-
-      <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.general.theme")}</Text>
-        <Group>
-          <SliderToggle
-            selectedValue={theme}
-            onSelect={setTheme}
-          />
-        </Group>
-      </View>
-
-      <View style={styles.settingRowVertical}>
-        <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>{t("settings.general.autoRead")}</Text>
-          <Toggle
-            checked={autoSpeak}
-            onToggle={setAutoSpeak}
-          />
+      {/* language and appearance card */}
+      <View style={styles.contentCard}>
+        <View style={styles.settingRowVertical}>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.general.language")}</Text>
+          <Group>
+            <Selector
+              options={languageOptions}
+              selectedValue={language}
+              onSelect={setLanguage}
+              title={t("settings.general.selectLanguage")}
+              fullWidth
+            />
+          </Group>
         </View>
-        <Text style={styles.helpText}>{t("settings.general.autoReadHelp")}</Text>
+
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.general.theme")}</Text>
+          <Group>
+            <SliderToggle
+              selectedValue={theme}
+              onSelect={setTheme}
+            />
+          </Group>
+        </View>
       </View>
 
-      <View style={[styles.settingRowVertical, Platform.OS === "web" && { marginTop: 10 }]}>
-        <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>{t("settings.general.advancedMode")}</Text>
-          <Toggle
-            checked={advancedMode}
-            onToggle={setAdvancedMode}
-          />
+      {/* audio and modes card */}
+      <View style={styles.contentCard}>
+        <View style={styles.settingRowVertical}>
+          <View style={styles.toggleRow}>
+            <Text style={styles.settingLabel}>{t("settings.general.autoRead")}</Text>
+            <Toggle
+              checked={autoSpeak}
+              onToggle={setAutoSpeak}
+            />
+          </View>
+          <Text style={styles.helpText}>{t("settings.general.autoReadHelp")}</Text>
         </View>
-        <Text style={styles.helpText}>{t("settings.general.advancedModeHelp")}</Text>
+
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={styles.toggleRow}>
+            <Text style={styles.settingLabel}>{t("settings.general.advancedMode")}</Text>
+            <Toggle
+              checked={advancedMode}
+              onToggle={setAdvancedMode}
+            />
+          </View>
+          <Text style={styles.helpText}>{t("settings.general.advancedModeHelp")}</Text>
+        </View>
       </View>
     </View>
   );
@@ -1628,67 +1641,73 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.advanced.title"))}
 
-      <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
-        <Text style={styles.settingLabel}>{t("settings.quickFlow.label")}</Text>
-        <Text style={[styles.helpText, { marginBottom: 10 }]}>
-          {t("settings.quickFlow.help")}
-        </Text>
-        <Group>
-          <Selector
-            options={quickFlowOptions}
-            selectedValue={quickFlowId}
-            onSelect={handleSelectQuickFlow}
-            title={t("settings.quickFlow.select")}
-            fullWidth
-          />
-        </Group>
-      </View>
-
-      <View style={styles.settingRowVertical}>
-        <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>{t("settings.transcribeLocally.label")}</Text>
-          <Toggle
-            checked={alwaysWhisper}
-            onToggle={setAlwaysWhisper}
-          />
+      {/* flow, audio and technical card */}
+      <View style={styles.contentCard}>
+        <View style={styles.settingRowVertical}>
+          <Text style={styles.settingLabel}>{t("settings.quickFlow.label")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.quickFlow.help")}
+          </Text>
+          <Group>
+            <Selector
+              options={quickFlowOptions}
+              selectedValue={quickFlowId}
+              onSelect={handleSelectQuickFlow}
+              title={t("settings.quickFlow.select")}
+              fullWidth
+            />
+          </Group>
         </View>
-        <Text style={styles.helpText}>
-          {Platform.OS === "web"
-            ? t("settings.transcribeLocally.helpWeb")
-            : t("settings.transcribeLocally.help")}
-        </Text>
-      </View>
 
-      <View style={styles.settingRowVertical}>
-        <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>{t("settings.general.technicalDetails")}</Text>
-          <Toggle
-            checked={showTechnicalDetails}
-            onToggle={setShowTechnicalDetails}
-          />
+        <View style={styles.settingRowVertical}>
+          <View style={styles.toggleRow}>
+            <Text style={styles.settingLabel}>{t("settings.transcribeLocally.label")}</Text>
+            <Toggle
+              checked={alwaysWhisper}
+              onToggle={setAlwaysWhisper}
+            />
+          </View>
+          <Text style={styles.helpText}>
+            {Platform.OS === "web"
+              ? t("settings.transcribeLocally.helpWeb")
+              : t("settings.transcribeLocally.help")}
+          </Text>
         </View>
-        <Text style={styles.helpText}>{t("settings.general.technicalDetailsHelp")}</Text>
+
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={styles.toggleRow}>
+            <Text style={styles.settingLabel}>{t("settings.general.technicalDetails")}</Text>
+            <Toggle
+              checked={showTechnicalDetails}
+              onToggle={setShowTechnicalDetails}
+            />
+          </View>
+          <Text style={styles.helpText}>{t("settings.general.technicalDetailsHelp")}</Text>
+        </View>
       </View>
 
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("settings.sharing.label")}</Text>
-        <Text style={[styles.helpText, { marginBottom: 6 }]}>
-          {t("settings.sharing.help")}
-        </Text>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          {t("settings.sharing.instanceHelp")}
-        </Text>
+      {/* sharing instance card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>{t("settings.sharing.label")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.xs }]}>
+            {t("settings.sharing.help")}
+          </Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.sharing.instanceHelp")}
+          </Text>
 
-        <Group>
-          <TextInputField
-            icon={serverIcon}
-            placeholder="https://privatebin.net/"
-            value={shareInstanceUrl}
-            onChangeText={setShareInstanceUrl}
-            autoCapitalize="none"
-            keyboardType="url"
-          />
-        </Group>
+          <Group>
+            <TextInputField
+              icon={serverIcon}
+              placeholder="https://privatebin.net/"
+              value={shareInstanceUrl}
+              onChangeText={setShareInstanceUrl}
+              autoCapitalize="none"
+              keyboardType="url"
+            />
+          </Group>
+        </View>
       </View>
     </View>
   );
@@ -1698,52 +1717,58 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.overlay.title"))}
 
+      {/* default assistant card */}
       {assistantStatus !== null && (
-        <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
-          <Text style={styles.settingLabel}>{t("settings.overlay.default")}</Text>
-          <Text style={styles.helpText}>
-            {t("settings.overlay.defaultHelp")}
-          </Text>
-          <Text style={[styles.assistantStatusText, assistantStatus ? styles.assistantStatusOn : styles.assistantStatusOff]}>
-            {assistantStatus
-              ? t("settings.overlay.isDefault")
-              : t("settings.overlay.isNotDefault")}
-          </Text>
-          {!assistantStatus && (
-            <Group>
-              <ActionButton
-                icon={operaIcon}
-                label={t("settings.overlay.setDefault")}
-                onPress={openAssistantSettings}
-              />
-            </Group>
-          )}
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={styles.settingLabel}>{t("settings.overlay.default")}</Text>
+            <Text style={styles.helpText}>
+              {t("settings.overlay.defaultHelp")}
+            </Text>
+            <Text style={[styles.assistantStatusText, assistantStatus ? styles.assistantStatusOn : styles.assistantStatusOff]}>
+              {assistantStatus
+                ? t("settings.overlay.isDefault")
+                : t("settings.overlay.isNotDefault")}
+            </Text>
+            {!assistantStatus && (
+              <Group>
+                <ActionButton
+                  icon={operaIcon}
+                  label={t("settings.overlay.setDefault")}
+                  onPress={openAssistantSettings}
+                />
+              </Group>
+            )}
+          </View>
         </View>
       )}
 
-      <View style={[styles.settingRowVertical, assistantStatus === null && { marginTop: 0 }]}>
-        <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>{t("settings.overlay.autoMic")}</Text>
-          <Toggle
-            checked={autoStartMic}
-            onToggle={setAutoStartMic}
-          />
-        </View>
-        <Text style={styles.helpText}>{t("settings.overlay.autoMicHelp")}</Text>
-      </View>
-
-      {Platform.OS === 'android' && (
-        <View style={styles.settingRowVertical}>
+      {/* overlay options card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, Platform.OS !== 'android' && { marginBottom: 0 }]}>
           <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{t("settings.overlay.appContext")}</Text>
+            <Text style={styles.settingLabel}>{t("settings.overlay.autoMic")}</Text>
             <Toggle
-              checked={useAppContext}
-              onToggle={setUseAppContext}
+              checked={autoStartMic}
+              onToggle={setAutoStartMic}
             />
           </View>
-          <Text style={styles.helpText}>{t("settings.overlay.appContextHelp")}</Text>
+          <Text style={styles.helpText}>{t("settings.overlay.autoMicHelp")}</Text>
         </View>
-      )}
+
+        {Platform.OS === 'android' && (
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <View style={styles.toggleRow}>
+              <Text style={styles.settingLabel}>{t("settings.overlay.appContext")}</Text>
+              <Toggle
+                checked={useAppContext}
+                onToggle={setUseAppContext}
+              />
+            </View>
+            <Text style={styles.helpText}>{t("settings.overlay.appContextHelp")}</Text>
+          </View>
+        )}
+      </View>
     </View>
   );
 
@@ -1752,37 +1777,39 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.cloud.title"))}
 
-      <View style={[styles.settingRowVertical, { marginTop: 0 }]}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.cloud.storage")}</Text>
-        <Group>
-          <Selector
-            options={cloudStorageOptions}
-            selectedValue={cloudProvider}
-            onSelect={handleSetCloudProvider}
-            title={t("settings.cloud.selectStorage")}
-            fullWidth
-          />
-        </Group>
-        {cloudProvider !== "none" && !cloudUserInfo && (() => {
-          const def = getCloudProviderDefinition(cloudProvider);
-          if (!def?.SetupComponent) return null;
-          const Setup = def.SetupComponent;
-          return <Setup onDone={() => connectProvider(def.id)} />;
-        })()}
-        {cloudProvider !== "none" && (
-          <CloudSyncBox
-            userInfo={cloudUserInfo}
-            status={hasSyncPin ? "ready" : "locked"}
-            hasBackup={hasCloudBackup}
-            lastSyncTime={lastSyncTime}
-            lastSyncSize={lastSyncSize}
-            onEnterPin={handleUnlockSyncPin}
-            onCreatePin={handleCreateSyncPin}
-            onDisconnect={handleDisconnectCloud}
-            onSync={handleSyncNow}
-            isSyncing={isSyncing}
-          />
-        )}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.cloud.storage")}</Text>
+          <Group>
+            <Selector
+              options={cloudStorageOptions}
+              selectedValue={cloudProvider}
+              onSelect={handleSetCloudProvider}
+              title={t("settings.cloud.selectStorage")}
+              fullWidth
+            />
+          </Group>
+          {cloudProvider !== "none" && !cloudUserInfo && (() => {
+            const def = getCloudProviderDefinition(cloudProvider);
+            if (!def?.SetupComponent) return null;
+            const Setup = def.SetupComponent;
+            return <Setup onDone={() => connectProvider(def.id)} />;
+          })()}
+          {cloudProvider !== "none" && (
+            <CloudSyncBox
+              userInfo={cloudUserInfo}
+              status={hasSyncPin ? "ready" : "locked"}
+              hasBackup={hasCloudBackup}
+              lastSyncTime={lastSyncTime}
+              lastSyncSize={lastSyncSize}
+              onEnterPin={handleUnlockSyncPin}
+              onCreatePin={handleCreateSyncPin}
+              onDisconnect={handleDisconnectCloud}
+              onSync={handleSyncNow}
+              isSyncing={isSyncing}
+            />
+          )}
+        </View>
       </View>
     </View>
   );
@@ -1793,91 +1820,99 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {renderSubPageHeader(t("settings.nav.service.title"))}
 
       {!!BETA_SERVER_URL && (
-        <View style={styles.settingRowVertical}>
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <View style={styles.toggleRow}>
+              <Text style={styles.settingLabel}>Opera Beta server</Text>
+              <Toggle
+                checked={enabledProviders.includes(BETA_PROVIDER_ID)}
+                onToggle={(v) => setProviderEnabled(BETA_PROVIDER_ID, v)}
+              />
+            </View>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              A test server we host so you can try Opera without setting one up.
+            </Text>
+
+            <Group>
+              <ActionButton
+                icon={arrowIcon}
+                label="See Opera Beta details"
+                onPress={() => setActiveSubPage("beta")}
+              />
+            </Group>
+          </View>
+        </View>
+      )}
+
+      {/* local ai service card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>Opera Beta server</Text>
+            <Text style={styles.settingLabel}>{t("settings.service.local")}</Text>
             <Toggle
-              checked={enabledProviders.includes(BETA_PROVIDER_ID)}
-              onToggle={(v) => setProviderEnabled(BETA_PROVIDER_ID, v)}
+              checked={localAvailable && enabledProviders.includes("local")}
+              disabled={!localAvailable}
+              onToggle={(v) => {
+                if (localAvailable) setProviderEnabled("local", v);
+              }}
             />
           </View>
-          <Text style={[styles.helpText, { marginBottom: 12 }]}>
-            A test server we host so you can try Opera without setting one up.
-          </Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.service.localHelp")}</Text>
 
           <Group>
             <ActionButton
               icon={arrowIcon}
-              label="See Opera Beta details"
-              onPress={() => setActiveSubPage("beta")}
+              label={t("settings.local.see")}
+              onPress={() => setActiveSubPage("local")}
             />
           </Group>
         </View>
-      )}
-
-      <View style={styles.settingRowVertical}>
-        <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>{t("settings.service.local")}</Text>
-          <Toggle
-            checked={localAvailable && enabledProviders.includes("local")}
-            disabled={!localAvailable}
-            onToggle={(v) => {
-              if (localAvailable) setProviderEnabled("local", v);
-            }}
-          />
-        </View>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>{t("settings.service.localHelp")}</Text>
-
-        <Group>
-          <ActionButton
-            icon={arrowIcon}
-            label={t("settings.local.see")}
-            onPress={() => setActiveSubPage("local")}
-          />
-        </Group>
       </View>
 
-      <View style={styles.settingRowVertical}>
-        {/* ollama servers section */}
-        <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>{t("settings.service.ollama")}</Text>
-          <View style={styles.toggleRight}>
-            <IconButton
-              icon={questionIcon}
-              label={t("common.info")}
-              size={22}
-              tintColor={Colors.textMuted}
-              containerSize={32}
-              pressedColor={Colors.surfacePressed}
-              onPress={() => showAlert(
-                t("settings.service.ollama"),
-                t("settings.service.ollamaInfo"),
-                undefined,
-                { image: ollamaInfoImage, messageAlign: "left" },
-              )}
-            />
-            <Toggle
-              checked={enabledProviders.includes("ollama")}
-              onToggle={(v) => setProviderEnabled("ollama", v)}
-            />
+      {/* ollama service card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={styles.toggleRow}>
+            <Text style={styles.settingLabel}>{t("settings.service.ollama")}</Text>
+            <View style={styles.toggleRight}>
+              <IconButton
+                icon={questionIcon}
+                label={t("common.info")}
+                size={22}
+                tintColor={Colors.textMuted}
+                containerSize={32}
+                pressedColor={Colors.surfacePressed}
+                onPress={() => showAlert(
+                  t("settings.service.ollama"),
+                  t("settings.service.ollamaInfo"),
+                  undefined,
+                  { image: ollamaInfoImage, messageAlign: "left" },
+                )}
+              />
+              <Toggle
+                checked={enabledProviders.includes("ollama")}
+                onToggle={(v) => setProviderEnabled("ollama", v)}
+              />
+            </View>
           </View>
-        </View>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>{t("settings.service.ollamaHelp")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.service.ollamaHelp")}</Text>
 
-        <Group>
-          <ActionButton
-            icon={arrowIcon}
-            label={t("settings.ollama.see")}
-            onPress={() => setActiveSubPage("ollama")}
-          />
-        </Group>
+          <Group>
+            <ActionButton
+              icon={arrowIcon}
+              label={t("settings.ollama.see")}
+              onPress={() => setActiveSubPage("ollama")}
+            />
+          </Group>
+        </View>
       </View>
 
+      {/* local whisper transcription for web */}
       {Platform.OS === "web" && (
-        <>
-          <View style={[styles.settingRowVertical, { zIndex: 9 }]}>
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { zIndex: 9, marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>{t("settings.whisper.label")}</Text>
-            <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.whisper.help")}</Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.whisper.help")}</Text>
             <Group>
               <Selector
                 options={whisperModelOptions}
@@ -1898,7 +1933,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               </View>
             )}
           </View>
-        </>
+        </View>
       )}
     </View>
   );
@@ -1908,17 +1943,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("Opera Beta", "service")}
 
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>Opera Beta server</Text>
-        <Text style={[styles.helpText, { marginTop: 8 }]}>
-          A test server we host so you can try Opera without setting one up. Everything needed to answer goes through it: your messages, your attachments, whatever a tool reads for you (contacts, calendar, screen text), and your IP address.
-        </Text>
-        <Text style={[styles.helpText, { marginTop: 6 }]}>
-          We do not read any of it, we do not keep it, and we will never use it for anything. The server is shut down and wiped at the end of the Play Store beta.
-        </Text>
-        <Text style={[styles.helpText, { marginTop: 6 }]}>
-          It is there for testing only. For everyday use, set up your own Ollama server and nothing leaves your network.
-        </Text>
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>Opera Beta server</Text>
+          <Text style={[styles.helpText, { marginTop: 8 }]}>
+            A test server we host so you can try Opera without setting one up. Everything needed to answer goes through it: your messages, your attachments, whatever a tool reads for you (contacts, calendar, screen text), and your IP address.
+          </Text>
+          <Text style={[styles.helpText, { marginTop: 6 }]}>
+            We do not read any of it, we do not keep it, and we will never use it for anything. The server is shut down and wiped at the end of the Play Store beta.
+          </Text>
+          <Text style={[styles.helpText, { marginTop: 6 }]}>
+            It is there for testing only. For everyday use, set up your own Ollama server and nothing leaves your network.
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -1928,17 +1965,23 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.service.local"), "service")}
 
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("settings.local.modelTitle")}</Text>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>{t("settings.local.help")}</Text>
+      <View style={styles.contentCard}>
+        <View style={{ marginBottom: Spacing.xxl }}>
+          <ImageCard source={huggingImage} width="100%" alt="Hugging Face" />
+        </View>
 
-        <Group style={styles.groupSpacing}>
-          <ActionButton
-            icon={addIcon}
-            label={t("settings.local.addModel")}
-            onPress={() => setAddModelSheetVisible(true)}
-          />
-        </Group>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>{t("settings.local.modelTitle")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.local.help")}</Text>
+
+          <Group>
+            <ActionButton
+              icon={addIcon}
+              label={t("settings.local.addModel")}
+              onPress={() => setAddModelSheetVisible(true)}
+            />
+          </Group>
+        </View>
       </View>
     </View>
   );
@@ -1948,71 +1991,81 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("Ollama", "service")}
 
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("settings.ollama.title")}</Text>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>{t("settings.ollama.help")}</Text>
+      {/* ollama servers card */}
+      <View style={styles.contentCard}>
+        <View style={{ marginBottom: Spacing.xxl }}>
+          <ImageCard source={ollamaImage} width="100%" alt="Ollama" />
+        </View>
 
-        {ollamaServers.length > 0 && (
-          <Group style={styles.groupSpacingTight}>
-            {ollamaServers.map((server, index) => {
-              const url = server.url.trim();
-              const connected = url.length > 0 && serverErrors[url] === false;
-              return (
-                <Pressable
-                  key={index}
-                  style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
-                  onPress={() => openOllamaServer(index)}
-                >
-                  <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-                  <Text style={styles.navLabel}>{ollamaServerLabel(server)}</Text>
-                  <IconButton
-                    icon={connected ? validIcon : errorIcon}
-                    label={connected ? t("common.statusOk") : t("common.statusError")}
-                    size={20}
-                    tintColor={connected ? Colors.textPrimary : Colors.error}
-                    containerSize={32}
-                    pressedColor={Colors.surfacePressed}
-                    style={styles.navStatusIcon}
-                    onPress={() => {
-                      if (!connected) {
-                        showAlert(
-                          t("settings.ollama.unreachableTitle"),
-                          t("settings.ollama.unreachableInfo"),
-                          undefined,
-                          { image: ollamaErrorImage, messageAlign: "left" },
-                        );
-                      } else {
-                        showAlert(
-                          ollamaServerLabel(server),
-                          t("settings.ollama.connected"),
-                        );
-                      }
-                    }}
-                  />
-                </Pressable>
-              );
-            })}
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>{t("settings.ollama.title")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.ollama.help")}</Text>
+
+          {ollamaServers.length > 0 && (
+            <Group style={styles.groupSpacingTight}>
+              {ollamaServers.map((server, index) => {
+                const url = server.url.trim();
+                const connected = url.length > 0 && serverErrors[url] === false;
+                return (
+                  <Pressable
+                    key={index}
+                    style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
+                    onPress={() => openOllamaServer(index)}
+                  >
+                    <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+                    <Text style={styles.navLabel}>{ollamaServerLabel(server)}</Text>
+                    <IconButton
+                      icon={connected ? validIcon : errorIcon}
+                      label={connected ? t("common.statusOk") : t("common.statusError")}
+                      size={20}
+                      tintColor={connected ? Colors.textPrimary : Colors.error}
+                      containerSize={32}
+                      pressedColor={Colors.surfacePressed}
+                      style={styles.navStatusIcon}
+                      onPress={() => {
+                        if (!connected) {
+                          showAlert(
+                            t("settings.ollama.unreachableTitle"),
+                            t("settings.ollama.unreachableInfo"),
+                            undefined,
+                            { image: ollamaErrorImage, messageAlign: "left" },
+                          );
+                        } else {
+                          showAlert(
+                            ollamaServerLabel(server),
+                            t("settings.ollama.connected"),
+                          );
+                        }
+                      }}
+                    />
+                  </Pressable>
+                );
+              })}
+            </Group>
+          )}
+
+          <Group>
+            <ActionButton
+              icon={addIcon}
+              label={t("settings.server.add")}
+              onPress={() => openServerDraft("ollamaserveradd")}
+            />
           </Group>
-        )}
-
-        <Group style={styles.groupSpacing}>
-          <ActionButton
-            icon={addIcon}
-            label={t("settings.server.add")}
-            onPress={() => openServerDraft("ollamaserveradd")}
-          />
-        </Group>
+        </View>
       </View>
 
-      <View style={styles.settingRowVertical}>
-        <View style={styles.toggleRow}>
-          <Text style={styles.settingLabel}>{t("settings.service.failover")}</Text>
-          <Toggle
-            checked={modelFailover}
-            onToggle={setModelFailover}
-          />
+      {/* model failover card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={styles.toggleRow}>
+            <Text style={styles.settingLabel}>{t("settings.service.failover")}</Text>
+            <Toggle
+              checked={modelFailover}
+              onToggle={setModelFailover}
+            />
+          </View>
+          <Text style={styles.helpText}>{t("settings.service.failoverHelp")}</Text>
         </View>
-        <Text style={styles.helpText}>{t("settings.service.failoverHelp")}</Text>
       </View>
     </View>
   );
@@ -2022,77 +2075,79 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.server.add"), "mcpservers")}
 
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("settings.server.name")}</Text>
-        <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.server.nameHelp")}</Text>
-        <Group>
-          <TextInputField
-            icon={penPlaceholderIcon}
-            placeholder={t("settings.server.namePlaceholder")}
-            value={serverDraft.name}
-            onChangeText={(v) => setServerDraft(prev => ({ ...prev, name: v }))}
-          />
-        </Group>
-      </View>
+      <View style={styles.contentCard}>
+        <View style={styles.settingRowVertical}>
+          <Text style={styles.settingLabel}>{t("settings.server.name")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.server.nameHelp")}</Text>
+          <Group>
+            <TextInputField
+              icon={penPlaceholderIcon}
+              placeholder={t("settings.server.namePlaceholder")}
+              value={serverDraft.name}
+              onChangeText={(v) => setServerDraft(prev => ({ ...prev, name: v }))}
+            />
+          </Group>
+        </View>
 
-      <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.server.link")}</Text>
-        <Group>
-          <TextInputField
-            icon={linkIcon}
-            placeholder={t("settings.service.serverLink")}
-            autoCapitalize="none"
-            autoCorrect={false}
-            value={serverDraft.url}
-            onChangeText={(v) => setServerDraft(prev => ({ ...prev, url: v }))}
-          />
-        </Group>
-      </View>
+        <View style={styles.settingRowVertical}>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.server.link")}</Text>
+          <Group>
+            <TextInputField
+              icon={linkIcon}
+              placeholder={t("settings.service.serverLink")}
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={serverDraft.url}
+              onChangeText={(v) => setServerDraft(prev => ({ ...prev, url: v }))}
+            />
+          </Group>
+        </View>
 
-      <View style={styles.settingRowVertical}>
-        <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.mcp.headerHelp")}</Text>
-        <Group>
-          <TextInputField
-            icon={penPlaceholderIcon}
-            placeholder={t("settings.mcp.headerName")}
-            autoCapitalize="none"
-            value={serverDraft.headerName}
-            onChangeText={(v) => setServerDraft(prev => ({ ...prev, headerName: v }))}
-          />
-          <TextInputField
-            icon={penPlaceholderIcon}
-            placeholder={t("settings.mcp.headerValue")}
-            autoCapitalize="none"
-            secureTextEntry
-            value={serverDraft.headerValue}
-            onChangeText={(v) => setServerDraft(prev => ({ ...prev, headerValue: v }))}
-          />
-        </Group>
-      </View>
+        <View style={styles.settingRowVertical}>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.mcp.headerHelp")}</Text>
+          <Group>
+            <TextInputField
+              icon={penPlaceholderIcon}
+              placeholder={t("settings.mcp.headerName")}
+              autoCapitalize="none"
+              value={serverDraft.headerName}
+              onChangeText={(v) => setServerDraft(prev => ({ ...prev, headerName: v }))}
+            />
+            <TextInputField
+              icon={penPlaceholderIcon}
+              placeholder={t("settings.mcp.headerValue")}
+              autoCapitalize="none"
+              secureTextEntry
+              value={serverDraft.headerValue}
+              onChangeText={(v) => setServerDraft(prev => ({ ...prev, headerValue: v }))}
+            />
+          </Group>
+        </View>
 
-      <View style={styles.settingRowVertical}>
-        <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.mcp.clientIdHelp")}</Text>
-        <Group>
-          <TextInputField
-            icon={penPlaceholderIcon}
-            placeholder={t("settings.mcp.clientId")}
-            autoCapitalize="none"
-            value={serverDraft.clientId}
-            onChangeText={(v) => setServerDraft(prev => ({ ...prev, clientId: v }))}
-          />
-        </Group>
-      </View>
+        <View style={styles.settingRowVertical}>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.mcp.clientIdHelp")}</Text>
+          <Group>
+            <TextInputField
+              icon={penPlaceholderIcon}
+              placeholder={t("settings.mcp.clientId")}
+              autoCapitalize="none"
+              value={serverDraft.clientId}
+              onChangeText={(v) => setServerDraft(prev => ({ ...prev, clientId: v }))}
+            />
+          </Group>
+        </View>
 
-      <View style={styles.settingRowVertical}>
-        <Group style={[styles.highlightGroup, (serverDraftBusy || !serverDraft.url.trim()) && styles.highlightGroupDisabled]}>
-          <ActionButton
-            icon={addIcon}
-            label={serverDraftBusy ? t("settings.server.checking") : t("settings.server.add")}
-            variant="highlight"
-            disabled={serverDraftBusy || !serverDraft.url.trim()}
-            onPress={submitMcpDraft}
-          />
-        </Group>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Group style={[styles.highlightGroup, (serverDraftBusy || !serverDraft.url.trim()) && styles.highlightGroupDisabled]}>
+            <ActionButton
+              icon={addIcon}
+              label={serverDraftBusy ? t("settings.server.checking") : t("settings.server.add")}
+              variant="highlight"
+              disabled={serverDraftBusy || !serverDraft.url.trim()}
+              onPress={submitMcpDraft}
+            />
+          </Group>
+        </View>
       </View>
     </View>
   );
@@ -2102,43 +2157,45 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.server.add"), "ollama")}
 
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("settings.server.name")}</Text>
-        <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.server.nameHelp")}</Text>
-        <Group>
-          <TextInputField
-            icon={penPlaceholderIcon}
-            placeholder={t("settings.server.namePlaceholder")}
-            value={serverDraft.name}
-            onChangeText={(v) => setServerDraft(prev => ({ ...prev, name: v }))}
-          />
-        </Group>
-      </View>
+      <View style={styles.contentCard}>
+        <View style={styles.settingRowVertical}>
+          <Text style={styles.settingLabel}>{t("settings.server.name")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.server.nameHelp")}</Text>
+          <Group>
+            <TextInputField
+              icon={penPlaceholderIcon}
+              placeholder={t("settings.server.namePlaceholder")}
+              value={serverDraft.name}
+              onChangeText={(v) => setServerDraft(prev => ({ ...prev, name: v }))}
+            />
+          </Group>
+        </View>
 
-      <View style={styles.settingRowVertical}>
-        <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.server.link")}</Text>
-        <Group>
-          <TextInputField
-            icon={linkIcon}
-            placeholder={t("settings.service.serverLink")}
-            autoCapitalize="none"
-            autoCorrect={false}
-            value={serverDraft.url}
-            onChangeText={(v) => setServerDraft(prev => ({ ...prev, url: v }))}
-          />
-        </Group>
-      </View>
+        <View style={styles.settingRowVertical}>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.server.link")}</Text>
+          <Group>
+            <TextInputField
+              icon={linkIcon}
+              placeholder={t("settings.service.serverLink")}
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={serverDraft.url}
+              onChangeText={(v) => setServerDraft(prev => ({ ...prev, url: v }))}
+            />
+          </Group>
+        </View>
 
-      <View style={styles.settingRowVertical}>
-        <Group style={[styles.highlightGroup, (serverDraftBusy || !serverDraft.url.trim()) && styles.highlightGroupDisabled]}>
-          <ActionButton
-            icon={addIcon}
-            label={serverDraftBusy ? t("settings.server.checking") : t("settings.server.add")}
-            variant="highlight"
-            disabled={serverDraftBusy || !serverDraft.url.trim()}
-            onPress={submitOllamaDraft}
-          />
-        </Group>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Group style={[styles.highlightGroup, (serverDraftBusy || !serverDraft.url.trim()) && styles.highlightGroupDisabled]}>
+            <ActionButton
+              icon={addIcon}
+              label={serverDraftBusy ? t("settings.server.checking") : t("settings.server.add")}
+              variant="highlight"
+              disabled={serverDraftBusy || !serverDraft.url.trim()}
+              onPress={submitOllamaDraft}
+            />
+          </Group>
+        </View>
       </View>
     </View>
   );
@@ -2156,130 +2213,135 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <View style={styles.subPageContainer}>
         {renderSubPageHeader(ollamaServerLabel(server), "ollama")}
 
-        <View style={styles.settingRowVertical}>
-          <Text style={styles.helpText}>{ollamaStatusLabel(server)}</Text>
-        </View>
-
-        <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.server.name")}</Text>
-          <Group>
-            <TextInputField
-              icon={penPlaceholderIcon}
-              placeholder={t("settings.server.namePlaceholder")}
-              value={server.name}
-              onChangeText={(v) => patchOllamaServer(index, { name: v })}
-            />
-          </Group>
-        </View>
-
-        <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.server.link")}</Text>
-          <Group>
-            <TextInputField
-              icon={linkIcon}
-              placeholder={t("settings.service.serverLink")}
-              autoCapitalize="none"
-              autoCorrect={false}
-              value={server.url}
-              onChangeText={(v) => patchOllamaServer(index, { url: v })}
-              onBlur={() => handleOllamaUrlBlur(index)}
-              rightIcon={serverErrors[server.url.trim()] ? errorIcon : undefined}
-              rightIconLabel={t("common.error")}
-              onRightIconPress={() => showAlert(
-                t("settings.ollama.unreachableTitle"),
-                t("settings.ollama.unreachableInfo"),
-                undefined,
-                { image: ollamaErrorImage, messageAlign: "left" },
-              )}
-            />
-          </Group>
-        </View>
-
-        {/* reconnect only while offline */}
-        {!connected && (
+        <View style={styles.contentCard}>
           <View style={styles.settingRowVertical}>
+            <Text style={styles.helpText}>{ollamaStatusLabel(server)}</Text>
+          </View>
+
+          <View style={styles.settingRowVertical}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.server.name")}</Text>
             <Group>
-              <ActionButton
-                icon={reconnectIcon}
-                label={ollamaModelsLoading ? t("settings.ollama.connecting") : t("settings.ollama.reconnect")}
-                disabled={ollamaModelsLoading || url.length === 0}
-                onPress={() => reconnectOllamaServer(index)}
-                style={styles.mcpGroupRow}
+              <TextInputField
+                icon={penPlaceholderIcon}
+                placeholder={t("settings.server.namePlaceholder")}
+                value={server.name}
+                onChangeText={(v) => patchOllamaServer(index, { name: v })}
               />
             </Group>
           </View>
-        )}
 
-        <View style={styles.settingRowVertical}>
-          <Text style={styles.settingLabel}>{t("settings.ollama.contextLength")}</Text>
-          <Text style={[styles.helpText, { marginBottom: 12 }]}>{t("settings.ollama.contextHelp")}</Text>
-          <Group>
-            {advancedMode ? (
+          <View style={styles.settingRowVertical}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.server.link")}</Text>
+            <Group>
               <TextInputField
-                icon={messageIcon}
-                placeholder="8192"
-                value={ollamaContextDraft}
-                onChangeText={(v) => setOllamaServerContext(index, v)}
-                keyboardType="numeric"
+                icon={linkIcon}
+                placeholder={t("settings.service.serverLink")}
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={server.url}
+                onChangeText={(v) => patchOllamaServer(index, { url: v })}
+                onBlur={() => handleOllamaUrlBlur(index)}
+                rightIcon={serverErrors[server.url.trim()] ? errorIcon : undefined}
+                rightIconLabel={t("common.error")}
+                onRightIconPress={() => showAlert(
+                  t("settings.ollama.unreachableTitle"),
+                  t("settings.ollama.unreachableInfo"),
+                  undefined,
+                  { image: ollamaErrorImage, messageAlign: "left" },
+                )}
               />
-            ) : (
-              <Slider
-                icon={messageIcon}
-                options={ollamaContextLengthOptions}
-                selectedValue={String(serverContextLength(server))}
-                onSelect={(v) => setOllamaServerContext(index, v)}
-              />
-            )}
-          </Group>
+            </Group>
+          </View>
+
+          {/* reconnect only while offline */}
+          {!connected && (
+            <View style={styles.settingRowVertical}>
+              <Group>
+                <ActionButton
+                  icon={reconnectIcon}
+                  label={ollamaModelsLoading ? t("settings.ollama.connecting") : t("settings.ollama.reconnect")}
+                  disabled={ollamaModelsLoading || url.length === 0}
+                  onPress={() => reconnectOllamaServer(index)}
+                  style={styles.mcpGroupRow}
+                />
+              </Group>
+            </View>
+          )}
+
+          <View style={styles.settingRowVertical}>
+            <Text style={styles.settingLabel}>{t("settings.ollama.contextLength")}</Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.ollama.contextHelp")}</Text>
+            <Group>
+              {advancedMode ? (
+                <TextInputField
+                  icon={messageIcon}
+                  placeholder="8192"
+                  value={ollamaContextDraft}
+                  onChangeText={(v) => setOllamaServerContext(index, v)}
+                  keyboardType="numeric"
+                />
+              ) : (
+                <Slider
+                  icon={messageIcon}
+                  options={ollamaContextLengthOptions}
+                  selectedValue={String(serverContextLength(server))}
+                  onSelect={(v) => setOllamaServerContext(index, v)}
+                />
+              )}
+            </Group>
+          </View>
+
+          <View style={styles.settingRowVertical}>
+            <Text style={styles.settingLabel}>{t("settings.ollama.keepAlive")}</Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {advancedMode ? t("settings.ollama.keepAliveHelpAdvanced") : t("settings.ollama.keepAliveHelp")}
+            </Text>
+            <Group>
+              {advancedMode ? (
+                <TextInputField
+                  icon={timeIcon}
+                  placeholder="300"
+                  value={ollamaKeepAliveDraft}
+                  onChangeText={(v) => setOllamaServerKeepAlive(index, v)}
+                  keyboardType="numeric"
+                />
+              ) : (
+                <Slider
+                  icon={timeIcon}
+                  options={ollamaKeepAliveOptions}
+                  selectedValue={String(serverKeepAlive(server))}
+                  onSelect={(v) => setOllamaServerKeepAlive(index, v)}
+                />
+              )}
+            </Group>
+          </View>
+
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {ollamaModels.length > 0 ? t("settings.ollama.modelsCount", { count: ollamaModels.length }) : t("settings.ollama.models")}
+            </Text>
+            <Text style={styles.helpText}>
+              {ollamaModels.length > 0
+                ? ollamaModels.join(", ")
+                : ollamaModelsLoading
+                ? t("settings.ollama.modelsLoading")
+                : t("settings.ollama.noModels")}
+            </Text>
+          </View>
         </View>
 
-        <View style={styles.settingRowVertical}>
-          <Text style={styles.settingLabel}>{t("settings.ollama.keepAlive")}</Text>
-          <Text style={[styles.helpText, { marginBottom: 12 }]}>
-            {advancedMode ? t("settings.ollama.keepAliveHelpAdvanced") : t("settings.ollama.keepAliveHelp")}
-          </Text>
-          <Group>
-            {advancedMode ? (
-              <TextInputField
-                icon={timeIcon}
-                placeholder="300"
-                value={ollamaKeepAliveDraft}
-                onChangeText={(v) => setOllamaServerKeepAlive(index, v)}
-                keyboardType="numeric"
+        {/* danger zone card */}
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Group style={styles.dangerGroup}>
+              <ActionButton
+                icon={binIcon}
+                label={t("settings.ollama.remove.action")}
+                variant="highlight"
+                onPress={() => removeOllamaServer(index)}
               />
-            ) : (
-              <Slider
-                icon={timeIcon}
-                options={ollamaKeepAliveOptions}
-                selectedValue={String(serverKeepAlive(server))}
-                onSelect={(v) => setOllamaServerKeepAlive(index, v)}
-              />
-            )}
-          </Group>
-        </View>
-
-        <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>
-            {ollamaModels.length > 0 ? t("settings.ollama.modelsCount", { count: ollamaModels.length }) : t("settings.ollama.models")}
-          </Text>
-          <Text style={styles.helpText}>
-            {ollamaModels.length > 0
-              ? ollamaModels.join(", ")
-              : ollamaModelsLoading
-              ? t("settings.ollama.modelsLoading")
-              : t("settings.ollama.noModels")}
-          </Text>
-        </View>
-
-        <View style={styles.settingRowVertical}>
-          <Group style={styles.dangerGroup}>
-            <ActionButton
-              icon={binIcon}
-              label={t("settings.ollama.remove.action")}
-              variant="highlight"
-              onPress={() => removeOllamaServer(index)}
-            />
-          </Group>
+            </Group>
+          </View>
         </View>
       </View>
     );
@@ -2290,106 +2352,115 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.privacy.title"))}
 
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("settings.privacy.data")}</Text>
-        <Text style={[styles.helpText, { marginBottom: 6 }]}>
-          {t("settings.privacy.intro")}
-        </Text>
-        <Text style={styles.helpText}>
-          {t("settings.privacy.localStorage")}
-        </Text>
-        <Text style={[styles.helpText, { marginTop: 4, marginBottom: 12 }]}>
-          {t("settings.privacy.noTracking")}
-        </Text>
-        <Group>
-          <ActionButton
-            icon={hyperlinkIcon}
-            label={t("settings.privacy.policy")}
-            onPress={() => Linking.openURL("https://maestroai.company/privacy.html").catch(() => { })}
-          />
-        </Group>
+      {/* privacy policy card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>{t("settings.privacy.data")}</Text>
+          <Text style={[styles.helpText, { marginBottom: 6 }]}>
+            {t("settings.privacy.intro")}
+          </Text>
+          <Text style={styles.helpText}>
+            {t("settings.privacy.localStorage")}
+          </Text>
+          <Text style={[styles.helpText, { marginTop: 4, marginBottom: Spacing.md }]}>
+            {t("settings.privacy.noTracking")}
+          </Text>
+          <Group>
+            <ActionButton
+              icon={hyperlinkIcon}
+              label={t("settings.privacy.policy")}
+              onPress={() => Linking.openURL("https://maestroai.company/privacy.html").catch(() => { })}
+            />
+          </Group>
+        </View>
       </View>
 
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("permissions.title")}</Text>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          {Platform.OS === "web"
-            ? t("settings.privacy.permissionsWeb")
-            : t("settings.privacy.permissionsNative")}
-        </Text>
+      {/* permissions card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>{t("permissions.title")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {Platform.OS === "web"
+              ? t("settings.privacy.permissionsWeb")
+              : t("settings.privacy.permissionsNative")}
+          </Text>
 
-        <Group>
-          <ActionButton
-            icon={micIcon}
-            label={t("permissions.microphone.label")}
-            onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
-            disabled={Platform.OS === "web"}
-            rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.microphone) : undefined}
-          />
-          <ActionButton
-            icon={cameraIcon}
-            label={t("permissions.camera.label")}
-            onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
-            disabled={Platform.OS === "web"}
-            rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.camera) : undefined}
-          />
-          <ActionButton
-            icon={locationIcon}
-            label={t("permissions.location.label")}
-            onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
-            disabled={Platform.OS === "web"}
-            rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.location) : undefined}
-          />
-          {Platform.OS !== "web" && (
+          <Group>
             <ActionButton
-              icon={photoIcon}
-              label={t("permissions.photos.label")}
-              onPress={() => Linking.openSettings()}
-              rightElement={renderPermissionBadge(permissionStatuses.photos)}
+              icon={micIcon}
+              label={t("permissions.microphone.label")}
+              onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+              disabled={Platform.OS === "web"}
+              rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.microphone) : undefined}
             />
-          )}
-          {Platform.OS !== "web" && (
             <ActionButton
-              icon={profilIcon}
-              label={t("permissions.contacts.label")}
-              onPress={() => Linking.openSettings()}
-              rightElement={renderPermissionBadge(permissionStatuses.contacts)}
+              icon={cameraIcon}
+              label={t("permissions.camera.label")}
+              onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+              disabled={Platform.OS === "web"}
+              rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.camera) : undefined}
             />
-          )}
-          {Platform.OS !== "web" && (
             <ActionButton
-              icon={calendarIcon}
-              label={t("permissions.calendar.label")}
-              onPress={() => Linking.openSettings()}
-              rightElement={renderPermissionBadge(permissionStatuses.calendar)}
+              icon={locationIcon}
+              label={t("permissions.location.label")}
+              onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+              disabled={Platform.OS === "web"}
+              rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.location) : undefined}
             />
-          )}
-        </Group>
+            {Platform.OS !== "web" && (
+              <ActionButton
+                icon={photoIcon}
+                label={t("permissions.photos.label")}
+                onPress={() => Linking.openSettings()}
+                rightElement={renderPermissionBadge(permissionStatuses.photos)}
+              />
+            )}
+            {Platform.OS !== "web" && (
+              <ActionButton
+                icon={profilIcon}
+                label={t("permissions.contacts.label")}
+                onPress={() => Linking.openSettings()}
+                rightElement={renderPermissionBadge(permissionStatuses.contacts)}
+              />
+            )}
+            {Platform.OS !== "web" && (
+              <ActionButton
+                icon={calendarIcon}
+                label={t("permissions.calendar.label")}
+                onPress={() => Linking.openSettings()}
+                rightElement={renderPermissionBadge(permissionStatuses.calendar)}
+              />
+            )}
+          </Group>
+        </View>
       </View>
 
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("settings.data.management")}</Text>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          {t("settings.data.managementHelp")}
-        </Text>
+      {/* data management card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>{t("settings.data.management")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.data.managementHelp")}
+          </Text>
 
-        <Group>
-          <ActionButton
-            icon={exportIcon}
-            label={t("settings.data.exportAction")}
-            onPress={handleExportData}
-          />
-          <ActionButton
-            icon={downloadIcon}
-            label={t("settings.data.importAction")}
-            onPress={handleImportData}
-          />
-          <ActionButton
-            icon={binIcon}
-            label={t("settings.data.deleteAllAction")}
-            onPress={handleDeleteAllConversations}
-          />
-        </Group>
+          <Group>
+            <ActionButton
+              icon={exportIcon}
+              label={t("settings.data.exportAction")}
+              onPress={handleExportData}
+            />
+            <ActionButton
+              icon={downloadIcon}
+              label={t("settings.data.importAction")}
+              onPress={handleImportData}
+            />
+            <ActionButton
+              icon={binIcon}
+              label={t("settings.data.deleteAllAction")}
+              onPress={handleDeleteAllConversations}
+            />
+          </Group>
+        </View>
       </View>
     </View>
   );
@@ -2404,70 +2475,79 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.support.title"))}
 
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("settings.support.report")}</Text>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          {t("settings.support.reportHelp")}
-        </Text>
-        <Group style={styles.groupSpacingTight}>
-          <TextInputField
-            icon={penPlaceholderIcon}
-            placeholder={t("bugReport.placeholder")}
-            value={report.text}
-            onChangeText={report.setText}
-          />
-        </Group>
+      {/* bug report card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>{t("settings.support.report")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.support.reportHelp")}
+          </Text>
+          <Group style={styles.groupSpacingTight}>
+            <TextInputField
+              icon={penPlaceholderIcon}
+              placeholder={t("bugReport.placeholder")}
+              value={report.text}
+              onChangeText={report.setText}
+            />
+          </Group>
 
-        <View style={styles.toggleRow}>
-          <Checkbox
-            label={t("bugReport.attachLogs")}
-            checked={report.logs !== null}
-            onToggle={report.toggleLogs}
-            labelFirst
-            style={styles.checkboxRow}
-          />
+          <View style={styles.toggleRow}>
+            <Checkbox
+              label={t("bugReport.attachLogs")}
+              checked={report.logs !== null}
+              onToggle={report.toggleLogs}
+              labelFirst
+              style={styles.checkboxRow}
+            />
+          </View>
+
+          <Text style={[styles.helpText, { marginTop: Spacing.md, marginBottom: Spacing.md }]}>{t("bugReport.consent")}</Text>
+
+          <Group>
+            <ActionButton
+              icon={arrowIcon}
+              label={t("bugReport.send")}
+              onPress={() => report.send()}
+            />
+          </Group>
         </View>
-
-        <Text style={[styles.helpText, { marginTop: 12, marginBottom: 12 }]}>{t("bugReport.consent")}</Text>
-
-        <Group>
-          <ActionButton
-            icon={arrowIcon}
-            label={t("bugReport.send")}
-            onPress={() => report.send()}
-          />
-        </Group>
       </View>
 
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("settings.support.more")}</Text>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          {t("settings.support.moreHelp")}
-        </Text>
-        <Group>
-          <ActionButton
-            icon={supportIcon}
-            label={t("settings.support.contact")}
-            onPress={() => Linking.openURL("https://maestroai.company/contact.html").catch(() => { })}
-          />
-        </Group>
+      {/* contact support card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>{t("settings.support.more")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.support.moreHelp")}
+          </Text>
+          <Group>
+            <ActionButton
+              icon={supportIcon}
+              label={t("settings.support.contact")}
+              onPress={() => Linking.openURL("https://maestroai.company/contact.html").catch(() => { })}
+            />
+          </Group>
+        </View>
       </View>
 
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("settings.support.testing")}</Text>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          {t("settings.support.testingHelp")}
-        </Text>
-        <Group style={styles.dangerGroup}>
-          <ActionButton
-            icon={deleteIcon}
-            label={t("settings.support.testCrash")}
-            variant="highlight"
-            onPress={() => {
-              throw new Error("Test crash triggered from Report a bug settings");
-            }}
-          />
-        </Group>
+      {/* diagnostic test card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>{t("settings.support.testing")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.support.testingHelp")}
+          </Text>
+          <Group style={styles.dangerGroup}>
+            <ActionButton
+              icon={deleteIcon}
+              label={t("settings.support.testCrash")}
+              variant="highlight"
+              onPress={() => {
+                throw new Error("Test crash triggered from Report a bug settings");
+              }}
+            />
+          </Group>
+        </View>
       </View>
     </View>
   );
@@ -2477,88 +2557,95 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.tools.title"))}
 
-      {generalTools.map((tool) => {
-        const name = tool.definition.function.name;
-        const key = `tool:${name}`;
-        const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
-        return (
-          <View key={name} style={styles.settingRowVertical}>
-            <View style={styles.toggleRow}>
-              <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
-              <Toggle
-                checked={enabled}
-                onToggle={async (v) => {
-                  setPluginStates(prev => ({ ...prev, [key]: v }));
-                  await PluginRegistry.setEnabled('tool', name, v);
-                  //request permission at enable time
-                  if (v) await tool.requestPermission?.();
-                }}
-              />
+      {/* built-in tools card */}
+      <View style={styles.contentCard}>
+        {generalTools.map((tool, index) => {
+          const name = tool.definition.function.name;
+          const key = `tool:${name}`;
+          const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
+          const isLast = index === generalTools.length - 1;
+          return (
+            <View key={name} style={[styles.settingRowVertical, isLast && { marginBottom: 0 }]}>
+              <View style={styles.toggleRow}>
+                <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
+                <Toggle
+                  checked={enabled}
+                  onToggle={async (v) => {
+                    setPluginStates(prev => ({ ...prev, [key]: v }));
+                    await PluginRegistry.setEnabled('tool', name, v);
+                    //request permission at enable time
+                    if (v) await tool.requestPermission?.();
+                  }}
+                />
+              </View>
+              {tool.displayDescription ? (
+                <Text style={styles.helpText}>
+                  {tool.displayDescription.endsWith('.') ? tool.displayDescription : `${tool.displayDescription}.`}
+                </Text>
+              ) : null}
             </View>
-            {tool.displayDescription ? (
-              <Text style={styles.helpText}>
-                {tool.displayDescription.endsWith('.') ? tool.displayDescription : `${tool.displayDescription}.`}
-              </Text>
-            ) : null}
-          </View>
-        );
-      })}
-
-      {/* widgets block: links out, same pattern as mobile actions below */}
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("settings.tools.widgets.title")}</Text>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          {t("settings.tools.widgets.help", { list: allWidgets.map(w => w.name).join(", ") })}
-        </Text>
-
-        <Group>
-          <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-            onPress={() => setActiveSubPage("widgets")}
-          >
-            <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <Text style={styles.navLabel}>{t("settings.tools.widgets.see")}</Text>
-          </Pressable>
-        </Group>
+          );
+        })}
       </View>
 
-      {/* mcp block: remote servers add their own tools, configured in a subpage */}
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("settings.tools.mcp.title")}</Text>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          {t("settings.tools.mcp.help")}
-        </Text>
-
-        <Group>
-          <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-            onPress={() => setActiveSubPage("mcpservers")}
-          >
-            <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-            <Text style={styles.navLabel}>{t("settings.tools.mcp.see")}</Text>
-          </Pressable>
-        </Group>
-      </View>
-
-      {/* mobile actions block, last: points to a deeper subpage instead of toggling in place. desktop has no mobile apps to open, so it's hidden there */}
-      {!isDesktop && (
+      {/* extensions and integrations card */}
+      <View style={styles.contentCard}>
+        {/* widgets block */}
         <View style={styles.settingRowVertical}>
-          <Text style={styles.settingLabel}>{t("settings.tools.mobile.title")}</Text>
-          <Text style={[styles.helpText, { marginBottom: 12 }]}>
-            {t("settings.tools.mobile.help", { list: mobileTools.map(tool => tool.displayName ?? tool.definition.function.name).join(", ") })}
+          <Text style={styles.settingLabel}>{t("settings.tools.widgets.title")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.tools.widgets.help", { list: allWidgets.map(w => w.name).join(", ") })}
           </Text>
 
           <Group>
             <Pressable
               style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
-              onPress={() => setActiveSubPage("mobileactions")}
+              onPress={() => setActiveSubPage("widgets")}
             >
               <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>{t("settings.tools.mobile.see")}</Text>
+              <Text style={styles.navLabel}>{t("settings.tools.widgets.see")}</Text>
             </Pressable>
           </Group>
         </View>
-      )}
+
+        {/* mcp block */}
+        <View style={[styles.settingRowVertical, isDesktop && { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>{t("settings.tools.mcp.title")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.tools.mcp.help")}
+          </Text>
+
+          <Group>
+            <Pressable
+              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+              onPress={() => setActiveSubPage("mcpservers")}
+            >
+              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <Text style={styles.navLabel}>{t("settings.tools.mcp.see")}</Text>
+            </Pressable>
+          </Group>
+        </View>
+
+        {/* mobile actions block */}
+        {!isDesktop && (
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={styles.settingLabel}>{t("settings.tools.mobile.title")}</Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {t("settings.tools.mobile.help", { list: mobileTools.map(tool => tool.displayName ?? tool.definition.function.name).join(", ") })}
+            </Text>
+
+            <Group>
+              <Pressable
+                style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+                onPress={() => setActiveSubPage("mobileactions")}
+              >
+                <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+                <Text style={styles.navLabel}>{t("settings.tools.mobile.see")}</Text>
+              </Pressable>
+            </Group>
+          </View>
+        )}
+      </View>
     </View>
   );
 
@@ -2567,43 +2654,45 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.tools.mcp.title"), "tools")}
 
-      <View style={styles.settingRowVertical}>
-        <Text style={[styles.helpText, { marginBottom: 12 }]}>
-          {t("settings.tools.mcp.help")}
-        </Text>
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.tools.mcp.help")}
+          </Text>
 
-        {mcpServers.length > 0 && (
-          <Group style={styles.groupSpacingTight}>
-            {mcpServers.map((server) => (
-              <Pressable
-                key={server.id}
-                style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
-                onPress={() => { setMcpDetailId(server.id); setActiveSubPage("mcpserver"); }}
-              >
-                <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-                <Text style={styles.navLabel}>{server.name}</Text>
-                {mcpNeedsAuth(server.id) ? (
-                  <IconButton
-                    icon={infoIcon}
-                    label={t("common.info")}
-                    size={22}
-                    tintColor={Colors.textMuted}
-                    containerSize={32}
-                    pressedColor={Colors.surfacePressed}
-                    style={styles.navStatusIcon}
-                    onPress={() => showMcpAuthInfo(server.id)}
-                  />
-                ) : (
-                  <Text style={styles.navStatus}>{mcpStatusLabel(server.id)}</Text>
-                )}
-              </Pressable>
-            ))}
+          {mcpServers.length > 0 && (
+            <Group style={styles.groupSpacingTight}>
+              {mcpServers.map((server) => (
+                <Pressable
+                  key={server.id}
+                  style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
+                  onPress={() => { setMcpDetailId(server.id); setActiveSubPage("mcpserver"); }}
+                >
+                  <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+                  <Text style={styles.navLabel}>{server.name}</Text>
+                  {mcpNeedsAuth(server.id) ? (
+                    <IconButton
+                      icon={infoIcon}
+                      label={t("common.info")}
+                      size={22}
+                      tintColor={Colors.textMuted}
+                      containerSize={32}
+                      pressedColor={Colors.surfacePressed}
+                      style={styles.navStatusIcon}
+                      onPress={() => showMcpAuthInfo(server.id)}
+                    />
+                  ) : (
+                    <Text style={styles.navStatus}>{mcpStatusLabel(server.id)}</Text>
+                  )}
+                </Pressable>
+              ))}
+            </Group>
+          )}
+
+          <Group>
+            <ActionButton icon={addIcon} label={t("settings.server.add")} onPress={() => openServerDraft("mcpserveradd")} />
           </Group>
-        )}
-
-        <Group style={styles.groupSpacing}>
-          <ActionButton icon={addIcon} label={t("settings.server.add")} onPress={() => openServerDraft("mcpserveradd")} />
-        </Group>
+        </View>
       </View>
     </View>
   );
@@ -2621,76 +2710,85 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <View style={styles.subPageContainer}>
         {renderSubPageHeader(server.name, "mcpservers")}
 
-        <View style={styles.settingRowVertical}>
-          <Text style={styles.helpText}>{mcpStatusLabel(server.id)}</Text>
-          {status.error ? (
-            <Text style={[styles.helpText, { marginTop: 6, color: Colors.error }]}>{status.error}</Text>
-          ) : null}
-        </View>
-
-        <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{server.name}</Text>
-          <Group style={styles.groupSpacingTight}>
-            <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
-              onPress={() => setActiveSubPage("mcpserversettings")}
-            >
-              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>{t("settings.server.settings")}</Text>
-            </Pressable>
-          </Group>
-
-          {/* reconnect only while offline */}
-          {status.state !== "connected" && (
-            <Group>
-              <ActionButton
-                icon={reconnectIcon}
-                label={busy ? t("settings.mcp.connecting") : t("settings.mcp.reconnect")}
-                disabled={busy || !server.url.trim()}
-                onPress={() => connectMcpServer(server.id)}
-                style={styles.mcpGroupRow}
-              />
-            </Group>
-          )}
-        </View>
-
-        {tools.length > 0 && (
+        {/* server status and actions card */}
+        <View style={styles.contentCard}>
           <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.mcp.tools", { count: tools.length })}</Text>
-            {tools.map((tool, index) => {
-              const name = tool.definition.function.name;
-              const key = `tool:${name}`;
-              const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
-              return (
-                <View key={name} style={index < tools.length - 1 && { marginBottom: 16 }}>
-                  <View style={styles.toggleRow}>
-                    <Text style={styles.settingLabel}>{tool.displayName}</Text>
-                    <Toggle
-                      checked={enabled}
-                      onToggle={async (v) => {
-                        setPluginStates(prev => ({ ...prev, [key]: v }));
-                        await PluginRegistry.setEnabled('tool', name, v);
-                      }}
-                    />
+            <Text style={styles.helpText}>{mcpStatusLabel(server.id)}</Text>
+            {status.error ? (
+              <Text style={[styles.helpText, { marginTop: 6, color: Colors.error }]}>{status.error}</Text>
+            ) : null}
+          </View>
+
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{server.name}</Text>
+            <Group style={status.state !== "connected" ? styles.groupSpacingTight : undefined}>
+              <Pressable
+                style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
+                onPress={() => setActiveSubPage("mcpserversettings")}
+              >
+                <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+                <Text style={styles.navLabel}>{t("settings.server.settings")}</Text>
+              </Pressable>
+            </Group>
+
+            {/* reconnect only while offline */}
+            {status.state !== "connected" && (
+              <Group>
+                <ActionButton
+                  icon={reconnectIcon}
+                  label={busy ? t("settings.mcp.connecting") : t("settings.mcp.reconnect")}
+                  disabled={busy || !server.url.trim()}
+                  onPress={() => connectMcpServer(server.id)}
+                  style={styles.mcpGroupRow}
+                />
+              </Group>
+            )}
+          </View>
+        </View>
+
+        {/* tools card */}
+        {tools.length > 0 && (
+          <View style={styles.contentCard}>
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.mcp.tools", { count: tools.length })}</Text>
+              {tools.map((tool, index) => {
+                const name = tool.definition.function.name;
+                const key = `tool:${name}`;
+                const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
+                return (
+                  <View key={name} style={index < tools.length - 1 && { marginBottom: Spacing.xxl }}>
+                    <View style={styles.toggleRow}>
+                      <Text style={styles.settingLabel}>{tool.displayName}</Text>
+                      <Toggle
+                        checked={enabled}
+                        onToggle={async (v) => {
+                          setPluginStates(prev => ({ ...prev, [key]: v }));
+                          await PluginRegistry.setEnabled('tool', name, v);
+                        }}
+                      />
+                    </View>
+                    {tool.displayDescription ? (
+                      <Text style={styles.helpText}>{tool.displayDescription}</Text>
+                    ) : null}
                   </View>
-                  {tool.displayDescription ? (
-                    <Text style={styles.helpText}>{tool.displayDescription}</Text>
-                  ) : null}
-                </View>
-              );
-            })}
+                );
+              })}
+            </View>
           </View>
         )}
 
-        <View style={styles.settingRowVertical}>
-          <Group style={styles.dangerGroup}>
-            <ActionButton
-              icon={binIcon}
-              label={t("settings.mcp.remove.action")}
-              variant="highlight"
-              onPress={() => removeMcpServer(server.id, server.name)}
-            />
-          </Group>
+        {/* danger zone card */}
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Group style={styles.dangerGroup}>
+              <ActionButton
+                icon={binIcon}
+                label={t("settings.mcp.remove.action")}
+                variant="highlight"
+                onPress={() => removeMcpServer(server.id, server.name)}
+              />
+            </Group>
+          </View>
         </View>
       </View>
     );
@@ -2705,59 +2803,61 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <View style={styles.subPageContainer}>
         {renderSubPageHeader(t("settings.server.settings"), "mcpserver")}
 
-        <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: 10 }]}>{t("settings.server.link")}</Text>
-          <Group>
-            <TextInputField
-              icon={linkIcon}
-              placeholder={t("settings.service.serverLink")}
-              autoCapitalize="none"
-              value={server.url}
-              onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, url: v } : s))}
-              onBlur={() => handleMcpUrlBlur(server.id, server.url)}
-              rightIcon={mcpNeedsAuth(server.id) ? infoIcon : undefined}
-              rightIconTint={Colors.textMuted}
-              rightIconLabel={t("common.info")}
-              onRightIconPress={() => showMcpAuthInfo(server.id)}
-            />
-          </Group>
-        </View>
+        <View style={styles.contentCard}>
+          <View style={styles.settingRowVertical}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.server.link")}</Text>
+            <Group>
+              <TextInputField
+                icon={linkIcon}
+                placeholder={t("settings.service.serverLink")}
+                autoCapitalize="none"
+                value={server.url}
+                onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, url: v } : s))}
+                onBlur={() => handleMcpUrlBlur(server.id, server.url)}
+                rightIcon={mcpNeedsAuth(server.id) ? infoIcon : undefined}
+                rightIconTint={Colors.textMuted}
+                rightIconLabel={t("common.info")}
+                onRightIconPress={() => showMcpAuthInfo(server.id)}
+              />
+            </Group>
+          </View>
 
-        <View style={styles.settingRowVertical}>
-          <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.mcp.headerHelp")}</Text>
-          <Group>
-            <TextInputField
-              icon={penPlaceholderIcon}
-              placeholder={t("settings.mcp.headerName")}
-              autoCapitalize="none"
-              value={server.headerName}
-              onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, headerName: v } : s))}
-              onBlur={() => saveMcpServer(server.id, { headerName: server.headerName })}
-            />
-            <TextInputField
-              icon={penPlaceholderIcon}
-              placeholder={t("settings.mcp.headerValue")}
-              autoCapitalize="none"
-              secureTextEntry
-              value={mcpHeaderValues[server.id] ?? ""}
-              onChangeText={(v) => setMcpHeaderValues(prev => ({ ...prev, [server.id]: v }))}
-              onBlur={() => McpService.setHeaderValue(server.id, mcpHeaderValues[server.id] ?? "")}
-            />
-          </Group>
-        </View>
+          <View style={styles.settingRowVertical}>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.mcp.headerHelp")}</Text>
+            <Group>
+              <TextInputField
+                icon={penPlaceholderIcon}
+                placeholder={t("settings.mcp.headerName")}
+                autoCapitalize="none"
+                value={server.headerName}
+                onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, headerName: v } : s))}
+                onBlur={() => saveMcpServer(server.id, { headerName: server.headerName })}
+              />
+              <TextInputField
+                icon={penPlaceholderIcon}
+                placeholder={t("settings.mcp.headerValue")}
+                autoCapitalize="none"
+                secureTextEntry
+                value={mcpHeaderValues[server.id] ?? ""}
+                onChangeText={(v) => setMcpHeaderValues(prev => ({ ...prev, [server.id]: v }))}
+                onBlur={() => McpService.setHeaderValue(server.id, mcpHeaderValues[server.id] ?? "")}
+              />
+            </Group>
+          </View>
 
-        <View style={styles.settingRowVertical}>
-          <Text style={[styles.helpText, { marginBottom: 10 }]}>{t("settings.mcp.clientIdHelp")}</Text>
-          <Group>
-            <TextInputField
-              icon={penPlaceholderIcon}
-              placeholder={t("settings.mcp.clientId")}
-              autoCapitalize="none"
-              value={server.clientId ?? ""}
-              onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, clientId: v } : s))}
-              onBlur={() => saveMcpServer(server.id, { clientId: server.clientId ?? "" })}
-            />
-          </Group>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.mcp.clientIdHelp")}</Text>
+            <Group>
+              <TextInputField
+                icon={penPlaceholderIcon}
+                placeholder={t("settings.mcp.clientId")}
+                autoCapitalize="none"
+                value={server.clientId ?? ""}
+                onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, clientId: v } : s))}
+                onBlur={() => saveMcpServer(server.id, { clientId: server.clientId ?? "" })}
+              />
+            </Group>
+          </View>
         </View>
       </View>
     );
@@ -2768,25 +2868,27 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.tools.widgets.title"), "tools")}
 
-      {allWidgets.map((widget) => {
-        const key = `widget:${widget.id}`;
-        const enabled = pluginStates[key] ?? (widget.enabledByDefault ?? false);
-        return (
-          <View key={widget.id} style={styles.settingRowVertical}>
-            <View style={styles.toggleRow}>
-              <Text style={styles.settingLabel}>{widget.name}</Text>
-              <Toggle
-                checked={enabled}
-                onToggle={async (v) => {
-                  setPluginStates(prev => ({ ...prev, [key]: v }));
-                  await PluginRegistry.setEnabled('widget', widget.id, v);
-                }}
-              />
+      <View style={styles.contentCard}>
+        {allWidgets.map((widget, index) => {
+          const key = `widget:${widget.id}`;
+          const enabled = pluginStates[key] ?? (widget.enabledByDefault ?? false);
+          return (
+            <View key={widget.id} style={[styles.settingRowVertical, index === allWidgets.length - 1 && { marginBottom: 0 }]}>
+              <View style={styles.toggleRow}>
+                <Text style={styles.settingLabel}>{widget.name}</Text>
+                <Toggle
+                  checked={enabled}
+                  onToggle={async (v) => {
+                    setPluginStates(prev => ({ ...prev, [key]: v }));
+                    await PluginRegistry.setEnabled('widget', widget.id, v);
+                  }}
+                />
+              </View>
+              <Text style={styles.helpText}>{widget.description.split('.')[0]}.</Text>
             </View>
-            <Text style={styles.helpText}>{widget.description.split('.')[0]}.</Text>
-          </View>
-        );
-      })}
+          );
+        })}
+      </View>
     </View>
   );
 
@@ -2795,32 +2897,34 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.tools.mobile.title"), "tools")}
 
-      {mobileTools.map((tool) => {
-        const name = tool.definition.function.name;
-        const key = `tool:${name}`;
-        const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
-        return (
-          <View key={name} style={styles.settingRowVertical}>
-            <View style={styles.toggleRow}>
-              <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
-              <Toggle
-                checked={enabled}
-                onToggle={async (v) => {
-                  setPluginStates(prev => ({ ...prev, [key]: v }));
-                  await PluginRegistry.setEnabled('tool', name, v);
-                  //request permission at enable time
-                  if (v) await tool.requestPermission?.();
-                }}
-              />
+      <View style={styles.contentCard}>
+        {mobileTools.map((tool, index) => {
+          const name = tool.definition.function.name;
+          const key = `tool:${name}`;
+          const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
+          return (
+            <View key={name} style={[styles.settingRowVertical, index === mobileTools.length - 1 && { marginBottom: 0 }]}>
+              <View style={styles.toggleRow}>
+                <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
+                <Toggle
+                  checked={enabled}
+                  onToggle={async (v) => {
+                    setPluginStates(prev => ({ ...prev, [key]: v }));
+                    await PluginRegistry.setEnabled('tool', name, v);
+                    //request permission at enable time
+                    if (v) await tool.requestPermission?.();
+                  }}
+                />
+              </View>
+              {tool.displayDescription ? (
+                <Text style={styles.helpText}>
+                  {tool.displayDescription.endsWith('.') ? tool.displayDescription : `${tool.displayDescription}.`}
+                </Text>
+              ) : null}
             </View>
-            {tool.displayDescription ? (
-              <Text style={styles.helpText}>
-                {tool.displayDescription.endsWith('.') ? tool.displayDescription : `${tool.displayDescription}.`}
-              </Text>
-            ) : null}
-          </View>
-        );
-      })}
+          );
+        })}
+      </View>
     </View>
   );
 
@@ -3078,7 +3182,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     bottom: 0,
     right: 0,
     backgroundColor: Colors.surface,
-    paddingHorizontal: Spacing.xxl2,
+    paddingHorizontal: Spacing.lg2,
   },
   largeScreenContainer: {
     width: 320,
@@ -3103,11 +3207,11 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   floatingContent: {
     flex: 1,
     paddingTop: 24,
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg2,
   },
   attachedContent: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg2,
   },
   innerContainer: {
     flex: 1,
@@ -3172,6 +3276,16 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   subPageContainer: {
     flex: 1,
   },
+  contentCard: {
+    backgroundColor: Colors.surface,
+    //concentric inner radius and padding
+    borderRadius: Radius.xxl + Spacing.md,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xl2,
+    marginBottom: Spacing.xxl2,
+  },
   backIcon: {
     width: 18,
     height: 18,
@@ -3228,17 +3342,21 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingBottom: Spacing.lg,
   },
   groupSpacing: {
-    marginBottom: 20,
+    marginBottom: Spacing.xxl,
+    borderRadius: Radius.xxl + Spacing.md,
+  },
+  mainPageGroup: {
+    borderRadius: Radius.xxl + Spacing.md,
   },
   groupSpacingTight: {
-    marginBottom: 8,
+    marginBottom: Spacing.lg2,
   },
   navItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    gap: 12,
+    paddingVertical: Spacing.xl2,
+    paddingHorizontal: Spacing.lg2,
+    gap: Spacing.lg2,
   },
   navItemLast: {
     marginBottom: 0,
@@ -3291,7 +3409,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     color: Colors.textOnPrimary,
   },
   settingRowVertical: {
-    marginBottom: 30,
+    marginBottom: Spacing.xxl,
     zIndex: 10,
   },
   settingLabel: {
@@ -3303,7 +3421,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 8,
   },
   toggleRight: {
     flexDirection: "row",

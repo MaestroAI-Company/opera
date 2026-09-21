@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, BackHandler, Image, Keyboard, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { LinearGradient } from "expo-linear-gradient";
+import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useResponsive } from "../../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
@@ -21,6 +22,7 @@ const shareIcon = require("../../../assets/icons/share.png");
 const pinIcon = require("../../../assets/icons/pin.png");
 const unpinIcon = require("../../../assets/icons/unpin.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
+const cancelIcon = require("../../../assets/icons/cancel.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
 
@@ -259,101 +261,130 @@ export default function ConversationsDrawer({
 
   const searchContent = (
     <View style={{ flex: 1 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Text style={styles.title}>{t("conversations.search.title")}</Text>
-      </View>
-
-      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24, gap: 12 }}>
-        <Pressable hitSlop={12} onPress={() => { Keyboard.dismiss(); setIsSearching(false); setSearchQuery(""); setSelectedSearchId(null); }} style={({ pressed, hovered }) => [(pressed || hovered) && { opacity: 0.6 }]}>
-          <Image source={arrowIcon} style={{ width: 18, height: 18, transform: [{ rotate: '-180deg' }] }} tintColor={Colors.textPrimary} />
+      <View style={styles.header}>
+        <Pressable
+          hitSlop={12}
+          onPress={() => {
+            Keyboard.dismiss();
+            setIsSearching(false);
+            setSearchQuery("");
+            setSelectedSearchId(null);
+          }}
+          style={({ pressed, hovered }) => [styles.backButton, (pressed || hovered) && { opacity: 0.6 }]}
+        >
+          <Image source={arrowIcon} style={styles.backIcon} tintColor={Colors.textPrimary} />
         </Pressable>
-
-        <View style={{ flex: 1 }}>
-          <Group>
-            <TextInputField
-              icon={searchIcon}
-              placeholder={t("conversations.search.placeholder")}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoFocus
-            />
-          </Group>
-        </View>
+        <Text style={styles.title} numberOfLines={1}>{t("conversations.search.title")}</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.sectionTitle}>{t("conversations.search.results")}</Text>
-        {searchResults.length === 0 && searchQuery.length > 0 ? (
-          <Text style={styles.emptyText}>{t("conversations.search.empty")}</Text>
-        ) : (
-          searchResults.map((conv) => {
-            const isSelected = conv.id === selectedSearchId;
-            const formattedDate = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(conv.updatedAt));
+      <View style={{ marginBottom: 24 }}>
+        <Group>
+          <TextInputField
+            icon={searchIcon}
+            placeholder={t("conversations.search.placeholder")}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+          />
+        </Group>
+      </View>
 
-            return (
-              <View key={conv.id} style={[styles.discussionRow, isSelected && styles.discussionRowSelected]}>
-                <Pressable
-                  style={({ pressed, hovered }) => [styles.discussionTextContainer, (pressed || hovered) && { opacity: 0.6 }]}
-                  onPress={() => {
-                    Keyboard.dismiss();
-                    setSelectedSearchId(conv.id);
-                    onSelectConversation(conv, searchQuery);
-                    if (!isDesktop) onClose();
-                  }}
-                >
-                  <Text style={[styles.discussionText, isSelected && styles.discussionTextSelected]} numberOfLines={1}>
-                    {conv.name}
-                  </Text>
-                </Pressable>
+      <View style={styles.scrollListContainer}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.sectionTitle}>{t("conversations.search.results")}</Text>
+          {searchResults.length === 0 && searchQuery.length > 0 ? (
+            <Text style={styles.emptyText}>{t("conversations.search.empty")}</Text>
+          ) : (
+            searchResults.map((conv) => {
+              const isSelected = conv.id === selectedSearchId;
+              const formattedDate = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(conv.updatedAt));
 
-                <View style={styles.rowActions}>
-                  {isSelected ? (
-                    <>
-                      <IconButton
-                        icon={shareIcon}
-                        label={t("common.share")}
-                        onPress={() => onShareConversation?.(conv)}
-                        size={22}
-                        tintColor={Colors.textOnPrimary}
-                        containerSize={32}
-                        pressedColor={Colors.overlayHover}
-                      />
-                      <IconButton
-                        icon={conv.pinned ? unpinIcon : pinIcon}
-                        label={conv.pinned ? t("common.unpin") : t("common.pin")}
-                        onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
-                        size={22}
-                        tintColor={Colors.textOnPrimary}
-                        containerSize={32}
-                        pressedColor={Colors.overlayHover}
-                      />
-                      <IconButton
-                        icon={deleteIcon}
-                        label={t("common.delete")}
-                        onPress={() => setDeleteConfirmId(conv.id)}
-                        size={22}
-                        tintColor={Colors.textOnPrimary}
-                        containerSize={32}
-                        pressedColor={Colors.overlayHover}
-                      />
-                    </>
-                  ) : (
-                    <Text style={{ fontSize: FontSizes.label, color: Colors.textMuted, fontFamily: Fonts.mono }}>
-                      {formattedDate}
+              return (
+                <View key={conv.id} style={[styles.discussionRow, isSelected && styles.discussionRowSelected]}>
+                  <Pressable
+                    style={({ pressed, hovered }) => [styles.discussionTextContainer, (pressed || hovered) && { opacity: 0.6 }]}
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setSelectedSearchId(conv.id);
+                      onSelectConversation(conv, searchQuery);
+                      if (!isDesktop) onClose();
+                    }}
+                  >
+                    <Text style={[styles.discussionText, isSelected && styles.discussionTextSelected]} numberOfLines={1}>
+                      {conv.name}
                     </Text>
-                  )}
+                  </Pressable>
+
+                  <View style={styles.rowActions}>
+                    {isSelected ? (
+                      <>
+                        <IconButton
+                          icon={shareIcon}
+                          label={t("common.share")}
+                          onPress={() => onShareConversation?.(conv)}
+                          size={22}
+                          tintColor={Colors.textOnPrimary}
+                          containerSize={32}
+                          pressedColor={Colors.overlayHover}
+                        />
+                        <IconButton
+                          icon={conv.pinned ? unpinIcon : pinIcon}
+                          label={conv.pinned ? t("common.unpin") : t("common.pin")}
+                          onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
+                          size={22}
+                          tintColor={Colors.textOnPrimary}
+                          containerSize={32}
+                          pressedColor={Colors.overlayHover}
+                        />
+                        <IconButton
+                          icon={deleteIcon}
+                          label={t("common.delete")}
+                          onPress={() => setDeleteConfirmId(conv.id)}
+                          size={22}
+                          tintColor={Colors.textOnPrimary}
+                          containerSize={32}
+                          pressedColor={Colors.overlayHover}
+                        />
+                      </>
+                    ) : (
+                      <Text style={{ fontSize: FontSizes.label, color: Colors.textMuted, fontFamily: Fonts.mono }}>
+                        {formattedDate}
+                      </Text>
+                    )}
+                  </View>
                 </View>
-              </View>
-            );
-          })
-        )}
-      </ScrollView>
+              );
+            })
+          )}
+        </ScrollView>
+        <LinearGradient
+          colors={[Colors.surface, Colors.surfaceFade, Colors.surfaceClear]}
+          style={styles.gradientTop}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={[Colors.surfaceClear, Colors.surfaceFade, Colors.surface]}
+          style={styles.gradientBottom}
+          pointerEvents="none"
+        />
+      </View>
     </View>
   );
 
   const innerContent = (
     <>
-      <Text style={styles.title}>{t("conversations.title")}</Text>
+      <View style={styles.header}>
+        <View style={styles.headerSpacer} />
+        <Text style={styles.title} numberOfLines={1}>{t("conversations.title")}</Text>
+        <Pressable
+          onPress={onClose}
+          hitSlop={12}
+          style={({ pressed, hovered }) => [styles.backButton, (pressed || hovered) && { opacity: 0.6 }]}
+        >
+          <Image source={cancelIcon} style={styles.closeIcon} tintColor={Colors.textPrimary} />
+        </Pressable>
+      </View>
 
       <Group style={styles.quickActionsSpacing}>
         <ActionButton
@@ -371,25 +402,37 @@ export default function ConversationsDrawer({
         />
       </Group>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {conversations.length === 0 && (
-          <Text style={styles.emptyText}>{t("conversations.empty")}</Text>
-        )}
+      <View style={styles.scrollListContainer}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          {conversations.length === 0 && (
+            <Text style={styles.emptyText}>{t("conversations.empty")}</Text>
+          )}
 
-        {pinnedConversations.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t("conversations.pins")}</Text>
-            {pinnedConversations.map(renderConversationRow)}
-          </View>
-        )}
+          {pinnedConversations.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t("conversations.pins")}</Text>
+              {pinnedConversations.map(renderConversationRow)}
+            </View>
+          )}
 
-        {groups.map((group) => (
-          <View key={group.title} style={styles.section}>
-            <Text style={styles.sectionTitle}>{group.title}</Text>
-            {group.data.map(renderConversationRow)}
-          </View>
-        ))}
-      </ScrollView>
+          {groups.map((group) => (
+            <View key={group.title} style={styles.section}>
+              <Text style={styles.sectionTitle}>{group.title}</Text>
+              {group.data.map(renderConversationRow)}
+            </View>
+          ))}
+        </ScrollView>
+        <LinearGradient
+          colors={[Colors.surface, Colors.surfaceFade, Colors.surfaceClear]}
+          style={styles.gradientTop}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={[Colors.surfaceClear, Colors.surfaceFade, Colors.surface]}
+          style={styles.gradientBottom}
+          pointerEvents="none"
+        />
+      </View>
     </>
   );
 
@@ -507,7 +550,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     left: 0,
     backgroundColor: Colors.surface,
     paddingTop: 60,
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.xxl2,
   },
   largeScreenContainer: {
     width: 320,
@@ -539,16 +582,66 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 16,
     flex: 1,
   },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.xxxl,
+    minHeight: 40,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  backIcon: {
+    width: 18,
+    height: 18,
+    transform: [{ rotate: "-180deg" }],
+  },
+  closeIcon: {
+    width: 18,
+    height: 18,
+  },
+  headerSpacer: {
+    width: 40,
+    height: 40,
+  },
   title: {
+    flex: 1,
     fontSize: FontSizes.xxxl,
     color: Colors.textPrimary,
-    marginBottom: 24,
     fontFamily: Fonts.display,
+    textAlign: "center",
+    includeFontPadding: false,
+    lineHeight: 40,
   },
   quickActionsSpacing: {
     marginBottom: 12,
   },
+  scrollListContainer: {
+    flex: 1,
+    position: "relative",
+  },
+  gradientTop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 30,
+    zIndex: 10,
+  },
+  gradientBottom: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 40,
+    zIndex: 10,
+  },
   scrollContent: {
+    paddingTop: 8,
     paddingBottom: 40,
   },
   section: {

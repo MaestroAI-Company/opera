@@ -6,8 +6,11 @@ export const settingsProgress = new Animated.Value(0);
 
 export const DRAWER_NATIVE_DRIVER = Platform.OS !== "web";
 
-//shared cap maps drag to progress
+//full width on mobile, capped elsewhere
 export function drawerWidthFor(windowWidth: number): number {
+  if (windowWidth < 768) {
+    return windowWidth;
+  }
   return Math.min(windowWidth * 0.90, 360);
 }
 

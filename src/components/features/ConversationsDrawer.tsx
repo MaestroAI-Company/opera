@@ -552,7 +552,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     left: 0,
     backgroundColor: Colors.surface,
     paddingTop: 60,
-    paddingHorizontal: Spacing.xxl2,
+    paddingHorizontal: Spacing.lg2,
   },
   largeScreenContainer: {
     width: 320,
@@ -576,12 +576,12 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   floatingContent: {
     paddingTop: 24,
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg2,
     flex: 1,
   },
   attachedContent: {
     paddingTop: 60,
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg2,
     flex: 1,
   },
   header: {
@@ -620,7 +620,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     lineHeight: 40,
   },
   quickActionsSpacing: {
-    marginBottom: 12,
+    marginBottom: Spacing.lg2,
     borderRadius: Radius.xxl + Spacing.md,
   },
   scrollListContainer: {

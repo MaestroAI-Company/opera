@@ -389,6 +389,7 @@ export default function ConversationsDrawer({
       <Group style={styles.quickActionsSpacing}>
         <ActionButton
           icon={newIcon}
+          iconBadge
           label={t("conversations.new")}
           onPress={() => {
             onNewConversation();
@@ -397,6 +398,7 @@ export default function ConversationsDrawer({
         />
         <ActionButton
           icon={searchIcon}
+          iconBadge
           label={t("conversations.search.action")}
           onPress={() => setIsSearching(true)}
         />
@@ -619,6 +621,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   quickActionsSpacing: {
     marginBottom: 12,
+    borderRadius: Radius.xxl + Spacing.md,
   },
   scrollListContainer: {
     flex: 1,

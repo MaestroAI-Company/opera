@@ -1376,7 +1376,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
           onPress={() => setActiveSubPage("profile")}
         >
-          <Image source={profilIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.menuIconWrap}>
+            <Image source={profilIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+          </View>
           <View style={styles.navTextContainer}>
             <Text style={styles.navTitle}>{name || t("settings.nav.profile.title")}</Text>
             <Text style={styles.navSubtitle}>{t("settings.nav.profile.subtitle")}</Text>
@@ -1387,7 +1389,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
           onPress={() => setActiveSubPage("cloud")}
         >
-          <Image source={cloudIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.menuIconWrap}>
+            <Image source={cloudIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+          </View>
           <View style={styles.navTextContainer}>
             <Text style={styles.navTitle}>{t("settings.nav.cloud.title")}</Text>
             <Text style={styles.navSubtitle}>{t("settings.nav.cloud.subtitle")}</Text>
@@ -1400,7 +1404,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
           onPress={() => setActiveSubPage("general")}
         >
-          <Image source={generalIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.menuIconWrap}>
+            <Image source={generalIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+          </View>
           <View style={styles.navTextContainer}>
             <Text style={styles.navTitle}>{t("settings.nav.general.title")}</Text>
             <Text style={styles.navSubtitle}>{t("settings.nav.general.subtitle")}</Text>
@@ -1412,7 +1418,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
             onPress={() => setActiveSubPage("assistantoverlay")}
           >
-            <Image source={micIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+            <View style={styles.menuIconWrap}>
+              <Image source={micIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+            </View>
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>{t("settings.nav.overlay.title")}</Text>
               <Text style={styles.navSubtitle}>{t("settings.nav.overlay.subtitle")}</Text>
@@ -1424,7 +1432,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
           onPress={() => setActiveSubPage("service")}
         >
-          <Image source={linkIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.menuIconWrap}>
+            <Image source={linkIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+          </View>
           <View style={styles.navTextContainer}>
             <Text style={styles.navTitle}>{t("settings.nav.service.title")}</Text>
             <Text style={styles.navSubtitle}>{t("settings.nav.service.subtitle")}</Text>
@@ -1435,7 +1445,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           style={({ pressed, hovered }) => [styles.navItem, !advancedMode && styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
           onPress={() => setActiveSubPage("tools")}
         >
-          <Image source={toolIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.menuIconWrap}>
+            <Image source={toolIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+          </View>
           <View style={styles.navTextContainer}>
             <Text style={styles.navTitle}>{t("settings.nav.tools.title")}</Text>
             <Text style={styles.navSubtitle}>{isDesktop ? t("settings.nav.tools.subtitleDesktop") : t("settings.nav.tools.subtitle")}</Text>
@@ -1447,7 +1459,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
             onPress={() => setActiveSubPage("advanced")}
           >
-            <Image source={advancedIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+            <View style={styles.menuIconWrap}>
+              <Image source={advancedIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+            </View>
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>{t("settings.nav.advanced.title")}</Text>
               <Text style={styles.navSubtitle}>{t("settings.nav.advanced.subtitle")}</Text>
@@ -1461,7 +1475,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
           onPress={() => setActiveSubPage("confidentiality")}
         >
-          <Image source={confidentialityIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.menuIconWrap}>
+            <Image source={confidentialityIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+          </View>
           <View style={styles.navTextContainer}>
             <Text style={styles.navTitle}>{t("settings.nav.privacy.title")}</Text>
             <Text style={styles.navSubtitle}>{t("settings.nav.privacy.subtitle")}</Text>
@@ -1472,7 +1488,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
           onPress={() => setActiveSubPage("reports")}
         >
-          <Image source={reportsIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.menuIconWrap}>
+            <Image source={reportsIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+          </View>
           <View style={styles.navTextContainer}>
             <Text style={styles.navTitle}>{t("settings.nav.support.title")}</Text>
             <Text style={styles.navSubtitle}>{t("settings.nav.support.subtitle")}</Text>
@@ -1483,7 +1501,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
           onPress={() => setActiveSubPage("sociallinks")}
         >
-          <Image source={informationIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+          <View style={styles.menuIconWrap}>
+            <Image source={informationIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+          </View>
           <View style={styles.navTextContainer}>
             <Text style={styles.navTitle}>{t("settings.nav.info.title")}</Text>
             <Text style={styles.navSubtitle}>{t("settings.nav.info.subtitle")}</Text>
@@ -3367,6 +3387,16 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   menuIcon: {
     width: 18,
     height: 18,
+  },
+  menuIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.xxl,
+    backgroundColor: Colors.primary,
+    borderWidth: 2,
+    borderColor: Colors.borderOnPrimary,
+    alignItems: "center",
+    justifyContent: "center",
   },
   navTextContainer: {
     flex: 1,

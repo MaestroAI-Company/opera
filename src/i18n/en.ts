@@ -183,7 +183,7 @@ export const en = {
   "chat.copied": "Copied to clipboard",
   "chat.copiedMarkdown": "Markdown copied to clipboard",
 
-  "chatbar.placeholder": "Ask",
+  "chatbar.placeholder": "Ask Maestro",
   "chatbar.transcribing": "Transcribing...",
   "chatbar.settings": "Settings",
   "chatbar.install": "Install",

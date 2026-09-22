@@ -13,7 +13,7 @@ import Group from "../ui/Group";
 import IconButton from "../ui/IconButton";
 import NotificationModal from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
-import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, playPageTransition, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
+import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, playBackButtonPulse, playPageTransition, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
 
 const searchIcon = require("../../../assets/icons/search.png");
 const newIcon = require("../../../assets/icons/add.png");
@@ -91,6 +91,7 @@ export default function ConversationsDrawer({
   const [searchResults, setSearchResults] = useState<Conversation[]>([]);
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null);
   const pageAnim = useAnimatedValue(1);
+  const backPulse = useAnimatedValue(0);
 
   useEffect(() => {
     if (!visible && (isSearching || searchQuery !== "" || selectedSearchId !== null)) {
@@ -105,9 +106,10 @@ export default function ConversationsDrawer({
   useEffect(() => {
     if (visible && isSearching !== prevSearchingRef.current) {
       playPageTransition(pageAnim);
+      playBackButtonPulse(backPulse);
     }
     prevSearchingRef.current = isSearching;
-  }, [isSearching, visible, pageAnim]);
+  }, [isSearching, visible, pageAnim, backPulse]);
 
   //native back exits search mode, then lets parent close the drawer
   useEffect(() => {
@@ -262,18 +264,35 @@ export default function ConversationsDrawer({
   const searchContent = (
     <View style={{ flex: 1 }}>
       <View style={styles.header}>
-        <Pressable
-          hitSlop={12}
-          onPress={() => {
-            Keyboard.dismiss();
-            setIsSearching(false);
-            setSearchQuery("");
-            setSelectedSearchId(null);
+        <Animated.View
+          style={{
+            transform: [
+              {
+                scale: backPulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 1.3],
+                }),
+              },
+            ],
+            opacity: backPulse.interpolate({
+              inputRange: [0, 1],
+              outputRange: [1, 0.3],
+            }),
           }}
-          style={({ pressed, hovered }) => [styles.backButton, (pressed || hovered) && { opacity: 0.6 }]}
         >
-          <Image source={arrowIcon} style={styles.backIcon} tintColor={Colors.textPrimary} />
-        </Pressable>
+          <Pressable
+            hitSlop={12}
+            onPress={() => {
+              Keyboard.dismiss();
+              setIsSearching(false);
+              setSearchQuery("");
+              setSelectedSearchId(null);
+            }}
+            style={({ pressed, hovered }) => [styles.backButton, (pressed || hovered) && { opacity: 0.6 }]}
+          >
+            <Image source={arrowIcon} style={styles.backIcon} tintColor={Colors.textPrimary} />
+          </Pressable>
+        </Animated.View>
         <Text style={styles.title} numberOfLines={1}>{t("conversations.search.title")}</Text>
         <View style={styles.headerSpacer} />
       </View>
@@ -644,7 +663,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     zIndex: 10,
   },
   scrollContent: {
-    paddingTop: 8,
+    paddingTop: 30,
     paddingBottom: 40,
   },
   section: {

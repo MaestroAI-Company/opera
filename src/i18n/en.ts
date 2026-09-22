@@ -434,10 +434,6 @@ export const en = {
   "settings.support.moreHelp":
     "Contact our support team for additional assistance and resources.",
   "settings.support.contact": "Contact support",
-  "settings.support.testing": "Testing",
-  "settings.support.testingHelp":
-    "Crashes the app on purpose to test the crash report screen.",
-  "settings.support.testCrash": "Trigger a test crash",
 
   "settings.tools.widgets.title": "Widgets",
   "settings.tools.widgets.help":

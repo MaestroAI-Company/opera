@@ -449,10 +449,6 @@ export const fr: Translations = {
   "settings.support.moreHelp":
     "Contactez notre équipe de support pour une assistance et des ressources supplémentaires.",
   "settings.support.contact": "Contacter le support",
-  "settings.support.testing": "Test",
-  "settings.support.testingHelp":
-    "Fait planter l'application volontairement pour tester l'écran de rapport de plantage.",
-  "settings.support.testCrash": "Déclencher un plantage de test",
 
   "settings.tools.widgets.title": "Widgets",
   "settings.tools.widgets.help":

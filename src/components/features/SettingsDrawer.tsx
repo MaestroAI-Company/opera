@@ -1633,25 +1633,29 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {/* audio and modes card */}
       <View style={styles.contentCard}>
         <View style={styles.settingRowVertical}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{t("settings.general.autoRead")}</Text>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>{t("settings.general.autoRead")}</Text>
+              <Text style={styles.helpText}>{t("settings.general.autoReadHelp")}</Text>
+            </View>
             <Toggle
               checked={autoSpeak}
               onToggle={setAutoSpeak}
             />
           </View>
-          <Text style={styles.helpText}>{t("settings.general.autoReadHelp")}</Text>
         </View>
 
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{t("settings.general.advancedMode")}</Text>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>{t("settings.general.advancedMode")}</Text>
+              <Text style={styles.helpText}>{t("settings.general.advancedModeHelp")}</Text>
+            </View>
             <Toggle
               checked={advancedMode}
               onToggle={setAdvancedMode}
             />
           </View>
-          <Text style={styles.helpText}>{t("settings.general.advancedModeHelp")}</Text>
         </View>
       </View>
     </View>
@@ -1680,29 +1684,33 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </View>
 
         <View style={styles.settingRowVertical}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{t("settings.transcribeLocally.label")}</Text>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>{t("settings.transcribeLocally.label")}</Text>
+              <Text style={styles.helpText}>
+                {Platform.OS === "web"
+                  ? t("settings.transcribeLocally.helpWeb")
+                  : t("settings.transcribeLocally.help")}
+              </Text>
+            </View>
             <Toggle
               checked={alwaysWhisper}
               onToggle={setAlwaysWhisper}
             />
           </View>
-          <Text style={styles.helpText}>
-            {Platform.OS === "web"
-              ? t("settings.transcribeLocally.helpWeb")
-              : t("settings.transcribeLocally.help")}
-          </Text>
         </View>
 
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{t("settings.general.technicalDetails")}</Text>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>{t("settings.general.technicalDetails")}</Text>
+              <Text style={styles.helpText}>{t("settings.general.technicalDetailsHelp")}</Text>
+            </View>
             <Toggle
               checked={showTechnicalDetails}
               onToggle={setShowTechnicalDetails}
             />
           </View>
-          <Text style={styles.helpText}>{t("settings.general.technicalDetailsHelp")}</Text>
         </View>
       </View>
 
@@ -1766,26 +1774,30 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {/* overlay options card */}
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, Platform.OS !== 'android' && { marginBottom: 0 }]}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{t("settings.overlay.autoMic")}</Text>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>{t("settings.overlay.autoMic")}</Text>
+              <Text style={styles.helpText}>{t("settings.overlay.autoMicHelp")}</Text>
+            </View>
             <Toggle
               checked={autoStartMic}
               onToggle={setAutoStartMic}
             />
           </View>
-          <Text style={styles.helpText}>{t("settings.overlay.autoMicHelp")}</Text>
         </View>
 
         {Platform.OS === 'android' && (
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <View style={styles.toggleRow}>
-              <Text style={styles.settingLabel}>{t("settings.overlay.appContext")}</Text>
+            <View style={styles.toggleGroupRow}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>{t("settings.overlay.appContext")}</Text>
+                <Text style={styles.helpText}>{t("settings.overlay.appContextHelp")}</Text>
+              </View>
               <Toggle
                 checked={useAppContext}
                 onToggle={setUseAppContext}
               />
             </View>
-            <Text style={styles.helpText}>{t("settings.overlay.appContextHelp")}</Text>
           </View>
         )}
       </View>
@@ -1840,61 +1852,56 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {renderSubPageHeader(t("settings.nav.service.title"))}
 
       {!!BETA_SERVER_URL && (
-        <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <View style={styles.toggleRow}>
+        <Pressable
+          style={({ pressed, hovered }) => [styles.contentCard, styles.toggleGroupCard, (pressed || hovered) && styles.toggleGroupCardPressed]}
+          onPress={() => setActiveSubPage("beta")}
+        >
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
               <Text style={styles.settingLabel}>Opera Beta server</Text>
-              <Toggle
-                checked={enabledProviders.includes(BETA_PROVIDER_ID)}
-                onToggle={(v) => setProviderEnabled(BETA_PROVIDER_ID, v)}
-              />
+              <Text style={styles.helpText}>
+                A test server we host so you can try Opera without setting one up.
+              </Text>
             </View>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              A test server we host so you can try Opera without setting one up.
-            </Text>
-
-            <Group>
-              <ActionButton
-                icon={arrowIcon}
-                label="See Opera Beta details"
-                onPress={() => setActiveSubPage("beta")}
-              />
-            </Group>
+            <View style={styles.toggleDivider} />
+            <Toggle
+              checked={enabledProviders.includes(BETA_PROVIDER_ID)}
+              onToggle={(v) => setProviderEnabled(BETA_PROVIDER_ID, v)}
+            />
           </View>
-        </View>
+        </Pressable>
       )}
 
       {/* local ai service card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <View style={styles.toggleRow}>
+      <Pressable
+        style={({ pressed, hovered }) => [styles.contentCard, styles.toggleGroupCard, (pressed || hovered) && styles.toggleGroupCardPressed]}
+        onPress={() => setActiveSubPage("local")}
+      >
+        <View style={styles.toggleGroupRow}>
+          <View style={styles.toggleGroupContent}>
             <Text style={styles.settingLabel}>{t("settings.service.local")}</Text>
-            <Toggle
-              checked={localAvailable && enabledProviders.includes("local")}
-              disabled={!localAvailable}
-              onToggle={(v) => {
-                if (localAvailable) setProviderEnabled("local", v);
-              }}
-            />
+            <Text style={styles.helpText}>{t("settings.service.localHelp")}</Text>
           </View>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.service.localHelp")}</Text>
-
-          <Group>
-            <ActionButton
-              icon={arrowIcon}
-              label={t("settings.local.see")}
-              onPress={() => setActiveSubPage("local")}
-            />
-          </Group>
+          <View style={styles.toggleDivider} />
+          <Toggle
+            checked={localAvailable && enabledProviders.includes("local")}
+            disabled={!localAvailable}
+            onToggle={(v) => {
+              if (localAvailable) setProviderEnabled("local", v);
+            }}
+          />
         </View>
-      </View>
+      </Pressable>
 
       {/* ollama service card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{t("settings.service.ollama")}</Text>
-            <View style={styles.toggleRight}>
+      <Pressable
+        style={({ pressed, hovered }) => [styles.contentCard, styles.toggleGroupCard, (pressed || hovered) && styles.toggleGroupCardPressed]}
+        onPress={() => setActiveSubPage("ollama")}
+      >
+        <View style={styles.toggleGroupRow}>
+          <View style={styles.toggleGroupContent}>
+            <View style={styles.toggleRow}>
+              <Text style={styles.settingLabel}>{t("settings.service.ollama")}</Text>
               <IconButton
                 icon={questionIcon}
                 label={t("common.info")}
@@ -1909,23 +1916,16 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                   { image: ollamaInfoImage, messageAlign: "left" },
                 )}
               />
-              <Toggle
-                checked={enabledProviders.includes("ollama")}
-                onToggle={(v) => setProviderEnabled("ollama", v)}
-              />
             </View>
+            <Text style={styles.helpText}>{t("settings.service.ollamaHelp")}</Text>
           </View>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.service.ollamaHelp")}</Text>
-
-          <Group>
-            <ActionButton
-              icon={arrowIcon}
-              label={t("settings.ollama.see")}
-              onPress={() => setActiveSubPage("ollama")}
-            />
-          </Group>
+          <View style={styles.toggleDivider} />
+          <Toggle
+            checked={enabledProviders.includes("ollama")}
+            onToggle={(v) => setProviderEnabled("ollama", v)}
+          />
         </View>
-      </View>
+      </Pressable>
 
       {/* local whisper transcription for web */}
       {Platform.OS === "web" && (
@@ -2077,14 +2077,16 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {/* model failover card */}
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{t("settings.service.failover")}</Text>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>{t("settings.service.failover")}</Text>
+              <Text style={styles.helpText}>{t("settings.service.failoverHelp")}</Text>
+            </View>
             <Toggle
               checked={modelFailover}
               onToggle={setModelFailover}
             />
           </View>
-          <Text style={styles.helpText}>{t("settings.service.failoverHelp")}</Text>
         </View>
       </View>
     </View>
@@ -2586,8 +2588,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           const isLast = index === generalTools.length - 1;
           return (
             <View key={name} style={[styles.settingRowVertical, isLast && { marginBottom: 0 }]}>
-              <View style={styles.toggleRow}>
-                <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
+              <View style={styles.toggleGroupRow}>
+                <View style={styles.toggleGroupContent}>
+                  <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
+                  {tool.displayDescription ? (
+                    <Text style={styles.helpText}>
+                      {tool.displayDescription.endsWith('.') ? tool.displayDescription : `${tool.displayDescription}.`}
+                    </Text>
+                  ) : null}
+                </View>
                 <Toggle
                   checked={enabled}
                   onToggle={async (v) => {
@@ -2598,11 +2607,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                   }}
                 />
               </View>
-              {tool.displayDescription ? (
-                <Text style={styles.helpText}>
-                  {tool.displayDescription.endsWith('.') ? tool.displayDescription : `${tool.displayDescription}.`}
-                </Text>
-              ) : null}
             </View>
           );
         })}
@@ -2777,8 +2781,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
                 return (
                   <View key={name} style={index < tools.length - 1 && { marginBottom: Spacing.xxl }}>
-                    <View style={styles.toggleRow}>
-                      <Text style={styles.settingLabel}>{tool.displayName}</Text>
+                    <View style={styles.toggleGroupRow}>
+                      <View style={styles.toggleGroupContent}>
+                        <Text style={styles.settingLabel}>{tool.displayName}</Text>
+                        {tool.displayDescription ? (
+                          <Text style={styles.helpText}>{tool.displayDescription}</Text>
+                        ) : null}
+                      </View>
                       <Toggle
                         checked={enabled}
                         onToggle={async (v) => {
@@ -2787,9 +2796,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                         }}
                       />
                     </View>
-                    {tool.displayDescription ? (
-                      <Text style={styles.helpText}>{tool.displayDescription}</Text>
-                    ) : null}
                   </View>
                 );
               })}
@@ -2894,8 +2900,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           const enabled = pluginStates[key] ?? (widget.enabledByDefault ?? false);
           return (
             <View key={widget.id} style={[styles.settingRowVertical, index === allWidgets.length - 1 && { marginBottom: 0 }]}>
-              <View style={styles.toggleRow}>
-                <Text style={styles.settingLabel}>{widget.name}</Text>
+              <View style={styles.toggleGroupRow}>
+                <View style={styles.toggleGroupContent}>
+                  <Text style={styles.settingLabel}>{widget.name}</Text>
+                  <Text style={styles.helpText}>{widget.description.split('.')[0]}.</Text>
+                </View>
                 <Toggle
                   checked={enabled}
                   onToggle={async (v) => {
@@ -2904,7 +2913,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                   }}
                 />
               </View>
-              <Text style={styles.helpText}>{widget.description.split('.')[0]}.</Text>
             </View>
           );
         })}
@@ -2924,8 +2932,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
           return (
             <View key={name} style={[styles.settingRowVertical, index === mobileTools.length - 1 && { marginBottom: 0 }]}>
-              <View style={styles.toggleRow}>
-                <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
+              <View style={styles.toggleGroupRow}>
+                <View style={styles.toggleGroupContent}>
+                  <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
+                  {tool.displayDescription ? (
+                    <Text style={styles.helpText}>
+                      {tool.displayDescription.endsWith('.') ? tool.displayDescription : `${tool.displayDescription}.`}
+                    </Text>
+                  ) : null}
+                </View>
                 <Toggle
                   checked={enabled}
                   onToggle={async (v) => {
@@ -2936,11 +2951,6 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                   }}
                 />
               </View>
-              {tool.displayDescription ? (
-                <Text style={styles.helpText}>
-                  {tool.displayDescription.endsWith('.') ? tool.displayDescription : `${tool.displayDescription}.`}
-                </Text>
-              ) : null}
             </View>
           );
         })}
@@ -3456,6 +3466,27 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
+  },
+  toggleGroupRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  toggleGroupContent: {
+    flex: 1,
+    marginRight: Spacing.lg2,
+  },
+  toggleGroupCard: {
+    overflow: "hidden",
+  },
+  toggleGroupCardPressed: {
+    backgroundColor: Colors.surfacePressed,
+  },
+  toggleDivider: {
+    width: 2,
+    alignSelf: "stretch",
+    backgroundColor: Colors.border,
+    marginRight: Spacing.lg2,
   },
   checkboxRow: {
     flex: 1,

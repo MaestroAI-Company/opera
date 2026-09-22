@@ -17,24 +17,44 @@ import {
   ViewStyle,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Reanimated, { interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Reanimated, {
+  interpolateColor,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import {
+  Fonts,
+  FontSizes,
+  Radius,
+  Spacing,
+  ThemeColors,
+} from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useT } from "../../i18n";
 import { AIModule } from "../../services/ai/AIModule";
 import { getAICoreModelLabel } from "../../services/ai/providers/AICoreProvider";
-import { getCachedModels, getLastModel, hydrateModelCache, setCachedModels, setLastModel } from "../../services/ai/providers/modelCache";
+import {
+  getCachedModels,
+  getLastModel,
+  hydrateModelCache,
+  setCachedModels,
+  setLastModel,
+} from "../../services/ai/providers/modelCache";
 import { buildSources, ModelSource } from "../../services/ai/providers/sources";
 import { AppEvents } from "../../services/events";
 import Group from "../ui/Group";
-import DrawerSheet from "./DrawerSheet";
 import NotificationModal from "../ui/NotificationModal";
+import ProgressBar from "../ui/ProgressBar";
 import SliderToggle, { SliderToggleOption } from "../ui/SliderToggle";
-import { useT } from "../../i18n";
 import { settleDrawer } from "./drawerAnimation";
+import DrawerSheet from "./DrawerSheet";
 
 const botIcon = require("../../../assets/icons/bot.png");
 const downloadIcon = require("../../../assets/icons/download.png");
+const tokenIcon = require("../../../assets/icons/token.png");
 const quickIcon = require("../../../assets/icons/Quick.png");
 const lowIcon = require("../../../assets/icons/Low.png");
 const highIcon = require("../../../assets/icons/High.png");
@@ -156,14 +176,19 @@ export function ModelSelectorDrawer({
         label: t(`reflection.${id}`),
         icon: REFLECTION_ICONS[id],
       })),
-    [t]
+    [t],
   );
 
   //anchor must match drawersheet layout
   const anchored = isDesktop || isLargeScreen;
 
   //remeasured on every open
-  const [anchor, setAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [anchor, setAnchor] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
   useEffect(() => {
     if (!anchored || !triggerRef?.current) return;
     triggerRef.current.measureInWindow((x, y, width, height) => {
@@ -191,8 +216,12 @@ export function ModelSelectorDrawer({
   }, [progress, onClose]);
 
   useEffect(() => {
-    AIModule.isModeAvailable("local").then(setLocalAvailable).catch(() => setLocalAvailable(false));
-    const sub = DeviceEventEmitter.addListener(AppEvents.settingsChanged, () => setSourcesRevision((r) => r + 1));
+    AIModule.isModeAvailable("local")
+      .then(setLocalAvailable)
+      .catch(() => setLocalAvailable(false));
+    const sub = DeviceEventEmitter.addListener(AppEvents.settingsChanged, () =>
+      setSourcesRevision((r) => r + 1),
+    );
     return () => sub.remove();
   }, []);
 
@@ -204,18 +233,21 @@ export function ModelSelectorDrawer({
   const sources = useMemo(
     () => buildSources(localAvailable),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- revision tracks the settings behind buildSources
-    [localAvailable, sourcesRevision]
+    [localAvailable, sourcesRevision],
   );
 
   //the source the app currently generates with, falls back to the first tab
   const matchesActive = (source?: ModelSource) =>
-    !!source && source.service === aiService && (source.service !== "ollama" || source.url === ollamaUrl);
+    !!source &&
+    source.service === aiService &&
+    (source.service !== "ollama" || source.url === ollamaUrl);
   const activeSource = useMemo(
     () => sources.find(matchesActive) ?? sources[0],
     // eslint-disable-next-line react-hooks/exhaustive-deps -- matchesActive only reads the deps below
-    [sources, aiService, ollamaUrl]
+    [sources, aiService, ollamaUrl],
   );
-  const browsedSource = sources.find((s) => s.key === browsedKey) ?? activeSource;
+  const browsedSource =
+    sources.find((s) => s.key === browsedKey) ?? activeSource;
   const isBrowsingActive = matchesActive(browsedSource);
 
   useEffect(() => {
@@ -237,7 +269,8 @@ export function ModelSelectorDrawer({
       const kept = sameSource ? prev.filter((m) => next.includes(m)) : [];
       const merged = [...kept, ...next.filter((m) => !kept.includes(m))];
       //nothing moved, keep the same list so the rows are not touched
-      const same = merged.length === prev.length && merged.every((m, i) => m === prev[i]);
+      const same =
+        merged.length === prev.length && merged.every((m, i) => m === prev[i]);
       return same ? prev : merged;
     });
   };
@@ -260,10 +293,15 @@ export function ModelSelectorDrawer({
     if (pendingKey.current !== key) return;
     applyModels(getCachedModels(key), key);
     try {
-      const available = await AIModule.isSourceAvailable(source.service, source.url);
+      const available = await AIModule.isSourceAvailable(
+        source.service,
+        source.url,
+      );
       if (pendingKey.current !== key) return;
       setIsAvailable(available);
-      const fetched = available ? await AIModule.getModelsFor(source.service, source.url) : [];
+      const fetched = available
+        ? await AIModule.getModelsFor(source.service, source.url)
+        : [];
       if (pendingKey.current !== key) return;
       applyModels(fetched, key);
       if (available) setCachedModels(key, fetched);
@@ -302,7 +340,15 @@ export function ModelSelectorDrawer({
       onModelChange("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the source key stands for browsedSource
-  }, [models, selectedModel, loading, hasFetched, isBrowsingActive, onModelChange, browsedSource?.key]);
+  }, [
+    models,
+    selectedModel,
+    loading,
+    hasFetched,
+    isBrowsingActive,
+    onModelChange,
+    browsedSource?.key,
+  ]);
 
   useEffect(() => {
     if (selectedModel) {
@@ -316,7 +362,9 @@ export function ModelSelectorDrawer({
     setDownloadModalVisible(false);
     setIsDownloading(true);
     setDownloadPercent(0);
-    AIModule.downloadFor(source.service, source.url, "gemma4", (progress) => setDownloadPercent(Math.round(progress * 100)))
+    AIModule.downloadFor(source.service, source.url, "gemma4", (progress) =>
+      setDownloadPercent(Math.round(progress * 100)),
+    )
       .then(() => fetchModels(source))
       .catch(console.error)
       .finally(() => setIsDownloading(false));
@@ -324,7 +372,8 @@ export function ModelSelectorDrawer({
 
   const handleSelectModel = (model: string) => {
     const source = browsedSource;
-    if (source && !isBrowsingActive) onServiceChange(source.service, source.url);
+    if (source && !isBrowsingActive)
+      onServiceChange(source.service, source.url);
     if (source) setLastModel(source.key, model);
     onModelChange(model);
   };
@@ -346,7 +395,9 @@ export function ModelSelectorDrawer({
     return [...models].sort((a, b) => a.localeCompare(b));
   }, [models]);
 
-  const selectedIndex = isBrowsingActive ? displayModels.findIndex((m) => m === selectedModel) : -1;
+  const selectedIndex = isBrowsingActive
+    ? displayModels.findIndex((m) => m === selectedModel)
+    : -1;
 
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [rowLayoutsVersion, setRowLayoutsVersion] = useState(0);
@@ -358,7 +409,9 @@ export function ModelSelectorDrawer({
   const dragStartY = useSharedValue(0);
   const dragIndex = useSharedValue(0);
 
-  const rowLayoutsRef = useRef<({ y: number; height: number } | undefined)[]>([]);
+  const rowLayoutsRef = useRef<({ y: number; height: number } | undefined)[]>(
+    [],
+  );
 
   const activeIndex = previewIndex ?? (selectedIndex >= 0 ? selectedIndex : 0);
   const hasPill = isBrowsingActive && selectedIndex >= 0;
@@ -386,13 +439,25 @@ export function ModelSelectorDrawer({
     if (!layout) return;
     pillY.value = withTiming(layout.y, { duration: 180 });
     pillHeight.value = withTiming(layout.height, { duration: 180 });
-  }, [selectedModel, rowLayoutsVersion, visible, selectedIndex, displayModels.length, pillY, pillHeight]);
+  }, [
+    selectedModel,
+    rowLayoutsVersion,
+    visible,
+    selectedIndex,
+    displayModels.length,
+    pillY,
+    pillHeight,
+  ]);
 
   //dense snapshot the drag worklet can read
   const rowLayouts = useMemo<RowLayout[]>(
-    () => Array.from({ length: displayModels.length }, (_, i) => rowLayoutsRef.current[i] ?? null),
+    () =>
+      Array.from(
+        { length: displayModels.length },
+        (_, i) => rowLayoutsRef.current[i] ?? null,
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- version tracks the mutable ref
-    [displayModels.length, rowLayoutsVersion]
+    [displayModels.length, rowLayoutsVersion],
   );
 
   const previewCrossed = (index: number) => {
@@ -466,7 +531,11 @@ export function ModelSelectorDrawer({
   const pillAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: pillY.value }, { scale: pillScale.value }],
     height: pillHeight.value,
-    backgroundColor: interpolateColor(pillLit.value, [0, 1], [Colors.primary, Colors.primaryBright]),
+    backgroundColor: interpolateColor(
+      pillLit.value,
+      [0, 1],
+      [Colors.primary, Colors.primaryBright],
+    ),
   }));
 
   const innerContent = (
@@ -478,9 +547,17 @@ export function ModelSelectorDrawer({
             <Pressable
               key={source.key}
               onPress={() => handleSelectSource(source)}
-              style={({ pressed, hovered }) => [styles.tab, (pressed || hovered) && { backgroundColor: Colors.overlaySubtle }]}
+              style={({ pressed, hovered }) => [
+                styles.tab,
+                (pressed || hovered) && {
+                  backgroundColor: Colors.overlaySubtle,
+                },
+              ]}
             >
-              <Text style={[styles.tabText, active && styles.tabTextActive]} numberOfLines={1}>
+              <Text
+                style={[styles.tabText, active && styles.tabTextActive]}
+                numberOfLines={1}
+              >
                 {source.label}
               </Text>
             </Pressable>
@@ -496,26 +573,44 @@ export function ModelSelectorDrawer({
           nestedScrollEnabled={true}
         >
           {sources.length === 0 ? (
-            <Text style={styles.emptyText}>No provider enabled, turn one on in Settings → Service</Text>
+            <Text style={styles.emptyText}>
+              No provider enabled, turn one on in Settings → Service
+            </Text>
           ) : loading && models.length === 0 ? (
             <View style={styles.loadingRow}>
-              <LottieView source={loadingAnimation} autoPlay loop style={{ width: 24, height: 16 }} />
-              <Text style={styles.modelStatus}>{t("modelSelector.loading")}</Text>
+              <LottieView
+                source={loadingAnimation}
+                autoPlay
+                loop
+                style={{ width: 24, height: 16 }}
+              />
+              <Text style={styles.modelStatus}>
+                {t("modelSelector.loading")}
+              </Text>
             </View>
           ) : models.length === 0 ? (
             <View>
               <Text style={styles.emptyText}>
-                {isAvailable ? t("modelSelector.noModels") : t("modelSelector.unreachable")}
+                {isAvailable
+                  ? t("modelSelector.noModels")
+                  : t("modelSelector.unreachable")}
               </Text>
               {isAvailable && browsedSource?.service === "ollama" && (
                 <Pressable
                   disabled={isDownloading}
                   onPress={() => setDownloadModalVisible(true)}
-                  style={({ pressed, hovered }) => [styles.downloadOption, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
+                  style={({ pressed, hovered }) => [
+                    styles.downloadOption,
+                    (pressed || hovered) && {
+                      backgroundColor: Colors.surfacePressed,
+                    },
+                  ]}
                 >
                   <Image source={downloadIcon} style={styles.downloadIcon} />
                   <Text style={styles.downloadText}>
-                    {isDownloading ? `${t("modelSelector.downloading")} ${downloadPercent}%` : "gemma4"}
+                    {isDownloading
+                      ? `${t("modelSelector.downloading")} ${downloadPercent}%`
+                      : "gemma4"}
                   </Text>
                 </Pressable>
               )}
@@ -535,11 +630,24 @@ export function ModelSelectorDrawer({
                     }}
                     style={({ pressed, hovered }) => [
                       styles.option,
-                      isSpecialActive ? styles.optionSelected : (pressed || hovered) && { backgroundColor: Colors.overlaySubtle },
-                      isSpecialActive && (pressed || hovered) && { backgroundColor: Colors.primaryActive }
+                      isSpecialActive
+                        ? styles.optionSelected
+                        : (pressed || hovered) && {
+                            backgroundColor: Colors.overlaySubtle,
+                          },
+                      isSpecialActive &&
+                        (pressed || hovered) && {
+                          backgroundColor: Colors.primaryActive,
+                        },
                     ]}
                   >
-                    <Text style={[styles.optionText, isSpecialActive && styles.optionTextSelected]} numberOfLines={1}>
+                    <Text
+                      style={[
+                        styles.optionText,
+                        isSpecialActive && styles.optionTextSelected,
+                      ]}
+                      numberOfLines={1}
+                    >
                       {displayName(model)}
                     </Text>
                   </Pressable>
@@ -548,7 +656,10 @@ export function ModelSelectorDrawer({
               {hasPill && rowLayoutsRef.current[activeIndex] && (
                 <GestureDetector gesture={pillPan}>
                   <Reanimated.View style={[styles.pill, pillAnimatedStyle]}>
-                    <Text style={[styles.optionText, styles.optionTextSelected]} numberOfLines={1}>
+                    <Text
+                      style={[styles.optionText, styles.optionTextSelected]}
+                      numberOfLines={1}
+                    >
                       {displayName(displayModels[activeIndex])}
                     </Text>
                   </Reanimated.View>
@@ -570,19 +681,29 @@ export function ModelSelectorDrawer({
           </Group>
         </View>
       )}
+
+      <View style={styles.downloadProgressRow}>
+        <Group>
+          <ProgressBar progress={0} icon={tokenIcon} />
+          <Text style={styles.tokenMaxLabel}>Token max :</Text>
+        </Group>
+      </View>
     </View>
   );
 
   //card hangs under its trigger
   const anchoredStyle = anchor
     ? {
-      position: "absolute" as const,
-      top: anchor.y + anchor.height + ANCHOR_GAP,
-      left: Math.max(
-        ANCHOR_MARGIN,
-        Math.min(anchor.x + anchor.width / 2 - DESKTOP_CARD_WIDTH / 2, windowWidth - DESKTOP_CARD_WIDTH - ANCHOR_MARGIN)
-      ),
-    }
+        position: "absolute" as const,
+        top: anchor.y + anchor.height + ANCHOR_GAP,
+        left: Math.max(
+          ANCHOR_MARGIN,
+          Math.min(
+            anchor.x + anchor.width / 2 - DESKTOP_CARD_WIDTH / 2,
+            windowWidth - DESKTOP_CARD_WIDTH - ANCHOR_MARGIN,
+          ),
+        ),
+      }
     : null;
 
   return (
@@ -594,7 +715,10 @@ export function ModelSelectorDrawer({
         progress={progress}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
-        sheetStyle={[styles.mobileSheet, { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + insets.bottom }]}
+        sheetStyle={[
+          styles.mobileSheet,
+          { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + insets.bottom },
+        ]}
         desktopStyle={[styles.desktopCard, anchoredStyle]}
         handleContainerStyle={styles.handleContainer}
         handleStyle={styles.dragHandle}
@@ -609,206 +733,225 @@ export function ModelSelectorDrawer({
         message={t("modelSelector.download.message")}
         onClose={() => setDownloadModalVisible(false)}
         buttons={[
-          { text: t("common.cancel"), onPress: () => setDownloadModalVisible(false), style: "secondary" },
-          { text: t("modelSelector.download.confirm"), onPress: handlePullModel, style: "primary" },
+          {
+            text: t("common.cancel"),
+            onPress: () => setDownloadModalVisible(false),
+            style: "secondary",
+          },
+          {
+            text: t("modelSelector.download.confirm"),
+            onPress: handlePullModel,
+            style: "primary",
+          },
         ]}
       />
     </>
   );
 }
 
-const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  shadowLayer: {
-    position: "relative",
-  },
-  shadowBlock: {
-    position: "absolute",
-    top: 4,
-    left: -4,
-    right: 4,
-    height: 44,
-    backgroundColor: Colors.shadowInk,
-    borderRadius: Radius.xxl,
-  },
-  trigger: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: Colors.border,
-    paddingHorizontal: 12,
-    height: 44,
-    backgroundColor: Colors.surface,
-    gap: 8,
-    borderRadius: Radius.xxl,
-    maxWidth: 180,
-    overflow: "hidden",
-    position: "relative",
-    zIndex: 1,
-  },
-  icon: {
-    width: 18,
-    height: 18,
-    tintColor: Colors.textPrimary,
-  },
-  label: {
-    fontSize: FontSizes.body,
-    color: Colors.textPrimary,
-    fontFamily: Fonts.mono,
-    flexShrink: 1,
-  },
-  desktopCard: {
-    width: DESKTOP_CARD_WIDTH,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
-    elevation: 5,
-    overflow: "hidden",
-    padding: 16,
-  },
-  mobileSheet: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.huge2,
-    borderTopRightRadius: Radius.huge2,
-    borderBottomLeftRadius: Radius.xxl,
-    borderBottomRightRadius: Radius.xxl,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  handleContainer: {
-    alignItems: "center",
-    paddingVertical: 6,
-    marginBottom: 8,
-  },
-  dragHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.textMuted,
-  },
-  sheetInner: {
-    width: "100%",
-  },
-  tabsRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: Spacing.xxl,
-    marginBottom: 12,
-  },
-  tab: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: Radius.md,
-    flexShrink: 1,
-  },
-  tabText: {
-    fontSize: FontSizes.body,
-    color: Colors.textPrimary,
-    fontFamily: Fonts.mono,
-  },
-  tabTextActive: {
-    color: Colors.primary,
-  },
-  modelsBox: {
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: Radius.xxl,
-    overflow: "hidden",
-  },
-  modelsScrollContent: {
-    paddingHorizontal: 6,
-    paddingVertical: 6,
-  },
-  loadingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  modelStatus: {
-    fontSize: FontSizes.label,
-    color: Colors.textMuted,
-    fontStyle: "italic",
-  },
-  emptyText: {
-    color: Colors.error,
-    textAlign: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: FontSizes.caption,
-    fontFamily: Fonts.body,
-  },
-  optionsList: {
-    position: "relative",
-  },
-  pill: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    borderRadius: Radius.md,
-    borderWidth: 2,
-    borderColor: Colors.borderOnPrimary,
-  },
-  option: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: Radius.md,
-    marginBottom: 4,
-    borderWidth: 2,
-    borderColor: "transparent",
-  },
-  optionSelected: {
-    backgroundColor: Colors.primary,
-    borderWidth: 2,
-    borderColor: Colors.borderOnPrimary,
-  },
-  optionText: {
-    fontSize: FontSizes.body,
-    color: Colors.textPrimary,
-    fontFamily: Fonts.mono,
-  },
-  optionTextSelected: {
-    color: Colors.textOnPrimary,
-  },
-  reflectionRow: {
-    marginTop: 12,
-  },
-  downloadOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surfaceSubtle,
-    padding: 10,
-    borderRadius: Radius.xl,
-    borderWidth: 1,
-    borderColor: Colors.codeBlockText,
-    borderStyle: "dashed",
-    gap: 8,
-    marginVertical: 4,
-  },
-  downloadIcon: {
-    width: 16,
-    height: 16,
-    tintColor: Colors.textPrimary,
-  },
-  downloadText: {
-    fontSize: FontSizes.caption,
-    color: Colors.linkAlt,
-    fontFamily: Fonts.mono,
-  },
-});
+const makeStyles = (Colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    shadowLayer: {
+      position: "relative",
+    },
+    shadowBlock: {
+      position: "absolute",
+      top: 4,
+      left: -4,
+      right: 4,
+      height: 44,
+      backgroundColor: Colors.shadowInk,
+      borderRadius: Radius.xxl,
+    },
+    trigger: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: Colors.border,
+      paddingHorizontal: 12,
+      height: 44,
+      backgroundColor: Colors.surface,
+      gap: 8,
+      borderRadius: Radius.xxl,
+      maxWidth: 180,
+      overflow: "hidden",
+      position: "relative",
+      zIndex: 1,
+    },
+    icon: {
+      width: 18,
+      height: 18,
+      tintColor: Colors.textPrimary,
+    },
+    label: {
+      fontSize: FontSizes.body,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.mono,
+      flexShrink: 1,
+    },
+    desktopCard: {
+      width: DESKTOP_CARD_WIDTH,
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.xxl,
+      borderWidth: 2,
+      borderColor: Colors.border,
+      boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
+      elevation: 5,
+      overflow: "hidden",
+      padding: 16,
+    },
+    mobileSheet: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: Colors.surface,
+      borderTopLeftRadius: Radius.huge2,
+      borderTopRightRadius: Radius.huge2,
+      borderBottomLeftRadius: Radius.xxl,
+      borderBottomRightRadius: Radius.xxl,
+      paddingHorizontal: 16,
+      paddingTop: 8,
+    },
+    handleContainer: {
+      alignItems: "center",
+      paddingVertical: 6,
+      marginBottom: 8,
+    },
+    dragHandle: {
+      width: 36,
+      height: 4,
+      borderRadius: Radius.pill,
+      backgroundColor: Colors.textMuted,
+    },
+    sheetInner: {
+      width: "100%",
+    },
+    tabsRow: {
+      flexDirection: "row",
+      justifyContent: "center",
+      gap: Spacing.xxl,
+      marginBottom: 12,
+    },
+    tab: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: Radius.md,
+      flexShrink: 1,
+    },
+    tabText: {
+      fontSize: FontSizes.body,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.mono,
+    },
+    tabTextActive: {
+      color: Colors.primary,
+    },
+    modelsBox: {
+      borderWidth: 2,
+      borderColor: Colors.border,
+      borderRadius: Radius.xxl,
+      overflow: "hidden",
+    },
+    modelsScrollContent: {
+      paddingHorizontal: 6,
+      paddingVertical: 6,
+    },
+    loadingRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      gap: 8,
+    },
+    modelStatus: {
+      fontSize: FontSizes.label,
+      color: Colors.textMuted,
+      fontStyle: "italic",
+    },
+    emptyText: {
+      color: Colors.error,
+      textAlign: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      fontSize: FontSizes.caption,
+      fontFamily: Fonts.body,
+    },
+    optionsList: {
+      position: "relative",
+    },
+    pill: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      top: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      borderRadius: Radius.md,
+      borderWidth: 2,
+      borderColor: Colors.borderOnPrimary,
+    },
+    option: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: Radius.md,
+      marginBottom: 4,
+      borderWidth: 2,
+      borderColor: "transparent",
+    },
+    optionSelected: {
+      backgroundColor: Colors.primary,
+      borderWidth: 2,
+      borderColor: Colors.borderOnPrimary,
+    },
+    optionText: {
+      fontSize: FontSizes.body,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.mono,
+    },
+    optionTextSelected: {
+      color: Colors.textOnPrimary,
+    },
+    reflectionRow: {
+      marginTop: 12,
+    },
+    downloadProgressRow: {
+      marginTop: 12,
+    },
+    tokenMaxLabel: {
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.label,
+      color: Colors.textSecondary,
+      paddingHorizontal: Spacing.lg2,
+      paddingBottom: Spacing.sm,
+    },
+    downloadOption: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: Colors.surfaceSubtle,
+      padding: 10,
+      borderRadius: Radius.xl,
+      borderWidth: 1,
+      borderColor: Colors.codeBlockText,
+      borderStyle: "dashed",
+      gap: 8,
+      marginVertical: 4,
+    },
+    downloadIcon: {
+      width: 16,
+      height: 16,
+      tintColor: Colors.textPrimary,
+    },
+    downloadText: {
+      fontSize: FontSizes.caption,
+      color: Colors.linkAlt,
+      fontFamily: Fonts.mono,
+    },
+  });

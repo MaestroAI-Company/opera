@@ -26,6 +26,7 @@ import HeadlessWebView from "../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../constants/theme";
 import BugReportSheet from "../components/features/BugReportSheet";
+import ButterflyCluster from "../components/features/ButterflyCluster";
 import ImagePreviewSheet, { PreviewImage } from "../components/features/ImagePreviewSheet";
 import CodePreviewSheet, { PreviewCode } from "../components/features/CodePreviewSheet";
 import ChatBar from "../components/features/ChatBar";
@@ -78,8 +79,7 @@ import { Settings } from "../services/settings/SettingsService";
 import { STT, WhisperSTT } from "../services/speech/STTService";
 import { TTS } from "../services/speech/TTSService";
 
-const butterflyImage = require("../../assets/images/butterfly5.png");
-const butterflyGrey = require("../../assets/images/butterfly2_grey.png");
+
 const texture2 = require("../../assets/images/texture2.png");
 const settingsIcon = require("../../assets/icons/settings.png");
 const addIcon = require("../../assets/icons/add.png");
@@ -1495,10 +1495,9 @@ export default function Index() {
           <View style={{ flex: 1, backgroundColor: "transparent" }} pointerEvents="box-none">
             {!activeConversation && (
               <View style={styles.centerContent}>
-                <Image
-                  source={incognitoMode ? butterflyGrey : butterflyImage}
+                <ButterflyCluster
+                  incognito={incognitoMode}
                   style={styles.butterfly}
-                  resizeMode="contain"
                 />
                 <TypewriterWelcome
                   text={userName ? `${greeting}\n${userName}` : greeting}

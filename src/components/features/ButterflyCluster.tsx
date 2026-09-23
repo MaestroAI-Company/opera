@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   AppState,
   AppStateStatus,
-  Image,
+  Easing,
   PanResponder,
   Platform,
   StyleProp,
@@ -29,7 +29,20 @@ export type ButterflyClusterProps = {
 };
 
 //reconstruct cluster with interactive parallax
-export default function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
+function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
+  const [containerSize, setContainerSize] = useState({ width: 250, height: 250 });
+  const incognitoAnim = useRef(new Animated.Value(incognito ? 1 : 0)).current;
+
+  //animate between cluster and incognito
+  useEffect(() => {
+    Animated.timing(incognitoAnim, {
+      toValue: incognito ? 1 : 0,
+      duration: 260,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      useNativeDriver: true,
+    }).start();
+  }, [incognito, incognitoAnim]);
+
   const leftGyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const topRightGyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const bottomGyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -137,7 +150,7 @@ export default function ButterflyCluster({ style, incognito }: ButterflyClusterP
   );
 
   useEffect(() => {
-    if (incognito || Platform.OS === "web") {
+    if (Platform.OS === "web") {
       leftGyro.setValue({ x: 0, y: 0 });
       topRightGyro.setValue({ x: 0, y: 0 });
       bottomGyro.setValue({ x: 0, y: 0 });
@@ -147,6 +160,7 @@ export default function ButterflyCluster({ style, incognito }: ButterflyClusterP
     let isMounted = true;
     let sub: { remove: () => void } | null = null;
     const current = { x: 0, y: 0 };
+    let wasAtRest = false;
 
     const subscribe = () => {
       if (sub) return;
@@ -155,6 +169,40 @@ export default function ButterflyCluster({ style, incognito }: ButterflyClusterP
 
         Gyroscope.setUpdateInterval(50);
         sub = Gyroscope.addListener(({ x, y }) => {
+          //skip updates when resting immobile
+          const isInputZero = Math.abs(x) < 0.02 && Math.abs(y) < 0.02;
+          const isMotionZero = Math.abs(current.x) < 0.08 && Math.abs(current.y) < 0.08;
+
+          if (isInputZero && isMotionZero) {
+            if (wasAtRest) return;
+            wasAtRest = true;
+            current.x = 0;
+            current.y = 0;
+            Animated.spring(topRightGyro, {
+              toValue: { x: 0, y: 0 },
+              tension: 26,
+              friction: 9,
+              useNativeDriver: true,
+            }).start();
+            if (!incognito) {
+              Animated.spring(leftGyro, {
+                toValue: { x: 0, y: 0 },
+                tension: 22,
+                friction: 9.5,
+                useNativeDriver: true,
+              }).start();
+              Animated.spring(bottomGyro, {
+                toValue: { x: 0, y: 0 },
+                tension: 18,
+                friction: 10,
+                useNativeDriver: true,
+              }).start();
+            }
+            return;
+          }
+
+          wasAtRest = false;
+
           //accumulate angular motion with gentle decay
           current.x = current.x * DECAY + y * GYRO_SPEED;
           current.y = current.y * DECAY + x * GYRO_SPEED;
@@ -171,21 +219,23 @@ export default function ButterflyCluster({ style, incognito }: ButterflyClusterP
             useNativeDriver: true,
           }).start();
 
-          //side butterfly glides with gentle drag
-          Animated.spring(leftGyro, {
-            toValue: { x: tx * 0.85, y: ty * 1.1 },
-            tension: 22,
-            friction: 9.5,
-            useNativeDriver: true,
-          }).start();
+          if (!incognito) {
+            //side butterfly glides with gentle drag
+            Animated.spring(leftGyro, {
+              toValue: { x: tx * 0.85, y: ty * 1.1 },
+              tension: 22,
+              friction: 9.5,
+              useNativeDriver: true,
+            }).start();
 
-          //bottom butterfly follows with soft inertia
-          Animated.spring(bottomGyro, {
-            toValue: { x: tx * 1.0, y: ty * 1.2 },
-            tension: 18,
-            friction: 10,
-            useNativeDriver: true,
-          }).start();
+            //bottom butterfly follows with soft inertia
+            Animated.spring(bottomGyro, {
+              toValue: { x: tx * 1.0, y: ty * 1.2 },
+              tension: 18,
+              friction: 10,
+              useNativeDriver: true,
+            }).start();
+          }
         });
       });
     };
@@ -215,140 +265,251 @@ export default function ButterflyCluster({ style, incognito }: ButterflyClusterP
     };
   }, [incognito, leftGyro, topRightGyro, bottomGyro]);
 
-  if (incognito) {
-    return (
-      <View style={[styles.container, style]}>
-        <Image source={butterflyGrey} style={styles.incognito} resizeMode="contain" />
-      </View>
-    );
-  }
+  const topRightIncognitoTransform = useMemo(
+    () => [
+      {
+        translateX: incognitoAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -0.1937 * containerSize.width],
+        }),
+      },
+      {
+        translateY: incognitoAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, 0.20135 * containerSize.height],
+        }),
+      },
+      {
+        scale: incognitoAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [1, 1.550388],
+        }),
+      },
+    ],
+    [containerSize.width, containerSize.height, incognitoAnim],
+  );
 
-  const leftDragTransform = [
-    { translateX: leftDrag.x },
-    { translateY: leftDrag.y },
-    { scale: leftScale },
-    {
-      rotate: leftDrag.x.interpolate({
-        inputRange: [-80, 80],
-        outputRange: ["-14deg", "14deg"],
+  const otherIncognitoTransform = useMemo(
+    () => [
+      {
+        scale: incognitoAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [1, 0.85],
+        }),
+      },
+    ],
+    [incognitoAnim],
+  );
+
+  const otherOpacity = useMemo(
+    () =>
+      incognitoAnim.interpolate({
+        inputRange: [0, 0.45, 1],
+        outputRange: [1, 0, 0],
         extrapolate: "clamp",
       }),
-    },
-  ];
+    [incognitoAnim],
+  );
 
-  const leftGyroTransform = [
-    { translateX: leftGyro.x },
-    { translateY: leftGyro.y },
-    {
-      rotate: leftGyro.x.interpolate({
-        inputRange: [-16, 16],
-        outputRange: ["-4deg", "4deg"],
+  const coloredOpacity = useMemo(
+    () =>
+      incognitoAnim.interpolate({
+        inputRange: [0, 0.7, 1],
+        outputRange: [1, 0.15, 0],
         extrapolate: "clamp",
       }),
-    },
-  ];
+    [incognitoAnim],
+  );
 
-  const topRightDragTransform = [
-    { translateX: topRightDrag.x },
-    { translateY: topRightDrag.y },
-    { scale: topRightScale },
-    {
-      rotate: topRightDrag.x.interpolate({
-        inputRange: [-80, 80],
-        outputRange: ["-16deg", "16deg"],
+  const greyOpacity = useMemo(
+    () =>
+      incognitoAnim.interpolate({
+        inputRange: [0, 0.3, 1],
+        outputRange: [0, 0.85, 1],
         extrapolate: "clamp",
       }),
-    },
-  ];
+    [incognitoAnim],
+  );
 
-  const topRightGyroTransform = [
-    { translateX: topRightGyro.x },
-    { translateY: topRightGyro.y },
-    {
-      rotate: topRightGyro.x.interpolate({
-        inputRange: [-16, 16],
-        outputRange: ["-5deg", "5deg"],
-        extrapolate: "clamp",
-      }),
-    },
-  ];
+  const leftDragTransform = useMemo(
+    () => [
+      { translateX: leftDrag.x },
+      { translateY: leftDrag.y },
+      { scale: leftScale },
+      {
+        rotate: leftDrag.x.interpolate({
+          inputRange: [-80, 80],
+          outputRange: ["-14deg", "14deg"],
+          extrapolate: "clamp",
+        }),
+      },
+    ],
+    [leftDrag, leftScale],
+  );
 
-  const bottomDragTransform = [
-    { translateX: bottomDrag.x },
-    { translateY: bottomDrag.y },
-    { scale: bottomScale },
-    {
-      rotate: bottomDrag.x.interpolate({
-        inputRange: [-80, 80],
-        outputRange: ["14deg", "-14deg"],
-        extrapolate: "clamp",
-      }),
-    },
-  ];
+  const leftGyroTransform = useMemo(
+    () => [
+      { translateX: leftGyro.x },
+      { translateY: leftGyro.y },
+      {
+        rotate: leftGyro.x.interpolate({
+          inputRange: [-16, 16],
+          outputRange: ["-4deg", "4deg"],
+          extrapolate: "clamp",
+        }),
+      },
+    ],
+    [leftGyro],
+  );
 
-  const bottomGyroTransform = [
-    { translateX: bottomGyro.x },
-    { translateY: bottomGyro.y },
-    {
-      rotate: bottomGyro.x.interpolate({
-        inputRange: [-16, 16],
-        outputRange: ["3.5deg", "-3.5deg"],
-        extrapolate: "clamp",
-      }),
-    },
-  ];
+  const topRightDragTransform = useMemo(
+    () => [
+      { translateX: topRightDrag.x },
+      { translateY: topRightDrag.y },
+      { scale: topRightScale },
+      {
+        rotate: topRightDrag.x.interpolate({
+          inputRange: [-80, 80],
+          outputRange: ["-16deg", "16deg"],
+          extrapolate: "clamp",
+        }),
+      },
+    ],
+    [topRightDrag, topRightScale],
+  );
+
+  const topRightGyroTransform = useMemo(
+    () => [
+      { translateX: topRightGyro.x },
+      { translateY: topRightGyro.y },
+      {
+        rotate: topRightGyro.x.interpolate({
+          inputRange: [-16, 16],
+          outputRange: ["-5deg", "5deg"],
+          extrapolate: "clamp",
+        }),
+      },
+    ],
+    [topRightGyro],
+  );
+
+  const bottomDragTransform = useMemo(
+    () => [
+      { translateX: bottomDrag.x },
+      { translateY: bottomDrag.y },
+      { scale: bottomScale },
+      {
+        rotate: bottomDrag.x.interpolate({
+          inputRange: [-80, 80],
+          outputRange: ["14deg", "-14deg"],
+          extrapolate: "clamp",
+        }),
+      },
+    ],
+    [bottomDrag, bottomScale],
+  );
+
+  const bottomGyroTransform = useMemo(
+    () => [
+      { translateX: bottomGyro.x },
+      { translateY: bottomGyro.y },
+      {
+        rotate: bottomGyro.x.interpolate({
+          inputRange: [-16, 16],
+          outputRange: ["3.5deg", "-3.5deg"],
+          extrapolate: "clamp",
+        }),
+      },
+    ],
+    [bottomGyro],
+  );
 
   return (
-    <View style={[styles.container, style]}>
+    <View
+      style={[styles.container, style]}
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        if (width > 0 && height > 0) {
+          setContainerSize((prev) =>
+            prev.width === width && prev.height === height ? prev : { width, height },
+          );
+        }
+      }}
+    >
       <Animated.View
+        pointerEvents={incognito ? "none" : "auto"}
         style={[
           styles.left,
           {
-            transform: leftDragTransform,
+            opacity: otherOpacity,
+            transform: otherIncognitoTransform,
             zIndex: activeKey === "left" ? 10 : 1,
           },
         ]}
-        {...leftPan.panHandlers}
       >
-        <Animated.Image
-          source={butterflyLeft}
-          style={[styles.imageFill, { transform: leftGyroTransform }]}
-          resizeMode="contain"
-        />
+        <Animated.View
+          style={[styles.imageFill, { transform: leftDragTransform }]}
+          {...leftPan.panHandlers}
+        >
+          <Animated.Image
+            source={butterflyLeft}
+            style={[styles.imageFill, { transform: leftGyroTransform }]}
+            resizeMode="contain"
+          />
+        </Animated.View>
       </Animated.View>
 
       <Animated.View
+        pointerEvents={incognito ? "none" : "auto"}
         style={[
           styles.bottom,
           {
-            transform: bottomDragTransform,
+            opacity: otherOpacity,
+            transform: otherIncognitoTransform,
             zIndex: activeKey === "bottom" ? 10 : 2,
           },
         ]}
-        {...bottomPan.panHandlers}
       >
-        <Animated.Image
-          source={butterflyBottom}
-          style={[styles.imageFill, { transform: bottomGyroTransform }]}
-          resizeMode="contain"
-        />
+        <Animated.View
+          style={[styles.imageFill, { transform: bottomDragTransform }]}
+          {...bottomPan.panHandlers}
+        >
+          <Animated.Image
+            source={butterflyBottom}
+            style={[styles.imageFill, { transform: bottomGyroTransform }]}
+            resizeMode="contain"
+          />
+        </Animated.View>
       </Animated.View>
 
       <Animated.View
         style={[
           styles.topRight,
           {
-            transform: topRightDragTransform,
-            zIndex: activeKey === "topRight" ? 10 : 3,
+            transform: topRightIncognitoTransform,
+            zIndex: activeKey === "topRight" ? 10 : (incognito ? 5 : 3),
           },
         ]}
-        {...topRightPan.panHandlers}
       >
-        <Animated.Image
-          source={butterflyTopRight}
-          style={[styles.imageFill, { transform: topRightGyroTransform }]}
-          resizeMode="contain"
-        />
+        <Animated.View
+          style={[styles.imageFill, { transform: topRightDragTransform }]}
+          {...topRightPan.panHandlers}
+        >
+          <Animated.View
+            style={[styles.imageFill, { transform: topRightGyroTransform }]}
+          >
+            <Animated.Image
+              source={butterflyTopRight}
+              style={[styles.imageFill, { opacity: coloredOpacity }]}
+              resizeMode="contain"
+            />
+            <Animated.Image
+              source={butterflyGrey}
+              style={[styles.imageFill, StyleSheet.absoluteFill, { opacity: greyOpacity }]}
+              resizeMode="contain"
+            />
+          </Animated.View>
+        </Animated.View>
       </Animated.View>
     </View>
   );
@@ -359,10 +520,6 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   imageFill: {
-    width: "100%",
-    height: "100%",
-  },
-  incognito: {
     width: "100%",
     height: "100%",
   },
@@ -388,3 +545,5 @@ const styles = StyleSheet.create({
     height: "43.08%",
   },
 });
+
+export default memo(ButterflyCluster);

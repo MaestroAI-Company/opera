@@ -25,6 +25,7 @@ import {
   StyleSheet,
   Text,
   useWindowDimensions,
+  Vibration,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -375,6 +376,11 @@ export default function SettingsDrawer({
     progress: number;
     sizeStr: string;
   } | null>(null);
+  const [selectedLocalModelId, setSelectedLocalModelId] = useState<string | null>(null);
+  const [localGridWidth, setLocalGridWidth] = useState(0);
+  const [ollamaGridWidth, setOllamaGridWidth] = useState(0);
+  const selectedLocalModel =
+    localSheet?.models.find((m) => m.id === selectedLocalModelId) ?? null;
   const [ollamaUrl, setOllamaUrlState] = useState("");
   const [ollamaServers, setOllamaServersState] = useState<OllamaServer[]>([]);
   const [enabledProviders, setEnabledProvidersState] = useState<string[]>([]);
@@ -2606,13 +2612,7 @@ export default function SettingsDrawer({
           </View>
         </View>
 
-        <View
-          style={
-            Platform.OS === "android"
-              ? styles.settingRowVertical
-              : [styles.settingRowVertical, { marginBottom: 0 }]
-          }
-        >
+        <View style={styles.settingRowVertical}>
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>
               <Text style={styles.settingLabel}>
@@ -2630,7 +2630,7 @@ export default function SettingsDrawer({
         </View>
 
         {Platform.OS === "android" && (
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={styles.settingRowVertical}>
             <View style={styles.toggleGroupRow}>
               <View style={styles.toggleGroupContent}>
                 <Text style={styles.settingLabel}>
@@ -2647,6 +2647,20 @@ export default function SettingsDrawer({
             </View>
           </View>
         )}
+
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.litert.forceLoad")}
+              </Text>
+              <Text style={[styles.helpText, { marginBottom: 0 }]}>
+                {t("settings.litert.forceLoadHelp")}
+              </Text>
+            </View>
+            <Toggle checked={litertForceLoad} onToggle={setLitertForceLoad} />
+          </View>
+        </View>
       </View>
 
       {/* sharing instance card */}
@@ -3052,79 +3066,61 @@ export default function SettingsDrawer({
               <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
                 {t("settings.local.modelsTitle")}
               </Text>
-              {localSheet.models.map((model, i) => (
-                <Group
-                  key={model.id}
-                  style={
-                    i < localSheet.models.length - 1
-                      ? styles.litertModelRow
-                      : undefined
-                  }
-                >
-                  <ActionButton
-                    label={model.label}
-                    rightElement={
-                      model.status && (
-                        <Text style={styles.litertRowMeta}>
+              {/* measure available grid width for columns */}
+              <View
+                style={styles.localModelsGrid}
+                onLayout={(e) => {
+                  const w = e.nativeEvent.layout.width;
+                  if (w > 0 && w !== localGridWidth) setLocalGridWidth(w);
+                }}
+              >
+                {localSheet.models.map((model, i) => {
+                  const isOdd = localSheet.models.length % 2 !== 0;
+                  //expand lone odd model to full row
+                  const isLastOdd = isOdd && i === localSheet.models.length - 1;
+                  //prevent wrapping subpixel overflow
+                  const cardWidth = isLastOdd
+                    ? "100%"
+                    : localGridWidth > 0
+                    ? Math.floor((localGridWidth - Spacing.md) / 2) - 1
+                    : "47%";
+
+                  return (
+                    <Pressable
+                      key={model.id}
+                      style={({ pressed, hovered }) => [
+                        styles.localModelCard,
+                        { width: cardWidth, flexGrow: isLastOdd ? 1 : 1 },
+                        isLastOdd && styles.localModelCardWide,
+                        (pressed || hovered) && {
+                          backgroundColor: Colors.surfacePressed,
+                        },
+                      ]}
+                      onPress={() => {
+                        Vibration.vibrate(8);
+                        setSelectedLocalModelId(model.id);
+                      }}
+                    >
+                      <Text style={styles.localModelCardTitle} numberOfLines={2}>
+                        {model.label}
+                      </Text>
+                      {!!model.status && (
+                        <Text style={styles.localModelCardStatus} numberOfLines={1}>
                           {t(`settings.local.status.${model.status}`)}
                         </Text>
-                      )
-                    }
-                  />
-                  {!!model.version && (
-                    <ActionButton
-                      label={t("settings.local.sheet.version")}
-                      rightElement={
-                        <Text style={styles.litertRowMeta}>
-                          {model.version}
-                        </Text>
-                      }
-                    />
-                  )}
-                  {model.contextTokens !== undefined && (
-                    <ActionButton
-                      label={t("settings.local.sheet.context")}
-                      rightElement={
-                        <Text style={styles.litertRowMeta}>
-                          {t("settings.local.sheet.tokens", {
-                            count: model.contextTokens.toLocaleString(),
-                          })}
-                        </Text>
-                      }
-                    />
-                  )}
-                  {model.thinking !== undefined && (
-                    <ActionButton
-                      label={t("settings.local.sheet.thinking")}
-                      rightElement={
-                        <Text style={styles.litertRowMeta}>
-                          {t(
-                            model.thinking
-                              ? "settings.local.sheet.yes"
-                              : "settings.local.sheet.no",
-                          )}
-                        </Text>
-                      }
-                    />
-                  )}
-                  {localSheet.canDownload &&
-                    (model.status === "downloadable" ||
-                      model.status === "downloading") && (
-                      <ActionButton
-                        icon={downloadIcon}
-                        label={t("settings.local.download")}
-                        disabled={!!localDownload}
-                        onPress={() => handleDownloadLocal(model.id)}
-                      />
-                    )}
-                </Group>
-              ))}
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
               {!!localDownload && (
-                <DownloadProgress
-                  title={t("settings.local.downloading")}
-                  progress={localDownload.progress}
-                  sizeStr={localDownload.sizeStr}
-                />
+                <View style={{ marginTop: Spacing.md }}>
+                  <DownloadProgress
+                    title={t("settings.local.downloading")}
+                    progress={localDownload.progress}
+                    sizeStr={localDownload.sizeStr}
+                  />
+                </View>
               )}
             </View>
           )}
@@ -3203,7 +3199,7 @@ export default function SettingsDrawer({
       </View>
 
       <View style={styles.contentCard}>
-        <View style={styles.settingRowVertical}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={styles.settingLabel}>
             {t("settings.litert.contextTitle")}
           </Text>
@@ -3218,20 +3214,6 @@ export default function SettingsDrawer({
               onSelect={setLitertContextLength}
             />
           </Group>
-        </View>
-
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <View style={styles.toggleGroupRow}>
-            <View style={styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>
-                {t("settings.litert.forceLoad")}
-              </Text>
-              <Text style={[styles.helpText, { marginBottom: 0 }]}>
-                {t("settings.litert.forceLoadHelp")}
-              </Text>
-            </View>
-            <Toggle checked={litertForceLoad} onToggle={setLitertForceLoad} />
-          </View>
         </View>
       </View>
     </View>
@@ -3255,66 +3237,64 @@ export default function SettingsDrawer({
           </Text>
 
           {ollamaServers.length > 0 && (
-            <Group style={styles.groupSpacingTight}>
+            <View
+              style={[styles.localModelsGrid, { marginBottom: Spacing.md }]}
+              onLayout={(e) => {
+                const w = e.nativeEvent.layout.width;
+                if (w > 0 && w !== ollamaGridWidth) setOllamaGridWidth(w);
+              }}
+            >
               {ollamaServers.map((server, index) => {
                 const url = server.url.trim();
-                const connected = url.length > 0 && serverErrors[url] === false;
+                const isOdd = ollamaServers.length % 2 !== 0;
+                //expand lone odd server to full row
+                const isLastOdd = isOdd && index === ollamaServers.length - 1;
+                //prevent wrapping subpixel overflow
+                const cardWidth = isLastOdd
+                  ? "100%"
+                  : ollamaGridWidth > 0
+                  ? Math.floor((ollamaGridWidth - Spacing.md) / 2) - 1
+                  : "47%";
+
                 return (
                   <Pressable
                     key={index}
                     style={({ pressed, hovered }) => [
-                      styles.navItem,
-                      styles.mcpGroupRow,
-                      (pressed || hovered) && styles.navItemPressed,
+                      styles.localModelCard,
+                      { width: cardWidth, flexGrow: isLastOdd ? 1 : 1 },
+                      isLastOdd && styles.localModelCardWide,
+                      (pressed || hovered) && {
+                        backgroundColor: Colors.surfacePressed,
+                      },
                     ]}
-                    onPress={() => openOllamaServer(index)}
+                    onPress={() => {
+                      Vibration.vibrate(8);
+                      openOllamaServer(index);
+                    }}
                   >
-                    <Image
-                      source={arrowIcon}
-                      style={styles.menuIcon}
-                      tintColor={Colors.textPrimary}
-                    />
-                    <Text style={styles.navLabel}>
+                    <Text style={styles.localModelCardTitle} numberOfLines={2}>
                       {ollamaServerLabel(server)}
                     </Text>
-                    <IconButton
-                      icon={connected ? validIcon : errorIcon}
-                      label={
-                        connected
-                          ? t("common.statusOk")
-                          : t("common.statusError")
-                      }
-                      size={20}
-                      tintColor={connected ? Colors.textPrimary : Colors.error}
-                      containerSize={32}
-                      pressedColor={Colors.surfacePressed}
-                      style={styles.navStatusIcon}
-                      onPress={() => {
-                        if (!connected) {
-                          showAlert(
-                            t("settings.ollama.unreachableTitle"),
-                            t("settings.ollama.unreachableInfo"),
-                            undefined,
-                            { image: ollamaErrorImage, messageAlign: "left" },
-                          );
-                        } else {
-                          showAlert(
-                            ollamaServerLabel(server),
-                            t("settings.ollama.connected"),
-                          );
-                        }
-                      }}
-                    />
+                    <Text
+                      style={[
+                        styles.localModelCardStatus,
+                        serverErrors[url] === true && { color: Colors.error },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {ollamaStatusLabel(server)}
+                    </Text>
                   </Pressable>
                 );
               })}
-            </Group>
+            </View>
           )}
 
-          <Group>
+          <Group style={styles.highlightGroup}>
             <ActionButton
               icon={addIcon}
               label={t("settings.server.add")}
+              variant="highlight"
               onPress={openOllamaAddSheet}
             />
           </Group>
@@ -3465,10 +3445,6 @@ export default function SettingsDrawer({
 
         <View style={styles.contentCard}>
           <View style={styles.settingRowVertical}>
-            <Text style={styles.helpText}>{ollamaStatusLabel(server)}</Text>
-          </View>
-
-          <View style={styles.settingRowVertical}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
               {t("settings.server.name")}
             </Text>
@@ -3510,25 +3486,6 @@ export default function SettingsDrawer({
               />
             </Group>
           </View>
-
-          {/* reconnect only while offline */}
-          {!connected && (
-            <View style={styles.settingRowVertical}>
-              <Group>
-                <ActionButton
-                  icon={reconnectIcon}
-                  label={
-                    ollamaModelsLoading
-                      ? t("settings.ollama.connecting")
-                      : t("settings.ollama.reconnect")
-                  }
-                  disabled={ollamaModelsLoading || url.length === 0}
-                  onPress={() => reconnectOllamaServer(index)}
-                  style={styles.mcpGroupRow}
-                />
-              </Group>
-            </View>
-          )}
 
           <View style={styles.settingRowVertical}>
             <Text style={styles.settingLabel}>
@@ -3604,14 +3561,24 @@ export default function SettingsDrawer({
           </View>
         </View>
 
-        {/* danger zone card */}
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Group style={styles.dangerGroup}>
+            <Group>
+              {!connected && (
+                <ActionButton
+                  icon={reconnectIcon}
+                  label={
+                    ollamaModelsLoading
+                      ? t("settings.ollama.connecting")
+                      : t("settings.ollama.reconnect")
+                  }
+                  disabled={ollamaModelsLoading || url.length === 0}
+                  onPress={() => reconnectOllamaServer(index)}
+                />
+              )}
               <ActionButton
                 icon={binIcon}
                 label={t("settings.ollama.remove.action")}
-                variant="highlight"
                 onPress={() => removeOllamaServer(index)}
               />
             </Group>
@@ -4081,18 +4048,17 @@ export default function SettingsDrawer({
       <View style={styles.subPageContainer}>
         {renderSubPageHeader(server.name, "mcpservers")}
 
-        {/* server status and actions card */}
+        {/* server actions card */}
         <View style={styles.contentCard}>
-          <View style={styles.settingRowVertical}>
-            <Text style={styles.helpText}>{mcpStatusLabel(server.id)}</Text>
-            {status.error ? (
+          {status.error ? (
+            <View style={styles.settingRowVertical}>
               <Text
-                style={[styles.helpText, { marginTop: 6, color: Colors.error }]}
+                style={[styles.helpText, { color: Colors.error }]}
               >
                 {status.error}
               </Text>
-            ) : null}
-          </View>
+            </View>
+          ) : null}
 
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
@@ -4944,6 +4910,119 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
+  //built-in model detail sheet
+  const localModelDetailSheet = (
+    <DrawerSheet
+      visible={selectedLocalModel !== null}
+      onClose={() => setSelectedLocalModelId(null)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.addModelSheetDesktop}
+    >
+      {selectedLocalModel && (
+        <View style={styles.addModelSheetBody}>
+          <ScrollView
+            contentContainerStyle={styles.addModelSheetContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.contentCard}>
+              <View
+                style={[styles.settingRowVertical, { marginBottom: Spacing.md }]}
+              >
+                <Text style={styles.settingLabel}>{selectedLocalModel.label}</Text>
+                {selectedLocalModel.status && (
+                  <Text style={[styles.helpText, { marginBottom: 0 }]}>
+                    {t(`settings.local.status.${selectedLocalModel.status}`)}
+                  </Text>
+                )}
+              </View>
+
+              <Group>
+                {selectedLocalModel.status && (
+                  <ActionButton
+                    label={t("settings.local.sheet.status")}
+                    rightElement={
+                      <Text style={styles.litertRowMeta}>
+                        {t(`settings.local.status.${selectedLocalModel.status}`)}
+                      </Text>
+                    }
+                  />
+                )}
+                {!!selectedLocalModel.version && (
+                  <ActionButton
+                    label={t("settings.local.sheet.version")}
+                    rightElement={
+                      <Text style={styles.litertRowMeta}>
+                        {selectedLocalModel.version}
+                      </Text>
+                    }
+                  />
+                )}
+                {selectedLocalModel.contextTokens !== undefined && (
+                  <ActionButton
+                    label={t("settings.local.sheet.context")}
+                    rightElement={
+                      <Text style={styles.litertRowMeta}>
+                        {t("settings.local.sheet.tokens", {
+                          count: selectedLocalModel.contextTokens.toLocaleString(),
+                        })}
+                      </Text>
+                    }
+                  />
+                )}
+                {selectedLocalModel.thinking !== undefined && (
+                  <ActionButton
+                    label={t("settings.local.sheet.thinking")}
+                    rightElement={
+                      <Text style={styles.litertRowMeta}>
+                        {t(
+                          selectedLocalModel.thinking
+                            ? "settings.local.sheet.yes"
+                            : "settings.local.sheet.no",
+                        )}
+                      </Text>
+                    }
+                  />
+                )}
+                {localSheet?.canDownload &&
+                  (selectedLocalModel.status === "downloadable" ||
+                    selectedLocalModel.status === "downloading") && (
+                    <ActionButton
+                      icon={downloadIcon}
+                      label={t("settings.local.download")}
+                      disabled={!!localDownload}
+                      onPress={() => {
+                        handleDownloadLocal(selectedLocalModel.id);
+                      }}
+                    />
+                  )}
+              </Group>
+
+              {!!localDownload && (
+                <View style={{ marginTop: Spacing.md }}>
+                  <DownloadProgress
+                    title={t("settings.local.downloading")}
+                    progress={localDownload.progress}
+                    sizeStr={localDownload.sizeStr}
+                  />
+                </View>
+              )}
+            </View>
+          </ScrollView>
+        </View>
+      )}
+    </DrawerSheet>
+  );
+
   if (isDesktop) {
     const largeScreenWidth = largeScreenAnim.interpolate({
       inputRange: [0, 1],
@@ -4982,6 +5061,7 @@ export default function SettingsDrawer({
         {notificationModal}
         {addModelSheet}
         {ollamaAddServerSheet}
+        {localModelDetailSheet}
       </Animated.View>
     );
   }
@@ -5017,6 +5097,7 @@ export default function SettingsDrawer({
       {notificationModal}
       {addModelSheet}
       {ollamaAddServerSheet}
+      {localModelDetailSheet}
     </View>
   );
 
@@ -5198,6 +5279,39 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     litertModelRow: {
       marginBottom: Spacing.md,
+    },
+    localModelsGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: Spacing.md,
+    },
+    localModelCard: {
+      borderWidth: 2,
+      borderColor: Colors.border,
+      borderRadius: Radius.xxl,
+      backgroundColor: Colors.surface,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.lg,
+      minHeight: 76,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    localModelCardWide: {
+      minHeight: 70,
+    },
+    localModelCardTitle: {
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.body,
+      lineHeight: 18,
+      color: Colors.textPrimary,
+      textAlign: "center",
+      marginBottom: Spacing.xs,
+    },
+    localModelCardStatus: {
+      fontFamily: Fonts.body,
+      fontSize: FontSizes.caption,
+      color: Colors.textSecondary,
+      textAlign: "center",
     },
     litertCancelRow: {
       marginTop: Spacing.md,

@@ -384,6 +384,7 @@ export const en = {
   "settings.local.sheetHelp": "Only what the system reports is shown.",
   "settings.local.modelsTitle": "Offered models",
   "settings.local.sheet.family": "Family",
+  "settings.local.sheet.status": "Status",
   "settings.local.sheet.runtime": "Runtime",
   "settings.local.sheet.browser": "Browser",
   "settings.local.sheet.version": "Version",

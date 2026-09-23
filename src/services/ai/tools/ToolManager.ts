@@ -69,15 +69,21 @@ class ToolManagerService {
     return this.getAllTools().filter(t => !this.mcpToolNames.has(t.definition.function.name));
   }
 
-  //get enabled tools
-  getDefinitions(): ToolDefinition[] {
+  //enabled and supported on this platform
+  getEnabledTools(): ITool[] {
     return Array.from(this.tools.values())
       .filter(t => this.isSupportedOnPlatform(t))
       .filter(t => {
         const name = t.definition.function.name;
         const defaultEnabled = t.enabledByDefault ?? false;
         return PluginRegistry.isEnabled('tool', name, defaultEnabled);
-      })
+      });
+  }
+
+  //enabled tools, filtered by names
+  getDefinitions(only?: string[]): ToolDefinition[] {
+    return this.getEnabledTools()
+      .filter(t => !only || only.includes(t.definition.function.name))
       .map(t => t.definition);
   }
 

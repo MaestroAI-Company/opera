@@ -1,5 +1,6 @@
+import { Platform } from 'react-native';
+import { t } from '../../../i18n';
 import { AppSettings, Settings } from '../../settings/SettingsService';
-import { getLocalProviderLabel } from './LocalProvider';
 
 //a pickable model source: a provider, plus the server it runs on for ollama
 export type ModelSource = {
@@ -9,7 +10,33 @@ export type ModelSource = {
   url: string;
 };
 
-export const PROVIDER_IDS = ['local', 'ollama', 'beta'] as const;
+export const PROVIDER_IDS = ['local', 'litert', 'ollama', 'beta'] as const;
+
+export type ProviderId = (typeof PROVIDER_IDS)[number];
+
+//tauri ships the web bundle, detect it
+export type ProviderPlatform = 'android' | 'ios' | 'web' | 'desktop';
+
+//providers with a reachable backend
+const PROVIDER_PLATFORMS: Record<ProviderId, readonly ProviderPlatform[]> = {
+  local: ['android', 'ios', 'web', 'desktop'],
+  //litert-lm is native arm64, mobile only
+  litert: ['android', 'ios'],
+  ollama: ['android', 'ios', 'web', 'desktop'],
+  beta: ['android', 'ios', 'web', 'desktop'],
+};
+
+export function currentPlatform(): ProviderPlatform {
+  if (Platform.OS === 'android') return 'android';
+  if (Platform.OS === 'ios') return 'ios';
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window ? 'desktop' : 'web';
+}
+
+//unsupported providers stay out of ui
+export function isProviderSupported(id: string): boolean {
+  const platforms = PROVIDER_PLATFORMS[id as ProviderId];
+  return !!platforms && platforms.includes(currentPlatform());
+}
 
 //hosted server offered during the beta, a provider of its own
 export const BETA_PROVIDER_ID = 'beta';
@@ -90,14 +117,17 @@ function serverLabel(url: string): string {
 export function buildSources(localAvailable: boolean): ModelSource[] {
   const enabled = getEnabledProviders();
   const sources: ModelSource[] = [];
-  if (localAvailable && enabled.includes('local')) {
-    sources.push({ key: 'local', service: 'local', label: getLocalProviderLabel(), url: '' });
+  if (localAvailable && isProviderSupported('local') && enabled.includes('local')) {
+    sources.push({ key: 'local', service: 'local', label: t('settings.service.local'), url: '' });
+  }
+  if (isProviderSupported('litert') && enabled.includes('litert')) {
+    sources.push({ key: 'litert', service: 'litert', label: t('settings.service.litert'), url: '' });
   }
   if (BETA_SERVER_URL && enabled.includes(BETA_PROVIDER_ID)) {
     //the provider owns its url, nothing to store
     sources.push({ key: BETA_PROVIDER_ID, service: BETA_PROVIDER_ID, label: 'Opera Beta', url: '' });
   }
-  if (enabled.includes('ollama')) {
+  if (isProviderSupported('ollama') && enabled.includes('ollama')) {
     const servers = getOllamaServers().filter((s) => s.url.length > 0);
     for (const server of servers) {
       //name wins over host then provider

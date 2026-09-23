@@ -5,25 +5,29 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library/legacy';
 import { TextInputWrapper } from "expo-paste-input";
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { Fragment, forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   Animated,
   BackHandler,
   Easing,
   Image,
   Keyboard,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TextLayoutEventData,
+  TextLayoutLine,
   Vibration,
   View
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
@@ -34,6 +38,7 @@ import {
   formatDocumentsForPrompt,
   type ExtractedDocument,
 } from "../../services/documents/DocumentService";
+import { findMentionSpans, listMentionables, MentionSpan } from "../../services/ai/mentions";
 import { Settings } from "../../services/settings/SettingsService";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
 import NotificationModal from "../ui/NotificationModal";
@@ -51,6 +56,9 @@ const IMAGE_COMPRESS_QUALITY = 0.7;
 //only two audio containers accepted
 const SUPPORTED_AUDIO_EXTENSIONS = ['wav', 'mp3'];
 const AUDIO_EXTENSION_PATTERN = /\.(wav|mp3|m4a|aac|flac|ogg)$/;
+
+//@query typed at the text end
+const MENTION_QUERY_RE = /(^|\s)@([\w-]*)$/;
 
 type AttachmentKind = 'image' | 'audio' | 'document' | 'unsupported';
 
@@ -162,6 +170,84 @@ const VAD_SILENCE_MS = 1500;
 const VAD_GRACE_MS = 600;
 const VAD_WEB_RMS_THRESHOLD = 0.01;
 
+//deletion inside a mention keeps @
+function collapseMention(base: string, next: string): string | null {
+  if (next.length >= base.length) return null;
+  let start = 0;
+  while (start < next.length && next[start] === base[start]) start++;
+  let tail = 0;
+  while (tail < next.length - start && next[next.length - 1 - tail] === base[base.length - 1 - tail]) tail++;
+  if (start + tail !== next.length) return null;
+  const end = base.length - tail;
+  const span = findMentionSpans(base).find(m => start > m.start && end <= m.end);
+  return span ? base.slice(0, span.start + 1) + base.slice(span.end) : null;
+}
+
+const INPUT_PADDING_VERTICAL = 6;
+const MENTION_LIST_MAX_HEIGHT = 200;
+const INPUT_LINE_HEIGHT = 20;
+const WEB_INPUT_LINE_HEIGHT = 22;
+
+//mention boxes drawn behind the input
+function MentionBoxes({ text, spans, scrollY }: { text: string; spans: MentionSpan[]; scrollY: number }) {
+  const styles = useThemedStyles(makeStyles);
+  const [lastLines, setLastLines] = useState<Record<string, TextLayoutLine>>({});
+  const [widths, setWidths] = useState<Record<string, number>>({});
+  const keys = spans.map(span => `${span.start}:${text.slice(0, span.end)}`);
+  //keep only measures of current mentions
+  const withMeasure = <T,>(prev: Record<string, T>, key: string, value: T) => {
+    const next: Record<string, T> = { [key]: value };
+    keys.forEach(k => { if (k !== key && k in prev) next[k] = prev[k]; });
+    return next;
+  };
+
+  return (
+    <View pointerEvents="none" style={styles.inputMirrorClip}>
+      {spans.map((span, i) => {
+        //key drops stale measures
+        const key = keys[i];
+        const line = lastLines[key];
+        const width = widths[key];
+        return (
+          <Fragment key={key}>
+            {/* mention line from prefix end */}
+            <Text
+              style={[styles.input, styles.mentionMeasure]}
+              textBreakStrategy="simple"
+              onTextLayout={(e: NativeSyntheticEvent<TextLayoutEventData>) => {
+                const lines = e.nativeEvent.lines;
+                if (lines.length > 0) setLastLines(prev => withMeasure(prev, key, lines[lines.length - 1]));
+              }}
+            >
+              {text.slice(0, span.end)}
+            </Text>
+            <Text
+              style={[styles.input, styles.mentionMeasureWord]}
+              numberOfLines={1}
+              onTextLayout={(e: NativeSyntheticEvent<TextLayoutEventData>) => {
+                const lines = e.nativeEvent.lines;
+                if (lines.length > 0) setWidths(prev => withMeasure(prev, key, lines[0].width));
+              }}
+            >
+              {text.slice(span.start, span.end)}
+            </Text>
+            {line && width != null && (
+              <View
+                style={[styles.mentionBox, {
+                  left: line.x + line.width - width,
+                  top: INPUT_PADDING_VERTICAL + line.y - scrollY,
+                  width,
+                  height: line.height,
+                }]}
+              />
+            )}
+          </Fragment>
+        );
+      })}
+    </View>
+  );
+}
+
 function VoiceIndicator() {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -226,6 +312,11 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const supportsFiles = supportsImages || supportsAudio;
   const bottomInsetToFill = insets.bottom + 16;
   const [text, setText] = useState("");
+  //latest text before react rerenders
+  const textRef = useRef("");
+  const lastCollapseRef = useRef<{ from: string; to: string } | null>(null);
+  useEffect(() => { textRef.current = text; }, [text]);
+  const [webInputHeight, setWebInputHeight] = useState<number | undefined>(undefined);
   const [, setWhisperAvailable] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -235,6 +326,9 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const [isAttachmentSheetVisible, setIsAttachmentSheetVisible] = useState(false);
   const [recentPhotos, setRecentPhotos] = useState<any[]>([]);
   const autoStartedRef = useRef(false);
+  const inputRef = useRef<TextInput>(null);
+  //web mirror follows the textarea scroll
+  const [inputScrollY, setInputScrollY] = useState(0);
   const transcribeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   //cache extraction so send stays instant
   const documentsRef = useRef(new Map<string, Promise<ExtractedDocument>>());
@@ -971,6 +1065,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         voiceText != null
       );
       setText("");
+      if (Platform.OS === 'web') setWebInputHeight(undefined);
       setSelectedFiles([]);
       documentsRef.current.clear();
       Keyboard.dismiss();
@@ -979,10 +1074,99 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     }
   };
 
+  //live list shows new items instantly
+  const mentionQuery = isRecording || isTranscribing ? null : text.match(MENTION_QUERY_RE)?.[2]?.toLowerCase() ?? null;
+  const mentionOptions = useMemo(() => {
+    if (mentionQuery === null) return [];
+    return listMentionables()
+      .filter(m => m.id.toLowerCase().includes(mentionQuery))
+      .sort((a, b) => Number(b.id.toLowerCase().startsWith(mentionQuery)) - Number(a.id.toLowerCase().startsWith(mentionQuery)));
+  }, [mentionQuery]);
+
+  //tab cursor resets with the query
+  const [mentionCursor, setMentionCursor] = useState({ query: '', index: 0 });
+  const activeMention = mentionCursor.query === mentionQuery && mentionOptions.length > 0
+    ? mentionCursor.index % mentionOptions.length
+    : 0;
+  const mentionListRef = useRef<ScrollView>(null);
+  const mentionRowsRef = useRef<Record<number, { y: number; height: number }>>({});
+
+  const moveMention = (step: number) => {
+    const count = mentionOptions.length;
+    const index = (activeMention + step + count) % count;
+    setMentionCursor({ query: mentionQuery ?? '', index });
+    const row = mentionRowsRef.current[index];
+    if (row) mentionListRef.current?.scrollTo({ y: Math.max(0, row.y + row.height - MENTION_LIST_MAX_HEIGHT), animated: false });
+  };
+
+  const pickMention = (id: string) => {
+    setText(prev => prev.replace(MENTION_QUERY_RE, `$1@${id} `));
+    //web click blurs the input
+    inputRef.current?.focus();
+  };
+
+  const mentionSpans = useMemo(() => findMentionSpans(text), [text]);
+
+  //backspace inside a mention leaves @
+  const handleChangeText = (next: string) => {
+    const last = lastCollapseRef.current;
+    //fast backspaces carry uncollapsed text
+    if (last && collapseMention(last.from, next) === last.to) {
+      textRef.current = last.to;
+      setText(last.to);
+      return;
+    }
+    const collapsed = collapseMention(textRef.current, next);
+    lastCollapseRef.current = collapsed ? { from: textRef.current, to: collapsed } : null;
+    textRef.current = collapsed ?? next;
+    setText(textRef.current);
+  };
+
+  //valid mentions styled, rest plain
+  const renderInputText = () => {
+    if (isTranscribing) return t("chatbar.transcribing");
+    const parts: React.ReactNode[] = [];
+    let cursor = 0;
+    mentionSpans.forEach(span => {
+      if (span.start > cursor) parts.push(text.slice(cursor, span.start));
+      parts.push(
+        <Text key={span.start} style={[styles.inputMention, incognito && styles.inputMentionIncognito, Platform.OS === 'web' && styles.inputMentionWeb]}>
+          {text.slice(span.start, span.end)}
+        </Text>
+      );
+      cursor = span.end;
+    });
+    if (cursor < text.length) parts.push(text.slice(cursor));
+    return parts;
+  };
+
+  const renderMentionName = (id: string, query: string) => {
+    const highlight = incognito ? styles.mentionHighlightIncognito : styles.mentionHighlight;
+    const start = Math.max(0, id.toLowerCase().indexOf(query));
+    const end = start + query.length;
+    return (
+      <Text style={[styles.mentionName, incognito && styles.mentionNameIncognito]}>
+        <Text style={highlight}>@</Text>
+        {id.slice(0, start)}
+        <Text style={highlight}>{id.slice(start, end)}</Text>
+        {id.slice(end)}
+      </Text>
+    );
+  };
+
   const handleKeyPress = (e: any) => {
     if (Platform.OS === 'web') {
+      if (e.nativeEvent.key === 'Tab' && mentionOptions.length > 0) {
+        e.preventDefault();
+        moveMention(e.nativeEvent.shiftKey ? -1 : 1);
+        return;
+      }
       if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
         e.preventDefault();
+        if (mentionOptions.length > 0) {
+          pickMention(mentionOptions[activeMention].id);
+          return;
+        }
         if (!isGenerating) {
           handleSend();
         }
@@ -1059,6 +1243,29 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     >
       <View style={{ width: '100%', alignItems: 'center', zIndex: 2, elevation: 9 }}>
         <Animated.View style={{ width: '100%', maxWidth: 800, zIndex: 2, elevation: 9 }}>
+          {mentionOptions.length > 0 && mentionQuery !== null && (
+            <View style={[styles.mentionPopup, incognito && styles.mentionPopupIncognito]}>
+              <ScrollView ref={mentionListRef} style={styles.mentionList} keyboardShouldPersistTaps="always">
+                {mentionOptions.map((option, index) => (
+                  <Pressable
+                    key={`${option.kind}-${option.id}`}
+                    onPress={() => pickMention(option.id)}
+                    onLayout={e => { mentionRowsRef.current[index] = e.nativeEvent.layout; }}
+                    style={({ pressed, hovered }) => [
+                      styles.mentionRow,
+                      (pressed || hovered || (Platform.OS === 'web' && index === activeMention)) && (incognito ? styles.mentionRowPressedIncognito : styles.mentionRowPressed),
+                    ]}
+                  >
+                    {renderMentionName(option.id, mentionQuery)}
+                    {option.requires.length > 0 && (
+                      <Text style={styles.mentionRequires}>{option.requires.map(r => `+@${r}`).join(' ')}</Text>
+                    )}
+                    <Text style={styles.mentionDescription} numberOfLines={1}>{option.description}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
           <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.pressableWrapper}>
             <Animated.View style={{ transform: [{ scale }] }}>
               {renderFiles ? (
@@ -1137,6 +1344,17 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                   <VoiceIndicator />
                 ) : (
                   <View style={{ flex: 1, marginLeft: 8, justifyContent: 'center' }}>
+                    {Platform.OS !== 'web' && !isTranscribing && mentionSpans.length > 0 && (
+                      <MentionBoxes text={text} spans={mentionSpans} scrollY={inputScrollY} />
+                    )}
+                    {/* mirror drawn behind the web textarea */}
+                    {Platform.OS === 'web' && mentionSpans.length > 0 && (
+                      <View pointerEvents="none" style={styles.inputMirrorClip}>
+                        <Text style={[styles.input, styles.inputMirror, { transform: [{ translateY: -inputScrollY }] }]}>
+                          {renderInputText()}
+                        </Text>
+                      </View>
+                    )}
                     <TextInputWrapper
                       onPaste={(payload) => {
                         if (supportsImages && payload.type === "images") {
@@ -1150,21 +1368,49 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                       }}
                     >
                       <TextInput
+                        ref={inputRef}
                         style={[
                           styles.input,
-                          { maxHeight: 132, minHeight: 32, lineHeight: 20 },
-                          Platform.OS === 'web' && { outlineStyle: 'none', margin: 0, paddingHorizontal: 0, overflow: 'hidden' } as any
+                          { maxHeight: 132, minHeight: Platform.OS === 'web' ? 22 : 32, lineHeight: Platform.OS === 'web' ? WEB_INPUT_LINE_HEIGHT : INPUT_LINE_HEIGHT },
+                          //default edittext padding offsets the boxes
+                          Platform.OS === 'android' && { paddingHorizontal: 0 },
+                          Platform.OS === 'web' && ({
+                            outlineStyle: 'none',
+                            margin: 0,
+                            paddingHorizontal: 0,
+                            paddingVertical: 0,
+                            minHeight: 22,
+                            height: text ? webInputHeight : 22,
+                            overflow: 'hidden',
+                            resize: 'none',
+                            fieldSizing: 'content',
+                          } as any),
+                          Platform.OS === 'web' && mentionSpans.length > 0 && [styles.inputUnderMirror, { caretColor: Colors.textOnPrimary } as any],
                         ]}
-                        value={isTranscribing ? t("chatbar.transcribing") : text}
-                        onChangeText={isTranscribing ? undefined : setText}
+                        value={Platform.OS === 'web' ? (isTranscribing ? t("chatbar.transcribing") : text) : undefined}
+                        onChangeText={isTranscribing ? undefined : (newText) => {
+                          if (!newText && webInputHeight !== undefined) setWebInputHeight(undefined);
+                          handleChangeText(newText);
+                        }}
+                        onScroll={(e: any) => setInputScrollY(e.nativeEvent.contentOffset?.y ?? e.nativeEvent.target?.scrollTop ?? 0)}
                         placeholder={placeholder ?? t("chatbar.placeholder")}
                         placeholderTextColor={Colors.whiteSoft}
                         multiline={true}
+                        numberOfLines={1}
+                        onContentSizeChange={Platform.OS === 'web' ? (e) => {
+                          const h = e.nativeEvent.contentSize?.height;
+                          if (h && h > 0) {
+                            setWebInputHeight(Math.min(132, Math.max(22, h)));
+                          }
+                        } : undefined}
                         editable={!isTranscribing}
                         onTouchStart={handlePressIn}
                         onTouchEnd={handlePressOut}
                         onKeyPress={handleKeyPress}
-                      />
+                      >
+                        {/* native span colors the mention */}
+                        {Platform.OS !== 'web' && <Text>{renderInputText()}</Text>}
+                      </TextInput>
                     </TextInputWrapper>
                   </View>
                 )}
@@ -1263,7 +1509,58 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   input: {
     color: Colors.textOnPrimary,
     fontSize: FontSizes.md,
-    paddingVertical: 6,
+    paddingVertical: INPUT_PADDING_VERTICAL,
+  },
+  inputMention: {
+    color: Colors.primary,
+  },
+  inputMentionIncognito: {
+    color: Colors.incognito,
+  },
+  //ring outside, mirror stays aligned
+  inputMentionWeb: {
+    backgroundColor: Colors.textOnPrimary,
+    borderRadius: Radius.sm,
+    boxShadow: `0px 0px 0px 2px ${Colors.textOnPrimary}, 0px 0px 0px 4px ${Colors.borderOnPrimary}`,
+  },
+  mentionBox: {
+    position: 'absolute',
+    backgroundColor: Colors.textOnPrimary,
+    borderRadius: Radius.sm,
+    boxShadow: `0px 0px 0px 2px ${Colors.textOnPrimary}, 0px 0px 0px 4px ${Colors.borderOnPrimary}`,
+  },
+  mentionMeasure: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 0,
+    lineHeight: INPUT_LINE_HEIGHT,
+    opacity: 0,
+  },
+  mentionMeasureWord: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    paddingVertical: 0,
+    lineHeight: INPUT_LINE_HEIGHT,
+    opacity: 0,
+  },
+  inputMirrorClip: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
+  //matches the web textarea metrics
+  inputMirror: {
+    lineHeight: WEB_INPUT_LINE_HEIGHT,
+    paddingVertical: 0,
+  },
+  inputUnderMirror: {
+    color: 'transparent',
   },
   voiceIndicatorContainer: {
     flex: 1,
@@ -1368,6 +1665,60 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     color: 'white',
     fontSize: FontSizes.labelSm,
     fontWeight: 'bold',
+  },
+  mentionPopup: {
+    backgroundColor: Colors.surface,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    borderRadius: Radius.xxl,
+    marginHorizontal: Spacing.xl2,
+    marginBottom: Spacing.md,
+    overflow: 'hidden',
+    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
+  },
+  mentionPopupIncognito: {
+    backgroundColor: Colors.incognitoSurface,
+  },
+  mentionList: {
+    maxHeight: MENTION_LIST_MAX_HEIGHT,
+  },
+  mentionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg2,
+    paddingVertical: Spacing.md,
+  },
+  mentionRowPressed: {
+    backgroundColor: Colors.surfacePressed,
+  },
+  mentionRowPressedIncognito: {
+    backgroundColor: Colors.incognitoPressed,
+  },
+  mentionName: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.bodyMd,
+    color: Colors.textPrimary,
+  },
+  mentionNameIncognito: {
+    color: Colors.textOnPrimary,
+  },
+  mentionHighlight: {
+    color: Colors.primary,
+  },
+  mentionHighlightIncognito: {
+    color: Colors.incognitoBright,
+  },
+  mentionRequires: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.label,
+    color: Colors.textMuted,
+  },
+  mentionDescription: {
+    flex: 1,
+    fontFamily: Fonts.body,
+    fontSize: FontSizes.caption,
+    color: Colors.textMuted,
   },
   filesAddedText: {
     fontFamily: Fonts.mono,

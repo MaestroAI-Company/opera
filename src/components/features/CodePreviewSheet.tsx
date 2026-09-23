@@ -75,9 +75,9 @@ export default function CodePreviewSheet({ code, onClose, isLargeScreen = false,
       <ScrollView contentContainerStyle={styles.content}>
         {shown && (
           <>
-            <Group style={styles.group}>
+            <Group style={styles.infoGroup}>
               <View style={styles.codeContainer}>
-                <CodeContent code={shown.code} language={shown.language} incognito={shown.incognito} />
+                <CodeContent code={shown.code} language={shown.language} incognito={shown.incognito} radius={Radius.xxl} />
               </View>
               {rows.map(row => (
                 <ActionButton
@@ -87,13 +87,15 @@ export default function CodePreviewSheet({ code, onClose, isLargeScreen = false,
                 />
               ))}
             </Group>
-            <Group style={styles.group}>
-              <ActionButton
-                icon={copyIcon}
-                label={copied ? t("chat.copied") : t("common.copy")}
-                onPress={handleCopy}
-              />
-            </Group>
+            <View style={styles.buttonCard}>
+              <Group>
+                <ActionButton
+                  icon={copyIcon}
+                  label={copied ? t("chat.copied") : t("common.copy")}
+                  onPress={handleCopy}
+                />
+              </Group>
+            </View>
           </>
         )}
       </ScrollView>
@@ -131,14 +133,19 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   content: {
     paddingHorizontal: Spacing.lg2,
     paddingBottom: Spacing.lg,
-    gap: Spacing.lg2,
+    gap: Spacing.xxl2,
   },
   codeContainer: {
     padding: Spacing.md,
   },
-  group: {
+  infoGroup: {
     borderRadius: Radius.xxl + Spacing.md,
     borderWidth: 0,
+  },
+  buttonCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl + Spacing.md,
+    padding: Spacing.md,
   },
   //label takes the rest of the row
   infoValue: {

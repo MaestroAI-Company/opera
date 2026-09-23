@@ -2,6 +2,7 @@ import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Animated,
   BackHandler,
+  Keyboard,
   LayoutChangeEvent,
   PanResponder,
   Platform,
@@ -14,13 +15,16 @@ import {
 import { Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useThemedStyles } from "../../hooks/useTheme";
-import { dragDrawer, gestureVelocity, settleDrawer } from "./drawerAnimation";
-
-//distance the finger must travel to fully open/close by drag alone
-const PULL_DISTANCE = 280;
+import { dragDrawer, gestureVelocity, releaseOpens, settleDrawer } from "./drawerAnimation";
 
 //slide fallback before real measure
 const CLOSED_SLIDE = 420;
+
+//lets an outside gesture drag a sheet one to one
+const sheetTravels = new WeakMap<Animated.Value, number>();
+export function sheetTravel(progress: Animated.Value): number {
+  return sheetTravels.get(progress) ?? CLOSED_SLIDE;
+}
 
 export type DrawerSheetProps = {
   visible: boolean;
@@ -60,8 +64,16 @@ export default function DrawerSheet({
   const ownedProgress = useAnimatedValue(0);
   const progress = isLift ? ownedProgress : externalProgress ?? ownedProgress;
   const nativeDriver = !isLift;
+  //outside gesture needs it mounted to show
+  const keepMounted = !isLift && externalProgress !== undefined;
   const [rendered, setRendered] = useState(visible);
   const [contentHeight, setContentHeight] = useState(0);
+  //sheet slides exactly its own height
+  const travel = contentHeight || CLOSED_SLIDE;
+
+  useEffect(() => {
+    sheetTravels.set(progress, travel);
+  }, [progress, travel]);
 
   const settle = useCallback(
     (open: boolean, velocity = 0) => {
@@ -77,31 +89,33 @@ export default function DrawerSheet({
     settle(visible);
   }, [visible, settle]);
 
-  const dismiss = useCallback(() => {
-    settle(false);
+  const dismiss = useCallback((velocity = 0) => {
+    //keyboard lift would hold it on screen
+    Keyboard.dismiss();
+    settle(false, velocity);
     onClose();
   }, [settle, onClose]);
 
-  //mobile pull down gesture, dismisses past a threshold, otherwise snaps back open
+  //pull down moves the sheet with the finger
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gestureState) =>
           gestureState.dy > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
         onPanResponderMove: (_, gestureState) => {
-          dragDrawer(progress, Math.max(0, Math.min(1, 1 - gestureState.dy / PULL_DISTANCE)));
+          dragDrawer(progress, 1 - gestureState.dy / travel);
         },
         onPanResponderRelease: (_, gestureState) => {
-          const velocity = -gestureVelocity(gestureState.vy, PULL_DISTANCE);
-          if (gestureState.dy > 70 || gestureState.vy > 0.5) {
-            dismiss();
-          } else {
+          const velocity = -gestureVelocity(gestureState.vy, travel);
+          if (releaseOpens(1 - gestureState.dy / travel, -gestureState.vy)) {
             settle(true, velocity);
+          } else {
+            dismiss(velocity);
           }
         },
         onPanResponderTerminate: () => settle(true),
       }),
-    [dismiss, settle, progress]
+    [dismiss, settle, progress, travel]
   );
 
   //overlay only: hardware back and desktop escape dismiss it, lift sits inside a screen
@@ -155,18 +169,16 @@ export default function DrawerSheet({
     );
   }
 
-  if (!rendered) return null;
+  if (!rendered && !keepMounted) return null;
 
-  //tall sheets need their real height
-  const closedOffset = Math.max(contentHeight, CLOSED_SLIDE);
-  const translateYMobile = progress.interpolate({ inputRange: [0, 1], outputRange: [closedOffset, 0] });
+  const translateYMobile = progress.interpolate({ inputRange: [0, 1], outputRange: [travel, 0] });
   const translateYDesktop = progress.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] });
   const translateYMobileWithKeyboard = keyboardTranslateY ? Animated.add(translateYMobile, keyboardTranslateY) : translateYMobile;
 
   return (
     <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
       <Animated.View style={[styles.overlay, { opacity: progress }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => dismiss()} />
       </Animated.View>
 
       {isLargeScreen || isDesktop ? (

@@ -29,7 +29,7 @@ export const fr: Translations = {
   "onboarding.start.cta": "Commencer",
   "onboarding.name.title": "Comment doit-on vous appeler ?",
   "onboarding.name.subtitle":
-    "Entrez votre nom pour personnaliser votre expérience avec Opera.",
+    "Indiquez votre nom pour personnaliser votre expérience avec Opera.",
   "onboarding.name.placeholder": "Entrez votre nom",
   "onboarding.name.continue": "Continuer",
   "onboarding.name.skip": "Passer cette étape",
@@ -105,7 +105,7 @@ export const fr: Translations = {
   "modelSelector.loading": "Chargement...",
   "modelSelector.noModels": "Aucun modèle trouvé",
   "modelSelector.unreachable":
-    "Impossible de récupérer les modèles / serveur injoignable",
+    "Impossible de récupérer les modèles : serveur injoignable",
   "modelSelector.downloading": "Téléchargement...",
   "modelSelector.download.title": "Télécharger Gemma4",
   "modelSelector.download.message":
@@ -118,13 +118,13 @@ export const fr: Translations = {
   "download.starting": "Démarrage...",
   "download.eta": "{seconds}s restantes",
 
-  "widget.html.empty": "Aucun contenu fourni",
+  "widget.html.empty": "Aucun contenu à afficher",
 
   "markdown.thinking": "Réflexion...",
   "markdown.tool.using": "Utilisation de l'outil : {name}...",
   "markdown.tool.used": "Outil utilisé : {name}",
   "markdown.tool.running": "Exécution de l'outil : {name}...",
-  "markdown.tool.searching": 'Recherche sur le web de "{query}"...',
+  "markdown.tool.searching": 'Recherche web de « {query} »...',
 
   "nextcloud.connect": "Connecter",
   "nextcloud.waiting": "En attente de votre validation dans le navigateur...",
@@ -143,7 +143,7 @@ export const fr: Translations = {
   "bugReport.title": "Signaler un bug",
   "bugReport.crashTitle": "Opera s'est fermé de manière inattendue",
   "bugReport.crashHelp":
-    "L'erreur a été enregistrée. Dites-nous ce que vous faisiez, cela nous aide à la trouver.",
+    "L'erreur a été enregistrée. Dites-nous ce que vous faisiez, ça nous aidera à comprendre ce qui s'est passé.",
   "bugReport.placeholder": "Décrivez le problème",
   "bugReport.crashPlaceholder": "Que faisiez-vous ?",
   "bugReport.attachLogs": "Joindre les dernières lignes de log",
@@ -328,7 +328,7 @@ export const fr: Translations = {
     "Active automatiquement le microphone dès l'ouverture de l'assistant.",
   "settings.overlay.appContext": "Utiliser le contexte de l'app",
   "settings.overlay.appContextHelp":
-    "Envoie l'app au premier plan et le texte à l'écran à Maestro lors de l'utilisation de l'Assistant Overlay",
+    "Envoie à Maestro l'app au premier plan et le texte affiché à l'écran lors de l'utilisation de l'Assistant Overlay",
 
   "settings.cloud.storage": "Stockage cloud",
   "settings.cloud.selectStorage": "Choisir le stockage cloud",
@@ -393,7 +393,7 @@ export const fr: Translations = {
   "settings.local.status.unavailable": "Indisponible",
   "settings.local.download": "Télécharger le modèle",
   "settings.local.downloading": "Téléchargement du modèle du navigateur",
-  "settings.local.notDownloaded": "Le modèle du navigateur n'est pas encore téléchargé. Téléchargez-le dans Réglages, Intégré.",
+  "settings.local.notDownloaded": "Le modèle du navigateur n'est pas encore téléchargé. Téléchargez-le depuis Réglages > Intégré.",
   "settings.service.litert": "Sur l'appareil",
   "settings.service.litertHelp":
     "Téléchargez des modèles ouverts depuis Hugging Face et exécutez-les sur cet appareil.",
@@ -421,7 +421,7 @@ export const fr: Translations = {
   "settings.litert.noResults": "Aucun modèle compatible ne correspond à cette recherche.",
   "settings.litert.downloadTitle": "Télécharger {name} ?",
   "settings.litert.downloadMessage":
-    "{name} prélève {size} et sera téléchargé via votre connexion actuelle.",
+    "{name} pèse {size} et sera téléchargé via votre connexion actuelle.",
   "settings.litert.downloadAction": "Télécharger",
   "settings.litert.deleteTitle": "Supprimer {name} ?",
   "settings.litert.deleteMessage":
@@ -454,7 +454,7 @@ export const fr: Translations = {
     "Ce serveur n'a pas pu être joint.\n\n- Vérifiez que le serveur est démarré.\n- Vérifiez la connexion réseau du serveur.\n- Assurez-vous que l'URL et le port sont corrects.",
   "settings.service.failover": "Bascule automatique",
   "settings.service.failoverHelp":
-    "Quand le serveur Ollama actif est injoignable, garde le même modèle en le lançant sur un autre serveur Ollama qui le propose.",
+    "Quand le serveur Ollama actif est injoignable, conserve le même modèle en le relançant sur un autre serveur Ollama qui le propose.",
   "settings.service.contextLength": "Longueur de contexte",
   "settings.service.contextLengthHelp":
     "Nombre maximal de tokens que le modèle peut utiliser.",
@@ -527,7 +527,7 @@ export const fr: Translations = {
   "settings.support.reportHelp": "Décrivez le problème rencontré.",
   "settings.support.more": "Besoin de plus d'aide",
   "settings.support.moreHelp":
-    "Contactez notre équipe de support pour une assistance et des ressources supplémentaires.",
+    "Contactez notre équipe de support pour obtenir de l'aide et des ressources supplémentaires.",
   "settings.support.contact": "Contacter le support",
 
   "settings.tools.widgets.title": "Widgets",
@@ -557,7 +557,7 @@ export const fr: Translations = {
   "settings.mcp.headerName": "nom de l'en-tête",
   "settings.mcp.headerValue": "valeur de l'en-tête",
   "settings.mcp.clientIdHelp":
-    "Nécessaire uniquement quand un serveur propose une connexion mais n'enregistre pas Opera de lui-même. Laissez vide sinon.",
+    "Nécessaire uniquement quand un serveur propose une connexion mais n'enregistre pas Opera automatiquement. Sinon, laissez ce champ vide.",
   "settings.mcp.clientId": "identifiant client oauth",
   "settings.mcp.remove.action": "Retirer le serveur",
   "settings.mcp.remove.title": "Retirer le serveur",

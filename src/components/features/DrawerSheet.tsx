@@ -31,7 +31,7 @@ export type DrawerSheetProps = {
   isDesktop?: boolean;
   liftOffset?: number;
   //extra native-driven translateY (eg. keyboard follow), composed with the drawer's own slide
-  keyboardTranslateY?: Animated.Value;
+  keyboardTranslateY?: Animated.Value | Animated.AnimatedInterpolation<number> | Animated.AnimatedNode;
   children: ReactNode;
   sheetStyle?: StyleProp<ViewStyle>;
   desktopStyle?: StyleProp<ViewStyle>;

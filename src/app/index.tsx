@@ -1861,8 +1861,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: Colors.surface,
-    borderWidth: 2,
-    borderColor: Colors.border,
     borderRadius: Radius.xxl,
     position: "relative",
     zIndex: 1,
@@ -1880,8 +1878,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   incognitoBox: {
     position: "relative",
-    borderWidth: 2,
-    borderColor: Colors.border,
     borderRadius: Radius.xxl,
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -1899,7 +1895,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   incognitoBoxActive: {
     backgroundColor: Colors.incognito,
-    borderColor: Colors.incognito,
   },
   incognitoButtonText: {
     fontSize: FontSizes.caption,

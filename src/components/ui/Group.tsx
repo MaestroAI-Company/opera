@@ -13,24 +13,23 @@ export default function Group({ children, style }: GroupProps) {
   const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.layer}>
-      <View style={[styles.box, style]}>
-        {children}
-      </View>
+      <View style={[styles.box, style]}>{children}</View>
     </View>
   );
 }
 
-const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
-  layer: {
-    position: "relative",
-  },
-  box: {
-    position: "relative",
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: Radius.xxl,
-    backgroundColor: Colors.surface,
-    zIndex: 1,
-    overflow: "hidden",
-  },
-});
+const makeStyles = (Colors: ThemeColors) =>
+  StyleSheet.create({
+    layer: {
+      position: "relative",
+    },
+    box: {
+      position: "relative",
+      borderWidth: 2,
+      borderColor: Colors.border,
+      borderRadius: Radius.xxl,
+      backgroundColor: Colors.surface,
+      zIndex: 1,
+      overflow: "hidden",
+    },
+  });

@@ -226,6 +226,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const supportsFiles = supportsImages || supportsAudio;
   const bottomInsetToFill = insets.bottom + 16;
   const [text, setText] = useState("");
+  const [webInputHeight, setWebInputHeight] = useState<number | undefined>(undefined);
   const [, setWhisperAvailable] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -971,6 +972,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         voiceText != null
       );
       setText("");
+      if (Platform.OS === 'web') setWebInputHeight(undefined);
       setSelectedFiles([]);
       documentsRef.current.clear();
       Keyboard.dismiss();
@@ -1152,14 +1154,34 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                       <TextInput
                         style={[
                           styles.input,
-                          { maxHeight: 132, minHeight: 32, lineHeight: 20 },
-                          Platform.OS === 'web' && { outlineStyle: 'none', margin: 0, paddingHorizontal: 0, overflow: 'hidden' } as any
+                          { maxHeight: 132, minHeight: Platform.OS === 'web' ? 22 : 32, lineHeight: Platform.OS === 'web' ? 22 : 20 },
+                          Platform.OS === 'web' && ({
+                            outlineStyle: 'none',
+                            margin: 0,
+                            paddingHorizontal: 0,
+                            paddingVertical: 0,
+                            minHeight: 22,
+                            height: text ? webInputHeight : 22,
+                            overflow: 'hidden',
+                            resize: 'none',
+                            fieldSizing: 'content',
+                          } as any)
                         ]}
                         value={isTranscribing ? t("chatbar.transcribing") : text}
-                        onChangeText={isTranscribing ? undefined : setText}
+                        onChangeText={isTranscribing ? undefined : (newText) => {
+                          if (!newText && webInputHeight !== undefined) setWebInputHeight(undefined);
+                          setText(newText);
+                        }}
                         placeholder={placeholder ?? t("chatbar.placeholder")}
                         placeholderTextColor={Colors.whiteSoft}
                         multiline={true}
+                        numberOfLines={1}
+                        onContentSizeChange={Platform.OS === 'web' ? (e) => {
+                          const h = e.nativeEvent.contentSize?.height;
+                          if (h && h > 0) {
+                            setWebInputHeight(Math.min(132, Math.max(22, h)));
+                          }
+                        } : undefined}
                         editable={!isTranscribing}
                         onTouchStart={handlePressIn}
                         onTouchEnd={handlePressOut}

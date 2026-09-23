@@ -1,4 +1,4 @@
-import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import {
@@ -116,7 +116,7 @@ export default function AttachmentSheet({
 
 const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   sheet: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.groupedBackground,
     borderTopLeftRadius: Radius.huge2,
     borderTopRightRadius: Radius.huge2,
     paddingTop: 12,
@@ -148,18 +148,17 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg2,
     marginBottom: 12,
   },
   sheetIconButton: {
     flex: 1,
     height: 70,
     backgroundColor: Colors.surface,
-    borderRadius: Radius.xxl,
+    borderRadius: Radius.xxl + 4,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: Colors.border,
+    borderWidth: 0,
   },
   sheetIconButtonIncognito: {
     backgroundColor: Colors.incognitoPressed,
@@ -183,7 +182,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     color: Colors.textOnPrimary,
   },
   sheetRecentPhotosContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg2,
     paddingBottom: 8,
   },
   sheetRecentPhotoWrapper: {

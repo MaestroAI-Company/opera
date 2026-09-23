@@ -28,9 +28,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    overflow: 'hidden',
     width: '100%',
     padding: 5,
   },

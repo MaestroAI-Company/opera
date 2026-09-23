@@ -15,7 +15,7 @@ export const LightColors = {
   surfaceCode: "#F0F0F0",
 
   //borders & outlines
-  border: "#00000017",
+  border: "#0000000D",
   borderOnPrimary: "#FFFFFF52",
   shadowInk: "#00000013",
 
@@ -60,6 +60,9 @@ export const LightColors = {
   backgroundClear: "rgba(255,245,236,0)",
   surfaceFade: "rgba(255,255,255,0.9)",
   surfaceClear: "rgba(255,255,255,0)",
+  groupedBackground: "#FAF9F6",
+  groupedBackgroundFade: "rgba(250,249,246,0.9)",
+  groupedBackgroundClear: "rgba(250,249,246,0)",
   whiteFaint: "rgba(255,255,255,0.2)",
   whiteDim: "rgba(255,255,255,0.4)",
   whiteSoft: "rgba(255,255,255,0.6)",
@@ -141,6 +144,9 @@ export const DarkColors: ThemeColors = {
   backgroundClear: "rgba(23,23,21,0)",
   surfaceFade: "rgba(37,37,37,0.9)",
   surfaceClear: "rgba(37,37,37,0)",
+  groupedBackground: "#141312",
+  groupedBackgroundFade: "rgba(20,19,18,0.9)",
+  groupedBackgroundClear: "rgba(20,19,18,0)",
 };
 
 //light stays the module default so non-react code keeps working

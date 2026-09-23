@@ -1,0 +1,153 @@
+import * as Clipboard from "expo-clipboard";
+import { useState } from "react";
+import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useThemedStyles } from "../../hooks/useTheme";
+import { useT } from "../../i18n";
+import ActionButton from "../ui/ActionButton";
+import Group from "../ui/Group";
+import { CodeContent, codeLanguageName } from "../ui/MarkdownText";
+import DrawerSheet from "./DrawerSheet";
+
+const copyIcon = require("../../../assets/icons/copy2.png");
+
+const DESKTOP_CARD_WIDTH = 560;
+const DESKTOP_MARGIN = 24;
+
+export type PreviewCode = { code: string; language?: string; title?: string; incognito?: boolean };
+
+type CodePreviewSheetProps = {
+  code: PreviewCode | null;
+  onClose: () => void;
+  isLargeScreen?: boolean;
+  isDesktop?: boolean;
+  bottomInset?: number;
+};
+
+//full view of a chat code block
+export default function CodePreviewSheet({ code, onClose, isLargeScreen = false, isDesktop = false, bottomInset = 0 }: CodePreviewSheetProps) {
+  const styles = useThemedStyles(makeStyles);
+  const t = useT();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  //last code stays during close animation
+  const [shown, setShown] = useState<PreviewCode | null>(code);
+  const [copied, setCopied] = useState(false);
+  if (code && code !== shown) {
+    setShown(code);
+    setCopied(false);
+  }
+
+  const language = codeLanguageName(shown?.language);
+  const rows = shown ? [
+    shown.title ? { label: t("codePreview.name"), value: shown.title } : null,
+    language ? { label: t("codePreview.language"), value: language } : null,
+    { label: t("codePreview.lines"), value: String(shown.code.split("\n").length) },
+    { label: t("codePreview.characters"), value: String(shown.code.length) },
+  ].filter((r): r is { label: string; value: string } => r !== null) : [];
+
+  const handleCopy = async () => {
+    if (!shown) return;
+    await Clipboard.setStringAsync(shown.code);
+    setCopied(true);
+  };
+
+  const centeredStyle = {
+    position: "absolute" as const,
+    left: Math.max(DESKTOP_MARGIN, (windowWidth - DESKTOP_CARD_WIDTH) / 2),
+    top: Math.max(DESKTOP_MARGIN, windowHeight * 0.08),
+    maxHeight: windowHeight * 0.84,
+  };
+
+  return (
+    <DrawerSheet
+      visible={!!code}
+      onClose={onClose}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      //sheet may grow up to just under the status bar
+      sheetStyle={[styles.sheet, { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + bottomInset, maxHeight: windowHeight - insets.top - Spacing.xl2 }]}
+      desktopStyle={[styles.desktopCard, centeredStyle]}
+    >
+      <ScrollView contentContainerStyle={styles.content}>
+        {shown && (
+          <>
+            <Group style={styles.group}>
+              <View style={styles.codeContainer}>
+                <CodeContent code={shown.code} language={shown.language} incognito={shown.incognito} />
+              </View>
+              {rows.map(row => (
+                <ActionButton
+                  key={row.label}
+                  label={row.label}
+                  rightElement={<Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="middle">{row.value}</Text>}
+                />
+              ))}
+            </Group>
+            <Group style={styles.group}>
+              <ActionButton
+                icon={copyIcon}
+                label={copied ? t("chat.copied") : t("common.copy")}
+                onPress={handleCopy}
+              />
+            </Group>
+          </>
+        )}
+      </ScrollView>
+    </DrawerSheet>
+  );
+}
+
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
+  sheet: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.groupedBackground,
+    borderTopLeftRadius: Radius.huge2,
+    borderTopRightRadius: Radius.huge2,
+    paddingTop: 12,
+  },
+  desktopCard: {
+    backgroundColor: Colors.groupedBackground,
+    borderRadius: Radius.xxl,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
+    elevation: 5,
+    width: DESKTOP_CARD_WIDTH,
+    overflow: "hidden",
+  },
+  sheetHandleContainer: {
+    alignItems: "center",
+    marginBottom: 12,
+    paddingVertical: 10,
+    marginTop: -10,
+  },
+  content: {
+    paddingHorizontal: Spacing.lg2,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.lg,
+    gap: Spacing.lg2,
+  },
+  codeContainer: {
+    padding: Spacing.md,
+  },
+  group: {
+    borderRadius: Radius.xxl + Spacing.md,
+    borderWidth: 0,
+  },
+  //label takes the rest of the row
+  infoValue: {
+    flexShrink: 1,
+    maxWidth: "60%",
+    textAlign: "right",
+    color: Colors.textMuted,
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.label,
+  },
+});

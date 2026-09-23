@@ -12,6 +12,7 @@ export const en = {
   "common.pin": "Pin",
   "common.unpin": "Unpin",
   "common.copy": "Copy",
+  "common.expand": "Expand",
   "common.regenerate": "Regenerate",
   "common.listen": "Listen",
   "common.stop": "Stop",
@@ -123,6 +124,15 @@ export const en = {
   "nextcloud.waiting": "Waiting for you to approve it in your browser...",
   "nextcloud.failed":
     "Login failed or timed out. Check the address and try again.",
+
+  "codePreview.name": "Name",
+  "codePreview.language": "Language",
+  "codePreview.lines": "Lines",
+  "codePreview.characters": "Characters",
+  "imagePreview.name": "Name",
+  "imagePreview.format": "Format",
+  "imagePreview.dimensions": "Dimensions",
+  "imagePreview.size": "Size",
 
   "bugReport.title": "Report a bug",
   "bugReport.crashTitle": "Opera closed unexpectedly",

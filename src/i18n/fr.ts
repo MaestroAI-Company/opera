@@ -13,6 +13,7 @@ export const fr: Translations = {
   "common.pin": "Épingler",
   "common.unpin": "Désépingler",
   "common.copy": "Copier",
+  "common.expand": "Agrandir",
   "common.regenerate": "Régénérer",
   "common.listen": "Écouter",
   "common.stop": "Arrêter",
@@ -128,6 +129,15 @@ export const fr: Translations = {
   "nextcloud.waiting": "En attente de votre validation dans le navigateur...",
   "nextcloud.failed":
     "Échec ou expiration de la connexion. Vérifiez l'adresse et réessayez.",
+
+  "codePreview.name": "Nom",
+  "codePreview.language": "Langage",
+  "codePreview.lines": "Lignes",
+  "codePreview.characters": "Caractères",
+  "imagePreview.name": "Nom",
+  "imagePreview.format": "Format",
+  "imagePreview.dimensions": "Dimensions",
+  "imagePreview.size": "Taille",
 
   "bugReport.title": "Signaler un bug",
   "bugReport.crashTitle": "Opera s'est fermé de manière inattendue",

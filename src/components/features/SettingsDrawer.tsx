@@ -24,8 +24,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Fonts,
   FontSizes,
@@ -50,8 +52,9 @@ import {
 } from "../../services/ai/providers/sources";
 import {
   CatalogEntry,
+  familyPublisher,
+  fetchCatalogEntry,
   fetchFamilies,
-  fetchFamilyModels,
   formatBytes,
   getCachedFamilies,
   getCatalogEntry,
@@ -60,6 +63,7 @@ import {
   ModelFamily,
   OTHER_FAMILY_ID,
   searchModels,
+  similarModels,
 } from "../../services/ai/providers/huggingFaceCatalog";
 import {
   cancelLiteRTDownload,
@@ -139,11 +143,16 @@ const addIcon = require("../../../assets/icons/add.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 const deleteIcon = require("../../../assets/icons/delete.png");
 const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
+
+const LITERT_CAPABILITY_KEYS = {
+  vision: "settings.litert.capVision",
+  audio: "settings.litert.capAudio",
+  thinking: "settings.litert.capThinking",
+} as const;
 const searchIcon = require("../../../assets/icons/search.png");
 const profilIcon = require("../../../assets/icons/profil.png");
 const cloudIcon = require("../../../assets/icons/cloud.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
-const backIcon = require("../../../assets/icons/back.png");
 const crossIcon = require("../../../assets/icons/cross.png");
 const cancelIcon = require("../../../assets/icons/cancel.png");
 const generalIcon = require("../../../assets/icons/general.png");
@@ -213,7 +222,6 @@ type SubPage =
   | "litert"
   | "ollama"
   | "ollamaserver"
-  | "ollamaserveradd"
   | "confidentiality"
   | "reports"
   | "tools"
@@ -239,7 +247,6 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   litert: "service",
   ollama: "service",
   ollamaserver: "ollama",
-  ollamaserveradd: "ollama",
   confidentiality: "main",
   reports: "main",
   tools: "main",
@@ -387,6 +394,14 @@ export default function SettingsDrawer({
   const [lastSyncSize, setLastSyncSize] = useState<number | null>(null);
 
   const [addModelSheetVisible, setAddModelSheetVisible] = useState(false);
+  const [ollamaAddVisible, setOllamaAddVisible] = useState(false);
+  const [addModelScrolled, setAddModelScrolled] = useState(false);
+  const [litertDetail, setLitertDetail] = useState<{
+    repoId: string;
+    entry: CatalogEntry | null;
+    loading: boolean;
+  } | null>(null);
+  const addModelScrollRef = useRef<ScrollView>(null);
   const [hfModelInput, setHfModelInput] = useState("");
   const [litertForceLoad, setLitertForceLoadState] = useState(false);
   const [litertContextLength, setLitertContextLengthState] = useState("8192");
@@ -398,12 +413,8 @@ export default function SettingsDrawer({
   );
   const [litertDownloadProgress, setLitertDownloadProgress] =
     useState<LiteRTDownloadSnapshot | null>(null);
-  //browse families, then their models
+  //families browse as carousels
   const [litertFamilies, setLitertFamilies] = useState<ModelFamily[]>([]);
-  const [litertFamilyId, setLitertFamilyId] = useState<string | null>(null);
-  const [litertFamilyModels, setLitertFamilyModels] = useState<CatalogEntry[]>(
-    [],
-  );
   const [litertSearchResults, setLitertSearchResults] = useState<
     CatalogEntry[]
   >([]);
@@ -411,6 +422,10 @@ export default function SettingsDrawer({
   const [litertBrowserFailed, setLitertBrowserFailed] = useState(false);
   //native-driven keyboard height, same as chatbar
   const { height: sheetKeyboardHeight } = useKeyboardAnimation();
+  const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  //sheet may grow up to just under the status bar
+  const sheetMaxHeight = windowHeight - insets.top - Spacing.xl2;
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [exportScopeVisible, setExportScopeVisible] = useState(false);
   const [exportSelection, setExportSelection] = useState({
@@ -1118,6 +1133,18 @@ export default function SettingsDrawer({
     setActiveSubPage(page);
   };
 
+  const openOllamaAddSheet = () => {
+    setServerDraft({
+      name: "",
+      url: "",
+      headerName: "",
+      headerValue: "",
+      clientId: "",
+    });
+    setServerDraftBusy(false);
+    setOllamaAddVisible(true);
+  };
+
   const submitMcpDraft = async () => {
     const url = serverDraft.url.trim();
     if (mcpServers.some((s) => s.url.trim() === url)) {
@@ -1165,7 +1192,7 @@ export default function SettingsDrawer({
       ]);
       //skip waiting for the next sweep
       setServerErrors((prev) => ({ ...prev, [url]: false }));
-      setActiveSubPage("ollama");
+      setOllamaAddVisible(false);
     } finally {
       setServerDraftBusy(false);
     }
@@ -1495,7 +1522,7 @@ export default function SettingsDrawer({
   };
 
   const openAddModelSheet = async () => {
-    setLitertFamilyId(null);
+    setLitertDetail(null);
     setHfModelInput("");
     setLitertSearchResults([]);
     setAddModelSheetVisible(true);
@@ -1532,23 +1559,15 @@ export default function SettingsDrawer({
     [],
   );
 
-  const openLitertFamily = async (family: ModelFamily) => {
-    setLitertFamilyId(family.id);
+  //sizes resolve on open, not on listing
+  const openLitertDetail = async (repoId: string) => {
     setHfModelInput("");
-    setLitertFamilyModels([]);
-    setLitertBrowserFailed(false);
-    setLitertBrowserLoading(true);
-    try {
-      const models = await fetchFamilyModels(family.id);
-      setLitertFamilyModels(models);
-      //no fit means dropped for good
-      if (models.length === 0) setLitertFamilies(getCachedFamilies());
-    } catch (e) {
-      console.warn("Could not read the model family:", e);
-      setLitertBrowserFailed(true);
-    } finally {
-      setLitertBrowserLoading(false);
-    }
+    setLitertDetail({ repoId, entry: null, loading: true });
+    addModelScrollRef.current?.scrollTo({ y: 0, animated: false });
+    const entry = await fetchCatalogEntry(repoId);
+    setLitertDetail((prev) =>
+      prev?.repoId === repoId ? { repoId, entry, loading: false } : prev,
+    );
   };
 
   const litertFamilyName = (family: ModelFamily) =>
@@ -3288,7 +3307,7 @@ export default function SettingsDrawer({
             <ActionButton
               icon={addIcon}
               label={t("settings.server.add")}
-              onPress={() => openServerDraft("ollamaserveradd")}
+              onPress={openOllamaAddSheet}
             />
           </Group>
         </View>
@@ -3416,72 +3435,6 @@ export default function SettingsDrawer({
               variant="highlight"
               disabled={serverDraftBusy || !serverDraft.url.trim()}
               onPress={submitMcpDraft}
-            />
-          </Group>
-        </View>
-      </View>
-    </View>
-  );
-
-  //ollama add server form
-  const renderOllamaServerAddSubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.server.add"), "ollama")}
-
-      <View style={styles.contentCard}>
-        <View style={styles.settingRowVertical}>
-          <Text style={styles.settingLabel}>{t("settings.server.name")}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.server.nameHelp")}
-          </Text>
-          <Group>
-            <TextInputField
-              icon={penPlaceholderIcon}
-              placeholder={t("settings.server.namePlaceholder")}
-              value={serverDraft.name}
-              onChangeText={(v) =>
-                setServerDraft((prev) => ({ ...prev, name: v }))
-              }
-            />
-          </Group>
-        </View>
-
-        <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-            {t("settings.server.link")}
-          </Text>
-          <Group>
-            <TextInputField
-              icon={linkIcon}
-              placeholder={t("settings.service.serverLink")}
-              autoCapitalize="none"
-              autoCorrect={false}
-              value={serverDraft.url}
-              onChangeText={(v) =>
-                setServerDraft((prev) => ({ ...prev, url: v }))
-              }
-            />
-          </Group>
-        </View>
-
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Group
-            style={[
-              styles.highlightGroup,
-              (serverDraftBusy || !serverDraft.url.trim()) &&
-                styles.highlightGroupDisabled,
-            ]}
-          >
-            <ActionButton
-              icon={addIcon}
-              label={
-                serverDraftBusy
-                  ? t("settings.server.checking")
-                  : t("settings.server.add")
-              }
-              variant="highlight"
-              disabled={serverDraftBusy || !serverDraft.url.trim()}
-              onPress={submitOllamaDraft}
             />
           </Group>
         </View>
@@ -4456,8 +4409,6 @@ export default function SettingsDrawer({
         return renderOllamaSubPage();
       case "ollamaserver":
         return renderOllamaServerSubPage();
-      case "ollamaserveradd":
-        return renderOllamaServerAddSubPage();
       case "confidentiality":
         return renderConfidentialitySubPage();
       case "advanced":
@@ -4650,105 +4601,338 @@ export default function SettingsDrawer({
 
   //query searches the hub, else browses
   const isLitertSearching = hfModelInput.trim().length >= MIN_SEARCH_LENGTH;
-  const litertBrowserModels = isLitertSearching
-    ? litertSearchResults
-    : litertFamilyModels;
+  const isLitertDetail = !isLitertSearching && litertDetail !== null;
+
+  const renderLitertCard = (repoId: string) => {
+    const entry = getCatalogEntry(repoId);
+    return (
+      <Pressable
+        key={repoId}
+        onPress={() => openLitertDetail(repoId)}
+        style={({ pressed, hovered }) => [
+          styles.litertCard,
+          (pressed || hovered) && { opacity: 0.6 },
+        ]}
+      >
+        <View style={styles.litertCardTile} />
+        <Text style={styles.litertCardName} numberOfLines={2}>
+          {entry?.label ?? repoId.split("/").pop()}
+        </Text>
+        <Text style={styles.litertCardMeta} numberOfLines={1}>
+          {isLiteRTModelDownloaded(repoId)
+            ? t("settings.litert.installed")
+            : familyPublisher(entry?.family ?? "")}
+        </Text>
+      </Pressable>
+    );
+  };
+
+  const renderLitertDetail = () => {
+    if (!litertDetail) return null;
+    const { repoId, entry: resolved, loading } = litertDetail;
+    const entry = resolved ?? getCatalogEntry(repoId);
+    const installed = isLiteRTModelDownloaded(repoId);
+    const canDownload = !!resolved && !installed && !downloadingLitert;
+    const publisher = familyPublisher(entry?.family ?? "");
+    const capabilities = (resolved?.capabilities ?? [])
+      .filter((c) => c in LITERT_CAPABILITY_KEYS)
+      .map((c) =>
+        t(LITERT_CAPABILITY_KEYS[c as keyof typeof LITERT_CAPABILITY_KEYS]),
+      );
+    const similar = similarModels(repoId);
+
+    return (
+      <>
+        <View style={styles.contentCard}>
+          <View style={styles.litertDetailHeader}>
+            <View style={styles.litertDetailTile} />
+            <View style={styles.litertDetailInfo}>
+              <Text style={styles.litertDetailName}>
+                {entry?.label ?? repoId.split("/").pop()}
+              </Text>
+              {!!publisher && (
+                <Text style={styles.litertDetailMeta}>{publisher}</Text>
+              )}
+              <Text style={styles.litertDetailMeta}>
+                {loading
+                  ? t("settings.litert.loading")
+                  : resolved
+                    ? formatBytes(resolved.sizeBytes)
+                    : t("settings.litert.unavailable")}
+              </Text>
+              {capabilities.length > 0 && (
+                <Text style={styles.litertDetailMeta}>
+                  {capabilities.join(", ")}
+                </Text>
+              )}
+            </View>
+          </View>
+
+          <Group
+            style={[
+              styles.highlightGroup,
+              styles.litertDetailDownload,
+              !canDownload && styles.highlightGroupDisabled,
+            ]}
+          >
+            <ActionButton
+              icon={downloadIcon}
+              label={
+                installed
+                  ? t("settings.litert.installed")
+                  : t("settings.litert.downloadAction")
+              }
+              variant="highlight"
+              disabled={!canDownload}
+              onPress={() => resolved && confirmDownloadLitert(resolved)}
+            />
+          </Group>
+
+          <Text style={[styles.settingLabel, styles.litertDetailSection]}>
+            {t("settings.litert.description")}
+          </Text>
+          <Text style={styles.helpText}>
+            {t("settings.litert.descriptionPlaceholder")}
+          </Text>
+        </View>
+
+        {similar.length > 0 && (
+          <View style={styles.contentCard}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.litert.otherModels")}
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.litertCarousel}
+            >
+              {similar.map(renderLitertCard)}
+            </ScrollView>
+          </View>
+        )}
+      </>
+    );
+  };
+
+  const litertList = litertBrowserLoading ? (
+    <Text style={styles.helpText}>{t("settings.litert.loading")}</Text>
+  ) : litertBrowserFailed ? (
+    <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
+  ) : (
+    <>
+      {!isLitertSearching ? (
+        <View style={styles.litertFamilies}>
+          {litertFamilies.map((family) => (
+            <View key={family.id}>
+              <Text style={[styles.settingLabel, styles.litertFamilyTitle]}>
+                {litertFamilyName(family)}
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.litertCarousel}
+              >
+                {family.repoIds.map(renderLitertCard)}
+              </ScrollView>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Group>
+          {litertSearchResults.map((entry) => (
+            <ActionButton
+              key={entry.repoId}
+              icon={downloadIcon}
+              label={entry.label}
+              rightElement={
+                <Text style={styles.litertRowMeta}>
+                  {isLiteRTModelDownloaded(entry.repoId)
+                    ? t("settings.litert.installed")
+                    : formatBytes(entry.sizeBytes)}
+                </Text>
+              }
+              onPress={() => openLitertDetail(entry.repoId)}
+            />
+          ))}
+        </Group>
+      )}
+      {isLitertSearching && litertSearchResults.length === 0 && (
+        <Text style={styles.helpText}>{t("settings.litert.noResults")}</Text>
+      )}
+    </>
+  );
 
   const addModelSheet = (
     <DrawerSheet
       visible={addModelSheetVisible}
       onClose={() => {
         setAddModelSheetVisible(false);
-        setLitertFamilyId(null);
+        setLitertDetail(null);
+        setAddModelScrolled(false);
       }}
       mode="overlay"
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
       keyboardTranslateY={sheetKeyboardHeight}
       sheetStyle={[
         styles.addModelSheet,
-        { paddingBottom: Platform.OS === "ios" ? 34 : 20 },
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          maxHeight: sheetMaxHeight,
+        },
       ]}
       desktopStyle={styles.addModelSheetDesktop}
     >
-      <View style={styles.addModelSheetContent}>
-        <Text style={styles.settingLabel}>
-          {t("settings.litert.addModelTitle")}
-        </Text>
-        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-          {t("settings.litert.addModelHelp")}
-        </Text>
-
-        <Group>
-          <TextInputField
-            icon={searchIcon}
-            placeholder={t("settings.litert.addModelPlaceholder")}
-            value={hfModelInput}
-            onChangeText={setHfModelInput}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </Group>
-
-        {litertBrowserLoading ? (
-          <Text style={styles.helpText}>{t("settings.litert.loading")}</Text>
-        ) : litertBrowserFailed ? (
-          <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
-        ) : (
-          <ScrollView style={styles.litertBrowserList}>
-            <Group>
-              {!isLitertSearching && litertFamilyId !== null && (
-                <ActionButton
-                  icon={backIcon}
-                  label={t("settings.litert.allFamilies")}
-                  onPress={() => setLitertFamilyId(null)}
+      <View style={styles.addModelSheetBody}>
+        <ScrollView
+          ref={addModelScrollRef}
+          contentContainerStyle={styles.addModelSheetContent}
+          keyboardShouldPersistTaps="handled"
+          onScroll={(e) =>
+            setAddModelScrolled(e.nativeEvent.contentOffset.y > 4)
+          }
+          scrollEventThrottle={16}
+        >
+          {/* same slot keeps the field focused */}
+          <View style={!isLitertDetail && styles.contentCard}>
+            <View
+              style={
+                isLitertDetail
+                  ? [styles.contentCard, styles.litertSearchWithBack]
+                  : styles.settingRowVertical
+              }
+            >
+              <Group>
+                <TextInputField
+                  icon={searchIcon}
+                  placeholder={t("settings.litert.addModelPlaceholder")}
+                  value={hfModelInput}
+                  onChangeText={setHfModelInput}
+                  autoCapitalize="none"
+                  autoCorrect={false}
                 />
-              )}
-              {!isLitertSearching && litertFamilyId === null
-                ? litertFamilies.map((family) => (
-                    <ActionButton
-                      key={family.id}
-                      icon={arrowIcon}
-                      label={litertFamilyName(family)}
-                      rightElement={
-                        <Text style={styles.litertRowMeta}>
-                          {family.repoIds.length}
-                        </Text>
-                      }
-                      onPress={() => openLitertFamily(family)}
-                    />
-                  ))
-                : litertBrowserModels.map((entry) => (
-                    <ActionButton
-                      key={entry.repoId}
-                      icon={downloadIcon}
-                      label={entry.label}
-                      rightElement={
-                        <Text style={styles.litertRowMeta}>
-                          {isLiteRTModelDownloaded(entry.repoId)
-                            ? t("settings.litert.installed")
-                            : formatBytes(entry.sizeBytes)}
-                        </Text>
-                      }
-                      disabled={
-                        isLiteRTModelDownloaded(entry.repoId) ||
-                        !!downloadingLitert
-                      }
-                      onPress={() => confirmDownloadLitert(entry)}
-                    />
-                  ))}
-            </Group>
-            {(isLitertSearching || litertFamilyId !== null) &&
-              litertBrowserModels.length === 0 && (
-                <Text style={styles.helpText}>
-                  {isLitertSearching
-                    ? t("settings.litert.noResults")
-                    : t("settings.litert.familyEmpty")}
-                </Text>
-              )}
-          </ScrollView>
+              </Group>
+            </View>
+            {!isLitertDetail && litertList}
+          </View>
+
+          {isLitertDetail && renderLitertDetail()}
+        </ScrollView>
+
+        {/* floats over the scroll like the settings back button */}
+        {isLitertDetail && (
+          <View style={styles.litertBackWrapper} pointerEvents="box-none">
+            {addModelScrolled && (
+              <View style={styles.fixedBackShadow} pointerEvents="none" />
+            )}
+            <Pressable
+              onPress={() => setLitertDetail(null)}
+              hitSlop={12}
+              style={({ pressed, hovered }) => [
+                styles.fixedBackButton,
+                addModelScrolled
+                  ? styles.fixedBackButtonScrolled
+                  : styles.fixedBackButtonUnscrolled,
+                (pressed || hovered) &&
+                  (addModelScrolled
+                    ? { backgroundColor: Colors.surfacePressed }
+                    : { opacity: 0.6 }),
+              ]}
+            >
+              <Image
+                source={arrowIcon}
+                style={styles.backIcon}
+                tintColor={Colors.textPrimary}
+              />
+            </Pressable>
+          </View>
         )}
       </View>
+    </DrawerSheet>
+  );
+
+  const ollamaAddServerSheet = (
+    <DrawerSheet
+      visible={ollamaAddVisible}
+      onClose={() => setOllamaAddVisible(false)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      keyboardTranslateY={sheetKeyboardHeight}
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.addModelSheetDesktop}
+    >
+      <ScrollView
+        contentContainerStyle={styles.addModelSheetContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.contentCard}>
+          <View style={styles.settingRowVertical}>
+            <Text style={styles.settingLabel}>{t("settings.server.name")}</Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {t("settings.server.nameHelp")}
+            </Text>
+            <Group>
+              <TextInputField
+                icon={penPlaceholderIcon}
+                placeholder={t("settings.server.namePlaceholder")}
+                value={serverDraft.name}
+                onChangeText={(v) =>
+                  setServerDraft((prev) => ({ ...prev, name: v }))
+                }
+              />
+            </Group>
+          </View>
+
+          <View style={styles.settingRowVertical}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.server.link")}
+            </Text>
+            <Group>
+              <TextInputField
+                icon={linkIcon}
+                placeholder={t("settings.service.serverLink")}
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={serverDraft.url}
+                onChangeText={(v) =>
+                  setServerDraft((prev) => ({ ...prev, url: v }))
+                }
+              />
+            </Group>
+          </View>
+
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Group
+              style={[
+                styles.highlightGroup,
+                (serverDraftBusy || !serverDraft.url.trim()) &&
+                  styles.highlightGroupDisabled,
+              ]}
+            >
+              <ActionButton
+                icon={addIcon}
+                label={
+                  serverDraftBusy
+                    ? t("settings.server.checking")
+                    : t("settings.server.add")
+                }
+                variant="highlight"
+                disabled={serverDraftBusy || !serverDraft.url.trim()}
+                onPress={submitOllamaDraft}
+              />
+            </Group>
+          </View>
+        </View>
+      </ScrollView>
     </DrawerSheet>
   );
 
@@ -4789,6 +4973,7 @@ export default function SettingsDrawer({
         </View>
         {notificationModal}
         {addModelSheet}
+        {ollamaAddServerSheet}
       </Animated.View>
     );
   }
@@ -4823,6 +5008,7 @@ export default function SettingsDrawer({
 
       {notificationModal}
       {addModelSheet}
+      {ollamaAddServerSheet}
     </View>
   );
 
@@ -4985,6 +5171,12 @@ const makeStyles = (Colors: ThemeColors) =>
       borderTopRightRadius: Radius.huge2,
       paddingTop: 12,
     },
+    sheetHandleContainer: {
+      alignItems: "center",
+      marginBottom: Spacing.xs2,
+      paddingVertical: 10,
+      marginTop: -10,
+    },
     addModelSheetDesktop: {
       backgroundColor: Colors.groupedBackground,
       borderRadius: Radius.xxl,
@@ -4996,24 +5188,103 @@ const makeStyles = (Colors: ThemeColors) =>
       overflow: "hidden",
       paddingVertical: 16,
     },
-    litertBrowserList: {
-      maxHeight: 280,
-      marginTop: Spacing.md,
-    },
     litertModelRow: {
       marginBottom: Spacing.md,
     },
     litertCancelRow: {
       marginTop: Spacing.md,
     },
+    litertDetailHeader: {
+      flexDirection: "row",
+      gap: Spacing.lg2,
+    },
+    litertDetailTile: {
+      width: 120,
+      height: 120,
+      backgroundColor: Colors.logoTile,
+      borderWidth: 2,
+      borderColor: Colors.logoTileBorder,
+      borderRadius: Radius.xxl,
+    },
+    litertDetailInfo: {
+      flex: 1,
+    },
+    litertDetailName: {
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.title,
+      color: Colors.textPrimary,
+      marginBottom: Spacing.xs,
+    },
+    litertDetailMeta: {
+      fontFamily: Fonts.body,
+      fontSize: FontSizes.caption,
+      color: Colors.textSecondary,
+      lineHeight: 20,
+    },
+    litertDetailDownload: {
+      marginTop: Spacing.lg2,
+    },
+    litertDetailSection: {
+      marginTop: Spacing.xxl,
+    },
+    litertFamilies: {
+      gap: Spacing.xxl,
+    },
+    litertFamilyTitle: {
+      marginBottom: Spacing.md,
+    },
+    litertCarousel: {
+      gap: Spacing.lg2,
+      paddingHorizontal: Spacing.md,
+    },
+    litertCard: {
+      width: 96,
+      alignItems: "center",
+    },
+    litertCardTile: {
+      width: 96,
+      height: 96,
+      backgroundColor: Colors.logoTile,
+      borderWidth: 2,
+      borderColor: Colors.logoTileBorder,
+      borderRadius: Radius.xxl,
+      marginBottom: Spacing.md,
+    },
+    litertCardName: {
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.label,
+      color: Colors.textPrimary,
+      textAlign: "center",
+    },
+    litertCardMeta: {
+      fontFamily: Fonts.body,
+      fontSize: FontSizes.labelSm,
+      color: Colors.textSecondary,
+      marginTop: Spacing.xs2,
+    },
     litertRowMeta: {
       fontFamily: Fonts.mono,
       fontSize: FontSizes.micro,
       color: Colors.textMuted,
     },
+    addModelSheetBody: {
+      flexShrink: 1,
+      position: "relative",
+    },
+    litertBackWrapper: {
+      position: "absolute",
+      top: Spacing.md + 4,
+      left: Spacing.lg2,
+      width: 40,
+      height: 40,
+      zIndex: 10,
+      elevation: 10,
+    },
+    litertSearchWithBack: {
+      marginLeft: 40 + Spacing.md,
+    },
     addModelSheetContent: {
       paddingHorizontal: Spacing.lg2,
-      paddingTop: Spacing.sm,
       paddingBottom: Spacing.lg,
     },
     groupSpacing: {

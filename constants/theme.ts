@@ -95,6 +95,9 @@ export const LightColors = {
   overlayHover: "rgba(0,0,0,0.15)",
   //snackbar stays a dark pill in both themes
   snackbarBg: "#444444",
+  //logo tiles stay white in both themes
+  logoTile: "#FFFFFF",
+  logoTileBorder: "#0000001A",
 } as const;
 
 //every palette carries the same keys, values stay free-form color strings

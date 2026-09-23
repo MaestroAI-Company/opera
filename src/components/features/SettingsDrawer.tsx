@@ -133,6 +133,7 @@ import {
   gestureVelocity,
   playBackButtonPulse,
   playPageTransition,
+  releaseOpens,
   settingsProgress,
   settleDrawer,
   settleLayoutDrawer,
@@ -285,19 +286,19 @@ export default function SettingsDrawer({
           );
         },
         onPanResponderMove: (_, gestureState) => {
-          dragDrawer(
-            progress,
-            Math.max(0, Math.min(1, 1 - gestureState.dx / drawerWidth)),
-          );
+          dragDrawer(progress, 1 - gestureState.dx / drawerWidth);
         },
         onPanResponderRelease: (_, gestureState) => {
-          const velocity = -gestureVelocity(gestureState.vx, drawerWidth);
-          if (gestureState.dx > drawerWidth * 0.35 || gestureState.vx > 0.5) {
-            settleDrawer(progress, false, velocity);
-            onClose();
-          } else {
-            settleDrawer(progress, true, velocity);
-          }
+          const open = releaseOpens(
+            1 - gestureState.dx / drawerWidth,
+            -gestureState.vx,
+          );
+          settleDrawer(
+            progress,
+            open,
+            -gestureVelocity(gestureState.vx, drawerWidth),
+          );
+          if (!open) onClose();
         },
         onPanResponderTerminate: () => {
           settleDrawer(progress, true);

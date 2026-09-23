@@ -22,16 +22,22 @@ export function gestureVelocity(vx: number, drawerWidth: number): number {
 //settled target skips restart
 const settledTarget = new WeakMap<Animated.Value, number>();
 
-//drag overrides settled target
+//panel stays under the finger
 export function dragDrawer(progress: Animated.Value, ratio: number) {
   settledTarget.delete(progress);
-  progress.setValue(ratio);
+  progress.setValue(Math.max(0, Math.min(1, ratio)));
 }
 
-//exits outpace entrances
-const DISMISS_VELOCITY = -3;
+//finger speed in px/ms read as flick
+const FLICK_SPEED = 0.5;
 
-//spring carries finger velocity
+//flick wins else nearest end
+export function releaseOpens(ratio: number, speed: number): boolean {
+  if (Math.abs(speed) > FLICK_SPEED) return speed > 0;
+  return ratio > 0.5;
+}
+
+//critically damped so finger speed carries over
 //nativeDriver defaults to the shared drawer setting, override false when the value
 //also feeds a layout property (eg. marginBottom), which the native driver can't touch
 export function settleDrawer(
@@ -46,10 +52,10 @@ export function settleDrawer(
   settledTarget.set(progress, toValue);
   Animated.spring(progress, {
     toValue,
-    velocity: open ? velocity : Math.min(velocity, DISMISS_VELOCITY),
+    velocity,
+    stiffness: 500,
+    damping: 45,
     overshootClamping: true,
-    bounciness: 0,
-    speed: 14,
     useNativeDriver: nativeDriver,
   }).start(() => onComplete?.());
 }

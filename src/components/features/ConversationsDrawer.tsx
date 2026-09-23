@@ -13,7 +13,7 @@ import Group from "../ui/Group";
 import IconButton from "../ui/IconButton";
 import NotificationModal from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
-import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, playBackButtonPulse, playPageTransition, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
+import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, playBackButtonPulse, playPageTransition, releaseOpens, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
 
 const searchIcon = require("../../../assets/icons/search.png");
 const newIcon = require("../../../assets/icons/add.png");
@@ -154,16 +154,12 @@ export default function ConversationsDrawer({
         return gestureState.dx < -10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
       },
       onPanResponderMove: (_, gestureState) => {
-        dragDrawer(progress, Math.max(0, Math.min(1, 1 + gestureState.dx / drawerWidth)));
+        dragDrawer(progress, 1 + gestureState.dx / drawerWidth);
       },
       onPanResponderRelease: (_, gestureState) => {
-        const velocity = gestureVelocity(gestureState.vx, drawerWidth);
-        if (gestureState.dx < -drawerWidth * 0.35 || gestureState.vx < -0.5) {
-          settleDrawer(progress, false, velocity);
-          onClose();
-        } else {
-          settleDrawer(progress, true, velocity);
-        }
+        const open = releaseOpens(1 + gestureState.dx / drawerWidth, gestureState.vx);
+        settleDrawer(progress, open, gestureVelocity(gestureState.vx, drawerWidth));
+        if (!open) onClose();
       },
       onPanResponderTerminate: () => {
         settleDrawer(progress, true);

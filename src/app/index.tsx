@@ -31,7 +31,8 @@ import CodePreviewSheet, { PreviewCode } from "../components/features/CodePrevie
 import ChatBar from "../components/features/ChatBar";
 import ChatView from "../components/features/ChatView";
 import ConversationsDrawer from "../components/features/ConversationsDrawer";
-import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, settingsProgress, settleDrawer } from "../components/features/drawerAnimation";
+import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, releaseOpens, settingsProgress, settleDrawer } from "../components/features/drawerAnimation";
+import { sheetTravel } from "../components/features/DrawerSheet";
 import { ModelSelectorDrawer, ModelSelectorTrigger } from "../components/features/ModelSelector";
 import SettingsDrawer from "../components/features/SettingsDrawer";
 import TopBar from "../components/features/TopBar";
@@ -101,9 +102,6 @@ type ShareNotice =
 
 //matches welcomeText's lineHeight, reserved upfront so the second line doesn't shift layout
 const WELCOME_LINE_HEIGHT = 40;
-
-//swipe-up distance that fully drags the model selector into view
-const MODEL_SELECTOR_DRAG_DISTANCE = 280;
 
 //time-of-day greeting shown on the home screen
 function getGreeting(t: TranslationFn): string {
@@ -497,36 +495,30 @@ export default function Index() {
         if (drawerVisible || settingsDrawerVisible || modelSelectorVisible) return;
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
         if (isHorizontal) {
-          const ratio = Math.min(1, Math.abs(gestureState.dx) / dragWidth);
-          //crossing start leaves other panel out
-          dragDrawer(conversationsProgress, gestureState.dx > 0 ? ratio : 0);
-          dragDrawer(settingsProgress, gestureState.dx > 0 ? 0 : ratio);
+          //clamp keeps the other panel out
+          dragDrawer(conversationsProgress, gestureState.dx / dragWidth);
+          dragDrawer(settingsProgress, -gestureState.dx / dragWidth);
         } else if (gestureState.dy < 0 && !activeConversation) {
           //carries the model selector up with the finger, same as the horizontal drawers
-          const ratio = Math.min(1, Math.abs(gestureState.dy) / MODEL_SELECTOR_DRAG_DISTANCE);
-          dragDrawer(modelSelectorProgress, ratio);
+          dragDrawer(modelSelectorProgress, -gestureState.dy / sheetTravel(modelSelectorProgress));
         }
       },
       onPanResponderRelease: (evt, gestureState) => {
         const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
         if (!isHorizontal) {
           if (!drawerVisible && !settingsDrawerVisible && !modelSelectorVisible && !activeConversation) {
-            const velocity = -gestureVelocity(gestureState.vy, MODEL_SELECTOR_DRAG_DISTANCE);
-            if (gestureState.dy < -40 || gestureState.vy < -0.5) {
-              settleDrawer(modelSelectorProgress, true, velocity);
-              setModelSelectorVisible(true);
-            } else {
-              //send peeked panel back off
-              settleDrawer(modelSelectorProgress, false, velocity);
-            }
+            const travel = sheetTravel(modelSelectorProgress);
+            const opens = releaseOpens(-gestureState.dy / travel, -gestureState.vy);
+            settleDrawer(modelSelectorProgress, opens, -gestureVelocity(gestureState.vy, travel));
+            if (opens) setModelSelectorVisible(true);
           }
           return;
         }
 
         const velocity = gestureVelocity(gestureState.vx, dragWidth);
-        //short flicks still commit
-        const opensLeft = gestureState.dx > 40 || gestureState.vx > 0.5;
-        const opensRight = gestureState.dx < -40 || gestureState.vx < -0.5;
+        //same release rule as the drawers
+        const opensLeft = gestureState.dx > 0 && releaseOpens(gestureState.dx / dragWidth, gestureState.vx);
+        const opensRight = gestureState.dx < 0 && releaseOpens(-gestureState.dx / dragWidth, -gestureState.vx);
 
         if (opensLeft) {
           if (settingsDrawerVisible) {

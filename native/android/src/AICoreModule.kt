@@ -91,6 +91,20 @@ class AICoreModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
     }
   }
 
+  //facts the sdk reports for one variant, missing keys are unknown
+  @ReactMethod
+  fun getModelInfo(modelName: String, promise: Promise) {
+    scope.launch {
+      val model = getModel(modelName)
+      val info = Arguments.createMap()
+      runCatching { model.checkStatus() }.onSuccess { info.putInt("status", it) }
+      runCatching { model.getBaseModelName() }.onSuccess { info.putString("baseModelName", it) }
+      runCatching { model.getTokenLimit() }.onSuccess { info.putInt("tokenLimit", it) }
+      runCatching { model.isThinkingModeAvailable() }.onSuccess { info.putBoolean("thinking", it) }
+      promise.resolve(info)
+    }
+  }
+
   //whether the on-device gemini nano supports thinking mode
   @ReactMethod
   fun isThinkingModeAvailable(modelName: String, promise: Promise) {

@@ -20,6 +20,7 @@ import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { t } from "../../i18n";
 import { AIModule } from "../../services/ai/AIModule";
 import { Suggestion } from "../../services/ai/generation/suggestions";
+import { resolveMentions } from "../../services/ai/mentions";
 import { Conversation, Message, MessageSource } from "../../services/db/DatabaseService";
 import { splitDocumentBlocks } from "../../services/documents/DocumentService";
 import { Settings } from "../../services/settings/SettingsService";
@@ -227,6 +228,11 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   );
   const documentNames = userDocuments?.names ?? [];
   const visibleContent = userDocuments ? userDocuments.text : item.content;
+  //requested tools with their dependencies
+  const mentions = useMemo(
+    () => (isUser ? resolveMentions(visibleContent) : []),
+    [isUser, visibleContent]
+  );
 
   //reparse only when deps move
   const disp = useMemo(
@@ -266,7 +272,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               )}
             </View>
           )}
-          {((item.images && item.images.length > 0) || documentNames.length > 0) && (
+          {((item.images && item.images.length > 0) || documentNames.length > 0 || mentions.length > 0) && (
             <View style={styles.attachmentsRow}>
               {item.images?.map((uri, i) => {
                 const isAudio = uri.startsWith('data:audio') || /\.(wav|mp3|m4a|aac|flac|ogg)(?:\?.*)?$/i.test(uri);
@@ -278,6 +284,9 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               })}
               {documentNames.map((name, i) => (
                 <AttachmentChip key={`doc-${i}`} icon={fileIcon} label={name} />
+              ))}
+              {mentions.map(mention => (
+                <AttachmentChip key={`mention-${mention.id}`} icon={appSourceIcon} label={`@${mention.id}`} />
               ))}
             </View>
           )}

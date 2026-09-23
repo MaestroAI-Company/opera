@@ -62,6 +62,8 @@ export interface ITool {
   enabledByDefault?: boolean;
   //omit if supported on all platforms
   platforms?: ToolPlatform[];
+  //tool names offered alongside on @mention
+  requires?: string[];
   //request os permission on enable
   requestPermission?(): Promise<boolean>;
   //optional ui for the tool result

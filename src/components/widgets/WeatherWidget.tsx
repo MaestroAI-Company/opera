@@ -45,6 +45,7 @@ export const WeatherWidget: IWidget<WeatherWidgetData> = {
   hasBorder: true,
   aiDefinesTitle: true,
   enabledByDefault: true,
+  requires: ['web_search'],
   icon: ICONS.clear_day,
   description: 'Weather card with current conditions and forecast. title="CITY" (city name only). "description": condition text (e.g. "Sunny"). "now": 1 item with temp, max, min for the day. "forecast": exactly 4 items (hours OR days, never mixed), each with icon, temp, max, min. Search for weather data first, then render this widget.',
   schema: `{

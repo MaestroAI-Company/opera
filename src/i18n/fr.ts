@@ -276,6 +276,9 @@ export const fr: Translations = {
   "settings.general.technicalDetails": "Afficher les détails techniques",
   "settings.general.technicalDetailsHelp":
     "Ajoute un bouton d'info sous les réponses pour inspecter les données techniques de l'IA.",
+  "settings.general.detectionBoxes": "Afficher les boxes de détection",
+  "settings.general.detectionBoxesHelp":
+    "Entoure les éléments de l'écran sur lesquels la sélection de l'overlay s'aimante.",
   "settings.general.autoRead": "Lecture automatique des réponses",
   "settings.general.autoReadHelp":
     "Lit la réponse à voix haute quand vous demandez à la voix.",
@@ -353,20 +356,86 @@ export const fr: Translations = {
     "Ollama vous permet d'exécuter des modèles d'IA sur votre propre ordinateur ou serveur plutôt que dans le cloud. Ajoutez l'URL de votre serveur Ollama ci-dessous pour y connecter Opera.",
   "settings.service.ollamaHelp":
     "Utilisez vos serveurs Ollama pour exécuter de puissants modèles d'IA chez vous.",
-  "settings.service.local": "Hugging Face",
+  "settings.service.local": "Intégré",
   "settings.service.localHelp":
-    "Exécutez des modèles open source depuis Hugging Face.",
-  "settings.local.see": "Voir les réglages Hugging Face",
-  "settings.local.title": "Hugging Face",
-  "settings.local.modelTitle": "Modèle d'IA",
-  "settings.local.addModel": "Ajouter un modèle d'IA",
-  "settings.local.addModelTitle": "Ajouter un modèle d'IA",
-  "settings.local.addModelHelp":
-    "Entrez l'identifiant du modèle Hugging Face pour l'ajouter à Opera (ex. HuggingFaceTB/SmolLM-360M).",
-  "settings.local.addModelPlaceholder": "nom du modèle",
-  "settings.local.addModelAction": "Télécharger le modèle",
+    "Utilisez le modèle d'IA fourni avec votre appareil. Rien à télécharger.",
+  "settings.local.see": "Voir les réglages Intégré",
+  "settings.local.title": "Intégré",
   "settings.local.help":
+    "Votre appareil embarque son propre modèle d'IA. Il est toujours disponible et ne demande aucune installation.",
+  "settings.local.browserModel": "Modèle du navigateur",
+  "settings.local.sheetTitle": "Fiche du modèle",
+  "settings.local.sheetHelp": "Seules les informations fournies par le système sont affichées.",
+  "settings.local.modelsTitle": "Modèles proposés",
+  "settings.local.sheet.family": "Famille",
+  "settings.local.sheet.runtime": "Moteur",
+  "settings.local.sheet.browser": "Navigateur",
+  "settings.local.sheet.version": "Version",
+  "settings.local.sheet.context": "Contexte",
+  "settings.local.sheet.thinking": "Réflexion",
+  "settings.local.sheet.tokens": "{count} tokens",
+  "settings.local.sheet.yes": "Oui",
+  "settings.local.sheet.no": "Non",
+  "settings.local.status.available": "Prêt",
+  "settings.local.status.downloadable": "À télécharger",
+  "settings.local.status.downloading": "Téléchargement",
+  "settings.local.status.unavailable": "Indisponible",
+  "settings.local.download": "Télécharger le modèle",
+  "settings.local.downloading": "Téléchargement du modèle du navigateur",
+  "settings.local.notDownloaded": "Le modèle du navigateur n'est pas encore téléchargé. Téléchargez-le dans Réglages, Intégré.",
+  "settings.service.litert": "Sur l'appareil",
+  "settings.service.litertHelp":
+    "Téléchargez des modèles ouverts depuis Hugging Face et exécutez-les sur cet appareil.",
+  "settings.litert.see": "Voir les réglages Sur l'appareil",
+  "settings.litert.title": "Sur l'appareil",
+  "settings.litert.modelTitle": "Modèle d'IA",
+  "settings.litert.help":
     "Ajoutez et gérez vos modèles d'IA depuis Hugging Face.",
+  "settings.litert.addModel": "Ajouter un modèle d'IA",
+  "settings.litert.addModelTitle": "Ajouter un modèle d'IA",
+  "settings.litert.addModelHelp":
+    "Choisissez une famille, puis un modèle. Seuls ceux qui tiennent sur cet appareil sont listés, et aucun ne demande de compte.",
+  "settings.litert.addModelPlaceholder": "rechercher un modèle",
+  "settings.litert.noModels": "Aucun modèle installé pour l'instant.",
+  "settings.litert.installed": "Installé",
+  "settings.litert.loading": "Chargement...",
+  "settings.litert.familyOther": "Autres",
+  "settings.litert.allFamilies": "Toutes les familles",
+  "settings.litert.familyEmpty": "Aucun modèle de cette famille ne tient sur cet appareil.",
+  "settings.litert.loadFailed":
+    "La liste des modèles n'a pas pu être chargée. Vérifiez votre connexion.",
+  "settings.litert.downloading": "Téléchargement...",
+  "settings.litert.downloadingModel": "Téléchargement de {name}",
+  "settings.litert.cancelDownload": "Annuler le téléchargement",
+  "settings.litert.noResults": "Aucun modèle compatible ne correspond à cette recherche.",
+  "settings.litert.downloadTitle": "Télécharger {name} ?",
+  "settings.litert.downloadMessage":
+    "{name} prélève {size} et sera téléchargé via votre connexion actuelle.",
+  "settings.litert.downloadAction": "Télécharger",
+  "settings.litert.deleteTitle": "Supprimer {name} ?",
+  "settings.litert.deleteMessage":
+    "Le modèle est retiré de cet appareil. Vous pourrez le télécharger de nouveau plus tard.",
+  "settings.litert.contextTitle": "Longueur de contexte",
+  "settings.litert.contextHelp":
+    "Budget du cache KV — des valeurs basses consomment moins de mémoire.",
+  "settings.litert.forceLoad": "Forcer le chargement",
+  "settings.litert.forceLoadHelp":
+    "Ignore la vérification de mémoire préalable. Peut planter si l'appareil manque de mémoire.",
+  "generation.error.contextLength":
+    "Cette conversation est trop longue pour le modèle. Lancez une nouvelle discussion, ou augmentez la longueur de contexte dans les réglages.",
+  "generation.error.memory":
+    "Pas assez de mémoire libre pour charger ce modèle. Fermez quelques applications, ou choisissez-en un plus petit.",
+  "generation.error.unreachable":
+    "Le serveur est injoignable. Vérifiez son adresse et votre connexion.",
+  "generation.error.refused":
+    "Le serveur a refusé la connexion. Vérifiez la clé d'API.",
+  "generation.error.missingModel": "Ce modèle n'est pas disponible sur le serveur.",
+  "generation.error.onDevice":
+    "Le modèle sur l'appareil n'a pas pu s'exécuter. Réessayez, ou changez de modèle dans les réglages.",
+  "generation.error.unknown":
+    "La génération a échoué pour une raison inconnue.",
+  "generation.error.generic":
+    "La génération a échoué. Réessayez, ou changez de modèle dans les réglages.",
   "settings.service.serverLink": "lien du serveur",
   "settings.service.addServer": "Ajouter un serveur",
   "settings.service.unreachable.title": "Serveur injoignable",

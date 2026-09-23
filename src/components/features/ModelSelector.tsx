@@ -565,128 +565,128 @@ export function ModelSelectorDrawer({
         })}
       </View>
 
-      <View style={styles.modelsBox}>
-        <ScrollView
-          style={{ maxHeight: MAX_MODELS_HEIGHT }}
-          contentContainerStyle={styles.modelsScrollContent}
-          showsVerticalScrollIndicator={false}
-          nestedScrollEnabled={true}
-        >
-          {sources.length === 0 ? (
-            <Text style={styles.emptyText}>
-              No provider enabled, turn one on in Settings → Service
-            </Text>
-          ) : loading && models.length === 0 ? (
-            <View style={styles.loadingRow}>
-              <LottieView
-                source={loadingAnimation}
-                autoPlay
-                loop
-                style={{ width: 24, height: 16 }}
-              />
-              <Text style={styles.modelStatus}>
-                {t("modelSelector.loading")}
-              </Text>
-            </View>
-          ) : models.length === 0 ? (
-            <View>
+      <View style={styles.contentCard}>
+        <View style={styles.modelsBox}>
+          <ScrollView
+            style={{ maxHeight: MAX_MODELS_HEIGHT }}
+            contentContainerStyle={styles.modelsScrollContent}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+          >
+            {sources.length === 0 ? (
               <Text style={styles.emptyText}>
-                {isAvailable
-                  ? t("modelSelector.noModels")
-                  : t("modelSelector.unreachable")}
+                No provider enabled, turn one on in Settings → Service
               </Text>
-              {isAvailable && browsedSource?.service === "ollama" && (
-                <Pressable
-                  disabled={isDownloading}
-                  onPress={() => setDownloadModalVisible(true)}
-                  style={({ pressed, hovered }) => [
-                    styles.downloadOption,
-                    (pressed || hovered) && {
-                      backgroundColor: Colors.surfacePressed,
-                    },
-                  ]}
-                >
-                  <Image source={downloadIcon} style={styles.downloadIcon} />
-                  <Text style={styles.downloadText}>
-                    {isDownloading
-                      ? `${t("modelSelector.downloading")} ${downloadPercent}%`
-                      : "gemma4"}
-                  </Text>
-                </Pressable>
-              )}
-            </View>
-          ) : (
-            <View style={styles.optionsList}>
-              {displayModels.map((model, index) => {
-                const selected = isBrowsingActive && model === selectedModel;
-                const isSpecialActive = !hasPill && selected;
-                return (
+            ) : loading && models.length === 0 ? (
+              <View style={styles.loadingRow}>
+                <LottieView
+                  source={loadingAnimation}
+                  autoPlay
+                  loop
+                  style={{ width: 24, height: 16 }}
+                />
+                <Text style={styles.modelStatus}>
+                  {t("modelSelector.loading")}
+                </Text>
+              </View>
+            ) : models.length === 0 ? (
+              <View>
+                <Text style={styles.emptyText}>
+                  {isAvailable
+                    ? t("modelSelector.noModels")
+                    : t("modelSelector.unreachable")}
+                </Text>
+                {isAvailable && browsedSource?.service === "ollama" && (
                   <Pressable
-                    key={model}
-                    onLayout={handleRowLayout(index)}
-                    onPress={() => {
-                      Vibration.vibrate(10);
-                      handleSelectModel(model);
-                    }}
+                    disabled={isDownloading}
+                    onPress={() => setDownloadModalVisible(true)}
                     style={({ pressed, hovered }) => [
-                      styles.option,
-                      isSpecialActive
-                        ? styles.optionSelected
-                        : (pressed || hovered) && {
-                            backgroundColor: Colors.overlaySubtle,
-                          },
-                      isSpecialActive &&
-                        (pressed || hovered) && {
-                          backgroundColor: Colors.primaryActive,
-                        },
+                      styles.downloadOption,
+                      (pressed || hovered) && {
+                        backgroundColor: Colors.surfacePressed,
+                      },
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.optionText,
-                        isSpecialActive && styles.optionTextSelected,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {displayName(model)}
+                    <Image source={downloadIcon} style={styles.downloadIcon} />
+                    <Text style={styles.downloadText}>
+                      {isDownloading
+                        ? `${t("modelSelector.downloading")} ${downloadPercent}%`
+                        : "gemma4"}
                     </Text>
                   </Pressable>
-                );
-              })}
-              {hasPill && rowLayoutsRef.current[activeIndex] && (
-                <GestureDetector gesture={pillPan}>
-                  <Reanimated.View style={[styles.pill, pillAnimatedStyle]}>
-                    <Text
-                      style={[styles.optionText, styles.optionTextSelected]}
-                      numberOfLines={1}
+                )}
+              </View>
+            ) : (
+              <View style={styles.optionsList}>
+                {displayModels.map((model, index) => {
+                  const selected = isBrowsingActive && model === selectedModel;
+                  const isSpecialActive = !hasPill && selected;
+                  return (
+                    <Pressable
+                      key={model}
+                      onLayout={handleRowLayout(index)}
+                      onPress={() => {
+                        Vibration.vibrate(10);
+                        handleSelectModel(model);
+                      }}
+                      style={({ pressed, hovered }) => [
+                        styles.option,
+                        isSpecialActive
+                          ? styles.optionSelected
+                          : (pressed || hovered) && {
+                              backgroundColor: Colors.overlaySubtle,
+                            },
+                        isSpecialActive &&
+                          (pressed || hovered) && {
+                            backgroundColor: Colors.primaryActive,
+                          },
+                      ]}
                     >
-                      {displayName(displayModels[activeIndex])}
-                    </Text>
-                  </Reanimated.View>
-                </GestureDetector>
-              )}
-            </View>
-          )}
-        </ScrollView>
+                      <Text
+                        style={[
+                          styles.optionText,
+                          isSpecialActive && styles.optionTextSelected,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {displayName(model)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+                {hasPill && rowLayoutsRef.current[activeIndex] && (
+                  <GestureDetector gesture={pillPan}>
+                    <Reanimated.View style={[styles.pill, pillAnimatedStyle]}>
+                      <Text
+                        style={[styles.optionText, styles.optionTextSelected]}
+                        numberOfLines={1}
+                      >
+                        {displayName(displayModels[activeIndex])}
+                      </Text>
+                    </Reanimated.View>
+                  </GestureDetector>
+                )}
+              </View>
+            )}
+          </ScrollView>
+        </View>
+
+        {showReflection && (
+          <View style={styles.reflectionRow}>
+            <Group>
+              <SliderToggle
+                selectedValue={selectedReflection}
+                onSelect={onReflectionChange}
+                options={reflections}
+              />
+            </Group>
+          </View>
+        )}
       </View>
 
-      {showReflection && (
-        <View style={styles.reflectionRow}>
-          <Group>
-            <SliderToggle
-              selectedValue={selectedReflection}
-              onSelect={onReflectionChange}
-              options={reflections}
-            />
-          </Group>
-        </View>
-      )}
-
-      <View style={styles.downloadProgressRow}>
-        <Group>
-          <ProgressBar progress={0} icon={tokenIcon} />
-          <Text style={styles.tokenMaxLabel}>Token max :</Text>
-        </Group>
+      <View style={[styles.contentCard, styles.downloadProgressRow]}>
+        <ProgressBar progress={0} icon={tokenIcon} />
+        <Text style={styles.tokenMaxLabel}>Token max :</Text>
       </View>
     </View>
   );
@@ -770,8 +770,6 @@ const makeStyles = (Colors: ThemeColors) =>
     trigger: {
       flexDirection: "row",
       alignItems: "center",
-      borderWidth: 2,
-      borderColor: Colors.border,
       paddingHorizontal: 12,
       height: 44,
       backgroundColor: Colors.surface,
@@ -795,26 +793,27 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     desktopCard: {
       width: DESKTOP_CARD_WIDTH,
-      backgroundColor: Colors.surface,
+      backgroundColor: Colors.groupedBackground,
       borderRadius: Radius.xxl,
       borderWidth: 2,
       borderColor: Colors.border,
       boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
       elevation: 5,
       overflow: "hidden",
-      padding: 16,
+      paddingVertical: 16,
+      paddingHorizontal: Spacing.lg2,
     },
     mobileSheet: {
       position: "absolute",
       bottom: 0,
       left: 0,
       right: 0,
-      backgroundColor: Colors.surface,
+      backgroundColor: Colors.groupedBackground,
       borderTopLeftRadius: Radius.huge2,
       borderTopRightRadius: Radius.huge2,
       borderBottomLeftRadius: Radius.xxl,
       borderBottomRightRadius: Radius.xxl,
-      paddingHorizontal: 16,
+      paddingHorizontal: Spacing.lg2,
       paddingTop: 8,
     },
     handleContainer: {
@@ -850,6 +849,13 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     tabTextActive: {
       color: Colors.primary,
+    },
+    contentCard: {
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
+      padding: Spacing.md,
+      marginBottom: Spacing.lg2,
     },
     modelsBox: {
       borderWidth: 2,
@@ -920,10 +926,12 @@ const makeStyles = (Colors: ThemeColors) =>
       color: Colors.textOnPrimary,
     },
     reflectionRow: {
-      marginTop: 12,
+      marginTop: Spacing.md,
     },
     downloadProgressRow: {
-      marginTop: 12,
+      padding: 0,
+      paddingVertical: Spacing.xs,
+      marginBottom: 0,
     },
     tokenMaxLabel: {
       fontFamily: Fonts.mono,

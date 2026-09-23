@@ -378,12 +378,12 @@ export default function ConversationsDrawer({
           )}
         </ScrollView>
         <LinearGradient
-          colors={[Colors.surface, Colors.surfaceFade, Colors.surfaceClear]}
+          colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
           style={styles.gradientTop}
           pointerEvents="none"
         />
         <LinearGradient
-          colors={[Colors.surfaceClear, Colors.surfaceFade, Colors.surface]}
+          colors={[Colors.groupedBackgroundClear, Colors.groupedBackgroundFade, Colors.groupedBackground]}
           style={styles.gradientBottom}
           pointerEvents="none"
         />
@@ -444,12 +444,12 @@ export default function ConversationsDrawer({
           ))}
         </ScrollView>
         <LinearGradient
-          colors={[Colors.surface, Colors.surfaceFade, Colors.surfaceClear]}
+          colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
           style={styles.gradientTop}
           pointerEvents="none"
         />
         <LinearGradient
-          colors={[Colors.surfaceClear, Colors.surfaceFade, Colors.surface]}
+          colors={[Colors.groupedBackgroundClear, Colors.groupedBackgroundFade, Colors.groupedBackground]}
           style={styles.gradientBottom}
           pointerEvents="none"
         />
@@ -569,13 +569,13 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     top: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.groupedBackground,
     paddingTop: 60,
     paddingHorizontal: Spacing.lg2,
   },
   largeScreenContainer: {
     width: 320,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.groupedBackground,
     zIndex: 10,
   },
   floatingContainer: {
@@ -641,6 +641,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   quickActionsSpacing: {
     marginBottom: Spacing.lg2,
     borderRadius: Radius.xxl + Spacing.md,
+    borderWidth: 0,
   },
   scrollListContainer: {
     flex: 1,

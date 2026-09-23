@@ -2479,6 +2479,7 @@ export default function SettingsDrawer({
         <Pressable
           style={({ pressed, hovered }) => [
             styles.toggleGroupRowItem,
+            styles.navItemLast,
             (pressed || hovered) && styles.toggleGroupCardPressed,
           ]}
           onPress={() => setActiveSubPage("ollama")}
@@ -3971,12 +3972,12 @@ export default function SettingsDrawer({
       </ScrollView>
 
       <LinearGradient
-        colors={[Colors.surface, Colors.surfaceFade, Colors.surfaceClear]}
+        colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
         style={styles.gradientTop}
         pointerEvents="none"
       />
       <LinearGradient
-        colors={[Colors.surfaceClear, Colors.surfaceFade, Colors.surface]}
+        colors={[Colors.groupedBackgroundClear, Colors.groupedBackgroundFade, Colors.groupedBackground]}
         style={styles.gradientBottom}
         pointerEvents="none"
       />
@@ -4166,12 +4167,12 @@ const makeStyles = (Colors: ThemeColors) =>
       top: 0,
       bottom: 0,
       right: 0,
-      backgroundColor: Colors.surface,
+      backgroundColor: Colors.groupedBackground,
       paddingHorizontal: Spacing.lg2,
     },
     largeScreenContainer: {
       width: 320,
-      backgroundColor: Colors.surface,
+      backgroundColor: Colors.groupedBackground,
       zIndex: 10,
     },
     floatingContainer: {
@@ -4232,14 +4233,10 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     fixedBackButtonScrolled: {
       backgroundColor: Colors.surface,
-      borderWidth: 2,
-      borderColor: Colors.border,
       borderRadius: Radius.xxl,
     },
     fixedBackButtonUnscrolled: {
       backgroundColor: "transparent",
-      borderWidth: 2,
-      borderColor: "transparent",
       borderRadius: Radius.xxl,
     },
     header: {
@@ -4267,10 +4264,8 @@ const makeStyles = (Colors: ThemeColors) =>
     contentCard: {
       backgroundColor: Colors.surface,
       borderRadius: Radius.xxl + Spacing.md,
-      borderWidth: 2,
-      borderColor: Colors.border,
-      paddingHorizontal: Spacing.md,
-      paddingVertical: Spacing.xl2,
+      borderWidth: 0,
+      padding: Spacing.md,
       marginBottom: Spacing.xxl2,
     },
     backIcon: {
@@ -4307,13 +4302,13 @@ const makeStyles = (Colors: ThemeColors) =>
       bottom: 0,
       left: 0,
       right: 0,
-      backgroundColor: Colors.surface,
+      backgroundColor: Colors.groupedBackground,
       borderTopLeftRadius: Radius.huge2,
       borderTopRightRadius: Radius.huge2,
       paddingTop: 12,
     },
     addModelSheetDesktop: {
-      backgroundColor: Colors.surface,
+      backgroundColor: Colors.groupedBackground,
       borderRadius: Radius.xxl,
       borderWidth: 2,
       borderColor: Colors.border,
@@ -4324,16 +4319,18 @@ const makeStyles = (Colors: ThemeColors) =>
       paddingVertical: 16,
     },
     addModelSheetContent: {
-      paddingHorizontal: Spacing.xxl,
+      paddingHorizontal: Spacing.lg2,
       paddingTop: Spacing.sm,
       paddingBottom: Spacing.lg,
     },
     groupSpacing: {
       marginBottom: Spacing.xxl,
       borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
     },
     mainPageGroup: {
       borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
     },
     groupSpacingTight: {
       marginBottom: Spacing.lg2,
@@ -4341,7 +4338,7 @@ const makeStyles = (Colors: ThemeColors) =>
     navItem: {
       flexDirection: "row",
       alignItems: "center",
-      paddingVertical: Spacing.xl2,
+      paddingVertical: Spacing.lg2,
       paddingHorizontal: Spacing.lg2,
       gap: Spacing.lg2,
     },
@@ -4413,6 +4410,7 @@ const makeStyles = (Colors: ThemeColors) =>
       fontSize: FontSizes.body,
       color: Colors.textPrimary,
       fontFamily: Fonts.mono,
+      paddingTop: Spacing.xs,
     },
     toggleRow: {
       flexDirection: "row",
@@ -4438,7 +4436,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     toggleGroupRowItem: {
       paddingHorizontal: Spacing.md,
-      paddingVertical: Spacing.xl2,
+      paddingVertical: Spacing.md,
     },
     toggleGroupCardPressed: {
       backgroundColor: Colors.surfacePressed,

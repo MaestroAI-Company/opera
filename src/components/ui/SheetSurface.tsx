@@ -260,7 +260,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     width: "100%",
   },
   sheet: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.groupedBackground,
     borderTopLeftRadius: Radius.huge2,
     borderTopRightRadius: Radius.huge2,
     paddingTop: 12,

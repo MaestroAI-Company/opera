@@ -2,30 +2,98 @@ import * as Calendar from "expo-calendar";
 import Constants from "expo-constants";
 import * as Contacts from "expo-contacts";
 import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import * as MediaLibrary from "expo-media-library/legacy";
-import { LinearGradient } from "expo-linear-gradient";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, ImageSourcePropType, Keyboard, Linking, NativeScrollEvent, NativeSyntheticEvent, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import {
+  Animated,
+  AppState,
+  BackHandler,
+  DeviceEventEmitter,
+  Image,
+  ImageSourcePropType,
+  Keyboard,
+  Linking,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  PanResponder,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import {
+  Fonts,
+  FontSizes,
+  Radius,
+  Spacing,
+  ThemeColors,
+} from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import { LocalModelSheet } from "../../services/ai/providers/LocalProvider";
-import { BETA_PROVIDER_ID, BETA_SERVER_URL, buildSources, getEnabledProviders, getOllamaServers, getOllamaTuning, isProviderSupported, OllamaServer, serializeOllamaServers, serializeProviders } from "../../services/ai/providers/sources";
-import { CatalogEntry, fetchFamilies, fetchFamilyModels, formatBytes, getCachedFamilies, getCatalogEntry, hydrateLiteRTCatalog, MIN_SEARCH_LENGTH, ModelFamily, OTHER_FAMILY_ID, searchModels } from "../../services/ai/providers/huggingFaceCatalog";
-import { cancelLiteRTDownload, deleteLiteRTModel, downloadLiteRTModel, getInstalledLiteRTModels, getLiteRTModelLabel, getPendingLiteRTDownload, isLiteRTModelDownloaded, LiteRTDownloadCancelled, LiteRTDownloadSnapshot, LiteRTModelInfo, subscribeLiteRTDownload } from "../../services/ai/providers/LiteRTProvider";
-import { parseQuickFlowOptionId, quickFlowOptionId } from "../../services/ai/quickFlow";
-import { isDefaultAssistant, openAssistantSettings } from "../../services/assistant/DefaultAssistant";
+import {
+  BETA_PROVIDER_ID,
+  BETA_SERVER_URL,
+  buildSources,
+  getEnabledProviders,
+  getOllamaServers,
+  getOllamaTuning,
+  isProviderSupported,
+  OllamaServer,
+  serializeOllamaServers,
+  serializeProviders,
+} from "../../services/ai/providers/sources";
+import {
+  CatalogEntry,
+  fetchFamilies,
+  fetchFamilyModels,
+  formatBytes,
+  getCachedFamilies,
+  getCatalogEntry,
+  hydrateLiteRTCatalog,
+  MIN_SEARCH_LENGTH,
+  ModelFamily,
+  OTHER_FAMILY_ID,
+  searchModels,
+} from "../../services/ai/providers/huggingFaceCatalog";
+import {
+  cancelLiteRTDownload,
+  deleteLiteRTModel,
+  downloadLiteRTModel,
+  getInstalledLiteRTModels,
+  getLiteRTModelLabel,
+  getPendingLiteRTDownload,
+  isLiteRTModelDownloaded,
+  LiteRTDownloadCancelled,
+  LiteRTDownloadSnapshot,
+  LiteRTModelInfo,
+  subscribeLiteRTDownload,
+} from "../../services/ai/providers/LiteRTProvider";
+import {
+  parseQuickFlowOptionId,
+  quickFlowOptionId,
+} from "../../services/ai/quickFlow";
 import { ITool } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
+import {
+  isDefaultAssistant,
+  openAssistantSettings,
+} from "../../services/assistant/DefaultAssistant";
 import { BackupService } from "../../services/BackupService";
 import { CloudUserInfo } from "../../services/cloud/CloudProvider";
-import { CLOUD_PROVIDERS, getCloudProviderDefinition } from "../../services/cloud/registry";
+import {
+  CLOUD_PROVIDERS,
+  getCloudProviderDefinition,
+} from "../../services/cloud/registry";
 import { CloudSync } from "../../services/CloudSyncService";
 import { AppEvents } from "../../services/events";
-import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { McpService } from "../../services/mcp/McpService";
 import { McpServerConfig } from "../../services/mcp/types";
+import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { Settings } from "../../services/settings/SettingsService";
 import { WhisperSTT } from "../../services/speech/STTService";
 import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
@@ -33,10 +101,10 @@ import ActionButton from "../ui/ActionButton";
 import Checkbox from "../ui/Checkbox";
 import DownloadProgress from "../ui/DownloadProgress";
 import Group from "../ui/Group";
+import IconButton from "../ui/IconButton";
 import ImageCard from "../ui/ImageCard";
 import NotificationBanner from "../ui/NotificationBanner";
 import NotificationCard from "../ui/NotificationCard";
-import IconButton from "../ui/IconButton";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import Selector, { SelectorOption } from "../ui/Selector";
 import Slider from "../ui/Slider";
@@ -52,9 +120,18 @@ import { useSettingsNotices } from "../../hooks/useSettingsNotices";
 
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useBugReport } from "../../hooks/useBugReport";
-import { useT } from "../../i18n";
 import { setThemeMode, useColors, useThemedStyles } from "../../hooks/useTheme";
-import { dragDrawer, drawerWidthFor, gestureVelocity, playPageTransition, settingsProgress, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
+import { useT } from "../../i18n";
+import {
+  dragDrawer,
+  drawerWidthFor,
+  gestureVelocity,
+  playBackButtonPulse,
+  playPageTransition,
+  settingsProgress,
+  settleDrawer,
+  settleLayoutDrawer,
+} from "./drawerAnimation";
 
 const linkIcon = require("../../../assets/icons/link.png");
 const addIcon = require("../../../assets/icons/add.png");
@@ -124,7 +201,30 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "advanced" | "assistantoverlay" | "service" | "beta" | "local" | "litert" | "ollama" | "ollamaserver" | "ollamaserveradd" | "confidentiality" | "reports" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "mcpservers" | "mcpserver" | "mcpserversettings" | "mcpserveradd" | "sociallinks";
+type SubPage =
+  | "main"
+  | "general"
+  | "advanced"
+  | "assistantoverlay"
+  | "service"
+  | "beta"
+  | "local"
+  | "litert"
+  | "ollama"
+  | "ollamaserver"
+  | "ollamaserveradd"
+  | "confidentiality"
+  | "reports"
+  | "tools"
+  | "widgets"
+  | "profile"
+  | "cloud"
+  | "mobileactions"
+  | "mcpservers"
+  | "mcpserver"
+  | "mcpserversettings"
+  | "mcpserveradd"
+  | "sociallinks";
 
 //page a subpage steps back to, followed by the header arrow and the android back button
 const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
@@ -153,38 +253,56 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   mcpserveradd: "mcpservers",
 };
 
-export default function SettingsDrawer({ visible, onClose, onDataChanged, isLargeScreen = false, isDesktop = false, initialSubPage }: SettingsDrawerProps) {
+export default function SettingsDrawer({
+  visible,
+  onClose,
+  onDataChanged,
+  isLargeScreen = false,
+  isDesktop = false,
+  initialSubPage,
+}: SettingsDrawerProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const { width } = useResponsive();
   const drawerWidth = drawerWidthFor(width);
   const progress = settingsProgress;
-  const panResponder = useMemo(() =>
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return gestureState.dx > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-      },
-      onPanResponderMove: (_, gestureState) => {
-        dragDrawer(progress, Math.max(0, Math.min(1, 1 - gestureState.dx / drawerWidth)));
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        const velocity = -gestureVelocity(gestureState.vx, drawerWidth);
-        if (gestureState.dx > drawerWidth * 0.35 || gestureState.vx > 0.5) {
-          settleDrawer(progress, false, velocity);
-          onClose();
-        } else {
-          settleDrawer(progress, true, velocity);
-        }
-      },
-      onPanResponderTerminate: () => {
-        settleDrawer(progress, true);
-      },
-    })
-    , [onClose, drawerWidth, progress]);
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          return (
+            gestureState.dx > 10 &&
+            Math.abs(gestureState.dx) > Math.abs(gestureState.dy)
+          );
+        },
+        onPanResponderMove: (_, gestureState) => {
+          dragDrawer(
+            progress,
+            Math.max(0, Math.min(1, 1 - gestureState.dx / drawerWidth)),
+          );
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          const velocity = -gestureVelocity(gestureState.vx, drawerWidth);
+          if (gestureState.dx > drawerWidth * 0.35 || gestureState.vx > 0.5) {
+            settleDrawer(progress, false, velocity);
+            onClose();
+          } else {
+            settleDrawer(progress, true, velocity);
+          }
+        },
+        onPanResponderTerminate: () => {
+          settleDrawer(progress, true);
+        },
+      }),
+    [onClose, drawerWidth, progress],
+  );
 
-  const [activeSubPage, setActiveSubPage] = useState<SubPage>(initialSubPage ?? "main");
+  const [activeSubPage, setActiveSubPage] = useState<SubPage>(
+    initialSubPage ?? "main",
+  );
   const pageAnim = useAnimatedValue(1);
+  const backPulse = useAnimatedValue(0);
 
   useEffect(() => {
     if (!visible && activeSubPage !== (initialSubPage ?? "main")) {
@@ -196,14 +314,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   useEffect(() => {
     if (visible && activeSubPage !== prevSubPageRef.current) {
       playPageTransition(pageAnim);
+      playBackButtonPulse(backPulse);
     }
     prevSubPageRef.current = activeSubPage;
-  }, [activeSubPage, visible, pageAnim]);
+  }, [activeSubPage, visible, pageAnim, backPulse]);
 
   //native back navigates back in the menu, then lets parent close the drawer
   useEffect(() => {
     if (!visible) return;
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       if (activeSubPage === "main") return false;
       setActiveSubPage(SUB_PAGE_PARENT[activeSubPage]);
       return true;
@@ -228,18 +347,24 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   }, [activeSubPage, visible]);
 
   //detect scroll to morph button
-  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y;
-    const scrolled = y > 10;
-    setIsScrolled((prev) => (prev !== scrolled ? scrolled : prev));
-  }, []);
+  const handleScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const y = e.nativeEvent.contentOffset.y;
+      const scrolled = y > 10;
+      setIsScrolled((prev) => (prev !== scrolled ? scrolled : prev));
+    },
+    [],
+  );
 
   const [language, setLanguageState] = useState("en");
   const [theme, setThemeState] = useState("system");
   const [aiService, setAiServiceState] = useState("ollama");
   const [localAvailable, setLocalAvailable] = useState(false);
   const [localSheet, setLocalSheet] = useState<LocalModelSheet | null>(null);
-  const [localDownload, setLocalDownload] = useState<{ progress: number; sizeStr: string } | null>(null);
+  const [localDownload, setLocalDownload] = useState<{
+    progress: number;
+    sizeStr: string;
+  } | null>(null);
   const [ollamaUrl, setOllamaUrlState] = useState("");
   const [ollamaServers, setOllamaServersState] = useState<OllamaServer[]>([]);
   const [enabledProviders, setEnabledProvidersState] = useState<string[]>([]);
@@ -247,7 +372,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   //unreachable server url
   const [serverErrors, setServerErrors] = useState<Record<string, boolean>>({});
   //opened server index in the list
-  const [ollamaDetailIndex, setOllamaDetailIndex] = useState<number | null>(null);
+  const [ollamaDetailIndex, setOllamaDetailIndex] = useState<number | null>(
+    null,
+  );
   //raw text of the tuning fields
   const [ollamaContextDraft, setOllamaContextDraft] = useState("");
   const [ollamaKeepAliveDraft, setOllamaKeepAliveDraft] = useState("");
@@ -262,51 +389,79 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [hfModelInput, setHfModelInput] = useState("");
   const [litertForceLoad, setLitertForceLoadState] = useState(false);
   const [litertContextLength, setLitertContextLengthState] = useState("8192");
-  const [installedLitertModels, setInstalledLitertModels] = useState<LiteRTModelInfo[]>([]);
-  const [downloadingLitert, setDownloadingLitert] = useState<string | null>(null);
-  const [litertDownloadProgress, setLitertDownloadProgress] = useState<LiteRTDownloadSnapshot | null>(null);
+  const [installedLitertModels, setInstalledLitertModels] = useState<
+    LiteRTModelInfo[]
+  >([]);
+  const [downloadingLitert, setDownloadingLitert] = useState<string | null>(
+    null,
+  );
+  const [litertDownloadProgress, setLitertDownloadProgress] =
+    useState<LiteRTDownloadSnapshot | null>(null);
   //browse families, then their models
   const [litertFamilies, setLitertFamilies] = useState<ModelFamily[]>([]);
   const [litertFamilyId, setLitertFamilyId] = useState<string | null>(null);
-  const [litertFamilyModels, setLitertFamilyModels] = useState<CatalogEntry[]>([]);
-  const [litertSearchResults, setLitertSearchResults] = useState<CatalogEntry[]>([]);
+  const [litertFamilyModels, setLitertFamilyModels] = useState<CatalogEntry[]>(
+    [],
+  );
+  const [litertSearchResults, setLitertSearchResults] = useState<
+    CatalogEntry[]
+  >([]);
   const [litertBrowserLoading, setLitertBrowserLoading] = useState(false);
   const [litertBrowserFailed, setLitertBrowserFailed] = useState(false);
   //native-driven keyboard height, same as chatbar
   const { height: sheetKeyboardHeight } = useKeyboardAnimation();
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [exportScopeVisible, setExportScopeVisible] = useState(false);
-  const [exportSelection, setExportSelection] = useState({ settings: true, conversations: true });
+  const [exportSelection, setExportSelection] = useState({
+    settings: true,
+    conversations: true,
+  });
   const [alertConfig, setAlertConfig] = useState<{
+    title: string;
+    message: string;
+    icon?: ImageSourcePropType;
+    image?: ImageSourcePropType;
+    messageAlign?: "left" | "center";
+    buttons?: ModalButton[];
+    showInput?: boolean;
+    inputValue?: string;
+    onInputChange?: (text: string) => void;
+    inputPlaceholder?: string;
+    inputSecureTextEntry?: boolean;
+    inputKeyboardType?: any;
+  }>({ title: "", message: "" });
+
+  const showAlert = (
     title: string,
     message: string,
-    icon?: ImageSourcePropType,
-    image?: ImageSourcePropType,
-    messageAlign?: "left" | "center",
     buttons?: ModalButton[],
-    showInput?: boolean,
-    inputValue?: string,
-    onInputChange?: (text: string) => void,
-    inputPlaceholder?: string,
-    inputSecureTextEntry?: boolean,
-    inputKeyboardType?: any,
-  }>({ title: '', message: '' });
-
-  const showAlert = (title: string, message: string, buttons?: ModalButton[], extraProps?: any) => {
+    extraProps?: any,
+  ) => {
     setAlertConfig({ title, message, buttons, ...extraProps });
     setAlertModalVisible(true);
   };
   //empty id means chores follow the main model
   const [quickFlowId, setQuickFlowIdState] = useState("");
-  const [quickFlowOptions, setQuickFlowOptions] = useState<SelectorOption[]>([]);
+  const [quickFlowOptions, setQuickFlowOptions] = useState<SelectorOption[]>(
+    [],
+  );
   const [whisperModel, setWhisperModelState] = useState("none");
   const [, setWhisperInstalled] = useState<boolean>(false);
-  const [installedWhisperModels, setInstalledWhisperModels] = useState<Record<string, boolean>>({});
+  const [installedWhisperModels, setInstalledWhisperModels] = useState<
+    Record<string, boolean>
+  >({});
   const [isDownloadingWhisper, setIsDownloadingWhisper] = useState(false);
-  const [whisperDownloadProgress, setWhisperDownloadProgress] = useState<{ progress: number, etaSeconds: number, speedStr: string, sizeStr: string } | null>(null);
+  const [whisperDownloadProgress, setWhisperDownloadProgress] = useState<{
+    progress: number;
+    etaSeconds: number;
+    speedStr: string;
+    sizeStr: string;
+  } | null>(null);
   const [, setWhisperLanguageState] = useState(() => {
     try {
-      return Intl.DateTimeFormat().resolvedOptions().locale.split('-')[0] || "auto";
+      return (
+        Intl.DateTimeFormat().resolvedOptions().locale.split("-")[0] || "auto"
+      );
     } catch {
       return "auto";
     }
@@ -331,10 +486,20 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const [mcpServers, setMcpServers] = useState<McpServerConfig[]>([]);
   //mirrored from secret store for editing
-  const [mcpHeaderValues, setMcpHeaderValues] = useState<Record<string, string>>({});
-  const [mcpConnecting, setMcpConnecting] = useState<Record<string, boolean>>({});
+  const [mcpHeaderValues, setMcpHeaderValues] = useState<
+    Record<string, string>
+  >({});
+  const [mcpConnecting, setMcpConnecting] = useState<Record<string, boolean>>(
+    {},
+  );
   //shared draft for the add form
-  const [serverDraft, setServerDraft] = useState({ name: "", url: "", headerName: "", headerValue: "", clientId: "" });
+  const [serverDraft, setServerDraft] = useState({
+    name: "",
+    url: "",
+    headerName: "",
+    headerValue: "",
+    clientId: "",
+  });
   const [serverDraftBusy, setServerDraftBusy] = useState(false);
   //active detail server
   const [mcpDetailId, setMcpDetailId] = useState<string | null>(null);
@@ -342,12 +507,18 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [mcpTick, setMcpTick] = useState(0);
 
   const allTools: ITool[] = ToolManager.getBuiltInTools();
-  const generalTools = allTools.filter(t => !MOBILE_TOOL_NAMES.has(t.definition.function.name));
-  const mobileTools = allTools.filter(t => MOBILE_TOOL_NAMES.has(t.definition.function.name));
+  const generalTools = allTools.filter(
+    (t) => !MOBILE_TOOL_NAMES.has(t.definition.function.name),
+  );
+  const mobileTools = allTools.filter((t) =>
+    MOBILE_TOOL_NAMES.has(t.definition.function.name),
+  );
   const allWidgets: IWidget[] = WidgetManager.getAllWidgets();
 
   const [cloudProvider, setCloudProvider] = useState<string>("none");
-  const [cloudUserInfo, setCloudUserInfo] = useState<CloudUserInfo | null>(null);
+  const [cloudUserInfo, setCloudUserInfo] = useState<CloudUserInfo | null>(
+    null,
+  );
   const [hasSyncPin, setHasSyncPin] = useState(false);
   const [hasCloudBackup, setHasCloudBackup] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -359,7 +530,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const cloudStorageOptions = [
     { id: "none", label: t("settings.cloud.none") },
-    ...CLOUD_PROVIDERS.map(def => ({ id: def.id, label: def.label })),
+    ...CLOUD_PROVIDERS.map((def) => ({ id: def.id, label: def.label })),
   ];
 
   const ollamaKeepAliveOptions = [
@@ -392,7 +563,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   ];
 
   type PermissionState = "granted" | "denied" | "undetermined";
-  const [permissionStatuses, setPermissionStatuses] = useState<Record<"microphone" | "camera" | "location" | "photos" | "contacts" | "calendar", PermissionState>>({
+  const [permissionStatuses, setPermissionStatuses] = useState<
+    Record<
+      "microphone" | "camera" | "location" | "photos" | "contacts" | "calendar",
+      PermissionState
+    >
+  >({
     microphone: "undetermined",
     camera: "undetermined",
     location: "undetermined",
@@ -402,14 +578,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   });
 
   const refreshPermissionStatuses = useCallback(async () => {
-    const [mic, camera, location, photos, contacts, calendar] = await Promise.all([
-      ExpoSpeechRecognitionModule.getPermissionsAsync().catch(() => null),
-      ImagePicker.getCameraPermissionsAsync().catch(() => null),
-      Location.getForegroundPermissionsAsync().catch(() => null),
-      MediaLibrary.getPermissionsAsync().catch(() => null),
-      Contacts.getPermissionsAsync().catch(() => null),
-      Calendar.getCalendarPermissions().catch(() => null),
-    ]);
+    const [mic, camera, location, photos, contacts, calendar] =
+      await Promise.all([
+        ExpoSpeechRecognitionModule.getPermissionsAsync().catch(() => null),
+        ImagePicker.getCameraPermissionsAsync().catch(() => null),
+        Location.getForegroundPermissionsAsync().catch(() => null),
+        MediaLibrary.getPermissionsAsync().catch(() => null),
+        Contacts.getPermissionsAsync().catch(() => null),
+        Calendar.getCalendarPermissions().catch(() => null),
+      ]);
     setPermissionStatuses({
       microphone: (mic?.status as PermissionState) ?? "undetermined",
       camera: (camera?.status as PermissionState) ?? "undetermined",
@@ -422,7 +599,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   //keep badges in sync after the user flips a permission in system settings
   useEffect(() => {
-    if (!visible || activeSubPage !== "confidentiality" || Platform.OS === "web") return;
+    if (
+      !visible ||
+      activeSubPage !== "confidentiality" ||
+      Platform.OS === "web"
+    )
+      return;
     refreshPermissionStatuses();
     const sub = AppState.addEventListener("change", (state) => {
       if (state === "active") refreshPermissionStatuses();
@@ -434,7 +616,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [assistantStatus, setAssistantStatus] = useState<boolean | null>(null);
 
   const refreshAssistantStatus = useCallback(() => {
-    isDefaultAssistant().then(setAssistantStatus).catch(() => { });
+    isDefaultAssistant()
+      .then(setAssistantStatus)
+      .catch(() => {});
   }, []);
 
   //recheck after returning from system settings
@@ -448,9 +632,23 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   }, [visible, activeSubPage, refreshAssistantStatus]);
 
   const renderPermissionBadge = (status: PermissionState) => (
-    <View style={[styles.permissionBadge, status === "granted" && styles.permissionBadgeAllowed]}>
-      <Text style={[styles.permissionBadgeText, status === "granted" && styles.permissionBadgeTextAllowed]}>
-        {status === "granted" ? t("permissions.allowed") : status === "denied" ? t("permissions.denied") : t("permissions.undefined")}
+    <View
+      style={[
+        styles.permissionBadge,
+        status === "granted" && styles.permissionBadgeAllowed,
+      ]}
+    >
+      <Text
+        style={[
+          styles.permissionBadgeText,
+          status === "granted" && styles.permissionBadgeTextAllowed,
+        ]}
+      >
+        {status === "granted"
+          ? t("permissions.allowed")
+          : status === "denied"
+            ? t("permissions.denied")
+            : t("permissions.undefined")}
       </Text>
     </View>
   );
@@ -460,11 +658,18 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     setExportScopeVisible(true);
   };
 
-  const runExport = async (includeSettings: boolean, includeConversations: boolean) => {
+  const runExport = async (
+    includeSettings: boolean,
+    includeConversations: boolean,
+  ) => {
     setExportScopeVisible(false);
     try {
-      const ok = await BackupService.exportData({ includeSettings, includeConversations });
-      if (ok) showAlert(t("settings.data.export"), t("settings.data.exportSuccess"));
+      const ok = await BackupService.exportData({
+        includeSettings,
+        includeConversations,
+      });
+      if (ok)
+        showAlert(t("settings.data.export"), t("settings.data.exportSuccess"));
     } catch {
       showAlert(t("common.error"), t("settings.data.exportFailed"));
     }
@@ -475,10 +680,16 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       const result = await BackupService.importData();
       if (result.success) {
         onDataChanged?.();
-        showAlert(t("settings.data.import"), result.warning ?? t("settings.data.importSuccess"));
+        showAlert(
+          t("settings.data.import"),
+          result.warning ?? t("settings.data.importSuccess"),
+        );
       }
     } catch (e) {
-      const message = e instanceof Error && e.message ? e.message : t("settings.data.importFailed");
+      const message =
+        e instanceof Error && e.message
+          ? e.message
+          : t("settings.data.importFailed");
       showAlert(t("common.error"), message);
     }
   };
@@ -502,8 +713,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             }
           },
         },
-        { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "danger" },
-      ]
+        {
+          text: t("common.cancel"),
+          onPress: () => setAlertModalVisible(false),
+          style: "danger",
+        },
+      ],
     );
   };
 
@@ -513,7 +728,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       t("settings.whisper.delete.title"),
       t("settings.whisper.delete.message", { model: whisperModel }),
       [
-        { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: t("common.cancel"),
+          onPress: () => setAlertModalVisible(false),
+          style: "secondary",
+        },
         {
           text: t("common.delete"),
           style: "danger",
@@ -522,13 +741,16 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             try {
               await WhisperSTT.deleteModel(whisperModel);
               setWhisperInstalled(false);
-              setInstalledWhisperModels(prev => ({ ...prev, [whisperModel]: false }));
+              setInstalledWhisperModels((prev) => ({
+                ...prev,
+                [whisperModel]: false,
+              }));
             } catch (e) {
               console.error("Failed to delete whisper model", e);
             }
-          }
-        }
-      ]
+          },
+        },
+      ],
     );
   };
 
@@ -539,7 +761,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       label: t("settings.whisper.tiny"),
       isDownload: !installedWhisperModels["tiny"],
       ...(installedWhisperModels["tiny"] && whisperModel === "tiny"
-        ? { rightIcon: deleteIcon, rightIconTintColor: Colors.surface, onRightIconPress: handleDeleteWhisper }
+        ? {
+            rightIcon: deleteIcon,
+            rightIconTintColor: Colors.surface,
+            onRightIconPress: handleDeleteWhisper,
+          }
         : {}),
     },
     {
@@ -547,7 +773,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       label: t("settings.whisper.base"),
       isDownload: !installedWhisperModels["base"],
       ...(installedWhisperModels["base"] && whisperModel === "base"
-        ? { rightIcon: deleteIcon, rightIconTintColor: Colors.surface, onRightIconPress: handleDeleteWhisper }
+        ? {
+            rightIcon: deleteIcon,
+            rightIconTintColor: Colors.surface,
+            onRightIconPress: handleDeleteWhisper,
+          }
         : {}),
     },
     {
@@ -555,17 +785,25 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       label: t("settings.whisper.small"),
       isDownload: !installedWhisperModels["small"],
       ...(installedWhisperModels["small"] && whisperModel === "small"
-        ? { rightIcon: deleteIcon, rightIconTintColor: Colors.surface, onRightIconPress: handleDeleteWhisper }
+        ? {
+            rightIcon: deleteIcon,
+            rightIconTintColor: Colors.surface,
+            onRightIconPress: handleDeleteWhisper,
+          }
         : {}),
     },
   ];
 
   const getWhisperSize = (model: string) => {
     switch (model) {
-      case "tiny": return "31 MB";
-      case "base": return "57 MB";
-      case "small": return "180 MB";
-      default: return "";
+      case "tiny":
+        return "31 MB";
+      case "base":
+        return "57 MB";
+      case "small":
+        return "180 MB";
+      default:
+        return "";
     }
   };
 
@@ -580,7 +818,15 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setOllamaUrlState(s.ollamaUrl);
         setOllamaServersState(getOllamaServers());
         setEnabledProvidersState(getEnabledProviders());
-        setQuickFlowIdState(s.quickFlowModel ? quickFlowOptionId(s.quickFlowService, s.quickFlowUrl, s.quickFlowModel) : "");
+        setQuickFlowIdState(
+          s.quickFlowModel
+            ? quickFlowOptionId(
+                s.quickFlowService,
+                s.quickFlowUrl,
+                s.quickFlowModel,
+              )
+            : "",
+        );
         setWhisperModelState(s.whisperModel);
         setWhisperLanguageState(s.whisperLanguage);
         setInstructionState(s.instruction);
@@ -643,11 +889,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     let cancelled = false;
     (async () => {
       const sources = buildSources(localAvailable);
-      const rows: SelectorOption[] = [{ id: "", label: t("settings.quickFlow.sameAsMain") }];
+      const rows: SelectorOption[] = [
+        { id: "", label: t("settings.quickFlow.sameAsMain") },
+      ];
       //query all sources in parallel
-      const modelsBySource = await Promise.all(sources.map((source) => AIModule.getModelsFor(source.service, source.url)));
+      const modelsBySource = await Promise.all(
+        sources.map((source) =>
+          AIModule.getModelsFor(source.service, source.url),
+        ),
+      );
       sources.forEach((source, i) => {
-        for (const model of [...modelsBySource[i]].sort((a, b) => a.localeCompare(b))) {
+        for (const model of [...modelsBySource[i]].sort((a, b) =>
+          a.localeCompare(b),
+        )) {
           rows.push({
             id: quickFlowOptionId(source.service, source.url, model),
             //source only matters when multiple
@@ -657,7 +911,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       });
       if (!cancelled) setQuickFlowOptions(rows);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [activeSubPage, localAvailable, ollamaServers, enabledProviders, t]);
 
   //built-in facts, read on page open
@@ -665,17 +921,26 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     if (activeSubPage !== "local") return;
     let cancelled = false;
     AIModule.getLocalModelSheet()
-      .then((sheet) => { if (!cancelled) setLocalSheet(sheet); })
+      .then((sheet) => {
+        if (!cancelled) setLocalSheet(sheet);
+      })
       .catch((e) => console.warn("Failed to load local model sheet", e));
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [activeSubPage]);
 
   //browsers need a user gesture
   const handleDownloadLocal = async (modelId: string) => {
     setLocalDownload({ progress: 0, sizeStr: "" });
     try {
-      await AIModule.downloadFor("local", undefined, modelId, (progress, _eta, _speed, sizeStr) =>
-        setLocalDownload({ progress, sizeStr }));
+      await AIModule.downloadFor(
+        "local",
+        undefined,
+        modelId,
+        (progress, _eta, _speed, sizeStr) =>
+          setLocalDownload({ progress, sizeStr }),
+      );
       setLocalSheet(await AIModule.getLocalModelSheet());
     } catch (e) {
       console.warn("Local model download failed", e);
@@ -688,38 +953,64 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const handleSelectQuickFlow = (id: string) => {
     setQuickFlowIdState(id);
     const { service, url, model } = parseQuickFlowOptionId(id);
-    Settings.setMany({ quickFlowService: service, quickFlowUrl: url, quickFlowModel: model });
+    Settings.setMany({
+      quickFlowService: service,
+      quickFlowUrl: url,
+      quickFlowModel: model,
+    });
   };
 
   //load plugin states when settings tab opens
   useEffect(() => {
-    if (activeSubPage !== 'tools' && activeSubPage !== 'widgets' && activeSubPage !== 'mobileactions' && activeSubPage !== 'mcpserver') return;
+    if (
+      activeSubPage !== "tools" &&
+      activeSubPage !== "widgets" &&
+      activeSubPage !== "mobileactions" &&
+      activeSubPage !== "mcpserver"
+    )
+      return;
     const states: Record<string, boolean> = {};
     for (const tool of ToolManager.getAllTools()) {
       const name = tool.definition.function.name;
-      states[`tool:${name}`] = PluginRegistry.isEnabled('tool', name, tool.enabledByDefault ?? false);
+      states[`tool:${name}`] = PluginRegistry.isEnabled(
+        "tool",
+        name,
+        tool.enabledByDefault ?? false,
+      );
     }
     for (const widget of WidgetManager.getAllWidgets()) {
-      states[`widget:${widget.id}`] = PluginRegistry.isEnabled('widget', widget.id, widget.enabledByDefault ?? false);
+      states[`widget:${widget.id}`] = PluginRegistry.isEnabled(
+        "widget",
+        widget.id,
+        widget.enabledByDefault ?? false,
+      );
     }
     setPluginStates(states);
   }, [activeSubPage, mcpTick]);
 
   //sync list when connections change
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener(AppEvents.mcpServersChanged, () => {
-      setMcpServers([...McpService.getServers()]);
-      setMcpTick((t) => t + 1);
-    });
+    const sub = DeviceEventEmitter.addListener(
+      AppEvents.mcpServersChanged,
+      () => {
+        setMcpServers([...McpService.getServers()]);
+        setMcpTick((t) => t + 1);
+      },
+    );
     return () => sub.remove();
   }, []);
 
   //read from secret store on mount
   useEffect(() => {
-    if (activeSubPage !== 'mcpservers' && activeSubPage !== 'mcpserver') return;
+    if (activeSubPage !== "mcpservers" && activeSubPage !== "mcpserver") return;
     const servers = McpService.getServers();
     //avoid flash of missing headers
-    Promise.all(servers.map(async (server) => [server.id, await McpService.getHeaderValue(server.id)] as const))
+    Promise.all(
+      servers.map(
+        async (server) =>
+          [server.id, await McpService.getHeaderValue(server.id)] as const,
+      ),
+    )
       .then((entries) => {
         setMcpServers([...servers]);
         setMcpHeaderValues(Object.fromEntries(entries));
@@ -733,7 +1024,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     try {
       const server = McpService.getServers().find((s) => s.id === id);
       //check if server needs oauth
-      if (McpService.getStatus(id).state === 'needs_auth') await McpService.authorize(id);
+      if (McpService.getStatus(id).state === "needs_auth")
+        await McpService.authorize(id);
       else if (server?.url.trim()) await McpService.connect(id);
     } finally {
       setMcpConnecting((prev) => ({ ...prev, [id]: false }));
@@ -744,7 +1036,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   //use registry for accurate count
   const mcpEnabledCount = (id: string): number =>
     McpService.getTools(id).filter((tool) =>
-      PluginRegistry.isEnabled('tool', tool.definition.function.name, tool.enabledByDefault ?? false),
+      PluginRegistry.isEnabled(
+        "tool",
+        tool.definition.function.name,
+        tool.enabledByDefault ?? false,
+      ),
     ).length;
 
   const mcpStatusLabel = (id: string): string => {
@@ -768,36 +1064,53 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     !mcpConnecting[id] && McpService.getStatus(id).state === "needs_auth";
 
   //the overlay carries the sign-in itself
-  const showMcpAuthInfo = (id: string) => showAlert(
-    t("settings.mcp.signInRequired"),
-    t("settings.mcp.signInInfo"),
-    [
-      { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" },
-      {
-        text: t("settings.mcp.signIn"),
-        onPress: () => { setAlertModalVisible(false); connectMcpServer(id); },
-      },
-    ],
-    { messageAlign: "left" },
-  );
+  const showMcpAuthInfo = (id: string) =>
+    showAlert(
+      t("settings.mcp.signInRequired"),
+      t("settings.mcp.signInInfo"),
+      [
+        {
+          text: t("common.cancel"),
+          onPress: () => setAlertModalVisible(false),
+          style: "secondary",
+        },
+        {
+          text: t("settings.mcp.signIn"),
+          onPress: () => {
+            setAlertModalVisible(false);
+            connectMcpServer(id);
+          },
+        },
+      ],
+      { messageAlign: "left" },
+    );
 
   const refreshMcpHeaders = async () => {
     const entries = await Promise.all(
-      McpService.getServers().map(async (server) => [server.id, await McpService.getHeaderValue(server.id)] as const),
+      McpService.getServers().map(
+        async (server) =>
+          [server.id, await McpService.getHeaderValue(server.id)] as const,
+      ),
     );
     setMcpHeaderValues(Object.fromEntries(entries));
   };
 
   //server joins only once it answers
   const openServerDraft = (page: SubPage) => {
-    setServerDraft({ name: "", url: "", headerName: "", headerValue: "", clientId: "" });
+    setServerDraft({
+      name: "",
+      url: "",
+      headerName: "",
+      headerValue: "",
+      clientId: "",
+    });
     setServerDraftBusy(false);
     setActiveSubPage(page);
   };
 
   const submitMcpDraft = async () => {
     const url = serverDraft.url.trim();
-    if (mcpServers.some(s => s.url.trim() === url)) {
+    if (mcpServers.some((s) => s.url.trim() === url)) {
       showAlert(t("settings.server.addFailed"), t("settings.server.duplicate"));
       return;
     }
@@ -808,7 +1121,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       await refreshMcpHeaders();
       setActiveSubPage("mcpservers");
     } catch (e: any) {
-      showAlert(t("settings.server.addFailed"), e?.message || t("settings.mcp.unreachable"), undefined, { messageAlign: "left" });
+      showAlert(
+        t("settings.server.addFailed"),
+        e?.message || t("settings.mcp.unreachable"),
+        undefined,
+        { messageAlign: "left" },
+      );
     } finally {
       setServerDraftBusy(false);
     }
@@ -816,13 +1134,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const submitOllamaDraft = async () => {
     const url = serverDraft.url.trim();
-    if (ollamaServers.some(s => s.url.trim() === url)) {
+    if (ollamaServers.some((s) => s.url.trim() === url)) {
       showAlert(t("settings.server.addFailed"), t("settings.server.duplicate"));
       return;
     }
     setServerDraftBusy(true);
     try {
-      if (!await AIModule.isSourceAvailable("ollama", url)) {
+      if (!(await AIModule.isSourceAvailable("ollama", url))) {
         showAlert(
           t("settings.ollama.unreachableTitle"),
           t("settings.ollama.unreachableInfo"),
@@ -831,9 +1149,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         );
         return;
       }
-      saveOllamaServers([...ollamaServers, { url, name: serverDraft.name.trim() }]);
+      saveOllamaServers([
+        ...ollamaServers,
+        { url, name: serverDraft.name.trim() },
+      ]);
       //skip waiting for the next sweep
-      setServerErrors(prev => ({ ...prev, [url]: false }));
+      setServerErrors((prev) => ({ ...prev, [url]: false }));
       setActiveSubPage("ollama");
     } finally {
       setServerDraftBusy(false);
@@ -862,7 +1183,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       t("settings.mcp.remove.title"),
       t("settings.mcp.remove.message", { name: label }),
       [
-        { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: t("common.cancel"),
+          onPress: () => setAlertModalVisible(false),
+          style: "secondary",
+        },
         {
           text: t("common.remove"),
           style: "danger",
@@ -898,11 +1223,18 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   //prefer the given name
   const ollamaServerLabel = (server: OllamaServer): string =>
-    server.name.trim() || server.url.trim().replace(/^https?:\/\//, "").replace(/\/+$/, "") || t("settings.ollama.newServer");
+    server.name.trim() ||
+    server.url
+      .trim()
+      .replace(/^https?:\/\//, "")
+      .replace(/\/+$/, "") ||
+    t("settings.ollama.newServer");
 
   //undefined falls back to global
   const serverContextLength = (server: OllamaServer) =>
-    server.contextLength && server.contextLength > 0 ? server.contextLength : Settings.getCached().ollamaContextLength;
+    server.contextLength && server.contextLength > 0
+      ? server.contextLength
+      : Settings.getCached().ollamaContextLength;
 
   const serverKeepAlive = (server: OllamaServer) =>
     server.keepAlive ?? Settings.getCached().ollamaKeepAlive;
@@ -913,33 +1245,49 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     if (!url) return t("settings.ollama.noLink");
     const failed = serverErrors[url];
     if (failed === undefined) return t("settings.ollama.checking");
-    return failed ? t("settings.ollama.unreachable") : t("settings.ollama.connected");
+    return failed
+      ? t("settings.ollama.unreachable")
+      : t("settings.ollama.connected");
   };
 
   //keep active server in the list
   const saveOllamaServers = (servers: OllamaServer[]) => {
     setOllamaServersState(servers);
     Settings.set("ollamaUrls", serializeOllamaServers(servers));
-    const filled = servers.filter(s => s.url.trim().length > 0);
-    const active = filled.find(s => s.url.trim() === ollamaUrl.trim()) ?? filled[0];
+    const filled = servers.filter((s) => s.url.trim().length > 0);
+    const active =
+      filled.find((s) => s.url.trim() === ollamaUrl.trim()) ?? filled[0];
     const activeUrl = active?.url.trim() ?? "";
     if (activeUrl === ollamaUrl) return;
     setOllamaUrlState(activeUrl);
     Settings.set("ollamaUrl", activeUrl);
-    if (active) AIModule.configure(activeUrl, serverContextLength(active), serverKeepAlive(active));
+    if (active)
+      AIModule.configure(
+        activeUrl,
+        serverContextLength(active),
+        serverKeepAlive(active),
+      );
   };
 
   const patchOllamaServer = (index: number, patch: Partial<OllamaServer>) => {
-    saveOllamaServers(ollamaServers.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+    saveOllamaServers(
+      ollamaServers.map((s, i) => (i === index ? { ...s, ...patch } : s)),
+    );
   };
 
   //tune only the active server
   const tuneOllamaServer = (index: number, patch: Partial<OllamaServer>) => {
-    const next = ollamaServers.map((s, i) => (i === index ? { ...s, ...patch } : s));
+    const next = ollamaServers.map((s, i) =>
+      i === index ? { ...s, ...patch } : s,
+    );
     saveOllamaServers(next);
     const server = next[index];
     if (server.url.trim() === ollamaUrl.trim()) {
-      AIModule.configure(server.url.trim(), serverContextLength(server), serverKeepAlive(server));
+      AIModule.configure(
+        server.url.trim(),
+        serverContextLength(server),
+        serverKeepAlive(server),
+      );
     }
   };
 
@@ -947,7 +1295,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     const next = v.replace(/[^0-9]/g, "");
     setOllamaContextDraft(next);
     const parsed = parseInt(next, 10);
-    tuneOllamaServer(index, { contextLength: isNaN(parsed) ? undefined : parsed });
+    tuneOllamaServer(index, {
+      contextLength: isNaN(parsed) ? undefined : parsed,
+    });
   };
 
   //leading minus keeps -1 typable
@@ -972,15 +1322,20 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     } catch {
       if (ollamaModelsRequest.current === request) setOllamaModels([]);
     } finally {
-      if (ollamaModelsRequest.current === request) setOllamaModelsLoading(false);
+      if (ollamaModelsRequest.current === request)
+        setOllamaModelsLoading(false);
     }
   };
 
   const openOllamaServer = (index: number) => {
     const server = ollamaServers[index];
     setOllamaDetailIndex(index);
-    setOllamaContextDraft(server?.contextLength != null ? String(server.contextLength) : "");
-    setOllamaKeepAliveDraft(server?.keepAlive != null ? String(server.keepAlive) : "");
+    setOllamaContextDraft(
+      server?.contextLength != null ? String(server.contextLength) : "",
+    );
+    setOllamaKeepAliveDraft(
+      server?.keepAlive != null ? String(server.keepAlive) : "",
+    );
     setOllamaModels([]);
     loadOllamaModels(server?.url ?? "");
     setActiveSubPage("ollamaserver");
@@ -992,7 +1347,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       t("settings.ollama.remove.title"),
       t("settings.ollama.remove.message", { name: ollamaServerLabel(server) }),
       [
-        { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: t("common.cancel"),
+          onPress: () => setAlertModalVisible(false),
+          style: "secondary",
+        },
         {
           text: t("common.remove"),
           style: "danger",
@@ -1045,12 +1404,23 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     setDownloadingLitert(entry.repoId);
     setLitertDownloadProgress(null);
     try {
-      await downloadLiteRTModel(entry.repoId, (progress, etaSeconds, speedStr, sizeStr) =>
-        setLitertDownloadProgress({ progress, etaSeconds, speedStr, sizeStr }));
+      await downloadLiteRTModel(
+        entry.repoId,
+        (progress, etaSeconds, speedStr, sizeStr) =>
+          setLitertDownloadProgress({
+            progress,
+            etaSeconds,
+            speedStr,
+            sizeStr,
+          }),
+      );
     } catch (e) {
       //failures alert, cancels do not
       if (!(e instanceof LiteRTDownloadCancelled)) {
-        showAlert(t("common.error"), e instanceof Error ? e.message : String(e));
+        showAlert(
+          t("common.error"),
+          e instanceof Error ? e.message : String(e),
+        );
       }
     } finally {
       setDownloadingLitert(null);
@@ -1066,7 +1436,10 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const confirmDownloadLitert = (entry: CatalogEntry) => {
     showAlert(
       t("settings.litert.downloadTitle", { name: entry.label }),
-      t("settings.litert.downloadMessage", { name: entry.label, size: formatBytes(entry.sizeBytes) }),
+      t("settings.litert.downloadMessage", {
+        name: entry.label,
+        size: formatBytes(entry.sizeBytes),
+      }),
       [
         {
           text: t("settings.litert.downloadAction"),
@@ -1075,8 +1448,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             handleDownloadLitert(entry);
           },
         },
-        { text: t("common.cancel"), style: "danger", onPress: () => setAlertModalVisible(false) },
-      ]
+        {
+          text: t("common.cancel"),
+          style: "danger",
+          onPress: () => setAlertModalVisible(false),
+        },
+      ],
     );
   };
 
@@ -1098,8 +1475,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             refreshLitertModels();
           },
         },
-        { text: t("common.cancel"), style: "danger", onPress: () => setAlertModalVisible(false) },
-      ]
+        {
+          text: t("common.cancel"),
+          style: "danger",
+          onPress: () => setAlertModalVisible(false),
+        },
+      ],
     );
   };
 
@@ -1124,19 +1505,22 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   };
 
   //queries hit the hub, not families
-  const runLitertSearch = useCallback(async (query: string, signal: AbortSignal) => {
-    setLitertBrowserFailed(false);
-    setLitertBrowserLoading(true);
-    try {
-      const results = await searchModels(query, signal);
-      if (!signal.aborted) setLitertSearchResults(results);
-    } catch (e) {
-      console.warn("Could not search the hugging face models:", e);
-      if (!signal.aborted) setLitertBrowserFailed(true);
-    } finally {
-      if (!signal.aborted) setLitertBrowserLoading(false);
-    }
-  }, []);
+  const runLitertSearch = useCallback(
+    async (query: string, signal: AbortSignal) => {
+      setLitertBrowserFailed(false);
+      setLitertBrowserLoading(true);
+      try {
+        const results = await searchModels(query, signal);
+        if (!signal.aborted) setLitertSearchResults(results);
+      } catch (e) {
+        console.warn("Could not search the hugging face models:", e);
+        if (!signal.aborted) setLitertBrowserFailed(true);
+      } finally {
+        if (!signal.aborted) setLitertBrowserLoading(false);
+      }
+    },
+    [],
+  );
 
   const openLitertFamily = async (family: ModelFamily) => {
     setLitertFamilyId(family.id);
@@ -1158,12 +1542,14 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   };
 
   const litertFamilyName = (family: ModelFamily) =>
-    family.id === OTHER_FAMILY_ID ? t("settings.litert.familyOther") : family.label;
+    family.id === OTHER_FAMILY_ID
+      ? t("settings.litert.familyOther")
+      : family.label;
 
   const setProviderEnabled = (id: string, enabled: boolean) => {
     const next = enabled
-      ? [...enabledProviders.filter(p => p !== id), id]
-      : enabledProviders.filter(p => p !== id);
+      ? [...enabledProviders.filter((p) => p !== id), id]
+      : enabledProviders.filter((p) => p !== id);
     setEnabledProvidersState(next);
     Settings.set("enabledProviders", serializeProviders(next));
     //the active service has to stay on an enabled provider
@@ -1183,7 +1569,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       const entry = getCatalogEntry(pending);
       if (entry?.url) handleDownloadLitert(entry);
     });
-    return () => { dropped = true; };
+    return () => {
+      dropped = true;
+    };
     //eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSubPage]);
 
@@ -1192,8 +1580,14 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     const query = hfModelInput.trim();
     if (!addModelSheetVisible || query.length < MIN_SEARCH_LENGTH) return;
     const controller = new AbortController();
-    const timer = setTimeout(() => runLitertSearch(query, controller.signal), 400);
-    return () => { clearTimeout(timer); controller.abort(); };
+    const timer = setTimeout(
+      () => runLitertSearch(query, controller.signal),
+      400,
+    );
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [hfModelInput, addModelSheetVisible, runLitertSearch]);
 
   //external downloads still drive this bar
@@ -1203,7 +1597,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setDownloadingLitert(modelId);
         setLitertDownloadProgress(snapshot);
       } else {
-        setDownloadingLitert((current) => (current === modelId ? null : current));
+        setDownloadingLitert((current) =>
+          current === modelId ? null : current,
+        );
         setLitertDownloadProgress(null);
         refreshLitertModels();
       }
@@ -1216,13 +1612,16 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     if (v && v !== "none") {
       WhisperSTT.isModelInstalled(v).then((installed) => {
         setWhisperInstalled(installed);
-        setInstalledWhisperModels(prev => ({ ...prev, [v]: installed }));
+        setInstalledWhisperModels((prev) => ({ ...prev, [v]: installed }));
         if (installed) {
           WhisperSTT.init(v).then((success) => {
             if (!success) {
-              showAlert(t("common.error"), t("settings.whisper.loadFailed", { model: v }));
+              showAlert(
+                t("common.error"),
+                t("settings.whisper.loadFailed", { model: v }),
+              );
               setWhisperInstalled(false);
-              setInstalledWhisperModels(prev => ({ ...prev, [v]: false }));
+              setInstalledWhisperModels((prev) => ({ ...prev, [v]: false }));
             }
           });
         }
@@ -1318,7 +1717,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     } else {
       setCloudProvider("none");
       setCloudUserInfo(null);
-      showAlert(t("settings.cloud.connectionError"), t("settings.cloud.connectFailed", { provider: getCloudProviderDefinition(providerName)?.label ?? providerName }));
+      showAlert(
+        t("settings.cloud.connectionError"),
+        t("settings.cloud.connectFailed", {
+          provider:
+            getCloudProviderDefinition(providerName)?.label ?? providerName,
+        }),
+      );
     }
   };
 
@@ -1350,89 +1755,150 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   };
 
   const handleDisconnectCloud = () => {
-    const label = getCloudProviderDefinition(cloudProvider)?.label ?? "cloud storage";
-    showAlert(t("settings.cloud.disconnect.title", { name: label }), t("settings.cloud.disconnect.message"), [
-      {
-        text: t("cloudSync.disconnect"), style: "secondary", onPress: async () => {
-          setAlertModalVisible(false);
-          await handleSetCloudProvider("none");
-        }
-      },
-      { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "primary" },
-    ]);
+    const label =
+      getCloudProviderDefinition(cloudProvider)?.label ?? "cloud storage";
+    showAlert(
+      t("settings.cloud.disconnect.title", { name: label }),
+      t("settings.cloud.disconnect.message"),
+      [
+        {
+          text: t("cloudSync.disconnect"),
+          style: "secondary",
+          onPress: async () => {
+            setAlertModalVisible(false);
+            await handleSetCloudProvider("none");
+          },
+        },
+        {
+          text: t("common.cancel"),
+          onPress: () => setAlertModalVisible(false),
+          style: "primary",
+        },
+      ],
+    );
   };
 
   const handleCreateSyncPin = () => {
     let currentInput = "";
-    showAlert(t("settings.pin.create.title"), t("settings.pin.create.message"), [
-      { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" },
+    showAlert(
+      t("settings.pin.create.title"),
+      t("settings.pin.create.message"),
+      [
+        {
+          text: t("common.cancel"),
+          onPress: () => setAlertModalVisible(false),
+          style: "secondary",
+        },
+        {
+          text: t("settings.pin.create.confirm"),
+          style: "primary",
+          onPress: async () => {
+            if (currentInput.length >= 4 && currentInput.length <= 6) {
+              await CloudSync.setPin(currentInput);
+              setHasSyncPin(true);
+              setAlertModalVisible(false);
+              handleSyncNow();
+            } else {
+              setAlertModalVisible(false);
+              setTimeout(
+                () => showAlert(t("common.error"), t("settings.pin.invalid")),
+                300,
+              );
+            }
+          },
+        },
+      ],
       {
-        text: t("settings.pin.create.confirm"), style: "primary", onPress: async () => {
-          if (currentInput.length >= 4 && currentInput.length <= 6) {
-            await CloudSync.setPin(currentInput);
-            setHasSyncPin(true);
-            setAlertModalVisible(false);
-            handleSyncNow();
-          } else {
-            setAlertModalVisible(false);
-            setTimeout(() => showAlert(t("common.error"), t("settings.pin.invalid")), 300);
-          }
-        }
-      }
-    ], {
-      showInput: true,
-      inputPlaceholder: t("settings.pin.placeholder"),
-      inputSecureTextEntry: true,
-      inputKeyboardType: "numeric",
-      onInputChange: (text: string) => {
-        currentInput = text;
-        setAlertConfig(prev => ({ ...prev, inputValue: text }));
-      }
-    });
+        showInput: true,
+        inputPlaceholder: t("settings.pin.placeholder"),
+        inputSecureTextEntry: true,
+        inputKeyboardType: "numeric",
+        onInputChange: (text: string) => {
+          currentInput = text;
+          setAlertConfig((prev) => ({ ...prev, inputValue: text }));
+        },
+      },
+    );
   };
 
   const handleUnlockSyncPin = () => {
     let currentInput = "";
-    showAlert(t("settings.pin.unlock.title"), t("settings.pin.unlock.message"), [
-      { text: t("settings.pin.forgot"), onPress: handleForgetSyncPin, style: "secondary" },
+    showAlert(
+      t("settings.pin.unlock.title"),
+      t("settings.pin.unlock.message"),
+      [
+        {
+          text: t("settings.pin.forgot"),
+          onPress: handleForgetSyncPin,
+          style: "secondary",
+        },
+        {
+          text: t("settings.pin.unlock.confirm"),
+          style: "primary",
+          onPress: async () => {
+            setAlertModalVisible(false);
+            const success = await CloudSync.verifyAndSetPin(currentInput);
+            if (success) {
+              setHasSyncPin(true);
+              setTimeout(
+                () =>
+                  showAlert(
+                    t("common.success"),
+                    t("settings.pin.unlockSuccess"),
+                  ),
+                300,
+              );
+            } else {
+              setTimeout(
+                () =>
+                  showAlert(t("common.error"), t("settings.pin.incorrect"), [
+                    {
+                      text: t("settings.pin.tryAgain"),
+                      onPress: handleUnlockSyncPin,
+                      style: "primary",
+                    },
+                    {
+                      text: t("common.cancel"),
+                      onPress: () => setAlertModalVisible(false),
+                      style: "secondary",
+                    },
+                  ]),
+                300,
+              );
+            }
+          },
+        },
+      ],
       {
-        text: t("settings.pin.unlock.confirm"), style: "primary", onPress: async () => {
-          setAlertModalVisible(false);
-          const success = await CloudSync.verifyAndSetPin(currentInput);
-          if (success) {
-            setHasSyncPin(true);
-            setTimeout(() => showAlert(t("common.success"), t("settings.pin.unlockSuccess")), 300);
-          } else {
-            setTimeout(() => showAlert(t("common.error"), t("settings.pin.incorrect"), [
-              { text: t("settings.pin.tryAgain"), onPress: handleUnlockSyncPin, style: "primary" },
-              { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" }
-            ]), 300);
-          }
-        }
-      }
-    ], {
-      showInput: true,
-      inputPlaceholder: t("settings.pin.placeholder"),
-      inputSecureTextEntry: true,
-      inputKeyboardType: "numeric",
-      onInputChange: (text: string) => {
-        currentInput = text;
-        setAlertConfig(prev => ({ ...prev, inputValue: text }));
-      }
-    });
+        showInput: true,
+        inputPlaceholder: t("settings.pin.placeholder"),
+        inputSecureTextEntry: true,
+        inputKeyboardType: "numeric",
+        onInputChange: (text: string) => {
+          currentInput = text;
+          setAlertConfig((prev) => ({ ...prev, inputValue: text }));
+        },
+      },
+    );
   };
 
   const handleForgetSyncPin = () => {
     showAlert(t("settings.pin.reset.title"), t("settings.pin.reset.message"), [
-      { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" },
       {
-        text: "Delete & Reset", style: "danger", onPress: async () => {
+        text: t("common.cancel"),
+        onPress: () => setAlertModalVisible(false),
+        style: "secondary",
+      },
+      {
+        text: "Delete & Reset",
+        style: "danger",
+        onPress: async () => {
           await CloudSync.forgetCode();
           setHasSyncPin(false);
           setAlertModalVisible(false);
           setTimeout(() => handleCreateSyncPin(), 400);
-        }
-      }
+        },
+      },
     ]);
   };
 
@@ -1445,7 +1911,10 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       await refreshLastSync();
       showAlert(t("common.success"), t("settings.cloud.syncSuccess"));
     } else {
-      showAlert(t("settings.cloud.syncError"), result.error || t("settings.cloud.unknownError"));
+      showAlert(
+        t("settings.cloud.syncError"),
+        result.error || t("settings.cloud.unknownError"),
+      );
     }
   };
 
@@ -1472,20 +1941,27 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   }, [refreshLastSync]);
 
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener(AppEvents.syncPinInvalidated, async () => {
-      setHasSyncPin(false);
-      setHasCloudBackup(await CloudSync.hasCloudBackup());
-    });
+    const sub = DeviceEventEmitter.addListener(
+      AppEvents.syncPinInvalidated,
+      async () => {
+        setHasSyncPin(false);
+        setHasCloudBackup(await CloudSync.hasCloudBackup());
+      },
+    );
     return () => sub.remove();
   }, []);
 
   //ping every configured server
   const checkOllamaServers = useCallback(async () => {
     if (!settingsLoaded) return;
-    const urls = ollamaServers.map(s => s.url.trim()).filter(Boolean);
-    const results = await Promise.all(urls.map(url => AIModule.isSourceAvailable("ollama", url)));
+    const urls = ollamaServers.map((s) => s.url.trim()).filter(Boolean);
+    const results = await Promise.all(
+      urls.map((url) => AIModule.isSourceAvailable("ollama", url)),
+    );
     const errors: Record<string, boolean> = {};
-    urls.forEach((url, i) => { errors[url] = !results[i]; });
+    urls.forEach((url, i) => {
+      errors[url] = !results[i];
+    });
     setServerErrors(errors);
   }, [settingsLoaded, ollamaServers]);
 
@@ -1494,9 +1970,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       setTimeout(() => {
         checkOllamaServers();
         if (Platform.OS === "web") {
-          ["tiny", "base", "small"].forEach(m => {
-            WhisperSTT.isModelInstalled(m).then(installed => {
-              setInstalledWhisperModels(prev => ({ ...prev, [m]: installed }));
+          ["tiny", "base", "small"].forEach((m) => {
+            WhisperSTT.isModelInstalled(m).then((installed) => {
+              setInstalledWhisperModels((prev) => ({
+                ...prev,
+                [m]: installed,
+              }));
             });
           });
           if (whisperModel && whisperModel !== "none") {
@@ -1513,13 +1992,24 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     setIsDownloadingWhisper(true);
     setWhisperDownloadProgress(null);
     try {
-      await WhisperSTT.downloadModel(model, (progress, etaSeconds, speedStr, sizeStr) => {
-        setWhisperDownloadProgress({ progress, etaSeconds, speedStr, sizeStr });
-      });
+      await WhisperSTT.downloadModel(
+        model,
+        (progress, etaSeconds, speedStr, sizeStr) => {
+          setWhisperDownloadProgress({
+            progress,
+            etaSeconds,
+            speedStr,
+            sizeStr,
+          });
+        },
+      );
       setWhisperInstalled(true);
-      setInstalledWhisperModels(prev => ({ ...prev, [model]: true }));
+      setInstalledWhisperModels((prev) => ({ ...prev, [model]: true }));
       setWhisperModel(model);
-      showAlert(t("common.success"), t("settings.whisper.downloadSuccess", { model }));
+      showAlert(
+        t("common.success"),
+        t("settings.whisper.downloadSuccess", { model }),
+      );
     } catch (e) {
       console.error("Failed to download whisper model", e);
       showAlert(t("common.error"), t("settings.whisper.downloadFailed"));
@@ -1536,17 +2026,24 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     }
     showAlert(
       t("settings.whisper.download.title"),
-      t("settings.whisper.download.message", { model: v, size: getWhisperSize(v) }),
+      t("settings.whisper.download.message", {
+        model: v,
+        size: getWhisperSize(v),
+      }),
       [
-        { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: t("common.cancel"),
+          onPress: () => setAlertModalVisible(false),
+          style: "secondary",
+        },
         {
           text: t("settings.whisper.download.confirm"),
           onPress: () => {
             setAlertModalVisible(false);
             handleDownloadWhisper(v);
-          }
-        }
-      ]
+          },
+        },
+      ],
     );
   };
 
@@ -1573,7 +2070,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const renderSubPageHeader = (title: string, _backTo?: SubPage) => (
     <View style={styles.header}>
       <View style={styles.headerSpacer} />
-      <Text style={styles.title} numberOfLines={1}>{title}</Text>
+      <Text style={styles.title} numberOfLines={1}>
+        {title}
+      </Text>
       <View style={styles.headerSpacer} />
     </View>
   );
@@ -1583,7 +2082,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.menuContainer}>
       <View style={styles.header}>
         <View style={styles.headerSpacer} />
-        <Text style={styles.title} numberOfLines={1}>{t("settings.title")}</Text>
+        <Text style={styles.title} numberOfLines={1}>
+          {t("settings.title")}
+        </Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -1601,7 +2102,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {!!notices.update && (
         <NotificationBanner
           icon={downloadIcon}
-          label={t("settings.notice.update", { version: notices.update.version })}
+          label={t("settings.notice.update", {
+            version: notices.update.version,
+          })}
           onPress={notices.openUpdate}
           style={[styles.groupSpacing, styles.mainPageGroup]}
         />
@@ -1610,98 +2113,176 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {/* profile section */}
       <Group style={[styles.groupSpacing, styles.mainPageGroup]}>
         <Pressable
-          style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+          style={({ pressed, hovered }) => [
+            styles.navItem,
+            (pressed || hovered) && styles.navItemPressed,
+          ]}
           onPress={() => setActiveSubPage("profile")}
         >
           <View style={styles.menuIconWrap}>
-            <Image source={profilIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+            <Image
+              source={profilIcon}
+              style={styles.menuIcon}
+              tintColor={Colors.textOnPrimary}
+            />
           </View>
           <View style={styles.navTextContainer}>
-            <Text style={styles.navTitle}>{name || t("settings.nav.profile.title")}</Text>
-            <Text style={styles.navSubtitle}>{t("settings.nav.profile.subtitle")}</Text>
+            <Text style={styles.navTitle}>
+              {name || t("settings.nav.profile.title")}
+            </Text>
+            <Text style={styles.navSubtitle}>
+              {t("settings.nav.profile.subtitle")}
+            </Text>
           </View>
         </Pressable>
 
         <Pressable
-          style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+          style={({ pressed, hovered }) => [
+            styles.navItem,
+            styles.navItemLast,
+            (pressed || hovered) && styles.navItemPressed,
+          ]}
           onPress={() => setActiveSubPage("cloud")}
         >
           <View style={styles.menuIconWrap}>
-            <Image source={cloudIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+            <Image
+              source={cloudIcon}
+              style={styles.menuIcon}
+              tintColor={Colors.textOnPrimary}
+            />
           </View>
           <View style={styles.navTextContainer}>
             <Text style={styles.navTitle}>{t("settings.nav.cloud.title")}</Text>
-            <Text style={styles.navSubtitle}>{t("settings.nav.cloud.subtitle")}</Text>
+            <Text style={styles.navSubtitle}>
+              {t("settings.nav.cloud.subtitle")}
+            </Text>
           </View>
         </Pressable>
       </Group>
 
       <Group style={[styles.groupSpacing, styles.mainPageGroup]}>
         <Pressable
-          style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+          style={({ pressed, hovered }) => [
+            styles.navItem,
+            (pressed || hovered) && styles.navItemPressed,
+          ]}
           onPress={() => setActiveSubPage("general")}
         >
           <View style={styles.menuIconWrap}>
-            <Image source={generalIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+            <Image
+              source={generalIcon}
+              style={styles.menuIcon}
+              tintColor={Colors.textOnPrimary}
+            />
           </View>
           <View style={styles.navTextContainer}>
-            <Text style={styles.navTitle}>{t("settings.nav.general.title")}</Text>
-            <Text style={styles.navSubtitle}>{t("settings.nav.general.subtitle")}</Text>
+            <Text style={styles.navTitle}>
+              {t("settings.nav.general.title")}
+            </Text>
+            <Text style={styles.navSubtitle}>
+              {t("settings.nav.general.subtitle")}
+            </Text>
           </View>
         </Pressable>
 
         {!isDesktop && (
           <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+            style={({ pressed, hovered }) => [
+              styles.navItem,
+              (pressed || hovered) && styles.navItemPressed,
+            ]}
             onPress={() => setActiveSubPage("assistantoverlay")}
           >
             <View style={styles.menuIconWrap}>
-              <Image source={micIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+              <Image
+                source={micIcon}
+                style={styles.menuIcon}
+                tintColor={Colors.textOnPrimary}
+              />
             </View>
             <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>{t("settings.nav.overlay.title")}</Text>
-              <Text style={styles.navSubtitle}>{t("settings.nav.overlay.subtitle")}</Text>
+              <Text style={styles.navTitle}>
+                {t("settings.nav.overlay.title")}
+              </Text>
+              <Text style={styles.navSubtitle}>
+                {t("settings.nav.overlay.subtitle")}
+              </Text>
             </View>
           </Pressable>
         )}
 
         <Pressable
-          style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+          style={({ pressed, hovered }) => [
+            styles.navItem,
+            (pressed || hovered) && styles.navItemPressed,
+          ]}
           onPress={() => setActiveSubPage("service")}
         >
           <View style={styles.menuIconWrap}>
-            <Image source={linkIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+            <Image
+              source={linkIcon}
+              style={styles.menuIcon}
+              tintColor={Colors.textOnPrimary}
+            />
           </View>
           <View style={styles.navTextContainer}>
-            <Text style={styles.navTitle}>{t("settings.nav.service.title")}</Text>
-            <Text style={styles.navSubtitle}>{t("settings.nav.service.subtitle")}</Text>
+            <Text style={styles.navTitle}>
+              {t("settings.nav.service.title")}
+            </Text>
+            <Text style={styles.navSubtitle}>
+              {t("settings.nav.service.subtitle")}
+            </Text>
           </View>
         </Pressable>
 
         <Pressable
-          style={({ pressed, hovered }) => [styles.navItem, !advancedMode && styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+          style={({ pressed, hovered }) => [
+            styles.navItem,
+            !advancedMode && styles.navItemLast,
+            (pressed || hovered) && styles.navItemPressed,
+          ]}
           onPress={() => setActiveSubPage("tools")}
         >
           <View style={styles.menuIconWrap}>
-            <Image source={toolIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+            <Image
+              source={toolIcon}
+              style={styles.menuIcon}
+              tintColor={Colors.textOnPrimary}
+            />
           </View>
           <View style={styles.navTextContainer}>
             <Text style={styles.navTitle}>{t("settings.nav.tools.title")}</Text>
-            <Text style={styles.navSubtitle}>{isDesktop ? t("settings.nav.tools.subtitleDesktop") : t("settings.nav.tools.subtitle")}</Text>
+            <Text style={styles.navSubtitle}>
+              {isDesktop
+                ? t("settings.nav.tools.subtitleDesktop")
+                : t("settings.nav.tools.subtitle")}
+            </Text>
           </View>
         </Pressable>
 
         {advancedMode && (
           <Pressable
-            style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+            style={({ pressed, hovered }) => [
+              styles.navItem,
+              styles.navItemLast,
+              (pressed || hovered) && styles.navItemPressed,
+            ]}
             onPress={() => setActiveSubPage("advanced")}
           >
             <View style={styles.menuIconWrap}>
-              <Image source={advancedIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+              <Image
+                source={advancedIcon}
+                style={styles.menuIcon}
+                tintColor={Colors.textOnPrimary}
+              />
             </View>
             <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>{t("settings.nav.advanced.title")}</Text>
-              <Text style={styles.navSubtitle}>{t("settings.nav.advanced.subtitle")}</Text>
+              <Text style={styles.navTitle}>
+                {t("settings.nav.advanced.title")}
+              </Text>
+              <Text style={styles.navSubtitle}>
+                {t("settings.nav.advanced.subtitle")}
+              </Text>
             </View>
           </Pressable>
         )}
@@ -1709,45 +2290,76 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <Group style={[styles.groupSpacing, styles.mainPageGroup]}>
         <Pressable
-          style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+          style={({ pressed, hovered }) => [
+            styles.navItem,
+            (pressed || hovered) && styles.navItemPressed,
+          ]}
           onPress={() => setActiveSubPage("confidentiality")}
         >
           <View style={styles.menuIconWrap}>
-            <Image source={confidentialityIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+            <Image
+              source={confidentialityIcon}
+              style={styles.menuIcon}
+              tintColor={Colors.textOnPrimary}
+            />
           </View>
           <View style={styles.navTextContainer}>
-            <Text style={styles.navTitle}>{t("settings.nav.privacy.title")}</Text>
-            <Text style={styles.navSubtitle}>{t("settings.nav.privacy.subtitle")}</Text>
+            <Text style={styles.navTitle}>
+              {t("settings.nav.privacy.title")}
+            </Text>
+            <Text style={styles.navSubtitle}>
+              {t("settings.nav.privacy.subtitle")}
+            </Text>
           </View>
         </Pressable>
 
         <Pressable
-          style={({ pressed, hovered }) => [styles.navItem, (pressed || hovered) && styles.navItemPressed]}
+          style={({ pressed, hovered }) => [
+            styles.navItem,
+            (pressed || hovered) && styles.navItemPressed,
+          ]}
           onPress={() => setActiveSubPage("reports")}
         >
           <View style={styles.menuIconWrap}>
-            <Image source={reportsIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+            <Image
+              source={reportsIcon}
+              style={styles.menuIcon}
+              tintColor={Colors.textOnPrimary}
+            />
           </View>
           <View style={styles.navTextContainer}>
-            <Text style={styles.navTitle}>{t("settings.nav.support.title")}</Text>
-            <Text style={styles.navSubtitle}>{t("settings.nav.support.subtitle")}</Text>
+            <Text style={styles.navTitle}>
+              {t("settings.nav.support.title")}
+            </Text>
+            <Text style={styles.navSubtitle}>
+              {t("settings.nav.support.subtitle")}
+            </Text>
           </View>
         </Pressable>
 
         <Pressable
-          style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+          style={({ pressed, hovered }) => [
+            styles.navItem,
+            styles.navItemLast,
+            (pressed || hovered) && styles.navItemPressed,
+          ]}
           onPress={() => setActiveSubPage("sociallinks")}
         >
           <View style={styles.menuIconWrap}>
-            <Image source={informationIcon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+            <Image
+              source={informationIcon}
+              style={styles.menuIcon}
+              tintColor={Colors.textOnPrimary}
+            />
           </View>
           <View style={styles.navTextContainer}>
             <Text style={styles.navTitle}>{t("settings.nav.info.title")}</Text>
-            <Text style={styles.navSubtitle}>{t("settings.nav.info.subtitle")}</Text>
+            <Text style={styles.navSubtitle}>
+              {t("settings.nav.info.subtitle")}
+            </Text>
           </View>
         </Pressable>
       </Group>
-
     </View>
   );
 
@@ -1759,9 +2371,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <View style={styles.contentCard}>
         <View style={styles.settingRowVertical}>
           <Text style={styles.settingLabel}>{t("settings.info.version")}</Text>
-          <Text style={styles.helpText}>
-            Opera Beta v{appVersion}
-          </Text>
+          <Text style={styles.helpText}>Opera Beta v{appVersion}</Text>
         </View>
 
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -1774,22 +2384,36 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             <ActionButton
               icon={operaIcon}
               label={t("settings.info.website")}
-              onPress={() => Linking.openURL("https://maestroai.company").catch(() => { })}
+              onPress={() =>
+                Linking.openURL("https://maestroai.company").catch(() => {})
+              }
             />
             <ActionButton
               icon={githubIcon}
               label="Github"
-              onPress={() => Linking.openURL("https://github.com/MaestroAI-Company/opera").catch(() => { })}
+              onPress={() =>
+                Linking.openURL(
+                  "https://github.com/MaestroAI-Company/opera",
+                ).catch(() => {})
+              }
             />
             <ActionButton
               icon={instagramIcon}
               label="Instagram"
-              onPress={() => Linking.openURL("https://www.instagram.com/maestroai.company?igsh=MWF4dmZvMXl1ZmdzeA==").catch(() => { })}
+              onPress={() =>
+                Linking.openURL(
+                  "https://www.instagram.com/maestroai.company?igsh=MWF4dmZvMXl1ZmdzeA==",
+                ).catch(() => {})
+              }
             />
             <ActionButton
               icon={tiktokIcon}
               label="TikTok"
-              onPress={() => Linking.openURL("https://www.tiktok.com/@maestroai.company?_r=1&_t=ZG-99DGujxTPEn").catch(() => { })}
+              onPress={() =>
+                Linking.openURL(
+                  "https://www.tiktok.com/@maestroai.company?_r=1&_t=ZG-99DGujxTPEn",
+                ).catch(() => {})
+              }
             />
           </Group>
         </View>
@@ -1810,7 +2434,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={styles.contentCard}>
         <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.profile.name")}</Text>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+            {t("settings.profile.name")}
+          </Text>
           <Group>
             <TextInputField
               icon={penPlaceholderIcon}
@@ -1822,7 +2448,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </View>
 
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.profile.instructions")}</Text>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+            {t("settings.profile.instructions")}
+          </Text>
           <Group>
             <TextInputField
               icon={penPlaceholderIcon}
@@ -1844,7 +2472,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {/* language and appearance card */}
       <View style={styles.contentCard}>
         <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.general.language")}</Text>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+            {t("settings.general.language")}
+          </Text>
           <Group>
             <Selector
               options={languageOptions}
@@ -1857,12 +2487,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </View>
 
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.general.theme")}</Text>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+            {t("settings.general.theme")}
+          </Text>
           <Group>
-            <SliderToggle
-              selectedValue={theme}
-              onSelect={setTheme}
-            />
+            <SliderToggle selectedValue={theme} onSelect={setTheme} />
           </Group>
         </View>
       </View>
@@ -1870,25 +2499,31 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {/* audio and modes card */}
       <View style={styles.contentCard}>
         <View style={styles.settingRowVertical}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{t("settings.general.autoRead")}</Text>
-            <Toggle
-              checked={autoSpeak}
-              onToggle={setAutoSpeak}
-            />
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.general.autoRead")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.general.autoReadHelp")}
+              </Text>
+            </View>
+            <Toggle checked={autoSpeak} onToggle={setAutoSpeak} />
           </View>
-          <Text style={styles.helpText}>{t("settings.general.autoReadHelp")}</Text>
         </View>
 
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{t("settings.general.advancedMode")}</Text>
-            <Toggle
-              checked={advancedMode}
-              onToggle={setAdvancedMode}
-            />
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.general.advancedMode")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.general.advancedModeHelp")}
+              </Text>
+            </View>
+            <Toggle checked={advancedMode} onToggle={setAdvancedMode} />
           </View>
-          <Text style={styles.helpText}>{t("settings.general.advancedModeHelp")}</Text>
         </View>
       </View>
     </View>
@@ -1901,7 +2536,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {/* flow, audio and technical card */}
       <View style={styles.contentCard}>
         <View style={styles.settingRowVertical}>
-          <Text style={styles.settingLabel}>{t("settings.quickFlow.label")}</Text>
+          <Text style={styles.settingLabel}>
+            {t("settings.quickFlow.label")}
+          </Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
             {t("settings.quickFlow.help")}
           </Text>
@@ -1917,41 +2554,60 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </View>
 
         <View style={styles.settingRowVertical}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{t("settings.transcribeLocally.label")}</Text>
-            <Toggle
-              checked={alwaysWhisper}
-              onToggle={setAlwaysWhisper}
-            />
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.transcribeLocally.label")}
+              </Text>
+              <Text style={styles.helpText}>
+                {Platform.OS === "web"
+                  ? t("settings.transcribeLocally.helpWeb")
+                  : t("settings.transcribeLocally.help")}
+              </Text>
+            </View>
+            <Toggle checked={alwaysWhisper} onToggle={setAlwaysWhisper} />
           </View>
-          <Text style={styles.helpText}>
-            {Platform.OS === "web"
-              ? t("settings.transcribeLocally.helpWeb")
-              : t("settings.transcribeLocally.help")}
-          </Text>
         </View>
 
-        <View style={Platform.OS === "android" ? styles.settingRowVertical : [styles.settingRowVertical, { marginBottom: 0 }]}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{t("settings.general.technicalDetails")}</Text>
+        <View
+          style={
+            Platform.OS === "android"
+              ? styles.settingRowVertical
+              : [styles.settingRowVertical, { marginBottom: 0 }]
+          }
+        >
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.general.technicalDetails")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.general.technicalDetailsHelp")}
+              </Text>
+            </View>
             <Toggle
               checked={showTechnicalDetails}
               onToggle={setShowTechnicalDetails}
             />
           </View>
-          <Text style={styles.helpText}>{t("settings.general.technicalDetailsHelp")}</Text>
         </View>
 
         {Platform.OS === "android" && (
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <View style={styles.toggleRow}>
-              <Text style={styles.settingLabel}>{t("settings.general.detectionBoxes")}</Text>
+            <View style={styles.toggleGroupRow}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.general.detectionBoxes")}
+                </Text>
+                <Text style={styles.helpText}>
+                  {t("settings.general.detectionBoxesHelp")}
+                </Text>
+              </View>
               <Toggle
                 checked={showDetectionBoxes}
                 onToggle={setShowDetectionBoxes}
               />
             </View>
-            <Text style={styles.helpText}>{t("settings.general.detectionBoxesHelp")}</Text>
           </View>
         )}
       </View>
@@ -1991,11 +2647,20 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {assistantStatus !== null && (
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={styles.settingLabel}>{t("settings.overlay.default")}</Text>
+            <Text style={styles.settingLabel}>
+              {t("settings.overlay.default")}
+            </Text>
             <Text style={styles.helpText}>
               {t("settings.overlay.defaultHelp")}
             </Text>
-            <Text style={[styles.assistantStatusText, assistantStatus ? styles.assistantStatusOn : styles.assistantStatusOff]}>
+            <Text
+              style={[
+                styles.assistantStatusText,
+                assistantStatus
+                  ? styles.assistantStatusOn
+                  : styles.assistantStatusOff,
+              ]}
+            >
               {assistantStatus
                 ? t("settings.overlay.isDefault")
                 : t("settings.overlay.isNotDefault")}
@@ -2015,27 +2680,38 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       {/* overlay options card */}
       <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, Platform.OS !== 'android' && { marginBottom: 0 }]}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{t("settings.overlay.autoMic")}</Text>
-            <Toggle
-              checked={autoStartMic}
-              onToggle={setAutoStartMic}
-            />
+        <View
+          style={[
+            styles.settingRowVertical,
+            Platform.OS !== "android" && { marginBottom: 0 },
+          ]}
+        >
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.overlay.autoMic")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.overlay.autoMicHelp")}
+              </Text>
+            </View>
+            <Toggle checked={autoStartMic} onToggle={setAutoStartMic} />
           </View>
-          <Text style={styles.helpText}>{t("settings.overlay.autoMicHelp")}</Text>
         </View>
 
-        {Platform.OS === 'android' && (
+        {Platform.OS === "android" && (
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <View style={styles.toggleRow}>
-              <Text style={styles.settingLabel}>{t("settings.overlay.appContext")}</Text>
-              <Toggle
-                checked={useAppContext}
-                onToggle={setUseAppContext}
-              />
+            <View style={styles.toggleGroupRow}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.overlay.appContext")}
+                </Text>
+                <Text style={styles.helpText}>
+                  {t("settings.overlay.appContextHelp")}
+                </Text>
+              </View>
+              <Toggle checked={useAppContext} onToggle={setUseAppContext} />
             </View>
-            <Text style={styles.helpText}>{t("settings.overlay.appContextHelp")}</Text>
           </View>
         )}
       </View>
@@ -2049,7 +2725,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.cloud.storage")}</Text>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+            {t("settings.cloud.storage")}
+          </Text>
           <Group>
             <Selector
               options={cloudStorageOptions}
@@ -2059,12 +2737,14 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               fullWidth
             />
           </Group>
-          {cloudProvider !== "none" && !cloudUserInfo && (() => {
-            const def = getCloudProviderDefinition(cloudProvider);
-            if (!def?.SetupComponent) return null;
-            const Setup = def.SetupComponent;
-            return <Setup onDone={() => connectProvider(def.id)} />;
-          })()}
+          {cloudProvider !== "none" &&
+            !cloudUserInfo &&
+            (() => {
+              const def = getCloudProviderDefinition(cloudProvider);
+              if (!def?.SetupComponent) return null;
+              const Setup = def.SetupComponent;
+              return <Setup onDone={() => connectProvider(def.id)} />;
+            })()}
           {cloudProvider !== "none" && (
             <CloudSyncBox
               userInfo={cloudUserInfo}
@@ -2089,36 +2769,50 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.service.title"))}
 
-      {!!BETA_SERVER_URL && (
-        <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <View style={styles.toggleRow}>
-              <Text style={styles.settingLabel}>Opera Beta server</Text>
+      {/* service providers group: beta, hugging face, ollama */}
+      <Group style={styles.groupSpacing}>
+        {!!BETA_SERVER_URL && (
+          <Pressable
+            style={({ pressed, hovered }) => [
+              styles.toggleGroupRowItem,
+              (pressed || hovered) && styles.toggleGroupCardPressed,
+            ]}
+            onPress={() => setActiveSubPage("beta")}
+          >
+            <View style={styles.toggleGroupRow}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>Opera Beta server</Text>
+                <Text style={styles.helpText}>
+                  A test server we host so you can try Opera without setting one
+                  up.
+                </Text>
+              </View>
+              <View style={styles.toggleDivider} />
               <Toggle
                 checked={enabledProviders.includes(BETA_PROVIDER_ID)}
                 onToggle={(v) => setProviderEnabled(BETA_PROVIDER_ID, v)}
               />
             </View>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              A test server we host so you can try Opera without setting one up.
-            </Text>
+          </Pressable>
+        )}
 
-            <Group>
-              <ActionButton
-                icon={arrowIcon}
-                label="See Opera Beta details"
-                onPress={() => setActiveSubPage("beta")}
-              />
-            </Group>
-          </View>
-        </View>
-      )}
-
-      {/* local ai service card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{t("settings.service.local")}</Text>
+        <Pressable
+          style={({ pressed, hovered }) => [
+            styles.toggleGroupRowItem,
+            (pressed || hovered) && styles.toggleGroupCardPressed,
+          ]}
+          onPress={() => setActiveSubPage("local")}
+        >
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.service.local")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.service.localHelp")}
+              </Text>
+            </View>
+            <View style={styles.toggleDivider} />
             <Toggle
               checked={localAvailable && enabledProviders.includes("local")}
               disabled={!localAvailable}
@@ -2127,86 +2821,90 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               }}
             />
           </View>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.service.localHelp")}</Text>
+        </Pressable>
 
-          <Group>
-            <ActionButton
-              icon={arrowIcon}
-              label={t("settings.local.see")}
-              onPress={() => setActiveSubPage("local")}
-            />
-          </Group>
-        </View>
-      </View>
-
-      {/* on-device models from hugging face */}
-      {isProviderSupported("litert") && (
-        <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <View style={styles.toggleRow}>
-              <Text style={styles.settingLabel}>{t("settings.service.litert")}</Text>
+        {isProviderSupported("litert") && (
+          <Pressable
+            style={({ pressed, hovered }) => [
+              styles.toggleGroupRowItem,
+              (pressed || hovered) && styles.toggleGroupCardPressed,
+            ]}
+            onPress={() => setActiveSubPage("litert")}
+          >
+            <View style={styles.toggleGroupRow}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.service.litert")}
+                </Text>
+                <Text style={styles.helpText}>
+                  {t("settings.service.litertHelp")}
+                </Text>
+              </View>
+              <View style={styles.toggleDivider} />
               <Toggle
                 checked={enabledProviders.includes("litert")}
                 onToggle={(v) => setProviderEnabled("litert", v)}
               />
             </View>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.service.litertHelp")}</Text>
+          </Pressable>
+        )}
 
-            <Group>
-              <ActionButton
-                icon={arrowIcon}
-                label={t("settings.litert.see")}
-                onPress={() => setActiveSubPage("litert")}
-              />
-            </Group>
-          </View>
-        </View>
-      )}
-
-      {/* ollama service card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{t("settings.service.ollama")}</Text>
-            <View style={styles.toggleRight}>
-              <IconButton
-                icon={questionIcon}
-                label={t("common.info")}
-                size={22}
-                tintColor={Colors.textMuted}
-                containerSize={32}
-                pressedColor={Colors.surfacePressed}
-                onPress={() => showAlert(
-                  t("settings.service.ollama"),
-                  t("settings.service.ollamaInfo"),
-                  undefined,
-                  { image: ollamaInfoImage, messageAlign: "left" },
-                )}
-              />
-              <Toggle
-                checked={enabledProviders.includes("ollama")}
-                onToggle={(v) => setProviderEnabled("ollama", v)}
-              />
+        <Pressable
+          style={({ pressed, hovered }) => [
+            styles.toggleGroupRowItem,
+            styles.navItemLast,
+            (pressed || hovered) && styles.toggleGroupCardPressed,
+          ]}
+          onPress={() => setActiveSubPage("ollama")}
+        >
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <View style={styles.toggleRow}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.service.ollama")}
+                </Text>
+                <IconButton
+                  icon={questionIcon}
+                  label={t("common.info")}
+                  size={22}
+                  tintColor={Colors.textMuted}
+                  containerSize={32}
+                  pressedColor={Colors.surfacePressed}
+                  onPress={() =>
+                    showAlert(
+                      t("settings.service.ollama"),
+                      t("settings.service.ollamaInfo"),
+                      undefined,
+                      { image: ollamaInfoImage, messageAlign: "left" },
+                    )
+                  }
+                />
+              </View>
+              <Text style={styles.helpText}>
+                {t("settings.service.ollamaHelp")}
+              </Text>
             </View>
-          </View>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.service.ollamaHelp")}</Text>
-
-          <Group>
-            <ActionButton
-              icon={arrowIcon}
-              label={t("settings.ollama.see")}
-              onPress={() => setActiveSubPage("ollama")}
+            <View style={styles.toggleDivider} />
+            <Toggle
+              checked={enabledProviders.includes("ollama")}
+              onToggle={(v) => setProviderEnabled("ollama", v)}
             />
-          </Group>
-        </View>
-      </View>
+          </View>
+        </Pressable>
+      </Group>
 
       {/* local whisper transcription for web */}
       {Platform.OS === "web" && (
         <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { zIndex: 9, marginBottom: 0 }]}>
-            <Text style={styles.settingLabel}>{t("settings.whisper.label")}</Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.whisper.help")}</Text>
+          <View
+            style={[styles.settingRowVertical, { zIndex: 9, marginBottom: 0 }]}
+          >
+            <Text style={styles.settingLabel}>
+              {t("settings.whisper.label")}
+            </Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {t("settings.whisper.help")}
+            </Text>
             <Group>
               <Selector
                 options={whisperModelOptions}
@@ -2219,7 +2917,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             {isDownloadingWhisper && (
               <View style={{ marginTop: 10 }}>
                 <DownloadProgress
-                  title={t("settings.whisper.downloading", { model: whisperModel })}
+                  title={t("settings.whisper.downloading", {
+                    model: whisperModel,
+                  })}
                   progress={whisperDownloadProgress?.progress || 0}
                   sizeStr={whisperDownloadProgress?.sizeStr}
                   etaSeconds={whisperDownloadProgress?.etaSeconds}
@@ -2241,13 +2941,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={styles.settingLabel}>Opera Beta server</Text>
           <Text style={[styles.helpText, { marginTop: 8 }]}>
-            A test server we host so you can try Opera without setting one up. Everything needed to answer goes through it: your messages, your attachments, whatever a tool reads for you (contacts, calendar, screen text), and your IP address.
+            A test server we host so you can try Opera without setting one up.
+            Everything needed to answer goes through it: your messages, your
+            attachments, whatever a tool reads for you (contacts, calendar,
+            screen text), and your IP address.
           </Text>
           <Text style={[styles.helpText, { marginTop: 6 }]}>
-            We do not read any of it, we do not keep it, and we will never use it for anything. The server is shut down and wiped at the end of the Play Store beta.
+            We do not read any of it, we do not keep it, and we will never use
+            it for anything. The server is shut down and wiped at the end of the
+            Play Store beta.
           </Text>
           <Text style={[styles.helpText, { marginTop: 6 }]}>
-            It is there for testing only. For everyday use, set up your own Ollama server and nothing leaves your network.
+            It is there for testing only. For everyday use, set up your own
+            Ollama server and nothing leaves your network.
           </Text>
         </View>
       </View>
@@ -2262,65 +2968,118 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={styles.settingLabel}>{t("settings.local.title")}</Text>
-          <Text style={[styles.helpText, { marginBottom: 0 }]}>{t("settings.local.help")}</Text>
+          <Text style={[styles.helpText, { marginBottom: 0 }]}>
+            {t("settings.local.help")}
+          </Text>
         </View>
       </View>
 
       {localSheet && (
         <View style={styles.contentCard}>
-          <View style={localSheet.models.length > 0 ? styles.settingRowVertical : [styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={styles.settingLabel}>{t("settings.local.sheetTitle")}</Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.local.sheetHelp")}</Text>
+          <View
+            style={
+              localSheet.models.length > 0
+                ? styles.settingRowVertical
+                : [styles.settingRowVertical, { marginBottom: 0 }]
+            }
+          >
+            <Text style={styles.settingLabel}>
+              {t("settings.local.sheetTitle")}
+            </Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {t("settings.local.sheetHelp")}
+            </Text>
             <Group>
-              {([
-                ["family", localSheet.family],
-                ["runtime", localSheet.runtime],
-                ["browser", localSheet.browser],
-              ] as const).filter(([, value]) => !!value).map(([key, value]) => (
-                <ActionButton
-                  key={key}
-                  label={t(`settings.local.sheet.${key}`)}
-                  rightElement={<Text style={styles.litertRowMeta}>{value}</Text>}
-                />
-              ))}
+              {(
+                [
+                  ["family", localSheet.family],
+                  ["runtime", localSheet.runtime],
+                  ["browser", localSheet.browser],
+                ] as const
+              )
+                .filter(([, value]) => !!value)
+                .map(([key, value]) => (
+                  <ActionButton
+                    key={key}
+                    label={t(`settings.local.sheet.${key}`)}
+                    rightElement={
+                      <Text style={styles.litertRowMeta}>{value}</Text>
+                    }
+                  />
+                ))}
             </Group>
           </View>
 
           {localSheet.models.length > 0 && (
             <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.local.modelsTitle")}</Text>
+              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+                {t("settings.local.modelsTitle")}
+              </Text>
               {localSheet.models.map((model, i) => (
-                <Group key={model.id} style={i < localSheet.models.length - 1 ? styles.litertModelRow : undefined}>
+                <Group
+                  key={model.id}
+                  style={
+                    i < localSheet.models.length - 1
+                      ? styles.litertModelRow
+                      : undefined
+                  }
+                >
                   <ActionButton
                     label={model.label}
-                    rightElement={model.status && <Text style={styles.litertRowMeta}>{t(`settings.local.status.${model.status}`)}</Text>}
+                    rightElement={
+                      model.status && (
+                        <Text style={styles.litertRowMeta}>
+                          {t(`settings.local.status.${model.status}`)}
+                        </Text>
+                      )
+                    }
                   />
                   {!!model.version && (
                     <ActionButton
                       label={t("settings.local.sheet.version")}
-                      rightElement={<Text style={styles.litertRowMeta}>{model.version}</Text>}
+                      rightElement={
+                        <Text style={styles.litertRowMeta}>
+                          {model.version}
+                        </Text>
+                      }
                     />
                   )}
                   {model.contextTokens !== undefined && (
                     <ActionButton
                       label={t("settings.local.sheet.context")}
-                      rightElement={<Text style={styles.litertRowMeta}>{t("settings.local.sheet.tokens", { count: model.contextTokens.toLocaleString() })}</Text>}
+                      rightElement={
+                        <Text style={styles.litertRowMeta}>
+                          {t("settings.local.sheet.tokens", {
+                            count: model.contextTokens.toLocaleString(),
+                          })}
+                        </Text>
+                      }
                     />
                   )}
                   {model.thinking !== undefined && (
                     <ActionButton
                       label={t("settings.local.sheet.thinking")}
-                      rightElement={<Text style={styles.litertRowMeta}>{t(model.thinking ? "settings.local.sheet.yes" : "settings.local.sheet.no")}</Text>}
+                      rightElement={
+                        <Text style={styles.litertRowMeta}>
+                          {t(
+                            model.thinking
+                              ? "settings.local.sheet.yes"
+                              : "settings.local.sheet.no",
+                          )}
+                        </Text>
+                      }
                     />
                   )}
-                  {localSheet.canDownload && (model.status === "downloadable" || model.status === "downloading") && (
-                    <ActionButton
-                      icon={downloadIcon}
-                      label={t("settings.local.download")}
-                      disabled={!!localDownload}
-                      onPress={() => handleDownloadLocal(model.id)}
-                    />
-                  )}
+                  {localSheet.canDownload &&
+                    (model.status === "downloadable" ||
+                      model.status === "downloading") && (
+                      <ActionButton
+                        icon={downloadIcon}
+                        label={t("settings.local.download")}
+                        disabled={!!localDownload}
+                        onPress={() => handleDownloadLocal(model.id)}
+                      />
+                    )}
                 </Group>
               ))}
               {!!localDownload && (
@@ -2348,18 +3107,26 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </View>
 
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{t("settings.litert.modelTitle")}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.litert.help")}</Text>
+          <Text style={styles.settingLabel}>
+            {t("settings.litert.modelTitle")}
+          </Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.litert.help")}
+          </Text>
 
           {installedLitertModels.length === 0 ? (
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.litert.noModels")}</Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {t("settings.litert.noModels")}
+            </Text>
           ) : (
             installedLitertModels.map((model) => (
               <Group key={model.id} style={styles.litertModelRow}>
                 <ActionButton
                   icon={deleteIcon}
                   label={model.label}
-                  rightElement={<Text style={styles.litertRowMeta}>{model.sizeStr}</Text>}
+                  rightElement={
+                    <Text style={styles.litertRowMeta}>{model.sizeStr}</Text>
+                  }
                   disabled={!!downloadingLitert}
                   onPress={() => handleDeleteLitert(model)}
                 />
@@ -2379,7 +3146,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           {!!downloadingLitert && (
             <>
               <DownloadProgress
-                title={t("settings.litert.downloadingModel", { name: getLiteRTModelLabel(downloadingLitert) })}
+                title={t("settings.litert.downloadingModel", {
+                  name: getLiteRTModelLabel(downloadingLitert),
+                })}
                 progress={litertDownloadProgress?.progress || 0}
                 sizeStr={litertDownloadProgress?.sizeStr}
                 etaSeconds={litertDownloadProgress?.etaSeconds}
@@ -2398,8 +3167,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
       <View style={styles.contentCard}>
         <View style={styles.settingRowVertical}>
-          <Text style={styles.settingLabel}>{t("settings.litert.contextTitle")}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.litert.contextHelp")}</Text>
+          <Text style={styles.settingLabel}>
+            {t("settings.litert.contextTitle")}
+          </Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.litert.contextHelp")}
+          </Text>
           <Group>
             <Slider
               icon={messageIcon}
@@ -2411,11 +3184,17 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </View>
 
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{t("settings.litert.forceLoad")}</Text>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.litert.forceLoad")}
+              </Text>
+              <Text style={[styles.helpText, { marginBottom: 0 }]}>
+                {t("settings.litert.forceLoadHelp")}
+              </Text>
+            </View>
             <Toggle checked={litertForceLoad} onToggle={setLitertForceLoad} />
           </View>
-          <Text style={[styles.helpText, { marginBottom: 0 }]}>{t("settings.litert.forceLoadHelp")}</Text>
         </View>
       </View>
     </View>
@@ -2434,7 +3213,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={styles.settingLabel}>{t("settings.ollama.title")}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.ollama.help")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.ollama.help")}
+          </Text>
 
           {ollamaServers.length > 0 && (
             <Group style={styles.groupSpacingTight}>
@@ -2444,14 +3225,28 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 return (
                   <Pressable
                     key={index}
-                    style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
+                    style={({ pressed, hovered }) => [
+                      styles.navItem,
+                      styles.mcpGroupRow,
+                      (pressed || hovered) && styles.navItemPressed,
+                    ]}
                     onPress={() => openOllamaServer(index)}
                   >
-                    <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-                    <Text style={styles.navLabel}>{ollamaServerLabel(server)}</Text>
+                    <Image
+                      source={arrowIcon}
+                      style={styles.menuIcon}
+                      tintColor={Colors.textPrimary}
+                    />
+                    <Text style={styles.navLabel}>
+                      {ollamaServerLabel(server)}
+                    </Text>
                     <IconButton
                       icon={connected ? validIcon : errorIcon}
-                      label={connected ? t("common.statusOk") : t("common.statusError")}
+                      label={
+                        connected
+                          ? t("common.statusOk")
+                          : t("common.statusError")
+                      }
                       size={20}
                       tintColor={connected ? Colors.textPrimary : Colors.error}
                       containerSize={32}
@@ -2492,14 +3287,17 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {/* model failover card */}
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.settingLabel}>{t("settings.service.failover")}</Text>
-            <Toggle
-              checked={modelFailover}
-              onToggle={setModelFailover}
-            />
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.service.failover")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.service.failoverHelp")}
+              </Text>
+            </View>
+            <Toggle checked={modelFailover} onToggle={setModelFailover} />
           </View>
-          <Text style={styles.helpText}>{t("settings.service.failoverHelp")}</Text>
         </View>
       </View>
     </View>
@@ -2513,19 +3311,25 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <View style={styles.contentCard}>
         <View style={styles.settingRowVertical}>
           <Text style={styles.settingLabel}>{t("settings.server.name")}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.server.nameHelp")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.server.nameHelp")}
+          </Text>
           <Group>
             <TextInputField
               icon={penPlaceholderIcon}
               placeholder={t("settings.server.namePlaceholder")}
               value={serverDraft.name}
-              onChangeText={(v) => setServerDraft(prev => ({ ...prev, name: v }))}
+              onChangeText={(v) =>
+                setServerDraft((prev) => ({ ...prev, name: v }))
+              }
             />
           </Group>
         </View>
 
         <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.server.link")}</Text>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+            {t("settings.server.link")}
+          </Text>
           <Group>
             <TextInputField
               icon={linkIcon}
@@ -2533,20 +3337,26 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               autoCapitalize="none"
               autoCorrect={false}
               value={serverDraft.url}
-              onChangeText={(v) => setServerDraft(prev => ({ ...prev, url: v }))}
+              onChangeText={(v) =>
+                setServerDraft((prev) => ({ ...prev, url: v }))
+              }
             />
           </Group>
         </View>
 
         <View style={styles.settingRowVertical}>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.mcp.headerHelp")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.mcp.headerHelp")}
+          </Text>
           <Group>
             <TextInputField
               icon={penPlaceholderIcon}
               placeholder={t("settings.mcp.headerName")}
               autoCapitalize="none"
               value={serverDraft.headerName}
-              onChangeText={(v) => setServerDraft(prev => ({ ...prev, headerName: v }))}
+              onChangeText={(v) =>
+                setServerDraft((prev) => ({ ...prev, headerName: v }))
+              }
             />
             <TextInputField
               icon={penPlaceholderIcon}
@@ -2554,29 +3364,45 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               autoCapitalize="none"
               secureTextEntry
               value={serverDraft.headerValue}
-              onChangeText={(v) => setServerDraft(prev => ({ ...prev, headerValue: v }))}
+              onChangeText={(v) =>
+                setServerDraft((prev) => ({ ...prev, headerValue: v }))
+              }
             />
           </Group>
         </View>
 
         <View style={styles.settingRowVertical}>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.mcp.clientIdHelp")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.mcp.clientIdHelp")}
+          </Text>
           <Group>
             <TextInputField
               icon={penPlaceholderIcon}
               placeholder={t("settings.mcp.clientId")}
               autoCapitalize="none"
               value={serverDraft.clientId}
-              onChangeText={(v) => setServerDraft(prev => ({ ...prev, clientId: v }))}
+              onChangeText={(v) =>
+                setServerDraft((prev) => ({ ...prev, clientId: v }))
+              }
             />
           </Group>
         </View>
 
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Group style={[styles.highlightGroup, (serverDraftBusy || !serverDraft.url.trim()) && styles.highlightGroupDisabled]}>
+          <Group
+            style={[
+              styles.highlightGroup,
+              (serverDraftBusy || !serverDraft.url.trim()) &&
+                styles.highlightGroupDisabled,
+            ]}
+          >
             <ActionButton
               icon={addIcon}
-              label={serverDraftBusy ? t("settings.server.checking") : t("settings.server.add")}
+              label={
+                serverDraftBusy
+                  ? t("settings.server.checking")
+                  : t("settings.server.add")
+              }
               variant="highlight"
               disabled={serverDraftBusy || !serverDraft.url.trim()}
               onPress={submitMcpDraft}
@@ -2595,19 +3421,25 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <View style={styles.contentCard}>
         <View style={styles.settingRowVertical}>
           <Text style={styles.settingLabel}>{t("settings.server.name")}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.server.nameHelp")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.server.nameHelp")}
+          </Text>
           <Group>
             <TextInputField
               icon={penPlaceholderIcon}
               placeholder={t("settings.server.namePlaceholder")}
               value={serverDraft.name}
-              onChangeText={(v) => setServerDraft(prev => ({ ...prev, name: v }))}
+              onChangeText={(v) =>
+                setServerDraft((prev) => ({ ...prev, name: v }))
+              }
             />
           </Group>
         </View>
 
         <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.server.link")}</Text>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+            {t("settings.server.link")}
+          </Text>
           <Group>
             <TextInputField
               icon={linkIcon}
@@ -2615,16 +3447,28 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               autoCapitalize="none"
               autoCorrect={false}
               value={serverDraft.url}
-              onChangeText={(v) => setServerDraft(prev => ({ ...prev, url: v }))}
+              onChangeText={(v) =>
+                setServerDraft((prev) => ({ ...prev, url: v }))
+              }
             />
           </Group>
         </View>
 
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Group style={[styles.highlightGroup, (serverDraftBusy || !serverDraft.url.trim()) && styles.highlightGroupDisabled]}>
+          <Group
+            style={[
+              styles.highlightGroup,
+              (serverDraftBusy || !serverDraft.url.trim()) &&
+                styles.highlightGroupDisabled,
+            ]}
+          >
             <ActionButton
               icon={addIcon}
-              label={serverDraftBusy ? t("settings.server.checking") : t("settings.server.add")}
+              label={
+                serverDraftBusy
+                  ? t("settings.server.checking")
+                  : t("settings.server.add")
+              }
               variant="highlight"
               disabled={serverDraftBusy || !serverDraft.url.trim()}
               onPress={submitOllamaDraft}
@@ -2654,7 +3498,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           </View>
 
           <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.server.name")}</Text>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.server.name")}
+            </Text>
             <Group>
               <TextInputField
                 icon={penPlaceholderIcon}
@@ -2666,7 +3512,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           </View>
 
           <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.server.link")}</Text>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.server.link")}
+            </Text>
             <Group>
               <TextInputField
                 icon={linkIcon}
@@ -2676,14 +3524,18 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 value={server.url}
                 onChangeText={(v) => patchOllamaServer(index, { url: v })}
                 onBlur={() => handleOllamaUrlBlur(index)}
-                rightIcon={serverErrors[server.url.trim()] ? errorIcon : undefined}
+                rightIcon={
+                  serverErrors[server.url.trim()] ? errorIcon : undefined
+                }
                 rightIconLabel={t("common.error")}
-                onRightIconPress={() => showAlert(
-                  t("settings.ollama.unreachableTitle"),
-                  t("settings.ollama.unreachableInfo"),
-                  undefined,
-                  { image: ollamaErrorImage, messageAlign: "left" },
-                )}
+                onRightIconPress={() =>
+                  showAlert(
+                    t("settings.ollama.unreachableTitle"),
+                    t("settings.ollama.unreachableInfo"),
+                    undefined,
+                    { image: ollamaErrorImage, messageAlign: "left" },
+                  )
+                }
               />
             </Group>
           </View>
@@ -2694,7 +3546,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               <Group>
                 <ActionButton
                   icon={reconnectIcon}
-                  label={ollamaModelsLoading ? t("settings.ollama.connecting") : t("settings.ollama.reconnect")}
+                  label={
+                    ollamaModelsLoading
+                      ? t("settings.ollama.connecting")
+                      : t("settings.ollama.reconnect")
+                  }
                   disabled={ollamaModelsLoading || url.length === 0}
                   onPress={() => reconnectOllamaServer(index)}
                   style={styles.mcpGroupRow}
@@ -2704,8 +3560,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           )}
 
           <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>{t("settings.ollama.contextLength")}</Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.ollama.contextHelp")}</Text>
+            <Text style={styles.settingLabel}>
+              {t("settings.ollama.contextLength")}
+            </Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {t("settings.ollama.contextHelp")}
+            </Text>
             <Group>
               {advancedMode ? (
                 <TextInputField
@@ -2727,9 +3587,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           </View>
 
           <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>{t("settings.ollama.keepAlive")}</Text>
+            <Text style={styles.settingLabel}>
+              {t("settings.ollama.keepAlive")}
+            </Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {advancedMode ? t("settings.ollama.keepAliveHelpAdvanced") : t("settings.ollama.keepAliveHelp")}
+              {advancedMode
+                ? t("settings.ollama.keepAliveHelpAdvanced")
+                : t("settings.ollama.keepAliveHelp")}
             </Text>
             <Group>
               {advancedMode ? (
@@ -2753,14 +3617,18 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {ollamaModels.length > 0 ? t("settings.ollama.modelsCount", { count: ollamaModels.length }) : t("settings.ollama.models")}
+              {ollamaModels.length > 0
+                ? t("settings.ollama.modelsCount", {
+                    count: ollamaModels.length,
+                  })
+                : t("settings.ollama.models")}
             </Text>
             <Text style={styles.helpText}>
               {ollamaModels.length > 0
                 ? ollamaModels.join(", ")
                 : ollamaModelsLoading
-                ? t("settings.ollama.modelsLoading")
-                : t("settings.ollama.noModels")}
+                  ? t("settings.ollama.modelsLoading")
+                  : t("settings.ollama.noModels")}
             </Text>
           </View>
         </View>
@@ -2797,14 +3665,23 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           <Text style={styles.helpText}>
             {t("settings.privacy.localStorage")}
           </Text>
-          <Text style={[styles.helpText, { marginTop: 4, marginBottom: Spacing.md }]}>
+          <Text
+            style={[
+              styles.helpText,
+              { marginTop: 4, marginBottom: Spacing.md },
+            ]}
+          >
             {t("settings.privacy.noTracking")}
           </Text>
           <Group>
             <ActionButton
               icon={hyperlinkIcon}
               label={t("settings.privacy.policy")}
-              onPress={() => Linking.openURL("https://maestroai.company/privacy.html").catch(() => { })}
+              onPress={() =>
+                Linking.openURL("https://maestroai.company/privacy.html").catch(
+                  () => {},
+                )
+              }
             />
           </Group>
         </View>
@@ -2824,23 +3701,41 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             <ActionButton
               icon={micIcon}
               label={t("permissions.microphone.label")}
-              onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+              onPress={
+                Platform.OS !== "web" ? () => Linking.openSettings() : undefined
+              }
               disabled={Platform.OS === "web"}
-              rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.microphone) : undefined}
+              rightElement={
+                Platform.OS !== "web"
+                  ? renderPermissionBadge(permissionStatuses.microphone)
+                  : undefined
+              }
             />
             <ActionButton
               icon={cameraIcon}
               label={t("permissions.camera.label")}
-              onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+              onPress={
+                Platform.OS !== "web" ? () => Linking.openSettings() : undefined
+              }
               disabled={Platform.OS === "web"}
-              rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.camera) : undefined}
+              rightElement={
+                Platform.OS !== "web"
+                  ? renderPermissionBadge(permissionStatuses.camera)
+                  : undefined
+              }
             />
             <ActionButton
               icon={locationIcon}
               label={t("permissions.location.label")}
-              onPress={Platform.OS !== "web" ? () => Linking.openSettings() : undefined}
+              onPress={
+                Platform.OS !== "web" ? () => Linking.openSettings() : undefined
+              }
               disabled={Platform.OS === "web"}
-              rightElement={Platform.OS !== "web" ? renderPermissionBadge(permissionStatuses.location) : undefined}
+              rightElement={
+                Platform.OS !== "web"
+                  ? renderPermissionBadge(permissionStatuses.location)
+                  : undefined
+              }
             />
             {Platform.OS !== "web" && (
               <ActionButton
@@ -2855,7 +3750,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 icon={profilIcon}
                 label={t("permissions.contacts.label")}
                 onPress={() => Linking.openSettings()}
-                rightElement={renderPermissionBadge(permissionStatuses.contacts)}
+                rightElement={renderPermissionBadge(
+                  permissionStatuses.contacts,
+                )}
               />
             )}
             {Platform.OS !== "web" && (
@@ -2863,7 +3760,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 icon={calendarIcon}
                 label={t("permissions.calendar.label")}
                 onPress={() => Linking.openSettings()}
-                rightElement={renderPermissionBadge(permissionStatuses.calendar)}
+                rightElement={renderPermissionBadge(
+                  permissionStatuses.calendar,
+                )}
               />
             )}
           </Group>
@@ -2873,7 +3772,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {/* data management card */}
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{t("settings.data.management")}</Text>
+          <Text style={styles.settingLabel}>
+            {t("settings.data.management")}
+          </Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
             {t("settings.data.managementHelp")}
           </Text>
@@ -2913,7 +3814,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       {/* bug report card */}
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{t("settings.support.report")}</Text>
+          <Text style={styles.settingLabel}>
+            {t("settings.support.report")}
+          </Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
             {t("settings.support.reportHelp")}
           </Text>
@@ -2936,13 +3839,21 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             />
           </View>
 
-          <Text style={[styles.helpText, { marginTop: Spacing.md, marginBottom: Spacing.md }]}>{t("bugReport.consent")}</Text>
+          <Text
+            style={[
+              styles.helpText,
+              { marginTop: Spacing.md, marginBottom: Spacing.md },
+            ]}
+          >
+            {t("bugReport.consent")}
+          </Text>
 
-          <Group>
+          <Group style={styles.highlightGroup}>
             <ActionButton
               icon={arrowIcon}
               label={t("bugReport.send")}
               onPress={() => report.send()}
+              variant="highlight"
             />
           </Group>
         </View>
@@ -2959,27 +3870,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
             <ActionButton
               icon={supportIcon}
               label={t("settings.support.contact")}
-              onPress={() => Linking.openURL("https://maestroai.company/contact.html").catch(() => { })}
-            />
-          </Group>
-        </View>
-      </View>
-
-      {/* diagnostic test card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{t("settings.support.testing")}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.support.testingHelp")}
-          </Text>
-          <Group style={styles.dangerGroup}>
-            <ActionButton
-              icon={deleteIcon}
-              label={t("settings.support.testCrash")}
-              variant="highlight"
-              onPress={() => {
-                throw new Error("Test crash triggered from Report a bug settings");
-              }}
+              onPress={() =>
+                Linking.openURL("https://maestroai.company/contact.html").catch(
+                  () => {},
+                )
+              }
             />
           </Group>
         </View>
@@ -2997,27 +3892,36 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         {generalTools.map((tool, index) => {
           const name = tool.definition.function.name;
           const key = `tool:${name}`;
-          const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
+          const enabled = pluginStates[key] ?? tool.enabledByDefault ?? false;
           const isLast = index === generalTools.length - 1;
           return (
-            <View key={name} style={[styles.settingRowVertical, isLast && { marginBottom: 0 }]}>
-              <View style={styles.toggleRow}>
-                <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
+            <View
+              key={name}
+              style={[styles.settingRowVertical, isLast && { marginBottom: 0 }]}
+            >
+              <View style={styles.toggleGroupRow}>
+                <View style={styles.toggleGroupContent}>
+                  <Text style={styles.settingLabel}>
+                    {tool.displayName ?? name}
+                  </Text>
+                  {tool.displayDescription ? (
+                    <Text style={styles.helpText}>
+                      {tool.displayDescription.endsWith(".")
+                        ? tool.displayDescription
+                        : `${tool.displayDescription}.`}
+                    </Text>
+                  ) : null}
+                </View>
                 <Toggle
                   checked={enabled}
                   onToggle={async (v) => {
-                    setPluginStates(prev => ({ ...prev, [key]: v }));
-                    await PluginRegistry.setEnabled('tool', name, v);
+                    setPluginStates((prev) => ({ ...prev, [key]: v }));
+                    await PluginRegistry.setEnabled("tool", name, v);
                     //request permission at enable time
                     if (v) await tool.requestPermission?.();
                   }}
                 />
               </View>
-              {tool.displayDescription ? (
-                <Text style={styles.helpText}>
-                  {tool.displayDescription.endsWith('.') ? tool.displayDescription : `${tool.displayDescription}.`}
-                </Text>
-              ) : null}
             </View>
           );
         })}
@@ -3027,35 +3931,61 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <View style={styles.contentCard}>
         {/* widgets block */}
         <View style={styles.settingRowVertical}>
-          <Text style={styles.settingLabel}>{t("settings.tools.widgets.title")}</Text>
+          <Text style={styles.settingLabel}>
+            {t("settings.tools.widgets.title")}
+          </Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.tools.widgets.help", { list: allWidgets.map(w => w.name).join(", ") })}
+            {t("settings.tools.widgets.help", {
+              list: allWidgets.map((w) => w.name).join(", "),
+            })}
           </Text>
 
           <Group>
             <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+              style={({ pressed, hovered }) => [
+                styles.navItem,
+                styles.navItemLast,
+                (pressed || hovered) && styles.navItemPressed,
+              ]}
               onPress={() => setActiveSubPage("widgets")}
             >
-              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-              <Text style={styles.navLabel}>{t("settings.tools.widgets.see")}</Text>
+              <Image
+                source={arrowIcon}
+                style={styles.menuIcon}
+                tintColor={Colors.textPrimary}
+              />
+              <Text style={styles.navLabel}>
+                {t("settings.tools.widgets.see")}
+              </Text>
             </Pressable>
           </Group>
         </View>
 
         {/* mcp block */}
-        <View style={[styles.settingRowVertical, isDesktop && { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{t("settings.tools.mcp.title")}</Text>
+        <View
+          style={[styles.settingRowVertical, isDesktop && { marginBottom: 0 }]}
+        >
+          <Text style={styles.settingLabel}>
+            {t("settings.tools.mcp.title")}
+          </Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
             {t("settings.tools.mcp.help")}
           </Text>
 
           <Group>
             <Pressable
-              style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+              style={({ pressed, hovered }) => [
+                styles.navItem,
+                styles.navItemLast,
+                (pressed || hovered) && styles.navItemPressed,
+              ]}
               onPress={() => setActiveSubPage("mcpservers")}
             >
-              <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+              <Image
+                source={arrowIcon}
+                style={styles.menuIcon}
+                tintColor={Colors.textPrimary}
+              />
               <Text style={styles.navLabel}>{t("settings.tools.mcp.see")}</Text>
             </Pressable>
           </Group>
@@ -3064,18 +3994,36 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         {/* mobile actions block */}
         {!isDesktop && (
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={styles.settingLabel}>{t("settings.tools.mobile.title")}</Text>
+            <Text style={styles.settingLabel}>
+              {t("settings.tools.mobile.title")}
+            </Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.tools.mobile.help", { list: mobileTools.map(tool => tool.displayName ?? tool.definition.function.name).join(", ") })}
+              {t("settings.tools.mobile.help", {
+                list: mobileTools
+                  .map(
+                    (tool) => tool.displayName ?? tool.definition.function.name,
+                  )
+                  .join(", "),
+              })}
             </Text>
 
             <Group>
               <Pressable
-                style={({ pressed, hovered }) => [styles.navItem, styles.navItemLast, (pressed || hovered) && styles.navItemPressed]}
+                style={({ pressed, hovered }) => [
+                  styles.navItem,
+                  styles.navItemLast,
+                  (pressed || hovered) && styles.navItemPressed,
+                ]}
                 onPress={() => setActiveSubPage("mobileactions")}
               >
-                <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-                <Text style={styles.navLabel}>{t("settings.tools.mobile.see")}</Text>
+                <Image
+                  source={arrowIcon}
+                  style={styles.menuIcon}
+                  tintColor={Colors.textPrimary}
+                />
+                <Text style={styles.navLabel}>
+                  {t("settings.tools.mobile.see")}
+                </Text>
               </Pressable>
             </Group>
           </View>
@@ -3100,10 +4048,21 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               {mcpServers.map((server) => (
                 <Pressable
                   key={server.id}
-                  style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
-                  onPress={() => { setMcpDetailId(server.id); setActiveSubPage("mcpserver"); }}
+                  style={({ pressed, hovered }) => [
+                    styles.navItem,
+                    styles.mcpGroupRow,
+                    (pressed || hovered) && styles.navItemPressed,
+                  ]}
+                  onPress={() => {
+                    setMcpDetailId(server.id);
+                    setActiveSubPage("mcpserver");
+                  }}
                 >
-                  <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
+                  <Image
+                    source={arrowIcon}
+                    style={styles.menuIcon}
+                    tintColor={Colors.textPrimary}
+                  />
                   <Text style={styles.navLabel}>{server.name}</Text>
                   {mcpNeedsAuth(server.id) ? (
                     <IconButton
@@ -3117,7 +4076,9 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                       onPress={() => showMcpAuthInfo(server.id)}
                     />
                   ) : (
-                    <Text style={styles.navStatus}>{mcpStatusLabel(server.id)}</Text>
+                    <Text style={styles.navStatus}>
+                      {mcpStatusLabel(server.id)}
+                    </Text>
                   )}
                 </Pressable>
               ))}
@@ -3125,7 +4086,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           )}
 
           <Group>
-            <ActionButton icon={addIcon} label={t("settings.server.add")} onPress={() => openServerDraft("mcpserveradd")} />
+            <ActionButton
+              icon={addIcon}
+              label={t("settings.server.add")}
+              onPress={() => openServerDraft("mcpserveradd")}
+            />
           </Group>
         </View>
       </View>
@@ -3150,19 +4115,41 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           <View style={styles.settingRowVertical}>
             <Text style={styles.helpText}>{mcpStatusLabel(server.id)}</Text>
             {status.error ? (
-              <Text style={[styles.helpText, { marginTop: 6, color: Colors.error }]}>{status.error}</Text>
+              <Text
+                style={[styles.helpText, { marginTop: 6, color: Colors.error }]}
+              >
+                {status.error}
+              </Text>
             ) : null}
           </View>
 
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{server.name}</Text>
-            <Group style={status.state !== "connected" ? styles.groupSpacingTight : undefined}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {server.name}
+            </Text>
+            <Group
+              style={
+                status.state !== "connected"
+                  ? styles.groupSpacingTight
+                  : undefined
+              }
+            >
               <Pressable
-                style={({ pressed, hovered }) => [styles.navItem, styles.mcpGroupRow, (pressed || hovered) && styles.navItemPressed]}
+                style={({ pressed, hovered }) => [
+                  styles.navItem,
+                  styles.mcpGroupRow,
+                  (pressed || hovered) && styles.navItemPressed,
+                ]}
                 onPress={() => setActiveSubPage("mcpserversettings")}
               >
-                <Image source={arrowIcon} style={styles.menuIcon} tintColor={Colors.textPrimary} />
-                <Text style={styles.navLabel}>{t("settings.server.settings")}</Text>
+                <Image
+                  source={arrowIcon}
+                  style={styles.menuIcon}
+                  tintColor={Colors.textPrimary}
+                />
+                <Text style={styles.navLabel}>
+                  {t("settings.server.settings")}
+                </Text>
               </Pressable>
             </Group>
 
@@ -3171,7 +4158,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               <Group>
                 <ActionButton
                   icon={reconnectIcon}
-                  label={busy ? t("settings.mcp.connecting") : t("settings.mcp.reconnect")}
+                  label={
+                    busy
+                      ? t("settings.mcp.connecting")
+                      : t("settings.mcp.reconnect")
+                  }
                   disabled={busy || !server.url.trim()}
                   onPress={() => connectMcpServer(server.id)}
                   style={styles.mcpGroupRow}
@@ -3185,26 +4176,40 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         {tools.length > 0 && (
           <View style={styles.contentCard}>
             <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.mcp.tools", { count: tools.length })}</Text>
+              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+                {t("settings.mcp.tools", { count: tools.length })}
+              </Text>
               {tools.map((tool, index) => {
                 const name = tool.definition.function.name;
                 const key = `tool:${name}`;
-                const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
+                const enabled =
+                  pluginStates[key] ?? tool.enabledByDefault ?? false;
                 return (
-                  <View key={name} style={index < tools.length - 1 && { marginBottom: Spacing.xxl }}>
-                    <View style={styles.toggleRow}>
-                      <Text style={styles.settingLabel}>{tool.displayName}</Text>
+                  <View
+                    key={name}
+                    style={
+                      index < tools.length - 1 && { marginBottom: Spacing.xxl }
+                    }
+                  >
+                    <View style={styles.toggleGroupRow}>
+                      <View style={styles.toggleGroupContent}>
+                        <Text style={styles.settingLabel}>
+                          {tool.displayName}
+                        </Text>
+                        {tool.displayDescription ? (
+                          <Text style={styles.helpText}>
+                            {tool.displayDescription}
+                          </Text>
+                        ) : null}
+                      </View>
                       <Toggle
                         checked={enabled}
                         onToggle={async (v) => {
-                          setPluginStates(prev => ({ ...prev, [key]: v }));
-                          await PluginRegistry.setEnabled('tool', name, v);
+                          setPluginStates((prev) => ({ ...prev, [key]: v }));
+                          await PluginRegistry.setEnabled("tool", name, v);
                         }}
                       />
                     </View>
-                    {tool.displayDescription ? (
-                      <Text style={styles.helpText}>{tool.displayDescription}</Text>
-                    ) : null}
                   </View>
                 );
               })}
@@ -3240,14 +4245,22 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
         <View style={styles.contentCard}>
           <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.server.link")}</Text>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.server.link")}
+            </Text>
             <Group>
               <TextInputField
                 icon={linkIcon}
                 placeholder={t("settings.service.serverLink")}
                 autoCapitalize="none"
                 value={server.url}
-                onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, url: v } : s))}
+                onChangeText={(v) =>
+                  setMcpServers((prev) =>
+                    prev.map((s) =>
+                      s.id === server.id ? { ...s, url: v } : s,
+                    ),
+                  )
+                }
                 onBlur={() => handleMcpUrlBlur(server.id, server.url)}
                 rightIcon={mcpNeedsAuth(server.id) ? infoIcon : undefined}
                 rightIconTint={Colors.textMuted}
@@ -3258,15 +4271,25 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           </View>
 
           <View style={styles.settingRowVertical}>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.mcp.headerHelp")}</Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {t("settings.mcp.headerHelp")}
+            </Text>
             <Group>
               <TextInputField
                 icon={penPlaceholderIcon}
                 placeholder={t("settings.mcp.headerName")}
                 autoCapitalize="none"
                 value={server.headerName}
-                onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, headerName: v } : s))}
-                onBlur={() => saveMcpServer(server.id, { headerName: server.headerName })}
+                onChangeText={(v) =>
+                  setMcpServers((prev) =>
+                    prev.map((s) =>
+                      s.id === server.id ? { ...s, headerName: v } : s,
+                    ),
+                  )
+                }
+                onBlur={() =>
+                  saveMcpServer(server.id, { headerName: server.headerName })
+                }
               />
               <TextInputField
                 icon={penPlaceholderIcon}
@@ -3274,22 +4297,39 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
                 autoCapitalize="none"
                 secureTextEntry
                 value={mcpHeaderValues[server.id] ?? ""}
-                onChangeText={(v) => setMcpHeaderValues(prev => ({ ...prev, [server.id]: v }))}
-                onBlur={() => McpService.setHeaderValue(server.id, mcpHeaderValues[server.id] ?? "")}
+                onChangeText={(v) =>
+                  setMcpHeaderValues((prev) => ({ ...prev, [server.id]: v }))
+                }
+                onBlur={() =>
+                  McpService.setHeaderValue(
+                    server.id,
+                    mcpHeaderValues[server.id] ?? "",
+                  )
+                }
               />
             </Group>
           </View>
 
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.mcp.clientIdHelp")}</Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {t("settings.mcp.clientIdHelp")}
+            </Text>
             <Group>
               <TextInputField
                 icon={penPlaceholderIcon}
                 placeholder={t("settings.mcp.clientId")}
                 autoCapitalize="none"
                 value={server.clientId ?? ""}
-                onChangeText={(v) => setMcpServers(prev => prev.map(s => s.id === server.id ? { ...s, clientId: v } : s))}
-                onBlur={() => saveMcpServer(server.id, { clientId: server.clientId ?? "" })}
+                onChangeText={(v) =>
+                  setMcpServers((prev) =>
+                    prev.map((s) =>
+                      s.id === server.id ? { ...s, clientId: v } : s,
+                    ),
+                  )
+                }
+                onBlur={() =>
+                  saveMcpServer(server.id, { clientId: server.clientId ?? "" })
+                }
               />
             </Group>
           </View>
@@ -3306,20 +4346,30 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       <View style={styles.contentCard}>
         {allWidgets.map((widget, index) => {
           const key = `widget:${widget.id}`;
-          const enabled = pluginStates[key] ?? (widget.enabledByDefault ?? false);
+          const enabled = pluginStates[key] ?? widget.enabledByDefault ?? false;
           return (
-            <View key={widget.id} style={[styles.settingRowVertical, index === allWidgets.length - 1 && { marginBottom: 0 }]}>
-              <View style={styles.toggleRow}>
-                <Text style={styles.settingLabel}>{widget.name}</Text>
+            <View
+              key={widget.id}
+              style={[
+                styles.settingRowVertical,
+                index === allWidgets.length - 1 && { marginBottom: 0 },
+              ]}
+            >
+              <View style={styles.toggleGroupRow}>
+                <View style={styles.toggleGroupContent}>
+                  <Text style={styles.settingLabel}>{widget.name}</Text>
+                  <Text style={styles.helpText}>
+                    {widget.description.split(".")[0]}.
+                  </Text>
+                </View>
                 <Toggle
                   checked={enabled}
                   onToggle={async (v) => {
-                    setPluginStates(prev => ({ ...prev, [key]: v }));
-                    await PluginRegistry.setEnabled('widget', widget.id, v);
+                    setPluginStates((prev) => ({ ...prev, [key]: v }));
+                    await PluginRegistry.setEnabled("widget", widget.id, v);
                   }}
                 />
               </View>
-              <Text style={styles.helpText}>{widget.description.split('.')[0]}.</Text>
             </View>
           );
         })}
@@ -3336,26 +4386,37 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         {mobileTools.map((tool, index) => {
           const name = tool.definition.function.name;
           const key = `tool:${name}`;
-          const enabled = pluginStates[key] ?? (tool.enabledByDefault ?? false);
+          const enabled = pluginStates[key] ?? tool.enabledByDefault ?? false;
           return (
-            <View key={name} style={[styles.settingRowVertical, index === mobileTools.length - 1 && { marginBottom: 0 }]}>
-              <View style={styles.toggleRow}>
-                <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
+            <View
+              key={name}
+              style={[
+                styles.settingRowVertical,
+                index === mobileTools.length - 1 && { marginBottom: 0 },
+              ]}
+            >
+              <View style={styles.toggleGroupRow}>
+                <View style={styles.toggleGroupContent}>
+                  <Text style={styles.settingLabel}>
+                    {tool.displayName ?? name}
+                  </Text>
+                  {tool.displayDescription ? (
+                    <Text style={styles.helpText}>
+                      {tool.displayDescription.endsWith(".")
+                        ? tool.displayDescription
+                        : `${tool.displayDescription}.`}
+                    </Text>
+                  ) : null}
+                </View>
                 <Toggle
                   checked={enabled}
                   onToggle={async (v) => {
-                    setPluginStates(prev => ({ ...prev, [key]: v }));
-                    await PluginRegistry.setEnabled('tool', name, v);
-                    //request permission at enable time
+                    setPluginStates((prev) => ({ ...prev, [key]: v }));
+                    await PluginRegistry.setEnabled("tool", name, v);
                     if (v) await tool.requestPermission?.();
                   }}
                 />
               </View>
-              {tool.displayDescription ? (
-                <Text style={styles.helpText}>
-                  {tool.displayDescription.endsWith('.') ? tool.displayDescription : `${tool.displayDescription}.`}
-                </Text>
-              ) : null}
             </View>
           );
         })}
@@ -3417,44 +4478,98 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const innerContent = (
     <View style={styles.innerContainer}>
-      <View style={[styles.fixedBackWrapper, { top: isDesktop ? 0 : 60 }]} pointerEvents="box-none">
-        {isScrolled && <View style={styles.fixedBackShadow} pointerEvents="none" />}
-        <Pressable
-          onPress={handleBack}
-          hitSlop={12}
-          style={({ pressed, hovered }) => [
-            styles.fixedBackButton,
-            isScrolled ? styles.fixedBackButtonScrolled : styles.fixedBackButtonUnscrolled,
-            (pressed || hovered) && (isScrolled ? { backgroundColor: Colors.surfacePressed } : { opacity: 0.6 }),
-          ]}
+      <View
+        style={[styles.fixedBackWrapper, { top: isDesktop ? 0 : 60 }]}
+        pointerEvents="box-none"
+      >
+        {isScrolled && (
+          <View style={styles.fixedBackShadow} pointerEvents="none" />
+        )}
+        <Animated.View
+          style={{
+            transform: [
+              {
+                scale: backPulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 1.3],
+                }),
+              },
+            ],
+            opacity: backPulse.interpolate({
+              inputRange: [0, 1],
+              outputRange: [1, 0.3],
+            }),
+          }}
         >
-          <Image
-            source={activeSubPage === "main" ? cancelIcon : arrowIcon}
-            style={activeSubPage === "main" ? styles.closeIcon : styles.backIcon}
-            tintColor={Colors.textPrimary}
-          />
-        </Pressable>
+          <Pressable
+            onPress={handleBack}
+            hitSlop={12}
+            style={({ pressed, hovered }) => [
+              styles.fixedBackButton,
+              isScrolled
+                ? styles.fixedBackButtonScrolled
+                : styles.fixedBackButtonUnscrolled,
+              (pressed || hovered) &&
+                (isScrolled
+                  ? { backgroundColor: Colors.surfacePressed }
+                  : { opacity: 0.6 }),
+            ]}
+          >
+            <Image
+              source={activeSubPage === "main" ? cancelIcon : arrowIcon}
+              style={
+                activeSubPage === "main" ? styles.closeIcon : styles.backIcon
+              }
+              tintColor={Colors.textPrimary}
+            />
+          </Pressable>
+        </Animated.View>
       </View>
 
       <ScrollView
         ref={scrollRef}
         onScroll={handleScroll}
         scrollEventThrottle={16}
-        contentContainerStyle={{ paddingTop: isDesktop ? 0 : 60, paddingBottom: 40, flexGrow: 1 }}
+        contentContainerStyle={{
+          paddingTop: isDesktop ? 0 : 60,
+          paddingBottom: 40,
+          flexGrow: 1,
+        }}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View style={{ flex: 1, opacity: pageAnim, transform: [{ translateY: pageAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
+        <Animated.View
+          style={{
+            flex: 1,
+            opacity: pageAnim,
+            transform: [
+              {
+                translateY: pageAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [8, 0],
+                }),
+              },
+            ],
+          }}
+        >
           {getSubPageContent()}
         </Animated.View>
       </ScrollView>
 
       <LinearGradient
-        colors={[Colors.surface, Colors.surfaceFade, Colors.surfaceClear]}
+        colors={[
+          Colors.groupedBackground,
+          Colors.groupedBackgroundFade,
+          Colors.groupedBackgroundClear,
+        ]}
         style={styles.gradientTop}
         pointerEvents="none"
       />
       <LinearGradient
-        colors={[Colors.surfaceClear, Colors.surfaceFade, Colors.surface]}
+        colors={[
+          Colors.groupedBackgroundClear,
+          Colors.groupedBackgroundFade,
+          Colors.groupedBackground,
+        ]}
         style={styles.gradientBottom}
         pointerEvents="none"
       />
@@ -3488,22 +4603,36 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           {
             label: t("settings.data.conversations"),
             checked: exportSelection.conversations,
-            onToggle: (checked) => setExportSelection(prev => ({ ...prev, conversations: checked })),
+            onToggle: (checked) =>
+              setExportSelection((prev) => ({
+                ...prev,
+                conversations: checked,
+              })),
           },
           {
             label: t("settings.title"),
             checked: exportSelection.settings,
-            onToggle: (checked) => setExportSelection(prev => ({ ...prev, settings: checked })),
+            onToggle: (checked) =>
+              setExportSelection((prev) => ({ ...prev, settings: checked })),
           },
         ]}
         buttons={[
           {
             text: t("settings.data.export"),
             style: "primary",
-            disabled: !exportSelection.settings && !exportSelection.conversations,
-            onPress: () => runExport(exportSelection.settings, exportSelection.conversations),
+            disabled:
+              !exportSelection.settings && !exportSelection.conversations,
+            onPress: () =>
+              runExport(
+                exportSelection.settings,
+                exportSelection.conversations,
+              ),
           },
-          { text: t("common.cancel"), style: "secondary", onPress: () => setExportScopeVisible(false) },
+          {
+            text: t("common.cancel"),
+            style: "secondary",
+            onPress: () => setExportScopeVisible(false),
+          },
         ]}
       />
     </>
@@ -3511,12 +4640,17 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   //query searches the hub, else browses
   const isLitertSearching = hfModelInput.trim().length >= MIN_SEARCH_LENGTH;
-  const litertBrowserModels = isLitertSearching ? litertSearchResults : litertFamilyModels;
+  const litertBrowserModels = isLitertSearching
+    ? litertSearchResults
+    : litertFamilyModels;
 
   const addModelSheet = (
     <DrawerSheet
       visible={addModelSheetVisible}
-      onClose={() => { setAddModelSheetVisible(false); setLitertFamilyId(null); }}
+      onClose={() => {
+        setAddModelSheetVisible(false);
+        setLitertFamilyId(null);
+      }}
       mode="overlay"
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
@@ -3528,8 +4662,12 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       desktopStyle={styles.addModelSheetDesktop}
     >
       <View style={styles.addModelSheetContent}>
-        <Text style={styles.settingLabel}>{t("settings.litert.addModelTitle")}</Text>
-        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.litert.addModelHelp")}</Text>
+        <Text style={styles.settingLabel}>
+          {t("settings.litert.addModelTitle")}
+        </Text>
+        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+          {t("settings.litert.addModelHelp")}
+        </Text>
 
         <Group>
           <TextInputField
@@ -3558,36 +4696,46 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
               )}
               {!isLitertSearching && litertFamilyId === null
                 ? litertFamilies.map((family) => (
-                  <ActionButton
-                    key={family.id}
-                    icon={arrowIcon}
-                    label={litertFamilyName(family)}
-                    rightElement={<Text style={styles.litertRowMeta}>{family.repoIds.length}</Text>}
-                    onPress={() => openLitertFamily(family)}
-                  />
-                ))
+                    <ActionButton
+                      key={family.id}
+                      icon={arrowIcon}
+                      label={litertFamilyName(family)}
+                      rightElement={
+                        <Text style={styles.litertRowMeta}>
+                          {family.repoIds.length}
+                        </Text>
+                      }
+                      onPress={() => openLitertFamily(family)}
+                    />
+                  ))
                 : litertBrowserModels.map((entry) => (
-                  <ActionButton
-                    key={entry.repoId}
-                    icon={downloadIcon}
-                    label={entry.label}
-                    rightElement={
-                      <Text style={styles.litertRowMeta}>
-                        {isLiteRTModelDownloaded(entry.repoId)
-                          ? t("settings.litert.installed")
-                          : formatBytes(entry.sizeBytes)}
-                      </Text>
-                    }
-                    disabled={isLiteRTModelDownloaded(entry.repoId) || !!downloadingLitert}
-                    onPress={() => confirmDownloadLitert(entry)}
-                  />
-                ))}
+                    <ActionButton
+                      key={entry.repoId}
+                      icon={downloadIcon}
+                      label={entry.label}
+                      rightElement={
+                        <Text style={styles.litertRowMeta}>
+                          {isLiteRTModelDownloaded(entry.repoId)
+                            ? t("settings.litert.installed")
+                            : formatBytes(entry.sizeBytes)}
+                        </Text>
+                      }
+                      disabled={
+                        isLiteRTModelDownloaded(entry.repoId) ||
+                        !!downloadingLitert
+                      }
+                      onPress={() => confirmDownloadLitert(entry)}
+                    />
+                  ))}
             </Group>
-            {(isLitertSearching || litertFamilyId !== null) && litertBrowserModels.length === 0 && (
-              <Text style={styles.helpText}>
-                {isLitertSearching ? t("settings.litert.noResults") : t("settings.litert.familyEmpty")}
-              </Text>
-            )}
+            {(isLitertSearching || litertFamilyId !== null) &&
+              litertBrowserModels.length === 0 && (
+                <Text style={styles.helpText}>
+                  {isLitertSearching
+                    ? t("settings.litert.noResults")
+                    : t("settings.litert.familyEmpty")}
+                </Text>
+              )}
           </ScrollView>
         )}
       </View>
@@ -3597,31 +4745,35 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   if (isDesktop) {
     const largeScreenWidth = largeScreenAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: [0, 320]
+      outputRange: [0, 320],
     });
     const largeScreenMargin = largeScreenAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: [0, 16]
+      outputRange: [0, 16],
     });
     const largeScreenOpacity = largeScreenAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: [0, 1]
+      outputRange: [0, 1],
     });
 
     return (
-      <Animated.View style={[
-        styles.largeScreenContainer,
-        isDesktop ? styles.floatingContainer : styles.attachedContainer,
-        {
-          width: largeScreenWidth,
-          opacity: largeScreenOpacity,
-          marginLeft: isDesktop ? largeScreenMargin : 0,
-          marginRight: isDesktop ? largeScreenMargin : 0,
-          overflow: "hidden"
-        }
-      ]}>
+      <Animated.View
+        style={[
+          styles.largeScreenContainer,
+          isDesktop ? styles.floatingContainer : styles.attachedContainer,
+          {
+            width: largeScreenWidth,
+            opacity: largeScreenOpacity,
+            marginLeft: isDesktop ? largeScreenMargin : 0,
+            marginRight: isDesktop ? largeScreenMargin : 0,
+            overflow: "hidden",
+          },
+        ]}
+      >
         <View style={{ width: 320, flex: 1 }}>
-          <View style={isDesktop ? styles.floatingContent : styles.attachedContent}>
+          <View
+            style={isDesktop ? styles.floatingContent : styles.attachedContent}
+          >
             {innerContent}
           </View>
         </View>
@@ -3648,7 +4800,14 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
       </Animated.View>
 
-      <Animated.View style={[styles.content, { width: drawerWidth }, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
+      <Animated.View
+        style={[
+          styles.content,
+          { width: drawerWidth },
+          { transform: [{ translateX }] },
+        ]}
+        {...panResponder.panHandlers}
+      >
         {innerContent}
       </Animated.View>
 
@@ -3660,378 +4819,404 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   return mobileDrawer;
 }
 
-const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
-  root: {
-    ...StyleSheet.absoluteFill,
-    zIndex: 1000,
-    elevation: 1000,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: Colors.scrimDrawer,
-  },
-  content: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    right: 0,
-    backgroundColor: Colors.surface,
-    paddingHorizontal: Spacing.lg2,
-  },
-  largeScreenContainer: {
-    width: 320,
-    backgroundColor: Colors.surface,
-    zIndex: 10,
-  },
-  floatingContainer: {
-    margin: 16,
-    marginTop: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window ? 40 : 8,
-    marginBottom: 16,
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
-    elevation: 5,
-    overflow: "hidden",
-  },
-  attachedContainer: {
-    borderLeftWidth: 1,
-    borderLeftColor: Colors.overlaySubtle,
-  },
-  floatingContent: {
-    flex: 1,
-    paddingTop: 24,
-    paddingHorizontal: Spacing.lg2,
-  },
-  attachedContent: {
-    flex: 1,
-    paddingHorizontal: Spacing.lg2,
-  },
-  innerContainer: {
-    flex: 1,
-    position: "relative",
-  },
-  fixedBackWrapper: {
-    position: "absolute",
-    left: 0,
-    zIndex: 100,
-    elevation: 10,
-    width: 40,
-    height: 40,
-  },
-  fixedBackShadow: {
-    position: "absolute",
-    top: 4,
-    left: -4,
-    width: 40,
-    height: 40,
-    backgroundColor: Colors.shadowInk,
-    borderRadius: Radius.xxl,
-  },
-  fixedBackButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-    zIndex: 1,
-  },
-  fixedBackButtonScrolled: {
-    backgroundColor: Colors.surface,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: Radius.xxl,
-  },
-  fixedBackButtonUnscrolled: {
-    backgroundColor: "transparent",
-    borderWidth: 2,
-    borderColor: "transparent",
-    borderRadius: Radius.xxl,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: Spacing.xxxl,
-    minHeight: 40,
-  },
-  title: {
-    flex: 1,
-    fontSize: FontSizes.xxxl,
-    color: Colors.textPrimary,
-    fontFamily: Fonts.display,
-    textAlign: "center",
-    includeFontPadding: false,
-    lineHeight: 40,
-  },
-  menuContainer: {
-    flex: 1,
-  },
-  subPageContainer: {
-    flex: 1,
-  },
-  contentCard: {
-    backgroundColor: Colors.surface,
-    //concentric inner radius and padding
-    borderRadius: Radius.xxl + Spacing.md,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xl2,
-    marginBottom: Spacing.xxl2,
-  },
-  backIcon: {
-    width: 18,
-    height: 18,
-    transform: [{ rotate: "-180deg" }],
-  },
-  closeIcon: {
-    width: 18,
-    height: 18,
-  },
-  gradientTop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    zIndex: 10,
-  },
-  gradientBottom: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    zIndex: 10,
-  },
-  headerSpacer: {
-    width: 40,
-    height: 40,
-  },
-  addModelSheet: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.huge2,
-    borderTopRightRadius: Radius.huge2,
-    paddingTop: 12,
-  },
-  addModelSheetDesktop: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
-    elevation: 5,
-    width: 380,
-    overflow: "hidden",
-    paddingVertical: 16,
-  },
-  litertBrowserList: {
-    maxHeight: 280,
-    marginTop: Spacing.md,
-  },
-  litertModelRow: {
-    marginBottom: Spacing.md,
-  },
-  litertCancelRow: {
-    marginTop: Spacing.md,
-  },
-  litertRowMeta: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.micro,
-    color: Colors.textMuted,
-  },
-  addModelSheetContent: {
-    paddingHorizontal: Spacing.xxl,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.lg,
-  },
-  groupSpacing: {
-    marginBottom: Spacing.xxl,
-    borderRadius: Radius.xxl + Spacing.md,
-  },
-  mainPageGroup: {
-    borderRadius: Radius.xxl + Spacing.md,
-  },
-  groupSpacingTight: {
-    marginBottom: Spacing.lg2,
-  },
-  navItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: Spacing.xl2,
-    paddingHorizontal: Spacing.lg2,
-    gap: Spacing.lg2,
-  },
-  navItemLast: {
-    marginBottom: 0,
-  },
-  navItemPressed: {
-    backgroundColor: Colors.surfacePressed,
-  },
-  menuIcon: {
-    width: 18,
-    height: 18,
-  },
-  menuIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.xxl,
-    backgroundColor: Colors.primary,
-    borderWidth: 2,
-    borderColor: Colors.borderOnPrimary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  navTextContainer: {
-    flex: 1,
-  },
-  navTitle: {
-    fontSize: FontSizes.lg,
-    fontFamily: Fonts.mono,
-    color: Colors.textPrimary,
-    marginBottom: 2,
-  },
-  navSubtitle: {
-    fontSize: FontSizes.bodyMd,
-    fontFamily: Fonts.body,
-    color: Colors.textMuted,
-  },
-  navLabel: {
-    flex: 1,
-    fontSize: FontSizes.body,
-    fontFamily: Fonts.mono,
-    color: Colors.textPrimary,
-  },
-  permissionBadge: {
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: Radius.md,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
-  },
-  permissionBadgeAllowed: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primaryBright,
-  },
-  permissionBadgeText: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.labelSm,
-    color: Colors.textSecondary,
-  },
-  permissionBadgeTextAllowed: {
-    color: Colors.textOnPrimary,
-  },
-  settingRowVertical: {
-    marginBottom: Spacing.xxl,
-    zIndex: 10,
-  },
-  settingLabel: {
-    fontSize: FontSizes.body,
-    color: Colors.textPrimary,
-    fontFamily: Fonts.mono,
-  },
-  toggleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  toggleRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
-  checkboxRow: {
-    flex: 1,
-    justifyContent: "space-between",
-  },
-  downloadOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surfaceSubtle,
-    padding: 12,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.codeBlockText,
-    borderStyle: "dashed",
-    gap: 10,
-    marginBottom: 20,
-  },
-  downloadIcon: {
-    width: 20,
-    height: 20,
-  },
-  downloadText: {
-    fontSize: FontSizes.bodyMd,
-    color: Colors.primary,
-    fontFamily: Fonts.mono,
-  },
-  helpText: {
-    fontSize: FontSizes.bodyMd,
-    color: Colors.textMuted,
-    fontFamily: Fonts.body,
-    marginTop: 4,
-    lineHeight: 20,
-  },
-  assistantStatusText: {
-    fontSize: FontSizes.bodyMd,
-    fontFamily: Fonts.body,
-    marginTop: 6,
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  assistantStatusOn: {
-    color: Colors.primary,
-  },
-  assistantStatusOff: {
-    color: Colors.textMuted,
-  },
-  //aligns a row with the input fields sharing its group
-  mcpGroupRow: {
-    height: 44,
-    paddingVertical: 0,
-    gap: 10,
-  },
-  navStatus: {
-    marginLeft: "auto",
-    fontFamily: Fonts.body,
-    fontSize: FontSizes.caption,
-    color: Colors.textMuted,
-  },
-  navStatusIcon: {
-    marginLeft: "auto",
-  },
-  dangerGroup: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.borderOnPrimary,
-  },
-  highlightGroup: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.borderOnPrimary,
-  },
-  highlightGroupDisabled: {
-    opacity: 0.5,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontFamily: Fonts.mono,
-    color: Colors.textMuted,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 10,
-    marginTop: 4,
-  },
-  versionText: {
-    textAlign: "center",
-    fontSize: FontSizes.label,
-    fontFamily: Fonts.mono,
-    color: Colors.textMuted,
-    marginTop: "auto",
-    paddingTop: 16,
-  },
-});
+const makeStyles = (Colors: ThemeColors) =>
+  StyleSheet.create({
+    root: {
+      ...StyleSheet.absoluteFill,
+      zIndex: 1000,
+      elevation: 1000,
+    },
+    overlay: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: Colors.scrimDrawer,
+    },
+    content: {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      right: 0,
+      backgroundColor: Colors.groupedBackground,
+      paddingHorizontal: Spacing.lg2,
+    },
+    largeScreenContainer: {
+      width: 320,
+      backgroundColor: Colors.groupedBackground,
+      zIndex: 10,
+    },
+    floatingContainer: {
+      margin: 16,
+      marginTop:
+        typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+          ? 40
+          : 8,
+      marginBottom: 16,
+      borderRadius: Radius.xxl,
+      borderWidth: 2,
+      borderColor: Colors.border,
+      boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
+      elevation: 5,
+      overflow: "hidden",
+    },
+    attachedContainer: {
+      borderLeftWidth: 1,
+      borderLeftColor: Colors.overlaySubtle,
+    },
+    floatingContent: {
+      flex: 1,
+      paddingTop: 24,
+      paddingHorizontal: Spacing.lg2,
+    },
+    attachedContent: {
+      flex: 1,
+      paddingHorizontal: Spacing.lg2,
+    },
+    innerContainer: {
+      flex: 1,
+      position: "relative",
+    },
+    fixedBackWrapper: {
+      position: "absolute",
+      left: 0,
+      zIndex: 100,
+      elevation: 10,
+      width: 40,
+      height: 40,
+    },
+    fixedBackShadow: {
+      position: "absolute",
+      top: 4,
+      left: -4,
+      width: 40,
+      height: 40,
+      backgroundColor: Colors.shadowInk,
+      borderRadius: Radius.xxl,
+    },
+    fixedBackButton: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+      position: "relative",
+      zIndex: 1,
+    },
+    fixedBackButtonScrolled: {
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.xxl,
+    },
+    fixedBackButtonUnscrolled: {
+      backgroundColor: "transparent",
+      borderRadius: Radius.xxl,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: Spacing.xxxl,
+      minHeight: 40,
+    },
+    title: {
+      flex: 1,
+      fontSize: FontSizes.xxxl,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.display,
+      textAlign: "center",
+      includeFontPadding: false,
+      lineHeight: 40,
+    },
+    menuContainer: {
+      flex: 1,
+    },
+    subPageContainer: {
+      flex: 1,
+    },
+    contentCard: {
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
+      padding: Spacing.md,
+      marginBottom: Spacing.xxl2,
+    },
+    backIcon: {
+      width: 18,
+      height: 18,
+      transform: [{ rotate: "-180deg" }],
+    },
+    closeIcon: {
+      width: 18,
+      height: 18,
+    },
+    gradientTop: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 60,
+      zIndex: 10,
+    },
+    gradientBottom: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 60,
+      zIndex: 10,
+    },
+    headerSpacer: {
+      width: 40,
+      height: 40,
+    },
+    addModelSheet: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: Colors.groupedBackground,
+      borderTopLeftRadius: Radius.huge2,
+      borderTopRightRadius: Radius.huge2,
+      paddingTop: 12,
+    },
+    addModelSheetDesktop: {
+      backgroundColor: Colors.groupedBackground,
+      borderRadius: Radius.xxl,
+      borderWidth: 2,
+      borderColor: Colors.border,
+      boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
+      elevation: 5,
+      width: 380,
+      overflow: "hidden",
+      paddingVertical: 16,
+    },
+    litertBrowserList: {
+      maxHeight: 280,
+      marginTop: Spacing.md,
+    },
+    litertModelRow: {
+      marginBottom: Spacing.md,
+    },
+    litertCancelRow: {
+      marginTop: Spacing.md,
+    },
+    litertRowMeta: {
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.micro,
+      color: Colors.textMuted,
+    },
+    addModelSheetContent: {
+      paddingHorizontal: Spacing.lg2,
+      paddingTop: Spacing.sm,
+      paddingBottom: Spacing.lg,
+    },
+    groupSpacing: {
+      marginBottom: Spacing.xxl,
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
+    },
+    mainPageGroup: {
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
+    },
+    groupSpacingTight: {
+      marginBottom: Spacing.lg2,
+    },
+    navItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: Spacing.lg2,
+      paddingHorizontal: Spacing.lg2,
+      gap: Spacing.lg2,
+    },
+    navItemLast: {
+      marginBottom: 0,
+    },
+    navItemPressed: {
+      backgroundColor: Colors.surfacePressed,
+    },
+    menuIcon: {
+      width: 18,
+      height: 18,
+    },
+    menuIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: Radius.xxl,
+      backgroundColor: Colors.primary,
+      borderWidth: 2,
+      borderColor: Colors.borderOnPrimary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    navTextContainer: {
+      flex: 1,
+    },
+    navTitle: {
+      fontSize: FontSizes.lg,
+      fontFamily: Fonts.mono,
+      color: Colors.textPrimary,
+      marginBottom: 2,
+    },
+    navSubtitle: {
+      fontSize: FontSizes.bodyMd,
+      fontFamily: Fonts.body,
+      color: Colors.textMuted,
+    },
+    navLabel: {
+      flex: 1,
+      fontSize: FontSizes.body,
+      fontFamily: Fonts.mono,
+      color: Colors.textPrimary,
+    },
+    permissionBadge: {
+      paddingVertical: 3,
+      paddingHorizontal: 8,
+      borderRadius: Radius.md,
+      borderWidth: 2,
+      borderColor: Colors.border,
+      backgroundColor: Colors.surface,
+    },
+    permissionBadgeAllowed: {
+      backgroundColor: Colors.primary,
+      borderColor: Colors.primaryBright,
+    },
+    permissionBadgeText: {
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.labelSm,
+      color: Colors.textSecondary,
+    },
+    permissionBadgeTextAllowed: {
+      color: Colors.textOnPrimary,
+    },
+    settingRowVertical: {
+      marginBottom: Spacing.xxl,
+      zIndex: 10,
+    },
+    settingLabel: {
+      fontSize: FontSizes.body,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.mono,
+      paddingTop: Spacing.xs,
+      paddingHorizontal: Spacing.md,
+    },
+    toggleRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    toggleRight: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 14,
+    },
+    toggleGroupRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    toggleGroupContent: {
+      flex: 1,
+      marginRight: Spacing.lg2,
+    },
+    toggleGroupCard: {
+      overflow: "hidden",
+    },
+    toggleGroupRowItem: {
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.md,
+    },
+    toggleGroupCardPressed: {
+      backgroundColor: Colors.surfacePressed,
+    },
+    toggleDivider: {
+      width: 2,
+      height: 34,
+      backgroundColor: Colors.border,
+      marginRight: Spacing.lg2,
+    },
+    checkboxRow: {
+      flex: 1,
+      justifyContent: "space-between",
+    },
+    downloadOption: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: Colors.surfaceSubtle,
+      padding: 12,
+      borderRadius: Radius.md,
+      borderWidth: 1,
+      borderColor: Colors.codeBlockText,
+      borderStyle: "dashed",
+      gap: 10,
+      marginBottom: 20,
+    },
+    downloadIcon: {
+      width: 20,
+      height: 20,
+    },
+    downloadText: {
+      fontSize: FontSizes.bodyMd,
+      color: Colors.primary,
+      fontFamily: Fonts.mono,
+    },
+    helpText: {
+      fontSize: FontSizes.bodyMd,
+      color: Colors.textMuted,
+      fontFamily: Fonts.body,
+      marginTop: 4,
+      lineHeight: 20,
+      paddingHorizontal: Spacing.md,
+    },
+    assistantStatusText: {
+      fontSize: FontSizes.bodyMd,
+      fontFamily: Fonts.body,
+      marginTop: 6,
+      marginBottom: 12,
+      lineHeight: 20,
+    },
+    assistantStatusOn: {
+      color: Colors.primary,
+    },
+    assistantStatusOff: {
+      color: Colors.textMuted,
+    },
+    mcpGroupRow: {
+      height: 44,
+      paddingVertical: 0,
+      gap: 10,
+    },
+    navStatus: {
+      marginLeft: "auto",
+      fontFamily: Fonts.body,
+      fontSize: FontSizes.caption,
+      color: Colors.textMuted,
+    },
+    navStatusIcon: {
+      marginLeft: "auto",
+    },
+    dangerGroup: {
+      backgroundColor: Colors.primary,
+      borderColor: Colors.borderOnPrimary,
+    },
+    highlightGroup: {
+      backgroundColor: Colors.primary,
+      borderColor: Colors.borderOnPrimary,
+    },
+    highlightGroupDisabled: {
+      opacity: 0.5,
+    },
+    sectionTitle: {
+      fontSize: 13,
+      fontFamily: Fonts.mono,
+      color: Colors.textMuted,
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 10,
+      marginTop: 4,
+    },
+    versionText: {
+      textAlign: "center",
+      fontSize: FontSizes.label,
+      fontFamily: Fonts.mono,
+      color: Colors.textMuted,
+      marginTop: "auto",
+      paddingTop: 16,
+    },
+  });

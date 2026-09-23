@@ -188,7 +188,7 @@ const huggingImage = require("../../../assets/images/ImageCard/Hugging.png");
 const questionIcon = require("../../../assets/icons/question.png");
 const infoIcon = require("../../../assets/icons/info.png");
 const reconnectIcon = require("../../../assets/icons/reconnect.png");
-const hyperlinkIcon = require("../../../assets/images/hyperlink2.png");
+const hyperlinkIcon = require("../../../assets/icons/hyperlink2.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
 

@@ -1,6 +1,6 @@
 import * as Clipboard from "expo-clipboard";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Animated, Image, Linking, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, DeviceEventEmitter, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import AutoHeightWebView from "react-native-autoheight-webview";
 import CodeHighlighter from "react-native-code-highlighter";
 import { vs2015 } from "react-syntax-highlighter/dist/esm/styles/hljs";
@@ -9,6 +9,7 @@ import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { getColors, getThemedStyles, useColors, useThemedStyles } from "../../hooks/useTheme";
 import { t } from "../../i18n";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
+import { AppEvents } from "../../services/events";
 import { WidgetManager } from "../../services/widgets/WidgetManager";
 import WidgetWrapper from "../widgets/WidgetWrapper";
 import IconButton from "./IconButton";
@@ -16,6 +17,7 @@ import { ensureKatexStylesheet, getKatexCss, KATEX_STYLESHEET_NAME } from "./kat
 
 const toolIcon = require("../../../assets/icons/tool.png");
 const copyIcon = require("../../../assets/icons/copy.png");
+const fullIcon = require("../../../assets/icons/full.png");
 
 const ToolCallBubble = ({ toolName, isGenerating }: { toolName: string, isGenerating?: boolean }) => {
   const Colors = useColors();
@@ -72,8 +74,6 @@ const makeS = (Colors: ThemeColors) => StyleSheet.create({
   codeCard: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
     overflow: "hidden",
     width: "100%",
     padding: 5,
@@ -94,9 +94,16 @@ const makeS = (Colors: ThemeColors) => StyleSheet.create({
     flex: 1,
     marginRight: Spacing.sm,
   },
+  codeActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+  },
   codeContent: {
     backgroundColor: Colors.codeBlockBg,
     borderRadius: Radius.md,
+    borderWidth: 2,
+    borderColor: Colors.responseBorder,
     overflow: "hidden",
   },
   h1: { fontSize: FontSizes.displaySm, fontWeight: "bold", marginTop: 8, marginBottom: 4, color: Colors.textPrimary },
@@ -632,6 +639,56 @@ const LANG_DISPLAY_NAMES: Record<string, string> = {
   dockerfile: "Dockerfile",
 };
 
+//readable name for a fence language
+export function codeLanguageName(language?: string): string | null {
+  const rawLang = language ? language.trim().toLowerCase() : "";
+  if (!rawLang) return null;
+  return LANG_DISPLAY_NAMES[rawLang] ?? (rawLang.length <= 4 ? rawLang.toUpperCase() : rawLang.charAt(0).toUpperCase() + rawLang.slice(1));
+}
+
+//dark highlighted code surface
+export function CodeContent({ code, language, incognito, maxHeight }: { code: string; language?: string; incognito?: boolean; maxHeight?: number }) {
+  const Colors = useColors();
+  const s = useThemedStyles(makeS);
+  const lang = language ? LANG_ALIASES[language] ?? language : undefined;
+  const textStyle = { fontFamily: Fonts.mono, fontSize: FontSizes.code, lineHeight: 18 } as const;
+  const codeBorderColor = incognito ? Colors.incognito : Colors.responseBorder;
+
+  return (
+    <View style={[s.codeContent, { maxHeight, borderColor: codeBorderColor, backgroundColor: Colors.codeBlockBg }]}>
+      {lang ? (
+        <CodeHighlighter
+          language={lang}
+          hljsStyle={vs2015}
+          textStyle={textStyle}
+          scrollViewProps={{
+            nestedScrollEnabled: true,
+            showsHorizontalScrollIndicator: false,
+            contentContainerStyle: { padding: Spacing.md },
+          }}
+          customStyle={{ backgroundColor: "transparent", padding: 0, margin: 0 }}
+        >
+          {code}
+        </CodeHighlighter>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          nestedScrollEnabled={true}
+          contentContainerStyle={{ padding: Spacing.md }}
+        >
+          <Text style={[textStyle, { color: Colors.codeBlockText }]} selectable={true}>
+            {code}
+          </Text>
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+//long blocks open in the full view
+const CODE_BLOCK_MAX_HEIGHT = 320;
+
 //rehighlighting a block is costly
 const CodeBlock = React.memo(function CodeBlock({
   code,
@@ -654,60 +711,45 @@ const CodeBlock = React.memo(function CodeBlock({
     Clipboard.setStringAsync(code);
   }, [code]);
 
-  const lang = language ? LANG_ALIASES[language] ?? language : undefined;
-  const rawLang = language ? language.trim().toLowerCase() : "";
-  const displayTitle = title || (rawLang ? (LANG_DISPLAY_NAMES[rawLang] ?? (rawLang.length <= 4 ? rawLang.toUpperCase() : rawLang.charAt(0).toUpperCase() + rawLang.slice(1))) : "Code");
-  const textStyle = { fontFamily: Fonts.mono, fontSize: FontSizes.code, lineHeight: 18 } as const;
+  //full view opens at app root
+  const handleOpen = useCallback(() => {
+    DeviceEventEmitter.emit(AppEvents.openCodePreview, { code, language, title, incognito });
+  }, [code, language, title, incognito]);
 
-  const cardBorderColor = incognito ? Colors.incognito : (dark ? Colors.responseBorder : Colors.border);
+  const displayTitle = title || codeLanguageName(language) || "Code";
+
   const cardBg = dark ? Colors.responseSurface : Colors.surface;
   const titleColor = dark ? Colors.responseTextStrong : Colors.textPrimary;
 
   return (
-    <View style={[s.codeCard, { borderColor: cardBorderColor, backgroundColor: cardBg }]}>
+    <Pressable onPress={handleOpen} style={[s.codeCard, { backgroundColor: cardBg }]}>
       <View style={s.codeHeader}>
         <Text style={[s.codeTitle, { color: titleColor }]} numberOfLines={1}>
           {displayTitle}
         </Text>
-        <IconButton
-          icon={copyIcon}
-          label={t("common.copy")}
-          onPress={handleCopy}
-          containerSize={28}
-          size={16}
-          pressedColor={Colors.surfacePressed}
-          tintColor={dark ? Colors.responseTextMuted : Colors.textSecondary}
-        />
+        <View style={s.codeActions}>
+          <IconButton
+            icon={fullIcon}
+            label={t("common.expand")}
+            onPress={handleOpen}
+            containerSize={28}
+            size={16}
+            pressedColor={Colors.surfacePressed}
+            tintColor={dark ? Colors.responseTextMuted : Colors.textSecondary}
+          />
+          <IconButton
+            icon={copyIcon}
+            label={t("common.copy")}
+            onPress={handleCopy}
+            containerSize={28}
+            size={16}
+            pressedColor={Colors.surfacePressed}
+            tintColor={dark ? Colors.responseTextMuted : Colors.textSecondary}
+          />
+        </View>
       </View>
-      <View style={[s.codeContent, { backgroundColor: Colors.codeBlockBg }]}>
-        {lang ? (
-          <CodeHighlighter
-            language={lang}
-            hljsStyle={vs2015}
-            textStyle={textStyle}
-            scrollViewProps={{
-              nestedScrollEnabled: true,
-              showsHorizontalScrollIndicator: false,
-              contentContainerStyle: { padding: Spacing.md },
-            }}
-            customStyle={{ backgroundColor: "transparent", padding: 0, margin: 0 }}
-          >
-            {code}
-          </CodeHighlighter>
-        ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            nestedScrollEnabled={true}
-            contentContainerStyle={{ padding: Spacing.md }}
-          >
-            <Text style={[textStyle, { color: Colors.codeBlockText }]} selectable={true}>
-              {code}
-            </Text>
-          </ScrollView>
-        )}
-      </View>
-    </View>
+      <CodeContent code={code} language={language} incognito={incognito} maxHeight={CODE_BLOCK_MAX_HEIGHT} />
+    </Pressable>
   );
 });
 

@@ -76,26 +76,26 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
         desktopStyle={[styles.desktopCard, centeredStyle]}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={styles.title}>{crash ? t("bugReport.crashTitle") : t("bugReport.title")}</Text>
+          <View style={styles.contentCard}>
+            <Text style={styles.title}>{crash ? t("bugReport.crashTitle") : t("bugReport.title")}</Text>
 
-          {crash && (
-            <Text style={[styles.help, styles.consent]}>
-              {t("bugReport.crashHelp")}
-            </Text>
-          )}
+            {crash && (
+              <Text style={styles.help}>
+                {t("bugReport.crashHelp")}
+              </Text>
+            )}
 
-          <View style={styles.settingRowVertical}>
-            <Group>
-              <TextInputField
-                icon={penPlaceholderIcon}
-                placeholder={crash ? t("bugReport.crashPlaceholder") : t("bugReport.placeholder")}
-                value={report.text}
-                onChangeText={report.setText}
-              />
-            </Group>
-          </View>
+            <View style={styles.inputGroup}>
+              <Group>
+                <TextInputField
+                  icon={penPlaceholderIcon}
+                  placeholder={crash ? t("bugReport.crashPlaceholder") : t("bugReport.placeholder")}
+                  value={report.text}
+                  onChangeText={report.setText}
+                />
+              </Group>
+            </View>
 
-          <View style={styles.settingRowVertical}>
             <View style={styles.toggleRow}>
               <Checkbox
                 label={t("bugReport.attachLogs")}
@@ -105,10 +105,8 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
                 style={styles.checkboxRow}
               />
             </View>
-          </View>
 
-          {screenshot && (
-            <View style={styles.settingRowVertical}>
+            {screenshot && (
               <View style={styles.toggleRow}>
                 <Checkbox
                   label={t("bugReport.attachScreenshot")}
@@ -118,22 +116,22 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
                   style={styles.checkboxRow}
                 />
               </View>
-            </View>
-          )}
+            )}
 
-          <Text style={[styles.help, styles.consent]}>
-            {t("bugReport.consent")}
-            {report.screenshot ? " " + t("bugReport.consentScreenshot") : ""}
-          </Text>
+            <Text style={[styles.help, styles.consent]}>
+              {t("bugReport.consent")}
+              {report.screenshot ? " " + t("bugReport.consentScreenshot") : ""}
+            </Text>
 
-          <Group style={styles.highlightGroup}>
-            <ActionButton
-              icon={arrowIcon}
-              label={t("bugReport.send")}
-              onPress={() => report.send(onClose)}
-              variant="highlight"
-            />
-          </Group>
+            <Group style={styles.highlightGroup}>
+              <ActionButton
+                icon={arrowIcon}
+                label={t("bugReport.send")}
+                onPress={() => report.send(onClose)}
+                variant="highlight"
+              />
+            </Group>
+          </View>
         </ScrollView>
       </DrawerSheet>
 
@@ -154,14 +152,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.groupedBackground,
     borderTopLeftRadius: Radius.huge2,
     borderTopRightRadius: Radius.huge2,
     paddingTop: 12,
     maxHeight: "85%",
   },
   desktopCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.groupedBackground,
     borderRadius: Radius.xxl,
     borderWidth: 2,
     borderColor: Colors.border,
@@ -177,14 +175,21 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     marginTop: -10,
   },
   content: {
-    paddingHorizontal: Spacing.xl2,
+    paddingHorizontal: Spacing.lg2,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.lg,
+  },
+  contentCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl + Spacing.md,
+    borderWidth: 0,
+    padding: Spacing.md,
   },
   title: {
     fontSize: FontSizes.body,
     color: Colors.textPrimary,
     fontFamily: Fonts.mono,
+    paddingTop: Spacing.xs,
     marginBottom: 6,
   },
   help: {
@@ -192,12 +197,13 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     color: Colors.textMuted,
     fontFamily: Fonts.body,
   },
+  inputGroup: {
+    marginBottom: Spacing.md,
+    marginTop: Spacing.sm,
+  },
   consent: {
     marginTop: 12,
     marginBottom: 12,
-  },
-  settingRowVertical: {
-    marginBottom: 30,
   },
   toggleRow: {
     flexDirection: "row",

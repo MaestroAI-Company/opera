@@ -20,6 +20,7 @@ import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { t } from "../../i18n";
 import { AIModule } from "../../services/ai/AIModule";
 import { Suggestion } from "../../services/ai/generation/suggestions";
+import { resolveMentions } from "../../services/ai/mentions";
 import { Conversation, Message, MessageSource } from "../../services/db/DatabaseService";
 import { splitDocumentBlocks } from "../../services/documents/DocumentService";
 import { Settings } from "../../services/settings/SettingsService";
@@ -28,6 +29,7 @@ import IconButton from "../ui/IconButton";
 import { deriveChatDisplay, renderMarkdown } from "../ui/MarkdownText";
 import SuggestionPill from "../ui/SuggestionPill";
 import ThinkingIcon from "../ui/ThinkingIcon";
+import type { PreviewImage } from "./ImagePreviewSheet";
 
 const butterflyImage = require("../../../assets/images/butterfly5.png");
 const butterflyGreyImage = require("../../../assets/images/butterfly2_grey.png");
@@ -122,13 +124,13 @@ function attachmentFilename(path: string): string {
   }
 }
 
-//attached file inside a user bubble
-const AttachmentChip = ({ icon, label }: { icon: any; label: string }) => {
+//attached file above a user bubble
+const AttachmentChip = ({ icon, label, tinted = true }: { icon: any; label: string; tinted?: boolean }) => {
   const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.attachmentChip}>
-      <Image source={icon} style={styles.attachmentIcon} />
-      <Text style={styles.attachmentLabel} numberOfLines={1} ellipsizeMode="middle">{label}</Text>
+      <Image source={icon} style={[styles.attachmentIcon, tinted && styles.attachmentIconTinted]} />
+      {!!label && <Text style={styles.attachmentLabel} numberOfLines={2} ellipsizeMode="middle">{label}</Text>}
     </View>
   );
 };
@@ -153,6 +155,7 @@ type ChatViewProps = {
   //shown under the last assistant message only
   suggestions?: Suggestion[];
   onSuggestionPress?: (text: string) => void;
+  onImagePress?: (image: PreviewImage) => void;
 };
 
 const stripMarkdown = (md: string) => {
@@ -194,7 +197,7 @@ const FlashingText = ({ text }: { text: string }) => {
   );
 };
 
-const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isChatGenerating, showMetrics, fallbackModel, canThink, dark, onOpenInApp, suggestions, onSuggestionPress }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string; canThink?: boolean; dark?: boolean; onOpenInApp?: (item: Message) => void; suggestions?: Suggestion[]; onSuggestionPress?: (text: string) => void }) => {
+const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isChatGenerating, showMetrics, fallbackModel, canThink, dark, onOpenInApp, suggestions, onSuggestionPress, onImagePress }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string; canThink?: boolean; dark?: boolean; onOpenInApp?: (item: Message) => void; suggestions?: Suggestion[]; onSuggestionPress?: (text: string) => void; onImagePress?: (image: PreviewImage) => void }) => {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const isUser = item.role === "user";
@@ -227,6 +230,11 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   );
   const documentNames = userDocuments?.names ?? [];
   const visibleContent = userDocuments ? userDocuments.text : item.content;
+  //requested tools with their dependencies
+  const mentions = useMemo(
+    () => (isUser ? resolveMentions(visibleContent) : []),
+    [isUser, visibleContent]
+  );
 
   //reparse only when deps move
   const disp = useMemo(
@@ -255,42 +263,44 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   };
 
   return (
-    <View style={[styles.bubble, isUser ? (incognito ? styles.userBubbleIncognito : styles.userBubble) : styles.aiBubble]}>
+    <View style={[styles.bubble, isUser ? styles.userMessage : styles.aiBubble]}>
       {isUser ? (
-        <View>
-          {item.screenContext && item.screenContext.icon && (
-            <View style={styles.screenContextChip}>
-              <Image source={{ uri: item.screenContext.icon }} style={styles.screenContextIcon} />
-              {!!item.screenContext.label && (
-                <Text style={styles.screenContextLabel} numberOfLines={1}>{item.screenContext.label}</Text>
-              )}
-            </View>
-          )}
-          {((item.images && item.images.length > 0) || documentNames.length > 0) && (
+        <>
+          {(!!item.screenContext?.icon || (item.images && item.images.length > 0) || documentNames.length > 0 || mentions.length > 0) && (
             <View style={styles.attachmentsRow}>
+              {!!item.screenContext?.icon && (
+                <AttachmentChip icon={{ uri: item.screenContext.icon }} label={item.screenContext.label || ''} tinted={false} />
+              )}
               {item.images?.map((uri, i) => {
                 const isAudio = uri.startsWith('data:audio') || /\.(wav|mp3|m4a|aac|flac|ogg)(?:\?.*)?$/i.test(uri);
                 return isAudio ? (
                   <AttachmentChip key={i} icon={speakerIcon} label={attachmentFilename(uri)} />
                 ) : (
-                  <Image key={i} source={{ uri }} style={styles.messageImage} />
+                  <Pressable key={i} onPress={() => onImagePress?.({ uri })} style={({ pressed, hovered }) => (pressed || hovered) && { opacity: 0.8 }}>
+                    <Image source={{ uri }} style={styles.messageImage} />
+                  </Pressable>
                 );
               })}
               {documentNames.map((name, i) => (
                 <AttachmentChip key={`doc-${i}`} icon={fileIcon} label={name} />
               ))}
+              {mentions.map(mention => (
+                <AttachmentChip key={`mention-${mention.id}`} icon={appSourceIcon} label={`@${mention.id}`} />
+              ))}
             </View>
           )}
           {!!visibleContent && (
-            <Text
-              style={[styles.bubbleText, styles.userText]}
-              selectable={true}
-              selectionColor={Colors.whiteDim}
-            >
-              {visibleContent}
-            </Text>
+            <View style={incognito ? styles.userBubbleIncognito : styles.userBubble}>
+              <Text
+                style={[styles.bubbleText, styles.userText]}
+                selectable={true}
+                selectionColor={Colors.whiteDim}
+              >
+                {visibleContent}
+              </Text>
+            </View>
           )}
-        </View>
+        </>
       ) : (
         <View style={styles.aiContainer}>
           {isCurrentlyThinking && (
@@ -415,10 +425,11 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   prev.onRegenerate === next.onRegenerate &&
   prev.showSnackbar === next.showSnackbar &&
   prev.onOpenInApp === next.onOpenInApp &&
-  prev.onSuggestionPress === next.onSuggestionPress);
+  prev.onSuggestionPress === next.onSuggestionPress &&
+  prev.onImagePress === next.onImagePress);
 MessageItem.displayName = "MessageItem";
 
-export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp, suggestions, onSuggestionPress }: ChatViewProps) {
+export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp, suggestions, onSuggestionPress, onImagePress }: ChatViewProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const listRef = useRef<FlatList>(null);
@@ -486,8 +497,8 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   }, [messages]);
 
   const renderItem = useCallback(({ item }: { item: Message }) => {
-    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} suggestions={item.id === lastAssistantId ? suggestions : undefined} onSuggestionPress={onSuggestionPress} />;
-  }, [incognito, onRegenerate, speakerEnabled, handleSpeak, speakingMessageId, generatingMessageId, showMetrics, conversation?.model, canThink, dark, onOpenInApp, lastAssistantId, suggestions, onSuggestionPress]);
+    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} suggestions={item.id === lastAssistantId ? suggestions : undefined} onSuggestionPress={onSuggestionPress} onImagePress={onImagePress} />;
+  }, [incognito, onRegenerate, speakerEnabled, handleSpeak, speakingMessageId, generatingMessageId, showMetrics, conversation?.model, canThink, dark, onOpenInApp, lastAssistantId, suggestions, onSuggestionPress, onImagePress]);
 
   return (
     <View style={styles.container}>
@@ -592,21 +603,30 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  userBubble: {
+  //attachments and text stacked on the right
+  userMessage: {
     alignSelf: "flex-end",
+    alignItems: "flex-end",
+    maxWidth: "80%",
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    gap: Spacing.sm,
+  },
+  userBubble: {
     backgroundColor: Colors.primary,
     borderRadius: Radius.xxl,
-    maxWidth: "80%",
     borderWidth: 2,
     borderColor: Colors.borderOnPrimary,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
   userBubbleIncognito: {
-    alignSelf: "flex-end",
     backgroundColor: Colors.incognito,
     borderRadius: Radius.xxl,
-    maxWidth: "80%",
     borderWidth: 2,
     borderColor: Colors.borderOnPrimary,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
   aiBubble: {
     alignSelf: "stretch",
@@ -740,31 +760,10 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   messageImage: {
     width: 120,
     height: 120,
-    borderRadius: Radius.xl,
-  },
-  screenContextChip: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.whiteFaint,
-    paddingLeft: 4,
-    paddingRight: 10,
-    paddingVertical: 4,
-    borderRadius: Radius.huge,
-    marginBottom: 6,
-    gap: 6,
-    maxWidth: 220,
-  },
-  screenContextIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-  },
-  screenContextLabel: {
-    color: 'white',
-    fontFamily: Fonts.body,
-    fontSize: FontSizes.xxs,
-    flexShrink: 1,
+    borderRadius: Radius.xxl,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceSubtle,
   },
   sourcesRow: {
     flexDirection: 'row',
@@ -799,33 +798,36 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   attachmentsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+    gap: Spacing.sm,
   },
+  //square tile matching image size
   attachmentChip: {
-    flexDirection: 'row',
+    width: 120,
+    height: 120,
     alignItems: 'center',
-    backgroundColor: Colors.whiteFaint,
+    justifyContent: 'center',
+    backgroundColor: Colors.surface,
     borderWidth: 2,
-    borderColor: Colors.borderOnPrimary,
+    borderColor: Colors.border,
     borderRadius: Radius.xxl,
-    paddingLeft: 8,
-    paddingRight: 10,
-    paddingVertical: 6,
-    gap: 6,
-    maxWidth: 220,
+    padding: Spacing.lg,
+    gap: Spacing.md,
   },
   attachmentIcon: {
-    width: 14,
-    height: 14,
-    tintColor: Colors.textOnPrimary,
+    width: 32,
+    height: 32,
+    borderRadius: Radius.md,
+  },
+  attachmentIconTinted: {
+    tintColor: Colors.textMuted,
   },
   attachmentLabel: {
-    color: Colors.textOnPrimary,
+    color: Colors.textSecondary,
     fontFamily: Fonts.mono,
     fontSize: FontSizes.label,
-    flexShrink: 1,
+    textAlign: 'center',
   },
   disclaimerContainer: {
     flexDirection: 'row',

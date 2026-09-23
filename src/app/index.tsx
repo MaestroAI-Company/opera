@@ -8,6 +8,7 @@ import {
   AppState,
   BackHandler,
   DeviceEventEmitter,
+  Easing,
   Image,
   ImageBackground,
   PanResponder,
@@ -25,6 +26,8 @@ import HeadlessWebView from "../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../constants/theme";
 import BugReportSheet from "../components/features/BugReportSheet";
+import ImagePreviewSheet, { PreviewImage } from "../components/features/ImagePreviewSheet";
+import CodePreviewSheet, { PreviewCode } from "../components/features/CodePreviewSheet";
 import ChatBar from "../components/features/ChatBar";
 import ChatView from "../components/features/ChatView";
 import ConversationsDrawer from "../components/features/ConversationsDrawer";
@@ -46,6 +49,7 @@ import { useColors, useThemedStyles } from "../hooks/useTheme";
 import { t, useT, type TranslationFn } from "../i18n";
 import { CloudSync } from "../services/CloudSyncService";
 import { AIModule } from "../services/ai/AIModule";
+import { hydrateLiteRTCatalog } from "../services/ai/providers/huggingFaceCatalog";
 import { getOllamaTuning, migrateModelSources } from "../services/ai/providers/sources";
 import { buildSystemPrompt } from "../services/ai/generation/chatGeneration";
 import { GenerationService } from "../services/ai/generation/GenerationService";
@@ -169,6 +173,106 @@ function DissolveIn({ delay, style, children }: { delay: number; style?: any; ch
   return <Animated.View style={[style, { opacity }]}>{children}</Animated.View>;
 }
 
+//both labels have a different length, so the pill eases between their widths instead of jumping
+function IncognitoToggle({ incognito, onPress }: { incognito: boolean; onPress: () => void }) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
+  const t = useT();
+  const [widths, setWidths] = useState({ on: 0, off: 0 });
+  const [label, setLabel] = useState(incognito);
+  const width = useAnimatedValue(0);
+  const labelOpacity = useAnimatedValue(1);
+  const sizedFor = useRef<boolean | null>(null);
+
+  const target = incognito ? widths.on : widths.off;
+  const measured = widths.on > 0 && widths.off > 0;
+
+  useEffect(() => {
+    if (!target) return;
+    //only a mode change is worth easing, a fresh measure just sets the size
+    const modeChanged = sizedFor.current !== null && sizedFor.current !== incognito;
+    sizedFor.current = incognito;
+    if (!modeChanged) {
+      width.setValue(target);
+      return;
+    }
+    Animated.timing(width, {
+      toValue: target,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [target, incognito, width]);
+
+  //swaps the label while it is faded out, so the text is never clipped mid resize
+  useEffect(() => {
+    if (label === incognito) return;
+    Animated.timing(labelOpacity, {
+      toValue: 0,
+      duration: 110,
+      easing: Easing.in(Easing.quad),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (!finished) return;
+      setLabel(incognito);
+      Animated.timing(labelOpacity, {
+        toValue: 1,
+        duration: 190,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [incognito, label, labelOpacity]);
+
+  return (
+    <>
+      <View style={styles.incognitoMeasure}>
+        <View
+          style={styles.incognitoBox}
+          onLayout={(e) => {
+            const w = e.nativeEvent.layout.width;
+            setWidths((prev) => (prev.off === w ? prev : { ...prev, off: w }));
+          }}
+        >
+          <Text style={styles.incognitoButtonText}>{t("home.incognito.enable")}</Text>
+        </View>
+        <View
+          style={styles.incognitoBox}
+          onLayout={(e) => {
+            const w = e.nativeEvent.layout.width;
+            setWidths((prev) => (prev.on === w ? prev : { ...prev, on: w }));
+          }}
+        >
+          <Text style={styles.incognitoButtonText}>{t("home.incognito.disable")}</Text>
+        </View>
+      </View>
+      <Animated.View style={measured ? { width } : null}>
+        <Pressable
+          onPress={onPress}
+          style={({ pressed, hovered }) => [
+            styles.incognitoBox,
+            incognito && styles.incognitoBoxActive,
+            (pressed || hovered) && (incognito ? { backgroundColor: Colors.incognitoPressed } : { backgroundColor: Colors.surfacePressed })
+          ]}
+        >
+          <Animated.Text
+            numberOfLines={1}
+            style={[
+              styles.incognitoButtonText,
+              label && styles.incognitoButtonTextActive,
+              { opacity: labelOpacity },
+            ]}
+          >
+            {label
+              ? t("home.incognito.disable")
+              : t("home.incognito.enable")}
+          </Animated.Text>
+        </Pressable>
+      </Animated.View>
+    </>
+  );
+}
+
 export default function Index() {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -211,6 +315,16 @@ export default function Index() {
   }, [drawerVisible, settingsDrawerVisible, isDesktop]);
 
   const [incognitoMode, setIncognitoMode] = useState(false);
+  //fades the incognito blurb in and out instead of snapping it
+  const incognitoProgress = useAnimatedValue(0);
+  useEffect(() => {
+    Animated.timing(incognitoProgress, {
+      toValue: incognitoMode ? 1 : 0,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [incognitoMode, incognitoProgress]);
   const [userName, setUserName] = useState("");
   const [userInstruction, setUserInstruction] = useState("");
   const [aiService, setAiService] = useState("ollama");
@@ -317,6 +431,8 @@ export default function Index() {
   //reopen crash report from last run
   const [pendingCrash, setPendingCrash] = useState<Crash | null>(takePendingCrash);
   const [bugReportVisible, setBugReportVisible] = useState(pendingCrash !== null);
+  const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
+  const [previewCode, setPreviewCode] = useState<PreviewCode | null>(null);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const rootRef = useRef<View>(null);
 
@@ -652,6 +768,8 @@ export default function Index() {
         const tuning = getOllamaTuning(s.ollamaUrl);
         AIModule.configure(s.ollamaUrl, tuning.contextLength, tuning.keepAlive);
         AIModule.setMode(s.aiService);
+        //model name comes from the catalog
+        await hydrateLiteRTCatalog();
         STT.setLanguage(s.whisperLanguage);
       } catch (e) {
         console.warn("Failed to load settings at boot", e);
@@ -718,12 +836,14 @@ export default function Index() {
     const modelSelectorSub = DeviceEventEmitter.addListener(AppEvents.openModelSelector, () => {
       openDrawerSafely(() => setModelSelectorVisible(true));
     });
+    const codePreviewSub = DeviceEventEmitter.addListener(AppEvents.openCodePreview, setPreviewCode);
 
     return () => {
       if (reloadTimer) clearTimeout(reloadTimer);
       conversationsSub.remove();
       settingsSub.remove();
       modelSelectorSub.remove();
+      codePreviewSub.remove();
     };
   }, [dbReady, loadConversations, openDrawerSafely]);
 
@@ -986,7 +1106,7 @@ export default function Index() {
       taskHistory.push({ role: "user", content: text, images });
 
       const taskSelectedModel = selectedModel;
-      const taskSystemPrompt = buildSystemPrompt(userInstruction);
+      const taskSystemPrompt = buildSystemPrompt(selectedModel, userInstruction);
       const taskReflection = selectedReflection;
       const taskConv = conv;
 
@@ -1159,7 +1279,7 @@ export default function Index() {
     setMessages([...historyUpToHere]);
 
     const taskSelectedModel = selectedModel;
-    const taskSystemPrompt = buildSystemPrompt(userInstruction);
+    const taskSystemPrompt = buildSystemPrompt(selectedModel, userInstruction);
     const taskReflection = selectedReflection;
     const taskConv = activeConversation;
     const isIncognitoTask = taskConv.id.startsWith("incognito_");
@@ -1390,37 +1510,30 @@ export default function Index() {
                   reserveLines={userName ? 2 : 1}
                 />
                 <DissolveIn delay={2800}>
-                  <Pressable
+                  <IncognitoToggle
+                    incognito={incognitoMode}
                     onPress={() => {
                       Vibration.vibrate(10);
                       setIncognitoMode((prev) => !prev);
                     }}
-                    style={({ pressed, hovered }) => [
-                      styles.incognitoBox,
-                      incognitoMode && styles.incognitoBoxActive,
-                      (pressed || hovered) && (incognitoMode ? { backgroundColor: Colors.incognitoPressed } : { backgroundColor: Colors.surfacePressed })
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.incognitoButtonText,
-                        incognitoMode && styles.incognitoButtonTextActive,
-                      ]}
-                    >
-                      {incognitoMode
-                        ? t("home.incognito.disable")
-                        : t("home.incognito.enable")}
-                    </Text>
-                  </Pressable>
+                  />
                 </DissolveIn>
-                <Text
+                <Animated.Text
                   style={[
                     styles.incognitoDescription,
-                    { opacity: incognitoMode ? 1 : 0 },
+                    {
+                      opacity: incognitoProgress,
+                      transform: [{
+                        translateY: incognitoProgress.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [6, 0],
+                        }),
+                      }],
+                    },
                   ]}
                 >
                   Welcome to incognito mode. You can ask quick questions without leaving a trace. Once you close the window, your conversation disappears forever.
-                </Text>
+                </Animated.Text>
               </View>
             )}
 
@@ -1445,6 +1558,7 @@ export default function Index() {
                   });
                 }}
                 canThink={modelCapabilities.includes("thinking") && selectedReflection !== "none"}
+                onImagePress={setPreviewImage}
               />
             )}
 
@@ -1587,6 +1701,22 @@ export default function Index() {
           setPendingCrash(null);
           setScreenshot(null);
         }}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        bottomInset={insets.bottom}
+      />
+
+      <ImagePreviewSheet
+        image={previewImage}
+        onClose={() => setPreviewImage(null)}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        bottomInset={insets.bottom}
+      />
+
+      <CodePreviewSheet
+        code={previewCode}
+        onClose={() => setPreviewCode(null)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
         bottomInset={insets.bottom}
@@ -1757,8 +1887,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: Colors.surface,
-    borderWidth: 2,
-    borderColor: Colors.border,
     borderRadius: Radius.xxl,
     position: "relative",
     zIndex: 1,
@@ -1776,8 +1904,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   incognitoBox: {
     position: "relative",
-    borderWidth: 2,
-    borderColor: Colors.border,
     borderRadius: Radius.xxl,
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -1785,9 +1911,16 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     zIndex: 1,
     marginTop: 20,
   },
+  //off screen copies of the pill, measured to know both target widths up front
+  incognitoMeasure: {
+    position: "absolute",
+    width: 400,
+    alignItems: "flex-start",
+    opacity: 0,
+    pointerEvents: "none",
+  },
   incognitoBoxActive: {
     backgroundColor: Colors.incognito,
-    borderColor: Colors.incognito,
   },
   incognitoButtonText: {
     fontSize: FontSizes.caption,

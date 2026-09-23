@@ -395,6 +395,7 @@ export const fr: Translations = {
   "settings.local.sheetHelp": "Seules les informations fournies par le système sont affichées.",
   "settings.local.modelsTitle": "Modèles proposés",
   "settings.local.sheet.family": "Famille",
+  "settings.local.sheet.status": "Statut",
   "settings.local.sheet.runtime": "Moteur",
   "settings.local.sheet.browser": "Navigateur",
   "settings.local.sheet.version": "Version",

@@ -34,6 +34,7 @@ import {
   ThemeColors,
 } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
+import { contextFloorTokens } from "../../services/ai/generation/chatGeneration";
 import { LocalModelSheet } from "../../services/ai/providers/LocalProvider";
 import {
   BETA_PROVIDER_ID,
@@ -545,14 +546,23 @@ export default function SettingsDrawer({
     { id: "-1", label: "∞" },
   ];
 
-  const litertContextLengthOptions = [
+  //first step must fit the system prompt
+  const withContextFloor = (service: string, options: { id: string; label: string }[]) => {
+    const floor = contextFloorTokens(service, instruction);
+    return [
+      { id: String(floor), label: `${(floor / 1024).toFixed(1)}k` },
+      ...options.filter((o) => Number(o.id) > floor),
+    ];
+  };
+
+  const litertContextLengthOptions = withContextFloor("litert", [
     { id: "1024", label: "1k" },
     { id: "2048", label: "2k" },
     { id: "4096", label: "4k" },
     { id: "8192", label: "8k" },
-  ];
+  ]);
 
-  const ollamaContextLengthOptions = [
+  const ollamaContextLengthOptions = withContextFloor("ollama", [
     { id: "8192", label: "8k" },
     { id: "16384", label: "16k" },
     { id: "32768", label: "32k" },
@@ -560,7 +570,7 @@ export default function SettingsDrawer({
     { id: "131072", label: "128k" },
     { id: "262144", label: "256k" },
     { id: "524288", label: "512k" },
-  ];
+  ]);
 
   type PermissionState = "granted" | "denied" | "undetermined";
   const [permissionStatuses, setPermissionStatuses] = useState<

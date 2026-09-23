@@ -915,6 +915,7 @@ function AssistantOverlay() {
           }}
           onReflectionChange={setReflection}
           isLargeScreen={isLargeScreen}
+          messages={messages}
         />
 
         <HeadlessWebView />

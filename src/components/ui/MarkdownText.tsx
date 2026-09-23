@@ -399,6 +399,8 @@ export type ChatDisplay = {
   thinkingText: string;
   toolNames: string[];
   finalContent: string;
+  //what the reader sees, for copy
+  visibleText: string;
   showThinkingRow: boolean;
   showMarkdown: boolean;
   currentThought: string;
@@ -453,7 +455,7 @@ export function deriveChatDisplay(raw: string, isGenerating: boolean, liveTool: 
   }
 
   const showMarkdown = hasConvText || hasTool;
-  return { thinkingText, toolNames, finalContent: stripped, showThinkingRow, showMarkdown, currentThought };
+  return { thinkingText, toolNames, finalContent: stripped, visibleText: contentOnly.trim(), showThinkingRow, showMarkdown, currentThought };
 }
 
 function splitMath(text: string): { kind: "text" | "math"; content: string }[] {

@@ -38,8 +38,10 @@ import { AIModule } from "../../services/ai/AIModule";
 import { getLocalModelLabel, isLocalModel } from "../../services/ai/providers/LocalProvider";
 import { getLiteRTModelLabel, isLiteRTModel, subscribeLiteRTDownload } from "../../services/ai/providers/LiteRTProvider";
 import { getCachedModels, getLastModel, hydrateModelCache, setCachedModels, setLastModel } from "../../services/ai/providers/modelCache";
-import { buildSources, ModelSource } from "../../services/ai/providers/sources";
+import { buildSources, getOllamaTuning, ModelSource } from "../../services/ai/providers/sources";
+import { estimateTokens } from "../../services/ai/tokens";
 import { AppEvents } from "../../services/events";
+import { Settings } from "../../services/settings/SettingsService";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 import ProgressBar from "../ui/ProgressBar";
@@ -66,6 +68,14 @@ const MAX_MODELS_HEIGHT = 240;
 const ANCHOR_GAP = 8;
 const ANCHOR_MARGIN = 8;
 const DESKTOP_CARD_WIDTH = 320;
+
+//context size configured for the active source
+const contextWindowFor = (service: string, ollamaUrl: string) => {
+  if (service === "litert") return Settings.getCached().litertContextLength;
+  //beta shares the ollama tuning
+  if (service === "ollama" || service === "beta") return getOllamaTuning(ollamaUrl).contextLength;
+  return 0;
+};
 
 type RowLayout = { y: number; height: number } | null;
 
@@ -139,6 +149,8 @@ export type ModelSelectorDrawerProps = {
   isDesktop?: boolean;
   //trigger to hang panel under
   triggerRef?: React.RefObject<View | null>;
+  //current conversation, fills the token window
+  messages?: { content: string }[];
 };
 
 //fluid drawer, built the same way as ConversationsDrawer/SettingsDrawer: mounted at the screen
@@ -158,6 +170,7 @@ export function ModelSelectorDrawer({
   isLargeScreen = false,
   isDesktop = false,
   triggerRef,
+  messages = [],
 }: ModelSelectorDrawerProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -393,6 +406,21 @@ export function ModelSelectorDrawer({
   const displayModels = useMemo(() => {
     return [...models].sort((a, b) => a.localeCompare(b));
   }, [models]);
+
+  const usedTokens = useMemo(
+    () => messages.reduce((sum, m) => sum + estimateTokens(m.content), 0),
+    [messages],
+  );
+  //built-in models report their own window
+  const [localContextTokens, setLocalContextTokens] = useState(0);
+  useEffect(() => {
+    if (!visible || aiService !== "local") return;
+    AIModule.getLocalModelSheet()
+      .then((sheet) => setLocalContextTokens(sheet?.models.find((m) => m.id === selectedModel)?.contextTokens ?? 0))
+      .catch(() => setLocalContextTokens(0));
+  }, [visible, aiService, selectedModel]);
+  const contextWindow = aiService === "local" ? localContextTokens : contextWindowFor(aiService, ollamaUrl);
+  const showTokenWindow = messages.length > 0 && contextWindow > 0;
 
   const selectedIndex = isBrowsingActive
     ? displayModels.findIndex((m) => m === selectedModel)
@@ -683,10 +711,14 @@ export function ModelSelectorDrawer({
         )}
       </View>
 
-      <View style={[styles.contentCard, styles.downloadProgressRow]}>
-        <ProgressBar progress={0} icon={tokenIcon} />
-        <Text style={styles.tokenMaxLabel}>Token max :</Text>
-      </View>
+      {showTokenWindow && (
+        <View style={[styles.contentCard, styles.downloadProgressRow]}>
+          <ProgressBar progress={usedTokens / contextWindow} icon={tokenIcon} />
+          <Text style={styles.tokenMaxLabel}>
+            {t("modelSelector.tokenWindow")} : {usedTokens} / {contextWindow}
+          </Text>
+        </View>
+      )}
     </View>
   );
 

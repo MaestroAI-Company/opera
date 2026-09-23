@@ -7,6 +7,7 @@ import { Settings } from '../../settings/SettingsService';
 import { ToolSource } from '../tools/ITool';
 import { extractCitedUrls } from './citations';
 import { buildMentionSegment, resolveMentions } from '../mentions';
+import { estimateTokens } from '../tokens';
 
 //marker when user stops generation
 export const INTERRUPTED_MARKER = '\n\n_The user interrupted the response_';
@@ -41,6 +42,8 @@ function parseParamsB(model: string): number | null {
 
 //small windows cannot afford full prompt
 function modelTier(model: string): ModelTier {
+  //nano full handles the medium prompt
+  if (model.startsWith('aicore-nano-full')) return 'medium';
   if (isLocalModel(model)) return 'small';
   const paramsB = parseParamsB(model);
   if (paramsB === null) {
@@ -60,8 +63,24 @@ const PROMPT_BY_TIER: Record<ModelTier, string> = {
 
 //instruction then app prompt then extras
 export function buildSystemPrompt(model: string, userInstruction: string, extraSegment = ''): string {
+  return promptForTier(modelTier(model), userInstruction, extraSegment);
+}
+
+//headroom for the first reply
+const CONTEXT_MARGIN = 100;
+
+//smallest context that still fits the system prompt
+export function contextFloorTokens(service: string, userInstruction: string): number {
+  const settings = Settings.getCached();
+  //other sources assume their usual tier
+  const prompt = settings.aiService === service
+    ? buildSystemPrompt(settings.ollamaModel, userInstruction)
+    : promptForTier(service === 'litert' ? 'small' : 'large', userInstruction);
+  return estimateTokens(prompt) + CONTEXT_MARGIN;
+}
+
+function promptForTier(tier: ModelTier, userInstruction: string, extraSegment = ''): string {
   const instruction = userInstruction.trim();
-  const tier = modelTier(model);
   const appPrompt = PROMPT_BY_TIER[tier];
   const base = instruction.length > 0
     ? `${instruction}\n\n---\n\n${appPrompt}`
@@ -99,6 +118,14 @@ function resolveCitedSources(content: string, recorded: ToolSource[] | undefined
   return citedUrls.map(url => recorded?.find(s => s.url === url) ?? { url });
 }
 
+//not every provider reports token counts
+function completeMetrics(metrics: MessageMetrics, content: string, think: boolean | string, model: string): MessageMetrics {
+  const tokens = metrics.tokens || estimateTokens(content);
+  const tokensPerSec = metrics.tokensPerSec || (metrics.timeSec ? tokens / metrics.timeSec : undefined);
+  const thinking = think === false ? 'none' : think === true ? 'high' : think;
+  return { ...metrics, tokens, tokensPerSec, thinking, systemPrompt: modelTier(model) };
+}
+
 //one streaming path for both screens
 export async function streamAssistantReply(params: {
   model: string;
@@ -127,8 +154,8 @@ export async function streamAssistantReply(params: {
       params.signal,
       { think: params.think },
       (received) => {
-        metrics = received;
-        params.onMetrics?.(received);
+        metrics = completeMetrics(received, content, params.think, params.model);
+        params.onMetrics?.(metrics);
       },
       (received) => {
         sources = received;

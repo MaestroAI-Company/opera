@@ -832,6 +832,7 @@ export default function Index() {
       setAiService(Settings.getCached().aiService);
       setOllamaUrl(Settings.getCached().ollamaUrl);
       setUserName(Settings.getCached().name);
+      setShowTechnicalDetails(Settings.getCached().showTechnicalDetails);
     });
     const modelSelectorSub = DeviceEventEmitter.addListener(AppEvents.openModelSelector, () => {
       openDrawerSafely(() => setModelSelectorVisible(true));
@@ -865,6 +866,9 @@ export default function Index() {
     setActiveConversation(null);
     setMessages([]);
   }, []);
+
+  //stable ref keeps drawer rows memoized
+  const closeConversationsDrawer = useCallback(() => setDrawerVisible(false), []);
 
   //defer upload until accepted
   const askToShareConversation = useCallback((conv: Conversation) => {
@@ -1424,7 +1428,7 @@ export default function Index() {
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
       visible={drawerVisible}
-      onClose={() => setDrawerVisible(false)}
+      onClose={closeConversationsDrawer}
       conversations={conversations}
       selectedConversationId={activeConversation?.id ?? null}
       onSelectConversation={selectConversation}
@@ -1740,6 +1744,7 @@ export default function Index() {
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
         triggerRef={modelTriggerRef}
+        messages={messages}
       />
 
       <HeadlessWebView />

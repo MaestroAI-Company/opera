@@ -26,6 +26,8 @@ import HeadlessWebView from "../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../constants/theme";
 import BugReportSheet from "../components/features/BugReportSheet";
+import ImagePreviewSheet, { PreviewImage } from "../components/features/ImagePreviewSheet";
+import CodePreviewSheet, { PreviewCode } from "../components/features/CodePreviewSheet";
 import ChatBar from "../components/features/ChatBar";
 import ChatView from "../components/features/ChatView";
 import ConversationsDrawer from "../components/features/ConversationsDrawer";
@@ -428,6 +430,8 @@ export default function Index() {
   //reopen crash report from last run
   const [pendingCrash, setPendingCrash] = useState<Crash | null>(takePendingCrash);
   const [bugReportVisible, setBugReportVisible] = useState(pendingCrash !== null);
+  const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
+  const [previewCode, setPreviewCode] = useState<PreviewCode | null>(null);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const rootRef = useRef<View>(null);
 
@@ -829,12 +833,14 @@ export default function Index() {
     const modelSelectorSub = DeviceEventEmitter.addListener(AppEvents.openModelSelector, () => {
       openDrawerSafely(() => setModelSelectorVisible(true));
     });
+    const codePreviewSub = DeviceEventEmitter.addListener(AppEvents.openCodePreview, setPreviewCode);
 
     return () => {
       if (reloadTimer) clearTimeout(reloadTimer);
       conversationsSub.remove();
       settingsSub.remove();
       modelSelectorSub.remove();
+      codePreviewSub.remove();
     };
   }, [dbReady, loadConversations, openDrawerSafely]);
 
@@ -1549,6 +1555,7 @@ export default function Index() {
                   });
                 }}
                 canThink={modelCapabilities.includes("thinking") && selectedReflection !== "none"}
+                onImagePress={setPreviewImage}
               />
             )}
 
@@ -1691,6 +1698,22 @@ export default function Index() {
           setPendingCrash(null);
           setScreenshot(null);
         }}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        bottomInset={insets.bottom}
+      />
+
+      <ImagePreviewSheet
+        image={previewImage}
+        onClose={() => setPreviewImage(null)}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        bottomInset={insets.bottom}
+      />
+
+      <CodePreviewSheet
+        code={previewCode}
+        onClose={() => setPreviewCode(null)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
         bottomInset={insets.bottom}

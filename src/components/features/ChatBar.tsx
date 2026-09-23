@@ -186,6 +186,7 @@ function collapseMention(base: string, next: string): string | null {
 const INPUT_PADDING_VERTICAL = 6;
 const MENTION_LIST_MAX_HEIGHT = 200;
 const INPUT_LINE_HEIGHT = 20;
+const WEB_INPUT_LINE_HEIGHT = 22;
 
 //mention boxes drawn behind the input
 function MentionBoxes({ text, spans, scrollY }: { text: string; spans: MentionSpan[]; scrollY: number }) {
@@ -315,6 +316,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const textRef = useRef("");
   const lastCollapseRef = useRef<{ from: string; to: string } | null>(null);
   useEffect(() => { textRef.current = text; }, [text]);
+  const [webInputHeight, setWebInputHeight] = useState<number | undefined>(undefined);
   const [, setWhisperAvailable] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -1063,6 +1065,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         voiceText != null
       );
       setText("");
+      if (Platform.OS === 'web') setWebInputHeight(undefined);
       setSelectedFiles([]);
       documentsRef.current.clear();
       Keyboard.dismiss();
@@ -1368,19 +1371,38 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                         ref={inputRef}
                         style={[
                           styles.input,
-                          { maxHeight: 132, minHeight: 32, lineHeight: INPUT_LINE_HEIGHT },
+                          { maxHeight: 132, minHeight: Platform.OS === 'web' ? 22 : 32, lineHeight: Platform.OS === 'web' ? WEB_INPUT_LINE_HEIGHT : INPUT_LINE_HEIGHT },
                           //default edittext padding offsets the boxes
                           Platform.OS === 'android' && { paddingHorizontal: 0 },
-                          Platform.OS === 'web' && { outlineStyle: 'none', margin: 0, paddingHorizontal: 0, overflow: 'hidden' } as any,
+                          Platform.OS === 'web' && ({
+                            outlineStyle: 'none',
+                            margin: 0,
+                            paddingHorizontal: 0,
+                            paddingVertical: 0,
+                            minHeight: 22,
+                            height: text ? webInputHeight : 22,
+                            overflow: 'hidden',
+                            resize: 'none',
+                            fieldSizing: 'content',
+                          } as any),
                           Platform.OS === 'web' && mentionSpans.length > 0 && [styles.inputUnderMirror, { caretColor: Colors.textOnPrimary } as any],
                         ]}
                         value={Platform.OS === 'web' ? (isTranscribing ? t("chatbar.transcribing") : text) : undefined}
-                        onChangeText={isTranscribing ? undefined : handleChangeText}
+                        onChangeText={isTranscribing ? undefined : (newText) => {
+                          if (!newText && webInputHeight !== undefined) setWebInputHeight(undefined);
+                          handleChangeText(newText);
+                        }}
                         onScroll={(e: any) => setInputScrollY(e.nativeEvent.contentOffset?.y ?? e.nativeEvent.target?.scrollTop ?? 0)}
                         placeholder={placeholder ?? t("chatbar.placeholder")}
                         placeholderTextColor={Colors.whiteSoft}
                         multiline={true}
-                        rows={1}
+                        numberOfLines={1}
+                        onContentSizeChange={Platform.OS === 'web' ? (e) => {
+                          const h = e.nativeEvent.contentSize?.height;
+                          if (h && h > 0) {
+                            setWebInputHeight(Math.min(132, Math.max(22, h)));
+                          }
+                        } : undefined}
                         editable={!isTranscribing}
                         onTouchStart={handlePressIn}
                         onTouchEnd={handlePressOut}
@@ -1532,8 +1554,10 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     bottom: 0,
     overflow: 'hidden',
   },
+  //matches the web textarea metrics
   inputMirror: {
-    lineHeight: INPUT_LINE_HEIGHT,
+    lineHeight: WEB_INPUT_LINE_HEIGHT,
+    paddingVertical: 0,
   },
   inputUnderMirror: {
     color: 'transparent',

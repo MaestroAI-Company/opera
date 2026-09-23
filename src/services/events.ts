@@ -11,6 +11,8 @@ export const AppEvents = {
   textSelectionDrag: 'TEXT_SELECTION_DRAG',
   openModelSelector: 'OPEN_MODEL_SELECTOR',
   openBugReport: 'OPEN_BUG_REPORT',
+  //a chat code block was tapped
+  openCodePreview: 'OPEN_CODE_PREVIEW',
   //mcp server state changed
   mcpServersChanged: 'MCP_SERVERS_CHANGED',
 } as const;

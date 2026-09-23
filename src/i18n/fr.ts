@@ -13,6 +13,7 @@ export const fr: Translations = {
   "common.pin": "Épingler",
   "common.unpin": "Désépingler",
   "common.copy": "Copier",
+  "common.expand": "Agrandir",
   "common.regenerate": "Régénérer",
   "common.listen": "Écouter",
   "common.stop": "Arrêter",
@@ -128,6 +129,15 @@ export const fr: Translations = {
   "nextcloud.waiting": "En attente de votre validation dans le navigateur...",
   "nextcloud.failed":
     "Échec ou expiration de la connexion. Vérifiez l'adresse et réessayez.",
+
+  "codePreview.name": "Nom",
+  "codePreview.language": "Langage",
+  "codePreview.lines": "Lignes",
+  "codePreview.characters": "Caractères",
+  "imagePreview.name": "Nom",
+  "imagePreview.format": "Format",
+  "imagePreview.dimensions": "Dimensions",
+  "imagePreview.size": "Taille",
 
   "bugReport.title": "Signaler un bug",
   "bugReport.crashTitle": "Opera s'est fermé de manière inattendue",
@@ -518,10 +528,6 @@ export const fr: Translations = {
   "settings.support.moreHelp":
     "Contactez notre équipe de support pour une assistance et des ressources supplémentaires.",
   "settings.support.contact": "Contacter le support",
-  "settings.support.testing": "Test",
-  "settings.support.testingHelp":
-    "Fait planter l'application volontairement pour tester l'écran de rapport de plantage.",
-  "settings.support.testCrash": "Déclencher un plantage de test",
 
   "settings.tools.widgets.title": "Widgets",
   "settings.tools.widgets.help":

@@ -74,3 +74,22 @@ export function playPageTransition(value: Animated.Value) {
     useNativeDriver: DRAWER_NATIVE_DRIVER,
   }).start();
 }
+
+//back button grows and lightens then settles on every page change
+export function playBackButtonPulse(value: Animated.Value) {
+  value.setValue(0);
+  Animated.sequence([
+    Animated.timing(value, {
+      toValue: 1,
+      duration: 120,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: DRAWER_NATIVE_DRIVER,
+    }),
+    Animated.timing(value, {
+      toValue: 0,
+      duration: 160,
+      easing: Easing.in(Easing.quad),
+      useNativeDriver: DRAWER_NATIVE_DRIVER,
+    }),
+  ]).start();
+}

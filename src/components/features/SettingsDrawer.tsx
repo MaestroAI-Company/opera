@@ -10,8 +10,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, AppState, BackHandler, DeviceEventEmitter, Image, ImageSourcePropType, Keyboard, Linking, NativeScrollEvent, NativeSyntheticEvent, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
-import { getLocalProviderLabel } from "../../services/ai/providers/LocalProvider";
-import { BETA_PROVIDER_ID, BETA_SERVER_URL, buildSources, getEnabledProviders, getOllamaServers, getOllamaTuning, OllamaServer, serializeOllamaServers, serializeProviders } from "../../services/ai/providers/sources";
+import { LocalModelSheet } from "../../services/ai/providers/LocalProvider";
+import { BETA_PROVIDER_ID, BETA_SERVER_URL, buildSources, getEnabledProviders, getOllamaServers, getOllamaTuning, isProviderSupported, OllamaServer, serializeOllamaServers, serializeProviders } from "../../services/ai/providers/sources";
+import { CatalogEntry, fetchFamilies, fetchFamilyModels, formatBytes, getCachedFamilies, getCatalogEntry, hydrateLiteRTCatalog, MIN_SEARCH_LENGTH, ModelFamily, OTHER_FAMILY_ID, searchModels } from "../../services/ai/providers/huggingFaceCatalog";
+import { cancelLiteRTDownload, deleteLiteRTModel, downloadLiteRTModel, getInstalledLiteRTModels, getLiteRTModelLabel, getPendingLiteRTDownload, isLiteRTModelDownloaded, LiteRTDownloadCancelled, LiteRTDownloadSnapshot, LiteRTModelInfo, subscribeLiteRTDownload } from "../../services/ai/providers/LiteRTProvider";
 import { parseQuickFlowOptionId, quickFlowOptionId } from "../../services/ai/quickFlow";
 import { isDefaultAssistant, openAssistantSettings } from "../../services/assistant/DefaultAssistant";
 import { ITool } from "../../services/ai/tools/ITool";
@@ -44,6 +46,7 @@ import Toggle from "../ui/Toggle";
 import CloudSyncBox from "./CloudSyncBox";
 import DrawerSheet from "./DrawerSheet";
 
+import { useKeyboardAnimation } from "react-native-keyboard-controller";
 import { useResponsive } from "../../hooks/useResponsive";
 import { useSettingsNotices } from "../../hooks/useSettingsNotices";
 
@@ -62,6 +65,8 @@ const searchIcon = require("../../../assets/icons/search.png");
 const profilIcon = require("../../../assets/icons/profil.png");
 const cloudIcon = require("../../../assets/icons/cloud.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
+const backIcon = require("../../../assets/icons/back.png");
+const crossIcon = require("../../../assets/icons/cross.png");
 const cancelIcon = require("../../../assets/icons/cancel.png");
 const generalIcon = require("../../../assets/icons/general.png");
 const advancedIcon = require("../../../assets/icons/settings.png");
@@ -119,7 +124,7 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage = "main" | "general" | "advanced" | "assistantoverlay" | "service" | "beta" | "local" | "ollama" | "ollamaserver" | "ollamaserveradd" | "confidentiality" | "reports" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "mcpservers" | "mcpserver" | "mcpserversettings" | "mcpserveradd" | "sociallinks";
+type SubPage = "main" | "general" | "advanced" | "assistantoverlay" | "service" | "beta" | "local" | "litert" | "ollama" | "ollamaserver" | "ollamaserveradd" | "confidentiality" | "reports" | "tools" | "widgets" | "profile" | "cloud" | "mobileactions" | "mcpservers" | "mcpserver" | "mcpserversettings" | "mcpserveradd" | "sociallinks";
 
 //page a subpage steps back to, followed by the header arrow and the android back button
 const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
@@ -130,6 +135,7 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   service: "main",
   beta: "service",
   local: "service",
+  litert: "service",
   ollama: "service",
   ollamaserver: "ollama",
   ollamaserveradd: "ollama",
@@ -232,6 +238,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [theme, setThemeState] = useState("system");
   const [aiService, setAiServiceState] = useState("ollama");
   const [localAvailable, setLocalAvailable] = useState(false);
+  const [localSheet, setLocalSheet] = useState<LocalModelSheet | null>(null);
+  const [localDownload, setLocalDownload] = useState<{ progress: number; sizeStr: string } | null>(null);
   const [ollamaUrl, setOllamaUrlState] = useState("");
   const [ollamaServers, setOllamaServersState] = useState<OllamaServer[]>([]);
   const [enabledProviders, setEnabledProvidersState] = useState<string[]>([]);
@@ -252,6 +260,20 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
 
   const [addModelSheetVisible, setAddModelSheetVisible] = useState(false);
   const [hfModelInput, setHfModelInput] = useState("");
+  const [litertForceLoad, setLitertForceLoadState] = useState(false);
+  const [litertContextLength, setLitertContextLengthState] = useState("8192");
+  const [installedLitertModels, setInstalledLitertModels] = useState<LiteRTModelInfo[]>([]);
+  const [downloadingLitert, setDownloadingLitert] = useState<string | null>(null);
+  const [litertDownloadProgress, setLitertDownloadProgress] = useState<LiteRTDownloadSnapshot | null>(null);
+  //browse families, then their models
+  const [litertFamilies, setLitertFamilies] = useState<ModelFamily[]>([]);
+  const [litertFamilyId, setLitertFamilyId] = useState<string | null>(null);
+  const [litertFamilyModels, setLitertFamilyModels] = useState<CatalogEntry[]>([]);
+  const [litertSearchResults, setLitertSearchResults] = useState<CatalogEntry[]>([]);
+  const [litertBrowserLoading, setLitertBrowserLoading] = useState(false);
+  const [litertBrowserFailed, setLitertBrowserFailed] = useState(false);
+  //native-driven keyboard height, same as chatbar
+  const { height: sheetKeyboardHeight } = useKeyboardAnimation();
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [exportScopeVisible, setExportScopeVisible] = useState(false);
   const [exportSelection, setExportSelection] = useState({ settings: true, conversations: true });
@@ -296,6 +318,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
   const [autoSpeak, setAutoSpeakState] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(false);
+  const [showDetectionBoxes, setShowDetectionBoxesState] = useState(false);
   const [advancedMode, setAdvancedModeState] = useState(false);
   const [useAppContext, setUseAppContextState] = useState(true);
   const [autoStartMic, setAutoStartMicState] = useState(true);
@@ -349,6 +372,13 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     { id: "43200", label: "12h" },
     { id: "86400", label: "24h" },
     { id: "-1", label: "∞" },
+  ];
+
+  const litertContextLengthOptions = [
+    { id: "1024", label: "1k" },
+    { id: "2048", label: "2k" },
+    { id: "4096", label: "4k" },
+    { id: "8192", label: "8k" },
   ];
 
   const ollamaContextLengthOptions = [
@@ -558,10 +588,16 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         setAlwaysWhisperState(s.alwaysWhisper);
         setAutoSpeakState(s.autoSpeak);
         setShowTechnicalDetailsState(s.showTechnicalDetails);
+        setShowDetectionBoxesState(s.showDetectionBoxes);
         setAdvancedModeState(s.advancedMode);
         setUseAppContextState(s.useAppContext);
         setModelFailoverState(s.modelFailover);
         setShareInstanceUrlState(s.shareInstanceUrl || "");
+        setLitertForceLoadState(s.litertForceLoad);
+        setLitertContextLengthState(String(s.litertContextLength));
+        //installed read is synchronous while rendering
+        await hydrateLiteRTCatalog();
+        setInstalledLitertModels(getInstalledLiteRTModels());
         //apply to services
         const tuning = getOllamaTuning(s.ollamaUrl);
         AIModule.configure(s.ollamaUrl, tuning.contextLength, tuning.keepAlive);
@@ -623,6 +659,31 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     })();
     return () => { cancelled = true; };
   }, [activeSubPage, localAvailable, ollamaServers, enabledProviders, t]);
+
+  //built-in facts, read on page open
+  useEffect(() => {
+    if (activeSubPage !== "local") return;
+    let cancelled = false;
+    AIModule.getLocalModelSheet()
+      .then((sheet) => { if (!cancelled) setLocalSheet(sheet); })
+      .catch((e) => console.warn("Failed to load local model sheet", e));
+    return () => { cancelled = true; };
+  }, [activeSubPage]);
+
+  //browsers need a user gesture
+  const handleDownloadLocal = async (modelId: string) => {
+    setLocalDownload({ progress: 0, sizeStr: "" });
+    try {
+      await AIModule.downloadFor("local", undefined, modelId, (progress, _eta, _speed, sizeStr) =>
+        setLocalDownload({ progress, sizeStr }));
+      setLocalSheet(await AIModule.getLocalModelSheet());
+    } catch (e) {
+      console.warn("Local model download failed", e);
+      showAlert(t("common.error"), e instanceof Error ? e.message : String(e));
+    } finally {
+      setLocalDownload(null);
+    }
+  };
 
   const handleSelectQuickFlow = (id: string) => {
     setQuickFlowIdState(id);
@@ -964,6 +1025,141 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     await loadOllamaModels(ollamaServers[index]?.url ?? "");
   };
 
+  const refreshLitertModels = useCallback(() => {
+    setInstalledLitertModels(getInstalledLiteRTModels());
+  }, []);
+
+  const setLitertForceLoad = (v: boolean) => {
+    setLitertForceLoadState(v);
+    Settings.set("litertForceLoad", v);
+  };
+
+  const setLitertContextLength = (v: string) => {
+    setLitertContextLengthState(v);
+    const parsed = parseInt(v, 10);
+    if (!isNaN(parsed)) Settings.set("litertContextLength", parsed);
+  };
+
+  const handleDownloadLitert = async (entry: CatalogEntry) => {
+    setAddModelSheetVisible(false);
+    setDownloadingLitert(entry.repoId);
+    setLitertDownloadProgress(null);
+    try {
+      await downloadLiteRTModel(entry.repoId, (progress, etaSeconds, speedStr, sizeStr) =>
+        setLitertDownloadProgress({ progress, etaSeconds, speedStr, sizeStr }));
+    } catch (e) {
+      //failures alert, cancels do not
+      if (!(e instanceof LiteRTDownloadCancelled)) {
+        showAlert(t("common.error"), e instanceof Error ? e.message : String(e));
+      }
+    } finally {
+      setDownloadingLitert(null);
+      setLitertDownloadProgress(null);
+      refreshLitertModels();
+    }
+  };
+
+  const handleCancelLitert = () => {
+    if (downloadingLitert) cancelLiteRTDownload(downloadingLitert);
+  };
+
+  const confirmDownloadLitert = (entry: CatalogEntry) => {
+    showAlert(
+      t("settings.litert.downloadTitle", { name: entry.label }),
+      t("settings.litert.downloadMessage", { name: entry.label, size: formatBytes(entry.sizeBytes) }),
+      [
+        {
+          text: t("settings.litert.downloadAction"),
+          onPress: () => {
+            setAlertModalVisible(false);
+            handleDownloadLitert(entry);
+          },
+        },
+        { text: t("common.cancel"), style: "danger", onPress: () => setAlertModalVisible(false) },
+      ]
+    );
+  };
+
+  const handleDeleteLitert = (model: LiteRTModelInfo) => {
+    showAlert(
+      t("settings.litert.deleteTitle", { name: model.label }),
+      t("settings.litert.deleteMessage"),
+      [
+        {
+          text: t("common.delete"),
+          style: "secondary",
+          onPress: () => {
+            setAlertModalVisible(false);
+            try {
+              deleteLiteRTModel(model.id);
+            } catch (e) {
+              console.warn("Could not delete the model:", e);
+            }
+            refreshLitertModels();
+          },
+        },
+        { text: t("common.cancel"), style: "danger", onPress: () => setAlertModalVisible(false) },
+      ]
+    );
+  };
+
+  const openAddModelSheet = async () => {
+    setLitertFamilyId(null);
+    setHfModelInput("");
+    setLitertSearchResults([]);
+    setAddModelSheetVisible(true);
+    //cache paints, hub refreshes behind
+    const cached = getCachedFamilies();
+    setLitertFamilies(cached);
+    setLitertBrowserFailed(false);
+    setLitertBrowserLoading(cached.length === 0);
+    try {
+      setLitertFamilies(await fetchFamilies());
+    } catch (e) {
+      console.warn("Could not list the hugging face models:", e);
+      setLitertBrowserFailed(cached.length === 0);
+    } finally {
+      setLitertBrowserLoading(false);
+    }
+  };
+
+  //queries hit the hub, not families
+  const runLitertSearch = useCallback(async (query: string, signal: AbortSignal) => {
+    setLitertBrowserFailed(false);
+    setLitertBrowserLoading(true);
+    try {
+      const results = await searchModels(query, signal);
+      if (!signal.aborted) setLitertSearchResults(results);
+    } catch (e) {
+      console.warn("Could not search the hugging face models:", e);
+      if (!signal.aborted) setLitertBrowserFailed(true);
+    } finally {
+      if (!signal.aborted) setLitertBrowserLoading(false);
+    }
+  }, []);
+
+  const openLitertFamily = async (family: ModelFamily) => {
+    setLitertFamilyId(family.id);
+    setHfModelInput("");
+    setLitertFamilyModels([]);
+    setLitertBrowserFailed(false);
+    setLitertBrowserLoading(true);
+    try {
+      const models = await fetchFamilyModels(family.id);
+      setLitertFamilyModels(models);
+      //no fit means dropped for good
+      if (models.length === 0) setLitertFamilies(getCachedFamilies());
+    } catch (e) {
+      console.warn("Could not read the model family:", e);
+      setLitertBrowserFailed(true);
+    } finally {
+      setLitertBrowserLoading(false);
+    }
+  };
+
+  const litertFamilyName = (family: ModelFamily) =>
+    family.id === OTHER_FAMILY_ID ? t("settings.litert.familyOther") : family.label;
+
   const setProviderEnabled = (id: string, enabled: boolean) => {
     const next = enabled
       ? [...enabledProviders.filter(p => p !== id), id]
@@ -977,6 +1173,42 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       setAiService(id);
     }
   };
+
+  //dead downloads resume from disk
+  useEffect(() => {
+    if (activeSubPage !== "litert" || downloadingLitert) return;
+    let dropped = false;
+    getPendingLiteRTDownload().then((pending) => {
+      if (dropped || !pending) return;
+      const entry = getCatalogEntry(pending);
+      if (entry?.url) handleDownloadLitert(entry);
+    });
+    return () => { dropped = true; };
+    //eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSubPage]);
+
+  //typing settles before a round trip
+  useEffect(() => {
+    const query = hfModelInput.trim();
+    if (!addModelSheetVisible || query.length < MIN_SEARCH_LENGTH) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => runLitertSearch(query, controller.signal), 400);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [hfModelInput, addModelSheetVisible, runLitertSearch]);
+
+  //external downloads still drive this bar
+  useEffect(() => {
+    return subscribeLiteRTDownload((modelId, snapshot) => {
+      if (snapshot) {
+        setDownloadingLitert(modelId);
+        setLitertDownloadProgress(snapshot);
+      } else {
+        setDownloadingLitert((current) => (current === modelId ? null : current));
+        setLitertDownloadProgress(null);
+        refreshLitertModels();
+      }
+    });
+  }, [refreshLitertModels]);
 
   const setWhisperModel = (v: string) => {
     setWhisperModelState(v);
@@ -1028,6 +1260,11 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
   const setShowTechnicalDetails = (v: boolean) => {
     setShowTechnicalDetailsState(v);
     Settings.set("showTechnicalDetails", v);
+  };
+
+  const setShowDetectionBoxes = (v: boolean) => {
+    setShowDetectionBoxesState(v);
+    Settings.set("showDetectionBoxes", v);
   };
 
   const setAdvancedMode = (v: boolean) => {
@@ -1694,7 +1931,7 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           </Text>
         </View>
 
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+        <View style={Platform.OS === "android" ? styles.settingRowVertical : [styles.settingRowVertical, { marginBottom: 0 }]}>
           <View style={styles.toggleRow}>
             <Text style={styles.settingLabel}>{t("settings.general.technicalDetails")}</Text>
             <Toggle
@@ -1704,6 +1941,19 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
           </View>
           <Text style={styles.helpText}>{t("settings.general.technicalDetailsHelp")}</Text>
         </View>
+
+        {Platform.OS === "android" && (
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <View style={styles.toggleRow}>
+              <Text style={styles.settingLabel}>{t("settings.general.detectionBoxes")}</Text>
+              <Toggle
+                checked={showDetectionBoxes}
+                onToggle={setShowDetectionBoxes}
+              />
+            </View>
+            <Text style={styles.helpText}>{t("settings.general.detectionBoxesHelp")}</Text>
+          </View>
+        )}
       </View>
 
       {/* sharing instance card */}
@@ -1889,6 +2139,30 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </View>
       </View>
 
+      {/* on-device models from hugging face */}
+      {isProviderSupported("litert") && (
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <View style={styles.toggleRow}>
+              <Text style={styles.settingLabel}>{t("settings.service.litert")}</Text>
+              <Toggle
+                checked={enabledProviders.includes("litert")}
+                onToggle={(v) => setProviderEnabled("litert", v)}
+              />
+            </View>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.service.litertHelp")}</Text>
+
+            <Group>
+              <ActionButton
+                icon={arrowIcon}
+                label={t("settings.litert.see")}
+                onPress={() => setActiveSubPage("litert")}
+              />
+            </Group>
+          </View>
+        </View>
+      )}
+
       {/* ollama service card */}
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -1980,10 +2254,93 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     </View>
   );
 
-  //local provider info subpage
+  //built-in provider, model ships with device
   const renderLocalSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.service.local"), "service")}
+      {renderSubPageHeader(t("settings.local.title"), "service")}
+
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>{t("settings.local.title")}</Text>
+          <Text style={[styles.helpText, { marginBottom: 0 }]}>{t("settings.local.help")}</Text>
+        </View>
+      </View>
+
+      {localSheet && (
+        <View style={styles.contentCard}>
+          <View style={localSheet.models.length > 0 ? styles.settingRowVertical : [styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={styles.settingLabel}>{t("settings.local.sheetTitle")}</Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.local.sheetHelp")}</Text>
+            <Group>
+              {([
+                ["family", localSheet.family],
+                ["runtime", localSheet.runtime],
+                ["browser", localSheet.browser],
+              ] as const).filter(([, value]) => !!value).map(([key, value]) => (
+                <ActionButton
+                  key={key}
+                  label={t(`settings.local.sheet.${key}`)}
+                  rightElement={<Text style={styles.litertRowMeta}>{value}</Text>}
+                />
+              ))}
+            </Group>
+          </View>
+
+          {localSheet.models.length > 0 && (
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.local.modelsTitle")}</Text>
+              {localSheet.models.map((model, i) => (
+                <Group key={model.id} style={i < localSheet.models.length - 1 ? styles.litertModelRow : undefined}>
+                  <ActionButton
+                    label={model.label}
+                    rightElement={model.status && <Text style={styles.litertRowMeta}>{t(`settings.local.status.${model.status}`)}</Text>}
+                  />
+                  {!!model.version && (
+                    <ActionButton
+                      label={t("settings.local.sheet.version")}
+                      rightElement={<Text style={styles.litertRowMeta}>{model.version}</Text>}
+                    />
+                  )}
+                  {model.contextTokens !== undefined && (
+                    <ActionButton
+                      label={t("settings.local.sheet.context")}
+                      rightElement={<Text style={styles.litertRowMeta}>{t("settings.local.sheet.tokens", { count: model.contextTokens.toLocaleString() })}</Text>}
+                    />
+                  )}
+                  {model.thinking !== undefined && (
+                    <ActionButton
+                      label={t("settings.local.sheet.thinking")}
+                      rightElement={<Text style={styles.litertRowMeta}>{t(model.thinking ? "settings.local.sheet.yes" : "settings.local.sheet.no")}</Text>}
+                    />
+                  )}
+                  {localSheet.canDownload && (model.status === "downloadable" || model.status === "downloading") && (
+                    <ActionButton
+                      icon={downloadIcon}
+                      label={t("settings.local.download")}
+                      disabled={!!localDownload}
+                      onPress={() => handleDownloadLocal(model.id)}
+                    />
+                  )}
+                </Group>
+              ))}
+              {!!localDownload && (
+                <DownloadProgress
+                  title={t("settings.local.downloading")}
+                  progress={localDownload.progress}
+                  sizeStr={localDownload.sizeStr}
+                />
+              )}
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
+
+  //on-device provider, models the browser installed
+  const renderLitertSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader(t("settings.litert.title"), "service")}
 
       <View style={styles.contentCard}>
         <View style={{ marginBottom: Spacing.xxl }}>
@@ -1991,16 +2348,74 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         </View>
 
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{t("settings.local.modelTitle")}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.local.help")}</Text>
+          <Text style={styles.settingLabel}>{t("settings.litert.modelTitle")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.litert.help")}</Text>
+
+          {installedLitertModels.length === 0 ? (
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.litert.noModels")}</Text>
+          ) : (
+            installedLitertModels.map((model) => (
+              <Group key={model.id} style={styles.litertModelRow}>
+                <ActionButton
+                  icon={deleteIcon}
+                  label={model.label}
+                  rightElement={<Text style={styles.litertRowMeta}>{model.sizeStr}</Text>}
+                  disabled={!!downloadingLitert}
+                  onPress={() => handleDeleteLitert(model)}
+                />
+              </Group>
+            ))
+          )}
 
           <Group>
             <ActionButton
               icon={addIcon}
-              label={t("settings.local.addModel")}
-              onPress={() => setAddModelSheetVisible(true)}
+              label={t("settings.litert.addModel")}
+              disabled={!!downloadingLitert}
+              onPress={openAddModelSheet}
             />
           </Group>
+
+          {!!downloadingLitert && (
+            <>
+              <DownloadProgress
+                title={t("settings.litert.downloadingModel", { name: getLiteRTModelLabel(downloadingLitert) })}
+                progress={litertDownloadProgress?.progress || 0}
+                sizeStr={litertDownloadProgress?.sizeStr}
+                etaSeconds={litertDownloadProgress?.etaSeconds}
+              />
+              <Group style={styles.litertCancelRow}>
+                <ActionButton
+                  icon={crossIcon}
+                  label={t("settings.litert.cancelDownload")}
+                  onPress={handleCancelLitert}
+                />
+              </Group>
+            </>
+          )}
+        </View>
+      </View>
+
+      <View style={styles.contentCard}>
+        <View style={styles.settingRowVertical}>
+          <Text style={styles.settingLabel}>{t("settings.litert.contextTitle")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.litert.contextHelp")}</Text>
+          <Group>
+            <Slider
+              icon={messageIcon}
+              options={litertContextLengthOptions}
+              selectedValue={litertContextLength}
+              onSelect={setLitertContextLength}
+            />
+          </Group>
+        </View>
+
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={styles.toggleRow}>
+            <Text style={styles.settingLabel}>{t("settings.litert.forceLoad")}</Text>
+            <Toggle checked={litertForceLoad} onToggle={setLitertForceLoad} />
+          </View>
+          <Text style={[styles.helpText, { marginBottom: 0 }]}>{t("settings.litert.forceLoadHelp")}</Text>
         </View>
       </View>
     </View>
@@ -2964,6 +3379,8 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
         return renderBetaSubPage();
       case "local":
         return renderLocalSubPage();
+      case "litert":
+        return renderLitertSubPage();
       case "ollama":
         return renderOllamaSubPage();
       case "ollamaserver":
@@ -3092,13 +3509,18 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
     </>
   );
 
+  //query searches the hub, else browses
+  const isLitertSearching = hfModelInput.trim().length >= MIN_SEARCH_LENGTH;
+  const litertBrowserModels = isLitertSearching ? litertSearchResults : litertFamilyModels;
+
   const addModelSheet = (
     <DrawerSheet
       visible={addModelSheetVisible}
-      onClose={() => setAddModelSheetVisible(false)}
+      onClose={() => { setAddModelSheetVisible(false); setLitertFamilyId(null); }}
       mode="overlay"
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
+      keyboardTranslateY={sheetKeyboardHeight}
       sheetStyle={[
         styles.addModelSheet,
         { paddingBottom: Platform.OS === "ios" ? 34 : 20 },
@@ -3106,16 +3528,68 @@ export default function SettingsDrawer({ visible, onClose, onDataChanged, isLarg
       desktopStyle={styles.addModelSheetDesktop}
     >
       <View style={styles.addModelSheetContent}>
+        <Text style={styles.settingLabel}>{t("settings.litert.addModelTitle")}</Text>
+        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("settings.litert.addModelHelp")}</Text>
+
         <Group>
           <TextInputField
             icon={searchIcon}
-            placeholder={t("settings.local.addModelPlaceholder")}
+            placeholder={t("settings.litert.addModelPlaceholder")}
             value={hfModelInput}
             onChangeText={setHfModelInput}
             autoCapitalize="none"
             autoCorrect={false}
           />
         </Group>
+
+        {litertBrowserLoading ? (
+          <Text style={styles.helpText}>{t("settings.litert.loading")}</Text>
+        ) : litertBrowserFailed ? (
+          <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
+        ) : (
+          <ScrollView style={styles.litertBrowserList}>
+            <Group>
+              {!isLitertSearching && litertFamilyId !== null && (
+                <ActionButton
+                  icon={backIcon}
+                  label={t("settings.litert.allFamilies")}
+                  onPress={() => setLitertFamilyId(null)}
+                />
+              )}
+              {!isLitertSearching && litertFamilyId === null
+                ? litertFamilies.map((family) => (
+                  <ActionButton
+                    key={family.id}
+                    icon={arrowIcon}
+                    label={litertFamilyName(family)}
+                    rightElement={<Text style={styles.litertRowMeta}>{family.repoIds.length}</Text>}
+                    onPress={() => openLitertFamily(family)}
+                  />
+                ))
+                : litertBrowserModels.map((entry) => (
+                  <ActionButton
+                    key={entry.repoId}
+                    icon={downloadIcon}
+                    label={entry.label}
+                    rightElement={
+                      <Text style={styles.litertRowMeta}>
+                        {isLiteRTModelDownloaded(entry.repoId)
+                          ? t("settings.litert.installed")
+                          : formatBytes(entry.sizeBytes)}
+                      </Text>
+                    }
+                    disabled={isLiteRTModelDownloaded(entry.repoId) || !!downloadingLitert}
+                    onPress={() => confirmDownloadLitert(entry)}
+                  />
+                ))}
+            </Group>
+            {(isLitertSearching || litertFamilyId !== null) && litertBrowserModels.length === 0 && (
+              <Text style={styles.helpText}>
+                {isLitertSearching ? t("settings.litert.noResults") : t("settings.litert.familyEmpty")}
+              </Text>
+            )}
+          </ScrollView>
+        )}
       </View>
     </DrawerSheet>
   );
@@ -3355,6 +3829,21 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     width: 380,
     overflow: "hidden",
     paddingVertical: 16,
+  },
+  litertBrowserList: {
+    maxHeight: 280,
+    marginTop: Spacing.md,
+  },
+  litertModelRow: {
+    marginBottom: Spacing.md,
+  },
+  litertCancelRow: {
+    marginTop: Spacing.md,
+  },
+  litertRowMeta: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.micro,
+    color: Colors.textMuted,
   },
   addModelSheetContent: {
     paddingHorizontal: Spacing.xxl,

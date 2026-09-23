@@ -47,6 +47,7 @@ import { useColors, useThemedStyles } from "../hooks/useTheme";
 import { t, useT, type TranslationFn } from "../i18n";
 import { CloudSync } from "../services/CloudSyncService";
 import { AIModule } from "../services/ai/AIModule";
+import { hydrateLiteRTCatalog } from "../services/ai/providers/huggingFaceCatalog";
 import { getOllamaTuning, migrateModelSources } from "../services/ai/providers/sources";
 import { buildSystemPrompt } from "../services/ai/generation/chatGeneration";
 import { GenerationService } from "../services/ai/generation/GenerationService";
@@ -763,6 +764,8 @@ export default function Index() {
         const tuning = getOllamaTuning(s.ollamaUrl);
         AIModule.configure(s.ollamaUrl, tuning.contextLength, tuning.keepAlive);
         AIModule.setMode(s.aiService);
+        //model name comes from the catalog
+        await hydrateLiteRTCatalog();
         STT.setLanguage(s.whisperLanguage);
       } catch (e) {
         console.warn("Failed to load settings at boot", e);
@@ -1097,7 +1100,7 @@ export default function Index() {
       taskHistory.push({ role: "user", content: text, images });
 
       const taskSelectedModel = selectedModel;
-      const taskSystemPrompt = buildSystemPrompt(userInstruction);
+      const taskSystemPrompt = buildSystemPrompt(selectedModel, userInstruction);
       const taskReflection = selectedReflection;
       const taskConv = conv;
 
@@ -1270,7 +1273,7 @@ export default function Index() {
     setMessages([...historyUpToHere]);
 
     const taskSelectedModel = selectedModel;
-    const taskSystemPrompt = buildSystemPrompt(userInstruction);
+    const taskSystemPrompt = buildSystemPrompt(selectedModel, userInstruction);
     const taskReflection = selectedReflection;
     const taskConv = activeConversation;
     const isIncognitoTask = taskConv.id.startsWith("incognito_");

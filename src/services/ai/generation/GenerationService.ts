@@ -1,8 +1,35 @@
+import { t } from '../../../i18n';
 import { DB, MessageMetrics } from '../../db/DatabaseService';
 import { ToolSource } from '../tools/ITool';
 import { ChatHistoryEntry, streamAssistantReply } from './chatGeneration';
 
 export type RunStatus = 'streaming' | 'done' | 'error' | 'aborted';
+
+//translate the frequent raw errors
+function describeError(raw?: string): string {
+  const text = raw ?? '';
+  if (/maximum number of tokens|too long|context length|context window/i.test(text)) {
+    return t('generation.error.contextLength');
+  }
+  if (/insufficient memory|MemoryError|not enough memory|OutOfMemory/i.test(text)) {
+    return t('generation.error.memory');
+  }
+  if (/Network request failed|Failed to fetch|ECONNREFUSED|ETIMEDOUT|timeout|Unable to resolve host/i.test(text)) {
+    return t('generation.error.unreachable');
+  }
+  if (/\b(401|403)\b|unauthorized|forbidden|invalid api key/i.test(text)) {
+    return t('generation.error.refused');
+  }
+  if (/\b404\b|model not found|no such model/i.test(text)) {
+    return t('generation.error.missingModel');
+  }
+  //native sdk matches, not our naming
+  if (/litert|LiteRtLm|tensor_buffer|Status Code/i.test(text)) {
+    return t('generation.error.onDevice');
+  }
+  if (text.trim().length === 0) return t('generation.error.unknown');
+  return t('generation.error.generic');
+}
 
 //reply owned outside any screen
 export type Run = {
@@ -103,7 +130,7 @@ class GenerationServiceImpl {
       if (outcome.status === 'error') {
         status = 'error';
         run.error = outcome.error;
-        run.content = `Error during generation: ${outcome.error ?? 'unknown error'}`;
+        run.content = describeError(outcome.error);
       } else {
         status = outcome.status === 'aborted' ? 'aborted' : 'done';
         run.content = outcome.content;

@@ -4,7 +4,8 @@ import { ToolManager } from './tools/ToolManager';
 import { ToolSource } from './tools/ITool';
 import { sendMessageWithToolPrompt } from './tools/fallbackToolCall';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
-import { LocalProvider } from './providers/LocalProvider';
+import { LocalModelSheet, LocalProvider } from './providers/LocalProvider';
+import { LiteRTProvider } from './providers/LiteRTProvider';
 import { MessageMetrics } from '../db/DatabaseService';
 import { LocationService } from '../location/LocationService';
 import { Settings } from '../settings/SettingsService';
@@ -44,6 +45,8 @@ class CentralAIModule {
     this.providers.set('OLLAMA', new OllamaProvider(DEFAULT_URL));
     //universal on-device provider (routes to the platform local backend)
     this.providers.set('LOCAL', new LocalProvider());
+    //litert-lm runs on-device hugging face models
+    this.providers.set('LITERT', new LiteRTProvider());
     //hosted beta server, its own provider even though it speaks ollama
     if (BETA_SERVER_URL) this.providers.set('BETA', new OllamaProvider(BETA_SERVER_URL));
   }
@@ -88,6 +91,12 @@ class CentralAIModule {
     } catch {
       return false;
     }
+  }
+
+  //built-in backend reports its models
+  async getLocalModelSheet(): Promise<LocalModelSheet | null> {
+    const provider = this.providers.get('LOCAL') as LocalProvider | undefined;
+    return provider ? provider.getModelSheet() : null;
   }
 
   async getAvailableModels(): Promise<string[]> {
@@ -296,7 +305,8 @@ class CentralAIModule {
     signal?: AbortSignal,
     options?: { think?: boolean | string },
     onMetrics?: (metrics: MessageMetrics) => void,
-    onSources?: (sources: ToolSource[]) => void
+    onSources?: (sources: ToolSource[]) => void,
+    toolFilter?: string[]
   ): Promise<void> {
     await this.failoverIfUnreachable(modelName);
     const provider = this.getActiveProvider();
@@ -308,7 +318,7 @@ class CentralAIModule {
       supportsTools = caps.includes('tools');
     } catch {}
 
-    const tools = ToolManager.getDefinitions();
+    const tools = ToolManager.getDefinitions(toolFilter);
     const processedMessages = await this.processImages(messages);
     const enhancedPrompt = systemPrompt + (await this.buildContextBlock());
 

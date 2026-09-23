@@ -9,6 +9,7 @@ export class SearchTool implements ITool {
   enabledByDefault = true;
   //ios/android need the SearchWebView bridge
   platforms: ToolPlatform[] = ['ios', 'android', 'web', 'desktop'];
+  requires = ['fetch_pages'];
 
   definition: ToolDefinition = {
     type: 'function',

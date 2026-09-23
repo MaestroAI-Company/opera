@@ -10,6 +10,7 @@ export interface IWidget<T = any> {
   description: string; // system prompt description
   schema: string; // json schema definition
   enabledByDefault?: boolean; // default enabled state in settings
+  requires?: string[]; // tool names offered alongside on @mention
   component: React.ComponentType<{ data: T; title?: string; incognito?: boolean }>;
 }
 
@@ -40,8 +41,7 @@ class CentralWidgetManager {
     );
   }
 
-  getSystemPromptSegment(): string {
-    const enabledWidgets = this.getEnabledWidgets();
+  getSystemPromptSegment(enabledWidgets: IWidget[] = this.getEnabledWidgets()): string {
     if (enabledWidgets.length === 0) return '';
 
     let prompt = `\n\n## WIDGET SYSTEM\n`;

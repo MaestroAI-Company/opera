@@ -26,6 +26,7 @@ export type AppSettings = {
   name: string;
   includeDateTime: boolean;
   showTechnicalDetails: boolean;
+  showDetectionBoxes: boolean;
   advancedMode: boolean;
   dataWarningDismissed: boolean;
   useAppContext: boolean;
@@ -33,6 +34,8 @@ export type AppSettings = {
   assistantPromptDismissed: boolean;
   hasSeenAssistantOverlay: boolean;
   shareInstanceUrl: string;
+  litertForceLoad: boolean;
+  litertContextLength: number;
 };
 
 //shared by both platforms, web overrides ollamaUrl
@@ -43,7 +46,7 @@ export const BASE_DEFAULTS: AppSettings = {
   ollamaUrl: '',
   ollamaUrls: '[]',
   mcpServers: '[]',
-  enabledProviders: 'local,ollama,beta',
+  enabledProviders: 'local,litert,ollama,beta',
   modelFailover: true,
   ollamaModel: '',
   ollamaContextLength: 8192,
@@ -69,6 +72,7 @@ export const BASE_DEFAULTS: AppSettings = {
   name: '',
   includeDateTime: true,
   showTechnicalDetails: false,
+  showDetectionBoxes: false,
   advancedMode: false,
   dataWarningDismissed: false,
   useAppContext: true,
@@ -77,6 +81,8 @@ export const BASE_DEFAULTS: AppSettings = {
   hasSeenAssistantOverlay: false,
   //empty means the built-in privatebin instance
   shareInstanceUrl: '',
+  litertForceLoad: false,
+  litertContextLength: 8192,
 };
 
 //text storage needs per-key readers
@@ -89,17 +95,20 @@ const BOOLEAN_KEYS = [
   'hasSeenOnboarding',
   'includeDateTime',
   'showTechnicalDetails',
+  'showDetectionBoxes',
   'advancedMode',
   'dataWarningDismissed',
   'useAppContext',
   'shakeToReport',
   'assistantPromptDismissed',
   'hasSeenAssistantOverlay',
+  'litertForceLoad',
 ] as const;
 
 const NUMBER_KEYS = [
   'ollamaContextLength',
   'ollamaKeepAlive',
+  'litertContextLength',
 ] as const;
 
 export function isBooleanKey(key: string): boolean {

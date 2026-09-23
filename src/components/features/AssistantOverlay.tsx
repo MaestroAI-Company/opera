@@ -178,6 +178,7 @@ function AssistantOverlay() {
   const [appContextDismissed, setAppContextDismissed] = useState(false);
   //hide chrome while drawing lasso
   const [isDrawingSelection, setIsDrawingSelection] = useState(false);
+  const [showDetections, setShowDetections] = useState(false);
 
   //lift bottom bar above keyboard
   const keyboardHeight = useSharedValue(0);
@@ -280,6 +281,7 @@ function AssistantOverlay() {
     setAiService(s.aiService);
     setOllamaUrl(s.ollamaUrl);
     setAlwaysWhisper(s.alwaysWhisper);
+    setShowDetections(s.showDetectionBoxes);
     //store setting for later
     autoStartMicSetting.current = s.autoStartMic ?? true;
     const tuning = getOllamaTuning(s.ollamaUrl);
@@ -546,7 +548,7 @@ function AssistantOverlay() {
     //dismiss chip after first message
     setAppContextDismissed(true);
 
-    const taskSystemPrompt = buildSystemPrompt(instruction, screenContextSegment);
+    const taskSystemPrompt = buildSystemPrompt(model, instruction, screenContextSegment);
     screenContextSegmentsRef.current[userMsg.id] = screenContextSegment;
 
     const assistantMsg = await DB.addMessage(conv.id, 'assistant', '…');
@@ -659,7 +661,7 @@ function AssistantOverlay() {
       msgId: assistantMsg.id,
       prompt: regenUserText,
       model,
-      systemPrompt: buildSystemPrompt(instruction, regenSegment),
+      systemPrompt: buildSystemPrompt(model, instruction, regenSegment),
       history: taskHistory,
       think: reflection === 'none' ? false : reflection,
     });
@@ -791,6 +793,7 @@ function AssistantOverlay() {
                   onDrawingChange={setIsDrawingSelection}
                   onDismiss={closeOverlay}
                   detections={detections}
+                  showDetections={showDetections}
                 />
                 <TextLayer
                   codes={screenText.codes}

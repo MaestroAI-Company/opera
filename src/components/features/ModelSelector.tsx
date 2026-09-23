@@ -22,7 +22,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { AIModule } from "../../services/ai/AIModule";
-import { getAICoreModelLabel } from "../../services/ai/providers/AICoreProvider";
+import { getLocalModelLabel, isLocalModel } from "../../services/ai/providers/LocalProvider";
+import { getLiteRTModelLabel, isLiteRTModel, subscribeLiteRTDownload } from "../../services/ai/providers/LiteRTProvider";
 import { getCachedModels, getLastModel, hydrateModelCache, setCachedModels, setLastModel } from "../../services/ai/providers/modelCache";
 import { buildSources, ModelSource } from "../../services/ai/providers/sources";
 import { AppEvents } from "../../services/events";
@@ -81,7 +82,9 @@ export function ModelSelectorTrigger({
   const styles = useThemedStyles(makeStyles);
 
   const displayName = (model: string) =>
-    model.startsWith("aicore-") ? getAICoreModelLabel(model) : model;
+    isLocalModel(model) ? getLocalModelLabel(model)
+      : isLiteRTModel(model) ? getLiteRTModelLabel(model)
+        : model;
 
   return (
     <View style={[styles.container, style]} ref={viewRef} collapsable={false}>
@@ -193,7 +196,11 @@ export function ModelSelectorDrawer({
   useEffect(() => {
     AIModule.isModeAvailable("local").then(setLocalAvailable).catch(() => setLocalAvailable(false));
     const sub = DeviceEventEmitter.addListener(AppEvents.settingsChanged, () => setSourcesRevision((r) => r + 1));
-    return () => sub.remove();
+    //downloaded models must appear here too
+    const unsubscribe = subscribeLiteRTDownload((_, snapshot) => {
+      if (!snapshot) setSourcesRevision((r) => r + 1);
+    });
+    return () => { sub.remove(); unsubscribe(); };
   }, []);
 
   //settings may have changed while the panel was closed
@@ -338,9 +345,11 @@ export function ModelSelectorDrawer({
     if (last) onModelChange(last);
   };
 
-  //friendly label for aicore variants
+  //friendly label for local variants
   const displayName = (model: string) =>
-    model.startsWith("aicore-") ? getAICoreModelLabel(model) : model;
+    isLocalModel(model) ? getLocalModelLabel(model)
+      : isLiteRTModel(model) ? getLiteRTModelLabel(model)
+        : model;
 
   const displayModels = useMemo(() => {
     return [...models].sort((a, b) => a.localeCompare(b));

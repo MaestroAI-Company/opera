@@ -1,5 +1,5 @@
 import { DeviceEventEmitter, NativeModules, Platform } from 'react-native';
-import { IAIProvider } from './IAIProvider';
+import type { LocalBackend, LocalModelSheet, LocalModelStatus } from './LocalProvider';
 import { MessageMetrics } from '../../db/DatabaseService';
 import { ToolCall, ToolDefinition } from "../tools/ITool";
 import {
@@ -23,7 +23,15 @@ export function getAICoreModelLabel(modelName: string): string {
   return MODEL_LABELS[modelName] || modelName;
 }
 
-export class AICoreProvider implements IAIProvider {
+//ml kit FeatureStatus codes
+const STATUS: Record<number, LocalModelStatus> = {
+  0: "unavailable",
+  1: "downloadable",
+  2: "downloading",
+  3: "available",
+};
+
+export class AICoreProvider implements LocalBackend {
   private supported(): boolean {
     return MODULE !== null;
   }
@@ -69,6 +77,28 @@ export class AICoreProvider implements IAIProvider {
       console.warn("AICore isThinkingModeAvailable error:", e);
     }
     return caps;
+  }
+
+  async getModelSheet(): Promise<LocalModelSheet> {
+    const ids: string[] = this.supported() ? await this.getAvailableModels() : [];
+    const models = await Promise.all(ids.map(async (id) => {
+      let info: { status?: number; baseModelName?: string; tokenLimit?: number; thinking?: boolean } = {};
+      try {
+        info = await MODULE.getModelInfo(id);
+      } catch (e) {
+        console.warn("AICore getModelInfo error:", e);
+      }
+      return {
+        id,
+        label: getAICoreModelLabel(id),
+        status: info.status !== undefined ? STATUS[info.status] : undefined,
+        version: info.baseModelName || undefined,
+        contextTokens: info.tokenLimit,
+        thinking: info.thinking,
+      };
+    }));
+    //ml kit api, gemini nano only
+    return { runtime: "ML Kit GenAI · AICore", family: "Gemini Nano", models };
   }
 
   //transient aicore inference error

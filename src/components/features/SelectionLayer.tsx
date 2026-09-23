@@ -28,8 +28,6 @@ const ENCLOSED_MIN = 0.45;
 const MAGNET_MIN = 0.55;
 //padding around detected elements
 const DETECTION_INFLATE = 1.2;
-//paint what selection snaps to
-const DEBUG_DETECTIONS = false;
 const STROKE_WIDTH = 7;
 const SETTLE_MS = 300;
 
@@ -58,6 +56,8 @@ type Props = {
   onDismiss?: () => void;
   //capture elements aim selection
   detections?: SelectionRegion[];
+  //paint what selection snaps to
+  showDetections?: boolean;
 };
 
 function boundsOf(points: Point[]): Rect {
@@ -201,7 +201,7 @@ function toRegion(rect: Rect, size: Size): SelectionRegion {
   return { x, y, w: Math.max(0.02, x2 / size.w - x), h: Math.max(0.02, y2 / size.h - y) };
 }
 
-export default function SelectionLayer({ selection, onChange, onVibrate, onDrawingChange, onDismiss, detections }: Props) {
+export default function SelectionLayer({ selection, onChange, onVibrate, onDrawingChange, onDismiss, detections, showDetections }: Props) {
   const [size, setSize] = useState<Size>({ w: 1, h: 1 });
   const [resizing, setResizing] = useState(false);
   const [drawing, setDrawing] = useState(false);
@@ -532,7 +532,7 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
         </Svg>
       )}
 
-      {__DEV__ && DEBUG_DETECTIONS && (
+      {showDetections && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           {rects.map((rect, i) => (
             <View

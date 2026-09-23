@@ -118,6 +118,7 @@ import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 import CloudSyncBox from "./CloudSyncBox";
 import DrawerSheet from "./DrawerSheet";
+import ProfileCard from "./ProfileCard";
 
 import { useKeyboardAnimation } from "react-native-keyboard-controller";
 import { useResponsive } from "../../hooks/useResponsive";
@@ -2463,6 +2464,12 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.nav.profile.title"))}
 
       <View style={styles.contentCard}>
+        <View style={styles.settingRowVertical}>
+          <Group>
+            <ProfileCard name={name} />
+          </Group>
+        </View>
+
         <View style={styles.settingRowVertical}>
           <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
             {t("settings.profile.name")}

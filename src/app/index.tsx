@@ -743,7 +743,7 @@ export default function Index() {
         //onboarding flow is native/desktop only, browser web skips straight to the app
         const isBrowserWeb = Platform.OS === "web" && !(typeof window !== "undefined" && "__TAURI_INTERNALS__" in window);
         if (!s.hasSeenOnboarding && !isBrowserWeb) {
-          router.replace("/starting");
+          router.replace("/onboarding");
           return;
         }
 

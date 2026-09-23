@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, BackHandler, Image, Keyboard, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Animated, BackHandler, Image, Keyboard, NativeScrollEvent, NativeSyntheticEvent, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
@@ -92,6 +92,17 @@ export default function ConversationsDrawer({
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null);
   const pageAnim = useAnimatedValue(1);
   const backPulse = useAnimatedValue(0);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    setIsScrolled(false);
+  }, [isSearching, visible]);
+
+  //detect scroll to morph close button
+  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const scrolled = e.nativeEvent.contentOffset.y > 10;
+    setIsScrolled((prev) => (prev !== scrolled ? scrolled : prev));
+  }, []);
 
   useEffect(() => {
     if (!visible && (isSearching || searchQuery !== "" || selectedSearchId !== null)) {
@@ -262,7 +273,7 @@ export default function ConversationsDrawer({
   };
 
   const searchContent = (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, paddingTop: isDesktop ? 0 : 60 }}>
       <View style={styles.header}>
         <Animated.View
           style={{
@@ -392,69 +403,81 @@ export default function ConversationsDrawer({
   );
 
   const innerContent = (
-    <>
-      <View style={styles.header}>
-        <View style={styles.headerSpacer} />
-        <Text style={styles.title} numberOfLines={1}>{t("conversations.title")}</Text>
+    <View style={styles.scrollListContainer}>
+      <View style={[styles.fixedCloseWrapper, { top: isDesktop ? 0 : 60 }]} pointerEvents="box-none">
+        {isScrolled && <View style={styles.fixedCloseShadow} pointerEvents="none" />}
         <Pressable
           onPress={onClose}
           hitSlop={12}
-          style={({ pressed, hovered }) => [styles.backButton, (pressed || hovered) && { opacity: 0.6 }]}
+          style={({ pressed, hovered }) => [
+            styles.backButton,
+            isScrolled && styles.fixedCloseScrolled,
+            (pressed || hovered) && (isScrolled ? { backgroundColor: Colors.surfacePressed } : { opacity: 0.6 }),
+          ]}
         >
           <Image source={cancelIcon} style={styles.closeIcon} tintColor={Colors.textPrimary} />
         </Pressable>
       </View>
 
-      <Group style={styles.quickActionsSpacing}>
-        <ActionButton
-          icon={newIcon}
-          iconBadge
-          label={t("conversations.new")}
-          onPress={() => {
-            onNewConversation();
-            if (!isDesktop) onClose();
-          }}
-        />
-        <ActionButton
-          icon={searchIcon}
-          iconBadge
-          label={t("conversations.search.action")}
-          onPress={() => setIsSearching(true)}
-        />
-      </Group>
+      <ScrollView
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: isDesktop ? 0 : 60, paddingBottom: 40 }}
+      >
+        <View style={styles.header}>
+          <View style={styles.headerSpacer} />
+          <Text style={styles.title} numberOfLines={1}>{t("conversations.title")}</Text>
+          <View style={styles.headerSpacer} />
+        </View>
 
-      <View style={styles.scrollListContainer}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          {conversations.length === 0 && (
-            <Text style={styles.emptyText}>{t("conversations.empty")}</Text>
-          )}
+        <Group style={styles.quickActionsSpacing}>
+          <ActionButton
+            icon={newIcon}
+            iconBadge
+            label={t("conversations.new")}
+            onPress={() => {
+              onNewConversation();
+              if (!isDesktop) onClose();
+            }}
+          />
+          <ActionButton
+            icon={searchIcon}
+            iconBadge
+            label={t("conversations.search.action")}
+            onPress={() => setIsSearching(true)}
+          />
+        </Group>
 
-          {pinnedConversations.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{t("conversations.pins")}</Text>
-              {pinnedConversations.map(renderConversationRow)}
-            </View>
-          )}
+        {conversations.length === 0 && (
+          <Text style={styles.emptyText}>{t("conversations.empty")}</Text>
+        )}
 
-          {groups.map((group) => (
-            <View key={group.title} style={styles.section}>
-              <Text style={styles.sectionTitle}>{group.title}</Text>
-              {group.data.map(renderConversationRow)}
-            </View>
-          ))}
-        </ScrollView>
-        <LinearGradient
-          colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
-          style={styles.gradientTop}
-          pointerEvents="none"
-        />
-        <LinearGradient
-          colors={[Colors.groupedBackgroundClear, Colors.groupedBackgroundFade, Colors.groupedBackground]}
-          style={styles.gradientBottom}
-          pointerEvents="none"
-        />
-      </View>
-    </>
+        {pinnedConversations.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t("conversations.pins")}</Text>
+            {pinnedConversations.map(renderConversationRow)}
+          </View>
+        )}
+
+        {groups.map((group) => (
+          <View key={group.title} style={styles.section}>
+            <Text style={styles.sectionTitle}>{group.title}</Text>
+            {group.data.map(renderConversationRow)}
+          </View>
+        ))}
+      </ScrollView>
+      <LinearGradient
+        colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
+        style={styles.screenGradientTop}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={[Colors.groupedBackgroundClear, Colors.groupedBackgroundFade, Colors.groupedBackground]}
+        style={styles.screenGradientBottom}
+        pointerEvents="none"
+      />
+    </View>
   );
 
   const notificationModal = (
@@ -570,7 +593,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     bottom: 0,
     left: 0,
     backgroundColor: Colors.groupedBackground,
-    paddingTop: 60,
     paddingHorizontal: Spacing.lg2,
   },
   largeScreenContainer: {
@@ -599,7 +621,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flex: 1,
   },
   attachedContent: {
-    paddingTop: 60,
     paddingHorizontal: Spacing.lg2,
     flex: 1,
   },
@@ -639,7 +660,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     lineHeight: 40,
   },
   quickActionsSpacing: {
-    marginBottom: Spacing.lg2,
+    marginBottom: Spacing.xxl,
     borderRadius: Radius.xxl + Spacing.md,
     borderWidth: 0,
   },
@@ -663,6 +684,43 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     height: 40,
     zIndex: 10,
   },
+  screenGradientTop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    zIndex: 10,
+  },
+  screenGradientBottom: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    zIndex: 10,
+  },
+  fixedCloseWrapper: {
+    position: "absolute",
+    right: 0,
+    zIndex: 100,
+    elevation: 10,
+    width: 40,
+    height: 40,
+  },
+  fixedCloseShadow: {
+    position: "absolute",
+    top: 4,
+    left: -4,
+    width: 40,
+    height: 40,
+    backgroundColor: Colors.shadowInk,
+    borderRadius: Radius.xxl,
+  },
+  fixedCloseScrolled: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl,
+  },
   scrollContent: {
     paddingTop: 30,
     paddingBottom: 40,
@@ -676,6 +734,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     fontFamily: Fonts.body,
     textTransform: "uppercase",
     marginBottom: 8,
+    paddingHorizontal: Spacing.lg,
   },
   emptyText: {
     fontSize: FontSizes.bodyMd,

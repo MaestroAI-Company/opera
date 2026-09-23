@@ -4411,6 +4411,7 @@ const makeStyles = (Colors: ThemeColors) =>
       color: Colors.textPrimary,
       fontFamily: Fonts.mono,
       paddingTop: Spacing.xs,
+      paddingHorizontal: Spacing.md,
     },
     toggleRow: {
       flexDirection: "row",
@@ -4478,6 +4479,7 @@ const makeStyles = (Colors: ThemeColors) =>
       fontFamily: Fonts.body,
       marginTop: 4,
       lineHeight: 20,
+      paddingHorizontal: Spacing.md,
     },
     assistantStatusText: {
       fontSize: FontSizes.bodyMd,

@@ -124,13 +124,12 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   sheetHandleContainer: {
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: Spacing.xs2,
     paddingVertical: 10,
     marginTop: -10,
   },
   content: {
     paddingHorizontal: Spacing.lg2,
-    paddingTop: Spacing.md,
     paddingBottom: Spacing.lg,
     gap: Spacing.lg2,
   },

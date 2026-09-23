@@ -55,18 +55,18 @@ export type CatalogEntry = {
 export type ModelFamily = { id: string; label: string; repoIds: string[] };
 
 //deepseek matches before qwen
-const FAMILIES: { id: string; label: string; match: RegExp }[] = [
-  { id: 'deepseek', label: 'DeepSeek', match: /deepseek/i },
-  { id: 'gemma', label: 'Gemma', match: /gemma/i },
-  { id: 'qwen', label: 'Qwen', match: /qwen/i },
-  { id: 'smollm', label: 'SmolLM', match: /smol/i },
-  { id: 'phi', label: 'Phi', match: /phi-?\d/i },
-  { id: 'lfm', label: 'LFM', match: /lfm\d/i },
-  { id: 'llama', label: 'Llama', match: /llama/i },
-  { id: 'mistral', label: 'Mistral', match: /ministral|mistral/i },
-  { id: 'granite', label: 'Granite', match: /granite/i },
-  { id: 'falcon', label: 'Falcon', match: /falcon/i },
-  { id: 'internvl', label: 'InternVL', match: /internvl/i },
+const FAMILIES: { id: string; label: string; publisher: string; match: RegExp }[] = [
+  { id: 'deepseek', label: 'DeepSeek', publisher: 'DeepSeek', match: /deepseek/i },
+  { id: 'gemma', label: 'Gemma', publisher: 'Google', match: /gemma/i },
+  { id: 'qwen', label: 'Qwen', publisher: 'Qwen', match: /qwen/i },
+  { id: 'smollm', label: 'SmolLM', publisher: 'Hugging Face', match: /smol/i },
+  { id: 'phi', label: 'Phi', publisher: 'Microsoft', match: /phi-?\d/i },
+  { id: 'lfm', label: 'LFM', publisher: 'Liquid AI', match: /lfm\d/i },
+  { id: 'llama', label: 'Llama', publisher: 'Meta', match: /llama/i },
+  { id: 'mistral', label: 'Mistral', publisher: 'Mistral AI', match: /ministral|mistral/i },
+  { id: 'granite', label: 'Granite', publisher: 'IBM', match: /granite/i },
+  { id: 'falcon', label: 'Falcon', publisher: 'TII', match: /falcon/i },
+  { id: 'internvl', label: 'InternVL', publisher: 'Shanghai AI Lab', match: /internvl/i },
 ];
 
 export const OTHER_FAMILY_ID = 'other';
@@ -96,6 +96,10 @@ function familyOf(repoId: string): string {
 
 export function familyLabel(id: string): string {
   return FAMILIES.find((f) => f.id === id)?.label ?? '';
+}
+
+export function familyPublisher(id: string): string {
+  return FAMILIES.find((f) => f.id === id)?.publisher ?? '';
 }
 
 //parameter count from name or null
@@ -300,17 +304,36 @@ async function resolveEntry(repoId: string): Promise<CatalogEntry | null> {
 
 const bySize = (a: CatalogEntry, b: CatalogEntry) => a.sizeBytes - b.sizeBytes;
 
-//lazy, one call per repo
-export async function fetchFamilyModels(familyId: string): Promise<CatalogEntry[]> {
-  const family = store.families.find((f) => f.id === familyId);
-  if (!family) return [];
+//real size when resolved, else param guess
+function estimatedBytes(entry: CatalogEntry | undefined): number | null {
+  if (!entry) return null;
+  if (entry.sizeBytes > 0) return entry.sizeBytes;
+  const paramsB = parseParamsB(entry.label);
+  return paramsB === null ? null : paramsB * BYTES_PER_PARAM_FLOOR;
+}
 
-  const resolved = await Promise.all(family.repoIds.map(resolveEntry));
-  const entries = resolved.filter((e): e is CatalogEntry => e !== null).sort(bySize);
-  //name gate misses show empty families
-  if (entries.length === 0) store.families = store.families.filter((f) => f.id !== familyId);
+//closest sizes across the listed families
+export function similarModels(repoId: string, limit = 6): string[] {
+  const target = estimatedBytes(store.entries[repoId]);
+  if (target === null) return [];
+  const distance = (bytes: number) => Math.abs(Math.log(bytes / target));
+  return store.families
+    .flatMap((f) => f.repoIds)
+    .filter((id) => id !== repoId)
+    .map((id) => ({ id, bytes: estimatedBytes(store.entries[id]) }))
+    .filter((c): c is { id: string; bytes: number } => c.bytes !== null)
+    .sort((a, b) => distance(a.bytes) - distance(b.bytes))
+    .slice(0, limit)
+    .map((c) => c.id);
+}
+
+//sizes resolve on pick, not on listing
+export async function fetchCatalogEntry(repoId: string): Promise<CatalogEntry | null> {
+  const known = store.entries[repoId];
+  if (known?.url) return known;
+  const entry = await resolveEntry(repoId);
   persist();
-  return entries;
+  return entry;
 }
 
 //hub search finds anything runnable

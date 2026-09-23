@@ -402,16 +402,18 @@ export const fr: Translations = {
   "settings.litert.help":
     "Ajoutez et gérez vos modèles d'IA depuis Hugging Face.",
   "settings.litert.addModel": "Ajouter un modèle d'IA",
-  "settings.litert.addModelTitle": "Ajouter un modèle d'IA",
-  "settings.litert.addModelHelp":
-    "Choisissez une famille, puis un modèle. Seuls ceux qui tiennent sur cet appareil sont listés, et aucun ne demande de compte.",
   "settings.litert.addModelPlaceholder": "rechercher un modèle",
   "settings.litert.noModels": "Aucun modèle installé pour l'instant.",
   "settings.litert.installed": "Installé",
   "settings.litert.loading": "Chargement...",
   "settings.litert.familyOther": "Autres",
-  "settings.litert.allFamilies": "Toutes les familles",
-  "settings.litert.familyEmpty": "Aucun modèle de cette famille ne tient sur cet appareil.",
+  "settings.litert.unavailable": "Ce modèle ne tient pas sur cet appareil ou n'a pas pu être chargé.",
+  "settings.litert.capVision": "Vision",
+  "settings.litert.capAudio": "Audio",
+  "settings.litert.capThinking": "Réflexion",
+  "settings.litert.description": "Description",
+  "settings.litert.descriptionPlaceholder": "[description]",
+  "settings.litert.otherModels": "Autres modèles",
   "settings.litert.loadFailed":
     "La liste des modèles n'a pas pu être chargée. Vérifiez votre connexion.",
   "settings.litert.downloading": "Téléchargement...",

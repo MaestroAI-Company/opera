@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useKeyboardAnimation, useKeyboardState } from "react-native-keyboard-controller";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useBugReport } from "../../hooks/useBugReport";
 import { useT } from "../../i18n";
@@ -39,6 +40,7 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
   const { height: keyboardHeight } = useKeyboardAnimation();
   const isKeyboardOpen = useKeyboardState((state) => state.isVisible);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const notify = useCallback((title: string, message: string, buttons?: ModalButton[]) => {
     setAlertConfig({ title, message, buttons });
@@ -71,7 +73,7 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
         keyboardTranslateY={keyboardHeight}
         sheetStyle={[
           styles.sheet,
-          { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + (isKeyboardOpen ? 0 : bottomInset) },
+          { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + (isKeyboardOpen ? 0 : bottomInset), maxHeight: windowHeight - insets.top - Spacing.xl2 },
         ]}
         desktopStyle={[styles.desktopCard, centeredStyle]}
       >
@@ -156,7 +158,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     borderTopLeftRadius: Radius.huge2,
     borderTopRightRadius: Radius.huge2,
     paddingTop: 12,
-    maxHeight: "85%",
   },
   desktopCard: {
     backgroundColor: Colors.groupedBackground,
@@ -170,13 +171,12 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   sheetHandleContainer: {
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: Spacing.xs2,
     paddingVertical: 10,
     marginTop: -10,
   },
   content: {
     paddingHorizontal: Spacing.lg2,
-    paddingTop: Spacing.md,
     paddingBottom: Spacing.lg,
   },
   contentCard: {

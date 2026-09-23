@@ -4,6 +4,7 @@ import { type PropsWithChildren } from "react";
 const rootStyle = `
 html,body{overscroll-behavior:none}
 #root{overflow:hidden}
+[data-chatbar-input]::-webkit-scrollbar{display:none}
 `;
 
 export default function Root({ children }: PropsWithChildren) {

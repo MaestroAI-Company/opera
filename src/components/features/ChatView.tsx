@@ -8,10 +8,12 @@ import {
   Linking,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  ToastAndroid,
   View,
 } from "react-native";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
@@ -43,6 +45,10 @@ const imageSourceIcon = require("../../../assets/icons/photo.png");
 const linkSourceIcon = require("../../../assets/icons/hyperlink.png");
 const arrowIcon = require("../../../assets/icons/return.png");
 const fileIcon = require("../../../assets/icons/file.png");
+const arrowDownIcon = require("../../../assets/icons/down_arrow.png");
+
+//android 13+ shows its own clipboard confirmation
+const ANDROID_CLIPBOARD_UI_API = 33;
 
 //last title segment after separator
 function sourceLabel(source: MessageSource): string {
@@ -202,6 +208,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   const styles = useThemedStyles(makeStyles);
   const isUser = item.role === "user";
   const [showDetails, setShowDetails] = useState(false);
+  const [showThinking, setShowThinking] = useState(false);
   //suggestion cards take half the visible row
   const [suggestionBarWidth, setSuggestionBarWidth] = useState(0);
 
@@ -254,12 +261,18 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
     { label: "time", value: item.metrics?.timeSec != null ? `${item.metrics.timeSec.toFixed(1)}s` : "N/A" },
     { label: "tokens", value: item.metrics?.tokens != null ? String(item.metrics.tokens) : "N/A" },
     { label: "tokens_per_sec", value: item.metrics?.tokensPerSec != null ? item.metrics.tokensPerSec.toFixed(1) : "N/A" },
+    { label: "system_prompt", value: item.metrics?.systemPrompt || "N/A" },
   ];
+  const thinkingLevel = item.metrics?.thinking;
+  const canExpandThinking = thinkingLevel !== "none" && disp.thinkingText.length > 0;
 
-  const copyToClipboard = async (text: string, isMarkdown: boolean) => {
-    const contentToCopy = isMarkdown ? text : stripMarkdown(text);
+  //copy only what is displayed
+  const copyToClipboard = async (isMarkdown: boolean) => {
+    const contentToCopy = isMarkdown ? disp.visibleText : stripMarkdown(disp.visibleText);
     await Clipboard.setStringAsync(contentToCopy);
-    showSnackbar(isMarkdown ? t("chat.copiedMarkdown") : t("chat.copied"));
+    const message = isMarkdown ? t("chat.copiedMarkdown") : t("chat.copied");
+    if (Platform.OS !== "android") showSnackbar(message);
+    else if (Platform.Version < ANDROID_CLIPBOARD_UI_API) ToastAndroid.show(message, ToastAndroid.SHORT);
   };
 
   return (
@@ -341,8 +354,8 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               <IconButton
                 icon={copyIcon}
                 label={t("common.copy")}
-                onPress={() => copyToClipboard(item.content, false)}
-                onLongPress={() => copyToClipboard(item.content, true)}
+                onPress={() => copyToClipboard(false)}
+                onLongPress={() => copyToClipboard(true)}
                 delayLongPress={500}
                 containerSize={32}
                 pressedColor={Colors.surfacePressed}
@@ -370,6 +383,32 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               )}
             </View>
           )}
+          {showMetrics && showDetails && (
+            <View style={styles.metricsCard}>
+              {metricRows.map(row => (
+                <View key={row.label} style={styles.metricsRow}>
+                  <Text style={styles.metricsLabel}>{row.label}</Text>
+                  <Text style={styles.metricsSeparator}> : </Text>
+                  <Text style={[styles.metricsValue, incognito && { color: Colors.incognito }]}>{row.value}</Text>
+                </View>
+              ))}
+              <Pressable
+                disabled={!canExpandThinking}
+                onPress={() => setShowThinking(prev => !prev)}
+                style={({ pressed, hovered }) => [styles.metricsRow, canExpandThinking && (pressed || hovered) && { opacity: 0.6 }]}
+              >
+                <Text style={styles.metricsLabel}>thinking</Text>
+                <Text style={styles.metricsSeparator}> : </Text>
+                <Text style={[styles.metricsValue, incognito && { color: Colors.incognito }]}>{thinkingLevel ?? "N/A"}</Text>
+                {canExpandThinking && (
+                  <Image source={arrowDownIcon} style={[styles.metricsArrow, showThinking && styles.metricsArrowOpen]} />
+                )}
+              </Pressable>
+              {canExpandThinking && showThinking && (
+                <Text style={styles.metricsThinking} selectable={true}>{disp.thinkingText}</Text>
+              )}
+            </View>
+          )}
           {!isCurrentlyThinking && !isGenerating && !isChatGenerating && !!suggestions && suggestions.length > 0 && (
             <ScrollView
               horizontal
@@ -388,17 +427,6 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                 />
               ))}
             </ScrollView>
-          )}
-          {showMetrics && showDetails && (
-            <View style={styles.metricsCard}>
-              {metricRows.map(row => (
-                <View key={row.label} style={styles.metricsRow}>
-                  <Text style={styles.metricsLabel}>{row.label}</Text>
-                  <Text style={styles.metricsSeparator}> : </Text>
-                  <Text style={[styles.metricsValue, incognito && { color: Colors.incognito }]}>{row.value}</Text>
-                </View>
-              ))}
-            </View>
           )}
         </View>
       )}
@@ -736,6 +764,21 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     fontFamily: Fonts.mono,
     fontSize: FontSizes.label,
     color: Colors.primary,
+  },
+  metricsArrow: {
+    width: 12,
+    height: 12,
+    marginLeft: Spacing.sm,
+    tintColor: Colors.textMuted,
+  },
+  metricsArrowOpen: {
+    transform: [{ rotate: "180deg" }],
+  },
+  metricsThinking: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.label,
+    color: Colors.textMuted,
+    marginTop: Spacing.xs,
   },
   snackbarContainer: {
     position: 'absolute',

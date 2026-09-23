@@ -111,6 +111,7 @@ export const fr: Translations = {
   "modelSelector.download.message":
     "Voulez-vous télécharger le modèle Gemma4 sur votre serveur Ollama ? Ce modèle pèse plusieurs Go.",
   "modelSelector.download.confirm": "Télécharger",
+  "modelSelector.tokenWindow": "Fenêtre de token",
 
   "selector.placeholder": "Sélectionner...",
 

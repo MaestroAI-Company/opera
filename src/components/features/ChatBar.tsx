@@ -408,6 +408,13 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const nativeAudioUriRef = useRef<string | null>(null);
   const stopResolverRef = useRef<((text: string | null) => void) | null>(null);
   const sendCancelledRef = useRef(false);
+  //repeat taps during a freeze resend stale text
+  const sendingRef = useRef(false);
+  const [sentCount, setSentCount] = useState(0);
+  //unlock once the cleared input rendered
+  useEffect(() => {
+    sendingRef.current = false;
+  }, [sentCount]);
 
   //web vad state (rms threshold)
   const vadHasSpeechRef = useRef(false);
@@ -1030,13 +1037,24 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   };
 
   const handleSend = async () => {
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    let sent = false;
+    try {
+      sent = await sendOnce();
+    } finally {
+      if (!sent) sendingRef.current = false;
+    }
+  };
+
+  const sendOnce = async (): Promise<boolean> => {
     const wasRecording = isRecording;
     let voiceText: string | null = null;
     if (wasRecording) {
       voiceText = await stopSTT();
       const cancelled = sendCancelledRef.current;
       sendCancelledRef.current = false;
-      if (cancelled) return;
+      if (cancelled) return false;
     }
     const finalText = (voiceText ?? text).trim();
     if ((finalText || attachments.length > 0) && onSend) {
@@ -1047,7 +1065,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       if (blocked) {
         setModalConfig(blocked);
         setModalVisible(true);
-        return;
+        return false;
       }
 
       let documents: ExtractedDocument[];
@@ -1056,7 +1074,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       } catch (e: any) {
         setModalConfig({ title: t("chatbar.unreadableDocument"), message: e.message });
         setModalVisible(true);
-        return;
+        return false;
       }
       const images = await buildImages();
       onSend(
@@ -1068,10 +1086,13 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       if (Platform.OS === 'web') setWebInputHeight(undefined);
       setSelectedFiles([]);
       documentsRef.current.clear();
+      setSentCount(n => n + 1);
       Keyboard.dismiss();
+      return true;
     } else if (voiceText === null && wasRecording && autoStartMic) {
       onTranscribeError?.();
     }
+    return false;
   };
 
   //live list shows new items instantly
@@ -1381,9 +1402,11 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                             paddingVertical: 0,
                             minHeight: 22,
                             height: text ? webInputHeight : 22,
-                            overflow: 'hidden',
+                            overflow: 'auto',
                             resize: 'none',
                             fieldSizing: 'content',
+                            scrollbarWidth: 'none',
+                            msOverflowStyle: 'none',
                           } as any),
                           Platform.OS === 'web' && mentionSpans.length > 0 && [styles.inputUnderMirror, { caretColor: Colors.textOnPrimary } as any],
                         ]}
@@ -1396,7 +1419,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                         placeholder={placeholder ?? t("chatbar.placeholder")}
                         placeholderTextColor={Colors.whiteSoft}
                         multiline={true}
-                        numberOfLines={1}
+                        numberOfLines={Platform.OS === 'web' ? 1 : undefined}
                         onContentSizeChange={Platform.OS === 'web' ? (e) => {
                           const h = e.nativeEvent.contentSize?.height;
                           if (h && h > 0) {
@@ -1407,6 +1430,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                         onTouchStart={handlePressIn}
                         onTouchEnd={handlePressOut}
                         onKeyPress={handleKeyPress}
+                        {...(Platform.OS === 'web' && ({ dataSet: { chatbarInput: true } } as any))}
                       >
                         {/* native span colors the mention */}
                         {Platform.OS !== 'web' && <Text>{renderInputText()}</Text>}

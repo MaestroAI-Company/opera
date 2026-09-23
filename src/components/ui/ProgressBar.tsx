@@ -27,7 +27,8 @@ export default function ProgressBar({
             style={[
               styles.fill,
               {
-                width: `${clamped * 100}%`,
+                //full bar also covers the right border
+                right: clamped >= 1 ? -2 : `${(1 - clamped) * 100}%`,
                 backgroundColor: fillColor ?? Colors.primary,
               },
             ]}
@@ -69,13 +70,13 @@ const makeStyles = (Colors: ThemeColors) =>
       borderColor: Colors.border,
       justifyContent: "center",
     },
+    //sits over the track border, never taller
     fill: {
       position: "absolute",
       left: -2,
-      top: "50%",
-      marginTop: -12,
-      height: 24,
-      borderRadius: Radius.md,
+      top: -2,
+      bottom: -2,
+      borderRadius: Radius.xs,
       borderWidth: 2,
       borderColor: Colors.borderOnPrimary,
     },

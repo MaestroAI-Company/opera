@@ -649,7 +649,7 @@ export function codeLanguageName(language?: string): string | null {
 }
 
 //dark highlighted code surface
-export function CodeContent({ code, language, incognito, maxHeight }: { code: string; language?: string; incognito?: boolean; maxHeight?: number }) {
+export function CodeContent({ code, language, incognito, maxHeight, radius }: { code: string; language?: string; incognito?: boolean; maxHeight?: number; radius?: number }) {
   const Colors = useColors();
   const s = useThemedStyles(makeS);
   const lang = language ? LANG_ALIASES[language] ?? language : undefined;
@@ -657,7 +657,7 @@ export function CodeContent({ code, language, incognito, maxHeight }: { code: st
   const codeBorderColor = incognito ? Colors.incognito : Colors.responseBorder;
 
   return (
-    <View style={[s.codeContent, { maxHeight, borderColor: codeBorderColor, backgroundColor: Colors.codeBlockBg }]}>
+    <View style={[s.codeContent, { maxHeight, borderColor: codeBorderColor, backgroundColor: Colors.codeBlockBg, borderRadius: radius ?? s.codeContent.borderRadius }]}>
       {lang ? (
         <CodeHighlighter
           language={lang}

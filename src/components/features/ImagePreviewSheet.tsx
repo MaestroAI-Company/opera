@@ -97,6 +97,12 @@ export default function ImagePreviewSheet({ image, onClose, isLargeScreen = fals
               <Image
                 source={{ uri: shown.uri }}
                 resizeMode="contain"
+                onLoad={(e) => {
+                  const { width, height } = e.nativeEvent.source;
+                  if (width > 0 && height > 0) {
+                    setMeasured({ uri: shown.uri, width, height });
+                  }
+                }}
                 style={[
                   styles.image,
                   size ? { aspectRatio: size.width / size.height } : styles.imagePlaceholder,
@@ -155,6 +161,9 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   image: {
     width: "100%",
     borderRadius: Radius.xxl,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    overflow: "hidden",
   },
   imagePlaceholder: {
     aspectRatio: 1,

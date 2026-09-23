@@ -23,26 +23,41 @@ export const en = {
   "common.statusOk": "Connected",
   "common.statusError": "Error",
 
-  "onboarding.start.tagline": "AI for all,\nprivacy for freedom",
-  "onboarding.start.cta": "Get started",
-  "onboarding.name.title": "What should we call you?",
-  "onboarding.name.subtitle":
-    "Enter your name to personalize your experience with Opera.",
+  "onboarding.next": "Continue",
+  "onboarding.back": "Back",
+  "onboarding.welcome.title": "AI for all,\nprivacy for freedom.",
+  "onboarding.welcome.subtitle":
+    "Meet Maestro, the assistant inside Opera. It works for you, and only for you.",
+  "onboarding.welcome.local.title": "Local first",
+  "onboarding.welcome.local.description":
+    "Runs on your device, no server required.",
+  "onboarding.welcome.account.title": "No account",
+  "onboarding.welcome.account.description": "Open the app and start talking.",
+  "onboarding.welcome.open.title": "Open source",
+  "onboarding.welcome.open.description": "Code anyone can read and verify.",
+  "onboarding.welcome.cta": "Get started",
   "onboarding.name.placeholder": "Enter your name",
-  "onboarding.name.continue": "Continue",
-  "onboarding.name.skip": "Skip this step",
+  "onboarding.profile.title": "What should Maestro call you?",
+  "onboarding.profile.subtitle":
+    "Maestro will use it to greet you. You can change it anytime in settings.",
+  "onboarding.profile.card": "Card",
+  "profileCard.placeholder": "Your name",
+  "onboarding.permissions.title": "What can Maestro use?",
+  "onboarding.permissions.subtitle":
+    "Only what you allow. You can change your mind anytime in your",
+  "onboarding.permissions.settingsLink": "device settings ↗",
+  "onboarding.permissions.subtitleWeb":
+    "Only what you allow. You can change your mind anytime in your system settings.",
+  "onboarding.ready.title": "You're all set.",
+  "onboarding.ready.titleNamed": "You're all set,\n{name}.",
+  "onboarding.ready.subtitle":
+    "Maestro is ready. Ask anything, by text or by voice.",
+  "onboarding.ready.cta": "Start with Maestro",
 
   "permissions.title": "Permissions",
-  "permissions.subtitle.web":
-    "Opera needs a few permissions to work at its best. You can manage them at any time from your browser's site settings.",
-  "permissions.subtitle.native":
-    "Opera needs a few permissions to work at its best. You can change them at any time in your device",
-  "permissions.subtitle.settingsLink": "settings ↗",
   "permissions.allow": "Allow",
   "permissions.allowed": "Allowed",
   "permissions.denied": "Denied",
-  "permissions.continue": "Continue",
-  "permissions.skip": "Skip this step",
   "permissions.microphone.label": "Microphone",
   "permissions.microphone.description": "To dictate your messages by voice.",
   "permissions.camera.label": "Camera",

@@ -24,27 +24,43 @@ export const fr: Translations = {
   "common.statusOk": "Connecté",
   "common.statusError": "Erreur",
 
-  "onboarding.start.tagline":
-    "L'IA pour tous,\nla confidentialité pour la liberté",
-  "onboarding.start.cta": "Commencer",
-  "onboarding.name.title": "Comment doit-on vous appeler ?",
-  "onboarding.name.subtitle":
-    "Indiquez votre nom pour personnaliser votre expérience avec Opera.",
+  "onboarding.next": "Continuer",
+  "onboarding.back": "Retour",
+  "onboarding.welcome.title": "L'IA pour tous,\nla confidentialité pour la liberté.",
+  "onboarding.welcome.subtitle":
+    "Voici Maestro, l'assistant d'Opera. Il travaille pour vous, et seulement pour vous.",
+  "onboarding.welcome.local.title": "Local d'abord",
+  "onboarding.welcome.local.description":
+    "Fonctionne sur votre appareil, sans serveur.",
+  "onboarding.welcome.account.title": "Sans compte",
+  "onboarding.welcome.account.description":
+    "Ouvrez l'application et lancez-vous.",
+  "onboarding.welcome.open.title": "Open source",
+  "onboarding.welcome.open.description":
+    "Un code que chacun peut lire et vérifier.",
+  "onboarding.welcome.cta": "Commencer",
   "onboarding.name.placeholder": "Entrez votre nom",
-  "onboarding.name.continue": "Continuer",
-  "onboarding.name.skip": "Passer cette étape",
+  "onboarding.profile.title": "Comment Maestro doit-il vous appeler ?",
+  "onboarding.profile.subtitle":
+    "Maestro l'utilisera pour vous saluer. Vous pourrez le modifier à tout moment dans les paramètres.",
+  "onboarding.profile.card": "Carte",
+  "profileCard.placeholder": "Votre nom",
+  "onboarding.permissions.title": "À quoi Maestro peut-il accéder ?",
+  "onboarding.permissions.subtitle":
+    "Seulement à ce que vous autorisez. Vous pourrez changer d'avis à tout moment dans les",
+  "onboarding.permissions.settingsLink": "paramètres de l'appareil ↗",
+  "onboarding.permissions.subtitleWeb":
+    "Seulement à ce que vous autorisez. Vous pourrez changer d'avis à tout moment dans les paramètres du système.",
+  "onboarding.ready.title": "Tout est prêt.",
+  "onboarding.ready.titleNamed": "Tout est prêt,\n{name}.",
+  "onboarding.ready.subtitle":
+    "Maestro vous attend. Posez-lui vos questions, à l'écrit comme à l'oral.",
+  "onboarding.ready.cta": "Commencer avec Maestro",
 
   "permissions.title": "Autorisations",
-  "permissions.subtitle.web":
-    "Opera a besoin de quelques autorisations pour fonctionner au mieux. Vous pouvez les gérer à tout moment dans les paramètres de site de votre navigateur.",
-  "permissions.subtitle.native":
-    "Opera a besoin de quelques autorisations pour fonctionner au mieux. Vous pouvez les modifier à tout moment dans les",
-  "permissions.subtitle.settingsLink": "paramètres de votre appareil",
   "permissions.allow": "Autoriser",
   "permissions.allowed": "Autorisé",
   "permissions.denied": "Refusé",
-  "permissions.continue": "Continuer",
-  "permissions.skip": "Passer cette étape",
   "permissions.microphone.label": "Microphone",
   "permissions.microphone.description": "Pour dicter vos messages à la voix.",
   "permissions.camera.label": "Caméra",

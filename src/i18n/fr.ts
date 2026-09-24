@@ -377,8 +377,6 @@ export const fr: Translations = {
     "Cela supprimera définitivement votre sauvegarde cloud existante afin de créer un nouveau code PIN. Voulez-vous continuer ?",
 
   "settings.service.ollama": "Ollama",
-  "settings.service.ollamaInfo":
-    "Ollama vous permet d'exécuter des modèles d'IA sur votre propre ordinateur ou serveur plutôt que dans le cloud. Ajoutez l'URL de votre serveur Ollama ci-dessous pour y connecter Opera.",
   "settings.service.ollamaHelp":
     "Utilisez vos serveurs Ollama pour exécuter de puissants modèles d'IA chez vous.",
   "settings.service.local": "Intégré",
@@ -428,6 +426,7 @@ export const fr: Translations = {
   "settings.litert.description": "Description",
   "settings.litert.descriptionPlaceholder": "[description]",
   "settings.litert.otherModels": "Autres modèles",
+  "settings.litert.sameFamily": "Même famille",
   "settings.litert.loadFailed":
     "La liste des modèles n'a pas pu être chargée. Vérifiez votre connexion.",
   "settings.litert.downloadingModel": "Téléchargement de {name}",
@@ -535,15 +534,12 @@ export const fr: Translations = {
   "settings.tools.widgets.title": "Widgets",
   "settings.tools.widgets.help":
     "Résultats structurés que l'assistant peut afficher : {list}.",
-  "settings.tools.widgets.see": "Voir les widgets",
   "settings.tools.mcp.title": "Serveurs MCP",
   "settings.tools.mcp.help":
     "Connectez Opera à des serveurs MCP externes pour que l'assistant puisse utiliser leurs outils.",
-  "settings.tools.mcp.see": "Voir les serveurs MCP",
   "settings.tools.mobile.title": "Actions mobiles",
   "settings.tools.mobile.help":
     "Autorise l'assistant à s'intégrer aux applications installées : {list}.",
-  "settings.tools.mobile.see": "Voir les actions mobiles",
 
   "settings.mcp.connecting": "Connexion...",
   "settings.mcp.noTools": "Aucun outil",

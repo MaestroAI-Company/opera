@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, BackHandler, Image, Keyboard, NativeScrollEvent, NativeSyntheticEvent, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useResponsive } from "../../hooks/useResponsive";
@@ -326,7 +327,8 @@ export default function ConversationsDrawer({
       </View>
 
       <View style={styles.scrollListContainer}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* results under the keyboard stay reachable */}
+        <KeyboardAwareScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           <Text style={styles.sectionTitle}>{t("conversations.search.results")}</Text>
           {searchResults.length === 0 && searchQuery.length > 0 ? (
             <Text style={styles.emptyText}>{t("conversations.search.empty")}</Text>
@@ -392,7 +394,7 @@ export default function ConversationsDrawer({
               );
             })
           )}
-        </ScrollView>
+        </KeyboardAwareScrollView>
         <LinearGradient
           colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
           style={styles.gradientTop}

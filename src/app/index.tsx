@@ -20,7 +20,8 @@ import {
   Vibration,
   View
 } from "react-native";
-import { KeyboardAvoidingView, KeyboardController } from "react-native-keyboard-controller";
+import { KeyboardController } from "react-native-keyboard-controller";
+import Reanimated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import HeadlessWebView from "../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
@@ -43,6 +44,7 @@ import NotificationModal from "../components/ui/NotificationModal";
 import { isWidgetTouchActive } from "../components/widgets/WidgetTouchArea";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
 import { useBugReportTrigger } from "../hooks/useBugReportTrigger";
+import { useKeyboardLift } from "../hooks/useKeyboardLift";
 import { takePendingCrash, type Crash } from "../services/logging/CrashReporter";
 import { captureScreen } from "../services/logging/ReportScreenshot";
 import { useResponsive } from "../hooks/useResponsive";
@@ -450,6 +452,13 @@ export default function Index() {
   useEffect(() => {
     bugReportVisibleRef.current = bugReportVisible;
   }, [bugReportVisible]);
+
+  //overlay inputs must not lift the chat
+  const keyboardLift = useKeyboardLift(!drawerVisible && !settingsDrawerVisible && !bugReportVisible);
+  const keyboardLiftStyle = useAnimatedStyle(() => ({
+    //bar's safe area spacer sits under the keyboard
+    paddingBottom: Math.max(keyboardLift.value - insets.bottom, 0),
+  }));
 
   const openBugReport = useCallback(async () => {
     //shakes ignored while sheet is open
@@ -1458,10 +1467,8 @@ export default function Index() {
         end={{ x: 0.5, y: 1 }}
         style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
       />
-      <KeyboardAvoidingView
-        style={[styles.container, { backgroundColor: "transparent" }]}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        enabled={!drawerVisible && !settingsDrawerVisible && !bugReportVisible}
+      <Reanimated.View
+        style={[styles.container, { backgroundColor: "transparent" }, keyboardLiftStyle]}
         {...(isLargeScreen ? {} : panResponder.panHandlers)}
       >
 
@@ -1640,7 +1647,6 @@ export default function Index() {
                     });
                   }}
                   onAttachmentSheetVisibilityChange={setAttachmentSheetVisible}
-                  enabled={!settingsDrawerVisible && (isLargeScreen || !drawerVisible)}
                 />
               )}
             </View>
@@ -1648,7 +1654,7 @@ export default function Index() {
 
           {isDesktop ? settingsDrawer : null}
         </View>
-      </KeyboardAvoidingView>
+      </Reanimated.View>
 
       {isDesktop ? null : conversationsDrawer}
       {isDesktop ? null : settingsDrawer}

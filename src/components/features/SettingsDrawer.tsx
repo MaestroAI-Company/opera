@@ -123,7 +123,7 @@ import ProfileCard from "./ProfileCard";
 
 import {
   KeyboardAwareScrollView,
-  useKeyboardAnimation,
+  type KeyboardAwareScrollViewRef,
 } from "react-native-keyboard-controller";
 import { useResponsive } from "../../hooks/useResponsive";
 import { useSettingsNotices } from "../../hooks/useSettingsNotices";
@@ -363,7 +363,7 @@ export default function SettingsDrawer({
   }, [visible, activeSubPage]);
 
   const [isScrolled, setIsScrolled] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<KeyboardAwareScrollViewRef>(null);
 
   const handleBack = useCallback(() => {
     if (activeSubPage === "main") {
@@ -452,8 +452,6 @@ export default function SettingsDrawer({
   >([]);
   const [litertBrowserLoading, setLitertBrowserLoading] = useState(false);
   const [litertBrowserFailed, setLitertBrowserFailed] = useState(false);
-  //native-driven keyboard height, same as chatbar
-  const { height: sheetKeyboardHeight } = useKeyboardAnimation();
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   //sheet may grow up to just under the status bar
@@ -4236,8 +4234,10 @@ export default function SettingsDrawer({
         </Animated.View>
       </View>
 
-      <ScrollView
+      {/* focused field scrolls just above the keyboard */}
+      <KeyboardAwareScrollView
         ref={scrollRef}
+        bottomOffset={Spacing.xl2}
         onScroll={handleScroll}
         scrollEventThrottle={16}
         contentContainerStyle={{
@@ -4263,7 +4263,7 @@ export default function SettingsDrawer({
         >
           {getSubPageContent()}
         </Animated.View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <LinearGradient
         colors={[
@@ -4528,7 +4528,7 @@ export default function SettingsDrawer({
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
       handleContainerStyle={styles.sheetHandleContainer}
-      keyboardTranslateY={sheetKeyboardHeight}
+      avoidKeyboard
       sheetStyle={[
         styles.addModelSheet,
         {
@@ -4613,7 +4613,7 @@ export default function SettingsDrawer({
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
       handleContainerStyle={styles.sheetHandleContainer}
-      keyboardTranslateY={sheetKeyboardHeight}
+      avoidKeyboard
       sheetStyle={[
         styles.addModelSheet,
         {

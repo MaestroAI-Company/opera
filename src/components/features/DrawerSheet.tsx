@@ -12,8 +12,10 @@ import {
   View,
   ViewStyle,
 } from "react-native";
+import Reanimated, { useAnimatedStyle } from "react-native-reanimated";
 import { Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { useKeyboardLift } from "../../hooks/useKeyboardLift";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { dragDrawer, gestureVelocity, releaseOpens, settleDrawer } from "./drawerAnimation";
 
@@ -34,9 +36,8 @@ export type DrawerSheetProps = {
   isLargeScreen?: boolean;
   isDesktop?: boolean;
   liftOffset?: number;
-  //extra native-driven translateY (eg. keyboard follow), composed with the drawer's own slide
-  //keyboard hook hands out an AnimatedMultiplication
-  keyboardTranslateY?: Animated.AnimatedNode;
+  //sheet sits on the keyboard, needs a maxHeight in sheetStyle
+  avoidKeyboard?: boolean;
   children: ReactNode;
   sheetStyle?: StyleProp<ViewStyle>;
   desktopStyle?: StyleProp<ViewStyle>;
@@ -52,7 +53,7 @@ export default function DrawerSheet({
   isLargeScreen = false,
   isDesktop = false,
   liftOffset = 0,
-  keyboardTranslateY,
+  avoidKeyboard = false,
   children,
   sheetStyle,
   desktopStyle,
@@ -186,7 +187,6 @@ export default function DrawerSheet({
 
   const translateYMobile = progress.interpolate({ inputRange: [0, 1], outputRange: [travel, 0] });
   const translateYDesktop = progress.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] });
-  const translateYMobileWithKeyboard = keyboardTranslateY ? Animated.add(translateYMobile, keyboardTranslateY) : translateYMobile;
 
   return (
     <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
@@ -208,15 +208,23 @@ export default function DrawerSheet({
         <Animated.View
           pointerEvents={visible ? "auto" : "none"}
           onLayout={(e: LayoutChangeEvent) => setContentHeight(e.nativeEvent.layout.height)}
-          style={[sheetStyle, { transform: [{ translateY: translateYMobileWithKeyboard }] }, !measured && styles.hidden]}
+          style={[sheetStyle, { transform: [{ translateY: translateYMobile }] }, !measured && styles.hidden]}
           {...panResponder.panHandlers}
         >
           {handle}
           {children}
+          {avoidKeyboard && <KeyboardSpacer />}
         </Animated.View>
       )}
     </View>
   );
+}
+
+//grows with the keyboard, maxHeight shrinks the content instead
+function KeyboardSpacer() {
+  const keyboardHeight = useKeyboardLift();
+  const style = useAnimatedStyle(() => ({ height: keyboardHeight.value }));
+  return <Reanimated.View style={style} />;
 }
 
 const makeStyles = (Colors: ThemeColors) => StyleSheet.create({

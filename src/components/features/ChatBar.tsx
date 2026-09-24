@@ -24,7 +24,6 @@ import {
   Vibration,
   View
 } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
@@ -109,7 +108,6 @@ type ChatInputBarProps = {
   canTranscribeRemotely?: boolean;
   onOpenSettings?: () => void;
   onAttachmentSheetVisibilityChange?: (visible: boolean) => void;
-  enabled?: boolean;
   autoStartMic?: boolean;
   //screen-selection attachment from overlay
   selection?: { uri: string; label: string } | null;
@@ -296,7 +294,6 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   canTranscribeRemotely = false,
   onOpenSettings,
   onAttachmentSheetVisibilityChange,
-  enabled = true,
   autoStartMic = false,
   selection = null,
   onSelectionRemove,
@@ -1256,11 +1253,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   }, [selectedFiles, supportsImages, supportsAudio, t]);
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      enabled={enabled}
-      style={{ width: '100%', maxWidth: 840, alignSelf: 'center' }}
-    >
+    <View style={{ width: '100%', maxWidth: 840, alignSelf: 'center' }}>
       <View style={{ width: '100%', alignItems: 'center', zIndex: 2, elevation: 9 }}>
         <Animated.View style={{ width: '100%', maxWidth: 800, zIndex: 2, elevation: 9 }}>
           {mentionOptions.length > 0 && mentionQuery !== null && (
@@ -1478,7 +1471,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         buttons={modalConfig.buttons}
         onClose={() => setModalVisible(false)}
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 });
 

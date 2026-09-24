@@ -136,13 +136,13 @@ import {
   dragDrawer,
   drawerWidthFor,
   gestureVelocity,
-  playBackButtonPulse,
-  playPageTransition,
   releaseOpens,
   settingsProgress,
   settleDrawer,
   settleLayoutDrawer,
 } from "./drawerAnimation";
+import DrawerBackButton from "./DrawerBackButton";
+import PageStack from "./PageStack";
 import { pressStyle } from "../ui/pressStyle";
 
 const linkIcon = require("../../../assets/icons/link.png");
@@ -162,7 +162,6 @@ const cloudIcon = require("../../../assets/icons/cloud.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
 const rightArrowIcon = require("../../../assets/icons/right.png");
 const crossIcon = require("../../../assets/icons/cross.png");
-const cancelIcon = require("../../../assets/icons/cancel.png");
 const generalIcon = require("../../../assets/icons/general.png");
 const advancedIcon = require("../../../assets/icons/settings.png");
 const serverIcon = require("../../../assets/icons/server.png");
@@ -277,6 +276,8 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   mcpserversettings: "mcpserver",
 };
 
+const subPageParent = (page: SubPage) => (page === "main" ? null : SUB_PAGE_PARENT[page]);
+
 export default function SettingsDrawer({
   visible,
   onClose,
@@ -325,8 +326,6 @@ export default function SettingsDrawer({
   const [activeSubPage, setActiveSubPage] = useState<SubPage>(
     initialSubPage ?? "main",
   );
-  const pageAnim = useAnimatedValue(1);
-  const backPulse = useAnimatedValue(0);
 
   //entry page swaps in before paint, never while sliding out
   const [prevVisible, setPrevVisible] = useState(visible);
@@ -337,19 +336,12 @@ export default function SettingsDrawer({
     if (visible) setActiveSubPage(initialSubPage ?? "main");
   }
 
-  const prevSubPageRef = useRef(activeSubPage);
   const wasVisibleRef = useRef(visible);
   useEffect(() => {
     //page stays mounted while closing, its input would keep the keyboard
     if (!visible && wasVisibleRef.current) Keyboard.dismiss();
-    //opening already shows the right page
-    if (visible && wasVisibleRef.current && activeSubPage !== prevSubPageRef.current) {
-      playPageTransition(pageAnim);
-      playBackButtonPulse(backPulse);
-    }
-    prevSubPageRef.current = activeSubPage;
     wasVisibleRef.current = visible;
-  }, [activeSubPage, visible, pageAnim, backPulse]);
+  }, [visible]);
 
   //native back navigates back in the menu, then lets parent close the drawer
   useEffect(() => {
@@ -434,6 +426,11 @@ export default function SettingsDrawer({
     loading: boolean;
   } | null>(null);
   const addModelScrollRef = useRef<ScrollView>(null);
+
+  //open sheets keep the back press for themselves
+  const sheetOpen =
+    addModelSheetVisible || ollamaAddVisible || mcpAddVisible || selectedLocalModel !== null;
+
   const [hfModelInput, setHfModelInput] = useState("");
   const [litertForceLoad, setLitertForceLoadState] = useState(false);
   const [litertContextLength, setLitertContextLengthState] = useState("8192");
@@ -4137,8 +4134,8 @@ export default function SettingsDrawer({
     </View>
   );
 
-  const getSubPageContent = () => {
-    switch (activeSubPage) {
+  const getSubPageContent = (page: SubPage) => {
+    switch (page) {
       case "profile":
         return renderProfileSubPage();
       case "cloud":
@@ -4191,79 +4188,40 @@ export default function SettingsDrawer({
         style={[styles.fixedBackWrapper, { top: isDesktop ? 0 : 60 }]}
         pointerEvents="box-none"
       >
-        {isScrolled && (
-          <View style={styles.fixedBackShadow} pointerEvents="none" />
-        )}
-        <Animated.View
-          style={{
-            transform: [
-              {
-                scale: backPulse.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 1.3],
-                }),
-              },
-            ],
-            opacity: backPulse.interpolate({
-              inputRange: [0, 1],
-              outputRange: [1, 0.3],
-            }),
-          }}
-        >
-          <Pressable
-            onPress={handleBack}
-            hitSlop={12}
-            style={pressStyle(
-              [
-                styles.fixedBackButton,
-                isScrolled
-                  ? styles.fixedBackButtonScrolled
-                  : styles.fixedBackButtonUnscrolled,
-              ],
-              isScrolled ? "surface" : "fade",
-            )}
-          >
-            <Image
-              source={activeSubPage === "main" ? cancelIcon : arrowIcon}
-              style={
-                activeSubPage === "main" ? styles.closeIcon : styles.backIcon
-              }
-              tintColor={Colors.textPrimary}
-            />
-          </Pressable>
-        </Animated.View>
+        <DrawerBackButton
+          kind={activeSubPage === "main" ? "close" : "back"}
+          onPress={handleBack}
+          scrolled={isScrolled}
+          pulseKey={activeSubPage}
+        />
       </View>
 
-      {/* focused field scrolls just above the keyboard */}
-      <KeyboardAwareScrollView
-        ref={scrollRef}
-        bottomOffset={Spacing.xl2}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        contentContainerStyle={{
-          paddingTop: isDesktop ? 0 : 60,
-          paddingBottom: 40,
-          flexGrow: 1,
-        }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Animated.View
-          style={{
-            flex: 1,
-            opacity: pageAnim,
-            transform: [
-              {
-                translateY: pageAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [8, 0],
-                }),
-              },
-            ],
-          }}
-        >
-          {getSubPageContent()}
-        </Animated.View>
-      </KeyboardAwareScrollView>
+      <PageStack
+        page={activeSubPage}
+        visible={visible}
+        //push travels the whole panel, padding included
+        width={isDesktop ? 320 : drawerWidth}
+        parentOf={subPageParent}
+        gestureEnabled={!sheetOpen}
+        onBack={handleBack}
+        renderPage={(page, active) => (
+          //focused field scrolls just above the keyboard
+          <KeyboardAwareScrollView
+            ref={active ? scrollRef : undefined}
+            bottomOffset={Spacing.xl2}
+            onScroll={active ? handleScroll : undefined}
+            scrollEventThrottle={16}
+            contentContainerStyle={{
+              paddingTop: isDesktop ? 0 : 60,
+              paddingBottom: 40,
+              flexGrow: 1,
+            }}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={{ flex: 1 }}>{getSubPageContent(page)}</View>
+          </KeyboardAwareScrollView>
+        )}
+      />
 
       <LinearGradient
         colors={[
@@ -5030,6 +4988,8 @@ const makeStyles = (Colors: ThemeColors) =>
       right: 0,
       backgroundColor: Colors.groupedBackground,
       paddingHorizontal: Spacing.lg2,
+      //pushed pages stay inside the panel
+      overflow: "hidden",
     },
     largeScreenContainer: {
       width: 320,
@@ -5125,10 +5085,6 @@ const makeStyles = (Colors: ThemeColors) =>
       width: 18,
       height: 18,
       transform: [{ rotate: "-180deg" }],
-    },
-    closeIcon: {
-      width: 18,
-      height: 18,
     },
     gradientTop: {
       position: "absolute",

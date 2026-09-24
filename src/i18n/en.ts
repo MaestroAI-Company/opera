@@ -20,8 +20,6 @@ export const en = {
   "common.openInApp": "Open in app",
   "common.info": "Info",
   "common.clear": "Clear",
-  "common.statusOk": "Connected",
-  "common.statusError": "Error",
 
   "onboarding.next": "Continue",
   "onboarding.back": "Back",
@@ -375,7 +373,6 @@ export const en = {
   "settings.service.local": "Built-in",
   "settings.service.localHelp":
     "Use the AI model that ships with your device. Nothing to download.",
-  "settings.local.see": "See Built-in settings",
   "settings.local.title": "Built-in",
   "settings.local.help":
     "Your device comes with its own AI model. It is always available and needs no setup.",
@@ -403,7 +400,6 @@ export const en = {
   "settings.service.litert": "On-Device",
   "settings.service.litertHelp":
     "Download open models from Hugging Face and run them on this device.",
-  "settings.litert.see": "See On-Device settings",
   "settings.litert.title": "On-Device",
   "settings.litert.modelTitle": "AI Model",
   "settings.litert.help": "Add and manage your AI models from Hugging Face.",
@@ -421,7 +417,6 @@ export const en = {
   "settings.litert.descriptionPlaceholder": "[description]",
   "settings.litert.otherModels": "Other models",
   "settings.litert.loadFailed": "The model list could not be loaded. Check your connection.",
-  "settings.litert.downloading": "Downloading...",
   "settings.litert.downloadingModel": "Downloading {name}",
   "settings.litert.cancelDownload": "Cancel download",
   "settings.litert.noResults": "No compatible model matches this search.",
@@ -449,21 +444,9 @@ export const en = {
   "generation.error.unknown": "Generation failed for an unknown reason.",
   "generation.error.generic": "Generation failed. Try again, or switch model in the settings.",
   "settings.service.serverLink": "server link",
-  "settings.service.addServer": "Add server link",
-  "settings.service.unreachable.title": "Server unreachable",
-  "settings.service.unreachable.message":
-    "This server could not be reached.\n\n- Check that the server is running.\n- Check the server's network connection.\n- Make sure the URL and port are correct.",
   "settings.service.failover": "Model failover",
   "settings.service.failoverHelp":
     "When the active Ollama server cannot be reached, keep the same model running on another Ollama server that offers it.",
-  "settings.service.contextLength": "Context Length",
-  "settings.service.contextLengthHelp":
-    "Maximum number of tokens the model can use.",
-  "settings.service.keepAlive": "Model Keep Alive",
-  "settings.service.keepAliveHelp":
-    "How long the model stays loaded in memory after a request.",
-  "settings.service.keepAliveHelpAdvanced":
-    "How long the model stays loaded in memory after a request, in seconds. Use -1 to keep it loaded forever.",
 
   "settings.whisper.label": "Whisper Model",
   "settings.whisper.help":
@@ -561,8 +544,6 @@ export const en = {
   "settings.mcp.remove.title": "Remove server",
   "settings.mcp.remove.message":
     "Remove {name}? Its tools and its saved connection will be deleted.",
-  "settings.mcp.importFailed": "Import failed",
-  "settings.mcp.unreadableConfig": "This configuration could not be read.",
   "settings.server.link": "Link",
   "settings.server.add": "Add server",
   "settings.server.name": "Name",
@@ -575,7 +556,6 @@ export const en = {
   "settings.ollama.title": "Ollama servers",
   "settings.ollama.help":
     "Add your Ollama server links to connect Opera to them.",
-  "settings.ollama.see": "See Ollama settings",
   "settings.ollama.newServer": "New server",
   "settings.ollama.noLink": "No link",
   "settings.ollama.checking": "Checking...",

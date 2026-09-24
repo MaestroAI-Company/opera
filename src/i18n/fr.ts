@@ -21,8 +21,6 @@ export const fr: Translations = {
   "common.openInApp": "Ouvrir dans l'application",
   "common.info": "Info",
   "common.clear": "Effacer",
-  "common.statusOk": "Connecté",
-  "common.statusError": "Erreur",
 
   "onboarding.next": "Continuer",
   "onboarding.back": "Retour",
@@ -386,7 +384,6 @@ export const fr: Translations = {
   "settings.service.local": "Intégré",
   "settings.service.localHelp":
     "Utilisez le modèle d'IA fourni avec votre appareil. Rien à télécharger.",
-  "settings.local.see": "Voir les réglages Intégré",
   "settings.local.title": "Intégré",
   "settings.local.help":
     "Votre appareil embarque son propre modèle d'IA. Il est toujours disponible et ne demande aucune installation.",
@@ -414,7 +411,6 @@ export const fr: Translations = {
   "settings.service.litert": "Sur l'appareil",
   "settings.service.litertHelp":
     "Téléchargez des modèles ouverts depuis Hugging Face et exécutez-les sur cet appareil.",
-  "settings.litert.see": "Voir les réglages Sur l'appareil",
   "settings.litert.title": "Sur l'appareil",
   "settings.litert.modelTitle": "Modèle d'IA",
   "settings.litert.help":
@@ -434,7 +430,6 @@ export const fr: Translations = {
   "settings.litert.otherModels": "Autres modèles",
   "settings.litert.loadFailed":
     "La liste des modèles n'a pas pu être chargée. Vérifiez votre connexion.",
-  "settings.litert.downloading": "Téléchargement...",
   "settings.litert.downloadingModel": "Téléchargement de {name}",
   "settings.litert.cancelDownload": "Annuler le téléchargement",
   "settings.litert.noResults": "Aucun modèle compatible ne correspond à cette recherche.",
@@ -467,21 +462,9 @@ export const fr: Translations = {
   "generation.error.generic":
     "La génération a échoué. Réessayez, ou changez de modèle dans les réglages.",
   "settings.service.serverLink": "lien du serveur",
-  "settings.service.addServer": "Ajouter un serveur",
-  "settings.service.unreachable.title": "Serveur injoignable",
-  "settings.service.unreachable.message":
-    "Ce serveur n'a pas pu être joint.\n\n- Vérifiez que le serveur est démarré.\n- Vérifiez la connexion réseau du serveur.\n- Assurez-vous que l'URL et le port sont corrects.",
   "settings.service.failover": "Bascule automatique",
   "settings.service.failoverHelp":
     "Quand le serveur Ollama actif est injoignable, conserve le même modèle en le relançant sur un autre serveur Ollama qui le propose.",
-  "settings.service.contextLength": "Longueur de contexte",
-  "settings.service.contextLengthHelp":
-    "Nombre maximal de tokens que le modèle peut utiliser.",
-  "settings.service.keepAlive": "Maintien du modèle en mémoire",
-  "settings.service.keepAliveHelp":
-    "Durée pendant laquelle le modèle reste chargé en mémoire après une requête.",
-  "settings.service.keepAliveHelpAdvanced":
-    "Durée pendant laquelle le modèle reste chargé en mémoire après une requête, en secondes. Utilisez -1 pour le garder chargé indéfiniment.",
 
   "settings.whisper.label": "Modèle Whisper",
   "settings.whisper.help":
@@ -582,8 +565,6 @@ export const fr: Translations = {
   "settings.mcp.remove.title": "Retirer le serveur",
   "settings.mcp.remove.message":
     "Retirer {name} ? Ses outils et sa connexion enregistrée seront supprimés.",
-  "settings.mcp.importFailed": "Échec de l'import",
-  "settings.mcp.unreadableConfig": "Cette configuration n'a pas pu être lue.",
   "settings.server.link": "Lien",
   "settings.server.add": "Ajouter un serveur",
   "settings.server.name": "Nom",
@@ -596,7 +577,6 @@ export const fr: Translations = {
   "settings.ollama.title": "Serveurs Ollama",
   "settings.ollama.help":
     "Ajoutez les liens de vos serveurs Ollama pour y connecter Opera.",
-  "settings.ollama.see": "Voir les réglages Ollama",
   "settings.ollama.newServer": "Nouveau serveur",
   "settings.ollama.noLink": "Aucun lien",
   "settings.ollama.checking": "Vérification...",

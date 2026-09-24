@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
-import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { loadNextcloudConfig, runNextcloudLoginFlow } from "../../services/cloud/NextcloudProvider";
 import Group from "../ui/Group";
 import TextInputField from "../ui/TextInputField";
+import { pressStyle } from "../ui/pressStyle";
 
 const linkIcon = require("../../../assets/icons/link.png");
 
@@ -15,7 +16,6 @@ type NextcloudSetupProps = {
 
 //nextcloud login flow, the browser grants the app password
 export default function NextcloudSetup({ onDone }: NextcloudSetupProps) {
-  const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const t = useT();
 
@@ -84,10 +84,7 @@ export default function NextcloudSetup({ onDone }: NextcloudSetupProps) {
         <>
           <Text style={styles.statusText}>{t("nextcloud.waiting")}</Text>
           <Pressable
-            style={({ pressed, hovered }) => [
-              styles.cancelBtn,
-              (pressed || hovered) && { backgroundColor: Colors.surfacePressed },
-            ]}
+            style={pressStyle(styles.cancelBtn, "surface")}
             onPress={handleCancel}
           >
             <Text style={styles.cancelBtnText}>{t("common.cancel")}</Text>
@@ -95,11 +92,10 @@ export default function NextcloudSetup({ onDone }: NextcloudSetupProps) {
         </>
       ) : (
         <Pressable
-          style={({ pressed, hovered }) => [
-            styles.connectBtn,
-            (pressed || hovered) && !!serverUrl.trim() && { backgroundColor: Colors.primaryPressed },
-            !serverUrl.trim() && styles.connectBtnDisabled,
-          ]}
+          style={pressStyle(
+            [styles.connectBtn, !serverUrl.trim() && styles.connectBtnDisabled],
+            !!serverUrl.trim() && "primary"
+          )}
           onPress={handleConnect}
           disabled={!serverUrl.trim()}
         >

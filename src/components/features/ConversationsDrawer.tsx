@@ -14,6 +14,7 @@ import IconButton from "../ui/IconButton";
 import NotificationModal from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
 import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, playBackButtonPulse, playPageTransition, releaseOpens, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
+import { pressStyle } from "../ui/pressStyle";
 
 const searchIcon = require("../../../assets/icons/search.png");
 const newIcon = require("../../../assets/icons/add.png");
@@ -36,7 +37,6 @@ type ConversationsDrawerProps = {
   onDeleteConversation?: (id: string) => void;
   onTogglePinConversation?: (id: string, pinned: boolean) => void;
   onShareConversation?: (conv: Conversation) => void;
-  isLargeScreen?: boolean;
   isDesktop?: boolean;
 };
 
@@ -74,7 +74,6 @@ export default function ConversationsDrawer({
   onDeleteConversation,
   onTogglePinConversation,
   onShareConversation,
-  isLargeScreen = false,
   isDesktop = false,
 }: ConversationsDrawerProps) {
   const Colors = useColors();
@@ -95,6 +94,8 @@ export default function ConversationsDrawer({
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
+    //a morph while sliding out would show
+    if (!visible) return;
     setIsScrolled(false);
   }, [isSearching, visible]);
 
@@ -104,22 +105,30 @@ export default function ConversationsDrawer({
     setIsScrolled((prev) => (prev !== scrolled ? scrolled : prev));
   }, []);
 
-  useEffect(() => {
-    if (!visible && (isSearching || searchQuery !== "" || selectedSearchId !== null)) {
+  //search clears before paint on open, never while sliding out
+  const [prevVisible, setPrevVisible] = useState(visible);
+  if (visible !== prevVisible) {
+    setPrevVisible(visible);
+    if (visible) {
       setIsSearching(false);
       setSearchQuery("");
       setSearchResults([]);
       setSelectedSearchId(null);
     }
-  }, [visible]);
+  }
 
   const prevSearchingRef = useRef(isSearching);
+  const wasVisibleRef = useRef(visible);
   useEffect(() => {
-    if (visible && isSearching !== prevSearchingRef.current) {
+    //search input stays mounted while closing, it would keep the keyboard
+    if (!visible && wasVisibleRef.current) Keyboard.dismiss();
+    //opening already shows the list
+    if (visible && wasVisibleRef.current && isSearching !== prevSearchingRef.current) {
       playPageTransition(pageAnim);
       playBackButtonPulse(backPulse);
     }
     prevSearchingRef.current = isSearching;
+    wasVisibleRef.current = visible;
   }, [isSearching, visible, pageAnim, backPulse]);
 
   //native back exits search mode, then lets parent close the drawer
@@ -211,7 +220,7 @@ export default function ConversationsDrawer({
     return (
       <View key={conv.id} style={[styles.discussionRow, isSelected && styles.discussionRowSelected]}>
         <Pressable
-          style={({ pressed, hovered }) => [styles.discussionTextContainer, (pressed || hovered) && { opacity: 0.6 }]}
+          style={pressStyle(styles.discussionTextContainer, "fade")}
           onPress={() => {
             onSelectConversation(conv);
             onClose();
@@ -295,7 +304,7 @@ export default function ConversationsDrawer({
               setSearchQuery("");
               setSelectedSearchId(null);
             }}
-            style={({ pressed, hovered }) => [styles.backButton, (pressed || hovered) && { opacity: 0.6 }]}
+            style={pressStyle(styles.backButton, "fade")}
           >
             <Image source={arrowIcon} style={styles.backIcon} tintColor={Colors.textPrimary} />
           </Pressable>
@@ -329,7 +338,7 @@ export default function ConversationsDrawer({
               return (
                 <View key={conv.id} style={[styles.discussionRow, isSelected && styles.discussionRowSelected]}>
                   <Pressable
-                    style={({ pressed, hovered }) => [styles.discussionTextContainer, (pressed || hovered) && { opacity: 0.6 }]}
+                    style={pressStyle(styles.discussionTextContainer, "fade")}
                     onPress={() => {
                       Keyboard.dismiss();
                       setSelectedSearchId(conv.id);
@@ -405,11 +414,10 @@ export default function ConversationsDrawer({
         <Pressable
           onPress={onClose}
           hitSlop={12}
-          style={({ pressed, hovered }) => [
-            styles.backButton,
-            isScrolled && styles.fixedCloseScrolled,
-            (pressed || hovered) && (isScrolled ? { backgroundColor: Colors.surfacePressed } : { opacity: 0.6 }),
-          ]}
+          style={pressStyle(
+            [styles.backButton, isScrolled && styles.fixedCloseScrolled],
+            isScrolled ? "surface" : "fade"
+          )}
         >
           <Image source={cancelIcon} style={styles.closeIcon} tintColor={Colors.textPrimary} />
         </Pressable>
@@ -519,17 +527,17 @@ export default function ConversationsDrawer({
     return (
       <Animated.View style={[
         styles.largeScreenContainer,
-        isDesktop ? styles.floatingContainer : styles.attachedContainer,
+        styles.floatingContainer,
         {
           width: largeScreenWidth,
           opacity: largeScreenOpacity,
-          marginLeft: isDesktop ? largeScreenMargin : 0,
-          marginRight: isDesktop ? largeScreenMargin : 0,
+          marginLeft: largeScreenMargin,
+          marginRight: largeScreenMargin,
           alignItems: 'flex-end',
         }
       ]}>
         <View style={{ width: 320, flex: 1 }}>
-          <View style={isDesktop ? styles.floatingContent : styles.attachedContent}>
+          <View style={styles.floatingContent}>
             <Animated.View style={{ flex: 1, opacity: pageAnim, transform: [{ translateY: pageAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
               {isSearching ? searchContent : innerContent}
             </Animated.View>
@@ -607,16 +615,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     elevation: 5,
     overflow: "hidden",
   },
-  attachedContainer: {
-    borderRightWidth: 1,
-    borderRightColor: Colors.overlaySubtle,
-  },
   floatingContent: {
     paddingTop: 24,
-    paddingHorizontal: Spacing.lg2,
-    flex: 1,
-  },
-  attachedContent: {
     paddingHorizontal: Spacing.lg2,
     flex: 1,
   },

@@ -65,10 +65,6 @@ function redactUrls(line: string): string {
   });
 }
 
-export function getRecentLogs(limit?: number): string[] {
-  return (limit ? buffer.slice(-limit) : buffer).map(redactUrls);
-}
-
 //post error share of window
 const TAIL_RATIO = 4;
 

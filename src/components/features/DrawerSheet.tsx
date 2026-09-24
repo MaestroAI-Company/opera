@@ -68,8 +68,11 @@ export default function DrawerSheet({
   const keepMounted = !isLift && externalProgress !== undefined;
   const [rendered, setRendered] = useState(visible);
   const [contentHeight, setContentHeight] = useState(0);
+  const measured = contentHeight > 0;
   //sheet slides exactly its own height
   const travel = contentHeight || CLOSED_SLIDE;
+  //desktop card only fades, no height needed
+  const slides = isLift || !(isLargeScreen || isDesktop);
 
   useEffect(() => {
     sheetTravels.set(progress, travel);
@@ -78,16 +81,27 @@ export default function DrawerSheet({
   const settle = useCallback(
     (open: boolean, velocity = 0) => {
       settleDrawer(progress, open, velocity, nativeDriver, () => {
-        if (!open) setRendered(false);
+        if (open) return;
+        setRendered(false);
+        //content may differ next time
+        if (!keepMounted) setContentHeight(0);
       });
     },
-    [progress, nativeDriver]
+    [progress, nativeDriver, keepMounted]
   );
 
   useEffect(() => {
-    if (visible) setRendered(true);
+    if (visible) {
+      setRendered(true);
+      //sliding a guessed height pops tall sheets in
+      if (slides && !measured) return;
+    } else if (slides && !measured) {
+      //never shown, nothing to animate out
+      setRendered(false);
+      return;
+    }
     settle(visible);
-  }, [visible, settle]);
+  }, [visible, slides, measured, settle]);
 
   const dismiss = useCallback((velocity = 0) => {
     //keyboard lift would hold it on screen
@@ -146,13 +160,12 @@ export default function DrawerSheet({
 
   if (isLift) {
     if (!rendered) return null;
-    const measuring = contentHeight === 0;
     return (
       <Animated.View
         onLayout={(e: LayoutChangeEvent) => setContentHeight(e.nativeEvent.layout.height)}
         pointerEvents={visible ? "auto" : "none"}
         style={
-          measuring
+          !measured
             ? styles.measuring
             : {
               //open state eats the safe area below so the sheet reaches the screen edge
@@ -195,7 +208,7 @@ export default function DrawerSheet({
         <Animated.View
           pointerEvents={visible ? "auto" : "none"}
           onLayout={(e: LayoutChangeEvent) => setContentHeight(e.nativeEvent.layout.height)}
-          style={[sheetStyle, { transform: [{ translateY: translateYMobileWithKeyboard }] }]}
+          style={[sheetStyle, { transform: [{ translateY: translateYMobileWithKeyboard }] }, !measured && styles.hidden]}
           {...panResponder.panHandlers}
         >
           {handle}
@@ -222,6 +235,9 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingRight: Spacing.xl2,
     paddingBottom: Spacing.xl2,
     justifyContent: "flex-end",
+  },
+  hidden: {
+    opacity: 0,
   },
   measuring: {
     position: "absolute",

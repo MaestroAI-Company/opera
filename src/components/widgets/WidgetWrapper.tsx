@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { IWidget } from '../../services/widgets/WidgetManager';
 import { Radius, ThemeColors } from '../../../constants/theme';
-import { useColors, useThemedStyles } from '../../hooks/useTheme';
+import { useThemedStyles } from '../../hooks/useTheme';
 
 interface WidgetWrapperProps {
   widget: Pick<IWidget, 'name' | 'hasBorder'>;
@@ -11,7 +11,6 @@ interface WidgetWrapperProps {
 }
 
 export default function WidgetWrapper({ widget, children }: WidgetWrapperProps) {
-  const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   if (!widget.hasBorder) {
     return <>{children}</>;

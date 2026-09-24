@@ -16,6 +16,7 @@ import Reanimated, { useAnimatedStyle } from "react-native-reanimated";
 import { Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useKeyboardLift } from "../../hooks/useKeyboardLift";
+import { usePredictiveBack } from "../../hooks/usePredictiveBack";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { dragDrawer, gestureVelocity, releaseOpens, settleDrawer } from "./drawerAnimation";
 
@@ -132,6 +133,13 @@ export default function DrawerSheet({
       }),
     [dismiss, settle, progress, travel]
   );
+
+  //android back gesture pulls the sheet down, release closes it
+  usePredictiveBack(visible, {
+    onProgress: (p) => dragDrawer(progress, 1 - p),
+    onCancel: () => settle(true),
+    onBack: () => dismiss(),
+  });
 
   //overlay only: hardware back and desktop escape dismiss it, lift sits inside a screen
   //that already arbitrates its own back-press priority (eg. recording > sheet)

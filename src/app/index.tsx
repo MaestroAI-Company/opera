@@ -1866,6 +1866,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   settingsShadowLayer: {
     position: "relative",
     marginLeft: 6,
+    zIndex: 6,
   },
   settingsShadowBlock: {
     position: "absolute",

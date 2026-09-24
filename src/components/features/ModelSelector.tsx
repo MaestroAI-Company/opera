@@ -788,6 +788,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     shadowLayer: {
       position: "relative",
+      zIndex: 6,
     },
     shadowBlock: {
       position: "absolute",

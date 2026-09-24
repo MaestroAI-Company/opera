@@ -190,12 +190,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     color: Colors.textPrimary,
     fontFamily: Fonts.mono,
     paddingTop: Spacing.xs,
+    paddingHorizontal: Spacing.md,
     marginBottom: 6,
   },
   help: {
     fontSize: FontSizes.caption,
     color: Colors.textMuted,
     fontFamily: Fonts.body,
+    paddingHorizontal: Spacing.md,
   },
   inputGroup: {
     marginBottom: Spacing.md,
@@ -210,6 +212,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginTop: 8,
+    paddingHorizontal: Spacing.md,
   },
   checkboxRow: {
     flex: 1,

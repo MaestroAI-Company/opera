@@ -327,6 +327,15 @@ export function similarModels(repoId: string, limit = 6): string[] {
     .map((c) => c.id);
 }
 
+//same brand, catalog popularity order
+export function sameFamilyModels(repoId: string): string[] {
+  const family = familyOf(repoId);
+  //other mixes unrelated brands
+  if (family === OTHER_FAMILY_ID) return [];
+  const listed = store.families.find((f) => f.id === family)?.repoIds ?? [];
+  return listed.filter((id) => id !== repoId);
+}
+
 //sizes resolve on pick, not on listing
 export async function fetchCatalogEntry(repoId: string): Promise<CatalogEntry | null> {
   const known = store.entries[repoId];

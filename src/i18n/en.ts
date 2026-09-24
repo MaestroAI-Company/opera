@@ -366,8 +366,6 @@ export const en = {
     "This will permanently delete your existing cloud backup so you can create a new PIN. Are you sure?",
 
   "settings.service.ollama": "Ollama",
-  "settings.service.ollamaInfo":
-    "Ollama lets you run AI models on your own computer or server instead of the cloud. Add your Ollama server's URL below to connect Opera to it.",
   "settings.service.ollamaHelp":
     "Use your Ollama servers to run powerful AI models at home.",
   "settings.service.local": "Built-in",
@@ -416,6 +414,7 @@ export const en = {
   "settings.litert.description": "Description",
   "settings.litert.descriptionPlaceholder": "[description]",
   "settings.litert.otherModels": "Other models",
+  "settings.litert.sameFamily": "Same family",
   "settings.litert.loadFailed": "The model list could not be loaded. Check your connection.",
   "settings.litert.downloadingModel": "Downloading {name}",
   "settings.litert.cancelDownload": "Cancel download",
@@ -514,15 +513,12 @@ export const en = {
   "settings.tools.widgets.title": "Widgets",
   "settings.tools.widgets.help":
     "Structured results the assistant can display: {list}.",
-  "settings.tools.widgets.see": "See widgets",
   "settings.tools.mcp.title": "MCP Servers",
   "settings.tools.mcp.help":
     "Connect Opera to external MCP servers so the assistant can use their tools.",
-  "settings.tools.mcp.see": "See MCP Servers",
   "settings.tools.mobile.title": "Mobile actions",
   "settings.tools.mobile.help":
     "Allow the assistant to integrate with installed apps: {list}.",
-  "settings.tools.mobile.see": "See mobile actions",
 
   "settings.mcp.connecting": "Connecting...",
   "settings.mcp.noTools": "No tools",

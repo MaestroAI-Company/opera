@@ -3,6 +3,7 @@ import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constan
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { CloudUserInfo } from '../../services/cloud/CloudProvider';
+import { pressStyle } from "../ui/pressStyle";
 
 type CloudSyncBoxProps = {
   userInfo: CloudUserInfo | null;
@@ -70,20 +71,20 @@ export default function CloudSyncBox({
       <View style={styles.actionsRow}>
         {locked ? (
           hasBackup ? (
-            <Pressable style={({ pressed, hovered }) => [styles.actionBtn, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]} onPress={onEnterPin}>
+            <Pressable style={pressStyle(styles.actionBtn, "surface")} onPress={onEnterPin}>
               <Text style={styles.actionBtnText}>{t("cloudSync.enterPin")}</Text>
             </Pressable>
           ) : (
-            <Pressable style={({ pressed, hovered }) => [styles.actionBtn, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]} onPress={onCreatePin}>
+            <Pressable style={pressStyle(styles.actionBtn, "surface")} onPress={onCreatePin}>
               <Text style={styles.actionBtnText}>{t("cloudSync.createPin")}</Text>
             </Pressable>
           )
         ) : (
           <>
-            <Pressable style={({ pressed, hovered }) => [styles.actionBtn, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]} onPress={onDisconnect}>
+            <Pressable style={pressStyle(styles.actionBtn, "surface")} onPress={onDisconnect}>
               <Text style={styles.actionBtnText}>{t("cloudSync.disconnect")}</Text>
             </Pressable>
-            <Pressable style={({ pressed, hovered }) => [styles.actionBtn, styles.syncBtn, (pressed || hovered) && { backgroundColor: Colors.primaryPressed }]} onPress={onSync} disabled={isSyncing}>
+            <Pressable style={pressStyle([styles.actionBtn, styles.syncBtn], "primary")} onPress={onSync} disabled={isSyncing}>
               <Text style={[styles.actionBtnText, { color: Colors.textOnPrimary }]}>
                 {isSyncing ? t("cloudSync.syncing") : t("cloudSync.syncNow")}
               </Text>

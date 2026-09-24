@@ -35,10 +35,6 @@ export function setLocale(next: string): void {
   for (const listener of listeners) listener();
 }
 
-export function getLocale(): SupportedLocale {
-  return locale;
-}
-
 //track the saved language setting
 export function initI18n(): void {
   if (started) return;

@@ -5,6 +5,7 @@ import Checkbox from "./Checkbox";
 import Group from "./Group";
 import ImageCard from "./ImageCard";
 import TextInputField from "./TextInputField";
+import { pressStyle } from "./pressStyle";
 
 export type ModalButton = {
   text: string;
@@ -134,20 +135,18 @@ export default function NotificationModal({
                 return (
                   <Pressable
                     key={index}
-                    style={({ pressed, hovered }) => [
-                      styles.button,
-                      isPrimary && styles.buttonPrimary,
-                      isDanger && styles.buttonDanger,
-                      !isPrimary && !isDanger && styles.buttonSecondary,
-                      btn.disabled && styles.buttonDisabled,
-                      !btn.disabled && (pressed || hovered) && (
-                        isPrimary
-                          ? { backgroundColor: Colors.primaryPressed, borderColor: Colors.primaryPressed }
-                          : isDanger
-                            ? { backgroundColor: Colors.primaryPressed, borderColor: Colors.primaryPressed }
-                            : { backgroundColor: Colors.surfacePressed }
-                      )
-                    ]}
+                    style={pressStyle(
+                      [
+                        styles.button,
+                        isPrimary && styles.buttonPrimary,
+                        isDanger && styles.buttonDanger,
+                        !isPrimary && !isDanger && styles.buttonSecondary,
+                        btn.disabled && styles.buttonDisabled,
+                      ],
+                      !btn.disabled && (isPrimary || isDanger
+                        ? { backgroundColor: Colors.primaryPressed, borderColor: Colors.primaryPressed }
+                        : "surface")
+                    )}
                     onPress={() => !btn.disabled && btn.onPress()}
                   >
                     <Text style={[

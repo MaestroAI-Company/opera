@@ -4,11 +4,9 @@ import {
   AppState,
   AppStateStatus,
   Easing,
-  PanResponder,
   Platform,
   StyleProp,
   StyleSheet,
-  Vibration,
   View,
   ViewStyle,
 } from "react-native";
@@ -28,7 +26,7 @@ export type ButterflyClusterProps = {
   incognito?: boolean;
 };
 
-//reconstruct cluster with interactive parallax
+//cluster with gyro parallax
 function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
   const [containerSize, setContainerSize] = useState({ width: 250, height: 250 });
   const incognitoAnim = useRef(new Animated.Value(incognito ? 1 : 0)).current;
@@ -37,7 +35,7 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
   useEffect(() => {
     Animated.timing(incognitoAnim, {
       toValue: incognito ? 1 : 0,
-      duration: 260,
+      duration: 160,
       easing: Easing.bezier(0.25, 0.1, 0.25, 1),
       useNativeDriver: true,
     }).start();
@@ -46,108 +44,6 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
   const leftGyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const topRightGyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const bottomGyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-
-  const [activeKey, setActiveKey] = useState<"left" | "topRight" | "bottom" | null>(null);
-
-  const leftDrag = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-  const topRightDrag = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-  const bottomDrag = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-
-  const leftScale = useRef(new Animated.Value(1)).current;
-  const topRightScale = useRef(new Animated.Value(1)).current;
-  const bottomScale = useRef(new Animated.Value(1)).current;
-
-  //create magnetic responder per butterfly
-  const makeMagneticPan = (
-    key: "left" | "topRight" | "bottom",
-    offset: Animated.ValueXY,
-    scale: Animated.Value,
-    resistance: number,
-    tension: number,
-    friction: number,
-  ) =>
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 3 || Math.abs(g.dy) > 3,
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => {
-        //cancel spring on touch
-        offset.stopAnimation();
-        scale.stopAnimation();
-        setActiveKey(key);
-        //grow grabbed butterfly to foreground
-        Animated.spring(scale, {
-          toValue: 1.2,
-          tension: 110,
-          friction: 7,
-          useNativeDriver: true,
-        }).start();
-        Vibration.vibrate(8);
-      },
-      onPanResponderMove: (_, g) => {
-        //magnetic resistance formula
-        const rx = (g.dx * resistance) / (resistance + Math.abs(g.dx));
-        const ry = (g.dy * resistance) / (resistance + Math.abs(g.dy));
-        offset.setValue({ x: rx, y: ry });
-      },
-      onPanResponderRelease: (_, g) => {
-        Vibration.vibrate(6);
-        //snap back with gesture velocity
-        Animated.parallel([
-          Animated.spring(offset, {
-            toValue: { x: 0, y: 0 },
-            velocity: { x: g.vx, y: g.vy },
-            tension,
-            friction,
-            useNativeDriver: true,
-          }),
-          Animated.spring(scale, {
-            toValue: 1,
-            tension: 80,
-            friction: 8,
-            useNativeDriver: true,
-          }),
-        ]).start(({ finished }) => {
-          if (finished) {
-            setActiveKey((prev) => (prev === key ? null : prev));
-          }
-        });
-      },
-      onPanResponderTerminate: () => {
-        //restore to rest on interruption
-        Animated.parallel([
-          Animated.spring(offset, {
-            toValue: { x: 0, y: 0 },
-            tension,
-            friction,
-            useNativeDriver: true,
-          }),
-          Animated.spring(scale, {
-            toValue: 1,
-            tension,
-            friction,
-            useNativeDriver: true,
-          }),
-        ]).start(({ finished }) => {
-          if (finished) {
-            setActiveKey((prev) => (prev === key ? null : prev));
-          }
-        });
-      },
-    });
-
-  const leftPan = useMemo(
-    () => makeMagneticPan("left", leftDrag, leftScale, 110, 80, 6.5),
-    [leftDrag, leftScale],
-  );
-  const topRightPan = useMemo(
-    () => makeMagneticPan("topRight", topRightDrag, topRightScale, 130, 90, 5.5),
-    [topRightDrag, topRightScale],
-  );
-  const bottomPan = useMemo(
-    () => makeMagneticPan("bottom", bottomDrag, bottomScale, 95, 70, 7.5),
-    [bottomDrag, bottomScale],
-  );
 
   useEffect(() => {
     if (Platform.OS === "web") {
@@ -331,22 +227,6 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
     [incognitoAnim],
   );
 
-  const leftDragTransform = useMemo(
-    () => [
-      { translateX: leftDrag.x },
-      { translateY: leftDrag.y },
-      { scale: leftScale },
-      {
-        rotate: leftDrag.x.interpolate({
-          inputRange: [-80, 80],
-          outputRange: ["-14deg", "14deg"],
-          extrapolate: "clamp",
-        }),
-      },
-    ],
-    [leftDrag, leftScale],
-  );
-
   const leftGyroTransform = useMemo(
     () => [
       { translateX: leftGyro.x },
@@ -362,22 +242,6 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
     [leftGyro],
   );
 
-  const topRightDragTransform = useMemo(
-    () => [
-      { translateX: topRightDrag.x },
-      { translateY: topRightDrag.y },
-      { scale: topRightScale },
-      {
-        rotate: topRightDrag.x.interpolate({
-          inputRange: [-80, 80],
-          outputRange: ["-16deg", "16deg"],
-          extrapolate: "clamp",
-        }),
-      },
-    ],
-    [topRightDrag, topRightScale],
-  );
-
   const topRightGyroTransform = useMemo(
     () => [
       { translateX: topRightGyro.x },
@@ -391,22 +255,6 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
       },
     ],
     [topRightGyro],
-  );
-
-  const bottomDragTransform = useMemo(
-    () => [
-      { translateX: bottomDrag.x },
-      { translateY: bottomDrag.y },
-      { scale: bottomScale },
-      {
-        rotate: bottomDrag.x.interpolate({
-          inputRange: [-80, 80],
-          outputRange: ["14deg", "-14deg"],
-          extrapolate: "clamp",
-        }),
-      },
-    ],
-    [bottomDrag, bottomScale],
   );
 
   const bottomGyroTransform = useMemo(
@@ -426,6 +274,7 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
 
   return (
     <View
+      pointerEvents="none"
       style={[styles.container, style]}
       onLayout={(e) => {
         const { width, height } = e.nativeEvent.layout;
@@ -437,49 +286,37 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
       }}
     >
       <Animated.View
-        pointerEvents={incognito ? "none" : "auto"}
         style={[
           styles.left,
           {
             opacity: otherOpacity,
             transform: otherIncognitoTransform,
-            zIndex: activeKey === "left" ? 10 : 1,
+            zIndex: 1,
           },
         ]}
       >
-        <Animated.View
-          style={[styles.imageFill, { transform: leftDragTransform }]}
-          {...leftPan.panHandlers}
-        >
-          <Animated.Image
-            source={butterflyLeft}
-            style={[styles.imageFill, { transform: leftGyroTransform }]}
-            resizeMode="contain"
-          />
-        </Animated.View>
+        <Animated.Image
+          source={butterflyLeft}
+          style={[styles.imageFill, { transform: leftGyroTransform }]}
+          resizeMode="contain"
+        />
       </Animated.View>
 
       <Animated.View
-        pointerEvents={incognito ? "none" : "auto"}
         style={[
           styles.bottom,
           {
             opacity: otherOpacity,
             transform: otherIncognitoTransform,
-            zIndex: activeKey === "bottom" ? 10 : 2,
+            zIndex: 2,
           },
         ]}
       >
-        <Animated.View
-          style={[styles.imageFill, { transform: bottomDragTransform }]}
-          {...bottomPan.panHandlers}
-        >
-          <Animated.Image
-            source={butterflyBottom}
-            style={[styles.imageFill, { transform: bottomGyroTransform }]}
-            resizeMode="contain"
-          />
-        </Animated.View>
+        <Animated.Image
+          source={butterflyBottom}
+          style={[styles.imageFill, { transform: bottomGyroTransform }]}
+          resizeMode="contain"
+        />
       </Animated.View>
 
       <Animated.View
@@ -487,28 +324,23 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
           styles.topRight,
           {
             transform: topRightIncognitoTransform,
-            zIndex: activeKey === "topRight" ? 10 : (incognito ? 5 : 3),
+            zIndex: incognito ? 5 : 3,
           },
         ]}
       >
         <Animated.View
-          style={[styles.imageFill, { transform: topRightDragTransform }]}
-          {...topRightPan.panHandlers}
+          style={[styles.imageFill, { transform: topRightGyroTransform }]}
         >
-          <Animated.View
-            style={[styles.imageFill, { transform: topRightGyroTransform }]}
-          >
-            <Animated.Image
-              source={butterflyTopRight}
-              style={[styles.imageFill, { opacity: coloredOpacity }]}
-              resizeMode="contain"
-            />
-            <Animated.Image
-              source={butterflyGrey}
-              style={[styles.imageFill, StyleSheet.absoluteFill, { opacity: greyOpacity }]}
-              resizeMode="contain"
-            />
-          </Animated.View>
+          <Animated.Image
+            source={butterflyTopRight}
+            style={[styles.imageFill, { opacity: coloredOpacity }]}
+            resizeMode="contain"
+          />
+          <Animated.Image
+            source={butterflyGrey}
+            style={[styles.imageFill, StyleSheet.absoluteFill, { opacity: greyOpacity }]}
+            resizeMode="contain"
+          />
         </Animated.View>
       </Animated.View>
     </View>

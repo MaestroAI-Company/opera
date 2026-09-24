@@ -40,7 +40,6 @@ import TopBar from "../components/features/TopBar";
 import ActionButton from "../components/ui/ActionButton";
 import Group from "../components/ui/Group";
 import NotificationModal from "../components/ui/NotificationModal";
-import { hasOpenOverlaySheet } from "../components/ui/SheetSurface";
 import { isWidgetTouchActive } from "../components/widgets/WidgetTouchArea";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
 import { useBugReportTrigger } from "../hooks/useBugReportTrigger";
@@ -78,6 +77,7 @@ import { clearShareFromUrl, fetchSharedConversation, resolvePasteHost, shareConv
 import { Settings } from "../services/settings/SettingsService";
 import { STT, WhisperSTT } from "../services/speech/STTService";
 import { TTS } from "../services/speech/TTSService";
+import { pressStyle } from "../components/ui/pressStyle";
 
 
 const texture2 = require("../../assets/images/texture2.png");
@@ -247,11 +247,10 @@ function IncognitoToggle({ incognito, onPress }: { incognito: boolean; onPress: 
       <Animated.View style={measured ? { width } : null}>
         <Pressable
           onPress={onPress}
-          style={({ pressed, hovered }) => [
-            styles.incognitoBox,
-            incognito && styles.incognitoBoxActive,
-            (pressed || hovered) && (incognito ? { backgroundColor: Colors.incognitoPressed } : { backgroundColor: Colors.surfacePressed })
-          ]}
+          style={pressStyle(
+            [styles.incognitoBox, incognito && styles.incognitoBoxActive],
+            incognito ? { backgroundColor: Colors.incognitoPressed } : "surface"
+          )}
         >
           <Animated.Text
             numberOfLines={1}
@@ -380,11 +379,24 @@ export default function Index() {
     activeConversationRef.current = activeConversation;
   }, [activeConversation]);
 
+  //every close path must pick up what changed in settings
+  const closeSettings = useCallback(() => {
+    setSettingsDrawerVisible(false);
+    setSettingsInitialSubPage("main");
+    const cached = Settings.getCached();
+    if (cached.ollamaModel) setSelectedModel(cached.ollamaModel);
+    setAiService(cached.aiService);
+    setOllamaUrl(cached.ollamaUrl);
+    setSpeakerEnabled(cached.speaker);
+    setAlwaysWhisper(cached.alwaysWhisper);
+    setShowTechnicalDetails(cached.showTechnicalDetails);
+  }, []);
+
   useEffect(() => {
     const handleBackButton = () => {
       //close drawers on android back press, after drawer-level handlers
       if (settingsDrawerVisibleRef.current) {
-        setSettingsDrawerVisible(false);
+        closeSettings();
         return true;
       }
       if (drawerVisibleRef.current) {
@@ -400,7 +412,7 @@ export default function Index() {
     );
 
     return () => backHandler.remove();
-  }, []);
+  }, [closeSettings]);
 
   const openDrawerSafely = useCallback((openFn: () => void) => {
     //skip pointless native round trip
@@ -458,90 +470,69 @@ export default function Index() {
   //composer owns its own drags, text selection is not a swipe
   const touchInComposerRef = useRef(false);
 
+  //grant resets dx and dy, so the axis is picked before it
+  const swipeAxisRef = useRef<"x" | "y">("x");
+
   //state read lets compiler memoize
   const panResponder = useMemo(() =>
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        //a sheet floats over the ui, it owns the gesture
-        if (hasOpenOverlaySheet() || modelSelectorVisible) return false;
+        //an open panel covers the screen and owns its gestures
+        if (drawerVisible || settingsDrawerVisible || modelSelectorVisible) return false;
         //an interactive widget owns the gesture it started
         if (isWidgetTouchActive()) return false;
-        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-        if (isHorizontal) {
+        //locked for the whole drag, a diagonal must not flip it
+        if (Math.abs(gestureState.dx) > Math.abs(gestureState.dy)) {
+          swipeAxisRef.current = "x";
           if (Math.abs(gestureState.dx) <= 10) return false;
-          if (settingsDrawerVisible && gestureState.dx > 0) return true;
-          if (drawerVisible && gestureState.dx < 0) return true;
-
           const isLeftEdge = gestureState.x0 < 40;
-          if (isLeftEdge && gestureState.dx > 0) return true;
-          return gestureState.dx < 0;
+          return gestureState.dx < 0 || isLeftEdge;
         }
+        swipeAxisRef.current = "y";
 
         if (touchInComposerRef.current) return false;
 
         //swipe up on homepage opens model selector
-        if (!drawerVisible && !settingsDrawerVisible && !modelSelectorVisible && !activeConversation) {
-          return gestureState.dy < -15;
-        }
-
-        return false;
+        return !activeConversation && gestureState.dy < -15;
       },
       onPanResponderGrant: () => {
         //retract before keyboard shrinks panel
-        if (!drawerVisible && !settingsDrawerVisible && !modelSelectorVisible) KeyboardController.dismiss();
+        KeyboardController.dismiss();
       },
       onPanResponderMove: (evt, gestureState) => {
-        //gesture drives panel directly
-        if (drawerVisible || settingsDrawerVisible || modelSelectorVisible) return;
-        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-        if (isHorizontal) {
+        if (swipeAxisRef.current === "x") {
           //clamp keeps the other panel out
           dragDrawer(conversationsProgress, gestureState.dx / dragWidth);
           dragDrawer(settingsProgress, -gestureState.dx / dragWidth);
-        } else if (gestureState.dy < 0 && !activeConversation) {
+        } else {
           //carries the model selector up with the finger, same as the horizontal drawers
           dragDrawer(modelSelectorProgress, -gestureState.dy / sheetTravel(modelSelectorProgress));
         }
       },
       onPanResponderRelease: (evt, gestureState) => {
-        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-        if (!isHorizontal) {
-          if (!drawerVisible && !settingsDrawerVisible && !modelSelectorVisible && !activeConversation) {
-            const travel = sheetTravel(modelSelectorProgress);
-            const opens = releaseOpens(-gestureState.dy / travel, -gestureState.vy);
-            settleDrawer(modelSelectorProgress, opens, -gestureVelocity(gestureState.vy, travel));
-            if (opens) setModelSelectorVisible(true);
-          }
+        if (swipeAxisRef.current === "y") {
+          const travel = sheetTravel(modelSelectorProgress);
+          const opens = releaseOpens(-gestureState.dy / travel, -gestureState.vy);
+          settleDrawer(modelSelectorProgress, opens, -gestureVelocity(gestureState.vy, travel));
+          if (opens) setModelSelectorVisible(true);
           return;
         }
 
         const velocity = gestureVelocity(gestureState.vx, dragWidth);
         //same release rule as the drawers
-        const opensLeft = gestureState.dx > 0 && releaseOpens(gestureState.dx / dragWidth, gestureState.vx);
-        const opensRight = gestureState.dx < 0 && releaseOpens(-gestureState.dx / dragWidth, -gestureState.vx);
-
-        if (opensLeft) {
-          if (settingsDrawerVisible) {
-            setSettingsDrawerVisible(false);
-          } else {
-            settleDrawer(conversationsProgress, true, velocity);
-            setDrawerVisible(true);
-          }
-        } else if (opensRight) {
-          if (drawerVisible) {
-            setDrawerVisible(false);
-          } else {
-            settleDrawer(settingsProgress, true, -velocity);
-            setSettingsDrawerVisible(true);
-          }
-        } else if (!drawerVisible && !settingsDrawerVisible) {
+        if (gestureState.dx > 0 && releaseOpens(gestureState.dx / dragWidth, gestureState.vx)) {
+          settleDrawer(conversationsProgress, true, velocity);
+          setDrawerVisible(true);
+        } else if (gestureState.dx < 0 && releaseOpens(-gestureState.dx / dragWidth, -gestureState.vx)) {
+          settleDrawer(settingsProgress, true, -velocity);
+          setSettingsDrawerVisible(true);
+        } else {
           //send peeked panel back off
           settleDrawer(conversationsProgress, false, velocity);
           settleDrawer(settingsProgress, false, -velocity);
         }
       },
       onPanResponderTerminate: () => {
-        if (drawerVisible || settingsDrawerVisible || modelSelectorVisible) return;
         settleDrawer(conversationsProgress, false);
         settleDrawer(settingsProgress, false);
         settleDrawer(modelSelectorProgress, false);
@@ -573,7 +564,7 @@ export default function Index() {
       handled = true;
       if (total >= SWIPE_THRESHOLD) {
         if (settingsDrawerVisibleRef.current) {
-          setSettingsDrawerVisible(false);
+          closeSettings();
         } else {
           openDrawerSafely(() => setDrawerVisible(true));
         }
@@ -629,7 +620,7 @@ export default function Index() {
       window.removeEventListener("wheel", handleWheel);
       if (resetTimer) clearTimeout(resetTimer);
     };
-  }, [openDrawerSafely]);
+  }, [openDrawerSafely, closeSettings]);
 
   const processQueue = async () => {
     if (isProcessingRef.current) return;
@@ -1417,7 +1408,6 @@ export default function Index() {
 
   const conversationsDrawer = (
     <ConversationsDrawer
-      isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
       visible={drawerVisible}
       onClose={closeConversationsDrawer}
@@ -1437,19 +1427,7 @@ export default function Index() {
       isDesktop={isDesktop}
       visible={settingsDrawerVisible}
       initialSubPage={settingsInitialSubPage}
-      onClose={() => {
-        setSettingsDrawerVisible(false);
-        setSettingsInitialSubPage("main");
-        const cached = Settings.getCached();
-        if (cached.ollamaModel && cached.ollamaModel !== selectedModel) {
-          setSelectedModel(cached.ollamaModel);
-        }
-        setAiService(cached.aiService);
-        setOllamaUrl(cached.ollamaUrl);
-        setSpeakerEnabled(cached.speaker);
-        setAlwaysWhisper(cached.alwaysWhisper);
-        setShowTechnicalDetails(cached.showTechnicalDetails);
-      }}
+      onClose={closeSettings}
       onDataChanged={async () => {
         await loadConversations();
         startNewConversation();
@@ -1569,7 +1547,6 @@ export default function Index() {
                   openDrawerSafely(() => setDrawerVisible(prev => !prev));
                 }}
                 onNewPress={startNewConversation}
-                isLargeScreen={isLargeScreen}
                 isDesktop={isDesktop}
                 centerElement={
                   <ModelSelectorTrigger
@@ -1585,29 +1562,18 @@ export default function Index() {
                   <View style={styles.settingsShadowLayer}>
                     <View style={styles.settingsShadowBlock} />
                     <Pressable
-                      style={({ pressed, hovered }) => {
-                        const showText = isDesktop;
-                        return [
-                          styles.settingsButton,
-                          (pressed || hovered) && { backgroundColor: Colors.surfacePressed },
-                          !showText && { paddingHorizontal: 0, width: 44 }
-                        ];
-                      }}
+                      style={pressStyle(
+                        [styles.settingsButton, !isDesktop && { paddingHorizontal: 0, width: 44 }],
+                        "surface"
+                      )}
                       onPress={() => {
                         if (!isDesktop && drawerVisible) return;
                         openDrawerSafely(() => {
                           if (settingsDrawerVisible) {
-                            const cached = Settings.getCached();
-                            if (cached.ollamaModel && cached.ollamaModel !== selectedModel) {
-                              setSelectedModel(cached.ollamaModel);
-                            }
-                            setAiService(cached.aiService);
-                            setOllamaUrl(cached.ollamaUrl);
-                            setSpeakerEnabled(cached.speaker);
-                            setAlwaysWhisper(cached.alwaysWhisper);
-                            setShowTechnicalDetails(cached.showTechnicalDetails);
+                            closeSettings();
+                          } else {
+                            setSettingsDrawerVisible(true);
                           }
-                          setSettingsDrawerVisible(!settingsDrawerVisible);
                         });
                       }}
                     >

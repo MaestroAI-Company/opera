@@ -42,7 +42,8 @@ import { findMentionSpans, listMentionables, MentionSpan } from "../../services/
 import { Settings } from "../../services/settings/SettingsService";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
 import NotificationModal from "../ui/NotificationModal";
-import AttachmentSheet, { ATTACHMENT_SHEET_LIFTS, SelectedFile } from "./AttachmentSheet";
+import AttachmentSheet, { SelectedFile } from "./AttachmentSheet";
+import { pressStyle } from "../ui/pressStyle";
 
 const nextWhiteIcon = require("../../../assets/icons/arrow.png");
 const micIcon = require("../../../assets/icons/microphone.png");
@@ -249,7 +250,6 @@ function MentionBoxes({ text, spans, scrollY }: { text: string; spans: MentionSp
 }
 
 function VoiceIndicator() {
-  const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const anims = useMemo(() => Array.from({ length: 7 }).map(() => new Animated.Value(1)), []);
   useEffect(() => {
@@ -310,7 +310,6 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const supportsImages = modelCapabilities.includes('vision');
   const supportsAudio = modelCapabilities.includes('audio');
   const supportsFiles = supportsImages || supportsAudio;
-  const bottomInsetToFill = insets.bottom + 16;
   const [text, setText] = useState("");
   //latest text before react rerenders
   const textRef = useRef("");
@@ -1302,7 +1301,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                         <View style={styles.filePreviewContainerTop}>
                           <Image source={{ uri: appContextChip.icon }} style={styles.appContextChipIcon} resizeMode="contain" />
                           {onAppContextRemove && (
-                            <Pressable style={({ pressed, hovered }) => [styles.removeFileBtnTop, (pressed || hovered) && { opacity: 0.8 }]} onPress={onAppContextRemove}>
+                            <Pressable style={pressStyle(styles.removeFileBtnTop, "fadeLight")} onPress={onAppContextRemove}>
                               <Text style={styles.removeFileBtnTextTop}>✕</Text>
                             </Pressable>
                           )}
@@ -1321,7 +1320,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                               )}
                             </View>
                           )}
-                          <Pressable style={({ pressed, hovered }) => [styles.removeFileBtnTop, (pressed || hovered) && { opacity: 0.8 }]} onPress={chip.onRemove}>
+                          <Pressable style={pressStyle(styles.removeFileBtnTop, "fadeLight")} onPress={chip.onRemove}>
                             <Text style={styles.removeFileBtnTextTop}>✕</Text>
                           </Pressable>
                         </View>
@@ -1348,13 +1347,13 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 ]}
               >
                 {supportsFiles && (
-                  <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} style={({ pressed, hovered }) => [styles.plusButton, (pressed || hovered) && { opacity: 0.8 }]}>
+                  <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} style={pressStyle(styles.plusButton, "fadeLight")}>
                     <Image source={addIcon} style={styles.plusIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 )}
 
                 {(Platform.OS !== 'web' || Settings.getCached().whisperModel !== 'none' || canTranscribeRemotely) && !isGenerating && (
-                  <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={({ pressed, hovered }) => [styles.micButton, (pressed || hovered) && { opacity: 0.8 }]}>
+                  <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={pressStyle(styles.micButton, "fadeLight")}>
                     <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
                       <Image source={isRecording ? stopIcon : micIcon} style={styles.micIcon} tintColor={Colors.textOnPrimary} />
                     </Animated.View>
@@ -1440,11 +1439,11 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 )}
 
                 {isGenerating ? (
-                  <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} style={({ pressed, hovered }) => [styles.sendButton, (pressed || hovered) && { opacity: 0.8 }]}>
+                  <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} style={pressStyle(styles.sendButton, "fadeLight")}>
                     <Image source={stopIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 ) : (
-                  <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} style={({ pressed, hovered }) => [styles.sendButton, (pressed || hovered) && { opacity: 0.8 }]}>
+                  <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} style={pressStyle(styles.sendButton, "fadeLight")}>
                     <Image source={nextWhiteIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 )}
@@ -1455,11 +1454,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         </Animated.View>
       </View>
 
-      {/* lifting sheet needs safe area below */}
-      {!ATTACHMENT_SHEET_LIFTS && <View style={{ width: '100%', height: insets.bottom }} />}
-
       <AttachmentSheet
-        bottomInset={ATTACHMENT_SHEET_LIFTS ? insets.bottom : bottomInsetToFill}
+        bottomInset={insets.bottom}
         visible={isAttachmentSheetVisible}
         incognito={incognito}
         onClose={closeSheet}
@@ -1472,7 +1468,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         onLongPressRecentPhoto={handleSelectRecentPhoto}
       />
 
-      {ATTACHMENT_SHEET_LIFTS && <View style={{ width: '100%', height: insets.bottom }} />}
+      {/* lifting sheet needs safe area below */}
+      <View style={{ width: '100%', height: insets.bottom }} />
 
       <NotificationModal
         visible={modalVisible}

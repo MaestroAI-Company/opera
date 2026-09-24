@@ -36,6 +36,7 @@ import { ContactsService } from "../services/contacts/ContactsService";
 import { LocationService } from "../services/location/LocationService";
 import { Settings } from "../services/settings/SettingsService";
 import { STT } from "../services/speech/STTService";
+import { pressStyle } from "../components/ui/pressStyle";
 
 const texture2 = require("../../assets/images/texture2.png");
 const wordmark = require("../../assets/icons/opera.png");
@@ -325,7 +326,7 @@ export default function OnboardingPage() {
                 key={perm.id}
                 onPress={() => requestPermission(perm)}
                 disabled={!!status}
-                style={({ pressed, hovered }) => [styles.row, (pressed || hovered) && !status && styles.rowPressed]}
+                style={pressStyle(styles.row, !status && styles.rowPressed)}
               >
                 <View style={styles.iconBadge}>
                   <Image source={perm.icon} style={styles.badgeIcon} tintColor={Colors.textOnPrimary} />
@@ -449,7 +450,7 @@ export default function OnboardingPage() {
                 accessibilityRole="button"
                 accessibilityLabel={t("onboarding.back")}
                 onPress={() => goTo(step - 1)}
-                style={({ pressed, hovered }) => [styles.backButton, (pressed || hovered) && styles.backButtonPressed]}
+                style={pressStyle(styles.backButton, styles.backButtonPressed)}
               >
                 <Image source={arrowIcon} style={styles.backIcon} tintColor={Colors.textPrimary} />
               </Pressable>
@@ -457,7 +458,7 @@ export default function OnboardingPage() {
             <Animated.View pointerEvents={launchCtaReady ? "auto" : "none"} style={[styles.ctaWrap, { opacity: launchCtaOpacity }]}>
               <Pressable
                 onPress={isLast ? finish : () => goTo(step + 1)}
-                style={({ pressed, hovered }) => [styles.cta, isLast && styles.ctaGlow, (pressed || hovered) && styles.ctaPressed]}
+                style={pressStyle([styles.cta, isLast && styles.ctaGlow], styles.ctaPressed)}
               >
                 <Text style={styles.ctaText}>{ctaLabel}</Text>
                 <Image source={arrowIcon} style={styles.ctaIcon} tintColor={Colors.textOnPrimary} />

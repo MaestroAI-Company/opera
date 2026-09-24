@@ -4,6 +4,7 @@ import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTimin
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+import { pressStyle } from "./pressStyle";
 
 //load theme icons
 const autoIcon = require("../../../assets/icons/auto.png");
@@ -193,7 +194,7 @@ export default function SliderToggle({
               if (option.id !== selectedValue) Vibration.vibrate(10);
               onSelect(option.id);
             }}
-            style={({ pressed, hovered }) => [styles.optionButton, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
+            style={pressStyle(styles.optionButton, "surface")}
           >
             <Text style={styles.optionText}>{option.label}</Text>
           </Pressable>

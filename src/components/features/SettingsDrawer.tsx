@@ -6,7 +6,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   AppState,
@@ -140,6 +140,7 @@ import {
   settleDrawer,
   settleLayoutDrawer,
 } from "./drawerAnimation";
+import { pressStyle } from "../ui/pressStyle";
 
 const linkIcon = require("../../../assets/icons/link.png");
 const addIcon = require("../../../assets/icons/add.png");
@@ -165,7 +166,6 @@ const toolIcon = require("../../../assets/icons/tool.png");
 const confidentialityIcon = require("../../../assets/icons/confidentiality.png");
 const reportsIcon = require("../../../assets/icons/bug.png");
 const supportIcon = require("../../../assets/icons/support.png");
-const socialIcon = require("../../../assets/icons/social.png");
 const informationIcon = require("../../../assets/icons/information.png");
 const githubIcon = require("../../../assets/icons/github.png");
 const operaIcon = require("../../../assets/icons/operaicon.png");
@@ -181,7 +181,6 @@ const exportIcon = require("../../../assets/icons/export.png");
 const messageIcon = require("../../../assets/icons/message.png");
 const timeIcon = require("../../../assets/icons/time.png");
 const errorIcon = require("../../../assets/icons/error.png");
-const validIcon = require("../../../assets/icons/valid.png");
 const ollamaImage = require("../../../assets/images/ImageCard/Ollama.png");
 const ollamaErrorImage = require("../../../assets/images/ImageCard/OllamaError.png");
 const ollamaInfoImage = require("../../../assets/images/ImageCard/OllamaInfo.png");
@@ -192,6 +191,20 @@ const reconnectIcon = require("../../../assets/icons/reconnect.png");
 const hyperlinkIcon = require("../../../assets/icons/hyperlink2.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
+
+//downloads tick per chunk, repaint on whole percents or twice a second
+function throttleProgress<T extends { progress: number }>(set: Dispatch<SetStateAction<T | null>>) {
+  let lastPercent = -1;
+  let lastTime = 0;
+  return (value: T) => {
+    const percent = Math.floor(value.progress * 100);
+    const now = Date.now();
+    if (percent === lastPercent && now - lastTime < 500) return;
+    lastPercent = percent;
+    lastTime = now;
+    set(value);
+  };
+}
 
 const appVersion = Constants.expoConfig?.version ?? "1.0.0";
 
@@ -315,19 +328,27 @@ export default function SettingsDrawer({
   const pageAnim = useAnimatedValue(1);
   const backPulse = useAnimatedValue(0);
 
-  useEffect(() => {
-    if (!visible && activeSubPage !== (initialSubPage ?? "main")) {
-      setActiveSubPage(initialSubPage ?? "main");
-    }
-  }, [visible]);
+  //entry page swaps in before paint, never while sliding out
+  const [prevVisible, setPrevVisible] = useState(visible);
+  const [prevInitialSubPage, setPrevInitialSubPage] = useState(initialSubPage);
+  if (visible !== prevVisible || initialSubPage !== prevInitialSubPage) {
+    setPrevVisible(visible);
+    setPrevInitialSubPage(initialSubPage);
+    if (visible) setActiveSubPage(initialSubPage ?? "main");
+  }
 
   const prevSubPageRef = useRef(activeSubPage);
+  const wasVisibleRef = useRef(visible);
   useEffect(() => {
-    if (visible && activeSubPage !== prevSubPageRef.current) {
+    //page stays mounted while closing, its input would keep the keyboard
+    if (!visible && wasVisibleRef.current) Keyboard.dismiss();
+    //opening already shows the right page
+    if (visible && wasVisibleRef.current && activeSubPage !== prevSubPageRef.current) {
       playPageTransition(pageAnim);
       playBackButtonPulse(backPulse);
     }
     prevSubPageRef.current = activeSubPage;
+    wasVisibleRef.current = visible;
   }, [activeSubPage, visible, pageAnim, backPulse]);
 
   //native back navigates back in the menu, then lets parent close the drawer
@@ -353,6 +374,8 @@ export default function SettingsDrawer({
   }, [activeSubPage, onClose]);
 
   useEffect(() => {
+    //a jump while sliding out would show
+    if (!visible) return;
     setIsScrolled(false);
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   }, [activeSubPage, visible]);
@@ -501,7 +524,6 @@ export default function SettingsDrawer({
   const [advancedMode, setAdvancedModeState] = useState(false);
   const [useAppContext, setUseAppContextState] = useState(true);
   const [autoStartMic, setAutoStartMicState] = useState(true);
-  const [usageAnalytics, setUsageAnalyticsState] = useState(true);
   const [shareInstanceUrl, setShareInstanceUrlState] = useState("");
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
@@ -966,13 +988,14 @@ export default function SettingsDrawer({
   //browsers need a user gesture
   const handleDownloadLocal = async (modelId: string) => {
     setLocalDownload({ progress: 0, sizeStr: "" });
+    const reportProgress = throttleProgress(setLocalDownload);
     try {
       await AIModule.downloadFor(
         "local",
         undefined,
         modelId,
         (progress, _eta, _speed, sizeStr) =>
-          setLocalDownload({ progress, sizeStr }),
+          reportProgress({ progress, sizeStr }),
       );
       setLocalSheet(await AIModule.getLocalModelSheet());
     } catch (e) {
@@ -1449,16 +1472,8 @@ export default function SettingsDrawer({
     setDownloadingLitert(entry.repoId);
     setLitertDownloadProgress(null);
     try {
-      await downloadLiteRTModel(
-        entry.repoId,
-        (progress, etaSeconds, speedStr, sizeStr) =>
-          setLitertDownloadProgress({
-            progress,
-            etaSeconds,
-            speedStr,
-            sizeStr,
-          }),
-      );
+      //progress arrives through the shared subscription below
+      await downloadLiteRTModel(entry.repoId);
     } catch (e) {
       //failures alert, cancels do not
       if (!(e instanceof LiteRTDownloadCancelled)) {
@@ -1629,10 +1644,11 @@ export default function SettingsDrawer({
 
   //external downloads still drive this bar
   useEffect(() => {
+    const reportProgress = throttleProgress(setLitertDownloadProgress);
     return subscribeLiteRTDownload((modelId, snapshot) => {
       if (snapshot) {
         setDownloadingLitert(modelId);
-        setLitertDownloadProgress(snapshot);
+        reportProgress(snapshot);
       } else {
         setDownloadingLitert((current) =>
           current === modelId ? null : current,
@@ -1964,11 +1980,10 @@ export default function SettingsDrawer({
 
   useEffect(() => {
     if (visible) {
-      setActiveSubPage(initialSubPage ?? "main");
       CloudSync.requestAutoSync(DRAWER_SYNC_DELAY_MS);
       refreshLastSync();
     }
-  }, [visible, initialSubPage, refreshLastSync]);
+  }, [visible, refreshLastSync]);
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener(AppEvents.syncCompleted, () => {
@@ -2028,11 +2043,12 @@ export default function SettingsDrawer({
     if (model === "none") return;
     setIsDownloadingWhisper(true);
     setWhisperDownloadProgress(null);
+    const reportProgress = throttleProgress(setWhisperDownloadProgress);
     try {
       await WhisperSTT.downloadModel(
         model,
         (progress, etaSeconds, speedStr, sizeStr) => {
-          setWhisperDownloadProgress({
+          reportProgress({
             progress,
             etaSeconds,
             speedStr,
@@ -2104,7 +2120,7 @@ export default function SettingsDrawer({
   }, [visible, isDesktop, largeScreenAnim, progress]);
 
   //back header for subpages
-  const renderSubPageHeader = (title: string, _backTo?: SubPage) => (
+  const renderSubPageHeader = (title: string) => (
     <View style={styles.header}>
       <View style={styles.headerSpacer} />
       <Text style={styles.title} numberOfLines={1}>
@@ -2150,10 +2166,7 @@ export default function SettingsDrawer({
       {/* profile section */}
       <Group style={[styles.groupSpacing, styles.mainPageGroup]}>
         <Pressable
-          style={({ pressed, hovered }) => [
-            styles.navItem,
-            (pressed || hovered) && styles.navItemPressed,
-          ]}
+          style={pressStyle(styles.navItem, styles.navItemPressed)}
           onPress={() => setActiveSubPage("profile")}
         >
           <View style={styles.menuIconWrap}>
@@ -2174,11 +2187,7 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={({ pressed, hovered }) => [
-            styles.navItem,
-            styles.navItemLast,
-            (pressed || hovered) && styles.navItemPressed,
-          ]}
+          style={pressStyle([styles.navItem, styles.navItemLast], styles.navItemPressed)}
           onPress={() => setActiveSubPage("cloud")}
         >
           <View style={styles.menuIconWrap}>
@@ -2199,10 +2208,7 @@ export default function SettingsDrawer({
 
       <Group style={[styles.groupSpacing, styles.mainPageGroup]}>
         <Pressable
-          style={({ pressed, hovered }) => [
-            styles.navItem,
-            (pressed || hovered) && styles.navItemPressed,
-          ]}
+          style={pressStyle(styles.navItem, styles.navItemPressed)}
           onPress={() => setActiveSubPage("general")}
         >
           <View style={styles.menuIconWrap}>
@@ -2224,10 +2230,7 @@ export default function SettingsDrawer({
 
         {!isDesktop && (
           <Pressable
-            style={({ pressed, hovered }) => [
-              styles.navItem,
-              (pressed || hovered) && styles.navItemPressed,
-            ]}
+            style={pressStyle(styles.navItem, styles.navItemPressed)}
             onPress={() => setActiveSubPage("assistantoverlay")}
           >
             <View style={styles.menuIconWrap}>
@@ -2249,10 +2252,7 @@ export default function SettingsDrawer({
         )}
 
         <Pressable
-          style={({ pressed, hovered }) => [
-            styles.navItem,
-            (pressed || hovered) && styles.navItemPressed,
-          ]}
+          style={pressStyle(styles.navItem, styles.navItemPressed)}
           onPress={() => setActiveSubPage("service")}
         >
           <View style={styles.menuIconWrap}>
@@ -2273,11 +2273,7 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={({ pressed, hovered }) => [
-            styles.navItem,
-            !advancedMode && styles.navItemLast,
-            (pressed || hovered) && styles.navItemPressed,
-          ]}
+          style={pressStyle([styles.navItem, !advancedMode && styles.navItemLast], styles.navItemPressed)}
           onPress={() => setActiveSubPage("tools")}
         >
           <View style={styles.menuIconWrap}>
@@ -2299,11 +2295,7 @@ export default function SettingsDrawer({
 
         {advancedMode && (
           <Pressable
-            style={({ pressed, hovered }) => [
-              styles.navItem,
-              styles.navItemLast,
-              (pressed || hovered) && styles.navItemPressed,
-            ]}
+            style={pressStyle([styles.navItem, styles.navItemLast], styles.navItemPressed)}
             onPress={() => setActiveSubPage("advanced")}
           >
             <View style={styles.menuIconWrap}>
@@ -2327,10 +2319,7 @@ export default function SettingsDrawer({
 
       <Group style={[styles.groupSpacing, styles.mainPageGroup]}>
         <Pressable
-          style={({ pressed, hovered }) => [
-            styles.navItem,
-            (pressed || hovered) && styles.navItemPressed,
-          ]}
+          style={pressStyle(styles.navItem, styles.navItemPressed)}
           onPress={() => setActiveSubPage("confidentiality")}
         >
           <View style={styles.menuIconWrap}>
@@ -2351,10 +2340,7 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={({ pressed, hovered }) => [
-            styles.navItem,
-            (pressed || hovered) && styles.navItemPressed,
-          ]}
+          style={pressStyle(styles.navItem, styles.navItemPressed)}
           onPress={() => setActiveSubPage("reports")}
         >
           <View style={styles.menuIconWrap}>
@@ -2375,11 +2361,7 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={({ pressed, hovered }) => [
-            styles.navItem,
-            styles.navItemLast,
-            (pressed || hovered) && styles.navItemPressed,
-          ]}
+          style={pressStyle([styles.navItem, styles.navItemLast], styles.navItemPressed)}
           onPress={() => setActiveSubPage("sociallinks")}
         >
           <View style={styles.menuIconWrap}>
@@ -2824,10 +2806,7 @@ export default function SettingsDrawer({
       <Group style={styles.groupSpacing}>
         {!!BETA_SERVER_URL && (
           <Pressable
-            style={({ pressed, hovered }) => [
-              styles.toggleGroupRowItem,
-              (pressed || hovered) && styles.toggleGroupCardPressed,
-            ]}
+            style={pressStyle(styles.toggleGroupRowItem, styles.toggleGroupCardPressed)}
             onPress={() => setActiveSubPage("beta")}
           >
             <View style={styles.toggleGroupRow}>
@@ -2848,10 +2827,7 @@ export default function SettingsDrawer({
         )}
 
         <Pressable
-          style={({ pressed, hovered }) => [
-            styles.toggleGroupRowItem,
-            (pressed || hovered) && styles.toggleGroupCardPressed,
-          ]}
+          style={pressStyle(styles.toggleGroupRowItem, styles.toggleGroupCardPressed)}
           onPress={() => setActiveSubPage("local")}
         >
           <View style={styles.toggleGroupRow}>
@@ -2876,10 +2852,7 @@ export default function SettingsDrawer({
 
         {isProviderSupported("litert") && (
           <Pressable
-            style={({ pressed, hovered }) => [
-              styles.toggleGroupRowItem,
-              (pressed || hovered) && styles.toggleGroupCardPressed,
-            ]}
+            style={pressStyle(styles.toggleGroupRowItem, styles.toggleGroupCardPressed)}
             onPress={() => setActiveSubPage("litert")}
           >
             <View style={styles.toggleGroupRow}>
@@ -2901,11 +2874,7 @@ export default function SettingsDrawer({
         )}
 
         <Pressable
-          style={({ pressed, hovered }) => [
-            styles.toggleGroupRowItem,
-            styles.navItemLast,
-            (pressed || hovered) && styles.toggleGroupCardPressed,
-          ]}
+          style={pressStyle([styles.toggleGroupRowItem, styles.navItemLast], styles.toggleGroupCardPressed)}
           onPress={() => setActiveSubPage("ollama")}
         >
           <View style={styles.toggleGroupRow}>
@@ -2986,7 +2955,7 @@ export default function SettingsDrawer({
   //beta provider info subpage
   const renderBetaSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Opera Beta", "service")}
+      {renderSubPageHeader("Opera Beta")}
 
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -3014,7 +2983,7 @@ export default function SettingsDrawer({
   //built-in provider, model ships with device
   const renderLocalSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.local.title"), "service")}
+      {renderSubPageHeader(t("settings.local.title"))}
 
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -3088,14 +3057,14 @@ export default function SettingsDrawer({
                   return (
                     <Pressable
                       key={model.id}
-                      style={({ pressed, hovered }) => [
-                        styles.localModelCard,
-                        { width: cardWidth, flexGrow: isLastOdd ? 1 : 1 },
-                        isLastOdd && styles.localModelCardWide,
-                        (pressed || hovered) && {
-                          backgroundColor: Colors.surfacePressed,
-                        },
-                      ]}
+                      style={pressStyle(
+                        [
+                          styles.localModelCard,
+                          { width: cardWidth, flexGrow: isLastOdd ? 1 : 1 },
+                          isLastOdd && styles.localModelCardWide,
+                        ],
+                        "surface",
+                      )}
                       onPress={() => {
                         Vibration.vibrate(8);
                         setSelectedLocalModelId(model.id);
@@ -3132,7 +3101,7 @@ export default function SettingsDrawer({
   //on-device provider, models the browser installed
   const renderLitertSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.litert.title"), "service")}
+      {renderSubPageHeader(t("settings.litert.title"))}
 
       <View style={styles.contentCard}>
         <View style={{ marginBottom: Spacing.xxl }}>
@@ -3222,7 +3191,7 @@ export default function SettingsDrawer({
   //ollama server list subpage
   const renderOllamaSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Ollama", "service")}
+      {renderSubPageHeader("Ollama")}
 
       {/* ollama servers card */}
       <View style={styles.contentCard}>
@@ -3259,14 +3228,14 @@ export default function SettingsDrawer({
                 return (
                   <Pressable
                     key={index}
-                    style={({ pressed, hovered }) => [
-                      styles.localModelCard,
-                      { width: cardWidth, flexGrow: isLastOdd ? 1 : 1 },
-                      isLastOdd && styles.localModelCardWide,
-                      (pressed || hovered) && {
-                        backgroundColor: Colors.surfacePressed,
-                      },
-                    ]}
+                    style={pressStyle(
+                      [
+                        styles.localModelCard,
+                        { width: cardWidth, flexGrow: isLastOdd ? 1 : 1 },
+                        isLastOdd && styles.localModelCardWide,
+                      ],
+                      "surface",
+                    )}
                     onPress={() => {
                       Vibration.vibrate(8);
                       openOllamaServer(index);
@@ -3323,7 +3292,7 @@ export default function SettingsDrawer({
   //mcp add server form
   const renderMcpServerAddSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.server.add"), "mcpservers")}
+      {renderSubPageHeader(t("settings.server.add"))}
 
       <View style={styles.contentCard}>
         <View style={styles.settingRowVertical}>
@@ -3441,7 +3410,7 @@ export default function SettingsDrawer({
 
     return (
       <View style={styles.subPageContainer}>
-        {renderSubPageHeader(ollamaServerLabel(server), "ollama")}
+        {renderSubPageHeader(ollamaServerLabel(server))}
 
         <View style={styles.contentCard}>
           <View style={styles.settingRowVertical}>
@@ -3880,11 +3849,7 @@ export default function SettingsDrawer({
 
           <Group>
             <Pressable
-              style={({ pressed, hovered }) => [
-                styles.navItem,
-                styles.navItemLast,
-                (pressed || hovered) && styles.navItemPressed,
-              ]}
+              style={pressStyle([styles.navItem, styles.navItemLast], styles.navItemPressed)}
               onPress={() => setActiveSubPage("widgets")}
             >
               <Image
@@ -3912,11 +3877,7 @@ export default function SettingsDrawer({
 
           <Group>
             <Pressable
-              style={({ pressed, hovered }) => [
-                styles.navItem,
-                styles.navItemLast,
-                (pressed || hovered) && styles.navItemPressed,
-              ]}
+              style={pressStyle([styles.navItem, styles.navItemLast], styles.navItemPressed)}
               onPress={() => setActiveSubPage("mcpservers")}
             >
               <Image
@@ -3947,11 +3908,7 @@ export default function SettingsDrawer({
 
             <Group>
               <Pressable
-                style={({ pressed, hovered }) => [
-                  styles.navItem,
-                  styles.navItemLast,
-                  (pressed || hovered) && styles.navItemPressed,
-                ]}
+                style={pressStyle([styles.navItem, styles.navItemLast], styles.navItemPressed)}
                 onPress={() => setActiveSubPage("mobileactions")}
               >
                 <Image
@@ -3973,7 +3930,7 @@ export default function SettingsDrawer({
   //mcp list page
   const renderMcpServersSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.tools.mcp.title"), "tools")}
+      {renderSubPageHeader(t("settings.tools.mcp.title"))}
 
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -3986,11 +3943,7 @@ export default function SettingsDrawer({
               {mcpServers.map((server) => (
                 <Pressable
                   key={server.id}
-                  style={({ pressed, hovered }) => [
-                    styles.navItem,
-                    styles.mcpGroupRow,
-                    (pressed || hovered) && styles.navItemPressed,
-                  ]}
+                  style={pressStyle([styles.navItem, styles.mcpGroupRow], styles.navItemPressed)}
                   onPress={() => {
                     setMcpDetailId(server.id);
                     setActiveSubPage("mcpserver");
@@ -4046,7 +3999,7 @@ export default function SettingsDrawer({
 
     return (
       <View style={styles.subPageContainer}>
-        {renderSubPageHeader(server.name, "mcpservers")}
+        {renderSubPageHeader(server.name)}
 
         {/* server actions card */}
         <View style={styles.contentCard}>
@@ -4072,11 +4025,7 @@ export default function SettingsDrawer({
               }
             >
               <Pressable
-                style={({ pressed, hovered }) => [
-                  styles.navItem,
-                  styles.mcpGroupRow,
-                  (pressed || hovered) && styles.navItemPressed,
-                ]}
+                style={pressStyle([styles.navItem, styles.mcpGroupRow], styles.navItemPressed)}
                 onPress={() => setActiveSubPage("mcpserversettings")}
               >
                 <Image
@@ -4178,7 +4127,7 @@ export default function SettingsDrawer({
 
     return (
       <View style={styles.subPageContainer}>
-        {renderSubPageHeader(t("settings.server.settings"), "mcpserver")}
+        {renderSubPageHeader(t("settings.server.settings"))}
 
         <View style={styles.contentCard}>
           <View style={styles.settingRowVertical}>
@@ -4278,7 +4227,7 @@ export default function SettingsDrawer({
   // widgets subpage content
   const renderWidgetsSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.tools.widgets.title"), "tools")}
+      {renderSubPageHeader(t("settings.tools.widgets.title"))}
 
       <View style={styles.contentCard}>
         {allWidgets.map((widget, index) => {
@@ -4317,7 +4266,7 @@ export default function SettingsDrawer({
   // mobile actions subpage content
   const renderMobileActionsSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.tools.mobile.title"), "tools")}
+      {renderSubPageHeader(t("settings.tools.mobile.title"))}
 
       <View style={styles.contentCard}>
         {mobileTools.map((tool, index) => {
@@ -4439,16 +4388,15 @@ export default function SettingsDrawer({
           <Pressable
             onPress={handleBack}
             hitSlop={12}
-            style={({ pressed, hovered }) => [
-              styles.fixedBackButton,
-              isScrolled
-                ? styles.fixedBackButtonScrolled
-                : styles.fixedBackButtonUnscrolled,
-              (pressed || hovered) &&
-                (isScrolled
-                  ? { backgroundColor: Colors.surfacePressed }
-                  : { opacity: 0.6 }),
-            ]}
+            style={pressStyle(
+              [
+                styles.fixedBackButton,
+                isScrolled
+                  ? styles.fixedBackButtonScrolled
+                  : styles.fixedBackButtonUnscrolled,
+              ],
+              isScrolled ? "surface" : "fade",
+            )}
           >
             <Image
               source={activeSubPage === "main" ? cancelIcon : arrowIcon}
@@ -4583,10 +4531,7 @@ export default function SettingsDrawer({
       <Pressable
         key={repoId}
         onPress={() => openLitertDetail(repoId)}
-        style={({ pressed, hovered }) => [
-          styles.litertCard,
-          (pressed || hovered) && { opacity: 0.6 },
-        ]}
+        style={pressStyle(styles.litertCard, "fade")}
       >
         <View style={styles.litertCardTile} />
         <Text style={styles.litertCardName} numberOfLines={2}>
@@ -4803,16 +4748,15 @@ export default function SettingsDrawer({
             <Pressable
               onPress={() => setLitertDetail(null)}
               hitSlop={12}
-              style={({ pressed, hovered }) => [
-                styles.fixedBackButton,
-                addModelScrolled
-                  ? styles.fixedBackButtonScrolled
-                  : styles.fixedBackButtonUnscrolled,
-                (pressed || hovered) &&
-                  (addModelScrolled
-                    ? { backgroundColor: Colors.surfacePressed }
-                    : { opacity: 0.6 }),
-              ]}
+              style={pressStyle(
+                [
+                  styles.fixedBackButton,
+                  addModelScrolled
+                    ? styles.fixedBackButtonScrolled
+                    : styles.fixedBackButtonUnscrolled,
+                ],
+                addModelScrolled ? "surface" : "fade",
+              )}
             >
               <Image
                 source={arrowIcon}
@@ -5041,20 +4985,18 @@ export default function SettingsDrawer({
       <Animated.View
         style={[
           styles.largeScreenContainer,
-          isDesktop ? styles.floatingContainer : styles.attachedContainer,
+          styles.floatingContainer,
           {
             width: largeScreenWidth,
             opacity: largeScreenOpacity,
-            marginLeft: isDesktop ? largeScreenMargin : 0,
-            marginRight: isDesktop ? largeScreenMargin : 0,
+            marginLeft: largeScreenMargin,
+            marginRight: largeScreenMargin,
             overflow: "hidden",
           },
         ]}
       >
         <View style={{ width: 320, flex: 1 }}>
-          <View
-            style={isDesktop ? styles.floatingContent : styles.attachedContent}
-          >
+          <View style={styles.floatingContent}>
             {innerContent}
           </View>
         </View>
@@ -5142,17 +5084,9 @@ const makeStyles = (Colors: ThemeColors) =>
       elevation: 5,
       overflow: "hidden",
     },
-    attachedContainer: {
-      borderLeftWidth: 1,
-      borderLeftColor: Colors.overlaySubtle,
-    },
     floatingContent: {
       flex: 1,
       paddingTop: 24,
-      paddingHorizontal: Spacing.lg2,
-    },
-    attachedContent: {
-      flex: 1,
       paddingHorizontal: Spacing.lg2,
     },
     innerContainer: {
@@ -5504,11 +5438,6 @@ const makeStyles = (Colors: ThemeColors) =>
       justifyContent: "space-between",
       alignItems: "center",
     },
-    toggleRight: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 14,
-    },
     toggleGroupRow: {
       flexDirection: "row",
       justifyContent: "space-between",
@@ -5517,9 +5446,6 @@ const makeStyles = (Colors: ThemeColors) =>
     toggleGroupContent: {
       flex: 1,
       marginRight: Spacing.lg2,
-    },
-    toggleGroupCard: {
-      overflow: "hidden",
     },
     toggleGroupRowItem: {
       paddingHorizontal: Spacing.md,
@@ -5537,27 +5463,6 @@ const makeStyles = (Colors: ThemeColors) =>
     checkboxRow: {
       flex: 1,
       justifyContent: "space-between",
-    },
-    downloadOption: {
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: Colors.surfaceSubtle,
-      padding: 12,
-      borderRadius: Radius.md,
-      borderWidth: 1,
-      borderColor: Colors.codeBlockText,
-      borderStyle: "dashed",
-      gap: 10,
-      marginBottom: 20,
-    },
-    downloadIcon: {
-      width: 20,
-      height: 20,
-    },
-    downloadText: {
-      fontSize: FontSizes.bodyMd,
-      color: Colors.primary,
-      fontFamily: Fonts.mono,
     },
     helpText: {
       fontSize: FontSizes.bodyMd,
@@ -5604,22 +5509,5 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     highlightGroupDisabled: {
       opacity: 0.5,
-    },
-    sectionTitle: {
-      fontSize: 13,
-      fontFamily: Fonts.mono,
-      color: Colors.textMuted,
-      textTransform: "uppercase",
-      letterSpacing: 1,
-      marginBottom: 10,
-      marginTop: 4,
-    },
-    versionText: {
-      textAlign: "center",
-      fontSize: FontSizes.label,
-      fontFamily: Fonts.mono,
-      color: Colors.textMuted,
-      marginTop: "auto",
-      paddingTop: 16,
     },
   });

@@ -20,7 +20,6 @@ const copyIcon = require("../../../assets/icons/copy.png");
 const fullIcon = require("../../../assets/icons/full.png");
 
 const ToolCallBubble = ({ toolName, isGenerating }: { toolName: string, isGenerating?: boolean }) => {
-  const Colors = useColors();
   const s = useThemedStyles(makeS);
   const opacity = useAnimatedValue(isGenerating ? 0.4 : 1);
 
@@ -60,16 +59,6 @@ const makeS = (Colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 4,
     borderRadius: Radius.sm,
     fontSize: FontSizes.caption,
-  },
-  codeBlock: {
-    fontFamily: Fonts.mono,
-    backgroundColor: Colors.codeBlockBg,
-    color: Colors.codeBlockText,
-    padding: 8,
-    borderRadius: Radius.lg,
-    fontSize: FontSizes.caption,
-    lineHeight: 18,
-    marginVertical: 4,
   },
   codeCard: {
     backgroundColor: Colors.surface,
@@ -348,16 +337,6 @@ function findToolCallBlocks(md: string, allowPartial = false): ToolCallBlock[] {
   }
   pushRawToolCallBlocks(md, segmentStart, md.length, blocks, allowPartial);
   return blocks;
-}
-
-export function hasConversationalText(md: string): boolean {
-  if (md === "…" || md.trim() === "") return false;
-  let clean = md.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
-  const blocks = findToolCallBlocks(clean);
-  for (let k = blocks.length - 1; k >= 0; k--) {
-    clean = clean.substring(0, blocks[k].start) + clean.substring(blocks[k].end);
-  }
-  return clean.trim().length > 0;
 }
 
 //extract tool names from json

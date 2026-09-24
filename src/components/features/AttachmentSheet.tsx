@@ -13,13 +13,11 @@ import {
 } from 'react-native';
 import Group from "../ui/Group";
 import DrawerSheet from "./DrawerSheet";
+import { pressStyle } from "../ui/pressStyle";
 
 const cameraIcon = require("../../../assets/icons/camera.png");
 const fileIcon = require("../../../assets/icons/file.png");
 const photoIcon = require("../../../assets/icons/photo.png");
-
-//lifts bar instead of overlaying
-export const ATTACHMENT_SHEET_LIFTS = true;
 
 export type SelectedFile = { uri: string; type: string; name: string; id?: string; mimeType?: string };
 
@@ -57,7 +55,8 @@ export default function AttachmentSheet({
   return (
     <DrawerSheet
       visible={visible}
-      mode={ATTACHMENT_SHEET_LIFTS ? "lift" : "overlay"}
+      //lifts the bar instead of overlaying it
+      mode="lift"
       //sheet pads its own safe area and overlaps the inset below
       liftOffset={bottomInset}
       onClose={onClose}
@@ -79,7 +78,7 @@ export default function AttachmentSheet({
             //flex on cell since group adds a layer
             <View key={label} style={styles.sheetIconButtonCell}>
               <Group style={incognito && styles.sheetIconButtonGroupIncognito}>
-                <Pressable style={({ pressed, hovered }) => [styles.sheetIconButton, (pressed || hovered) && { backgroundColor: incognito ? Colors.incognito : Colors.surfacePressed }]} onPress={onPress}>
+                <Pressable style={pressStyle(styles.sheetIconButton, { backgroundColor: incognito ? Colors.incognito : Colors.surfacePressed })} onPress={onPress}>
                   <Image source={icon} style={[styles.sheetIcon, incognito && styles.sheetIconIncognito]} />
                   <Text style={[styles.sheetIconText, incognito && styles.sheetTextIncognito]}>{label}</Text>
                 </Pressable>

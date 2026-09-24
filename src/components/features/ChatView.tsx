@@ -32,6 +32,7 @@ import { deriveChatDisplay, renderMarkdown } from "../ui/MarkdownText";
 import SuggestionPill from "../ui/SuggestionPill";
 import ThinkingIcon from "../ui/ThinkingIcon";
 import type { PreviewImage } from "./ImagePreviewSheet";
+import { pressStyle } from "../ui/pressStyle";
 
 const butterflyImage = require("../../../assets/images/butterfly5.png");
 const butterflyGreyImage = require("../../../assets/images/butterfly2_grey.png");
@@ -101,7 +102,7 @@ const SourcePill = ({ source }: { source: MessageSource }) => {
     <Pressable
       onPress={() => { if (canOpen) Linking.openURL(source.url).catch(() => { }); }}
       disabled={!canOpen}
-      style={({ pressed, hovered }) => [styles.sourcePill, canOpen && (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
+      style={pressStyle(styles.sourcePill, canOpen && "surface")}
     >
       <Text style={styles.sourceLabel} numberOfLines={1}>{sourceLabel(source)}</Text>
       <Image
@@ -289,7 +290,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                 return isAudio ? (
                   <AttachmentChip key={i} icon={speakerIcon} label={attachmentFilename(uri)} />
                 ) : (
-                  <Pressable key={i} onPress={() => onImagePress?.({ uri })} style={({ pressed, hovered }) => (pressed || hovered) && { opacity: 0.8 }}>
+                  <Pressable key={i} onPress={() => onImagePress?.({ uri })} style={pressStyle(null, "fadeLight")}>
                     <Image source={{ uri }} style={styles.messageImage} />
                   </Pressable>
                 );
@@ -395,7 +396,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               <Pressable
                 disabled={!canExpandThinking}
                 onPress={() => setShowThinking(prev => !prev)}
-                style={({ pressed, hovered }) => [styles.metricsRow, canExpandThinking && (pressed || hovered) && { opacity: 0.6 }]}
+                style={pressStyle(styles.metricsRow, canExpandThinking && "fade")}
               >
                 <Text style={styles.metricsLabel}>thinking</Text>
                 <Text style={styles.metricsSeparator}> : </Text>
@@ -561,7 +562,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
                 <Pressable
                   onPress={() => onOpenConfidentiality?.()}
                   hitSlop={8}
-                  style={({ pressed, hovered }) => [(pressed || hovered) && { opacity: 0.6 }]}
+                  style={pressStyle(null, "fade")}
                 >
                   <Text style={[styles.disclaimerLink, incognito && styles.disclaimerLinkIncognito]}>
                     Confidentiality

@@ -57,7 +57,10 @@ export function settleDrawer(
     damping: 45,
     overshootClamping: true,
     useNativeDriver: nativeDriver,
-  }).start(() => onComplete?.());
+  }).start(({ finished }) => {
+    //interrupted close must not unmount a reopened sheet
+    if (finished) onComplete?.();
+  });
 }
 
 //desktop width animates on fixed timing

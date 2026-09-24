@@ -121,6 +121,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   shadowLayer: {
     position: "relative",
+    zIndex: 6,
   },
   shadowBlock: {
     position: "absolute",

@@ -99,7 +99,7 @@ class ToolManagerService {
     try {
       const data = tool.widget.build(args, result);
       if (!data) {
-        if (__DEV__) console.log(`[ToolManager] ${name} produced no widget data, keeping the bubble`);
+        if (__DEV__) console.log(`[ToolManager] ${name} produced no widget data`);
         return null;
       }
       return `\n\n\`\`\`toolwidget id="${name}"\n${JSON.stringify(data)}\n\`\`\`\n\n`;

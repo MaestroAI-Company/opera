@@ -1688,7 +1688,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     marginHorizontal: Spacing.xl2,
     marginBottom: Spacing.md,
     overflow: 'hidden',
-    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
+    boxShadow: `-4px 4px 0px ${Colors.shadowInk}`,
   },
   mentionPopupIncognito: {
     backgroundColor: Colors.incognitoSurface,

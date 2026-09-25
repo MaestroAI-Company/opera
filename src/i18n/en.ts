@@ -103,13 +103,14 @@ export const en = {
     "Are you sure you want to delete this conversation? This action cannot be undone.",
 
   "cloudSync.setupIncomplete": "Setup not finished",
-  "cloudSync.lastSynced": "Last synced: {date}",
+  "cloudSync.lastSynced": "Last synced",
   "cloudSync.ready": "Ready to sync",
   "cloudSync.enterPin": "Enter PIN",
   "cloudSync.createPin": "Create PIN",
   "cloudSync.disconnect": "Disconnect",
   "cloudSync.syncing": "Syncing...",
   "cloudSync.syncNow": "Sync Now",
+  "cloudSync.backupSize": "Backup size",
 
   "modelSelector.loading": "Loading...",
   "modelSelector.noModels": "No models found",
@@ -129,15 +130,15 @@ export const en = {
   "widget.html.empty": "No content provided",
 
   "markdown.thinking": "Thinking...",
-  "markdown.tool.using": "Using tool: {name}...",
-  "markdown.tool.used": "Used tool: {name}",
-  "markdown.tool.running": "Running tool: {name}...",
-  "markdown.tool.searching": 'Searching the web for "{query}"...',
 
   "nextcloud.connect": "Connect",
   "nextcloud.waiting": "Waiting for you to approve it in your browser...",
   "nextcloud.failed":
     "Login failed or timed out. Check the address and try again.",
+  "nextcloud.help":
+    "Enter your server address, then approve the connection in the browser window that opens.",
+  "nextcloud.cors":
+    "Blocked by CORS: a browser refuses to call another domain unless that domain allows it. This needs CORS headers on your Nextcloud reverse proxy, otherwise use the desktop or mobile app.",
 
   "codePreview.name": "Name",
   "codePreview.language": "Language",
@@ -147,6 +148,14 @@ export const en = {
   "imagePreview.format": "Format",
   "imagePreview.dimensions": "Dimensions",
   "imagePreview.size": "Size",
+  "messageDetails.model": "Model",
+  "messageDetails.time": "Time",
+  "messageDetails.tokens": "Tokens",
+  "messageDetails.speed": "Tokens/s",
+  "messageDetails.prompt": "System prompt",
+  "messageDetails.thinking": "Reflection",
+  "messageDetails.tools": "Tools",
+  "messageDetails.reasoning": "Reasoning",
 
   "bugReport.title": "Report a bug",
   "bugReport.crashTitle": "Opera closed unexpectedly",
@@ -364,7 +373,17 @@ export const en = {
   "settings.pin.reset.title": "Reset Backup?",
   "settings.pin.reset.message":
     "This will permanently delete your existing cloud backup so you can create a new PIN. Are you sure?",
+  "settings.pin.reset.confirm": "Delete & Reset",
 
+  "settings.service.beta": "Opera Beta server",
+  "settings.service.betaHelp":
+    "A test server we host so you can try Opera without setting one up.",
+  "settings.beta.intro":
+    "A test server we host so you can try Opera without setting one up. Everything needed to answer goes through it: your messages, your attachments, whatever a tool reads for you (contacts, calendar, screen text), and your IP address.",
+  "settings.beta.privacy":
+    "We do not read any of it, we do not keep it, and we will never use it for anything. The server is shut down and wiped at the end of the Play Store beta.",
+  "settings.beta.testing":
+    "It is there for testing only. For everyday use, set up your own Ollama server and nothing leaves your network.",
   "settings.service.ollama": "Ollama",
   "settings.service.ollamaHelp":
     "Use your Ollama servers to run powerful AI models at home.",
@@ -418,6 +437,10 @@ export const en = {
   "settings.litert.loadFailed": "The model list could not be loaded. Check your connection.",
   "settings.litert.downloadingModel": "Downloading {name}",
   "settings.litert.cancelDownload": "Cancel download",
+  "settings.litert.downloadingPercent": "Downloading {percent}%",
+  "settings.litert.downloaded": "Downloaded",
+  "settings.litert.speed": "Speed",
+  "settings.litert.timeLeft": "Time remaining",
   "settings.litert.noResults": "No compatible model matches this search.",
   "settings.litert.downloadTitle": "Download {name}?",
   "settings.litert.downloadMessage":
@@ -522,6 +545,9 @@ export const en = {
 
   "settings.mcp.connecting": "Connecting...",
   "settings.mcp.noTools": "No tools",
+  "settings.mcp.oneTool": "1 tool",
+  "settings.mcp.toolCount": "{count} tools",
+  "settings.mcp.toolsEnabled": "{enabled} of {total} tools",
   "settings.mcp.signInRequired": "Sign in required",
   "settings.mcp.signIn": "Sign in",
   "settings.mcp.unreachable": "Unreachable",

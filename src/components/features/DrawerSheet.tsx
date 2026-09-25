@@ -22,6 +22,8 @@ import { dragDrawer, gestureVelocity, releaseOpens, settleDrawer } from "./drawe
 
 //slide fallback before real measure
 const CLOSED_SLIDE = 420;
+//closed sheet parks below so no edge peeks
+const CLOSED_MARGIN = 80;
 
 //lets an outside gesture drag a sheet one to one
 const sheetTravels = new WeakMap<Animated.Value, number>();
@@ -193,7 +195,7 @@ export default function DrawerSheet({
 
   if (!rendered && !keepMounted) return null;
 
-  const translateYMobile = progress.interpolate({ inputRange: [0, 1], outputRange: [travel, 0] });
+  const translateYMobile = progress.interpolate({ inputRange: [0, 1], outputRange: [travel + CLOSED_MARGIN, 0] });
   const translateYDesktop = progress.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] });
 
   return (

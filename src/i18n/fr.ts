@@ -108,13 +108,14 @@ export const fr: Translations = {
     "Voulez-vous vraiment supprimer cette conversation ? Cette action est irréversible.",
 
   "cloudSync.setupIncomplete": "Configuration non terminée",
-  "cloudSync.lastSynced": "Dernière synchronisation : {date}",
+  "cloudSync.lastSynced": "Dernière synchro",
   "cloudSync.ready": "Prêt à synchroniser",
   "cloudSync.enterPin": "Saisir le code PIN",
   "cloudSync.createPin": "Créer un code PIN",
   "cloudSync.disconnect": "Déconnecter",
   "cloudSync.syncing": "Synchronisation...",
   "cloudSync.syncNow": "Synchroniser",
+  "cloudSync.backupSize": "Taille de sauvegarde",
 
   "modelSelector.loading": "Chargement...",
   "modelSelector.noModels": "Aucun modèle trouvé",
@@ -135,15 +136,15 @@ export const fr: Translations = {
   "widget.html.empty": "Aucun contenu à afficher",
 
   "markdown.thinking": "Réflexion...",
-  "markdown.tool.using": "Utilisation de l'outil : {name}...",
-  "markdown.tool.used": "Outil utilisé : {name}",
-  "markdown.tool.running": "Exécution de l'outil : {name}...",
-  "markdown.tool.searching": 'Recherche web de « {query} »...',
 
   "nextcloud.connect": "Connecter",
   "nextcloud.waiting": "En attente de votre validation dans le navigateur...",
   "nextcloud.failed":
     "Échec ou expiration de la connexion. Vérifiez l'adresse et réessayez.",
+  "nextcloud.help":
+    "Saisissez l'adresse de votre serveur, puis validez la connexion dans la fenêtre du navigateur qui s'ouvre.",
+  "nextcloud.cors":
+    "Bloqué par CORS : un navigateur refuse d'appeler un autre domaine si celui-ci ne l'autorise pas. Il faut ajouter des en-têtes CORS sur le reverse proxy de votre Nextcloud, sinon utilisez l'application desktop ou mobile.",
 
   "codePreview.name": "Nom",
   "codePreview.language": "Langage",
@@ -153,6 +154,14 @@ export const fr: Translations = {
   "imagePreview.format": "Format",
   "imagePreview.dimensions": "Dimensions",
   "imagePreview.size": "Taille",
+  "messageDetails.model": "Modèle",
+  "messageDetails.time": "Durée",
+  "messageDetails.tokens": "Tokens",
+  "messageDetails.speed": "Tokens/s",
+  "messageDetails.prompt": "Prompt système",
+  "messageDetails.thinking": "Réflexion",
+  "messageDetails.tools": "Outils",
+  "messageDetails.reasoning": "Raisonnement",
 
   "bugReport.title": "Signaler un bug",
   "bugReport.crashTitle": "Opera s'est fermé de manière inattendue",
@@ -375,7 +384,17 @@ export const fr: Translations = {
   "settings.pin.reset.title": "Réinitialiser la sauvegarde ?",
   "settings.pin.reset.message":
     "Cela supprimera définitivement votre sauvegarde cloud existante afin de créer un nouveau code PIN. Voulez-vous continuer ?",
+  "settings.pin.reset.confirm": "Supprimer et réinitialiser",
 
+  "settings.service.beta": "Serveur Opera Beta",
+  "settings.service.betaHelp":
+    "Un serveur de test que nous hébergeons pour essayer Opera sans en installer un.",
+  "settings.beta.intro":
+    "Un serveur de test que nous hébergeons pour essayer Opera sans en installer un. Tout ce qui sert à répondre passe par lui : vos messages, vos pièces jointes, ce qu'un outil lit pour vous (contacts, agenda, texte de l'écran) et votre adresse IP.",
+  "settings.beta.privacy":
+    "Nous n'en lisons rien, nous n'en gardons rien et nous ne l'utiliserons jamais pour quoi que ce soit. Le serveur sera arrêté et effacé à la fin de la bêta Play Store.",
+  "settings.beta.testing":
+    "Il sert uniquement aux tests. Pour un usage quotidien, installez votre propre serveur Ollama et rien ne quittera votre réseau.",
   "settings.service.ollama": "Ollama",
   "settings.service.ollamaHelp":
     "Utilisez vos serveurs Ollama pour exécuter de puissants modèles d'IA chez vous.",
@@ -431,6 +450,10 @@ export const fr: Translations = {
     "La liste des modèles n'a pas pu être chargée. Vérifiez votre connexion.",
   "settings.litert.downloadingModel": "Téléchargement de {name}",
   "settings.litert.cancelDownload": "Annuler le téléchargement",
+  "settings.litert.downloadingPercent": "Téléchargement {percent}%",
+  "settings.litert.downloaded": "Téléchargé",
+  "settings.litert.speed": "Vitesse",
+  "settings.litert.timeLeft": "Temps restant",
   "settings.litert.noResults": "Aucun modèle compatible ne correspond à cette recherche.",
   "settings.litert.downloadTitle": "Télécharger {name} ?",
   "settings.litert.downloadMessage":
@@ -543,6 +566,9 @@ export const fr: Translations = {
 
   "settings.mcp.connecting": "Connexion...",
   "settings.mcp.noTools": "Aucun outil",
+  "settings.mcp.oneTool": "1 outil",
+  "settings.mcp.toolCount": "{count} outils",
+  "settings.mcp.toolsEnabled": "{enabled} sur {total} outils",
   "settings.mcp.signInRequired": "Connexion requise",
   "settings.mcp.signIn": "Se connecter",
   "settings.mcp.unreachable": "Injoignable",

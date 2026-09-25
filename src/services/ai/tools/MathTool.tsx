@@ -396,7 +396,7 @@ export class MathTool implements ITool {
     name: 'Calculate',
     hasBorder: true,
     build: (args, result) => {
-      //errors keep the default bubble
+      //errors show no widget
       const separator = result.lastIndexOf(' = ');
       if (separator === -1) return null;
       return { expression: String(args.expression), result: result.slice(separator + 3) };

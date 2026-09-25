@@ -1,13 +1,13 @@
 import * as Clipboard from "expo-clipboard";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Animated, DeviceEventEmitter, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { DeviceEventEmitter, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import AutoHeightWebView from "react-native-autoheight-webview";
 import CodeHighlighter from "react-native-code-highlighter";
 import { vs2015 } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
-import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { getColors, getThemedStyles, useColors, useThemedStyles } from "../../hooks/useTheme";
 import { t } from "../../i18n";
+import type { ToolCall } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { AppEvents } from "../../services/events";
 import { WidgetManager } from "../../services/widgets/WidgetManager";
@@ -15,38 +15,8 @@ import WidgetWrapper from "../widgets/WidgetWrapper";
 import IconButton from "./IconButton";
 import { ensureKatexStylesheet, getKatexCss, KATEX_STYLESHEET_NAME } from "./katexStylesheet";
 
-const toolIcon = require("../../../assets/icons/tool.png");
 const copyIcon = require("../../../assets/icons/copy.png");
 const fullIcon = require("../../../assets/icons/full.png");
-
-const ToolCallBubble = ({ toolName, isGenerating }: { toolName: string, isGenerating?: boolean }) => {
-  const s = useThemedStyles(makeS);
-  const opacity = useAnimatedValue(isGenerating ? 0.4 : 1);
-
-  useEffect(() => {
-    if (isGenerating) {
-      const anim = Animated.loop(
-        Animated.sequence([
-          Animated.timing(opacity, { toValue: 1, duration: 600, useNativeDriver: true }),
-          Animated.timing(opacity, { toValue: 0.4, duration: 600, useNativeDriver: true }),
-        ])
-      );
-      anim.start();
-      return () => anim.stop();
-    } else {
-      opacity.setValue(1);
-    }
-  }, [isGenerating, opacity]);
-
-  return (
-    <View style={s.toolCallBubble}>
-      <Image source={toolIcon} style={s.toolCallIcon} />
-      <Animated.Text style={[s.toolCallLabel, { opacity }]}>
-        {isGenerating ? t("markdown.tool.using", { name: toolName }) : t("markdown.tool.used", { name: toolName })}
-      </Animated.Text>
-    </View>
-  );
-};
 
 const makeS = (Colors: ThemeColors) => StyleSheet.create({
   base: { fontSize: FontSizes.xl, lineHeight: 28, color: Colors.textPrimary, fontFamily: Fonts.body },
@@ -107,27 +77,6 @@ const makeS = (Colors: ThemeColors) => StyleSheet.create({
   tableHeaderCell: { fontSize: FontSizes.labelSm, lineHeight: 14, color: Colors.textMuted, fontFamily: Fonts.mono, letterSpacing: 0.4, textTransform: "uppercase" },
   tableCellBox: { flex: 1, paddingHorizontal: Spacing.lg2, paddingVertical: Spacing.md },
   inlineRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },
-  toolCallBubble: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.overlayFaint,
-    padding: Spacing.lg,
-    borderRadius: Radius.lg2,
-    marginVertical: Spacing.sm,
-    alignSelf: "flex-start",
-  },
-  toolCallIcon: {
-    width: 18,
-    height: 18,
-    marginRight: Spacing.md,
-    opacity: 0.7,
-    tintColor: Colors.textSecondary,
-  },
-  toolCallLabel: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.caption,
-    color: Colors.textSecondary,
-  },
   widgetLoading: {
     padding: Spacing.xl2,
     alignItems: "center",
@@ -339,24 +288,29 @@ function findToolCallBlocks(md: string, allowPartial = false): ToolCallBlock[] {
   return blocks;
 }
 
-//extract tool names from json
-export function parseToolNames(json: string): string[] {
+//extract tool calls from json
+function parseToolCallJson(json: string): ToolCall[] {
   const clean = json.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
-  const names: string[] = [];
   try {
     const data = JSON.parse(clean);
-    if (data?.tool_calls && Array.isArray(data.tool_calls)) {
-      data.tool_calls.forEach((tc: any) => {
-        if (tc?.function?.name) names.push(tc.function.name);
-      });
-    } else if (data?.name) {
-      names.push(data.name);
-    }
+    const fns: any[] = Array.isArray(data?.tool_calls) ? data.tool_calls.map((tc: any) => tc?.function) : [data?.function ?? data];
+    return fns
+      .filter(fn => typeof fn?.name === 'string')
+      .map(fn => ({ function: { name: fn.name, arguments: fn.arguments && typeof fn.arguments === 'object' ? fn.arguments : {} } }));
   } catch {
-    const nameMatches = clean.matchAll(/"name"\s*:\s*"([^"]+)"/g);
-    for (const match of nameMatches) names.push(match[1]);
+    //partial json while streaming
+    return [...clean.matchAll(/"name"\s*:\s*"([^"]+)"/g)].map(m => ({ function: { name: m[1], arguments: {} } }));
   }
-  return names;
+}
+
+//readable name and argument values
+export function describeToolCall(call: ToolCall): { name: string; detail: string } {
+  const tool = ToolManager.getAllTools().find(tl => tl.definition.function.name === call.function.name);
+  const detail = Object.values(call.function.arguments)
+    .flat()
+    .filter(v => ['string', 'number', 'boolean'].includes(typeof v) && v !== '')
+    .join(', ');
+  return { name: tool?.displayName ?? call.function.name, detail };
 }
 
 //last visible thinking step for the thinking row
@@ -376,11 +330,14 @@ export type LiveTool = { name: string | null; args: any } | null;
 
 export type ChatDisplay = {
   thinkingText: string;
-  toolNames: string[];
+  //every call of the reply, in order
+  toolCalls: ToolCall[];
+  //reply text without tool calls
   finalContent: string;
   //what the reader sees, for copy
   visibleText: string;
   showThinkingRow: boolean;
+  showToolsRow: boolean;
   showMarkdown: boolean;
   currentThought: string;
 };
@@ -397,25 +354,27 @@ export function deriveChatDisplay(raw: string, isGenerating: boolean, liveTool: 
     .replace(/\[\[cite:[\s\S]*?(?:\]\]|$)/g, '');
   const blocks = findToolCallBlocks(stripped, isGenerating);
 
-  //keep tool json for bubbles
-  //strip blocks to compute presence
+  //tool calls show outside the text
   let contentOnly = stripped;
-  const contentToolNames: string[] = [];
+  const toolCalls: ToolCall[] = [];
   for (let k = blocks.length - 1; k >= 0; k--) {
     const b = blocks[k];
-    contentOnly = contentOnly.substring(0, b.start) + contentOnly.substring(b.end);
-    contentToolNames.push(...parseToolNames(b.json));
-  }
-
-  const toolNames: string[] = [];
-  for (const n of contentToolNames) {
-    if (n && n !== 'Tool' && !toolNames.includes(n)) toolNames.push(n);
+    //blank lines around a block would stack
+    const before = contentOnly.substring(0, b.start).trimEnd();
+    const after = contentOnly.substring(b.end).trimStart();
+    contentOnly = before && after ? `${before}\n\n${after}` : before + after;
+    toolCalls.unshift(...parseToolCallJson(b.json));
   }
   const liveName = isGenerating ? liveTool?.name : null;
-  if (liveName && !toolNames.includes(liveName)) toolNames.push(liveName);
+  if (liveName && !toolCalls.some(c => c.function.name === liveName)) {
+    toolCalls.push({ function: { name: liveName, arguments: liveTool?.args ?? {} } });
+  }
 
   const hasConvText = contentOnly.trim().length > 0;
-  const hasTool = toolNames.length > 0;
+  const hasTool = toolCalls.length > 0;
+  //widgets are results, not the answer
+  const lastBlock = blocks[blocks.length - 1];
+  const answerStarted = !!lastBlock && stripped.substring(lastBlock.end).replace(/```toolwidget[\s\S]*?(?:```|$)/g, '').trim().length > 0;
 
   let showThinkingRow = false;
   let currentThought = '';
@@ -424,17 +383,14 @@ export function deriveChatDisplay(raw: string, isGenerating: boolean, liveTool: 
     showThinkingRow = !hasConvText && (thinkingText.length > 0 || !hasTool);
     if (thinkingText.length > 0) {
       currentThought = extractThinkStep(thinkingText);
-    } else if (liveName) {
-      currentThought = liveName === 'web_search'
-        ? t('markdown.tool.searching', { query: liveTool?.args?.query || '' })
-        : t('markdown.tool.running', { name: liveName });
     } else if (canThink) {
       currentThought = t('markdown.thinking');
     }
   }
 
-  const showMarkdown = hasConvText || hasTool;
-  return { thinkingText, toolNames, finalContent: stripped, visibleText: contentOnly.trim(), showThinkingRow, showMarkdown, currentThought };
+  //tools leave for the details sheet once the answer streams
+  const showToolsRow = isGenerating && hasTool && !answerStarted;
+  return { thinkingText, toolCalls, finalContent: contentOnly, visibleText: contentOnly.trim(), showThinkingRow, showToolsRow, showMarkdown: hasConvText, currentThought };
 }
 
 function splitMath(text: string): { kind: "text" | "math"; content: string }[] {
@@ -734,20 +690,7 @@ const CodeBlock = React.memo(function CodeBlock({
   );
 });
 
-//closed tool widget blocks per tool name, they replace their bubble
-function countToolWidgetBlocks(md: string): Map<string, number> {
-  const counts = new Map<string, number>();
-  const re = /```toolwidget\s+id="([^"]+)"[\s\S]*?\n\s*```/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(md)) !== null) {
-    const id = m[1];
-    if (!ToolManager.getWidget(id)) continue;
-    counts.set(id, (counts.get(id) ?? 0) + 1);
-  }
-  return counts;
-}
-
-export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: boolean, dark?: boolean): React.ReactNode[] {
+export function renderMarkdown(md: string, incognito?: boolean, dark?: boolean): React.ReactNode[] {
   const Colors = getColors();
   const s = getThemedStyles(makeS);
   const selColor = incognito ? Colors.incognitoSelection : Colors.primarySelection;
@@ -757,17 +700,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
   const mutedColor = dark ? Colors.responseTextMuted : Colors.textMuted;
   const borderColor = dark ? Colors.responseBorder : Colors.codeBlockText;
 
-  //wrap toolcall blocks for bubble rendering
-  let processedMd = md;
-  const blocks = findToolCallBlocks(processedMd, isGenerating);
-  for (let k = blocks.length - 1; k >= 0; k--) {
-    const b = blocks[k];
-    processedMd = processedMd.substring(0, b.start) + '\n```toolcall\n' + b.json + '\n```\n' + processedMd.substring(b.end);
-  }
-
-  const pendingToolWidgets = countToolWidgetBlocks(processedMd);
-
-  const lines = processedMd.split("\n");
+  const lines = md.split("\n");
   const elements: React.ReactNode[] = [];
   let i = 0;
 
@@ -849,7 +782,7 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
       if (language === "toolwidget") {
         const idMatch = header.match(/id="([^"]+)"/);
         const toolWidget = idMatch ? ToolManager.getWidget(idMatch[1]) : undefined;
-        //unknown id or streaming keeps bubble
+        //unknown or still streaming shows nothing
         if (!toolWidget || !isClosed) continue;
 
         let data;
@@ -864,28 +797,6 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
             <toolWidget.component data={data} incognito={incognito} />
           </WidgetWrapper>
         );
-        continue;
-      }
-
-      if (language === "toolcall") {
-        const rawJson = codeLines.join("\n");
-        let toolNames = parseToolNames(rawJson);
-
-        if (toolNames.length === 0) {
-          toolNames = ["Tool"];
-        }
-
-        toolNames.forEach((tName, idx) => {
-          //result widget replaces the bubble
-          const pending = pendingToolWidgets.get(tName) ?? 0;
-          if (pending > 0) {
-            pendingToolWidgets.set(tName, pending - 1);
-            return;
-          }
-          elements.push(
-            <ToolCallBubble key={`toolcall-${i}-${idx}`} toolName={tName} isGenerating={isGenerating} />
-          );
-        });
         continue;
       }
 
@@ -973,11 +884,9 @@ export function renderMarkdown(md: string, incognito?: boolean, isGenerating?: b
       const headerTextColor = incognito ? Colors.textOnPrimary : (dark ? textColor : Colors.textOnPrimary);
       const headerBorderColor = dark ? borderColor : Colors.borderOnPrimary;
       const cardStyle = incognito || dark
-        ? { borderWidth: 2, borderColor }
+        ? undefined
         : {
           backgroundColor: Colors.surface,
-          borderWidth: 2,
-          borderColor,
           shadowColor: Colors.shadowInk,
           shadowOffset: { width: -3, height: 3 },
           shadowOpacity: 1,

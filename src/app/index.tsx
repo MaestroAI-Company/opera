@@ -30,6 +30,7 @@ import BugReportSheet from "../components/features/BugReportSheet";
 import ButterflyCluster from "../components/features/ButterflyCluster";
 import ImagePreviewSheet, { PreviewImage } from "../components/features/ImagePreviewSheet";
 import CodePreviewSheet, { PreviewCode } from "../components/features/CodePreviewSheet";
+import MessageDetailsSheet, { PreviewDetails } from "../components/features/MessageDetailsSheet";
 import ChatBar from "../components/features/ChatBar";
 import ChatView from "../components/features/ChatView";
 import ConversationsDrawer from "../components/features/ConversationsDrawer";
@@ -445,6 +446,7 @@ export default function Index() {
   const [bugReportVisible, setBugReportVisible] = useState(pendingCrash !== null);
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
   const [previewCode, setPreviewCode] = useState<PreviewCode | null>(null);
+  const [previewDetails, setPreviewDetails] = useState<PreviewDetails | null>(null);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const rootRef = useRef<View>(null);
 
@@ -1539,6 +1541,7 @@ export default function Index() {
                 }}
                 canThink={modelCapabilities.includes("thinking") && selectedReflection !== "none"}
                 onImagePress={setPreviewImage}
+                onDetailsPress={setPreviewDetails}
               />
             )}
 
@@ -1684,6 +1687,14 @@ export default function Index() {
       <CodePreviewSheet
         code={previewCode}
         onClose={() => setPreviewCode(null)}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        bottomInset={insets.bottom}
+      />
+
+      <MessageDetailsSheet
+        details={previewDetails}
+        onClose={() => setPreviewDetails(null)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
         bottomInset={insets.bottom}

@@ -43,13 +43,13 @@ export interface ToolSource {
   favicon?: string;
 }
 
-//widget rendering a tool result in place of the "using tool" bubble
+//widget rendering a tool result in the reply
 export interface ToolWidget<T = any> {
   //header label
   name: string;
   //toggle container border
   hasBorder: boolean;
-  //null result keeps the default bubble
+  //null result shows no widget
   build(args: Record<string, any>, result: string): T | null;
   component: React.ComponentType<{ data: T; incognito?: boolean }>;
 }

@@ -23,15 +23,17 @@ import { t } from "../../i18n";
 import { AIModule } from "../../services/ai/AIModule";
 import { Suggestion } from "../../services/ai/generation/suggestions";
 import { resolveMentions } from "../../services/ai/mentions";
+import type { ToolCall } from "../../services/ai/tools/ITool";
 import { Conversation, Message, MessageSource } from "../../services/db/DatabaseService";
 import { splitDocumentBlocks } from "../../services/documents/DocumentService";
 import { Settings } from "../../services/settings/SettingsService";
 import { TTS } from "../../services/speech/TTSService";
 import IconButton from "../ui/IconButton";
-import { deriveChatDisplay, renderMarkdown } from "../ui/MarkdownText";
+import { deriveChatDisplay, describeToolCall, renderMarkdown } from "../ui/MarkdownText";
 import SuggestionPill from "../ui/SuggestionPill";
 import ThinkingIcon from "../ui/ThinkingIcon";
 import type { PreviewImage } from "./ImagePreviewSheet";
+import type { PreviewDetails } from "./MessageDetailsSheet";
 import { pressStyle } from "../ui/pressStyle";
 
 const butterflyImage = require("../../../assets/images/butterfly5.png");
@@ -46,7 +48,7 @@ const imageSourceIcon = require("../../../assets/icons/photo.png");
 const linkSourceIcon = require("../../../assets/icons/hyperlink.png");
 const arrowIcon = require("../../../assets/icons/return.png");
 const fileIcon = require("../../../assets/icons/file.png");
-const arrowDownIcon = require("../../../assets/icons/down_arrow.png");
+const rightArrowIcon = require("../../../assets/icons/right.png");
 
 //android 13+ shows its own clipboard confirmation
 const ANDROID_CLIPBOARD_UI_API = 33;
@@ -163,6 +165,7 @@ type ChatViewProps = {
   suggestions?: Suggestion[];
   onSuggestionPress?: (text: string) => void;
   onImagePress?: (image: PreviewImage) => void;
+  onDetailsPress?: (details: PreviewDetails) => void;
 };
 
 const stripMarkdown = (md: string) => {
@@ -181,7 +184,7 @@ function formatDate(timestamp: number): string {
   }).format(new Date(timestamp));
 }
 
-const FlashingText = ({ text }: { text: string }) => {
+const FlashingText = ({ text }: { text: React.ReactNode }) => {
   const styles = useThemedStyles(makeStyles);
   const opacity = useAnimatedValue(0.4);
 
@@ -198,18 +201,53 @@ const FlashingText = ({ text }: { text: string }) => {
   }, [opacity]);
 
   return (
-    <Animated.Text style={[styles.flashingText, { opacity }]} numberOfLines={2}>
+    <Animated.Text style={[styles.flashingText, { opacity }]} numberOfLines={1}>
       {text}
     </Animated.Text>
   );
 };
 
-const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isChatGenerating, showMetrics, fallbackModel, canThink, dark, onOpenInApp, suggestions, onSuggestionPress, onImagePress }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string; canThink?: boolean; dark?: boolean; onOpenInApp?: (item: Message) => void; suggestions?: Suggestion[]; onSuggestionPress?: (text: string) => void; onImagePress?: (image: PreviewImage) => void }) => {
+//every tool call of a reply in one pill
+const ToolsPill = ({ calls }: { calls: ToolCall[] }) => {
+  const styles = useThemedStyles(makeStyles);
+  const [open, setOpen] = useState(false);
+  const last = calls.length - 1;
+
+  //numbered like the thinking steps
+  const callLine = (call: ToolCall, index: number) => {
+    const { name, detail } = describeToolCall(call);
+    return (
+      <>
+        {`${index + 1}. ${name}`}
+        {!!detail && <Text style={styles.toolDetail}>{` · ${detail}`}</Text>}
+      </>
+    );
+  };
+
+  return (
+    <Pressable
+      onPress={() => setOpen(prev => !prev)}
+      style={pressStyle([styles.thinkingPill, open && styles.thinkingPillOpen], "surface")}
+    >
+      <Image source={rightArrowIcon} style={[styles.thinkingArrow, open && styles.thinkingArrowOpen]} />
+      {open ? (
+        <View style={styles.toolList}>
+          {calls.map((call, i) => (
+            <Text key={i} style={styles.thinkingText}>{callLine(call, i)}</Text>
+          ))}
+        </View>
+      ) : (
+        <FlashingText text={callLine(calls[last], last)} />
+      )}
+    </Pressable>
+  );
+};
+
+const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isChatGenerating, showMetrics, fallbackModel, canThink, dark, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string; canThink?: boolean; dark?: boolean; onOpenInApp?: (item: Message) => void; suggestions?: Suggestion[]; onSuggestionPress?: (text: string) => void; onImagePress?: (image: PreviewImage) => void; onDetailsPress?: (details: PreviewDetails) => void }) => {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const isUser = item.role === "user";
-  const [showDetails, setShowDetails] = useState(false);
-  const [showThinking, setShowThinking] = useState(false);
+  const [thinkingOpen, setThinkingOpen] = useState(false);
   //suggestion cards take half the visible row
   const [suggestionBarWidth, setSuggestionBarWidth] = useState(0);
 
@@ -250,22 +288,16 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
     [item.content, isGenerating, activeTool, canThink]
   );
   const isCurrentlyThinking = !isUser && disp.showThinkingRow;
+  const isUsingTools = !isUser && disp.showToolsRow;
+  //only real reasoning can unfold
+  const hasReasoning = disp.thinkingText.length > 0;
+  const reasoningOpen = thinkingOpen && hasReasoning;
 
   //reparse keyed on text and theme colors
   const markdownNodes = useMemo(
-    () => (disp.showMarkdown ? renderMarkdown(disp.finalContent, incognito, isGenerating, dark) : null),
-    [disp.showMarkdown, disp.finalContent, incognito, isGenerating, dark, Colors]
+    () => (disp.showMarkdown ? renderMarkdown(disp.finalContent, incognito, dark) : null),
+    [disp.showMarkdown, disp.finalContent, incognito, dark, Colors]
   );
-
-  const metricRows = [
-    { label: "ai_model", value: item.metrics?.model || fallbackModel || "N/A" },
-    { label: "time", value: item.metrics?.timeSec != null ? `${item.metrics.timeSec.toFixed(1)}s` : "N/A" },
-    { label: "tokens", value: item.metrics?.tokens != null ? String(item.metrics.tokens) : "N/A" },
-    { label: "tokens_per_sec", value: item.metrics?.tokensPerSec != null ? item.metrics.tokensPerSec.toFixed(1) : "N/A" },
-    { label: "system_prompt", value: item.metrics?.systemPrompt || "N/A" },
-  ];
-  const thinkingLevel = item.metrics?.thinking;
-  const canExpandThinking = thinkingLevel !== "none" && disp.thinkingText.length > 0;
 
   //copy only what is displayed
   const copyToClipboard = async (isMarkdown: boolean) => {
@@ -317,10 +349,30 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
         </>
       ) : (
         <View style={styles.aiContainer}>
-          {isCurrentlyThinking && (
+          {(isCurrentlyThinking || isUsingTools) && (
             <View style={styles.thinkingContainer}>
-              <ThinkingIcon />
-              {!!disp.currentThought && <FlashingText text={disp.currentThought} />}
+              <View style={styles.thinkingIcon}>
+                <ThinkingIcon />
+              </View>
+              <View style={styles.activityPills}>
+                {isCurrentlyThinking && (!!disp.currentThought || hasReasoning) && (
+                  <Pressable
+                    disabled={!hasReasoning}
+                    onPress={() => setThinkingOpen(prev => !prev)}
+                    style={pressStyle([styles.thinkingPill, reasoningOpen && styles.thinkingPillOpen], hasReasoning && "surface")}
+                  >
+                    {hasReasoning && (
+                      <Image source={rightArrowIcon} style={[styles.thinkingArrow, reasoningOpen && styles.thinkingArrowOpen]} />
+                    )}
+                    {reasoningOpen ? (
+                      <Text style={styles.thinkingText}>{disp.thinkingText.replace(/\*\*/g, "")}</Text>
+                    ) : (
+                      <FlashingText text={disp.currentThought} />
+                    )}
+                  </Pressable>
+                )}
+                {isUsingTools && <ToolsPill calls={disp.toolCalls} />}
+              </View>
             </View>
           )}
           {markdownNodes}
@@ -372,41 +424,20 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                   tintColor={dark ? Colors.surface : Colors.textMuted}
                 />
               )}
-              {showMetrics && (
+              {showMetrics && !!onDetailsPress && (
                 <IconButton
                   icon={infoIcon}
                   label={t("common.details")}
-                  onPress={() => setShowDetails(prev => !prev)}
+                  onPress={() => onDetailsPress({
+                    model: item.metrics?.model || fallbackModel,
+                    metrics: item.metrics,
+                    thinkingText: disp.thinkingText,
+                    toolCalls: disp.toolCalls,
+                  })}
                   containerSize={32}
                   pressedColor={Colors.surfacePressed}
-                  tintColor={showDetails ? (incognito ? Colors.incognito : Colors.primary) : (dark ? Colors.surface : Colors.textMuted)}
+                  tintColor={dark ? Colors.surface : Colors.textMuted}
                 />
-              )}
-            </View>
-          )}
-          {showMetrics && showDetails && (
-            <View style={styles.metricsCard}>
-              {metricRows.map(row => (
-                <View key={row.label} style={styles.metricsRow}>
-                  <Text style={styles.metricsLabel}>{row.label}</Text>
-                  <Text style={styles.metricsSeparator}> : </Text>
-                  <Text style={[styles.metricsValue, incognito && { color: Colors.incognito }]}>{row.value}</Text>
-                </View>
-              ))}
-              <Pressable
-                disabled={!canExpandThinking}
-                onPress={() => setShowThinking(prev => !prev)}
-                style={pressStyle(styles.metricsRow, canExpandThinking && "fade")}
-              >
-                <Text style={styles.metricsLabel}>thinking</Text>
-                <Text style={styles.metricsSeparator}> : </Text>
-                <Text style={[styles.metricsValue, incognito && { color: Colors.incognito }]}>{thinkingLevel ?? "N/A"}</Text>
-                {canExpandThinking && (
-                  <Image source={arrowDownIcon} style={[styles.metricsArrow, showThinking && styles.metricsArrowOpen]} />
-                )}
-              </Pressable>
-              {canExpandThinking && showThinking && (
-                <Text style={styles.metricsThinking} selectable={true}>{disp.thinkingText}</Text>
               )}
             </View>
           )}
@@ -455,10 +486,11 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   prev.showSnackbar === next.showSnackbar &&
   prev.onOpenInApp === next.onOpenInApp &&
   prev.onSuggestionPress === next.onSuggestionPress &&
-  prev.onImagePress === next.onImagePress);
+  prev.onImagePress === next.onImagePress &&
+  prev.onDetailsPress === next.onDetailsPress);
 MessageItem.displayName = "MessageItem";
 
-export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp, suggestions, onSuggestionPress, onImagePress }: ChatViewProps) {
+export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress }: ChatViewProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const listRef = useRef<FlatList>(null);
@@ -526,8 +558,8 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   }, [messages]);
 
   const renderItem = useCallback(({ item }: { item: Message }) => {
-    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} suggestions={item.id === lastAssistantId ? suggestions : undefined} onSuggestionPress={onSuggestionPress} onImagePress={onImagePress} />;
-  }, [incognito, onRegenerate, speakerEnabled, handleSpeak, speakingMessageId, generatingMessageId, showMetrics, conversation?.model, canThink, dark, onOpenInApp, lastAssistantId, suggestions, onSuggestionPress, onImagePress]);
+    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} suggestions={item.id === lastAssistantId ? suggestions : undefined} onSuggestionPress={onSuggestionPress} onImagePress={onImagePress} onDetailsPress={onDetailsPress} />;
+  }, [incognito, onRegenerate, speakerEnabled, handleSpeak, speakingMessageId, generatingMessageId, showMetrics, conversation?.model, canThink, dark, onOpenInApp, lastAssistantId, suggestions, onSuggestionPress, onImagePress, onDetailsPress]);
 
   return (
     <View style={styles.container}>
@@ -713,14 +745,62 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   thinkingContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    //butterfly stays on the first line
+    alignItems: 'flex-start',
     gap: 12,
+  },
+  //unfolded text must not squeeze it
+  thinkingIcon: {
+    flexShrink: 0,
+  },
+  //pills hug their text
+  activityPills: {
+    flexShrink: 1,
+    alignItems: "flex-start",
+    gap: Spacing.sm,
   },
   flashingText: {
     color: Colors.textSecondary,
     fontSize: FontSizes.bodyMd,
     fontFamily: Fonts.mono,
     flexShrink: 1,
+  },
+  thinkingPill: {
+    flexShrink: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.lg2,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg2,
+  },
+  thinkingPillOpen: {
+    alignItems: "flex-start",
+  },
+  //right chevron points down when folded
+  thinkingArrow: {
+    width: 18,
+    height: 18,
+    tintColor: Colors.textPrimary,
+    transform: [{ rotate: "90deg" }],
+  },
+  thinkingArrowOpen: {
+    transform: [{ rotate: "-90deg" }],
+  },
+  thinkingText: {
+    flexShrink: 1,
+    color: Colors.textSecondary,
+    fontSize: FontSizes.bodyMd,
+    fontFamily: Fonts.mono,
+    lineHeight: 20,
+  },
+  toolList: {
+    flexShrink: 1,
+    gap: Spacing.xs,
+  },
+  toolDetail: {
+    color: Colors.textMuted,
   },
   aiToolbar: {
     flexDirection: "row",
@@ -741,45 +821,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     //cards hug the right edge when sparse
     flexGrow: 1,
     justifyContent: "flex-end",
-  },
-  metricsCard: {
-    marginTop: 4,
-    gap: 3,
-  },
-  metricsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  metricsLabel: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.label,
-    color: Colors.textMuted,
-    minWidth: 110,
-  },
-  metricsSeparator: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.label,
-    color: Colors.textMuted,
-  },
-  metricsValue: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.label,
-    color: Colors.primary,
-  },
-  metricsArrow: {
-    width: 12,
-    height: 12,
-    marginLeft: Spacing.sm,
-    tintColor: Colors.textMuted,
-  },
-  metricsArrowOpen: {
-    transform: [{ rotate: "180deg" }],
-  },
-  metricsThinking: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.label,
-    color: Colors.textMuted,
-    marginTop: Spacing.xs,
   },
   snackbarContainer: {
     position: 'absolute',

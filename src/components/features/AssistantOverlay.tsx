@@ -35,6 +35,7 @@ import { AppSettings, Settings } from '../../services/settings/SettingsService';
 import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { TTS } from '../../services/speech/TTSService';
 import NotificationModal from '../ui/NotificationModal';
+import ToolConsentHost from './ToolConsentHost';
 import ChatBar, { ChatBarHandle } from './ChatBar';
 import ChatView from './ChatView';
 import { ModelSelectorDrawer, ModelSelectorTrigger } from './ModelSelector';
@@ -884,6 +885,8 @@ function AssistantOverlay() {
           buttons={modalConfig.buttons}
           onClose={() => setModalVisible(false)}
         />
+
+        <ToolConsentHost />
 
         <ModelSelectorDrawer
           visible={modelSelectorVisible}

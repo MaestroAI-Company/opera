@@ -574,6 +574,9 @@ export const fr: Translations = {
   "settings.tools.mobile.help":
     "Autorise l'assistant à s'intégrer aux applications installées : {list}.",
 
+  "tools.consent.allow": "Autoriser",
+  "tools.consent.decline": "Refuser",
+
   "settings.mcp.connecting": "Connexion...",
   "settings.mcp.noTools": "Aucun outil",
   "settings.mcp.oneTool": "1 outil",

@@ -1,3 +1,6 @@
+//consent records a tool approval
+type PluginType = 'tool' | 'widget' | 'consent';
+
 // manages enabled/disabled state for tools and widgets on web (localStorage)
 class PluginRegistryService {
   // key: "tool:name" or "widget:id", value: enabled boolean
@@ -22,14 +25,14 @@ class PluginRegistryService {
   }
 
   // check if a plugin is enabled; falls back to defaultEnabled if no stored value
-  isEnabled(type: 'tool' | 'widget', id: string, defaultEnabled: boolean): boolean {
+  isEnabled(type: PluginType, id: string, defaultEnabled: boolean): boolean {
     const key = `${type}:${id}`;
     if (this.cache.has(key)) return this.cache.get(key)!;
     return defaultEnabled;
   }
 
   // persist and cache a new enabled state
-  async setEnabled(type: 'tool' | 'widget', id: string, enabled: boolean): Promise<void> {
+  async setEnabled(type: PluginType, id: string, enabled: boolean): Promise<void> {
     const key = `${type}:${id}`;
     this.cache.set(key, enabled);
     try {

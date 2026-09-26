@@ -3,6 +3,7 @@ import { Settings } from '../../settings/SettingsService';
 import { universalFetch } from '../utils/universalFetch';
 
 const HF_API = 'https://huggingface.co/api/models';
+const HF_AVATARS = 'https://huggingface.co/api/avatars';
 //only .litertlm containers run, not mediapipe
 const MODEL_EXT = '.litertlm';
 const CACHE_KEY = 'litert_catalog';
@@ -50,6 +51,7 @@ export type CatalogEntry = {
   url: string;
   sizeBytes: number;
   capabilities: string[];
+  baseModel?: string;
 };
 
 export type ModelFamily = { id: string; label: string; repoIds: string[] };
@@ -129,7 +131,18 @@ function capabilitiesFromTags(repoId: string, tags: string[], pipeline?: string)
   return capabilities;
 }
 
-type HFSibling = { rfilename: string; size?: number };
+//plain tag names the upstream repo
+function baseModelFromTags(tags: string[]): string | undefined {
+  return tags.find((t) => /^base_model:[^:]+$/.test(t))?.slice('base_model:'.length);
+}
+
+//upstream publisher avatar > litert-community
+export function modelAvatarUrl(entry: CatalogEntry | null, repoId: string): string {
+  const owner = (entry?.baseModel ?? repoId).split('/')[0];
+  return `${HF_AVATARS}/${owner}`;
+}
+
+type HFSibling ={ rfilename: string; size?: number };
 type HFModel = {
   id: string;
   gated?: boolean | string;
@@ -231,6 +244,7 @@ export async function fetchFamilies(): Promise<ModelFamily[]> {
       url: known?.url ?? '',
       sizeBytes: known?.sizeBytes ?? 0,
       capabilities: capabilitiesFromTags(model.id, model.tags ?? [], model.pipeline_tag),
+      baseModel: baseModelFromTags(model.tags ?? []),
     };
   }
 
@@ -293,6 +307,7 @@ async function resolveEntry(repoId: string): Promise<CatalogEntry | null> {
       url: `https://huggingface.co/${repoId}/resolve/main/${picked.file}`,
       sizeBytes: picked.sizeBytes,
       capabilities,
+      baseModel: baseModelFromTags(model.tags ?? []),
     };
     store.entries[repoId] = entry;
     return entry;
@@ -343,6 +358,59 @@ export async function fetchCatalogEntry(repoId: string): Promise<CatalogEntry | 
   const entry = await resolveEntry(repoId);
   persist();
   return entry;
+}
+
+//short cards are link lines
+const MIN_DESCRIPTION_LENGTH = 80;
+//html, headings, lists, tables, images
+const NON_PROSE = /^(<|#|\||[-*+>]\s|\d+\.\s|!\[)/;
+
+//first paragraph of model card
+function summarizeReadme(readme: string): string | null {
+  const body = readme
+    .replace(/^---\r?\n[\s\S]*?\r?\n---/, '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    //multiline tags stay one skippable line
+    .replace(/<[^>]*>/g, (tag) => tag.replace(/\s+/g, ' '));
+  let paragraph: string[] = [];
+  for (const line of [...body.split(/\r?\n/), '']) {
+    const text = line.trim();
+    //pipes mean nav bars or tables
+    if (text && !NON_PROSE.test(text) && !text.includes(' | ')) {
+      paragraph.push(text);
+      continue;
+    }
+    let joined = paragraph.join(' ')
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/\*\*|__|`/g, '')
+      .trim();
+    //drops a sentence leading into a list
+    if (joined.endsWith(':')) joined = joined.slice(0, joined.lastIndexOf('. ') + 1);
+    if (joined.length >= MIN_DESCRIPTION_LENGTH) return joined;
+    paragraph = [];
+  }
+  return null;
+}
+
+async function readReadme(repoId: string): Promise<string | null> {
+  try {
+    const response = await universalFetch(`https://huggingface.co/${repoId}/raw/main/README.md`);
+    return response.ok ? summarizeReadme(await response.text()) : null;
+  } catch {
+    return null;
+  }
+}
+
+const descriptions = new Map<string, string | null>();
+
+//upstream card > litert card if gated
+export async function fetchModelDescription(repoId: string): Promise<string | null> {
+  if (descriptions.has(repoId)) return descriptions.get(repoId)!;
+  const base = store.entries[repoId]?.baseModel;
+  const description = (base ? await readReadme(base) : null) ?? await readReadme(repoId);
+  descriptions.set(repoId, description);
+  return description;
 }
 
 //hub search finds anything runnable

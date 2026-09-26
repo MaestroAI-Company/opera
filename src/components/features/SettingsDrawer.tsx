@@ -56,11 +56,13 @@ import {
   familyPublisher,
   fetchCatalogEntry,
   fetchFamilies,
+  fetchModelDescription,
   formatBytes,
   getCachedFamilies,
   getCatalogEntry,
   hydrateLiteRTCatalog,
   MIN_SEARCH_LENGTH,
+  modelAvatarUrl,
   ModelFamily,
   OTHER_FAMILY_ID,
   sameFamilyModels,
@@ -178,6 +180,13 @@ const instagramIcon = require("../../../assets/icons/instagram.png");
 const tiktokIcon = require("../../../assets/icons/tiktok.png");
 const micIcon = require("../../../assets/icons/microphone.png");
 const cameraIcon = require("../../../assets/icons/camera.png");
+const highIcon = require("../../../assets/icons/High.png");
+//same icons as the chat and reflection picker
+const LITERT_CAPABILITY_ICONS = {
+  vision: cameraIcon,
+  audio: micIcon,
+  thinking: highIcon,
+};
 const photoIcon = require("../../../assets/icons/photo.png");
 const locationIcon = require("../../../assets/icons/location.png");
 const calendarIcon = require("../../../assets/icons/calendar.png");
@@ -436,6 +445,8 @@ export default function SettingsDrawer({
     repoId: string;
     entry: CatalogEntry | null;
     loading: boolean;
+    //undefined while the card loads
+    description?: string | null;
   } | null>(null);
   const addModelScrollRef = useRef<ScrollView>(null);
 
@@ -1606,9 +1617,14 @@ export default function SettingsDrawer({
     setHfModelInput("");
     setLitertDetail({ repoId, entry: null, loading: true });
     addModelScrollRef.current?.scrollTo({ y: 0, animated: false });
+    fetchModelDescription(repoId).then((description) =>
+      setLitertDetail((prev) =>
+        prev?.repoId === repoId ? { ...prev, description } : prev,
+      ),
+    );
     const entry = await fetchCatalogEntry(repoId);
     setLitertDetail((prev) =>
-      prev?.repoId === repoId ? { repoId, entry, loading: false } : prev,
+      prev?.repoId === repoId ? { ...prev, entry, loading: false } : prev,
     );
   };
 
@@ -4407,7 +4423,12 @@ export default function SettingsDrawer({
         onPress={() => openLitertDetail(repoId)}
         style={pressStyle(styles.litertCard, "fade")}
       >
-        <View style={styles.litertCardTile} />
+        <View style={styles.litertCardTile}>
+          <Image
+            source={{ uri: modelAvatarUrl(entry, repoId) }}
+            style={styles.litertTileImage}
+          />
+        </View>
         <Text style={styles.litertCardName} numberOfLines={2}>
           {entry?.label ?? repoId.split("/").pop()}
         </Text>
@@ -4422,16 +4443,20 @@ export default function SettingsDrawer({
 
   const renderLitertDetail = () => {
     if (!litertDetail) return null;
-    const { repoId, entry: resolved, loading } = litertDetail;
+    const { repoId, entry: resolved, loading, description } = litertDetail;
     const entry = resolved ?? getCatalogEntry(repoId);
     const installed = isLiteRTModelDownloaded(repoId);
     const canDownload = !!resolved && !installed && !downloadingLitert;
     const publisher = familyPublisher(entry?.family ?? "");
     const capabilities = (resolved?.capabilities ?? [])
-      .filter((c) => c in LITERT_CAPABILITY_KEYS)
-      .map((c) =>
-        t(LITERT_CAPABILITY_KEYS[c as keyof typeof LITERT_CAPABILITY_KEYS]),
-      );
+      .filter((c): c is keyof typeof LITERT_CAPABILITY_KEYS =>
+        c in LITERT_CAPABILITY_KEYS,
+      )
+      .map((c) => ({
+        id: c,
+        label: t(LITERT_CAPABILITY_KEYS[c]),
+        icon: LITERT_CAPABILITY_ICONS[c],
+      }));
     //both carousels share one card
     const sections = [
       { title: t("settings.litert.otherModels"), repoIds: similarModels(repoId) },
@@ -4442,7 +4467,12 @@ export default function SettingsDrawer({
       <>
         <View style={styles.contentCard}>
           <View style={styles.litertDetailHeader}>
-            <View style={styles.litertDetailTile} />
+            <View style={styles.litertDetailTile}>
+              <Image
+                source={{ uri: modelAvatarUrl(entry, repoId) }}
+                style={styles.litertTileImage}
+              />
+            </View>
             <View style={styles.litertDetailInfo}>
               <Text style={styles.litertDetailName}>
                 {entry?.label ?? repoId.split("/").pop()}
@@ -4457,11 +4487,18 @@ export default function SettingsDrawer({
                     ? formatBytes(resolved.sizeBytes)
                     : t("settings.litert.unavailable")}
               </Text>
-              {capabilities.length > 0 && (
-                <Text style={styles.litertDetailMeta}>
-                  {capabilities.join(", ")}
-                </Text>
-              )}
+              {capabilities.map((capability) => (
+                <View key={capability.id} style={styles.litertCapability}>
+                  <Image
+                    source={capability.icon}
+                    style={styles.litertCapabilityIcon}
+                    tintColor={Colors.textSecondary}
+                  />
+                  <Text style={styles.litertDetailMeta}>
+                    {capability.label}
+                  </Text>
+                </View>
+              ))}
             </View>
           </View>
 
@@ -4489,7 +4526,9 @@ export default function SettingsDrawer({
             {t("settings.litert.description")}
           </Text>
           <Text style={styles.helpText}>
-            {t("settings.litert.descriptionPlaceholder")}
+            {description === undefined
+              ? t("settings.litert.loading")
+              : (description ?? t("settings.litert.noDescription"))}
           </Text>
         </View>
 
@@ -5392,6 +5431,11 @@ const makeStyles = (Colors: ThemeColors) =>
       borderWidth: 2,
       borderColor: Colors.logoTileBorder,
       borderRadius: Radius.xxl,
+      overflow: "hidden",
+    },
+    litertTileImage: {
+      width: "100%",
+      height: "100%",
     },
     litertDetailInfo: {
       flex: 1,
@@ -5407,6 +5451,15 @@ const makeStyles = (Colors: ThemeColors) =>
       fontSize: FontSizes.caption,
       color: Colors.textSecondary,
       lineHeight: 20,
+    },
+    litertCapability: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Spacing.xs2,
+    },
+    litertCapabilityIcon: {
+      width: 14,
+      height: 14,
     },
     litertDetailDownload: {
       marginTop: Spacing.lg2,
@@ -5436,6 +5489,7 @@ const makeStyles = (Colors: ThemeColors) =>
       borderColor: Colors.logoTileBorder,
       borderRadius: Radius.xxl,
       marginBottom: Spacing.md,
+      overflow: "hidden",
     },
     litertCardName: {
       fontFamily: Fonts.mono,

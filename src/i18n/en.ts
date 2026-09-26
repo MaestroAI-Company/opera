@@ -441,7 +441,7 @@ export const en = {
   "settings.litert.capAudio": "Audio",
   "settings.litert.capThinking": "Thinking",
   "settings.litert.description": "Description",
-  "settings.litert.descriptionPlaceholder": "[description]",
+  "settings.litert.noDescription": "No description available on Hugging Face.",
   "settings.litert.otherModels": "Other models",
   "settings.litert.sameFamily": "Same family",
   "settings.litert.loadFailed": "The model list could not be loaded. Check your connection.",

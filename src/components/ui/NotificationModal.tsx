@@ -1,10 +1,12 @@
 import { Image, ImageSourcePropType, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import Checkbox from "./Checkbox";
 import Group from "./Group";
 import ImageCard from "./ImageCard";
 import TextInputField from "./TextInputField";
+import { pressStyle } from "./pressStyle";
 
 export type ModalButton = {
   text: string;
@@ -74,103 +76,107 @@ export default function NotificationModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.container} onPress={() => { }}>
+      {/* dialog recenters above the keyboard */}
+      <KeyboardAvoidingView behavior="padding" style={styles.scrim}>
+        <Pressable style={styles.overlay} onPress={onClose}>
+          <Pressable style={styles.container} onPress={() => { }}>
 
-          {image && (
-            <View style={styles.imageContainer}>
-              <ImageCard source={image} width="100%" />
-            </View>
-          )}
+            {image && (
+              <View style={styles.imageContainer}>
+                <ImageCard source={image} width="100%" />
+              </View>
+            )}
 
-          {(title || icon) && (
-            <View style={styles.header}>
-              {icon && <Image source={icon} style={styles.icon} tintColor={Colors.textPrimary} />}
-              {title && <Text style={styles.title}>{title}</Text>}
-            </View>
-          )}
+            {(title || icon) && (
+              <View style={styles.header}>
+                {icon && <Image source={icon} style={styles.icon} tintColor={Colors.textPrimary} />}
+                {title && <Text style={styles.title}>{title}</Text>}
+              </View>
+            )}
 
-          {message && <Text style={[styles.message, { textAlign: messageAlign }]}>{message}</Text>}
+            {message && <Text style={[styles.message, { textAlign: messageAlign }]}>{message}</Text>}
 
-          {showInput && (
-            <View style={styles.inputContainer}>
-              <Group>
-                <TextInputField
-                  value={inputValue || ""}
-                  onChangeText={onInputChange}
-                  placeholder={inputPlaceholder}
-                  secureTextEntry={inputSecureTextEntry}
-                  keyboardType={inputKeyboardType}
-                />
-              </Group>
-            </View>
-          )}
+            {showInput && (
+              <View style={styles.inputContainer}>
+                <Group>
+                  <TextInputField
+                    value={inputValue || ""}
+                    onChangeText={onInputChange}
+                    placeholder={inputPlaceholder}
+                    secureTextEntry={inputSecureTextEntry}
+                    keyboardType={inputKeyboardType}
+                  />
+                </Group>
+              </View>
+            )}
 
-          {options && options.length > 0 && (
-            <View style={styles.optionsContainer}>
-              {options.map((option, index) => (
-                <Checkbox
-                  key={index}
-                  label={option.label}
-                  checked={option.checked}
-                  onToggle={option.onToggle}
-                  disabled={option.disabled}
-                  labelFirst
-                />
-              ))}
-            </View>
-          )}
-
-          <View style={styles.buttonContainer}>
-            {[...activeButtons]
-              .sort((a, b) => {
-                const rank = (btn: ModalButton) => btn.style === "primary" || btn.style === "danger" ? 1 : 0;
-                return rank(a) - rank(b);
-              })
-              .map((btn, index) => {
-                const isPrimary = btn.style === "primary" || !btn.style;
-                const isDanger = btn.style === "danger";
-
-                return (
-                  <Pressable
+            {options && options.length > 0 && (
+              <View style={styles.optionsContainer}>
+                {options.map((option, index) => (
+                  <Checkbox
                     key={index}
-                    style={({ pressed, hovered }) => [
-                      styles.button,
-                      isPrimary && styles.buttonPrimary,
-                      isDanger && styles.buttonDanger,
-                      !isPrimary && !isDanger && styles.buttonSecondary,
-                      btn.disabled && styles.buttonDisabled,
-                      !btn.disabled && (pressed || hovered) && (
-                        isPrimary
+                    label={option.label}
+                    checked={option.checked}
+                    onToggle={option.onToggle}
+                    disabled={option.disabled}
+                    labelFirst
+                  />
+                ))}
+              </View>
+            )}
+
+            <View style={styles.buttonContainer}>
+              {[...activeButtons]
+                .sort((a, b) => {
+                  const rank = (btn: ModalButton) => btn.style === "primary" || btn.style === "danger" ? 1 : 0;
+                  return rank(a) - rank(b);
+                })
+                .map((btn, index) => {
+                  const isPrimary = btn.style === "primary" || !btn.style;
+                  const isDanger = btn.style === "danger";
+
+                  return (
+                    <Pressable
+                      key={index}
+                      style={pressStyle(
+                        [
+                          styles.button,
+                          isPrimary && styles.buttonPrimary,
+                          isDanger && styles.buttonDanger,
+                          !isPrimary && !isDanger && styles.buttonSecondary,
+                          btn.disabled && styles.buttonDisabled,
+                        ],
+                        !btn.disabled && (isPrimary || isDanger
                           ? { backgroundColor: Colors.primaryPressed, borderColor: Colors.primaryPressed }
-                          : isDanger
-                            ? { backgroundColor: Colors.primaryPressed, borderColor: Colors.primaryPressed }
-                            : { backgroundColor: Colors.surfacePressed }
-                      )
-                    ]}
-                    onPress={() => !btn.disabled && btn.onPress()}
-                  >
-                    <Text style={[
-                      styles.buttonText,
-                      !isPrimary && !isDanger && styles.buttonTextSecondary,
-                      btn.disabled && styles.buttonTextDisabled
-                    ]}>
-                      {btn.text}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-          </View>
+                          : "surface")
+                      )}
+                      onPress={() => !btn.disabled && btn.onPress()}
+                    >
+                      <Text style={[
+                        styles.buttonText,
+                        !isPrimary && !isDanger && styles.buttonTextSecondary,
+                        btn.disabled && styles.buttonTextDisabled
+                      ]}>
+                        {btn.text}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+            </View>
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
-  overlay: {
+  scrim: {
     flex: 1,
     backgroundColor: Colors.scrimModal,
+  },
+  overlay: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 24,

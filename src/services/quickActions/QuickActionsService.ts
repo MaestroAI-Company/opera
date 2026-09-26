@@ -13,17 +13,11 @@ export const STATIC_ACTIONS: QuickActions.Action[] = [
   },
 ];
 
-const dynamicActions: QuickActions.Action[] = [];
-
-export function setDynamicActions(actions: QuickActions.Action[]): void {
-  dynamicActions.splice(0, dynamicActions.length, ...actions);
-}
-
 export async function setupQuickActions(): Promise<void> {
   if (Platform.OS === "web") return;
   if (!(await QuickActions.isSupported())) return;
   //ios static actions from config plugin, android needs runtime setItems
   if (Platform.OS === "android") {
-    await QuickActions.setItems([...STATIC_ACTIONS, ...dynamicActions]);
+    await QuickActions.setItems(STATIC_ACTIONS);
   }
 }

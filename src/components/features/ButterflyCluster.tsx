@@ -4,11 +4,9 @@ import {
   AppState,
   AppStateStatus,
   Easing,
-  PanResponder,
   Platform,
   StyleProp,
   StyleSheet,
-  Vibration,
   View,
   ViewStyle,
 } from "react-native";
@@ -26,18 +24,34 @@ const GYRO_SPEED = 3.2;
 export type ButterflyClusterProps = {
   style?: StyleProp<ViewStyle>;
   incognito?: boolean;
+  delay?: number;
 };
 
-//reconstruct cluster with interactive parallax
-function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
+//cluster with gyro parallax
+function ButterflyCluster({ style, incognito, delay = 250 }: ButterflyClusterProps) {
   const [containerSize, setContainerSize] = useState({ width: 250, height: 250 });
   const incognitoAnim = useRef(new Animated.Value(incognito ? 1 : 0)).current;
+  const introAnim = useRef(new Animated.Value(0)).current;
+
+  //reveal cluster on screen load
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Animated.timing(introAnim, {
+        toValue: 1,
+        duration: 1100,
+        easing: Easing.bezier(0.16, 1, 0.3, 1),
+        useNativeDriver: true,
+      }).start();
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [introAnim, delay]);
 
   //animate between cluster and incognito
   useEffect(() => {
     Animated.timing(incognitoAnim, {
       toValue: incognito ? 1 : 0,
-      duration: 260,
+      duration: 160,
       easing: Easing.bezier(0.25, 0.1, 0.25, 1),
       useNativeDriver: true,
     }).start();
@@ -46,108 +60,6 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
   const leftGyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const topRightGyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const bottomGyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-
-  const [activeKey, setActiveKey] = useState<"left" | "topRight" | "bottom" | null>(null);
-
-  const leftDrag = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-  const topRightDrag = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-  const bottomDrag = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-
-  const leftScale = useRef(new Animated.Value(1)).current;
-  const topRightScale = useRef(new Animated.Value(1)).current;
-  const bottomScale = useRef(new Animated.Value(1)).current;
-
-  //create magnetic responder per butterfly
-  const makeMagneticPan = (
-    key: "left" | "topRight" | "bottom",
-    offset: Animated.ValueXY,
-    scale: Animated.Value,
-    resistance: number,
-    tension: number,
-    friction: number,
-  ) =>
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 3 || Math.abs(g.dy) > 3,
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => {
-        //cancel spring on touch
-        offset.stopAnimation();
-        scale.stopAnimation();
-        setActiveKey(key);
-        //grow grabbed butterfly to foreground
-        Animated.spring(scale, {
-          toValue: 1.2,
-          tension: 110,
-          friction: 7,
-          useNativeDriver: true,
-        }).start();
-        Vibration.vibrate(8);
-      },
-      onPanResponderMove: (_, g) => {
-        //magnetic resistance formula
-        const rx = (g.dx * resistance) / (resistance + Math.abs(g.dx));
-        const ry = (g.dy * resistance) / (resistance + Math.abs(g.dy));
-        offset.setValue({ x: rx, y: ry });
-      },
-      onPanResponderRelease: (_, g) => {
-        Vibration.vibrate(6);
-        //snap back with gesture velocity
-        Animated.parallel([
-          Animated.spring(offset, {
-            toValue: { x: 0, y: 0 },
-            velocity: { x: g.vx, y: g.vy },
-            tension,
-            friction,
-            useNativeDriver: true,
-          }),
-          Animated.spring(scale, {
-            toValue: 1,
-            tension: 80,
-            friction: 8,
-            useNativeDriver: true,
-          }),
-        ]).start(({ finished }) => {
-          if (finished) {
-            setActiveKey((prev) => (prev === key ? null : prev));
-          }
-        });
-      },
-      onPanResponderTerminate: () => {
-        //restore to rest on interruption
-        Animated.parallel([
-          Animated.spring(offset, {
-            toValue: { x: 0, y: 0 },
-            tension,
-            friction,
-            useNativeDriver: true,
-          }),
-          Animated.spring(scale, {
-            toValue: 1,
-            tension,
-            friction,
-            useNativeDriver: true,
-          }),
-        ]).start(({ finished }) => {
-          if (finished) {
-            setActiveKey((prev) => (prev === key ? null : prev));
-          }
-        });
-      },
-    });
-
-  const leftPan = useMemo(
-    () => makeMagneticPan("left", leftDrag, leftScale, 110, 80, 6.5),
-    [leftDrag, leftScale],
-  );
-  const topRightPan = useMemo(
-    () => makeMagneticPan("topRight", topRightDrag, topRightScale, 130, 90, 5.5),
-    [topRightDrag, topRightScale],
-  );
-  const bottomPan = useMemo(
-    () => makeMagneticPan("bottom", bottomDrag, bottomScale, 95, 70, 7.5),
-    [bottomDrag, bottomScale],
-  );
 
   useEffect(() => {
     if (Platform.OS === "web") {
@@ -331,22 +243,6 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
     [incognitoAnim],
   );
 
-  const leftDragTransform = useMemo(
-    () => [
-      { translateX: leftDrag.x },
-      { translateY: leftDrag.y },
-      { scale: leftScale },
-      {
-        rotate: leftDrag.x.interpolate({
-          inputRange: [-80, 80],
-          outputRange: ["-14deg", "14deg"],
-          extrapolate: "clamp",
-        }),
-      },
-    ],
-    [leftDrag, leftScale],
-  );
-
   const leftGyroTransform = useMemo(
     () => [
       { translateX: leftGyro.x },
@@ -360,22 +256,6 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
       },
     ],
     [leftGyro],
-  );
-
-  const topRightDragTransform = useMemo(
-    () => [
-      { translateX: topRightDrag.x },
-      { translateY: topRightDrag.y },
-      { scale: topRightScale },
-      {
-        rotate: topRightDrag.x.interpolate({
-          inputRange: [-80, 80],
-          outputRange: ["-16deg", "16deg"],
-          extrapolate: "clamp",
-        }),
-      },
-    ],
-    [topRightDrag, topRightScale],
   );
 
   const topRightGyroTransform = useMemo(
@@ -393,22 +273,6 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
     [topRightGyro],
   );
 
-  const bottomDragTransform = useMemo(
-    () => [
-      { translateX: bottomDrag.x },
-      { translateY: bottomDrag.y },
-      { scale: bottomScale },
-      {
-        rotate: bottomDrag.x.interpolate({
-          inputRange: [-80, 80],
-          outputRange: ["14deg", "-14deg"],
-          extrapolate: "clamp",
-        }),
-      },
-    ],
-    [bottomDrag, bottomScale],
-  );
-
   const bottomGyroTransform = useMemo(
     () => [
       { translateX: bottomGyro.x },
@@ -424,8 +288,121 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
     [bottomGyro],
   );
 
+  //fade in early during ascent
+  const introOpacity = useMemo(
+    () =>
+      introAnim.interpolate({
+        inputRange: [0, 0.35, 1],
+        outputRange: [0, 1, 1],
+        extrapolate: "clamp",
+      }),
+    [introAnim],
+  );
+
+  //fan left and rise up
+  const leftIntroTransform = useMemo(
+    () => [
+      {
+        translateX: introAnim.interpolate({
+          inputRange: [0, 0.35, 1],
+          outputRange: [
+            0.22185 * containerSize.width,
+            0.22185 * containerSize.width * 0.7,
+            0,
+          ],
+        }),
+      },
+      {
+        translateY: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.515 * containerSize.height, 0],
+        }),
+      },
+      {
+        scale: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.35, 1],
+        }),
+      },
+      {
+        rotate: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: ["-8deg", "0deg"],
+        }),
+      },
+    ],
+    [containerSize.width, containerSize.height, introAnim],
+  );
+
+  //fan right and rise up
+  const topRightIntroTransform = useMemo(
+    () => [
+      {
+        translateX: introAnim.interpolate({
+          inputRange: [0, 0.35, 1],
+          outputRange: [
+            -0.1937 * containerSize.width,
+            -0.1937 * containerSize.width * 0.7,
+            0,
+          ],
+        }),
+      },
+      {
+        translateY: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.66135 * containerSize.height, 0],
+        }),
+      },
+      {
+        scale: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.35, 1],
+        }),
+      },
+      {
+        rotate: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: ["6deg", "0deg"],
+        }),
+      },
+    ],
+    [containerSize.width, containerSize.height, introAnim],
+  );
+
+  //rise to cluster base anchor
+  const bottomIntroTransform = useMemo(
+    () => [
+      {
+        translateX: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-0.0182 * containerSize.width, 0],
+        }),
+      },
+      {
+        translateY: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.2201 * containerSize.height, 0],
+        }),
+      },
+      {
+        scale: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.35, 1],
+        }),
+      },
+      {
+        rotate: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: ["-2deg", "0deg"],
+        }),
+      },
+    ],
+    [containerSize.width, containerSize.height, introAnim],
+  );
+
   return (
     <View
+      pointerEvents="none"
       style={[styles.container, style]}
       onLayout={(e) => {
         const { width, height } = e.nativeEvent.layout;
@@ -437,19 +414,23 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
       }}
     >
       <Animated.View
-        pointerEvents={incognito ? "none" : "auto"}
         style={[
           styles.left,
           {
-            opacity: otherOpacity,
-            transform: otherIncognitoTransform,
-            zIndex: activeKey === "left" ? 10 : 1,
+            opacity: introOpacity,
+            transform: leftIntroTransform,
+            zIndex: 1,
           },
         ]}
       >
         <Animated.View
-          style={[styles.imageFill, { transform: leftDragTransform }]}
-          {...leftPan.panHandlers}
+          style={[
+            styles.imageFill,
+            {
+              opacity: otherOpacity,
+              transform: otherIncognitoTransform,
+            },
+          ]}
         >
           <Animated.Image
             source={butterflyLeft}
@@ -460,19 +441,23 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
       </Animated.View>
 
       <Animated.View
-        pointerEvents={incognito ? "none" : "auto"}
         style={[
           styles.bottom,
           {
-            opacity: otherOpacity,
-            transform: otherIncognitoTransform,
-            zIndex: activeKey === "bottom" ? 10 : 2,
+            opacity: introOpacity,
+            transform: bottomIntroTransform,
+            zIndex: 2,
           },
         ]}
       >
         <Animated.View
-          style={[styles.imageFill, { transform: bottomDragTransform }]}
-          {...bottomPan.panHandlers}
+          style={[
+            styles.imageFill,
+            {
+              opacity: otherOpacity,
+              transform: otherIncognitoTransform,
+            },
+          ]}
         >
           <Animated.Image
             source={butterflyBottom}
@@ -486,14 +471,19 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
         style={[
           styles.topRight,
           {
-            transform: topRightIncognitoTransform,
-            zIndex: activeKey === "topRight" ? 10 : (incognito ? 5 : 3),
+            opacity: introOpacity,
+            transform: topRightIntroTransform,
+            zIndex: incognito ? 5 : 3,
           },
         ]}
       >
         <Animated.View
-          style={[styles.imageFill, { transform: topRightDragTransform }]}
-          {...topRightPan.panHandlers}
+          style={[
+            styles.imageFill,
+            {
+              transform: topRightIncognitoTransform,
+            },
+          ]}
         >
           <Animated.View
             style={[styles.imageFill, { transform: topRightGyroTransform }]}

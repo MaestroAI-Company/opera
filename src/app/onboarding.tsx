@@ -2,7 +2,7 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
   BackHandler,
@@ -19,6 +19,7 @@ import {
   View,
   type ImageSourcePropType,
   type StyleProp,
+  type TextStyle,
   type ViewStyle,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
@@ -27,6 +28,7 @@ import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../constants/
 import ProfileCard from "../components/features/ProfileCard";
 import Group from "../components/ui/Group";
 import TextInputField from "../components/ui/TextInputField";
+import LottieView from "lottie-react-native";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
 import { useResponsive } from "../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
@@ -36,9 +38,10 @@ import { ContactsService } from "../services/contacts/ContactsService";
 import { LocationService } from "../services/location/LocationService";
 import { Settings } from "../services/settings/SettingsService";
 import { STT } from "../services/speech/STTService";
+import { pressStyle } from "../components/ui/pressStyle";
 
 const texture2 = require("../../assets/images/texture2.png");
-const wordmark = require("../../assets/icons/opera.png");
+const wordmarkAnimation = require("../../assets/animations/wordmark.json");
 const homeButterfly = require("../../assets/images/butterfly5.png");
 const arrowIcon = require("../../assets/icons/arrow.png");
 const pencilIcon = require("../../assets/icons/pencil.png");
@@ -57,6 +60,25 @@ const isWeb = Platform.OS === "web";
 //intro welcome profile permissions ready
 const LAST_STEP = 4;
 const BACK_BUTTON_SIZE = 56;
+
+type IntroPhase = "logo" | "phrases";
+
+const WORDMARK = { width: 260, height: 44 };
+const WORDMARK_LARGE = { width: 360, height: 61 };
+
+const PHRASE_HOLD = 3500;
+const INTRO_PHRASES = [
+  "privateAgain",
+  "noTrace",
+  "freedom",
+  "offline",
+  "privateLife",
+  "neverLeave",
+  "askAnything",
+  "staysHome",
+  "noCloud",
+  "pocket",
+] as const;
 
 const PROMISES = [
   { id: "local", icon: serverIcon },
@@ -139,6 +161,86 @@ function FloatingButterfly({ source, style }: { source: ImageSourcePropType; sty
   return <Animated.Image source={source} resizeMode="contain" style={[style, { transform: [{ translateY }] }]} />;
 }
 
+
+type PhraseCyclerProps = {
+  phrases: string[];
+  style: StyleProp<TextStyle>;
+  onFirstShown: () => void;
+};
+
+//fades each phrase in then out
+function PhraseCycler({ phrases, style, onFirstShown }: PhraseCyclerProps) {
+  const [index, setIndex] = useState(0);
+  const cycle = useAnimatedValue(0);
+  const shown = useRef(false);
+
+  useEffect(() => {
+    cycle.setValue(0);
+    Animated.timing(cycle, { toValue: 1, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(({ finished }) => {
+      if (!finished) return;
+      if (!shown.current) {
+        shown.current = true;
+        onFirstShown();
+      }
+      Animated.timing(cycle, {
+        toValue: 2,
+        duration: 400,
+        delay: PHRASE_HOLD,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }).start(({ finished: done }) => done && setIndex((i) => (i + 1) % phrases.length));
+    });
+    return () => cycle.stopAnimation();
+  }, [index, cycle, phrases.length, onFirstShown]);
+
+  //rises in then keeps rising out
+  const animatedStyle = useMemo(
+    () => ({
+      opacity: cycle.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 0] }),
+      transform: [{ translateY: cycle.interpolate({ inputRange: [0, 1, 2], outputRange: [10, 0, -10] }) }],
+    }),
+    [cycle],
+  );
+
+  return <Animated.Text style={[style, animatedStyle]}>{phrases[index]}</Animated.Text>;
+}
+
+type IntroStageProps = {
+  phase: IntroPhase;
+  onLogoGone: () => void;
+  onReady: () => void;
+};
+
+//logo sweep then the phrases
+function IntroStage({ phase, onLogoGone, onReady }: IntroStageProps) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
+  const t = useT();
+  const { isLargeScreen } = useResponsive();
+  const phrases = useMemo(() => INTRO_PHRASES.map((id) => t(`onboarding.intro.${id}`)), [t]);
+
+  return (
+    <View style={styles.stage}>
+      {phase === "logo" && (
+        <LottieView
+          source={wordmarkAnimation}
+          autoPlay
+          loop={false}
+          style={isLargeScreen ? WORDMARK_LARGE : WORDMARK}
+          resizeMode="contain"
+          colorFilters={[{ keypath: "**", color: Colors.textPrimary }]}
+          onAnimationFinish={(isCancelled) => {
+            if (!isCancelled) onLogoGone();
+          }}
+        />
+      )}
+      {phase === "phrases" && (
+        <PhraseCycler phrases={phrases} style={[styles.phrase, isLargeScreen && styles.phraseLarge]} onFirstShown={onReady} />
+      )}
+    </View>
+  );
+}
+
 export default function OnboardingPage() {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -154,6 +256,7 @@ export default function OnboardingPage() {
   const backButtonProgress = useAnimatedValue(0);
   const launchCtaOpacity = useAnimatedValue(0);
   const [launchCtaReady, setLaunchCtaReady] = useState(false);
+  const [introPhase, setIntroPhase] = useState<IntroPhase>("logo");
   const busy = useRef(false);
   const showBack = step > 0;
 
@@ -195,20 +298,18 @@ export default function OnboardingPage() {
     }).start();
   }, [showBack, backButtonProgress]);
 
-  //cta dissolves in once, after the launch logo settles
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLaunchCtaReady(true);
-      Animated.timing(launchCtaOpacity, {
-        toValue: 1,
-        duration: 500,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-    }, 900);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  //cta trails the first phrase
+  const revealCta = useCallback(() => {
+    setLaunchCtaReady(true);
+    Animated.timing(launchCtaOpacity, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [launchCtaOpacity]);
+
+  const onLogoGone = useCallback(() => setIntroPhase("phrases"), []);
 
   const requestPermission = async (perm: PermissionDef) => {
     if (statuses[perm.id]) return;
@@ -227,18 +328,7 @@ export default function OnboardingPage() {
   const ctaLabel = step === 0 ? t("onboarding.welcome.cta") : isLast ? t("onboarding.ready.cta") : t("onboarding.next");
   const trimmedName = name.trim();
 
-  const renderIntro = () => (
-    <View style={styles.introContent}>
-      <Reveal>
-        <Image
-          source={wordmark}
-          style={[styles.introWordmark, isLargeScreen && styles.introWordmarkLarge]}
-          tintColor={Colors.textPrimary}
-          resizeMode="contain"
-        />
-      </Reveal>
-    </View>
-  );
+  const renderIntro = () => <IntroStage phase={introPhase} onLogoGone={onLogoGone} onReady={revealCta} />;
 
   const renderWelcome = () => (
     <>
@@ -325,7 +415,7 @@ export default function OnboardingPage() {
                 key={perm.id}
                 onPress={() => requestPermission(perm)}
                 disabled={!!status}
-                style={({ pressed, hovered }) => [styles.row, (pressed || hovered) && !status && styles.rowPressed]}
+                style={pressStyle(styles.row, !status && styles.rowPressed)}
               >
                 <View style={styles.iconBadge}>
                   <Image source={perm.icon} style={styles.badgeIcon} tintColor={Colors.textOnPrimary} />
@@ -412,15 +502,7 @@ export default function OnboardingPage() {
             { paddingTop: insets.top + Spacing.md, paddingBottom: insets.bottom + Spacing.xxl },
           ]}
         >
-          <View style={styles.header}>
-            {step > 0 && (
-              <View style={styles.progress}>
-                {Array.from({ length: LAST_STEP }, (_, i) => (
-                  <View key={i} style={[styles.progressSegment, i < step && styles.progressSegmentDone]} />
-                ))}
-              </View>
-            )}
-          </View>
+          <View style={styles.header} />
 
           <Animated.View style={[styles.flex, { opacity: contentOpacity }]}>
             <ScrollView
@@ -449,7 +531,7 @@ export default function OnboardingPage() {
                 accessibilityRole="button"
                 accessibilityLabel={t("onboarding.back")}
                 onPress={() => goTo(step - 1)}
-                style={({ pressed, hovered }) => [styles.backButton, (pressed || hovered) && styles.backButtonPressed]}
+                style={pressStyle(styles.backButton, styles.backButtonPressed)}
               >
                 <Image source={arrowIcon} style={styles.backIcon} tintColor={Colors.textPrimary} />
               </Pressable>
@@ -457,7 +539,7 @@ export default function OnboardingPage() {
             <Animated.View pointerEvents={launchCtaReady ? "auto" : "none"} style={[styles.ctaWrap, { opacity: launchCtaOpacity }]}>
               <Pressable
                 onPress={isLast ? finish : () => goTo(step + 1)}
-                style={({ pressed, hovered }) => [styles.cta, isLast && styles.ctaGlow, (pressed || hovered) && styles.ctaPressed]}
+                style={pressStyle([styles.cta, isLast && styles.ctaGlow], styles.ctaPressed)}
               >
                 <Text style={styles.ctaText}>{ctaLabel}</Text>
                 <Image source={arrowIcon} style={styles.ctaIcon} tintColor={Colors.textOnPrimary} />
@@ -493,11 +575,9 @@ const makeStyles = (Colors: ThemeColors) =>
       alignSelf: "center",
       maxWidth: 520,
     },
+    //keeps step titles where they were
     header: {
       height: 44,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
     },
     footer: {
       flexDirection: "row",
@@ -527,22 +607,6 @@ const makeStyles = (Colors: ThemeColors) =>
       height: 16,
       transform: [{ scaleX: -1 }],
     },
-    progress: {
-      flexDirection: "row",
-      gap: Spacing.sm,
-    },
-    progressSegment: {
-      width: 28,
-      height: 8,
-      borderRadius: Radius.sm,
-      borderWidth: 2,
-      borderColor: Colors.border,
-      backgroundColor: Colors.surfacePressed,
-    },
-    progressSegmentDone: {
-      backgroundColor: Colors.primary,
-      borderColor: Colors.borderOnPrimary,
-    },
     scrollContent: {
       flexGrow: 1,
       justifyContent: "center",
@@ -554,16 +618,21 @@ const makeStyles = (Colors: ThemeColors) =>
       justifyContent: "flex-start",
       paddingTop: Spacing.xl,
     },
-    introContent: {
+    stage: {
       alignItems: "center",
     },
-    introWordmark: {
-      width: 260,
-      height: 44,
+    phrase: {
+      maxWidth: 320,
+      fontFamily: Fonts.display,
+      fontSize: FontSizes.displayMd,
+      lineHeight: 32,
+      textAlign: "center",
+      color: Colors.textPrimary,
     },
-    introWordmarkLarge: {
-      width: 360,
-      height: 61,
+    phraseLarge: {
+      maxWidth: 480,
+      fontSize: FontSizes.displayLg,
+      lineHeight: 44,
     },
     heroTitle: {
       fontFamily: Fonts.display,

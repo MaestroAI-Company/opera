@@ -57,10 +57,6 @@ export function getColors(): ThemeColors {
   return active;
 }
 
-export function isDarkTheme(): boolean {
-  return active === DarkColors;
-}
-
 function subscribe(callback: () => void): () => void {
   listeners.add(callback);
   return () => {

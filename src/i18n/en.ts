@@ -20,11 +20,19 @@ export const en = {
   "common.openInApp": "Open in app",
   "common.info": "Info",
   "common.clear": "Clear",
-  "common.statusOk": "Connected",
-  "common.statusError": "Error",
 
   "onboarding.next": "Continue",
   "onboarding.back": "Back",
+  "onboarding.intro.privateAgain": "Make your assistant private again.",
+  "onboarding.intro.noTrace": "No server. No trace.",
+  "onboarding.intro.freedom": "Meet the real freedom of asking.",
+  "onboarding.intro.offline": "Runs offline. Always.",
+  "onboarding.intro.privateLife": "Reclaim a truly private life.",
+  "onboarding.intro.neverLeave": "Your words never leave your phone.",
+  "onboarding.intro.askAnything": "Ask anything. Tell no one.",
+  "onboarding.intro.staysHome": "Every answer stays home.",
+  "onboarding.intro.noCloud": "No cloud. No compromise.",
+  "onboarding.intro.pocket": "Own the model in your pocket.",
   "onboarding.welcome.title": "AI for all,\nprivacy for freedom.",
   "onboarding.welcome.subtitle":
     "Meet Maestro, the assistant inside Opera. It works for you, and only for you.",
@@ -105,13 +113,14 @@ export const en = {
     "Are you sure you want to delete this conversation? This action cannot be undone.",
 
   "cloudSync.setupIncomplete": "Setup not finished",
-  "cloudSync.lastSynced": "Last synced: {date}",
+  "cloudSync.lastSynced": "Last synced",
   "cloudSync.ready": "Ready to sync",
   "cloudSync.enterPin": "Enter PIN",
   "cloudSync.createPin": "Create PIN",
   "cloudSync.disconnect": "Disconnect",
   "cloudSync.syncing": "Syncing...",
   "cloudSync.syncNow": "Sync Now",
+  "cloudSync.backupSize": "Backup size",
 
   "modelSelector.loading": "Loading...",
   "modelSelector.noModels": "No models found",
@@ -131,15 +140,15 @@ export const en = {
   "widget.html.empty": "No content provided",
 
   "markdown.thinking": "Thinking...",
-  "markdown.tool.using": "Using tool: {name}...",
-  "markdown.tool.used": "Used tool: {name}",
-  "markdown.tool.running": "Running tool: {name}...",
-  "markdown.tool.searching": 'Searching the web for "{query}"...',
 
   "nextcloud.connect": "Connect",
   "nextcloud.waiting": "Waiting for you to approve it in your browser...",
   "nextcloud.failed":
     "Login failed or timed out. Check the address and try again.",
+  "nextcloud.help":
+    "Enter your server address, then approve the connection in the browser window that opens.",
+  "nextcloud.cors":
+    "Blocked by CORS: a browser refuses to call another domain unless that domain allows it. This needs CORS headers on your Nextcloud reverse proxy, otherwise use the desktop or mobile app.",
 
   "codePreview.name": "Name",
   "codePreview.language": "Language",
@@ -149,6 +158,15 @@ export const en = {
   "imagePreview.format": "Format",
   "imagePreview.dimensions": "Dimensions",
   "imagePreview.size": "Size",
+  "messageDetails.model": "Model",
+  "messageDetails.time": "Time",
+  "messageDetails.tokens": "Tokens",
+  "messageDetails.speed": "Tokens/s",
+  "messageDetails.prompt": "System prompt",
+  "messageDetails.thinking": "Reflection",
+  "messageDetails.tools": "Tools",
+  "messageDetails.reasoning": "Reasoning",
+  "messageDetails.error": "Error",
 
   "bugReport.title": "Report a bug",
   "bugReport.crashTitle": "Opera closed unexpectedly",
@@ -366,16 +384,23 @@ export const en = {
   "settings.pin.reset.title": "Reset Backup?",
   "settings.pin.reset.message":
     "This will permanently delete your existing cloud backup so you can create a new PIN. Are you sure?",
+  "settings.pin.reset.confirm": "Delete & Reset",
 
+  "settings.service.beta": "Opera Beta server",
+  "settings.service.betaHelp":
+    "A test server we host so you can try Opera without setting one up.",
+  "settings.beta.intro":
+    "A test server we host so you can try Opera without setting one up. Everything needed to answer goes through it: your messages, your attachments, whatever a tool reads for you (contacts, calendar, screen text), and your IP address.",
+  "settings.beta.privacy":
+    "We do not read any of it, we do not keep it, and we will never use it for anything. The server is shut down and wiped at the end of the Play Store beta.",
+  "settings.beta.testing":
+    "It is there for testing only. For everyday use, set up your own Ollama server and nothing leaves your network.",
   "settings.service.ollama": "Ollama",
-  "settings.service.ollamaInfo":
-    "Ollama lets you run AI models on your own computer or server instead of the cloud. Add your Ollama server's URL below to connect Opera to it.",
   "settings.service.ollamaHelp":
     "Use your Ollama servers to run powerful AI models at home.",
   "settings.service.local": "Built-in",
   "settings.service.localHelp":
     "Use the AI model that ships with your device. Nothing to download.",
-  "settings.local.see": "See Built-in settings",
   "settings.local.title": "Built-in",
   "settings.local.help":
     "Your device comes with its own AI model. It is always available and needs no setup.",
@@ -403,13 +428,11 @@ export const en = {
   "settings.service.litert": "On-Device",
   "settings.service.litertHelp":
     "Download open models from Hugging Face and run them on this device.",
-  "settings.litert.see": "See On-Device settings",
   "settings.litert.title": "On-Device",
   "settings.litert.modelTitle": "AI Model",
   "settings.litert.help": "Add and manage your AI models from Hugging Face.",
   "settings.litert.addModel": "Add ai model",
   "settings.litert.addModelPlaceholder": "search models",
-  "settings.litert.noModels": "No model installed yet.",
   "settings.litert.installed": "Installed",
   "settings.litert.loading": "Loading...",
   "settings.litert.familyOther": "Other",
@@ -420,10 +443,14 @@ export const en = {
   "settings.litert.description": "Description",
   "settings.litert.descriptionPlaceholder": "[description]",
   "settings.litert.otherModels": "Other models",
+  "settings.litert.sameFamily": "Same family",
   "settings.litert.loadFailed": "The model list could not be loaded. Check your connection.",
-  "settings.litert.downloading": "Downloading...",
   "settings.litert.downloadingModel": "Downloading {name}",
   "settings.litert.cancelDownload": "Cancel download",
+  "settings.litert.downloadingPercent": "Downloading {percent}%",
+  "settings.litert.downloaded": "Downloaded",
+  "settings.litert.speed": "Speed",
+  "settings.litert.timeLeft": "Time remaining",
   "settings.litert.noResults": "No compatible model matches this search.",
   "settings.litert.downloadTitle": "Download {name}?",
   "settings.litert.downloadMessage":
@@ -449,21 +476,9 @@ export const en = {
   "generation.error.unknown": "Generation failed for an unknown reason.",
   "generation.error.generic": "Generation failed. Try again, or switch model in the settings.",
   "settings.service.serverLink": "server link",
-  "settings.service.addServer": "Add server link",
-  "settings.service.unreachable.title": "Server unreachable",
-  "settings.service.unreachable.message":
-    "This server could not be reached.\n\n- Check that the server is running.\n- Check the server's network connection.\n- Make sure the URL and port are correct.",
   "settings.service.failover": "Model failover",
   "settings.service.failoverHelp":
     "When the active Ollama server cannot be reached, keep the same model running on another Ollama server that offers it.",
-  "settings.service.contextLength": "Context Length",
-  "settings.service.contextLengthHelp":
-    "Maximum number of tokens the model can use.",
-  "settings.service.keepAlive": "Model Keep Alive",
-  "settings.service.keepAliveHelp":
-    "How long the model stays loaded in memory after a request.",
-  "settings.service.keepAliveHelpAdvanced":
-    "How long the model stays loaded in memory after a request, in seconds. Use -1 to keep it loaded forever.",
 
   "settings.whisper.label": "Whisper Model",
   "settings.whisper.help":
@@ -531,18 +546,18 @@ export const en = {
   "settings.tools.widgets.title": "Widgets",
   "settings.tools.widgets.help":
     "Structured results the assistant can display: {list}.",
-  "settings.tools.widgets.see": "See widgets",
   "settings.tools.mcp.title": "MCP Servers",
   "settings.tools.mcp.help":
     "Connect Opera to external MCP servers so the assistant can use their tools.",
-  "settings.tools.mcp.see": "See MCP Servers",
   "settings.tools.mobile.title": "Mobile actions",
   "settings.tools.mobile.help":
     "Allow the assistant to integrate with installed apps: {list}.",
-  "settings.tools.mobile.see": "See mobile actions",
 
   "settings.mcp.connecting": "Connecting...",
   "settings.mcp.noTools": "No tools",
+  "settings.mcp.oneTool": "1 tool",
+  "settings.mcp.toolCount": "{count} tools",
+  "settings.mcp.toolsEnabled": "{enabled} of {total} tools",
   "settings.mcp.signInRequired": "Sign in required",
   "settings.mcp.signIn": "Sign in",
   "settings.mcp.unreachable": "Unreachable",
@@ -561,8 +576,6 @@ export const en = {
   "settings.mcp.remove.title": "Remove server",
   "settings.mcp.remove.message":
     "Remove {name}? Its tools and its saved connection will be deleted.",
-  "settings.mcp.importFailed": "Import failed",
-  "settings.mcp.unreadableConfig": "This configuration could not be read.",
   "settings.server.link": "Link",
   "settings.server.add": "Add server",
   "settings.server.name": "Name",
@@ -575,7 +588,6 @@ export const en = {
   "settings.ollama.title": "Ollama servers",
   "settings.ollama.help":
     "Add your Ollama server links to connect Opera to them.",
-  "settings.ollama.see": "See Ollama settings",
   "settings.ollama.newServer": "New server",
   "settings.ollama.noLink": "No link",
   "settings.ollama.checking": "Checking...",

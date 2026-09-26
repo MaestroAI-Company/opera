@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius } from "../../../constants/theme";
 import { useColors } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 

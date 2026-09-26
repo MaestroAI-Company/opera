@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Pressable, StyleSheet, Image } from 'react-native';
 import Svg, { Path, Line, Rect } from 'react-native-svg';
-import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 
 // detect the tauri desktop shell and its host os
@@ -147,11 +147,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   iconMac: {
     marginRight: 0,
   },
-  title: {
-    fontSize: FontSizes.label,
-    color: Colors.textSecondary,
-    fontFamily: Fonts.body,
-  },
   controls: {
     flexDirection: 'row',
     height: '100%',
@@ -173,13 +168,5 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   closeButtonPressed: {
     backgroundColor: Colors.windowClosePressed,
-  },
-  controlIcon: {
-    width: 12,
-    height: 12,
-    tintColor: Colors.textSecondary,
-  },
-  closeControlIconActive: {
-    tintColor: Colors.textOnPrimary,
   },
 });

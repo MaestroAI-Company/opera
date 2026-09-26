@@ -1,4 +1,6 @@
 import * as Speech from 'expo-speech';
+import { Settings } from '../settings/SettingsService';
+import { Kokoro, KokoroPlayback } from './KokoroTTS';
 
 const CHUNK_MAX = 900;
 
@@ -37,6 +39,7 @@ class TextToSpeechService {
   private generation = 0;
   private speaking = false;
   private speakingId: string | null = null;
+  private playback: KokoroPlayback | null = null;
   private listeners = new Set<() => void>();
 
   isSpeaking(): boolean {
@@ -68,6 +71,8 @@ class TextToSpeechService {
 
     //cancel any current speech
     const gen = ++this.generation;
+    this.playback?.stop();
+    this.playback = null;
     try {
       Speech.stop();
     } catch (e) {
@@ -79,8 +84,20 @@ class TextToSpeechService {
 
     const lang = this.detectLanguage(clean) || options?.language || 'en';
     const locale = LOCALES[lang] || (/^[a-z]{2,3}(-[a-z0-9]{2,4})?$/i.test(lang) ? lang : 'en-US');
-    const chunks = this.chunkText(clean);
 
+    const useKokoro = Settings.getCached().ttsEngine === 'kokoro' && Kokoro.supports(lang) && Kokoro.isInstalled();
+    const rest = useKokoro ? await this.speakKokoro(clean, lang, gen) : this.chunkText(clean, CHUNK_MAX);
+    await this.speakSystem(rest, locale, gen);
+
+    if (gen === this.generation) {
+      this.speaking = false;
+      this.speakingId = null;
+      this.notify();
+    }
+    options?.onDone?.();
+  }
+
+  private async speakSystem(chunks: string[], locale: string, gen: number): Promise<void> {
     for (let i = 0; i < chunks.length; i++) {
       if (gen !== this.generation) break;
       await new Promise<void>((resolve) => {
@@ -99,13 +116,37 @@ class TextToSpeechService {
         }
       });
     }
+  }
 
-    if (gen === this.generation) {
-      this.speaking = false;
-      this.speakingId = null;
-      this.notify();
+  //chunks left for the system voice
+  private async speakKokoro(text: string, lang: string, gen: number): Promise<string[]> {
+    //kokoro has no per chunk pause
+    const chunks = this.splitSentences(text);
+    let playback: KokoroPlayback;
+    try {
+      playback = Kokoro.createPlayback();
+    } catch (e) {
+      console.warn('Kokoro playback error:', e);
+      return chunks;
     }
-    options?.onDone?.();
+    this.playback = playback;
+
+    let rest: string[] = [];
+    for (let i = 0; i < chunks.length; i++) {
+      try {
+        //synthesis overlaps the chunk already playing
+        const samples = await Kokoro.synthesize(chunks[i], lang);
+        if (gen !== this.generation) return [];
+        playback.enqueue(samples);
+      } catch (e) {
+        console.warn('Kokoro synthesis error:', e);
+        rest = chunks.slice(i);
+        break;
+      }
+    }
+    await playback.finish();
+    if (this.playback === playback) this.playback = null;
+    return gen === this.generation ? rest : [];
   }
 
   //interrupt current speech
@@ -113,6 +154,8 @@ class TextToSpeechService {
     this.generation++;
     this.speaking = false;
     this.speakingId = null;
+    this.playback?.stop();
+    this.playback = null;
     try {
       Speech.stop();
     } catch (e) {
@@ -128,6 +171,8 @@ class TextToSpeechService {
       .replace(/<think>[\s\S]*$/g, ' ')
       .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
       .replace(/[*_~`#>|]/g, ' ')
+      //titles and items need a stop
+      .replace(/([^.!?…:;,\s])[ \t]*\n+/g, '$1.\n')
       .replace(/\s+/g, ' ')
       .trim();
     return t;
@@ -158,13 +203,17 @@ class TextToSpeechService {
     return best.score >= 3 ? best.lang : '';
   }
 
+  private splitSentences(text: string): string[] {
+    return text.split(/(?<=[.!?…])\s+/).map((s) => s.trim()).filter(Boolean);
+  }
+
   //split long text for platform limits
-  private chunkText(text: string): string[] {
-    const sentences = text.split(/(?<=[.!?…])\s+/).map((s) => s.trim()).filter(Boolean);
+  private chunkText(text: string, max: number): string[] {
+    const sentences = this.splitSentences(text);
     const chunks: string[] = [];
     let current = '';
     for (const sentence of sentences) {
-      if (current && (current + ' ' + sentence).length > CHUNK_MAX) {
+      if (current && (current + ' ' + sentence).length > max) {
         chunks.push(current);
         current = sentence;
       } else {

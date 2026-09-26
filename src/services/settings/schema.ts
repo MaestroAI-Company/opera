@@ -20,6 +20,7 @@ export type AppSettings = {
   instruction: string;
   speaker: boolean;
   autoSpeak: boolean;
+  ttsEngine: string;
   alwaysWhisper: boolean;
   autoStartMic: boolean;
   hasSeenOnboarding: boolean;
@@ -66,6 +67,8 @@ export const BASE_DEFAULTS: AppSettings = {
   instruction: '',
   speaker: true,
   autoSpeak: true,
+  //kokoro once its model is downloaded
+  ttsEngine: 'system',
   alwaysWhisper: false,
   autoStartMic: true,
   hasSeenOnboarding: false,

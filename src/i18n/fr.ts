@@ -521,6 +521,23 @@ export const fr: Translations = {
     "Voulez-vous vraiment télécharger le modèle Whisper {model} ({size}) ?",
   "settings.whisper.download.confirm": "Télécharger",
 
+  "settings.tts.label": "Voix",
+  "settings.tts.help":
+    "Kokoro est une voix naturelle hors ligne pour l'anglais, le français, l'espagnol, l'italien, le portugais et le hindi. Les autres langues utilisent la voix du système.",
+  "settings.tts.select": "Choisir la voix",
+  "settings.tts.system": "Système",
+  "settings.tts.kokoro": "Kokoro",
+  "settings.tts.downloading": "Téléchargement de Kokoro...",
+  "settings.tts.downloadSuccess": "Voix Kokoro téléchargée avec succès.",
+  "settings.tts.downloadFailed": "Échec du téléchargement de la voix Kokoro.",
+  "settings.tts.delete.title": "Supprimer la voix Kokoro",
+  "settings.tts.delete.message":
+    "Voulez-vous vraiment supprimer la voix Kokoro ? Maestro utilisera la voix du système.",
+  "settings.tts.download.title": "Télécharger la voix Kokoro",
+  "settings.tts.download.message":
+    "Voulez-vous vraiment télécharger la voix Kokoro ({size}) ?",
+  "settings.tts.download.confirm": "Télécharger",
+
   "settings.privacy.data": "Confidentialité des données",
   "settings.privacy.intro":
     "Par défaut, tout reste sur votre téléphone : vos conversations, réglages et modèles locaux fonctionnent hors ligne, sans passer par internet.",

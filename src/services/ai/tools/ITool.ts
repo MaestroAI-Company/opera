@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { TranslationKey } from '../../../i18n';
 
 // tool call returned by ollama
 export interface ToolCall {
@@ -66,6 +67,8 @@ export interface ITool {
   requires?: string[];
   //request os permission on enable
   requestPermission?(): Promise<boolean>;
+  //off device data needs consent
+  consent?: { title: TranslationKey; message: TranslationKey };
   //optional ui for the tool result
   widget?: ToolWidget;
   execute(

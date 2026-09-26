@@ -553,6 +553,9 @@ export const en = {
   "settings.tools.mobile.help":
     "Allow the assistant to integrate with installed apps: {list}.",
 
+  "tools.consent.allow": "Allow",
+  "tools.consent.decline": "Decline",
+
   "settings.mcp.connecting": "Connecting...",
   "settings.mcp.noTools": "No tools",
   "settings.mcp.oneTool": "1 tool",

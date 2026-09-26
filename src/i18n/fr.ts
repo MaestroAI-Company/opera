@@ -24,22 +24,22 @@ export const fr: Translations = {
 
   "onboarding.next": "Continuer",
   "onboarding.back": "Retour",
-  "onboarding.intro.privateAgain": "Rendez à votre assistant sa confidentialité.",
-  "onboarding.intro.noTrace": "Aucun serveur. Aucune trace.",
-  "onboarding.intro.freedom": "Découvrez la vraie liberté de demander.",
-  "onboarding.intro.offline": "Fonctionne hors ligne. Toujours.",
-  "onboarding.intro.privateLife": "Retrouvez une vie vraiment privée.",
-  "onboarding.intro.neverLeave": "Vos mots ne quittent jamais votre téléphone.",
-  "onboarding.intro.askAnything": "Demandez tout. Personne n'en saura rien.",
-  "onboarding.intro.staysHome": "Chaque réponse reste chez vous.",
-  "onboarding.intro.noCloud": "Pas de cloud. Pas de compromis.",
-  "onboarding.intro.pocket": "Le modèle vous appartient, dans votre poche.",
+  "onboarding.intro.personal": "Votre assistant IA, vraiment personnel.",
+  "onboarding.intro.choice": "Conçu pour vous.",
+  "onboarding.intro.freedom": "Découvrez la vraie liberté d'échanger.",
+  "onboarding.intro.pocket": "Des modèles puissants, dans votre poche.",
+  "onboarding.intro.control": "Vos données, vos règles.",
+  "onboarding.intro.cloud": "Créé pour votre quotidien.",
+  "onboarding.intro.noTracking": "Aucune publicité. Aucun traqueur.",
+  "onboarding.intro.privacy": "Pensé pour respecter votre vie privée.",
+  "onboarding.intro.noAccount": "Sans compte obligatoire. Prêt à l'emploi.",
+  "onboarding.intro.openSource": "Open source, transparent et indépendant.",
   "onboarding.welcome.title": "L'IA pour tous,\nla confidentialité pour la liberté.",
   "onboarding.welcome.subtitle":
     "Voici Maestro, l'assistant d'Opera. Il travaille pour vous, et seulement pour vous.",
   "onboarding.welcome.local.title": "Local d'abord",
   "onboarding.welcome.local.description":
-    "Fonctionne sur votre appareil, sans serveur.",
+    "Fonctionne sur votre appareil, sans serveur requis.",
   "onboarding.welcome.account.title": "Sans compte",
   "onboarding.welcome.account.description":
     "Ouvrez l'application et lancez-vous.",
@@ -523,11 +523,11 @@ export const fr: Translations = {
 
   "settings.privacy.data": "Confidentialité des données",
   "settings.privacy.intro":
-    "Conçu pour la confidentialité, Opera garde toutes vos données et recherches entièrement sur votre appareil.",
-  "settings.privacy.localStorage":
-    "Stockage local : toutes vos données, recherches et réglages restent strictement sur votre appareil.",
+    "Par défaut, tout reste sur votre téléphone : vos conversations, réglages et modèles locaux fonctionnent hors ligne, sans passer par internet.",
+  "settings.privacy.externalServices":
+    "Des données ne sortent que si vous le choisissez : pour synchroniser un cloud (Google Drive, Nextcloud), utiliser un modèle en ligne ou faire une recherche web.",
   "settings.privacy.noTracking":
-    "Aucun suivi : nous ne collectons ni informations personnelles, ni statistiques, ni rapports de plantage. Votre vie privée est entièrement protégée.",
+    "Aucune publicité, aucun traqueur caché et aucune revente de données. Vous gardez le contrôle total.",
   "settings.privacy.policy": "Politique de confidentialité",
   "settings.privacy.permissionsWeb":
     "Opera a besoin de quelques autorisations pour fonctionner au mieux. Vous pouvez les gérer dans les paramètres de site de votre navigateur.",

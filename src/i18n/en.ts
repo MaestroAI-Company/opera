@@ -23,16 +23,16 @@ export const en = {
 
   "onboarding.next": "Continue",
   "onboarding.back": "Back",
-  "onboarding.intro.privateAgain": "Make your assistant private again.",
-  "onboarding.intro.noTrace": "No server. No trace.",
-  "onboarding.intro.freedom": "Meet the real freedom of asking.",
-  "onboarding.intro.offline": "Runs offline. Always.",
-  "onboarding.intro.privateLife": "Reclaim a truly private life.",
-  "onboarding.intro.neverLeave": "Your words never leave your phone.",
-  "onboarding.intro.askAnything": "Ask anything. Tell no one.",
-  "onboarding.intro.staysHome": "Every answer stays home.",
-  "onboarding.intro.noCloud": "No cloud. No compromise.",
-  "onboarding.intro.pocket": "Own the model in your pocket.",
+  "onboarding.intro.personal": "Your AI assistant, truly personal.",
+  "onboarding.intro.choice": "Designed for you.",
+  "onboarding.intro.freedom": "Discover the real freedom to explore.",
+  "onboarding.intro.pocket": "Powerful models, right in your pocket.",
+  "onboarding.intro.control": "Your data, your rules.",
+  "onboarding.intro.cloud": "Built for your everyday.",
+  "onboarding.intro.noTracking": "No ads. No hidden trackers.",
+  "onboarding.intro.privacy": "Made to respect your privacy.",
+  "onboarding.intro.noAccount": "No account required. Ready to go.",
+  "onboarding.intro.openSource": "Open source, transparent, and independent.",
   "onboarding.welcome.title": "AI for all,\nprivacy for freedom.",
   "onboarding.welcome.subtitle":
     "Meet Maestro, the assistant inside Opera. It works for you, and only for you.",
@@ -504,11 +504,11 @@ export const en = {
 
   "settings.privacy.data": "Data privacy",
   "settings.privacy.intro":
-    "Designed for privacy, Opera keeps all your data and searches entirely on your device.",
-  "settings.privacy.localStorage":
-    "Local Storage: All your data, searches, and settings stay strictly on your device.",
+    "By default, everything stays on your phone: your conversations, settings, and local models work offline without the internet.",
+  "settings.privacy.externalServices":
+    "Data only leaves your device if you choose to: when syncing with a cloud (Google Drive, Nextcloud), using an online model, or searching the web.",
   "settings.privacy.noTracking":
-    "No Tracking: We do not collect personal info, analytics, or crash reports. Your privacy is fully protected.",
+    "No ads, no hidden trackers, and no data selling. You remain in complete control.",
   "settings.privacy.policy": "Privacy Policy",
   "settings.privacy.permissionsWeb":
     "Opera needs a few permissions to work at its best. You can manage them from your browser's site settings.",

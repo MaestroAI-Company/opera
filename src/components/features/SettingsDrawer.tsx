@@ -3577,16 +3577,16 @@ export default function SettingsDrawer({
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={styles.settingLabel}>{t("settings.privacy.data")}</Text>
-          <Text style={[styles.helpText, { marginBottom: 6 }]}>
+          <Text style={[styles.helpText, { marginBottom: Spacing.xs }]}>
             {t("settings.privacy.intro")}
           </Text>
-          <Text style={styles.helpText}>
-            {t("settings.privacy.localStorage")}
+          <Text style={[styles.helpText, { marginBottom: Spacing.xs }]}>
+            {t("settings.privacy.externalServices")}
           </Text>
           <Text
             style={[
               styles.helpText,
-              { marginTop: 4, marginBottom: Spacing.md },
+              { marginBottom: Spacing.md },
             ]}
           >
             {t("settings.privacy.noTracking")}

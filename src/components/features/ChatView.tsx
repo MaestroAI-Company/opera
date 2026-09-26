@@ -392,6 +392,13 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                   <Text style={[styles.metricsValue, incognito && { color: Colors.incognito }]}>{row.value}</Text>
                 </View>
               ))}
+              {!!item.metrics?.error && (
+                <View style={styles.metricsRow}>
+                  <Text style={styles.metricsLabel}>error</Text>
+                  <Text style={styles.metricsSeparator}> : </Text>
+                  <Text style={[styles.metricsValue, styles.metricsError]} selectable={true}>{item.metrics.error}</Text>
+                </View>
+              )}
               <Pressable
                 disabled={!canExpandThinking}
                 onPress={() => setShowThinking(prev => !prev)}
@@ -764,6 +771,11 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     fontFamily: Fonts.mono,
     fontSize: FontSizes.label,
     color: Colors.primary,
+  },
+  //long messages wrap instead of overflowing
+  metricsError: {
+    flexShrink: 1,
+    color: Colors.error,
   },
   metricsArrow: {
     width: 12,

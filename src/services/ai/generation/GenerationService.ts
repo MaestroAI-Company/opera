@@ -106,6 +106,7 @@ class GenerationServiceImpl {
 
     if (!params.model) {
       run.content = params.noModelMessage ?? 'Please select a model in the main app settings.';
+      run.metrics = { error: 'no model selected' };
       return this.finish(run, 'error', persist);
     }
 
@@ -130,6 +131,7 @@ class GenerationServiceImpl {
       if (outcome.status === 'error') {
         status = 'error';
         run.error = outcome.error;
+        run.metrics = { ...run.metrics, error: outcome.error || 'unknown' };
         run.content = describeError(outcome.error);
       } else {
         status = outcome.status === 'aborted' ? 'aborted' : 'done';
@@ -147,8 +149,8 @@ class GenerationServiceImpl {
     if (persist) {
       //partial text is still worth keeping
       await DB.updateMessageContent(run.msgId, run.content);
+      if (run.metrics) await DB.updateMessageMetrics(run.msgId, run.metrics);
       if (status !== 'error') {
-        if (run.metrics) await DB.updateMessageMetrics(run.msgId, run.metrics);
         if (run.sources && run.sources.length > 0) await DB.updateMessageSources(run.msgId, run.sources);
       }
     }

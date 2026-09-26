@@ -453,7 +453,7 @@ export const fr: Translations = {
   "settings.litert.capAudio": "Audio",
   "settings.litert.capThinking": "Réflexion",
   "settings.litert.description": "Description",
-  "settings.litert.descriptionPlaceholder": "[description]",
+  "settings.litert.noDescription": "Aucune description disponible sur Hugging Face.",
   "settings.litert.otherModels": "Autres modèles",
   "settings.litert.sameFamily": "Même famille",
   "settings.litert.loadFailed":

@@ -37,8 +37,8 @@ export function isLocalModel(modelName: string): boolean {
   return modelName.startsWith("aicore-") || isBrowserModel(modelName);
 }
 
-export function getLocalModelLabel(modelName: string): string {
-  return isBrowserModel(modelName) ? getBrowserModelLabel() : getAICoreModelLabel(modelName);
+export function getLocalModelLabel(modelName: string, short = false): string {
+  return isBrowserModel(modelName) ? getBrowserModelLabel() : getAICoreModelLabel(modelName, short);
 }
 
 //universal on-device provider: picks the local backend for the current platform

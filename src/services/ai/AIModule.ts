@@ -216,6 +216,21 @@ class CentralAIModule {
     return capabilities;
   }
 
+  //caps of any model, not just active
+  async getModelCapabilitiesFor(mode: string, ollamaUrl: string | undefined, modelName: string): Promise<string[]> {
+    const provider = this.providerFor(mode, ollamaUrl);
+    if (!provider?.getModelCapabilities) return [];
+
+    const cacheKey = `${mode}:${ollamaUrl ?? ''}:${modelName}`;
+    const cached = this.capabilitiesCache.get(cacheKey);
+    if (cached) return cached;
+
+    const capabilities = await provider.getModelCapabilities(modelName);
+    //empty may mean failure, skip cache
+    if (capabilities.length > 0) this.capabilitiesCache.set(cacheKey, capabilities);
+    return capabilities;
+  }
+
   //convert local image uris to base64
   private async processImages(messages: { role: string; content: string; images?: string[]; tool_calls?: any[] }[]): Promise<{ role: string; content: string; images?: string[]; tool_calls?: any[] }[]> {
     return Promise.all(

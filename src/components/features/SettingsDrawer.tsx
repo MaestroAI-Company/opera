@@ -3286,11 +3286,7 @@ export default function SettingsDrawer({
             />
           </Group>
 
-          {installedLitertModels.length === 0 && !downloadingLitert ? (
-            <Text style={[styles.helpText, { marginTop: Spacing.md }]}>
-              {t("settings.litert.noModels")}
-            </Text>
-          ) : (
+          {(installedLitertModels.length > 0 || !!downloadingLitert) &&
             renderCardGrid([
               ...(downloadingLitert
                 ? [
@@ -3313,8 +3309,7 @@ export default function SettingsDrawer({
                 disabled: !!downloadingLitert,
                 onPress: () => handleDeleteLitert(model),
               })),
-            ])
-          )}
+            ])}
         </View>
       </View>
 

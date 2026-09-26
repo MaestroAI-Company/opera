@@ -17,6 +17,8 @@ export type MessageMetrics = {
   timeSec?: number;
   tokens?: number;
   tokensPerSec?: number;
+  //prompt plus reply, provider reported
+  contextTokens?: number;
   //reflection level sent to the model
   thinking?: string;
   //prompt tier the model received

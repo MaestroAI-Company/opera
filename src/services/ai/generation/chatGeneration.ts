@@ -5,6 +5,7 @@ import { WidgetManager } from '../../widgets/WidgetManager';
 import { SYSTEM_PROMPTS } from '../../../../constants/prompts';
 import { Settings } from '../../settings/SettingsService';
 import { ToolSource } from '../tools/ITool';
+import { ToolManager } from '../tools/ToolManager';
 import { extractCitedUrls } from './citations';
 import { buildMentionSegment, resolveMentions } from '../mentions';
 import { estimateTokens } from '../tokens';
@@ -77,6 +78,39 @@ export function contextFloorTokens(service: string, userInstruction: string): nu
     ? buildSystemPrompt(settings.ollamaModel, userInstruction)
     : promptForTier(service === 'litert' ? 'small' : 'large', userInstruction);
   return estimateTokens(prompt) + CONTEXT_MARGIN;
+}
+
+//chat template tokens per message
+const MESSAGE_OVERHEAD_TOKENS = 5;
+//typical vision encoder cost
+const IMAGE_TOKENS = 512;
+
+type ContextMessage = { content: string; images?: string[]; metrics?: MessageMetrics };
+
+function estimateMessageTokens(message: ContextMessage): number {
+  return estimateTokens(message.content) + MESSAGE_OVERHEAD_TOKENS + (message.images?.length ?? 0) * IMAGE_TOKENS;
+}
+
+//weight of the next request
+export function estimateContextTokens(model: string, userInstruction: string, messages: ContextMessage[]): number {
+  let exact = 0;
+  let start = 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const metrics = messages[i].metrics;
+    //provider count beats estimation
+    if (metrics?.contextTokens && metrics.model === model) {
+      exact = metrics.contextTokens;
+      start = i + 1;
+      break;
+    }
+  }
+  const later = messages.slice(start).reduce((sum, m) => sum + estimateMessageTokens(m), 0);
+  if (start > 0) return exact + later;
+
+  const prompt = buildSystemPrompt(model, userInstruction) + AIModule.buildContextBlock();
+  //small models get tools only via mentions
+  const tools = modelTier(model) === 'small' ? [] : ToolManager.getDefinitions();
+  return estimateTokens(prompt) + estimateTokens(JSON.stringify(tools)) + later;
 }
 
 function promptForTier(tier: ModelTier, userInstruction: string, extraSegment = ''): string {

@@ -39,7 +39,8 @@ import { getLocalModelLabel, isLocalModel } from "../../services/ai/providers/Lo
 import { getLiteRTModelLabel, isLiteRTModel, subscribeLiteRTDownload } from "../../services/ai/providers/LiteRTProvider";
 import { getCachedModels, getLastModel, hydrateModelCache, setCachedModels, setLastModel } from "../../services/ai/providers/modelCache";
 import { buildSources, getOllamaTuning, ModelSource } from "../../services/ai/providers/sources";
-import { estimateTokens } from "../../services/ai/tokens";
+import { estimateContextTokens } from "../../services/ai/generation/chatGeneration";
+import { MessageMetrics } from "../../services/db/DatabaseService";
 import { AppEvents } from "../../services/events";
 import { Settings } from "../../services/settings/SettingsService";
 import Group from "../ui/Group";
@@ -156,7 +157,7 @@ export type ModelSelectorDrawerProps = {
   //trigger to hang panel under
   triggerRef?: React.RefObject<View | null>;
   //current conversation, fills the token window
-  messages?: { content: string }[];
+  messages?: { content: string; images?: string[]; metrics?: MessageMetrics }[];
 };
 
 //fluid drawer, built the same way as ConversationsDrawer/SettingsDrawer: mounted at the screen
@@ -449,9 +450,10 @@ export function ModelSelectorDrawer({
     );
   };
 
+  //visible refreshes instruction and tools
   const usedTokens = useMemo(
-    () => messages.reduce((sum, m) => sum + estimateTokens(m.content), 0),
-    [messages],
+    () => estimateContextTokens(selectedModel, Settings.getCached().instruction, messages),
+    [messages, selectedModel, visible],
   );
   //built-in models report their own window
   const [localContextTokens, setLocalContextTokens] = useState(0);

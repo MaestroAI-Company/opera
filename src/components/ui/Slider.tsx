@@ -3,6 +3,7 @@ import { Image, ImageSourcePropType, LayoutChangeEvent, PanResponder, Pressable,
 import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { pressStyle } from "./pressStyle";
 
 export type SliderOption = {
   id: string;
@@ -202,7 +203,7 @@ export default function Slider({
               if (option.id !== selectedValue) Vibration.vibrate(10);
               onSelect(option.id);
             }}
-            style={({ pressed, hovered }) => [styles.slot, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
+            style={pressStyle(styles.slot, "surface")}
           >
             <View style={[styles.tick, index < activeIndex && styles.tickFilled]} />
           </Pressable>

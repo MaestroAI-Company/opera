@@ -21,11 +21,19 @@ export const fr: Translations = {
   "common.openInApp": "Ouvrir dans l'application",
   "common.info": "Info",
   "common.clear": "Effacer",
-  "common.statusOk": "Connecté",
-  "common.statusError": "Erreur",
 
   "onboarding.next": "Continuer",
   "onboarding.back": "Retour",
+  "onboarding.intro.privateAgain": "Rendez à votre assistant sa confidentialité.",
+  "onboarding.intro.noTrace": "Aucun serveur. Aucune trace.",
+  "onboarding.intro.freedom": "Découvrez la vraie liberté de demander.",
+  "onboarding.intro.offline": "Fonctionne hors ligne. Toujours.",
+  "onboarding.intro.privateLife": "Retrouvez une vie vraiment privée.",
+  "onboarding.intro.neverLeave": "Vos mots ne quittent jamais votre téléphone.",
+  "onboarding.intro.askAnything": "Demandez tout. Personne n'en saura rien.",
+  "onboarding.intro.staysHome": "Chaque réponse reste chez vous.",
+  "onboarding.intro.noCloud": "Pas de cloud. Pas de compromis.",
+  "onboarding.intro.pocket": "Le modèle vous appartient, dans votre poche.",
   "onboarding.welcome.title": "L'IA pour tous,\nla confidentialité pour la liberté.",
   "onboarding.welcome.subtitle":
     "Voici Maestro, l'assistant d'Opera. Il travaille pour vous, et seulement pour vous.",
@@ -110,13 +118,14 @@ export const fr: Translations = {
     "Voulez-vous vraiment supprimer cette conversation ? Cette action est irréversible.",
 
   "cloudSync.setupIncomplete": "Configuration non terminée",
-  "cloudSync.lastSynced": "Dernière synchronisation : {date}",
+  "cloudSync.lastSynced": "Dernière synchro",
   "cloudSync.ready": "Prêt à synchroniser",
   "cloudSync.enterPin": "Saisir le code PIN",
   "cloudSync.createPin": "Créer un code PIN",
   "cloudSync.disconnect": "Déconnecter",
   "cloudSync.syncing": "Synchronisation...",
   "cloudSync.syncNow": "Synchroniser",
+  "cloudSync.backupSize": "Taille de sauvegarde",
 
   "modelSelector.loading": "Chargement...",
   "modelSelector.noModels": "Aucun modèle trouvé",
@@ -137,15 +146,15 @@ export const fr: Translations = {
   "widget.html.empty": "Aucun contenu à afficher",
 
   "markdown.thinking": "Réflexion...",
-  "markdown.tool.using": "Utilisation de l'outil : {name}...",
-  "markdown.tool.used": "Outil utilisé : {name}",
-  "markdown.tool.running": "Exécution de l'outil : {name}...",
-  "markdown.tool.searching": 'Recherche web de « {query} »...',
 
   "nextcloud.connect": "Connecter",
   "nextcloud.waiting": "En attente de votre validation dans le navigateur...",
   "nextcloud.failed":
     "Échec ou expiration de la connexion. Vérifiez l'adresse et réessayez.",
+  "nextcloud.help":
+    "Saisissez l'adresse de votre serveur, puis validez la connexion dans la fenêtre du navigateur qui s'ouvre.",
+  "nextcloud.cors":
+    "Bloqué par CORS : un navigateur refuse d'appeler un autre domaine si celui-ci ne l'autorise pas. Il faut ajouter des en-têtes CORS sur le reverse proxy de votre Nextcloud, sinon utilisez l'application desktop ou mobile.",
 
   "codePreview.name": "Nom",
   "codePreview.language": "Langage",
@@ -155,6 +164,15 @@ export const fr: Translations = {
   "imagePreview.format": "Format",
   "imagePreview.dimensions": "Dimensions",
   "imagePreview.size": "Taille",
+  "messageDetails.model": "Modèle",
+  "messageDetails.time": "Durée",
+  "messageDetails.tokens": "Tokens",
+  "messageDetails.speed": "Tokens/s",
+  "messageDetails.prompt": "Prompt système",
+  "messageDetails.thinking": "Réflexion",
+  "messageDetails.tools": "Outils",
+  "messageDetails.reasoning": "Raisonnement",
+  "messageDetails.error": "Erreur",
 
   "bugReport.title": "Signaler un bug",
   "bugReport.crashTitle": "Opera s'est fermé de manière inattendue",
@@ -377,16 +395,23 @@ export const fr: Translations = {
   "settings.pin.reset.title": "Réinitialiser la sauvegarde ?",
   "settings.pin.reset.message":
     "Cela supprimera définitivement votre sauvegarde cloud existante afin de créer un nouveau code PIN. Voulez-vous continuer ?",
+  "settings.pin.reset.confirm": "Supprimer et réinitialiser",
 
+  "settings.service.beta": "Serveur Opera Beta",
+  "settings.service.betaHelp":
+    "Un serveur de test que nous hébergeons pour essayer Opera sans en installer un.",
+  "settings.beta.intro":
+    "Un serveur de test que nous hébergeons pour essayer Opera sans en installer un. Tout ce qui sert à répondre passe par lui : vos messages, vos pièces jointes, ce qu'un outil lit pour vous (contacts, agenda, texte de l'écran) et votre adresse IP.",
+  "settings.beta.privacy":
+    "Nous n'en lisons rien, nous n'en gardons rien et nous ne l'utiliserons jamais pour quoi que ce soit. Le serveur sera arrêté et effacé à la fin de la bêta Play Store.",
+  "settings.beta.testing":
+    "Il sert uniquement aux tests. Pour un usage quotidien, installez votre propre serveur Ollama et rien ne quittera votre réseau.",
   "settings.service.ollama": "Ollama",
-  "settings.service.ollamaInfo":
-    "Ollama vous permet d'exécuter des modèles d'IA sur votre propre ordinateur ou serveur plutôt que dans le cloud. Ajoutez l'URL de votre serveur Ollama ci-dessous pour y connecter Opera.",
   "settings.service.ollamaHelp":
     "Utilisez vos serveurs Ollama pour exécuter de puissants modèles d'IA chez vous.",
   "settings.service.local": "Intégré",
   "settings.service.localHelp":
     "Utilisez le modèle d'IA fourni avec votre appareil. Rien à télécharger.",
-  "settings.local.see": "Voir les réglages Intégré",
   "settings.local.title": "Intégré",
   "settings.local.help":
     "Votre appareil embarque son propre modèle d'IA. Il est toujours disponible et ne demande aucune installation.",
@@ -414,14 +439,12 @@ export const fr: Translations = {
   "settings.service.litert": "Sur l'appareil",
   "settings.service.litertHelp":
     "Téléchargez des modèles ouverts depuis Hugging Face et exécutez-les sur cet appareil.",
-  "settings.litert.see": "Voir les réglages Sur l'appareil",
   "settings.litert.title": "Sur l'appareil",
   "settings.litert.modelTitle": "Modèle d'IA",
   "settings.litert.help":
     "Ajoutez et gérez vos modèles d'IA depuis Hugging Face.",
   "settings.litert.addModel": "Ajouter un modèle d'IA",
   "settings.litert.addModelPlaceholder": "rechercher un modèle",
-  "settings.litert.noModels": "Aucun modèle installé pour l'instant.",
   "settings.litert.installed": "Installé",
   "settings.litert.loading": "Chargement...",
   "settings.litert.familyOther": "Autres",
@@ -432,11 +455,15 @@ export const fr: Translations = {
   "settings.litert.description": "Description",
   "settings.litert.descriptionPlaceholder": "[description]",
   "settings.litert.otherModels": "Autres modèles",
+  "settings.litert.sameFamily": "Même famille",
   "settings.litert.loadFailed":
     "La liste des modèles n'a pas pu être chargée. Vérifiez votre connexion.",
-  "settings.litert.downloading": "Téléchargement...",
   "settings.litert.downloadingModel": "Téléchargement de {name}",
   "settings.litert.cancelDownload": "Annuler le téléchargement",
+  "settings.litert.downloadingPercent": "Téléchargement {percent}%",
+  "settings.litert.downloaded": "Téléchargé",
+  "settings.litert.speed": "Vitesse",
+  "settings.litert.timeLeft": "Temps restant",
   "settings.litert.noResults": "Aucun modèle compatible ne correspond à cette recherche.",
   "settings.litert.downloadTitle": "Télécharger {name} ?",
   "settings.litert.downloadMessage":
@@ -467,21 +494,9 @@ export const fr: Translations = {
   "generation.error.generic":
     "La génération a échoué. Réessayez, ou changez de modèle dans les réglages.",
   "settings.service.serverLink": "lien du serveur",
-  "settings.service.addServer": "Ajouter un serveur",
-  "settings.service.unreachable.title": "Serveur injoignable",
-  "settings.service.unreachable.message":
-    "Ce serveur n'a pas pu être joint.\n\n- Vérifiez que le serveur est démarré.\n- Vérifiez la connexion réseau du serveur.\n- Assurez-vous que l'URL et le port sont corrects.",
   "settings.service.failover": "Bascule automatique",
   "settings.service.failoverHelp":
     "Quand le serveur Ollama actif est injoignable, conserve le même modèle en le relançant sur un autre serveur Ollama qui le propose.",
-  "settings.service.contextLength": "Longueur de contexte",
-  "settings.service.contextLengthHelp":
-    "Nombre maximal de tokens que le modèle peut utiliser.",
-  "settings.service.keepAlive": "Maintien du modèle en mémoire",
-  "settings.service.keepAliveHelp":
-    "Durée pendant laquelle le modèle reste chargé en mémoire après une requête.",
-  "settings.service.keepAliveHelpAdvanced":
-    "Durée pendant laquelle le modèle reste chargé en mémoire après une requête, en secondes. Utilisez -1 pour le garder chargé indéfiniment.",
 
   "settings.whisper.label": "Modèle Whisper",
   "settings.whisper.help":
@@ -552,18 +567,18 @@ export const fr: Translations = {
   "settings.tools.widgets.title": "Widgets",
   "settings.tools.widgets.help":
     "Résultats structurés que l'assistant peut afficher : {list}.",
-  "settings.tools.widgets.see": "Voir les widgets",
   "settings.tools.mcp.title": "Serveurs MCP",
   "settings.tools.mcp.help":
     "Connectez Opera à des serveurs MCP externes pour que l'assistant puisse utiliser leurs outils.",
-  "settings.tools.mcp.see": "Voir les serveurs MCP",
   "settings.tools.mobile.title": "Actions mobiles",
   "settings.tools.mobile.help":
     "Autorise l'assistant à s'intégrer aux applications installées : {list}.",
-  "settings.tools.mobile.see": "Voir les actions mobiles",
 
   "settings.mcp.connecting": "Connexion...",
   "settings.mcp.noTools": "Aucun outil",
+  "settings.mcp.oneTool": "1 outil",
+  "settings.mcp.toolCount": "{count} outils",
+  "settings.mcp.toolsEnabled": "{enabled} sur {total} outils",
   "settings.mcp.signInRequired": "Connexion requise",
   "settings.mcp.signIn": "Se connecter",
   "settings.mcp.unreachable": "Injoignable",
@@ -582,8 +597,6 @@ export const fr: Translations = {
   "settings.mcp.remove.title": "Retirer le serveur",
   "settings.mcp.remove.message":
     "Retirer {name} ? Ses outils et sa connexion enregistrée seront supprimés.",
-  "settings.mcp.importFailed": "Échec de l'import",
-  "settings.mcp.unreadableConfig": "Cette configuration n'a pas pu être lue.",
   "settings.server.link": "Lien",
   "settings.server.add": "Ajouter un serveur",
   "settings.server.name": "Nom",
@@ -596,7 +609,6 @@ export const fr: Translations = {
   "settings.ollama.title": "Serveurs Ollama",
   "settings.ollama.help":
     "Ajoutez les liens de vos serveurs Ollama pour y connecter Opera.",
-  "settings.ollama.see": "Voir les réglages Ollama",
   "settings.ollama.newServer": "Nouveau serveur",
   "settings.ollama.noLink": "Aucun lien",
   "settings.ollama.checking": "Vérification...",

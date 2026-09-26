@@ -57,7 +57,10 @@ export function settleDrawer(
     damping: 45,
     overshootClamping: true,
     useNativeDriver: nativeDriver,
-  }).start(() => onComplete?.());
+  }).start(({ finished }) => {
+    //interrupted close must not unmount a reopened sheet
+    if (finished) onComplete?.();
+  });
 }
 
 //desktop width animates on fixed timing
@@ -70,32 +73,20 @@ export function settleLayoutDrawer(progress: Animated.Value, open: boolean) {
   }).start();
 }
 
-//page content fades and slides in on every subpage navigation
-export function playPageTransition(value: Animated.Value) {
-  value.setValue(0);
-  Animated.timing(value, {
-    toValue: 1,
-    duration: 220,
-    easing: Easing.out(Easing.cubic),
+//same spring as the drawer, a native spring steps every frame where timing is sampled at 60fps
+export function settlePage(
+  progress: Animated.Value,
+  toValue: number,
+  onComplete: () => void
+) {
+  Animated.spring(progress, {
+    toValue,
+    stiffness: 500,
+    damping: 45,
+    overshootClamping: true,
     useNativeDriver: DRAWER_NATIVE_DRIVER,
-  }).start();
-}
-
-//back button grows and lightens then settles on every page change
-export function playBackButtonPulse(value: Animated.Value) {
-  value.setValue(0);
-  Animated.sequence([
-    Animated.timing(value, {
-      toValue: 1,
-      duration: 120,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: DRAWER_NATIVE_DRIVER,
-    }),
-    Animated.timing(value, {
-      toValue: 0,
-      duration: 160,
-      easing: Easing.in(Easing.quad),
-      useNativeDriver: DRAWER_NATIVE_DRIVER,
-    }),
-  ]).start();
+  }).start(({ finished }) => {
+    //a rewind or a gesture takes over the interrupted push
+    if (finished) onComplete();
+  });
 }

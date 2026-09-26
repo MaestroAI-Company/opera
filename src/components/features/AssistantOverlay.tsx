@@ -860,7 +860,6 @@ function AssistantOverlay() {
               canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes('audio') && !!selectedModel}
               modelCapabilities={modelCapabilities}
               onOpenSettings={() => { }}
-              enabled={true}
               autoStartMic={shouldAutoStartMic}
               selection={attachment}
               onSelectionRemove={clearSelection}

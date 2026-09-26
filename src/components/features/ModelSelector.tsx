@@ -46,8 +46,8 @@ import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 import ProgressBar from "../ui/ProgressBar";
 import SliderToggle, { SliderToggleOption } from "../ui/SliderToggle";
-import { settleDrawer } from "./drawerAnimation";
 import DrawerSheet from "./DrawerSheet";
+import { pressStyle } from "../ui/pressStyle";
 
 const botIcon = require("../../../assets/icons/bot.png");
 const downloadIcon = require("../../../assets/icons/download.png");
@@ -102,7 +102,6 @@ export function ModelSelectorTrigger({
   style,
   viewRef,
 }: ModelSelectorTriggerProps) {
-  const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
 
   const displayName = (model: string) =>
@@ -116,10 +115,7 @@ export function ModelSelectorTrigger({
         <View style={styles.shadowBlock} />
         <Pressable
           onPress={onPress}
-          style={({ pressed, hovered }) => [
-            styles.trigger,
-            (pressed || hovered) && { backgroundColor: Colors.surfacePressed },
-          ]}
+          style={pressStyle(styles.trigger, "surface")}
         >
           <Image source={botIcon} style={styles.icon} />
           <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
@@ -218,12 +214,6 @@ export function ModelSelectorDrawer({
   //settings own the source list, this forces a rebuild when they change
   const [sourcesRevision, setSourcesRevision] = useState(0);
   const [browsedKey, setBrowsedKey] = useState<string | null>(null);
-
-  //dismiss settles progress before callback, used when picking a model closes the sheet
-  const dismiss = useCallback(() => {
-    settleDrawer(progress, false);
-    onClose();
-  }, [progress, onClose]);
 
   useEffect(() => {
     AIModule.isModeAvailable("local").then(setLocalAvailable).catch(() => setLocalAvailable(false));
@@ -574,12 +564,7 @@ export function ModelSelectorDrawer({
             <Pressable
               key={source.key}
               onPress={() => handleSelectSource(source)}
-              style={({ pressed, hovered }) => [
-                styles.tab,
-                (pressed || hovered) && {
-                  backgroundColor: Colors.overlaySubtle,
-                },
-              ]}
+              style={pressStyle(styles.tab, "subtle")}
             >
               <Text
                 style={[styles.tabText, active && styles.tabTextActive]}
@@ -627,12 +612,7 @@ export function ModelSelectorDrawer({
                   <Pressable
                     disabled={isDownloading}
                     onPress={() => setDownloadModalVisible(true)}
-                    style={({ pressed, hovered }) => [
-                      styles.downloadOption,
-                      (pressed || hovered) && {
-                        backgroundColor: Colors.surfacePressed,
-                      },
-                    ]}
+                    style={pressStyle(styles.downloadOption, "surface")}
                   >
                     <Image source={downloadIcon} style={styles.downloadIcon} />
                     <Text style={styles.downloadText}>
@@ -656,18 +636,12 @@ export function ModelSelectorDrawer({
                         Vibration.vibrate(10);
                         handleSelectModel(model);
                       }}
-                      style={({ pressed, hovered }) => [
-                        styles.option,
+                      style={pressStyle(
+                        [styles.option, isSpecialActive && styles.optionSelected],
                         isSpecialActive
-                          ? styles.optionSelected
-                          : (pressed || hovered) && {
-                              backgroundColor: Colors.overlaySubtle,
-                            },
-                        isSpecialActive &&
-                          (pressed || hovered) && {
-                            backgroundColor: Colors.primaryActive,
-                          },
-                      ]}
+                          ? { backgroundColor: Colors.primaryActive }
+                          : "subtle",
+                      )}
                     >
                       <Text
                         style={[

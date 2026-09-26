@@ -12,13 +12,18 @@ import {
   View,
   ViewStyle,
 } from "react-native";
+import Reanimated, { useAnimatedStyle } from "react-native-reanimated";
 import { Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { useKeyboardLift } from "../../hooks/useKeyboardLift";
+import { usePredictiveBack } from "../../hooks/usePredictiveBack";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { dragDrawer, gestureVelocity, releaseOpens, settleDrawer } from "./drawerAnimation";
 
 //slide fallback before real measure
 const CLOSED_SLIDE = 420;
+//closed sheet parks below so no edge peeks
+const CLOSED_MARGIN = 80;
 
 //lets an outside gesture drag a sheet one to one
 const sheetTravels = new WeakMap<Animated.Value, number>();
@@ -34,9 +39,8 @@ export type DrawerSheetProps = {
   isLargeScreen?: boolean;
   isDesktop?: boolean;
   liftOffset?: number;
-  //extra native-driven translateY (eg. keyboard follow), composed with the drawer's own slide
-  //keyboard hook hands out an AnimatedMultiplication
-  keyboardTranslateY?: Animated.AnimatedNode;
+  //sheet sits on the keyboard, needs a maxHeight in sheetStyle
+  avoidKeyboard?: boolean;
   children: ReactNode;
   sheetStyle?: StyleProp<ViewStyle>;
   desktopStyle?: StyleProp<ViewStyle>;
@@ -52,7 +56,7 @@ export default function DrawerSheet({
   isLargeScreen = false,
   isDesktop = false,
   liftOffset = 0,
-  keyboardTranslateY,
+  avoidKeyboard = false,
   children,
   sheetStyle,
   desktopStyle,
@@ -68,8 +72,11 @@ export default function DrawerSheet({
   const keepMounted = !isLift && externalProgress !== undefined;
   const [rendered, setRendered] = useState(visible);
   const [contentHeight, setContentHeight] = useState(0);
+  const measured = contentHeight > 0;
   //sheet slides exactly its own height
   const travel = contentHeight || CLOSED_SLIDE;
+  //desktop card only fades, no height needed
+  const slides = isLift || !(isLargeScreen || isDesktop);
 
   useEffect(() => {
     sheetTravels.set(progress, travel);
@@ -78,16 +85,27 @@ export default function DrawerSheet({
   const settle = useCallback(
     (open: boolean, velocity = 0) => {
       settleDrawer(progress, open, velocity, nativeDriver, () => {
-        if (!open) setRendered(false);
+        if (open) return;
+        setRendered(false);
+        //content may differ next time
+        if (!keepMounted) setContentHeight(0);
       });
     },
-    [progress, nativeDriver]
+    [progress, nativeDriver, keepMounted]
   );
 
   useEffect(() => {
-    if (visible) setRendered(true);
+    if (visible) {
+      setRendered(true);
+      //sliding a guessed height pops tall sheets in
+      if (slides && !measured) return;
+    } else if (slides && !measured) {
+      //never shown, nothing to animate out
+      setRendered(false);
+      return;
+    }
     settle(visible);
-  }, [visible, settle]);
+  }, [visible, slides, measured, settle]);
 
   const dismiss = useCallback((velocity = 0) => {
     //keyboard lift would hold it on screen
@@ -118,6 +136,13 @@ export default function DrawerSheet({
     [dismiss, settle, progress, travel]
   );
 
+  //android back gesture pulls the sheet down, release closes it
+  usePredictiveBack(visible, {
+    onProgress: (p) => dragDrawer(progress, 1 - p),
+    onCancel: () => settle(true),
+    onBack: () => dismiss(),
+  });
+
   //overlay only: hardware back and desktop escape dismiss it, lift sits inside a screen
   //that already arbitrates its own back-press priority (eg. recording > sheet)
   useEffect(() => {
@@ -146,13 +171,12 @@ export default function DrawerSheet({
 
   if (isLift) {
     if (!rendered) return null;
-    const measuring = contentHeight === 0;
     return (
       <Animated.View
         onLayout={(e: LayoutChangeEvent) => setContentHeight(e.nativeEvent.layout.height)}
         pointerEvents={visible ? "auto" : "none"}
         style={
-          measuring
+          !measured
             ? styles.measuring
             : {
               //open state eats the safe area below so the sheet reaches the screen edge
@@ -171,9 +195,8 @@ export default function DrawerSheet({
 
   if (!rendered && !keepMounted) return null;
 
-  const translateYMobile = progress.interpolate({ inputRange: [0, 1], outputRange: [travel, 0] });
+  const translateYMobile = progress.interpolate({ inputRange: [0, 1], outputRange: [travel + CLOSED_MARGIN, 0] });
   const translateYDesktop = progress.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] });
-  const translateYMobileWithKeyboard = keyboardTranslateY ? Animated.add(translateYMobile, keyboardTranslateY) : translateYMobile;
 
   return (
     <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
@@ -195,15 +218,23 @@ export default function DrawerSheet({
         <Animated.View
           pointerEvents={visible ? "auto" : "none"}
           onLayout={(e: LayoutChangeEvent) => setContentHeight(e.nativeEvent.layout.height)}
-          style={[sheetStyle, { transform: [{ translateY: translateYMobileWithKeyboard }] }]}
+          style={[sheetStyle, { transform: [{ translateY: translateYMobile }] }, !measured && styles.hidden]}
           {...panResponder.panHandlers}
         >
           {handle}
           {children}
+          {avoidKeyboard && <KeyboardSpacer />}
         </Animated.View>
       )}
     </View>
   );
+}
+
+//grows with the keyboard, maxHeight shrinks the content instead
+function KeyboardSpacer() {
+  const keyboardHeight = useKeyboardLift();
+  const style = useAnimatedStyle(() => ({ height: keyboardHeight.value }));
+  return <Reanimated.View style={style} />;
 }
 
 const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
@@ -222,6 +253,9 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingRight: Spacing.xl2,
     paddingBottom: Spacing.xl2,
     justifyContent: "flex-end",
+  },
+  hidden: {
+    opacity: 0,
   },
   measuring: {
     position: "absolute",

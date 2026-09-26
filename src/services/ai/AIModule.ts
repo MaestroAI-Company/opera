@@ -380,7 +380,7 @@ class CentralAIModule {
       }
 
       //inject tool_calls json
-      //show ui bubble, keep tool call in history
+      //tool call shows in ui and history
       const roundChunk = accumulated.substring(beforeLen);
       if (!roundChunk.includes('"tool_calls"')) {
         for (const tc of result.toolCalls) {
@@ -411,7 +411,7 @@ class CentralAIModule {
         this.SharedGenerationState.activeToolArgs = null;
         this.SharedGenerationState.notify();
 
-        //widget block replaces tool bubble
+        //widget block shows the result
         const widgetBlock = ToolManager.buildWidgetBlock(toolName, tc.function.arguments, toolResult);
         if (widgetBlock) streamingOnChunk(widgetBlock);
 

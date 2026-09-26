@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
-import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { Platform, StyleSheet, Text, View } from "react-native";
+import { FontSizes, Fonts, Spacing, ThemeColors } from "../../../constants/theme";
+import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { loadNextcloudConfig, runNextcloudLoginFlow } from "../../services/cloud/NextcloudProvider";
+import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import TextInputField from "../ui/TextInputField";
 
 const linkIcon = require("../../../assets/icons/link.png");
+const cloudIcon = require("../../../assets/icons/cloud.png");
+const cancelIcon = require("../../../assets/icons/cancel.png");
 
 type NextcloudSetupProps = {
   onDone: () => void;
@@ -15,7 +18,6 @@ type NextcloudSetupProps = {
 
 //nextcloud login flow, the browser grants the app password
 export default function NextcloudSetup({ onDone }: NextcloudSetupProps) {
-  const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const t = useT();
 
@@ -29,6 +31,11 @@ export default function NextcloudSetup({ onDone }: NextcloudSetupProps) {
     loadNextcloudConfig().then(config => {
       if (config) setServerUrl(config.serverUrl);
     });
+  }, []);
+
+  //closing the sheet stops a pending login
+  useEffect(() => () => {
+    cancelledRef.current = true;
   }, []);
 
   const handleConnect = async () => {
@@ -52,142 +59,89 @@ export default function NextcloudSetup({ onDone }: NextcloudSetupProps) {
     setConnecting(false);
   };
 
+  const canConnect = !!serverUrl.trim();
+
+  //rows of a settings card, the parent draws the card
   return (
-    <View style={styles.container}>
-      {isBrowser && (
-        <View style={styles.warningBox}>
-          <Text style={styles.warningText}>
-            Blocked by CORS: a browser refuses to call another domain unless that domain allows it. This needs CORS
-            headers on your Nextcloud reverse proxy, otherwise use the desktop or mobile app.
+    <>
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>{t("settings.server.link")}</Text>
+        <Text style={[styles.helpText, !isBrowser && styles.helpTextSpaced]}>
+          {t("nextcloud.help")}
+        </Text>
+        {isBrowser && (
+          <Text style={[styles.helpText, styles.errorText, styles.helpTextSpaced]}>
+            {t("nextcloud.cors")}
           </Text>
-        </View>
-      )}
+        )}
+        <Group>
+          <TextInputField
+            icon={linkIcon}
+            placeholder="cloud.example.com"
+            value={serverUrl}
+            onChangeText={setServerUrl}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            editable={!connecting}
+          />
+        </Group>
+      </View>
 
-      <Text style={styles.helpText}>
-        Enter your server address, then approve the connection in the browser window that opens.
-      </Text>
-
-      <Group style={styles.field}>
-        <TextInputField
-          icon={linkIcon}
-          placeholder="cloud.example.com"
-          value={serverUrl}
-          onChangeText={setServerUrl}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-          editable={!connecting}
-        />
-      </Group>
-
-      {connecting ? (
-        <>
-          <Text style={styles.statusText}>{t("nextcloud.waiting")}</Text>
-          <Pressable
-            style={({ pressed, hovered }) => [
-              styles.cancelBtn,
-              (pressed || hovered) && { backgroundColor: Colors.surfacePressed },
-            ]}
-            onPress={handleCancel}
-          >
-            <Text style={styles.cancelBtnText}>{t("common.cancel")}</Text>
-          </Pressable>
-        </>
-      ) : (
-        <Pressable
-          style={({ pressed, hovered }) => [
-            styles.connectBtn,
-            (pressed || hovered) && !!serverUrl.trim() && { backgroundColor: Colors.primaryPressed },
-            !serverUrl.trim() && styles.connectBtnDisabled,
-          ]}
-          onPress={handleConnect}
-          disabled={!serverUrl.trim()}
-        >
-          <Text style={styles.connectBtnText}>{t("nextcloud.connect")}</Text>
-        </Pressable>
-      )}
-
-      {failed && <Text style={styles.errorText}>{t("nextcloud.failed")}</Text>}
-    </View>
+      <View>
+        {connecting ? (
+          <Group>
+            <ActionButton icon={cancelIcon} label={t("common.cancel")} onPress={handleCancel} />
+          </Group>
+        ) : (
+          <Group style={[styles.highlightGroup, !canConnect && styles.highlightGroupDisabled]}>
+            <ActionButton
+              icon={cloudIcon}
+              label={t("nextcloud.connect")}
+              variant="highlight"
+              disabled={!canConnect}
+              onPress={handleConnect}
+            />
+          </Group>
+        )}
+        {connecting && <Text style={styles.helpText}>{t("nextcloud.waiting")}</Text>}
+        {failed && <Text style={[styles.helpText, styles.errorText]}>{t("nextcloud.failed")}</Text>}
+      </View>
+    </>
   );
 }
 
+//same look as the settings drawer rows
 const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
-  container: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xxl,
-    padding: Spacing.lg,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    marginTop: Spacing.lg2,
+  settingRowVertical: {
+    marginBottom: Spacing.xxl,
   },
-  warningBox: {
-    backgroundColor: Colors.dangerBg,
-    borderWidth: 2,
-    borderColor: Colors.dangerBorderSoft,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.lg2,
-  },
-  warningText: {
-    fontSize: FontSizes.label,
-    fontFamily: Fonts.body,
-    color: Colors.error,
+  settingLabel: {
+    fontSize: FontSizes.body,
+    color: Colors.textPrimary,
+    fontFamily: Fonts.mono,
+    paddingTop: Spacing.xs,
+    paddingHorizontal: Spacing.md,
   },
   helpText: {
-    fontSize: FontSizes.label,
+    fontSize: FontSizes.bodyMd,
+    color: Colors.textMuted,
     fontFamily: Fonts.body,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.lg2,
+    marginTop: Spacing.xs,
+    lineHeight: 20,
+    paddingHorizontal: Spacing.md,
   },
-  field: {
-    marginBottom: Spacing.md,
-  },
-  statusText: {
-    fontSize: FontSizes.label,
-    fontFamily: Fonts.body,
-    color: Colors.textSecondary,
-    fontStyle: "italic",
+  helpTextSpaced: {
     marginBottom: Spacing.md,
   },
   errorText: {
-    fontSize: FontSizes.label,
-    fontFamily: Fonts.body,
     color: Colors.error,
-    marginTop: Spacing.md,
   },
-  connectBtn: {
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.lg2,
-    borderRadius: Radius.md,
-    borderWidth: 2,
-    borderColor: Colors.borderOnPrimary,
+  highlightGroup: {
     backgroundColor: Colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: Spacing.xs,
+    borderColor: Colors.borderOnPrimary,
   },
-  connectBtnDisabled: {
+  highlightGroupDisabled: {
     opacity: 0.5,
-  },
-  connectBtnText: {
-    fontSize: FontSizes.bodyMd,
-    fontFamily: Fonts.mono,
-    color: Colors.textOnPrimary,
-  },
-  cancelBtn: {
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.lg2,
-    borderRadius: Radius.md,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cancelBtnText: {
-    fontSize: FontSizes.bodyMd,
-    fontFamily: Fonts.mono,
-    color: Colors.textSecondary,
   },
 });

@@ -68,16 +68,16 @@ const WORDMARK_LARGE = { width: 360, height: 61 };
 
 const PHRASE_HOLD = 3500;
 const INTRO_PHRASES = [
-  "privateAgain",
-  "noTrace",
+  "personal",
+  "choice",
   "freedom",
-  "offline",
-  "privateLife",
-  "neverLeave",
-  "askAnything",
-  "staysHome",
-  "noCloud",
   "pocket",
+  "control",
+  "cloud",
+  "noTracking",
+  "privacy",
+  "noAccount",
+  "openSource",
 ] as const;
 
 const PROMISES = [

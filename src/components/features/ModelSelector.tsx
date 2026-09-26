@@ -56,17 +56,18 @@ const tokenIcon = require("../../../assets/icons/token.png");
 const quickIcon = require("../../../assets/icons/Quick.png");
 const lowIcon = require("../../../assets/icons/Low.png");
 const highIcon = require("../../../assets/icons/High.png");
-const cameraIcon = require("../../../assets/icons/camera.png");
-const micIcon = require("../../../assets/icons/microphone.png");
-const toolIcon = require("../../../assets/icons/tool.png");
+const visionIcon = require("../../../assets/icons/vision.png");
+const micIcon = require("../../../assets/icons/micro.png");
+const toolIcon = require("../../../assets/icons/tool2.png");
+const brainIcon = require("../../../assets/icons/brain.png");
 const loadingAnimation = require("../../../assets/animations/loading.json");
 
 const REFLECTION_ICONS = { none: quickIcon, low: lowIcon, high: highIcon };
 //first entry sits far right
 const CAPABILITY_ICONS = [
-  { id: "vision", icon: cameraIcon },
+  { id: "vision", icon: visionIcon },
   { id: "audio", icon: micIcon },
-  { id: "thinking", icon: highIcon },
+  { id: "thinking", icon: brainIcon },
   { id: "tools", icon: toolIcon },
 ];
 
@@ -601,7 +602,13 @@ export function ModelSelectorDrawer({
 
   const innerContent = (
     <View style={styles.sheetInner}>
-      <View style={styles.tabsRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        style={styles.tabsScroll}
+        contentContainerStyle={styles.tabsRow}
+      >
         {sources.map((source) => {
           const active = source.key === browsedSource?.key;
           return (
@@ -619,7 +626,7 @@ export function ModelSelectorDrawer({
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
 
       <View style={styles.contentCard}>
         <View style={styles.modelsBox}>
@@ -882,17 +889,21 @@ const makeStyles = (Colors: ThemeColors) =>
     sheetInner: {
       width: "100%",
     },
+    tabsScroll: {
+      flexGrow: 0,
+      marginBottom: Spacing.lg2,
+    },
     tabsRow: {
       flexDirection: "row",
-      justifyContent: "center",
+      alignItems: "center",
       gap: Spacing.xxl,
-      marginBottom: 12,
+      paddingHorizontal: Spacing.xs,
     },
     tab: {
-      paddingHorizontal: 10,
-      paddingVertical: 4,
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: Spacing.xs,
       borderRadius: Radius.md,
-      flexShrink: 1,
+      flexShrink: 0,
     },
     tabText: {
       fontSize: FontSizes.body,
@@ -986,9 +997,10 @@ const makeStyles = (Colors: ThemeColors) =>
       paddingLeft: Spacing.md,
     },
     capabilityIcon: {
-      width: 14,
-      height: 14,
+      width: 16,
+      height: 16,
       tintColor: Colors.textPrimary,
+      opacity: 0.5,
     },
     capabilityIconOnPrimary: {
       tintColor: Colors.textOnPrimary,

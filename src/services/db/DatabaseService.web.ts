@@ -19,6 +19,8 @@ export type MessageMetrics = {
   thinking?: string;
   //prompt tier the model received
   systemPrompt?: string;
+  //raw provider error shown in details
+  error?: string;
 };
 
 export type Message = {

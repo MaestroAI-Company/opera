@@ -104,6 +104,7 @@ import { McpService } from "../../services/mcp/McpService";
 import { McpServerConfig } from "../../services/mcp/types";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { Settings } from "../../services/settings/SettingsService";
+import { KOKORO_SIZE_BYTES, Kokoro } from "../../services/speech/KokoroTTS";
 import { WhisperSTT } from "../../services/speech/STTService";
 import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
 import ActionButton from "../ui/ActionButton";
@@ -528,6 +529,13 @@ export default function SettingsDrawer({
     speedStr: string;
     sizeStr: string;
   } | null>(null);
+  const [ttsEngine, setTtsEngineState] = useState("system");
+  const [kokoroInstalled, setKokoroInstalled] = useState(false);
+  const [isDownloadingKokoro, setIsDownloadingKokoro] = useState(false);
+  const [kokoroDownloadProgress, setKokoroDownloadProgress] = useState<{
+    progress: number;
+    sizeStr: string;
+  } | null>(null);
   const [, setWhisperLanguageState] = useState(() => {
     try {
       return (
@@ -886,6 +894,106 @@ export default function SettingsDrawer({
     }
   };
 
+  const setTtsEngine = (v: string) => {
+    setTtsEngineState(v);
+    Settings.set("ttsEngine", v);
+  };
+
+  const handleDownloadKokoro = async () => {
+    setIsDownloadingKokoro(true);
+    setKokoroDownloadProgress(null);
+    const reportProgress = throttleProgress(setKokoroDownloadProgress);
+    try {
+      await Kokoro.download((progress) =>
+        reportProgress({
+          progress,
+          sizeStr: `${formatBytes(progress * KOKORO_SIZE_BYTES)} / ${formatBytes(KOKORO_SIZE_BYTES)}`,
+        }),
+      );
+      setKokoroInstalled(true);
+      setTtsEngine("kokoro");
+      showAlert(t("common.success"), t("settings.tts.downloadSuccess"));
+    } catch (e) {
+      console.error("Failed to download Kokoro voice", e);
+      showAlert(t("common.error"), t("settings.tts.downloadFailed"));
+    } finally {
+      setIsDownloadingKokoro(false);
+      setKokoroDownloadProgress(null);
+    }
+  };
+
+  const handleSelectTtsEngine = (v: string) => {
+    if (v === "system" || kokoroInstalled) {
+      setTtsEngine(v);
+      return;
+    }
+    if (isDownloadingKokoro) return;
+    showAlert(
+      t("settings.tts.download.title"),
+      t("settings.tts.download.message", {
+        size: formatBytes(KOKORO_SIZE_BYTES),
+      }),
+      [
+        {
+          text: t("common.cancel"),
+          onPress: () => setAlertModalVisible(false),
+          style: "secondary",
+        },
+        {
+          text: t("settings.tts.download.confirm"),
+          onPress: () => {
+            setAlertModalVisible(false);
+            handleDownloadKokoro();
+          },
+        },
+      ],
+    );
+  };
+
+  const handleDeleteKokoro = () => {
+    showAlert(
+      t("settings.tts.delete.title"),
+      t("settings.tts.delete.message"),
+      [
+        {
+          text: t("common.cancel"),
+          onPress: () => setAlertModalVisible(false),
+          style: "secondary",
+        },
+        {
+          text: t("common.delete"),
+          style: "danger",
+          onPress: async () => {
+            setAlertModalVisible(false);
+            try {
+              await Kokoro.remove();
+              setKokoroInstalled(false);
+              setTtsEngine("system");
+            } catch (e) {
+              console.error("Failed to delete Kokoro voice", e);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const ttsEngineOptions = [
+    { id: "system", label: t("settings.tts.system") },
+    {
+      id: "kokoro",
+      label: t("settings.tts.kokoro"),
+      isDownload: !kokoroInstalled,
+      ...(kokoroInstalled && ttsEngine === "kokoro"
+        ? {
+            rightIcon: deleteIcon,
+            rightIconTintColor: Colors.surface,
+            onRightIconPress: handleDeleteKokoro,
+          }
+        : {}),
+    },
+  ];
+
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -912,6 +1020,8 @@ export default function SettingsDrawer({
         setNameState(s.name || "");
         setAlwaysWhisperState(s.alwaysWhisper);
         setAutoSpeakState(s.autoSpeak);
+        setTtsEngineState(s.ttsEngine);
+        setKokoroInstalled(Kokoro.isInstalled());
         setShowTechnicalDetailsState(s.showTechnicalDetails);
         setShowDetectionBoxesState(s.showDetectionBoxes);
         setAdvancedModeState(s.advancedMode);
@@ -2631,6 +2741,30 @@ export default function SettingsDrawer({
           </View>
         </View>
 
+        {Kokoro.isSupported() && (
+          <View style={styles.settingRowVertical}>
+            <Text style={styles.settingLabel}>{t("settings.tts.label")}</Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {t("settings.tts.help")}
+            </Text>
+            <Group>
+              <Selector
+                options={ttsEngineOptions}
+                selectedValue={ttsEngine}
+                onSelect={handleSelectTtsEngine}
+                title={t("settings.tts.select")}
+                fullWidth
+              />
+            </Group>
+            {isDownloadingKokoro && (
+              <DownloadProgress
+                title={t("settings.tts.downloading")}
+                progress={kokoroDownloadProgress?.progress || 0}
+                sizeStr={kokoroDownloadProgress?.sizeStr}
+              />
+            )}
+          </View>
+        )}
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>

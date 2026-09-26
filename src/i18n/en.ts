@@ -502,6 +502,23 @@ export const en = {
     "Are you sure you want to download the Whisper {model} model ({size})?",
   "settings.whisper.download.confirm": "Download",
 
+  "settings.tts.label": "Voice",
+  "settings.tts.help":
+    "Kokoro is a natural offline voice for English, French, Spanish, Italian, Portuguese and Hindi. Other languages use the system voice.",
+  "settings.tts.select": "Select voice",
+  "settings.tts.system": "System",
+  "settings.tts.kokoro": "Kokoro",
+  "settings.tts.downloading": "Downloading Kokoro...",
+  "settings.tts.downloadSuccess": "Kokoro voice downloaded successfully.",
+  "settings.tts.downloadFailed": "Failed to download the Kokoro voice.",
+  "settings.tts.delete.title": "Delete Kokoro voice",
+  "settings.tts.delete.message":
+    "Are you sure you want to delete the Kokoro voice? Maestro will use the system voice.",
+  "settings.tts.download.title": "Download Kokoro voice",
+  "settings.tts.download.message":
+    "Are you sure you want to download the Kokoro voice ({size})?",
+  "settings.tts.download.confirm": "Download",
+
   "settings.privacy.data": "Data privacy",
   "settings.privacy.intro":
     "By default, everything stays on your phone: your conversations, settings, and local models work offline without the internet.",

@@ -24,12 +24,28 @@ const GYRO_SPEED = 3.2;
 export type ButterflyClusterProps = {
   style?: StyleProp<ViewStyle>;
   incognito?: boolean;
+  delay?: number;
 };
 
 //cluster with gyro parallax
-function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
+function ButterflyCluster({ style, incognito, delay = 250 }: ButterflyClusterProps) {
   const [containerSize, setContainerSize] = useState({ width: 250, height: 250 });
   const incognitoAnim = useRef(new Animated.Value(incognito ? 1 : 0)).current;
+  const introAnim = useRef(new Animated.Value(0)).current;
+
+  //reveal cluster on screen load
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Animated.timing(introAnim, {
+        toValue: 1,
+        duration: 1100,
+        easing: Easing.bezier(0.16, 1, 0.3, 1),
+        useNativeDriver: true,
+      }).start();
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [introAnim, delay]);
 
   //animate between cluster and incognito
   useEffect(() => {
@@ -272,6 +288,118 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
     [bottomGyro],
   );
 
+  //fade in early during ascent
+  const introOpacity = useMemo(
+    () =>
+      introAnim.interpolate({
+        inputRange: [0, 0.35, 1],
+        outputRange: [0, 1, 1],
+        extrapolate: "clamp",
+      }),
+    [introAnim],
+  );
+
+  //fan left and rise up
+  const leftIntroTransform = useMemo(
+    () => [
+      {
+        translateX: introAnim.interpolate({
+          inputRange: [0, 0.35, 1],
+          outputRange: [
+            0.22185 * containerSize.width,
+            0.22185 * containerSize.width * 0.7,
+            0,
+          ],
+        }),
+      },
+      {
+        translateY: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.515 * containerSize.height, 0],
+        }),
+      },
+      {
+        scale: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.35, 1],
+        }),
+      },
+      {
+        rotate: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: ["-8deg", "0deg"],
+        }),
+      },
+    ],
+    [containerSize.width, containerSize.height, introAnim],
+  );
+
+  //fan right and rise up
+  const topRightIntroTransform = useMemo(
+    () => [
+      {
+        translateX: introAnim.interpolate({
+          inputRange: [0, 0.35, 1],
+          outputRange: [
+            -0.1937 * containerSize.width,
+            -0.1937 * containerSize.width * 0.7,
+            0,
+          ],
+        }),
+      },
+      {
+        translateY: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.66135 * containerSize.height, 0],
+        }),
+      },
+      {
+        scale: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.35, 1],
+        }),
+      },
+      {
+        rotate: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: ["6deg", "0deg"],
+        }),
+      },
+    ],
+    [containerSize.width, containerSize.height, introAnim],
+  );
+
+  //rise to cluster base anchor
+  const bottomIntroTransform = useMemo(
+    () => [
+      {
+        translateX: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-0.0182 * containerSize.width, 0],
+        }),
+      },
+      {
+        translateY: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.2201 * containerSize.height, 0],
+        }),
+      },
+      {
+        scale: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.35, 1],
+        }),
+      },
+      {
+        rotate: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: ["-2deg", "0deg"],
+        }),
+      },
+    ],
+    [containerSize.width, containerSize.height, introAnim],
+  );
+
   return (
     <View
       pointerEvents="none"
@@ -289,58 +417,88 @@ function ButterflyCluster({ style, incognito }: ButterflyClusterProps) {
         style={[
           styles.left,
           {
-            opacity: otherOpacity,
-            transform: otherIncognitoTransform,
+            opacity: introOpacity,
+            transform: leftIntroTransform,
             zIndex: 1,
           },
         ]}
       >
-        <Animated.Image
-          source={butterflyLeft}
-          style={[styles.imageFill, { transform: leftGyroTransform }]}
-          resizeMode="contain"
-        />
+        <Animated.View
+          style={[
+            styles.imageFill,
+            {
+              opacity: otherOpacity,
+              transform: otherIncognitoTransform,
+            },
+          ]}
+        >
+          <Animated.Image
+            source={butterflyLeft}
+            style={[styles.imageFill, { transform: leftGyroTransform }]}
+            resizeMode="contain"
+          />
+        </Animated.View>
       </Animated.View>
 
       <Animated.View
         style={[
           styles.bottom,
           {
-            opacity: otherOpacity,
-            transform: otherIncognitoTransform,
+            opacity: introOpacity,
+            transform: bottomIntroTransform,
             zIndex: 2,
           },
         ]}
       >
-        <Animated.Image
-          source={butterflyBottom}
-          style={[styles.imageFill, { transform: bottomGyroTransform }]}
-          resizeMode="contain"
-        />
+        <Animated.View
+          style={[
+            styles.imageFill,
+            {
+              opacity: otherOpacity,
+              transform: otherIncognitoTransform,
+            },
+          ]}
+        >
+          <Animated.Image
+            source={butterflyBottom}
+            style={[styles.imageFill, { transform: bottomGyroTransform }]}
+            resizeMode="contain"
+          />
+        </Animated.View>
       </Animated.View>
 
       <Animated.View
         style={[
           styles.topRight,
           {
-            transform: topRightIncognitoTransform,
+            opacity: introOpacity,
+            transform: topRightIntroTransform,
             zIndex: incognito ? 5 : 3,
           },
         ]}
       >
         <Animated.View
-          style={[styles.imageFill, { transform: topRightGyroTransform }]}
+          style={[
+            styles.imageFill,
+            {
+              transform: topRightIncognitoTransform,
+            },
+          ]}
         >
-          <Animated.Image
-            source={butterflyTopRight}
-            style={[styles.imageFill, { opacity: coloredOpacity }]}
-            resizeMode="contain"
-          />
-          <Animated.Image
-            source={butterflyGrey}
-            style={[styles.imageFill, StyleSheet.absoluteFill, { opacity: greyOpacity }]}
-            resizeMode="contain"
-          />
+          <Animated.View
+            style={[styles.imageFill, { transform: topRightGyroTransform }]}
+          >
+            <Animated.Image
+              source={butterflyTopRight}
+              style={[styles.imageFill, { opacity: coloredOpacity }]}
+              resizeMode="contain"
+            />
+            <Animated.Image
+              source={butterflyGrey}
+              style={[styles.imageFill, StyleSheet.absoluteFill, { opacity: greyOpacity }]}
+              resizeMode="contain"
+            />
+          </Animated.View>
         </Animated.View>
       </Animated.View>
     </View>

@@ -256,7 +256,7 @@ class CentralAIModule {
   }
 
     //append context lines when present
-  private async buildContextBlock(): Promise<string> {
+  buildContextBlock(): string {
     //use cached location refresh async
     if (!LocationService.getCached()) {
       LocationService.hasPermission().then((granted) => {
@@ -289,7 +289,7 @@ class CentralAIModule {
     await this.failoverIfUnreachable(modelName);
     const provider = this.getActiveProvider();
     const processedMessages = await this.processImages(messages);
-    const enhancedPrompt = systemPrompt + (await this.buildContextBlock());
+    const enhancedPrompt = systemPrompt + this.buildContextBlock();
     await provider.sendMessage(modelName, enhancedPrompt, processedMessages, onChunk, signal, options, onMetrics);
   }
 
@@ -307,7 +307,7 @@ class CentralAIModule {
       : this.getActiveProvider();
     if (!provider) throw new Error(`No AI provider for quick flow source: ${target.service}`);
     const processedMessages = await this.processImages(messages);
-    const enhancedPrompt = systemPrompt + (await this.buildContextBlock());
+    const enhancedPrompt = systemPrompt + this.buildContextBlock();
     await provider.sendMessage(target.model, enhancedPrompt, processedMessages, onChunk, signal, options);
   }
 
@@ -335,7 +335,7 @@ class CentralAIModule {
 
     const tools = ToolManager.getDefinitions(toolFilter);
     const processedMessages = await this.processImages(messages);
-    const enhancedPrompt = systemPrompt + (await this.buildContextBlock());
+    const enhancedPrompt = systemPrompt + this.buildContextBlock();
 
     if (tools.length === 0) {
       await provider.sendMessage(modelName, enhancedPrompt, processedMessages, onChunk, signal, options, onMetrics);

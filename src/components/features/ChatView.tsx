@@ -154,6 +154,8 @@ type ChatViewProps = {
   speakerEnabled?: boolean;
   showMetrics?: boolean;
   generatingMessageId?: string | null;
+  //waiting behind another conversation
+  queuedMessageIds?: string[];
   hideHeader?: boolean;
   hideGradients?: boolean;
   onOpenConfidentiality?: () => void;
@@ -243,7 +245,7 @@ const ToolsPill = ({ calls }: { calls: ToolCall[] }) => {
   );
 };
 
-const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isChatGenerating, showMetrics, fallbackModel, canThink, dark, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string; canThink?: boolean; dark?: boolean; onOpenInApp?: (item: Message) => void; suggestions?: Suggestion[]; onSuggestionPress?: (text: string) => void; onImagePress?: (image: PreviewImage) => void; onDetailsPress?: (details: PreviewDetails) => void }) => {
+const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isQueued, isChatGenerating, showMetrics, fallbackModel, canThink, dark, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isQueued?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string; canThink?: boolean; dark?: boolean; onOpenInApp?: (item: Message) => void; suggestions?: Suggestion[]; onSuggestionPress?: (text: string) => void; onImagePress?: (image: PreviewImage) => void; onDetailsPress?: (details: PreviewDetails) => void }) => {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const isUser = item.role === "user";
@@ -282,10 +284,12 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
     [isUser, visibleContent]
   );
 
+  //queued rows load like running ones
+  const isBusy = !!isGenerating || !!isQueued;
   //reparse only when deps move
   const disp = useMemo(
-    () => deriveChatDisplay(item.content, !!isGenerating, activeTool, !!canThink),
-    [item.content, isGenerating, activeTool, canThink]
+    () => deriveChatDisplay(item.content, isBusy, activeTool, !!canThink),
+    [item.content, isBusy, activeTool, canThink]
   );
   const isCurrentlyThinking = !isUser && disp.showThinkingRow;
   const isUsingTools = !isUser && disp.showToolsRow;
@@ -383,7 +387,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               ))}
             </View>
           )}
-          {!isUser && !isCurrentlyThinking && !isGenerating && (
+          {!isUser && !isCurrentlyThinking && !isBusy && (
             <View style={styles.aiToolbar}>
               {speakerEnabled && (
                 <IconButton
@@ -441,7 +445,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               )}
             </View>
           )}
-          {!isCurrentlyThinking && !isGenerating && !isChatGenerating && !!suggestions && suggestions.length > 0 && (
+          {!isCurrentlyThinking && !isBusy && !isChatGenerating && !!suggestions && suggestions.length > 0 && (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -474,6 +478,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   prev.incognito === next.incognito &&
   prev.speakerEnabled === next.speakerEnabled &&
   prev.isGenerating === next.isGenerating &&
+  prev.isQueued === next.isQueued &&
   prev.isChatGenerating === next.isChatGenerating &&
   prev.isSpeaking === next.isSpeaking &&
   prev.showMetrics === next.showMetrics &&
@@ -490,7 +495,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   prev.onDetailsPress === next.onDetailsPress);
 MessageItem.displayName = "MessageItem";
 
-export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress }: ChatViewProps) {
+export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, queuedMessageIds, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress }: ChatViewProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const listRef = useRef<FlatList>(null);
@@ -558,8 +563,8 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   }, [messages]);
 
   const renderItem = useCallback(({ item }: { item: Message }) => {
-    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} suggestions={item.id === lastAssistantId ? suggestions : undefined} onSuggestionPress={onSuggestionPress} onImagePress={onImagePress} onDetailsPress={onDetailsPress} />;
-  }, [incognito, onRegenerate, speakerEnabled, handleSpeak, speakingMessageId, generatingMessageId, showMetrics, conversation?.model, canThink, dark, onOpenInApp, lastAssistantId, suggestions, onSuggestionPress, onImagePress, onDetailsPress]);
+    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isQueued={!!queuedMessageIds?.includes(item.id)} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} suggestions={item.id === lastAssistantId ? suggestions : undefined} onSuggestionPress={onSuggestionPress} onImagePress={onImagePress} onDetailsPress={onDetailsPress} />;
+  }, [incognito, onRegenerate, speakerEnabled, handleSpeak, speakingMessageId, generatingMessageId, queuedMessageIds, showMetrics, conversation?.model, canThink, dark, onOpenInApp, lastAssistantId, suggestions, onSuggestionPress, onImagePress, onDetailsPress]);
 
   return (
     <View style={styles.container}>

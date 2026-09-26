@@ -55,9 +55,19 @@ const tokenIcon = require("../../../assets/icons/token.png");
 const quickIcon = require("../../../assets/icons/Quick.png");
 const lowIcon = require("../../../assets/icons/Low.png");
 const highIcon = require("../../../assets/icons/High.png");
+const cameraIcon = require("../../../assets/icons/camera.png");
+const micIcon = require("../../../assets/icons/microphone.png");
+const toolIcon = require("../../../assets/icons/tool.png");
 const loadingAnimation = require("../../../assets/animations/loading.json");
 
 const REFLECTION_ICONS = { none: quickIcon, low: lowIcon, high: highIcon };
+//first entry sits far right
+const CAPABILITY_ICONS = [
+  { id: "vision", icon: cameraIcon },
+  { id: "audio", icon: micIcon },
+  { id: "thinking", icon: highIcon },
+  { id: "tools", icon: toolIcon },
+];
 
 const LONG_PRESS_DELAY = 180;
 const BREAK_RATIO = 0.85;
@@ -105,7 +115,7 @@ export function ModelSelectorTrigger({
   const styles = useThemedStyles(makeStyles);
 
   const displayName = (model: string) =>
-    isLocalModel(model) ? getLocalModelLabel(model)
+    isLocalModel(model) ? getLocalModelLabel(model, true)
       : isLiteRTModel(model) ? getLiteRTModelLabel(model)
         : model;
 
@@ -304,7 +314,8 @@ export function ModelSelectorDrawer({
         : [];
       if (pendingKey.current !== key) return;
       applyModels(fetched, key);
-      if (available) setCachedModels(key, fetched);
+      //offline rows must not be cached
+      setCachedModels(key, fetched);
     } catch (error) {
       console.warn(`[ModelSelector] refresh failed for ${key}:`, error);
       if (pendingKey.current !== key) return;
@@ -317,14 +328,18 @@ export function ModelSelectorDrawer({
     }
   }, []);
 
+  //picking a model must not refetch
+  const needsModel = !selectedModel;
   useEffect(() => {
     //refetch on open and source change
     //picks a model without opening
-    if (visible || !selectedModel) fetchModels(browsedSource);
+    if (visible || needsModel) fetchModels(browsedSource);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only the source key should trigger a refetch
-  }, [visible, selectedModel, fetchModels, browsedSource?.key]);
+  }, [visible, needsModel, fetchModels, browsedSource?.key]);
 
   useEffect(() => {
+    //cache may be from offline server
+    if (!hasFetched || loading) return;
     //only the active source may correct the selected model
     if (!isBrowsingActive || !browsedSource) return;
     //rows stay with the browsed source
@@ -336,7 +351,7 @@ export function ModelSelectorDrawer({
       } else {
         setLastModel(browsedSource.key, selectedModel);
       }
-    } else if (hasFetched && !loading && selectedModel) {
+    } else if (selectedModel) {
       onModelChange("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the source key stands for browsedSource
@@ -389,13 +404,50 @@ export function ModelSelectorDrawer({
 
   //friendly label for local variants
   const displayName = (model: string) =>
-    isLocalModel(model) ? getLocalModelLabel(model)
+    isLocalModel(model) ? getLocalModelLabel(model, true)
       : isLiteRTModel(model) ? getLiteRTModelLabel(model)
         : model;
 
   const displayModels = useMemo(() => {
     return [...models].sort((a, b) => a.localeCompare(b));
   }, [models]);
+
+  //keyed by source and model
+  const [capabilities, setCapabilities] = useState<Record<string, string[]>>({});
+  const capsKey = (model: string) => `${browsedSource?.key}:${model}`;
+  useEffect(() => {
+    //confirmed rows, offline would hang
+    if (!visible || !hasFetched || !isAvailable || !browsedSource) return;
+    if (shownKey.current !== browsedSource.key) return;
+    const source = browsedSource;
+    Promise.all(
+      models.map((model) =>
+        AIModule.getModelCapabilitiesFor(source.service, source.url, model)
+          .then((caps) => [`${source.key}:${model}`, caps] as const)
+          .catch(() => [`${source.key}:${model}`, [] as string[]] as const),
+      ),
+    ).then((entries) =>
+      setCapabilities((prev) => ({ ...prev, ...Object.fromEntries(entries) })),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the source key stands for browsedSource
+  }, [visible, hasFetched, isAvailable, models, browsedSource?.key]);
+
+  const renderCapabilities = (model: string, onPrimary: boolean) => {
+    const caps = capabilities[capsKey(model)] ?? [];
+    const shown = CAPABILITY_ICONS.filter((c) => caps.includes(c.id));
+    if (shown.length === 0) return null;
+    return (
+      <View style={styles.capabilitiesRow}>
+        {shown.map((c) => (
+          <Image
+            key={c.id}
+            source={c.icon}
+            style={[styles.capabilityIcon, onPrimary && styles.capabilityIconOnPrimary]}
+          />
+        ))}
+      </View>
+    );
+  };
 
   const usedTokens = useMemo(
     () => messages.reduce((sum, m) => sum + estimateTokens(m.content), 0),
@@ -426,56 +478,46 @@ export function ModelSelectorDrawer({
   const dragStartY = useSharedValue(0);
   const dragIndex = useSharedValue(0);
 
-  const rowLayoutsRef = useRef<({ y: number; height: number } | undefined)[]>(
-    [],
+  //keyed by model, skips unchanged rows
+  const rowLayoutsRef = useRef<Record<string, { y: number; height: number }>>(
+    {},
   );
 
   const activeIndex = previewIndex ?? (selectedIndex >= 0 ? selectedIndex : 0);
   const hasPill = isBrowsingActive && selectedIndex >= 0;
 
-  const handleRowLayout = (index: number) => (e: LayoutChangeEvent) => {
+  const handleRowLayout = (model: string) => (e: LayoutChangeEvent) => {
     const { y, height } = e.nativeEvent.layout;
-    const existing = rowLayoutsRef.current[index];
+    const existing = rowLayoutsRef.current[model];
     if (existing && existing.y === y && existing.height === height) return;
-    rowLayoutsRef.current[index] = { y, height };
+    rowLayoutsRef.current[model] = { y, height };
     setRowLayoutsVersion((v) => v + 1);
   };
 
-  //reset measured rows on change
-  const modelsKey = displayModels.join("|");
-  useEffect(() => {
-    rowLayoutsRef.current = [];
-    setRowLayoutsVersion((v) => v + 1);
-  }, [modelsKey]);
+  //dense snapshot the drag worklet can read
+  const rowLayouts = useMemo<RowLayout[]>(
+    () => displayModels.map((m) => rowLayoutsRef.current[m] ?? null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- version tracks the mutable ref
+    [displayModels, rowLayoutsVersion],
+  );
+  //row highlights itself until measured
+  const pillShown = hasPill && !!rowLayouts[activeIndex];
 
   //park pill on selected slot
   useEffect(() => {
     if (previewIndex !== null) return;
-    if (selectedIndex < 0 || selectedIndex >= displayModels.length) return;
-    const layout = rowLayoutsRef.current[selectedIndex];
+    const layout = rowLayouts[selectedIndex];
     if (!layout) return;
     pillY.value = withTiming(layout.y, { duration: 180 });
     pillHeight.value = withTiming(layout.height, { duration: 180 });
   }, [
-    selectedModel,
-    rowLayoutsVersion,
+    previewIndex,
+    rowLayouts,
     visible,
     selectedIndex,
-    displayModels.length,
     pillY,
     pillHeight,
   ]);
-
-  //dense snapshot the drag worklet can read
-  const rowLayouts = useMemo<RowLayout[]>(
-    () =>
-      Array.from(
-        { length: displayModels.length },
-        (_, i) => rowLayoutsRef.current[i] ?? null,
-      ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- version tracks the mutable ref
-    [displayModels.length, rowLayoutsVersion],
-  );
 
   const previewCrossed = (index: number) => {
     setPreviewIndex(index);
@@ -625,13 +667,13 @@ export function ModelSelectorDrawer({
               </View>
             ) : (
               <View style={styles.optionsList}>
-                {displayModels.map((model, index) => {
+                {displayModels.map((model) => {
                   const selected = isBrowsingActive && model === selectedModel;
-                  const isSpecialActive = !hasPill && selected;
+                  const isSpecialActive = !pillShown && selected;
                   return (
                     <Pressable
                       key={model}
-                      onLayout={handleRowLayout(index)}
+                      onLayout={handleRowLayout(model)}
                       onPress={() => {
                         Vibration.vibrate(10);
                         handleSelectModel(model);
@@ -652,10 +694,11 @@ export function ModelSelectorDrawer({
                       >
                         {displayName(model)}
                       </Text>
+                      {renderCapabilities(model, isSpecialActive)}
                     </Pressable>
                   );
                 })}
-                {hasPill && rowLayoutsRef.current[activeIndex] && (
+                {pillShown && (
                   <GestureDetector gesture={pillPan}>
                     <Reanimated.View style={[styles.pill, pillAnimatedStyle]}>
                       <Text
@@ -664,6 +707,7 @@ export function ModelSelectorDrawer({
                       >
                         {displayName(displayModels[activeIndex])}
                       </Text>
+                      {renderCapabilities(displayModels[activeIndex], true)}
                     </Reanimated.View>
                   </GestureDetector>
                 )}
@@ -927,9 +971,25 @@ const makeStyles = (Colors: ThemeColors) =>
       fontSize: FontSizes.body,
       color: Colors.textPrimary,
       fontFamily: Fonts.mono,
+      flexShrink: 1,
     },
     optionTextSelected: {
       color: Colors.textOnPrimary,
+    },
+    capabilitiesRow: {
+      flexDirection: "row-reverse",
+      alignItems: "center",
+      gap: Spacing.md,
+      marginLeft: "auto",
+      paddingLeft: Spacing.md,
+    },
+    capabilityIcon: {
+      width: 14,
+      height: 14,
+      tintColor: Colors.textPrimary,
+    },
+    capabilityIconOnPrimary: {
+      tintColor: Colors.textOnPrimary,
     },
     reflectionRow: {
       marginTop: Spacing.md,

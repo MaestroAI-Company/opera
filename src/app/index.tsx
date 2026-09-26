@@ -475,6 +475,7 @@ export default function Index() {
   useBugReportTrigger(openBugReport);
 
   const [pendingConvIds, setPendingConvIds] = useState<string[]>([]);
+  const [pendingMsgIds, setPendingMsgIds] = useState<string[]>([]);
   const requestQueueRef = useRef<{ convId: string, task: () => Promise<void>, assistantMsgId: string, isIncognito: boolean }[]>([]);
   const isProcessingRef = useRef(false);
   const generatingConvIdRef = useRef<string | null>(null);
@@ -641,6 +642,7 @@ export default function Index() {
       while (requestQueueRef.current.length > 0) {
         const item = requestQueueRef.current.shift();
         setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
+        setPendingMsgIds(requestQueueRef.current.map(i => i.assistantMsgId));
         if (!item) continue;
         try {
           await item.task();
@@ -1188,6 +1190,7 @@ export default function Index() {
         isIncognito: isIncognitoTask
       });
       setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
+      setPendingMsgIds(requestQueueRef.current.map(i => i.assistantMsgId));
       processQueue().catch((e) => console.error("Queue processing failed:", e));
     },
     //processQueue is recreated every render, keeping it out avoids churn
@@ -1258,6 +1261,10 @@ export default function Index() {
     if (generatingConvId === activeConversation.id) {
       GenerationService.stop(activeConversation.id);
     }
+    //queued replies get deleted below
+    requestQueueRef.current = requestQueueRef.current.filter(i => i.convId !== activeConversation.id);
+    setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
+    setPendingMsgIds(requestQueueRef.current.map(i => i.assistantMsgId));
 
     const msgIndex = messagesRef.current.findIndex(m => m.id === aiMessageId);
     if (msgIndex === -1) return;
@@ -1348,6 +1355,7 @@ export default function Index() {
       isIncognito: isIncognitoTask
     });
     setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
+    setPendingMsgIds(requestQueueRef.current.map(i => i.assistantMsgId));
     processQueue().catch((e) => console.error("Queue processing failed:", e));
 
     //processQueue is recreated every render, keeping it out avoids churn
@@ -1365,6 +1373,7 @@ export default function Index() {
       const tasksToCancel = requestQueueRef.current.filter(i => i.convId === currentConvId);
       requestQueueRef.current = requestQueueRef.current.filter(i => i.convId !== currentConvId);
       setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
+      setPendingMsgIds(requestQueueRef.current.map(i => i.assistantMsgId));
 
       for (const item of tasksToCancel) {
         if (!item.isIncognito) {
@@ -1532,6 +1541,7 @@ export default function Index() {
                 speakerEnabled={speakerEnabled}
                 showMetrics={showTechnicalDetails}
                 generatingMessageId={generatingConvId === activeConversation.id ? streamingMsgId : null}
+                queuedMessageIds={pendingMsgIds}
                 hideGradients={isDesktop}
                 onOpenConfidentiality={() => {
                   openDrawerSafely(() => {

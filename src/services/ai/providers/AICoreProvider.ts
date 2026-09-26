@@ -12,15 +12,18 @@ import {
 const MODULE =
   Platform.OS === "android" ? (NativeModules.AICoreModule as any) : null;
 
-const MODEL_LABELS: Record<string, string> = {
-  "aicore-nano-full-stable": "Gemini Nano - Full (Stable)",
-  "aicore-nano-fast-stable": "Gemini Nano - Fast (Stable)",
-  "aicore-nano-full-preview": "Gemini Nano - Full (Preview)",
-  "aicore-nano-fast-preview": "Gemini Nano - Fast (Preview)",
+//short label drops the family
+const MODEL_LABELS: Record<string, { label: string; shortLabel?: string }> = {
+  "aicore-nano-full-stable": { label: "Gemini Nano - Full (Stable)", shortLabel: "Full (Stable)" },
+  "aicore-nano-fast-stable": { label: "Gemini Nano - Fast (Stable)", shortLabel: "Fast (Stable)" },
+  "aicore-nano-full-preview": { label: "Gemini Nano - Full (Preview)", shortLabel: "Full (Preview)" },
+  "aicore-nano-fast-preview": { label: "Gemini Nano - Fast (Preview)", shortLabel: "Fast (Preview)" },
 };
 
-export function getAICoreModelLabel(modelName: string): string {
-  return MODEL_LABELS[modelName] || modelName;
+export function getAICoreModelLabel(modelName: string, short = false): string {
+  const entry = MODEL_LABELS[modelName];
+  if (!entry) return modelName;
+  return (short && entry.shortLabel) || entry.label;
 }
 
 //ml kit FeatureStatus codes

@@ -17,19 +17,23 @@
   </p>
 </div>
 
-Opera is a local, on-device AI assistant. Talk to it through Ollama, an on-device model, or Android's built-in Gemini Nano — no account, no server required unless you choose one.
+Opera is a privacy-first AI assistant. Run a model on the device itself, on your own Ollama server, or on any OpenAI-compatible endpoint — no account, and nothing leaves your device unless you pick an online model, a cloud sync or a web search.
 
 ## Features
 
 | | |
 |---|---|
-| Model providers | Ollama, on-device (ExecuTorch + Whisper), or Android AICore (Gemini Nano) — picked per conversation |
-| Tools | weather, math, calendar, contacts, alarms, clipboard, opening apps, sending messages, fetching pages, web search |
-| MCP support | any OAuth-aware [Model Context Protocol](https://modelcontextprotocol.io) server plugs in and its tools show up in chat |
-| OS-level integration | default Android assistant, voice interaction, screen capture, on-screen text/object selection, overlay UI |
-| Structured widgets | weather, maps, HTML and Mermaid diagrams render as widgets, not raw text |
-| Sync & backup | Google Drive / Nextcloud sync, end-to-end encrypted backups, PrivateBin-style encrypted share links |
-| Incognito mode | UI recolors purple-gray for conversations that leave no trace |
+| Model providers | **Built-in** (Gemini Nano via Android AICore, or the browser's built-in model on web), **On-Device** (Hugging Face `.litertlm` models run with LiteRT-LM), **Ollama**, **OpenAI-compatible** (Mistral, LM Studio…) |
+| Tools | web search (DuckDuckGo), page fetching, math, clipboard, opening apps, sending messages, contacts, calendar, alarms, Android settings panels - each can be toggled on or off |
+| MCP support | any OAuth-aware [Model Context Protocol](https://modelcontextprotocol.io) server plugs in and its tools show up in chat; tools can be `@mentioned` |
+| Attachments | camera, photos, and documents (PDF, DOCX, plain text) |
+| Voice | dictation through the system speech recognizer, or raw audio sent to models that accept it; Whisper runs in the browser on web; replies can be read aloud |
+| Android integration | default assistant role, overlay over any app, screen capture with on-screen text selection and object detection, home-screen quick actions |
+| Rich replies | Markdown with KaTeX math and code highlighting, citations, reply suggestions; weather, maps, HTML and Mermaid widgets |
+| Sync & backup |Nextcloud/Google Drive sync encrypted with a PIN, local JSON export / import |
+| Sharing | conversations shared as encrypted [PrivateBin](https://privatebin.info) links, key kept in the URL fragment, instance configurable |
+| Incognito mode | conversations that are never written to history |
+| Languages | English, French |
 
 ## Stack
 
@@ -37,43 +41,48 @@ Opera is a local, on-device AI assistant. Talk to it through Ollama, an on-devic
 |---|---|
 | Mobile / Web UI | Expo (SDK 57), React Native, `expo-router`, React 19 |
 | Local database | SQLite (`expo-sqlite`) |
-| On-device AI | `react-native-executorch`, Whisper, Android AICore (Gemini Nano) |
-| Native Android | Kotlin / Java (voice interaction, screen capture, overlays) |
+| On-device AI | LiteRT-LM (`react-native-litert-lm`), Android AICore (Gemini Nano), ExecuTorch (on-screen object detection), Whisper via `@xenova/transformers` (web) |
+| Native Android | Kotlin / Java (voice interaction service, overlay, screen capture, text selection, AICore bridge) |
+| Crypto | `react-native-quick-crypto` / WebCrypto |
 | Language | TypeScript, strict |
-
-An experimental desktop build also exists via Tauri (`npm run desktop`).
 
 <details>
 <summary><strong>Project structure</strong></summary>
 
 ```
 src/
-  app/                 expo-router screens (chat, onboarding, settings entry points)
+  app/                 expo-router screens (chat, onboarding, oauth redirects)
   components/
     features/          feature UI (chat, drawers, overlay, settings sheets…)
-    ui/                 design-system primitives (buttons, inputs, cards…)
-    toolwidgets/        shared blocks used by structured tool-result widgets
-    widgets/            weather / maps / html / mermaid widgets
+    ui/                design-system primitives (buttons, inputs, cards…)
+    toolwidgets/       shared blocks used by tool-result widgets
+    widgets/           weather / maps / html / mermaid widgets
   services/
-    ai/                 providers (Ollama, AICore, local), tools, generation pipeline, MCP client
-    cloud/, crypto/     cloud sync providers + encrypted backup
-    db/                 SQLite-backed conversation storage
-    speech/             STT / TTS
-    overlay/            screen capture, selection, object detection
-    settings/, share/, notifications/, ...
-  hooks/, constants/     shared hooks and design tokens (constants/theme.ts)
+    ai/                providers, tools, generation pipeline, mentions, quick flow
+    mcp/               MCP client, OAuth, server storage
+    cloud/, crypto/    cloud sync providers and encrypted backup
+    db/                SQLite-backed conversation storage
+    speech/            STT / TTS
+    overlay/           screen capture, text selection, object detection
+    documents/         PDF / DOCX extraction
+    share/             PrivateBin share links
+    settings/, notifications/, updates/, ...
+  hooks/               shared hooks
+  i18n/                en / fr catalogs
 
-native/android/         native Kotlin/Java modules (assistant service, overlay, screen capture)
-plugins/                 custom Expo config plugins
-design/                  standalone design system showcase (index.html)
-assets/                  icons, images, fonts, animations, on-device models
+constants/             design tokens (theme.ts) and system prompts
+native/android/        native Kotlin/Java modules (assistant service, overlay, screen capture)
+plugins/               custom Expo config plugins
+src-tauri/             desktop shell
+design/                standalone design system showcase (index.html)
+assets/                icons, images, fonts, animations, on-device models
 ```
 
 </details>
 
 ## Getting started
 
-**Prerequisites** — Node.js & npm, [Expo CLI](https://docs.expo.dev/more/expo-cli/) (via `npx`), and for native builds: Android Studio/SDK.
+**Prerequisites** — Node.js & npm, [Expo CLI](https://docs.expo.dev/more/expo-cli/) (via `npx`), and for native builds: Android Studio/SDK. The desktop build also needs a Rust toolchain.
 
 ```bash
 npm install
@@ -86,14 +95,15 @@ npm run web        # run in the browser
 Then, only if you need it:
 
 ```bash
-cp .env.example .env   # Google Drive OAuth vars — irrelevant for plain local dev
+cp .env.example .env   # Google Drive OAuth and beta server vars — irrelevant for plain local dev
 ```
 
 **Building for real:**
 
 ```bash
 npm run build:android   # Expo prebuild + Gradle release APK
-npm run lint             # ESLint
+npm run build:desktop   # Tauri desktop bundle
+npm run lint            # ESLint
 ```
 
 Coding conventions for this repo are in [AGENTS.md](./AGENTS.md); the visual language — colors, type, spacing, component specs — is documented separately in [DESIGN.md](./DESIGN.md).

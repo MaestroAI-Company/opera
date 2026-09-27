@@ -302,6 +302,8 @@ export const en = {
     "Find Opera online, follow our updates, and contribute to the project.",
   "settings.info.website": "Website",
 
+  "settings.profile.personalize": "Personalize my profile",
+  "settings.profile.exportCard": "Export my Profile Card",
   "settings.profile.name": "Name",
   "settings.profile.instructions": "Write your instructions to AI",
   "settings.profile.instructionsPlaceholder": "write",
@@ -318,6 +320,8 @@ export const en = {
   "settings.general.autoRead": "Auto-read replies",
   "settings.general.autoReadHelp":
     "Speak the answer aloud when you ask by voice.",
+  "settings.general.voice.title": "Voice",
+  "settings.general.voice.help": "Auto read, voice engine, reading speed.",
   "settings.general.advancedMode": "Advanced mode",
   "settings.general.advancedModeHelp":
     "Add an Advanced section to the menu with the more technical settings.",
@@ -402,7 +406,7 @@ export const en = {
   "settings.service.ollama": "Ollama",
   "settings.service.ollamaHelp":
     "Use your Ollama servers to run powerful AI models at home.",
-  "settings.service.openai": "OpenAI-compatible",
+  "settings.service.openai": "Cloud API",
   "settings.service.openaiHelp":
     "Connect OpenAI, Gemini, Mistral, LM Studio or any server that speaks the OpenAI API.",
   "settings.service.local": "Built-in",

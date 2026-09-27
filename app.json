@@ -2,7 +2,7 @@
   "expo": {
     "name": "Opera",
     "slug": "opera",
-    "version": "0.9.14",
+    "version": "0.9.15",
     "orientation": "default",
     "icon": "./assets/icons/opera.png",
     "scheme": [
@@ -58,9 +58,30 @@
         {
           "android": {
             "fonts": [
-              { "fontFamily": "Petrona", "fontDefinitions": [{ "path": "./assets/fonts/Petrona-Medium.ttf", "weight": 400 }] },
-              { "fontFamily": "Figtree", "fontDefinitions": [{ "path": "./assets/fonts/Figtree-Regular.ttf", "weight": 400 }] },
-              { "fontFamily": "FragmentMono", "fontDefinitions": [{ "path": "./assets/fonts/FragmentMono-Regular.ttf", "weight": 400 }] }
+              {
+                "fontFamily": "Petrona",
+                "fontDefinitions": [
+                  { "path": "./assets/fonts/Petrona-Medium.ttf", "weight": 400 }
+                ]
+              },
+              {
+                "fontFamily": "Figtree",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/Figtree-Regular.ttf",
+                    "weight": 400
+                  }
+                ]
+              },
+              {
+                "fontFamily": "FragmentMono",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/FragmentMono-Regular.ttf",
+                    "weight": 400
+                  }
+                ]
+              }
             ]
           }
         }

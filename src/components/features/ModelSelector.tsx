@@ -159,6 +159,7 @@ export type ModelSelectorDrawerProps = {
   triggerRef?: React.RefObject<View | null>;
   //current conversation, fills the token window
   messages?: { content: string; images?: string[]; metrics?: MessageMetrics }[];
+  onOpenProviderSettings?: (provider: string) => void;
 };
 
 //fluid drawer, built the same way as ConversationsDrawer/SettingsDrawer: mounted at the screen
@@ -179,6 +180,7 @@ export function ModelSelectorDrawer({
   isDesktop = false,
   triggerRef,
   messages = [],
+  onOpenProviderSettings,
 }: ModelSelectorDrawerProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -397,6 +399,14 @@ export function ModelSelectorDrawer({
 
   //tab switch restores its last model
   const handleSelectSource = (source: ModelSource) => {
+    //open provider settings on reselect
+    if (browsedSource && source.key === browsedSource.key) {
+      if (onOpenProviderSettings) {
+        onClose();
+        onOpenProviderSettings(source.service);
+      }
+      return;
+    }
     setBrowsedKey(source.key);
     if (matchesActive(source)) return;
     onServiceChange(source.service, source.url);

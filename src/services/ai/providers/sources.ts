@@ -180,7 +180,7 @@ export function buildSources(localAvailable: boolean): ModelSource[] {
     sources.push(...serverSources('ollama', getOllamaServers(), 'Ollama'));
   }
   if (isProviderSupported(OPENAI_PROVIDER_ID) && enabled.includes(OPENAI_PROVIDER_ID)) {
-    sources.push(...serverSources(OPENAI_PROVIDER_ID, getOpenAIServers(), 'OpenAI API'));
+    sources.push(...serverSources(OPENAI_PROVIDER_ID, getOpenAIServers(), t('settings.service.openai')));
   }
   return sources;
 }

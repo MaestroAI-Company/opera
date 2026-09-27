@@ -7,11 +7,10 @@ import {
   pbkdf2,
   randomBytes,
 } from 'react-native-quick-crypto';
+import { b64ToBytes as fromB64 } from './encoding';
 import type { BackupCrypto } from './types';
 
 const AES_ALGORITHM = 'aes-256-cbc';
-
-const fromB64 = (b64: string) => Buffer.from(b64, 'base64');
 
 //same primitives as legacy js backups
 export const BackupCryptoImpl: BackupCrypto = {

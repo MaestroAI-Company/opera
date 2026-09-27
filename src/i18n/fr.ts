@@ -376,6 +376,13 @@ export const fr: Translations = {
   "settings.cloud.syncSuccess": "Données synchronisées avec succès.",
   "settings.cloud.syncError": "Erreur de synchronisation",
   "settings.cloud.unknownError": "Une erreur inconnue est survenue.",
+  "settings.cloud.progress.connecting": "Connexion à votre compte...",
+  "settings.cloud.progress.checking":
+    "Recherche d'une sauvegarde existante...",
+  "settings.cloud.progress.unlocking":
+    "Téléchargement et déchiffrement de votre sauvegarde...",
+  "settings.cloud.progress.resetting":
+    "Suppression de l'ancienne sauvegarde...",
 
   "settings.pin.create.title": "Créer un code PIN de synchronisation",
   "settings.pin.create.message":
@@ -385,7 +392,6 @@ export const fr: Translations = {
   "settings.pin.unlock.message":
     "Une sauvegarde cloud a été trouvée. Saisissez votre code PIN pour la déverrouiller et reprendre la synchronisation.",
   "settings.pin.unlock.confirm": "Déverrouiller",
-  "settings.pin.unlockSuccess": "Sauvegarde déverrouillée avec succès.",
   "settings.pin.incorrect":
     "Code PIN incorrect. Impossible de déchiffrer la sauvegarde.",
   "settings.pin.invalid": "Le code PIN doit contenir 4 à 6 chiffres.",

@@ -1,6 +1,7 @@
 import * as AuthSession from 'expo-auth-session';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { utf8Decode } from '../crypto/encoding';
 import { CloudDownload, CloudProvider, CloudUpload, CloudUserInfo } from './CloudProvider';
 
 const ANDROID_CLIENT_ID = '390321100520-3mi4mkdrdt8ke2nvl3ksbjef000ad5eg.apps.googleusercontent.com';
@@ -25,6 +26,13 @@ const TOKEN_EXPIRY_KEY = 'gdrive_token_expiry';
 //fixed loopback port, must be registered in google console as authorized redirect uri
 const OAUTH_LOOPBACK_PORT = 46357;
 
+//web auth tab reports back through storage
+const AUTH_TAB_STATE_KEY = 'gdrive_auth_tab_state';
+const AUTH_TAB_RESULT_KEY = 'gdrive_auth_tab_result';
+const AUTH_TAB_TIMEOUT_MS = 3 * 60 * 1000;
+const AUTH_POPUP_WIDTH = 500;
+const AUTH_POPUP_HEIGHT = 650;
+
 //lookup outcome, null when missing
 type DriveFileMeta = { id: string; md5Checksum: string | null };
 
@@ -47,8 +55,11 @@ export class GoogleDriveProvider implements CloudProvider {
 
   private getRedirectUri(): string {
     if (Platform.OS === 'web') {
-      return WEB_REDIRECT_URI
-        || AuthSession.makeRedirectUri({ preferLocalhost: true, path: 'oauth2redirect/google' });
+      //env uri only fits the origin it names
+      if (WEB_REDIRECT_URI && new URL(WEB_REDIRECT_URI).origin === window.location.origin) {
+        return WEB_REDIRECT_URI;
+      }
+      return AuthSession.makeRedirectUri({ preferLocalhost: true, path: 'oauth2redirect/google' });
     }
     const clientId = this.getClientId();
     const reversedClientId = clientId.split('.').reverse().join('.');
@@ -122,8 +133,10 @@ export class GoogleDriveProvider implements CloudProvider {
       };
 
       if (isWeb) {
-        //full-page redirect on web (popups are blocked in tauri/webviews)
         const authUrl = await this.currentRequest.makeAuthUrlAsync(discovery);
+        const viaTab = this.authenticateInTab(authUrl, this.currentRequest.state);
+        if (viaTab) return viaTab;
+        //tab blocked, full-page redirect instead
         window.location.href = authUrl;
         return new Promise<boolean>(() => {});
       }
@@ -150,6 +163,50 @@ export class GoogleDriveProvider implements CloudProvider {
       console.error('GoogleDriveProvider authenticate error:', e);
       return false;
     }
+  }
+
+  //popup keeps this page, null when blocked
+  private authenticateInTab(authUrl: string, state: string): Promise<boolean> | null {
+    localStorage.setItem(AUTH_TAB_STATE_KEY, state);
+    //small popup window centered on the app
+    const left = Math.round(window.screenX + (window.outerWidth - AUTH_POPUP_WIDTH) / 2);
+    const top = Math.round(window.screenY + (window.outerHeight - AUTH_POPUP_HEIGHT) / 2);
+    const features = `popup,width=${AUTH_POPUP_WIDTH},height=${AUTH_POPUP_HEIGHT},left=${left},top=${top}`;
+    if (!window.open(authUrl, 'opera-google-auth', features)) {
+      localStorage.removeItem(AUTH_TAB_STATE_KEY);
+      return null;
+    }
+
+    return new Promise<boolean>((resolve) => {
+      const finish = async (accessToken: string | null, expiresIn: number) => {
+        clearTimeout(timeout);
+        window.removeEventListener('storage', onStorage);
+        localStorage.removeItem(AUTH_TAB_STATE_KEY);
+        localStorage.removeItem(AUTH_TAB_RESULT_KEY);
+        if (accessToken) await this.saveTokens(accessToken, undefined, expiresIn);
+        resolve(!!accessToken);
+      };
+      const onStorage = (event: StorageEvent) => {
+        if (event.key !== AUTH_TAB_RESULT_KEY || !event.newValue) return;
+        const result = JSON.parse(event.newValue);
+        if (result.state === state) finish(result.accessToken, result.expiresIn);
+      };
+      //a closed tab goes unseen behind google coop
+      const timeout = setTimeout(() => finish(null, 0), AUTH_TAB_TIMEOUT_MS);
+      window.addEventListener('storage', onStorage);
+    });
+  }
+
+  //redirect tab hands its result to the opener tab
+  static handOffToOpenerTab(params: URLSearchParams): boolean {
+    const state = params.get('state');
+    if (!state || state !== localStorage.getItem(AUTH_TAB_STATE_KEY)) return false;
+    localStorage.setItem(AUTH_TAB_RESULT_KEY, JSON.stringify({
+      state,
+      accessToken: params.get('access_token'),
+      expiresIn: parseInt(params.get('expires_in') || '3600', 10),
+    }));
+    return true;
   }
 
   private async authenticateInBrowser(forcePrompt: boolean): Promise<boolean> {
@@ -291,7 +348,8 @@ export class GoogleDriveProvider implements CloudProvider {
         return { status: 'missing' };
       }
       if (!response.ok) return { status: 'error' };
-      return { status: 'ok', content: await response.text(), tag: meta.md5Checksum };
+      //expo text() decodes in js
+      return { status: 'ok', content: utf8Decode(new Uint8Array(await response.arrayBuffer())), tag: meta.md5Checksum };
     } catch (e) {
       console.error('Failed to download file:', e);
       return { status: 'error' };

@@ -520,6 +520,7 @@ export default function SettingsDrawer({
     inputPlaceholder?: string;
     inputSecureTextEntry?: boolean;
     inputKeyboardType?: any;
+    loading?: boolean;
   }>({ title: "", message: "" });
 
   const showAlert = (
@@ -1803,6 +1804,20 @@ export default function SettingsDrawer({
     Settings.set("autoStartMic", v);
   };
 
+  //same modal stays open between cloud steps
+  const showCloudProgress = (
+    message: string,
+    providerName = CloudSync.getProviderName(),
+  ) => {
+    showAlert(
+      getCloudProviderDefinition(providerName)?.label ??
+        t("settings.cloud.storage"),
+      message,
+      undefined,
+      { loading: true, messageAlign: "center" },
+    );
+  };
+
   const completeCloudConnect = async (v: string) => {
     const pinSet = CloudSync.hasPin();
     setHasSyncPin(pinSet);
@@ -1810,8 +1825,16 @@ export default function SettingsDrawer({
       const ui = await CloudSync.getUserInfo();
       setCloudUserInfo(ui);
 
+      //paused account resumes with its stored pin
+      if (pinSet) {
+        showCloudProgress(t("cloudSync.syncing"));
+        handleSyncNow();
+        return;
+      }
+
       //wait to avoid ui lag
       setTimeout(async () => {
+        showCloudProgress(t("settings.cloud.progress.checking"));
         const cloudBackupExists = await CloudSync.hasCloudBackup();
         setHasCloudBackup(cloudBackupExists);
         if (cloudBackupExists) {
@@ -1829,6 +1852,7 @@ export default function SettingsDrawer({
 
   const connectProvider = async (providerName: string) => {
     setCloudProvider(providerName);
+    showCloudProgress(t("settings.cloud.progress.connecting"), providerName);
     const success = await CloudSync.setProvider(providerName);
     if (success) {
       await completeCloudConnect(providerName);
@@ -1881,7 +1905,11 @@ export default function SettingsDrawer({
           style: "danger",
           onPress: async () => {
             setAlertModalVisible(false);
-            await handleSetCloudProvider("none");
+            //full unlink, the selector only pauses
+            await CloudSync.disconnect();
+            setCloudProvider("none");
+            await completeCloudConnect("none");
+            await refreshLastSync();
           },
         },
         {
@@ -1909,9 +1937,9 @@ export default function SettingsDrawer({
           style: "primary",
           onPress: async () => {
             if (currentInput.length >= 4 && currentInput.length <= 6) {
+              showCloudProgress(t("cloudSync.syncing"));
               await CloudSync.setPin(currentInput);
               setHasSyncPin(true);
-              setAlertModalVisible(false);
               handleSyncNow();
             } else {
               setAlertModalVisible(false);
@@ -1951,35 +1979,26 @@ export default function SettingsDrawer({
           text: t("settings.pin.unlock.confirm"),
           style: "primary",
           onPress: async () => {
-            setAlertModalVisible(false);
+            showCloudProgress(t("settings.cloud.progress.unlocking"));
             const success = await CloudSync.verifyAndSetPin(currentInput);
             if (success) {
               setHasSyncPin(true);
-              setTimeout(
-                () =>
-                  showAlert(
-                    t("common.success"),
-                    t("settings.pin.unlockSuccess"),
-                  ),
-                300,
-              );
+              //first sync runs right away
+              showCloudProgress(t("cloudSync.syncing"));
+              handleSyncNow();
             } else {
-              setTimeout(
-                () =>
-                  showAlert(t("common.error"), t("settings.pin.incorrect"), [
-                    {
-                      text: t("settings.pin.tryAgain"),
-                      onPress: handleUnlockSyncPin,
-                      style: "primary",
-                    },
-                    {
-                      text: t("common.cancel"),
-                      onPress: () => setAlertModalVisible(false),
-                      style: "secondary",
-                    },
-                  ]),
-                300,
-              );
+              showAlert(t("common.error"), t("settings.pin.incorrect"), [
+                {
+                  text: t("settings.pin.tryAgain"),
+                  onPress: handleUnlockSyncPin,
+                  style: "primary",
+                },
+                {
+                  text: t("common.cancel"),
+                  onPress: () => setAlertModalVisible(false),
+                  style: "secondary",
+                },
+              ]);
             }
           },
         },
@@ -2008,10 +2027,10 @@ export default function SettingsDrawer({
         text: t("settings.pin.reset.confirm"),
         style: "danger",
         onPress: async () => {
+          showCloudProgress(t("settings.cloud.progress.resetting"));
           await CloudSync.forgetCode();
           setHasSyncPin(false);
-          setAlertModalVisible(false);
-          setTimeout(() => handleCreateSyncPin(), 400);
+          handleCreateSyncPin();
         },
       },
     ]);
@@ -4421,6 +4440,7 @@ export default function SettingsDrawer({
         inputPlaceholder={alertConfig.inputPlaceholder}
         inputSecureTextEntry={alertConfig.inputSecureTextEntry}
         inputKeyboardType={alertConfig.inputKeyboardType}
+        loading={alertConfig.loading}
       />
       <NotificationModal
         visible={exportScopeVisible}

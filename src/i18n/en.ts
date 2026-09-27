@@ -366,6 +366,11 @@ export const en = {
   "settings.cloud.syncSuccess": "Data synchronized successfully.",
   "settings.cloud.syncError": "Sync Error",
   "settings.cloud.unknownError": "Unknown error occurred.",
+  "settings.cloud.progress.connecting": "Connecting to your account...",
+  "settings.cloud.progress.checking": "Looking for an existing backup...",
+  "settings.cloud.progress.unlocking":
+    "Downloading and decrypting your backup...",
+  "settings.cloud.progress.resetting": "Deleting the previous backup...",
 
   "settings.pin.create.title": "Create Sync PIN",
   "settings.pin.create.message":
@@ -375,7 +380,6 @@ export const en = {
   "settings.pin.unlock.message":
     "A cloud backup was found. Enter your PIN to unlock it and resume sync.",
   "settings.pin.unlock.confirm": "Unlock",
-  "settings.pin.unlockSuccess": "Backup unlocked successfully!",
   "settings.pin.incorrect": "Incorrect PIN. Could not decrypt backup.",
   "settings.pin.invalid": "PIN must be 4 to 6 digits.",
   "settings.pin.placeholder": "Enter 4-6 digits",

@@ -5057,15 +5057,18 @@ export default function SettingsDrawer({
         )}
       />
 
-      <LinearGradient
-        colors={[
-          Colors.groupedBackground,
-          Colors.groupedBackgroundFade,
-          Colors.groupedBackgroundClear,
-        ]}
-        style={styles.gradientTop}
-        pointerEvents="none"
-      />
+      {/* floating drawers keep their titles visible */}
+      {!isDesktop && (
+        <LinearGradient
+          colors={[
+            Colors.groupedBackground,
+            Colors.groupedBackgroundFade,
+            Colors.groupedBackgroundClear,
+          ]}
+          style={styles.gradientTop}
+          pointerEvents="none"
+        />
+      )}
       <LinearGradient
         colors={[
           Colors.groupedBackgroundClear,

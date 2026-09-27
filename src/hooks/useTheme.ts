@@ -68,8 +68,13 @@ function getSnapshot(): ThemeColors {
   return active;
 }
 
+//static web html is prerendered in light
+function getServerSnapshot(): ThemeColors {
+  return LightColors;
+}
+
 export function useColors(): ThemeColors {
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 
 export function useIsDark(): boolean {

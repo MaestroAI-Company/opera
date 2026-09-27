@@ -3,6 +3,8 @@ import type { TranslationKey } from '../../../i18n';
 
 // tool call returned by ollama
 export interface ToolCall {
+  //pairs tool results to calls
+  id?: string;
   function: {
     name: string;
     arguments: Record<string, any>;

@@ -402,6 +402,9 @@ export const en = {
   "settings.service.ollama": "Ollama",
   "settings.service.ollamaHelp":
     "Use your Ollama servers to run powerful AI models at home.",
+  "settings.service.openai": "OpenAI-compatible",
+  "settings.service.openaiHelp":
+    "Connect OpenAI, Gemini, Mistral, LM Studio or any server that speaks the OpenAI API.",
   "settings.service.local": "Built-in",
   "settings.service.localHelp":
     "Use the AI model that ships with your device. Nothing to download.",
@@ -482,7 +485,7 @@ export const en = {
   "settings.service.serverLink": "server link",
   "settings.service.failover": "Model failover",
   "settings.service.failoverHelp":
-    "When the active Ollama server cannot be reached, keep the same model running on another Ollama server that offers it.",
+    "When the active server cannot be reached, keep the same model running on another server that offers it.",
 
   "settings.whisper.label": "Whisper Model",
   "settings.whisper.help":
@@ -617,6 +620,15 @@ export const en = {
   "settings.ollama.unreachableInfo":
     "This server could not be reached.\n\n- Check that the server is running.\n- Check the server's network connection.\n- Make sure the URL and port are correct.",
   "settings.ollama.remove.action": "Remove server",
+  "settings.openai.title": "OpenAI-compatible servers",
+  "settings.openai.help":
+    "Add the API link of your service or server, for example https://api.openai.com/v1, https://generativelanguage.googleapis.com/v1beta/openai or http://localhost:1234/v1.",
+  "settings.openai.apiKey": "API key",
+  "settings.openai.apiKeyHelp":
+    "Required by cloud services like OpenAI or Gemini. Leave empty for a local server.",
+  "settings.openai.apiKeyPlaceholder": "api key",
+  "settings.openai.unreachableInfo":
+    "This server could not be reached.\n\n- Check that the server is running.\n- Make sure the link is the API link, often ending with /v1.\n- Check the API key if the service needs one.",
   "settings.ollama.remove.title": "Remove server",
   "settings.ollama.remove.message":
     "Remove {name}? Opera will stop offering its models.",

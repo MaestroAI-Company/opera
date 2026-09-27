@@ -6,6 +6,7 @@ export type AppSettings = {
   aiService: string;
   ollamaUrl: string;
   ollamaUrls: string;
+  openaiUrls: string;
   mcpServers: string;
   enabledProviders: string;
   modelFailover: boolean;
@@ -45,8 +46,9 @@ export const BASE_DEFAULTS: AppSettings = {
   aiService: 'ollama',
   ollamaUrl: '',
   ollamaUrls: '[]',
+  openaiUrls: '[]',
   mcpServers: '[]',
-  enabledProviders: 'local,litert,ollama,beta',
+  enabledProviders: 'local,litert,ollama,openai,beta',
   modelFailover: true,
   ollamaModel: '',
   ollamaContextLength: 8192,

@@ -415,6 +415,9 @@ export const fr: Translations = {
   "settings.service.ollama": "Ollama",
   "settings.service.ollamaHelp":
     "Utilisez vos serveurs Ollama pour exécuter de puissants modèles d'IA chez vous.",
+  "settings.service.openai": "Compatible OpenAI",
+  "settings.service.openaiHelp":
+    "Connectez OpenAI, Gemini, Mistral, LM Studio ou tout serveur qui parle l'API OpenAI.",
   "settings.service.local": "Intégré",
   "settings.service.localHelp":
     "Utilisez le modèle d'IA fourni avec votre appareil. Rien à télécharger.",
@@ -502,7 +505,7 @@ export const fr: Translations = {
   "settings.service.serverLink": "lien du serveur",
   "settings.service.failover": "Bascule automatique",
   "settings.service.failoverHelp":
-    "Quand le serveur Ollama actif est injoignable, conserve le même modèle en le relançant sur un autre serveur Ollama qui le propose.",
+    "Quand le serveur actif est injoignable, conserve le même modèle en le relançant sur un autre serveur qui le propose.",
 
   "settings.whisper.label": "Modèle Whisper",
   "settings.whisper.help":
@@ -641,6 +644,15 @@ export const fr: Translations = {
   "settings.ollama.unreachableInfo":
     "Ce serveur n'a pas pu être joint.\n\n- Vérifiez que le serveur est démarré.\n- Vérifiez la connexion réseau du serveur.\n- Assurez-vous que l'URL et le port sont corrects.",
   "settings.ollama.remove.action": "Retirer le serveur",
+  "settings.openai.title": "Serveurs compatibles OpenAI",
+  "settings.openai.help":
+    "Ajoutez le lien API de votre service ou serveur, par exemple https://api.openai.com/v1, https://generativelanguage.googleapis.com/v1beta/openai ou http://localhost:1234/v1.",
+  "settings.openai.apiKey": "Clé API",
+  "settings.openai.apiKeyHelp":
+    "Nécessaire pour les services cloud comme OpenAI ou Gemini. Laissez vide pour un serveur local.",
+  "settings.openai.apiKeyPlaceholder": "clé api",
+  "settings.openai.unreachableInfo":
+    "Ce serveur n'a pas pu être joint.\n\n- Vérifiez que le serveur est démarré.\n- Assurez-vous que le lien est le lien API, qui finit souvent par /v1.\n- Vérifiez la clé API si le service en demande une.",
   "settings.ollama.remove.title": "Retirer le serveur",
   "settings.ollama.remove.message":
     "Retirer {name} ? Opera ne proposera plus ses modèles.",

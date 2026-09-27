@@ -6,6 +6,7 @@ import Checkbox from "./Checkbox";
 import Group from "./Group";
 import ImageCard from "./ImageCard";
 import TextInputField from "./TextInputField";
+import ThinkingIcon from "./ThinkingIcon";
 import { pressStyle } from "./pressStyle";
 
 export type ModalButton = {
@@ -41,6 +42,9 @@ export type NotificationModalProps = {
   buttons?: ModalButton[];
   options?: ModalOption[];
 
+  //loader replaces the buttons
+  loading?: boolean;
+
   onClose: () => void;
 };
 
@@ -59,15 +63,18 @@ export default function NotificationModal({
   inputKeyboardType,
   buttons,
   options,
+  loading,
   onClose,
 }: NotificationModalProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
 
   //fallback to single close button if none provided
-  const activeButtons = buttons && buttons.length > 0
-    ? buttons.slice(0, 4)
-    : [{ text: "OK", onPress: onClose, style: "primary" as const }];
+  const activeButtons = loading
+    ? []
+    : buttons && buttons.length > 0
+      ? buttons.slice(0, 4)
+      : [{ text: "OK", onPress: onClose, style: "primary" as const }];
 
   return (
     <Modal
@@ -122,6 +129,12 @@ export default function NotificationModal({
                     labelFirst
                   />
                 ))}
+              </View>
+            )}
+
+            {loading && (
+              <View style={styles.loader}>
+                <ThinkingIcon />
               </View>
             )}
 
@@ -228,6 +241,9 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   optionsContainer: {
     marginBottom: 20,
     gap: 12,
+  },
+  loader: {
+    alignItems: "center",
   },
   buttonContainer: {
     flexDirection: "column",

@@ -1,3 +1,4 @@
+import { b64ToBytes as fromB64, bytesToB64 } from './encoding.web';
 import type { BackupCrypto } from './types';
 
 const encoder = new TextEncoder();
@@ -8,17 +9,7 @@ const subtle = () => {
   return webcrypto.subtle;
 };
 
-const fromB64 = (b64: string) => Uint8Array.from(atob(b64), (char) => char.charCodeAt(0));
-
-const toB64 = (buffer: ArrayBuffer) => {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  //chunked spread avoids argument limit
-  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-  }
-  return btoa(binary);
-};
+const toB64 = (buffer: ArrayBuffer) => bytesToB64(new Uint8Array(buffer));
 
 const aesKey = (keyB64: string, usage: KeyUsage) =>
   subtle().importKey('raw', fromB64(keyB64), { name: 'AES-CBC' }, false, [usage]);

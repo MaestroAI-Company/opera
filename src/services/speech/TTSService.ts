@@ -1,8 +1,15 @@
 import * as Speech from 'expo-speech';
+import { deriveChatDisplay } from '../../components/ui/MarkdownText';
+import { INTERRUPTED_MARKER } from '../ai/generation/chatGeneration';
 import { Settings } from '../settings/SettingsService';
-import { Kokoro, KokoroPlayback } from './KokoroTTS';
+import { AudioPlayback, createPlayback, prepareAudio } from './AudioPlayback';
+import { activate, getSpeed, getVoice, NEURAL_ENGINES } from './engines';
+import { SynthesisOptions } from './NeuralEngine';
+import { SentenceQueue } from './SentenceQueue';
 
 const CHUNK_MAX = 900;
+//short head starts audio sooner
+const FIRST_CHUNK_MIN = 20;
 
 //app language codes -> tts locale
 const LOCALES: Record<string, string> = {
@@ -35,11 +42,21 @@ const STOPWORDS: Record<string, string[]> = {
   nl: ['de', 'het', 'een', 'en', 'of', 'maar', 'is', 'zijn', 'was', 'waren', 'van', 'te', 'voor', 'met', 'op', 'bij', 'ik', 'jij', 'hij', 'zij', 'wij', 'niet', 'dat', 'die', 'dan', 'ook', 'als'],
 };
 
+type SpeakOptions = { onDone?: () => void; language?: string; id?: string };
+
+//handle fed by a streaming reply
+export type LiveSpeech = {
+  update(text: string): void;
+  finish(text: string): void;
+  cancel(): void;
+};
+
 class TextToSpeechService {
   private generation = 0;
   private speaking = false;
   private speakingId: string | null = null;
-  private playback: KokoroPlayback | null = null;
+  private playback: AudioPlayback | null = null;
+  private queue: SentenceQueue | null = null;
   private listeners = new Set<() => void>();
 
   isSpeaking(): boolean {
@@ -62,15 +79,65 @@ class TextToSpeechService {
   }
 
   //read text aloud
-  async speak(text: string, options?: { onDone?: () => void; language?: string; id?: string }): Promise<void> {
+  async speak(text: string, options?: SpeakOptions): Promise<void> {
     const clean = this.cleanText(text);
     if (!clean || clean === '…') {
       options?.onDone?.();
       return;
     }
+    const queue = new SentenceQueue();
+    queue.push(this.splitSentences(clean));
+    queue.close();
+    await this.play(queue, options);
+  }
 
+  //read a reply while it streams
+  speakLive(options?: SpeakOptions): LiveSpeech {
+    const queue = new SentenceQueue();
+    let taken = 0;
+    const feed = (text: string, final: boolean) => {
+      const sentences = this.splitSentences(this.cleanText(text));
+      //last sentence may still grow
+      const ready = final ? sentences.length : sentences.length - 1;
+      if (ready > taken) {
+        queue.push(sentences.slice(taken, ready));
+        taken = ready;
+      }
+    };
+    this.preload(options?.language);
+    this.play(queue, options);
+    return {
+      update: (text) => feed(text, false),
+      finish: (text) => {
+        feed(text, true);
+        queue.close();
+      },
+      cancel: () => {
+        if (this.queue === queue) this.stop();
+        queue.close();
+      },
+    };
+  }
+
+  //load the voice while generating
+  private preload(language?: string): void {
+    const engineId = Settings.getCached().ttsEngine;
+    const engine = NEURAL_ENGINES[engineId];
+    const lang = language || 'en';
+    if (!engine?.supports(lang) || !engine.isInstalled()) return;
+    activate(engineId)
+      .then(() => {
+        prepareAudio(engine.sampleRate);
+        return engine.preload(lang, getVoice(engineId));
+      })
+      .catch((e) => console.warn('Neural TTS preload error:', e));
+  }
+
+  private async play(queue: SentenceQueue, options?: SpeakOptions): Promise<void> {
     //cancel any current speech
     const gen = ++this.generation;
+    this.queue?.close();
+    this.queue = queue;
     this.playback?.stop();
     this.playback = null;
     try {
@@ -82,71 +149,96 @@ class TextToSpeechService {
     this.speakingId = options?.id ?? null;
     this.notify();
 
-    const lang = this.detectLanguage(clean) || options?.language || 'en';
-    const locale = LOCALES[lang] || (/^[a-z]{2,3}(-[a-z0-9]{2,4})?$/i.test(lang) ? lang : 'en-US');
-
-    const useKokoro = Settings.getCached().ttsEngine === 'kokoro' && Kokoro.supports(lang) && Kokoro.isInstalled();
-    const rest = useKokoro ? await this.speakKokoro(clean, lang, gen) : this.chunkText(clean, CHUNK_MAX);
-    await this.speakSystem(rest, locale, gen);
+    //language needs the first sentences
+    const head = await queue.peek();
+    if (gen === this.generation && head.length > 0) {
+      const lang = this.detectLanguage(head.join(' ')) || options?.language || 'en';
+      const locale = LOCALES[lang] || (/^[a-z]{2,3}(-[a-z0-9]{2,4})?$/i.test(lang) ? lang : 'en-US');
+      const engineId = Settings.getCached().ttsEngine;
+      const engine = NEURAL_ENGINES[engineId];
+      const speed = getSpeed();
+      if (engine?.supports(lang) && engine.isInstalled()) {
+        await this.speakNeural(engineId, queue, lang, gen, { voice: getVoice(engineId), speed });
+      }
+      //system voice takes what neural left
+      await this.speakSystem(queue, locale, speed, gen);
+    }
 
     if (gen === this.generation) {
       this.speaking = false;
       this.speakingId = null;
+      this.queue = null;
       this.notify();
     }
     options?.onDone?.();
   }
 
-  private async speakSystem(chunks: string[], locale: string, gen: number): Promise<void> {
-    for (let i = 0; i < chunks.length; i++) {
-      if (gen !== this.generation) break;
-      await new Promise<void>((resolve) => {
-        try {
-          Speech.speak(chunks[i], {
-            language: locale,
-            rate: 1.0,
-            pitch: 1.05,
-            onDone: () => resolve(),
-            onStopped: () => resolve(),
-            onError: () => resolve(),
-          });
-        } catch (e) {
-          console.warn('TTS speak error:', e);
-          resolve();
-        }
-      });
+  private async speakSystem(queue: SentenceQueue, locale: string, rate: number, gen: number): Promise<void> {
+    while (gen === this.generation) {
+      const chunks = this.mergeSentences(await queue.drain(), CHUNK_MAX);
+      if (chunks.length === 0) break;
+      for (const chunk of chunks) {
+        if (gen !== this.generation) break;
+        await new Promise<void>((resolve) => {
+          try {
+            Speech.speak(chunk, {
+              language: locale,
+              rate,
+              pitch: 1.05,
+              onDone: () => resolve(),
+              onStopped: () => resolve(),
+              onError: () => resolve(),
+            });
+          } catch (e) {
+            console.warn('TTS speak error:', e);
+            resolve();
+          }
+        });
+      }
     }
   }
 
-  //chunks left for the system voice
-  private async speakKokoro(text: string, lang: string, gen: number): Promise<string[]> {
-    //kokoro has no per chunk pause
-    const chunks = this.splitSentences(text);
-    let playback: KokoroPlayback;
+  //failed sentences go back
+  private async speakNeural(engineId: string, queue: SentenceQueue, lang: string, gen: number, options: SynthesisOptions): Promise<void> {
+    const start = performance.now();
+    const engine = await activate(engineId);
+    if (gen !== this.generation) return;
+    let playback: AudioPlayback;
     try {
-      playback = Kokoro.createPlayback();
+      playback = createPlayback(engine.sampleRate);
     } catch (e) {
-      console.warn('Kokoro playback error:', e);
-      return chunks;
+      console.warn('Neural TTS playback error:', e);
+      return;
     }
     this.playback = playback;
 
-    let rest: string[] = [];
-    for (let i = 0; i < chunks.length; i++) {
+    let first = true;
+    //neural has no per chunk pause
+    for (let sentence = await queue.next(); sentence !== null; sentence = await queue.next()) {
+      if (gen !== this.generation) break;
+      if (first) sentence = this.splitHead(sentence, queue);
       try {
         //synthesis overlaps the chunk already playing
-        const samples = await Kokoro.synthesize(chunks[i], lang);
-        if (gen !== this.generation) return [];
+        const samples = await engine.synthesize(sentence, lang, options);
+        if (gen !== this.generation) break;
+        if (first) console.log(`[TTS:${engineId}] first audio after ${Math.round(performance.now() - start)}ms`);
+        first = false;
         playback.enqueue(samples);
       } catch (e) {
-        console.warn('Kokoro synthesis error:', e);
-        rest = chunks.slice(i);
+        console.warn('Neural TTS synthesis error:', e);
+        queue.unshift(sentence);
         break;
       }
     }
     await playback.finish();
     if (this.playback === playback) this.playback = null;
-    return gen === this.generation ? rest : [];
+  }
+
+  private splitHead(sentence: string, queue: SentenceQueue): string {
+    const cut = sentence.indexOf(', ', FIRST_CHUNK_MIN);
+    if (cut < 0 || sentence.length - cut < FIRST_CHUNK_MIN) return sentence;
+    queue.unshift(sentence.slice(cut + 2));
+    return sentence.slice(0, cut + 1);
   }
 
   //interrupt current speech
@@ -154,6 +246,8 @@ class TextToSpeechService {
     this.generation++;
     this.speaking = false;
     this.speakingId = null;
+    this.queue?.close();
+    this.queue = null;
     this.playback?.stop();
     this.playback = null;
     try {
@@ -164,18 +258,26 @@ class TextToSpeechService {
     this.notify();
   }
 
-  //remove markdown and think blocks before speaking
+  //only what a listener should hear
   private cleanText(text: string): string {
-    let t = text
-      .replace(/<think>[\s\S]*?<\/think>/g, ' ')
-      .replace(/<think>[\s\S]*$/g, ' ')
-      .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+    //same parsing as the bubble
+    const { finalContent } = deriveChatDisplay(text.split(INTERRUPTED_MARKER).join(''), true, null);
+    return finalContent
+      //code and widgets are visual
+      .replace(/```[\s\S]*?(?:```|$)/g, '\n')
+      .replace(/\$\$[\s\S]*?(?:\$\$|$)/g, '\n')
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/https?:\/\/\S+/g, ' ')
+      .replace(/<\/?[a-z][^>]*>/gi, ' ')
+      //table rules and list markers
+      .replace(/^[ \t|:-]*-{3,}[ \t|:-]*$/gm, '')
+      .replace(/^[ \t]*(?:[-*+]|\d+[.)])[ \t]+/gm, '')
       .replace(/[*_~`#>|]/g, ' ')
       //titles and items need a stop
       .replace(/([^.!?…:;,\s])[ \t]*\n+/g, '$1.\n')
       .replace(/\s+/g, ' ')
       .trim();
-    return t;
   }
 
   //detect text language
@@ -204,12 +306,12 @@ class TextToSpeechService {
   }
 
   private splitSentences(text: string): string[] {
-    return text.split(/(?<=[.!?…])\s+/).map((s) => s.trim()).filter(Boolean);
+    //punctuation alone is not speech
+    return text.split(/(?<=[.!?…])\s+/).map((s) => s.trim()).filter((s) => /[\p{L}\p{N}]/u.test(s));
   }
 
-  //split long text for platform limits
-  private chunkText(text: string, max: number): string[] {
-    const sentences = this.splitSentences(text);
+  //platform caps the chunk length
+  private mergeSentences(sentences: string[], max: number): string[] {
     const chunks: string[] = [];
     let current = '';
     for (const sentence of sentences) {

@@ -21,6 +21,8 @@ export type AppSettings = {
   speaker: boolean;
   autoSpeak: boolean;
   ttsEngine: string;
+  ttsVoices: string;
+  ttsSpeed: string;
   alwaysWhisper: boolean;
   autoStartMic: boolean;
   hasSeenOnboarding: boolean;
@@ -67,8 +69,12 @@ export const BASE_DEFAULTS: AppSettings = {
   instruction: '',
   speaker: true,
   autoSpeak: true,
-  //kokoro once its model is downloaded
+  //neural engine once its model loads
   ttsEngine: 'system',
+  //engine id to voice json
+  ttsVoices: '{}',
+  //string keeps fractional rates
+  ttsSpeed: '1',
   alwaysWhisper: false,
   autoStartMic: true,
   hasSeenOnboarding: false,

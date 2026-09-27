@@ -104,7 +104,13 @@ import { McpService } from "../../services/mcp/McpService";
 import { McpServerConfig } from "../../services/mcp/types";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { Settings } from "../../services/settings/SettingsService";
-import { KOKORO_SIZE_BYTES, Kokoro } from "../../services/speech/KokoroTTS";
+import {
+  NEURAL_ENGINES,
+  TTS_SPEEDS,
+  getVoice,
+  setVoice,
+  supportedEngineIds,
+} from "../../services/speech/engines";
 import { WhisperSTT } from "../../services/speech/STTService";
 import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
 import ActionButton from "../ui/ActionButton";
@@ -159,7 +165,11 @@ const LITERT_CAPABILITY_KEYS = {
   audio: "settings.litert.capAudio",
   thinking: "settings.litert.capThinking",
 } as const;
-const searchIcon = require("../../../assets/icons/search.png");
+const TTS_ENGINE_KEYS = {
+  kokoro: "settings.tts.kokoro",
+  supertonic: "settings.tts.supertonic",
+} as const;
+const searchIcon =require("../../../assets/icons/search.png");
 const profilIcon = require("../../../assets/icons/profil.png");
 const cloudIcon = require("../../../assets/icons/cloud.png");
 const cloudUploadIcon = require("../../../assets/icons/cloudupload.png");
@@ -530,9 +540,15 @@ export default function SettingsDrawer({
     sizeStr: string;
   } | null>(null);
   const [ttsEngine, setTtsEngineState] = useState("system");
-  const [kokoroInstalled, setKokoroInstalled] = useState(false);
-  const [isDownloadingKokoro, setIsDownloadingKokoro] = useState(false);
-  const [kokoroDownloadProgress, setKokoroDownloadProgress] = useState<{
+  const [ttsVoice, setTtsVoiceState] = useState("");
+  const [ttsSpeed, setTtsSpeedState] = useState("1");
+  const [installedEngines, setInstalledEngines] = useState<
+    Record<string, boolean>
+  >({});
+  const [downloadingEngine, setDownloadingEngine] = useState<string | null>(
+    null,
+  );
+  const [engineDownloadProgress, setEngineDownloadProgress] = useState<{
     progress: number;
     sizeStr: string;
   } | null>(null);
@@ -894,44 +910,67 @@ export default function SettingsDrawer({
     }
   };
 
+  const ttsEngines = supportedEngineIds();
+  const engineName = (id: string) =>
+    t(TTS_ENGINE_KEYS[id as keyof typeof TTS_ENGINE_KEYS]);
+
   const setTtsEngine = (v: string) => {
     setTtsEngineState(v);
+    setTtsVoiceState(getVoice(v));
     Settings.set("ttsEngine", v);
   };
 
-  const handleDownloadKokoro = async () => {
-    setIsDownloadingKokoro(true);
-    setKokoroDownloadProgress(null);
-    const reportProgress = throttleProgress(setKokoroDownloadProgress);
+  const setTtsVoice = (v: string) => {
+    setTtsVoiceState(v);
+    setVoice(ttsEngine, v);
+  };
+
+  const setTtsSpeed = (v: string) => {
+    setTtsSpeedState(v);
+    Settings.set("ttsSpeed", v);
+  };
+
+  const handleDownloadEngine = async (id: string) => {
+    const engine = NEURAL_ENGINES[id];
+    setDownloadingEngine(id);
+    setEngineDownloadProgress(null);
+    const reportProgress = throttleProgress(setEngineDownloadProgress);
     try {
-      await Kokoro.download((progress) =>
+      await engine.download((progress) =>
         reportProgress({
           progress,
-          sizeStr: `${formatBytes(progress * KOKORO_SIZE_BYTES)} / ${formatBytes(KOKORO_SIZE_BYTES)}`,
+          sizeStr: `${formatBytes(progress * engine.sizeBytes)} / ${formatBytes(engine.sizeBytes)}`,
         }),
       );
-      setKokoroInstalled(true);
-      setTtsEngine("kokoro");
-      showAlert(t("common.success"), t("settings.tts.downloadSuccess"));
+      setInstalledEngines((prev) => ({ ...prev, [id]: true }));
+      setTtsEngine(id);
+      showAlert(
+        t("common.success"),
+        t("settings.tts.downloadSuccess", { engine: engineName(id) }),
+      );
     } catch (e) {
-      console.error("Failed to download Kokoro voice", e);
-      showAlert(t("common.error"), t("settings.tts.downloadFailed"));
+      console.error(`Failed to download ${id} voice`, e);
+      showAlert(
+        t("common.error"),
+        t("settings.tts.downloadFailed", { engine: engineName(id) }),
+      );
     } finally {
-      setIsDownloadingKokoro(false);
-      setKokoroDownloadProgress(null);
+      setDownloadingEngine(null);
+      setEngineDownloadProgress(null);
     }
   };
 
   const handleSelectTtsEngine = (v: string) => {
-    if (v === "system" || kokoroInstalled) {
+    if (v === "system" || installedEngines[v]) {
       setTtsEngine(v);
       return;
     }
-    if (isDownloadingKokoro) return;
+    if (downloadingEngine) return;
     showAlert(
-      t("settings.tts.download.title"),
+      t("settings.tts.download.title", { engine: engineName(v) }),
       t("settings.tts.download.message", {
-        size: formatBytes(KOKORO_SIZE_BYTES),
+        engine: engineName(v),
+        size: formatBytes(NEURAL_ENGINES[v].sizeBytes),
       }),
       [
         {
@@ -943,17 +982,17 @@ export default function SettingsDrawer({
           text: t("settings.tts.download.confirm"),
           onPress: () => {
             setAlertModalVisible(false);
-            handleDownloadKokoro();
+            handleDownloadEngine(v);
           },
         },
       ],
     );
   };
 
-  const handleDeleteKokoro = () => {
+  const handleDeleteEngine = (id: string) => {
     showAlert(
-      t("settings.tts.delete.title"),
-      t("settings.tts.delete.message"),
+      t("settings.tts.delete.title", { engine: engineName(id) }),
+      t("settings.tts.delete.message", { engine: engineName(id) }),
       [
         {
           text: t("common.cancel"),
@@ -966,11 +1005,11 @@ export default function SettingsDrawer({
           onPress: async () => {
             setAlertModalVisible(false);
             try {
-              await Kokoro.remove();
-              setKokoroInstalled(false);
+              await NEURAL_ENGINES[id].remove();
+              setInstalledEngines((prev) => ({ ...prev, [id]: false }));
               setTtsEngine("system");
             } catch (e) {
-              console.error("Failed to delete Kokoro voice", e);
+              console.error(`Failed to delete ${id} voice`, e);
             }
           },
         },
@@ -980,19 +1019,28 @@ export default function SettingsDrawer({
 
   const ttsEngineOptions = [
     { id: "system", label: t("settings.tts.system") },
-    {
-      id: "kokoro",
-      label: t("settings.tts.kokoro"),
-      isDownload: !kokoroInstalled,
-      ...(kokoroInstalled && ttsEngine === "kokoro"
+    ...ttsEngines.map((id) => ({
+      id,
+      label: engineName(id),
+      isDownload: !installedEngines[id],
+      ...(installedEngines[id] && ttsEngine === id
         ? {
             rightIcon: deleteIcon,
             rightIconTintColor: Colors.surface,
-            onRightIconPress: handleDeleteKokoro,
+            onRightIconPress: () => handleDeleteEngine(id),
           }
         : {}),
-    },
+    })),
   ];
+
+  const ttsVoiceOptions =
+    NEURAL_ENGINES[ttsEngine]?.voiceOptions(language) ?? [];
+  //kokoro may lack the slot
+  const selectedTtsVoice = ttsVoiceOptions.some((o) => o.id === ttsVoice)
+    ? ttsVoice
+    : (ttsVoiceOptions[0]?.id ?? "");
+
+  const ttsSpeedOptions = TTS_SPEEDS.map((id) => ({ id, label: `${id}×` }));
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -1021,7 +1069,16 @@ export default function SettingsDrawer({
         setAlwaysWhisperState(s.alwaysWhisper);
         setAutoSpeakState(s.autoSpeak);
         setTtsEngineState(s.ttsEngine);
-        setKokoroInstalled(Kokoro.isInstalled());
+        setTtsVoiceState(getVoice(s.ttsEngine));
+        setTtsSpeedState(s.ttsSpeed);
+        setInstalledEngines(
+          Object.fromEntries(
+            supportedEngineIds().map((id) => [
+              id,
+              NEURAL_ENGINES[id].isInstalled(),
+            ]),
+          ),
+        );
         setShowTechnicalDetailsState(s.showTechnicalDetails);
         setShowDetectionBoxesState(s.showDetectionBoxes);
         setAdvancedModeState(s.advancedMode);
@@ -2701,7 +2758,7 @@ export default function SettingsDrawer({
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.general.title"))}
 
-      {/* language, appearance, audio and modes card */}
+      {/* language, appearance and modes card */}
       <View style={styles.contentCard}>
         <View style={styles.settingRowVertical}>
           <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
@@ -2727,44 +2784,6 @@ export default function SettingsDrawer({
           </Group>
         </View>
 
-        <View style={styles.settingRowVertical}>
-          <View style={styles.toggleGroupRow}>
-            <View style={styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>
-                {t("settings.general.autoRead")}
-              </Text>
-              <Text style={styles.helpText}>
-                {t("settings.general.autoReadHelp")}
-              </Text>
-            </View>
-            <Toggle checked={autoSpeak} onToggle={setAutoSpeak} />
-          </View>
-        </View>
-
-        {Kokoro.isSupported() && (
-          <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>{t("settings.tts.label")}</Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.tts.help")}
-            </Text>
-            <Group>
-              <Selector
-                options={ttsEngineOptions}
-                selectedValue={ttsEngine}
-                onSelect={handleSelectTtsEngine}
-                title={t("settings.tts.select")}
-                fullWidth
-              />
-            </Group>
-            {isDownloadingKokoro && (
-              <DownloadProgress
-                title={t("settings.tts.downloading")}
-                progress={kokoroDownloadProgress?.progress || 0}
-                sizeStr={kokoroDownloadProgress?.sizeStr}
-              />
-            )}
-          </View>
-        )}
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>
@@ -2778,6 +2797,90 @@ export default function SettingsDrawer({
             <Toggle checked={advancedMode} onToggle={setAdvancedMode} />
           </View>
         </View>
+      </View>
+
+      {/* voice card */}
+      <View style={styles.contentCard}>
+        <View
+          style={[
+            styles.settingRowVertical,
+            ttsEngines.length === 0 && { marginBottom: 0 },
+          ]}
+        >
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.general.autoRead")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.general.autoReadHelp")}
+              </Text>
+            </View>
+            <Toggle checked={autoSpeak} onToggle={setAutoSpeak} />
+          </View>
+        </View>
+
+        {ttsEngines.length > 0 && (
+          <>
+            <View style={styles.settingRowVertical}>
+              <Text style={styles.settingLabel}>
+                {t("settings.tts.label")}
+              </Text>
+              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                {t("settings.tts.help")}
+              </Text>
+              <Group>
+                <Selector
+                  options={ttsEngineOptions}
+                  selectedValue={ttsEngine}
+                  onSelect={handleSelectTtsEngine}
+                  title={t("settings.tts.select")}
+                  fullWidth
+                />
+              </Group>
+              {downloadingEngine && (
+                <DownloadProgress
+                  title={t("settings.tts.downloading", {
+                    engine: engineName(downloadingEngine),
+                  })}
+                  progress={engineDownloadProgress?.progress || 0}
+                  sizeStr={engineDownloadProgress?.sizeStr}
+                />
+              )}
+            </View>
+            {ttsVoiceOptions.length > 0 && installedEngines[ttsEngine] && (
+              <View style={styles.settingRowVertical}>
+                <Text
+                  style={[styles.settingLabel, { marginBottom: Spacing.md }]}
+                >
+                  {t("settings.tts.voiceLabel")}
+                </Text>
+                <Group>
+                  <Selector
+                    options={ttsVoiceOptions}
+                    selectedValue={selectedTtsVoice}
+                    onSelect={setTtsVoice}
+                    title={t("settings.tts.selectVoice")}
+                    fullWidth
+                  />
+                </Group>
+              </View>
+            )}
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+                {t("settings.tts.speed")}
+              </Text>
+              <Group>
+                <Slider
+                  icon={timeIcon}
+                  options={ttsSpeedOptions}
+                  selectedValue={ttsSpeed}
+                  onSelect={setTtsSpeed}
+                />
+              </Group>
+            </View>
+          </>
+        )}
       </View>
     </View>
   );

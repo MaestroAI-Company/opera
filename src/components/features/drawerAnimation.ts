@@ -21,6 +21,8 @@ export function gestureVelocity(vx: number, drawerWidth: number): number {
 
 //settled target skips restart
 const settledTarget = new WeakMap<Animated.Value, number>();
+//callbacks waiting on the running spring
+const pendingDone = new WeakMap<Animated.Value, (() => void)[]>();
 
 //panel stays under the finger
 export function dragDrawer(progress: Animated.Value, ratio: number) {
@@ -48,8 +50,18 @@ export function settleDrawer(
   onComplete?: () => void
 ) {
   const toValue = open ? 1 : 0;
-  if (settledTarget.get(progress) === toValue) return;
+  if (settledTarget.get(progress) === toValue) {
+    //joins the spring already heading there
+    if (onComplete) {
+      const running = pendingDone.get(progress);
+      if (running) running.push(onComplete);
+      else onComplete();
+    }
+    return;
+  }
   settledTarget.set(progress, toValue);
+  const done = onComplete ? [onComplete] : [];
+  pendingDone.set(progress, done);
   Animated.spring(progress, {
     toValue,
     velocity,
@@ -58,19 +70,26 @@ export function settleDrawer(
     overshootClamping: true,
     useNativeDriver: nativeDriver,
   }).start(({ finished }) => {
+    if (pendingDone.get(progress) === done) pendingDone.delete(progress);
     //interrupted close must not unmount a reopened sheet
-    if (finished) onComplete?.();
+    if (finished) done.forEach((cb) => cb());
   });
 }
 
 //desktop width animates on fixed timing
-export function settleLayoutDrawer(progress: Animated.Value, open: boolean) {
+export function settleLayoutDrawer(
+  progress: Animated.Value,
+  open: boolean,
+  onComplete?: () => void
+) {
   Animated.timing(progress, {
     toValue: open ? 1 : 0,
     duration: open ? 280 : 220,
     easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
     useNativeDriver: false,
-  }).start();
+  }).start(({ finished }) => {
+    if (finished) onComplete?.();
+  });
 }
 
 //same spring as the drawer, a native spring steps every frame where timing is sampled at 60fps
@@ -89,4 +108,13 @@ export function settlePage(
     //a rewind or a gesture takes over the interrupted push
     if (finished) onComplete();
   });
+  if (!DRAWER_NATIVE_DRIVER) return;
+  //presses read the js pose
+  //one frame later, native owns it
+  requestAnimationFrame(() =>
+    (progress as unknown as JsValue)._updateValue(toValue, true)
+  );
 }
+
+//matches the animated value internals
+type JsValue = { _updateValue: (value: number, flush: boolean) => void };

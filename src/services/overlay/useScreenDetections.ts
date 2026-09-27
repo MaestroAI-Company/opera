@@ -12,6 +12,8 @@ export function useScreenDetections(session: number, enabled: boolean): CaptureR
   useEffect(() => {
     //no screen access no detector
     if (!enabled) return;
+    //load during entry and capture
+    ObjectDetector.prepare();
     let cancelled = false;
     //boxes unread when overlay hidden
     const appState = AppState.addEventListener('change', state => {
@@ -22,7 +24,6 @@ export function useScreenDetections(session: number, enabled: boolean): CaptureR
       //one analysis after capture lands
       const size = await ScreenCapture.waitForSize(() => cancelled);
       if (!size || cancelled) return;
-      ObjectDetector.prepare();
       const boxes = await ObjectDetector.detect();
       if (boxes && boxes.length > 0 && !cancelled) setFound({ session, boxes });
     });

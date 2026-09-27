@@ -194,10 +194,12 @@ export default function ConversationsDrawer({
         settleDrawer(progress, true);
       }
     } else {
+      //reset once the close settles
+      const reset = () => setIsSearching(false);
       if (isDesktop) {
-        settleLayoutDrawer(largeScreenAnim, false);
+        settleLayoutDrawer(largeScreenAnim, false, reset);
       } else {
-        settleDrawer(progress, false);
+        settleDrawer(progress, false, undefined, undefined, reset);
       }
     }
   }, [visible, isDesktop, largeScreenAnim, progress]);

@@ -16,7 +16,9 @@ import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.sin
 
 //matches the primarySelection token
 private const val SELECTION_COLOR = 0x66FF1A1A
@@ -49,8 +51,15 @@ class TextSelectionView(
   private val onDragging: (Boolean) -> Unit
 ) : View(context) {
 
-  //placed word and the visual line it sits on
-  data class Word(val rect: RectF, val text: String, val line: Int)
+  //rect in the rotated frame
+  data class Word(val rect: RectF, val angle: Float, val bounds: RectF, val text: String, val line: Int) {
+    private val cos = cos(Math.toRadians(angle.toDouble())).toFloat()
+    private val sin = sin(Math.toRadians(angle.toDouble())).toFloat()
+
+    //screen point into the rotated frame
+    fun frameX(x: Float, y: Float) = x * cos + y * sin
+    fun frameY(x: Float, y: Float) = y * cos - x * sin
+  }
 
   private val density = resources.displayMetrics.density
   private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = SELECTION_COLOR }
@@ -163,19 +172,27 @@ class TextSelectionView(
       while (last + 1 <= to && joins(words[last], words[last + 1])) last++
       val bounds = RectF(words[i].rect)
       for (k in i..last) bounds.union(words[k].rect)
+      //a run shares its line angle
+      canvas.save()
+      canvas.rotate(words[i].angle)
       canvas.drawRoundRect(bounds, radius, radius, fill)
+      canvas.restore()
       i = last + 1
     }
 
     //teardrops frame the selection
-    handleBounds(HANDLE_START)?.let { box ->
-      leftHandle?.setBounds(box.left.toInt(), box.top.toInt(), box.right.toInt(), box.bottom.toInt())
-      leftHandle?.draw(canvas)
-    }
-    handleBounds(HANDLE_END)?.let { box ->
-      rightHandle?.setBounds(box.left.toInt(), box.top.toInt(), box.right.toInt(), box.bottom.toInt())
-      rightHandle?.draw(canvas)
-    }
+    drawHandle(canvas, HANDLE_START, leftHandle)
+    drawHandle(canvas, HANDLE_END, rightHandle)
+  }
+
+  private fun drawHandle(canvas: Canvas, handle: Int, drawable: Drawable?) {
+    val box = handleBounds(handle) ?: return
+    val word = edgeWord(handle) ?: return
+    canvas.save()
+    canvas.rotate(word.angle)
+    drawable?.setBounds(box.left.toInt(), box.top.toInt(), box.right.toInt(), box.bottom.toInt())
+    drawable?.draw(canvas)
+    canvas.restore()
   }
 
   private fun systemHandle(attr: Int): Drawable? {
@@ -186,13 +203,17 @@ class TextSelectionView(
     return drawable
   }
 
-  private fun handleBounds(handle: Int): RectF? {
+  private fun edgeWord(handle: Int): Word? {
     val from = minOf(anchor, focus)
-    val to = maxOf(anchor, focus)
     if (from < 0) return null
+    return words[if (handle == HANDLE_START) from else maxOf(anchor, focus)]
+  }
+
+  //in the edge word frame
+  private fun handleBounds(handle: Int): RectF? {
     val start = handle == HANDLE_START
     val drawable = (if (start) leftHandle else rightHandle) ?: return null
-    val edge = if (start) words[from].rect else words[to].rect
+    val edge = edgeWord(handle)?.rect ?: return null
     val x = if (start) edge.left else edge.right
     val anchorAt = if (start) HANDLE_LEFT_ANCHOR else HANDLE_RIGHT_ANCHOR
     val left = x - drawable.intrinsicWidth * anchorAt
@@ -203,24 +224,30 @@ class TextSelectionView(
     a.line == b.line && b.rect.left - a.rect.right < a.rect.height() * MERGE_GAP
 
   private fun handleAt(x: Float, y: Float): Int {
-    if (grabs(handleBounds(HANDLE_START), x, y)) return HANDLE_START
-    if (grabs(handleBounds(HANDLE_END), x, y)) return HANDLE_END
+    if (grabs(HANDLE_START, x, y)) return HANDLE_START
+    if (grabs(HANDLE_END, x, y)) return HANDLE_END
     return NO_HANDLE
   }
 
-  private fun grabs(box: RectF?, x: Float, y: Float): Boolean {
-    val target = box ?: return false
-    return x >= target.left - handleSlop && x <= target.right + handleSlop &&
-      y >= target.top - handleSlop && y <= target.bottom + handleSlop
+  private fun grabs(handle: Int, x: Float, y: Float): Boolean {
+    val target = handleBounds(handle) ?: return false
+    val word = edgeWord(handle) ?: return false
+    val fx = word.frameX(x, y)
+    val fy = word.frameY(x, y)
+    return fx >= target.left - handleSlop && fx <= target.right + handleSlop &&
+      fy >= target.top - handleSlop && fy <= target.bottom + handleSlop
   }
 
   //strict enough to leave the lasso alone
   private fun hit(x: Float, y: Float): Int {
     for (i in words.indices) {
-      val rect = words[i].rect
+      val word = words[i]
+      val rect = word.rect
       val pad = rect.height() * TOUCH_PAD
-      if (x >= rect.left - pad && x <= rect.right + pad &&
-        y >= rect.top - pad && y <= rect.bottom + pad
+      val fx = word.frameX(x, y)
+      val fy = word.frameY(x, y)
+      if (fx >= rect.left - pad && fx <= rect.right + pad &&
+        fy >= rect.top - pad && fy <= rect.bottom + pad
       ) return i
     }
     return -1
@@ -231,7 +258,7 @@ class TextSelectionView(
     var line = -1
     var closest = Float.MAX_VALUE
     for (word in words) {
-      val gap = distance(y, word.rect.top, word.rect.bottom)
+      val gap = distance(word.frameY(x, y), word.rect.top, word.rect.bottom)
       if (gap < closest) {
         closest = gap
         line = word.line
@@ -244,7 +271,7 @@ class TextSelectionView(
     var shortest = Float.MAX_VALUE
     for (i in words.indices) {
       if (words[i].line != line) continue
-      val gap = distance(x, words[i].rect.left, words[i].rect.right)
+      val gap = distance(words[i].frameX(x, y), words[i].rect.left, words[i].rect.right)
       if (gap < shortest) {
         shortest = gap
         best = i
@@ -278,8 +305,8 @@ class TextSelectionView(
   private fun selectionBounds(): Rect {
     val from = minOf(anchor, focus)
     val to = maxOf(anchor, focus)
-    val bounds = RectF(words[from].rect)
-    for (i in from..to) bounds.union(words[i].rect)
+    val bounds = RectF(words[from].bounds)
+    for (i in from..to) bounds.union(words[i].bounds)
     return Rect(
       bounds.left.toInt(), bounds.top.toInt(),
       bounds.right.toInt(), bounds.bottom.toInt()

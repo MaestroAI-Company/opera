@@ -252,7 +252,7 @@ export function ModelSelectorDrawer({
   const matchesActive = (source?: ModelSource) =>
     !!source &&
     source.service === aiService &&
-    (source.service !== "ollama" || source.url === ollamaUrl);
+    (!source.url || source.url === ollamaUrl);
   const activeSource = useMemo(
     () => sources.find(matchesActive) ?? sources[0],
     // eslint-disable-next-line react-hooks/exhaustive-deps -- matchesActive only reads the deps below

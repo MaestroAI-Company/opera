@@ -87,11 +87,17 @@ import {
   getEnabledProviders,
   getOllamaServers,
   getOllamaTuning,
+  getOpenAIApiKeyById,
+  getOpenAIServers,
   isProviderSupported,
+  newOpenAIServerId,
   OllamaServer,
-  serializeOllamaServers,
+  OPENAI_PROVIDER_ID,
+  serializeServers,
   serializeProviders,
+  setOpenAIApiKey,
 } from "../../services/ai/providers/sources";
+import { OpenAIProvider } from "../../services/ai/providers/OpenAIProvider";
 import {
   parseQuickFlowOptionId,
   quickFlowOptionId,
@@ -271,6 +277,8 @@ type SubPage =
   | "litert"
   | "ollama"
   | "ollamaserver"
+  | "openai"
+  | "openaiserver"
   | "confidentiality"
   | "reports"
   | "tools"
@@ -295,6 +303,8 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   litert: "service",
   ollama: "service",
   ollamaserver: "ollama",
+  openai: "service",
+  openaiserver: "openai",
   confidentiality: "main",
   reports: "main",
   tools: "main",
@@ -448,11 +458,21 @@ export default function SettingsDrawer({
   const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
   //ignore stale server answers
   const ollamaModelsRequest = useRef(0);
+  const [openaiServers, setOpenAIServersState] = useState<OllamaServer[]>([]);
+  const [openaiDetailIndex, setOpenAIDetailIndex] = useState<number | null>(
+    null,
+  );
+  const [openaiModels, setOpenAIModels] = useState<string[]>([]);
+  const [openaiModelsLoading, setOpenAIModelsLoading] = useState(false);
+  const openaiModelsRequest = useRef(0);
+  //key text saved on blur
+  const [openaiKeyDraft, setOpenAIKeyDraft] = useState("");
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const [lastSyncSize, setLastSyncSize] = useState<number | null>(null);
 
   const [addModelSheetVisible, setAddModelSheetVisible] = useState(false);
   const [ollamaAddVisible, setOllamaAddVisible] = useState(false);
+  const [openaiAddVisible, setOpenAIAddVisible] = useState(false);
   const [mcpAddVisible, setMcpAddVisible] = useState(false);
   const [litertDownloadVisible, setLitertDownloadVisible] = useState(false);
   //id outlives the close so the sheet keeps its content
@@ -475,6 +495,7 @@ export default function SettingsDrawer({
   const sheetOpen =
     addModelSheetVisible ||
     ollamaAddVisible ||
+    openaiAddVisible ||
     mcpAddVisible ||
     litertDownloadVisible ||
     cloudSetupVisible ||
@@ -925,6 +946,7 @@ export default function SettingsDrawer({
         setAiServiceState(s.aiService);
         setOllamaUrlState(s.ollamaUrl);
         setOllamaServersState(getOllamaServers());
+        setOpenAIServersState(getOpenAIServers());
         setEnabledProvidersState(getEnabledProviders());
         setQuickFlowIdState(
           s.quickFlowModel
@@ -1287,6 +1309,51 @@ export default function SettingsDrawer({
     }
   };
 
+  const openOpenAIAddSheet = () => {
+    setServerDraft({
+      name: "",
+      url: "",
+      headerName: "",
+      headerValue: "",
+      clientId: "",
+    });
+    setOpenAIKeyDraft("");
+    setServerDraftBusy(false);
+    setOpenAIAddVisible(true);
+  };
+
+  const submitOpenAIDraft = async () => {
+    const url = serverDraft.url.trim();
+    if (openaiServers.some((s) => s.url.trim() === url)) {
+      showAlert(t("settings.server.addFailed"), t("settings.server.duplicate"));
+      return;
+    }
+    setServerDraftBusy(true);
+    try {
+      //unsaved key probes with the draft
+      if (!(await new OpenAIProvider(url, openaiKeyDraft).isAvailable())) {
+        showAlert(
+          t("settings.ollama.unreachableTitle"),
+          t("settings.openai.unreachableInfo"),
+          undefined,
+          { messageAlign: "left" },
+        );
+        return;
+      }
+      const id = newOpenAIServerId();
+      await setOpenAIApiKey(id, openaiKeyDraft);
+      saveOpenAIServers([
+        ...openaiServers,
+        { id, url, name: serverDraft.name.trim() },
+      ]);
+      //skip waiting for the next sweep
+      setServerErrors((prev) => ({ ...prev, [url]: false }));
+      setOpenAIAddVisible(false);
+    } finally {
+      setServerDraftBusy(false);
+    }
+  };
+
   const saveMcpServer = async (id: string, patch: Partial<McpServerConfig>) => {
     await McpService.updateServer(id, patch);
     setMcpServers([...McpService.getServers()]);
@@ -1379,7 +1446,7 @@ export default function SettingsDrawer({
   //keep active server in the list
   const saveOllamaServers = (servers: OllamaServer[]) => {
     setOllamaServersState(servers);
-    Settings.set("ollamaUrls", serializeOllamaServers(servers));
+    Settings.set("ollamaUrls", serializeServers(servers));
     const filled = servers.filter((s) => s.url.trim().length > 0);
     const active =
       filled.find((s) => s.url.trim() === ollamaUrl.trim()) ?? filled[0];
@@ -1501,13 +1568,125 @@ export default function SettingsDrawer({
       setActiveSubPage("ollama");
       return;
     }
-    checkOllamaServers();
+    checkServers();
     loadOllamaModels(url);
   };
 
   const reconnectOllamaServer = async (index: number) => {
-    await checkOllamaServers();
+    await checkServers();
     await loadOllamaModels(ollamaServers[index]?.url ?? "");
+  };
+
+  //move url only while openai active
+  const saveOpenAIServers = (servers: OllamaServer[]) => {
+    setOpenAIServersState(servers);
+    Settings.set("openaiUrls", serializeServers(servers));
+    if (aiService !== OPENAI_PROVIDER_ID) return;
+    const filled = servers.filter((s) => s.url.trim().length > 0);
+    const active =
+      filled.find((s) => s.url.trim() === ollamaUrl.trim()) ?? filled[0];
+    const activeUrl = active?.url.trim() ?? "";
+    if (activeUrl === ollamaUrl) return;
+    setOllamaUrlState(activeUrl);
+    Settings.set("ollamaUrl", activeUrl);
+    AIModule.configure(activeUrl);
+  };
+
+  const patchOpenAIServer = (index: number, patch: Partial<OllamaServer>) => {
+    saveOpenAIServers(
+      openaiServers.map((s, i) => (i === index ? { ...s, ...patch } : s)),
+    );
+  };
+
+  const loadOpenAIModels = async (url: string) => {
+    const target = url.trim();
+    const request = ++openaiModelsRequest.current;
+    if (!target) {
+      setOpenAIModels([]);
+      return;
+    }
+    setOpenAIModelsLoading(true);
+    try {
+      const models = await AIModule.getModelsFor(OPENAI_PROVIDER_ID, target);
+      if (openaiModelsRequest.current === request) setOpenAIModels(models);
+    } catch {
+      if (openaiModelsRequest.current === request) setOpenAIModels([]);
+    } finally {
+      if (openaiModelsRequest.current === request)
+        setOpenAIModelsLoading(false);
+    }
+  };
+
+  const openOpenAIServer = (index: number) => {
+    const server = openaiServers[index];
+    setOpenAIDetailIndex(index);
+    setOpenAIKeyDraft("");
+    if (server?.id) getOpenAIApiKeyById(server.id).then(setOpenAIKeyDraft);
+    setOpenAIModels([]);
+    loadOpenAIModels(server?.url ?? "");
+    setActiveSubPage("openaiserver");
+  };
+
+  //empty link drops the server
+  const handleOpenAIUrlBlur = (index: number) => {
+    const server = openaiServers[index];
+    const url = server?.url.trim() ?? "";
+    if (!url) {
+      if (server?.id) setOpenAIApiKey(server.id, "");
+      saveOpenAIServers(openaiServers.filter((_, i) => i !== index));
+      setOpenAIDetailIndex(null);
+      setActiveSubPage("openai");
+      return;
+    }
+    checkServers();
+    loadOpenAIModels(url);
+  };
+
+  //providers cache the key so rebuild
+  const handleOpenAIKeyBlur = async (index: number) => {
+    const server = openaiServers[index];
+    if (!server) return;
+    //legacy entries get an id here
+    const id = server.id ?? newOpenAIServerId();
+    if (!server.id) patchOpenAIServer(index, { id });
+    await setOpenAIApiKey(id, openaiKeyDraft);
+    const url = server.url.trim();
+    if (aiService === OPENAI_PROVIDER_ID && url === ollamaUrl.trim()) {
+      AIModule.configure(url);
+    }
+    checkServers();
+    loadOpenAIModels(url);
+  };
+
+  const reconnectOpenAIServer = async (index: number) => {
+    await checkServers();
+    await loadOpenAIModels(openaiServers[index]?.url ?? "");
+  };
+
+  const removeOpenAIServer = (index: number) => {
+    const server = openaiServers[index];
+    showAlert(
+      t("settings.ollama.remove.title"),
+      t("settings.ollama.remove.message", { name: ollamaServerLabel(server) }),
+      [
+        {
+          text: t("common.cancel"),
+          onPress: () => setAlertModalVisible(false),
+          style: "secondary",
+        },
+        {
+          text: t("common.remove"),
+          style: "danger",
+          onPress: () => {
+            setAlertModalVisible(false);
+            if (server.id) setOpenAIApiKey(server.id, "");
+            saveOpenAIServers(openaiServers.filter((_, i) => i !== index));
+            setOpenAIDetailIndex(null);
+            setActiveSubPage("openai");
+          },
+        },
+      ],
+    );
   };
 
   const refreshLitertModels = useCallback(() => {
@@ -2087,24 +2266,32 @@ export default function SettingsDrawer({
     return () => sub.remove();
   }, []);
 
-  //ping every configured server
-  const checkOllamaServers = useCallback(async () => {
+  //ping every server of both providers
+  const checkServers = useCallback(async () => {
     if (!settingsLoaded) return;
-    const urls = ollamaServers.map((s) => s.url.trim()).filter(Boolean);
+    const targets = [
+      ...ollamaServers.map((s) => ({ service: "ollama", url: s.url.trim() })),
+      ...openaiServers.map((s) => ({
+        service: OPENAI_PROVIDER_ID,
+        url: s.url.trim(),
+      })),
+    ].filter((target) => target.url.length > 0);
     const results = await Promise.all(
-      urls.map((url) => AIModule.isSourceAvailable("ollama", url)),
+      targets.map((target) =>
+        AIModule.isSourceAvailable(target.service, target.url),
+      ),
     );
     const errors: Record<string, boolean> = {};
-    urls.forEach((url, i) => {
-      errors[url] = !results[i];
+    targets.forEach((target, i) => {
+      errors[target.url] = !results[i];
     });
     setServerErrors(errors);
-  }, [settingsLoaded, ollamaServers]);
+  }, [settingsLoaded, ollamaServers, openaiServers]);
 
   useEffect(() => {
     if (visible) {
       setTimeout(() => {
-        checkOllamaServers();
+        checkServers();
         if (Platform.OS === "web") {
           ["tiny", "base", "small"].forEach((m) => {
             WhisperSTT.isModelInstalled(m).then((installed) => {
@@ -2120,7 +2307,7 @@ export default function SettingsDrawer({
         }
       }, 300);
     }
-  }, [visible, checkOllamaServers, whisperModel]);
+  }, [visible, checkServers, whisperModel]);
 
   const handleDownloadWhisper = async (modelToDownload?: string) => {
     const model = modelToDownload || whisperModel;
@@ -3176,7 +3363,7 @@ export default function SettingsDrawer({
 
         <Pressable
           style={pressStyle(
-            [styles.toggleGroupRowItem, styles.navItemLast],
+            styles.toggleGroupRowItem,
             styles.toggleGroupCardPressed,
           )}
           onPress={() => setActiveSubPage("ollama")}
@@ -3194,6 +3381,30 @@ export default function SettingsDrawer({
             <Toggle
               checked={enabledProviders.includes("ollama")}
               onToggle={(v) => setProviderEnabled("ollama", v)}
+            />
+          </View>
+        </Pressable>
+
+        <Pressable
+          style={pressStyle(
+            [styles.toggleGroupRowItem, styles.navItemLast],
+            styles.toggleGroupCardPressed,
+          )}
+          onPress={() => setActiveSubPage("openai")}
+        >
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.service.openai")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.service.openaiHelp")}
+              </Text>
+            </View>
+            <View style={styles.toggleDivider} />
+            <Toggle
+              checked={enabledProviders.includes(OPENAI_PROVIDER_ID)}
+              onToggle={(v) => setProviderEnabled(OPENAI_PROVIDER_ID, v)}
             />
           </View>
         </Pressable>
@@ -3662,6 +3873,184 @@ export default function SettingsDrawer({
                 icon={binIcon}
                 label={t("settings.ollama.remove.action")}
                 onPress={() => removeOllamaServer(index)}
+              />
+            </Group>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  //openai server list subpage
+  const renderOpenAISubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader(t("settings.service.openai"))}
+
+      {/* openai servers card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>{t("settings.openai.title")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.openai.help")}
+          </Text>
+
+          <Group style={styles.highlightGroup}>
+            <ActionButton
+              icon={addIcon}
+              label={t("settings.server.add")}
+              variant="highlight"
+              onPress={openOpenAIAddSheet}
+            />
+          </Group>
+
+          {openaiServers.length > 0 &&
+            renderCardGrid(
+              openaiServers.map((server, index) => ({
+                key: String(index),
+                title: ollamaServerLabel(server),
+                status: ollamaStatusLabel(server),
+                error: serverErrors[server.url.trim()] === true,
+                onPress: () => openOpenAIServer(index),
+              })),
+            )}
+        </View>
+      </View>
+
+      {/* model failover card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.service.failover")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.service.failoverHelp")}
+              </Text>
+            </View>
+            <Toggle checked={modelFailover} onToggle={setModelFailover} />
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
+  //openai server detail page
+  const renderOpenAIServerSubPage = () => {
+    const index = openaiDetailIndex ?? -1;
+    const server = openaiServers[index];
+    if (!server) return renderOpenAISubPage();
+
+    const url = server.url.trim();
+    const connected = url.length > 0 && serverErrors[url] === false;
+
+    return (
+      <View style={styles.subPageContainer}>
+        {renderSubPageHeader(ollamaServerLabel(server))}
+
+        <View style={styles.contentCard}>
+          <View style={styles.settingRowVertical}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.server.name")}
+            </Text>
+            <Group>
+              <TextInputField
+                icon={penPlaceholderIcon}
+                placeholder={t("settings.server.namePlaceholder")}
+                value={server.name}
+                onChangeText={(v) => patchOpenAIServer(index, { name: v })}
+              />
+            </Group>
+          </View>
+
+          <View style={styles.settingRowVertical}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.server.link")}
+            </Text>
+            <Group>
+              <TextInputField
+                icon={linkIcon}
+                placeholder={t("settings.service.serverLink")}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                value={server.url}
+                onChangeText={(v) => patchOpenAIServer(index, { url: v })}
+                onBlur={() => handleOpenAIUrlBlur(index)}
+                rightIcon={
+                  serverErrors[server.url.trim()] ? errorIcon : undefined
+                }
+                rightIconLabel={t("common.error")}
+                onRightIconPress={() =>
+                  showAlert(
+                    t("settings.ollama.unreachableTitle"),
+                    t("settings.openai.unreachableInfo"),
+                    undefined,
+                    { messageAlign: "left" },
+                  )
+                }
+              />
+            </Group>
+          </View>
+
+          <View style={styles.settingRowVertical}>
+            <Text style={styles.settingLabel}>
+              {t("settings.openai.apiKey")}
+            </Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {t("settings.openai.apiKeyHelp")}
+            </Text>
+            <Group>
+              <TextInputField
+                icon={penPlaceholderIcon}
+                placeholder={t("settings.openai.apiKeyPlaceholder")}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry
+                value={openaiKeyDraft}
+                onChangeText={setOpenAIKeyDraft}
+                onBlur={() => handleOpenAIKeyBlur(index)}
+              />
+            </Group>
+          </View>
+
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {openaiModels.length > 0
+                ? t("settings.ollama.modelsCount", {
+                    count: openaiModels.length,
+                  })
+                : t("settings.ollama.models")}
+            </Text>
+            <Text style={styles.helpText}>
+              {openaiModels.length > 0
+                ? openaiModels.join(", ")
+                : openaiModelsLoading
+                  ? t("settings.ollama.modelsLoading")
+                  : t("settings.ollama.noModels")}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Group>
+              {!connected && (
+                <ActionButton
+                  icon={reconnectIcon}
+                  label={
+                    openaiModelsLoading
+                      ? t("settings.ollama.connecting")
+                      : t("settings.ollama.reconnect")
+                  }
+                  disabled={openaiModelsLoading || url.length === 0}
+                  onPress={() => reconnectOpenAIServer(index)}
+                />
+              )}
+              <ActionButton
+                icon={binIcon}
+                label={t("settings.ollama.remove.action")}
+                onPress={() => removeOpenAIServer(index)}
               />
             </Group>
           </View>
@@ -4360,6 +4749,10 @@ export default function SettingsDrawer({
         return renderOllamaSubPage();
       case "ollamaserver":
         return renderOllamaServerSubPage();
+      case "openai":
+        return renderOpenAISubPage();
+      case "openaiserver":
+        return renderOpenAIServerSubPage();
       case "confidentiality":
         return renderConfidentialitySubPage();
       case "advanced":
@@ -4982,6 +5375,111 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
+  const openaiAddServerSheet = (
+    <DrawerSheet
+      visible={openaiAddVisible}
+      onClose={() => setOpenAIAddVisible(false)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      avoidKeyboard
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.addModelSheetDesktop}
+    >
+      <ScrollView
+        contentContainerStyle={styles.addModelSheetContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.contentCard}>
+          <View style={styles.settingRowVertical}>
+            <Text style={styles.settingLabel}>{t("settings.server.name")}</Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {t("settings.server.nameHelp")}
+            </Text>
+            <Group>
+              <TextInputField
+                icon={penPlaceholderIcon}
+                placeholder={t("settings.server.namePlaceholder")}
+                value={serverDraft.name}
+                onChangeText={(v) =>
+                  setServerDraft((prev) => ({ ...prev, name: v }))
+                }
+              />
+            </Group>
+          </View>
+
+          <View style={styles.settingRowVertical}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.server.link")}
+            </Text>
+            <Group>
+              <TextInputField
+                icon={linkIcon}
+                placeholder={t("settings.service.serverLink")}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                value={serverDraft.url}
+                onChangeText={(v) =>
+                  setServerDraft((prev) => ({ ...prev, url: v }))
+                }
+              />
+            </Group>
+          </View>
+
+          <View style={styles.settingRowVertical}>
+            <Text style={styles.settingLabel}>
+              {t("settings.openai.apiKey")}
+            </Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {t("settings.openai.apiKeyHelp")}
+            </Text>
+            <Group>
+              <TextInputField
+                icon={penPlaceholderIcon}
+                placeholder={t("settings.openai.apiKeyPlaceholder")}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry
+                value={openaiKeyDraft}
+                onChangeText={setOpenAIKeyDraft}
+              />
+            </Group>
+          </View>
+
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Group
+              style={[
+                styles.highlightGroup,
+                (serverDraftBusy || !serverDraft.url.trim()) &&
+                  styles.highlightGroupDisabled,
+              ]}
+            >
+              <ActionButton
+                icon={addIcon}
+                label={
+                  serverDraftBusy
+                    ? t("settings.server.checking")
+                    : t("settings.server.add")
+                }
+                variant="highlight"
+                disabled={serverDraftBusy || !serverDraft.url.trim()}
+                onPress={submitOpenAIDraft}
+              />
+            </Group>
+          </View>
+        </View>
+      </ScrollView>
+    </DrawerSheet>
+  );
+
   const mcpAddServerSheet = (
     <DrawerSheet
       visible={mcpAddVisible}
@@ -5389,6 +5887,7 @@ export default function SettingsDrawer({
         {notificationModal}
         {addModelSheet}
         {ollamaAddServerSheet}
+        {openaiAddServerSheet}
         {mcpAddServerSheet}
         {cloudSetupSheet}
         {localModelDetailSheet}
@@ -5428,6 +5927,7 @@ export default function SettingsDrawer({
       {notificationModal}
       {addModelSheet}
       {ollamaAddServerSheet}
+      {openaiAddServerSheet}
       {mcpAddServerSheet}
       {cloudSetupSheet}
       {localModelDetailSheet}

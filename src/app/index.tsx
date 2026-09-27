@@ -1205,7 +1205,7 @@ export default function Index() {
     Settings.set("aiService", service);
     Settings.set("ollamaUrl", url);
     AIModule.setMode(service);
-    if (service === "ollama") {
+    if (url) {
       const tuning = getOllamaTuning(url);
       AIModule.configure(url, tuning.contextLength, tuning.keepAlive);
     }

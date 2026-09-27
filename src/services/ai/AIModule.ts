@@ -11,7 +11,8 @@ import { LocationService } from '../location/LocationService';
 import { Settings } from '../settings/SettingsService';
 import { DEFAULT_OLLAMA_URL, imageToBase64 } from './utils/imageToBase64';
 import { resolveQuickFlow, QuickFlowTarget } from './quickFlow';
-import { activeSourceKey, BETA_SERVER_URL, buildSources, getOllamaTuning, ModelSource } from './providers/sources';
+import { activeSourceKey, BETA_SERVER_URL, buildSources, getOllamaTuning, OPENAI_PROVIDER_ID, ModelSource } from './providers/sources';
+import { OpenAIProvider } from './providers/OpenAIProvider';
 import { getCachedModels, hydrateModelCache } from './providers/modelCache';
 
 const DEFAULT_URL = DEFAULT_OLLAMA_URL;
@@ -49,6 +50,8 @@ class CentralAIModule {
     this.providers.set('LITERT', new LiteRTProvider());
     //hosted beta server, its own provider even though it speaks ollama
     if (BETA_SERVER_URL) this.providers.set('BETA', new OllamaProvider(BETA_SERVER_URL));
+    //url arrives with first configure
+    this.providers.set('OPENAI', new OpenAIProvider(''));
   }
 
   //switch active provider from settings
@@ -58,12 +61,15 @@ class CentralAIModule {
     this.modeConfigured = true;
   }
 
-  //reconfigure ollama provider with url from settings
-  configure(ollamaUrl: string, contextLength?: number, keepAlive?: number): void {
-    const url = ollamaUrl.trim().length > 0 ? ollamaUrl.trim() : DEFAULT_URL;
+  //rebuild server providers with active url
+  configure(activeUrl: string, contextLength?: number, keepAlive?: number): void {
+    const raw = activeUrl.trim();
+    const url = raw.length > 0 ? raw : DEFAULT_URL;
     this.providers.set('OLLAMA', new OllamaProvider(url, {}, contextLength, keepAlive));
     //beta shares the tuning, never the url
     if (BETA_SERVER_URL) this.providers.set('BETA', new OllamaProvider(BETA_SERVER_URL, {}, contextLength, keepAlive));
+    //openai servers have no tuning
+    this.providers.set('OPENAI', new OpenAIProvider(raw));
     //new server can serve different models
     this.capabilitiesCache.clear();
   }
@@ -105,12 +111,11 @@ class CentralAIModule {
   }
 
   //build provider without touching active one
-  private providerFor(mode: string, ollamaUrl?: string): IAIProvider | null {
+  private providerFor(mode: string, serverUrl?: string): IAIProvider | null {
     const key = (mode || 'ollama').toUpperCase() === 'AICORE' ? 'LOCAL' : (mode || 'ollama').toUpperCase();
-    if (key === 'OLLAMA') {
-      const url = (ollamaUrl ?? '').trim();
-      return url.length > 0 ? new OllamaProvider(url) : null;
-    }
+    const url = (serverUrl ?? '').trim();
+    if (key === 'OLLAMA') return url.length > 0 ? new OllamaProvider(url) : null;
+    if (key === 'OPENAI') return url.length > 0 ? new OpenAIProvider(url) : null;
     return this.providers.get(key) ?? null;
   }
 
@@ -142,12 +147,12 @@ class CentralAIModule {
     }
   }
 
-  //cached ollama matches are tried first
-  private async findOllamaSourceForModel(modelName: string, excludeKey?: string): Promise<ModelSource | null> {
+  //cached matches are tried first
+  private async findSourceForModel(service: string, modelName: string, excludeKey?: string): Promise<ModelSource | null> {
     if (!modelName) return null;
     await hydrateModelCache();
     const candidates = buildSources(false)
-      .filter((source) => source.service === 'ollama' && source.key !== excludeKey)
+      .filter((source) => source.service === service && source.key !== excludeKey)
       .sort((a, b) => Number(getCachedModels(b.key).includes(modelName)) - Number(getCachedModels(a.key).includes(modelName)));
     for (const source of candidates) {
       const models = await this.getModelsFor(source.service, source.url);
@@ -159,7 +164,7 @@ class CentralAIModule {
   //persist the switch for both screens
   private async switchToSource(source: ModelSource): Promise<void> {
     this.setMode(source.service);
-    if (source.service === 'ollama') {
+    if (source.url) {
       const tuning = getOllamaTuning(source.url);
       this.configure(source.url, tuning.contextLength, tuning.keepAlive);
     }
@@ -170,11 +175,12 @@ class CentralAIModule {
   private async failoverIfUnreachable(modelName: string): Promise<void> {
     const settings = Settings.getCached();
     if (!modelName || !settings.modelFailover) return;
-    if (settings.aiService !== 'ollama') return;
+    //only servers can fail over
+    if (settings.aiService !== 'ollama' && settings.aiService !== OPENAI_PROVIDER_ID) return;
     if (await this.isAvailable().catch(() => false)) return;
-    const source = await this.findOllamaSourceForModel(modelName, activeSourceKey(settings.aiService, settings.ollamaUrl));
+    const source = await this.findSourceForModel(settings.aiService, modelName, activeSourceKey(settings.aiService, settings.ollamaUrl));
     if (!source) return;
-    console.warn(`[AIModule] ollama server ${settings.ollamaUrl} unreachable, ${modelName} moved to ${source.key}`);
+    console.warn(`[AIModule] server ${settings.ollamaUrl} unreachable, ${modelName} moved to ${source.key}`);
     await this.switchToSource(source);
   }
 

@@ -356,7 +356,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
           {(isCurrentlyThinking || isUsingTools) && (
             <View style={styles.thinkingContainer}>
               <View style={styles.thinkingIcon}>
-                <ThinkingIcon />
+                <ThinkingIcon incognito={incognito} />
               </View>
               <View style={styles.activityPills}>
                 {isCurrentlyThinking && (!!disp.currentThought || hasReasoning) && (
@@ -396,7 +396,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                   onPress={() => onSpeak?.(item)}
                   containerSize={32}
                   pressedColor={Colors.surfacePressed}
-                  tintColor={isSpeaking ? Colors.primary : (dark ? Colors.surface : Colors.textMuted)}
+                  tintColor={isSpeaking ? (incognito ? Colors.incognito : Colors.primary) : (dark ? Colors.surface : Colors.textMuted)}
                 />
               )}
               <IconButton

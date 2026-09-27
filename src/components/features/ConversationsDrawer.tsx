@@ -290,7 +290,7 @@ export default function ConversationsDrawer({
         <View style={styles.headerSpacer} />
       </View>
 
-      <View style={{ marginBottom: 24 }}>
+      <View style={styles.contentCard}>
         <Group>
           <TextInputField
             icon={searchIcon}
@@ -616,6 +616,13 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     textAlign: "center",
     includeFontPadding: false,
     lineHeight: 40,
+  },
+  contentCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl + Spacing.md,
+    borderWidth: 0,
+    padding: Spacing.md,
+    marginBottom: Spacing.xxl,
   },
   quickActionsSpacing: {
     marginBottom: Spacing.xxl,

@@ -6,7 +6,15 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
-import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Dispatch,
+  SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Animated,
   AppState,
@@ -38,19 +46,6 @@ import {
 } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import { contextFloorTokens } from "../../services/ai/generation/chatGeneration";
-import { LocalModelSheet } from "../../services/ai/providers/LocalProvider";
-import {
-  BETA_PROVIDER_ID,
-  BETA_SERVER_URL,
-  buildSources,
-  getEnabledProviders,
-  getOllamaServers,
-  getOllamaTuning,
-  isProviderSupported,
-  OllamaServer,
-  serializeOllamaServers,
-  serializeProviders,
-} from "../../services/ai/providers/sources";
 import {
   CatalogEntry,
   familyPublisher,
@@ -82,6 +77,19 @@ import {
   LiteRTModelInfo,
   subscribeLiteRTDownload,
 } from "../../services/ai/providers/LiteRTProvider";
+import { LocalModelSheet } from "../../services/ai/providers/LocalProvider";
+import {
+  BETA_PROVIDER_ID,
+  BETA_SERVER_URL,
+  buildSources,
+  getEnabledProviders,
+  getOllamaServers,
+  getOllamaTuning,
+  isProviderSupported,
+  OllamaServer,
+  serializeOllamaServers,
+  serializeProviders,
+} from "../../services/ai/providers/sources";
 import {
   parseQuickFlowOptionId,
   quickFlowOptionId,
@@ -110,7 +118,6 @@ import ActionButton from "../ui/ActionButton";
 import Checkbox from "../ui/Checkbox";
 import DownloadProgress from "../ui/DownloadProgress";
 import Group from "../ui/Group";
-import ImageCard from "../ui/ImageCard";
 import NotificationBanner from "../ui/NotificationBanner";
 import NotificationCard from "../ui/NotificationCard";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
@@ -134,6 +141,7 @@ import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useBugReport } from "../../hooks/useBugReport";
 import { setThemeMode, useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+import { pressStyle } from "../ui/pressStyle";
 import {
   dragDrawer,
   drawerWidthFor,
@@ -142,10 +150,10 @@ import {
   settingsProgress,
   settleDrawer,
   settleLayoutDrawer,
+  settlePage,
 } from "./drawerAnimation";
 import DrawerBackButton from "./DrawerBackButton";
 import PageStack from "./PageStack";
-import { pressStyle } from "../ui/pressStyle";
 
 const linkIcon = require("../../../assets/icons/link.png");
 const addIcon = require("../../../assets/icons/add.png");
@@ -180,12 +188,14 @@ const instagramIcon = require("../../../assets/icons/instagram.png");
 const tiktokIcon = require("../../../assets/icons/tiktok.png");
 const micIcon = require("../../../assets/icons/microphone.png");
 const cameraIcon = require("../../../assets/icons/camera.png");
-const highIcon = require("../../../assets/icons/High.png");
-//same icons as the chat and reflection picker
+const visionIcon = require("../../../assets/icons/vision.png");
+const microIcon = require("../../../assets/icons/micro.png");
+const brainIcon = require("../../../assets/icons/brain.png");
+//same icons as the model drawer
 const LITERT_CAPABILITY_ICONS = {
-  vision: cameraIcon,
-  audio: micIcon,
-  thinking: highIcon,
+  vision: visionIcon,
+  audio: microIcon,
+  thinking: brainIcon,
 };
 const photoIcon = require("../../../assets/icons/photo.png");
 const locationIcon = require("../../../assets/icons/location.png");
@@ -195,9 +205,7 @@ const exportIcon = require("../../../assets/icons/export.png");
 const messageIcon = require("../../../assets/icons/message.png");
 const timeIcon = require("../../../assets/icons/time.png");
 const errorIcon = require("../../../assets/icons/error.png");
-const ollamaImage = require("../../../assets/images/ImageCard/Ollama.png");
 const ollamaErrorImage = require("../../../assets/images/ImageCard/OllamaError.png");
-const huggingImage = require("../../../assets/images/ImageCard/Hugging.png");
 const infoIcon = require("../../../assets/icons/info.png");
 const reconnectIcon = require("../../../assets/icons/reconnect.png");
 const hyperlinkIcon = require("../../../assets/icons/hyperlink2.png");
@@ -205,7 +213,9 @@ const hyperlinkIcon = require("../../../assets/icons/hyperlink2.png");
 const DRAWER_SYNC_DELAY_MS = 1500;
 
 //downloads tick per chunk, repaint on whole percents or twice a second
-function throttleProgress<T extends { progress: number }>(set: Dispatch<SetStateAction<T | null>>) {
+function throttleProgress<T extends { progress: number }>(
+  set: Dispatch<SetStateAction<T | null>>,
+) {
   let lastPercent = -1;
   let lastTime = 0;
   return (value: T) => {
@@ -220,7 +230,10 @@ function throttleProgress<T extends { progress: number }>(set: Dispatch<SetState
 
 //plugin help shows the first sentence only
 function shortDescription(text: string) {
-  const first = text.trim().split(/\.\s|\n/)[0].replace(/[\s.:;,]+$/, "");
+  const first = text
+    .trim()
+    .split(/\.\s|\n/)[0]
+    .replace(/[\s.:;,]+$/, "");
   return first ? `${first}.` : "";
 }
 
@@ -293,7 +306,8 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   mcpserversettings: "mcpserver",
 };
 
-const subPageParent = (page: SubPage) => (page === "main" ? null : SUB_PAGE_PARENT[page]);
+const subPageParent = (page: SubPage) =>
+  page === "main" ? null : SUB_PAGE_PARENT[page];
 
 export default function SettingsDrawer({
   visible,
@@ -408,7 +422,9 @@ export default function SettingsDrawer({
     progress: number;
     sizeStr: string;
   } | null>(null);
-  const [selectedLocalModelId, setSelectedLocalModelId] = useState<string | null>(null);
+  const [selectedLocalModelId, setSelectedLocalModelId] = useState<
+    string | null
+  >(null);
   const [localGridWidth, setLocalGridWidth] = useState(0);
   const [cardGridWidth, setCardGridWidth] = useState(0);
   const selectedLocalModel =
@@ -449,6 +465,8 @@ export default function SettingsDrawer({
     description?: string | null;
   } | null>(null);
   const addModelScrollRef = useRef<ScrollView>(null);
+  //measured width, the slide's push distance
+  const [litertBodyWidth, setLitertBodyWidth] = useState(320);
 
   //open sheets keep the back press for themselves
   const sheetOpen =
@@ -460,6 +478,8 @@ export default function SettingsDrawer({
     selectedLocalModel !== null;
 
   const [hfModelInput, setHfModelInput] = useState("");
+  //true as soon as the search field is focused, no typing needed
+  const [litertSearchActive, setLitertSearchActive] = useState(false);
   const [litertForceLoad, setLitertForceLoadState] = useState(false);
   const [litertContextLength, setLitertContextLengthState] = useState("8192");
   const [installedLitertModels, setInstalledLitertModels] = useState<
@@ -541,6 +561,8 @@ export default function SettingsDrawer({
   const report = useBugReport(showAlert);
   const [instruction, setInstructionState] = useState("");
   const [name, setNameState] = useState("");
+  //only feeds the card's look, so it doesn't redesign on every keystroke
+  const [confirmedName, setConfirmedName] = useState("");
   const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
   const [autoSpeak, setAutoSpeakState] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(false);
@@ -605,7 +627,7 @@ export default function SettingsDrawer({
 
   const ollamaKeepAliveOptions = [
     { id: "300", label: "5m" },
-    { id: "600", label: "10m" },
+    { id: "900", label: "10m" },
     { id: "1800", label: "30m" },
     { id: "3600", label: "1h" },
     { id: "7200", label: "2h" },
@@ -616,7 +638,10 @@ export default function SettingsDrawer({
   ];
 
   //first step must fit the system prompt
-  const withContextFloor = (service: string, options: { id: string; label: string }[]) => {
+  const withContextFloor = (
+    service: string,
+    options: { id: string; label: string }[],
+  ) => {
     const floor = contextFloorTokens(service, instruction);
     return [
       { id: String(floor), label: `${(floor / 1024).toFixed(1)}k` },
@@ -910,6 +935,7 @@ export default function SettingsDrawer({
         setWhisperLanguageState(s.whisperLanguage);
         setInstructionState(s.instruction);
         setNameState(s.name || "");
+        setConfirmedName(s.name || "");
         setAlwaysWhisperState(s.alwaysWhisper);
         setAutoSpeakState(s.autoSpeak);
         setShowTechnicalDetailsState(s.showTechnicalDetails);
@@ -1577,6 +1603,7 @@ export default function SettingsDrawer({
   const openAddModelSheet = async () => {
     setLitertDetail(null);
     setHfModelInput("");
+    setLitertSearchActive(false);
     setLitertSearchResults([]);
     setAddModelSheetVisible(true);
     //cache paints, hub refreshes behind
@@ -1615,6 +1642,7 @@ export default function SettingsDrawer({
   //sizes resolve on open, not on listing
   const openLitertDetail = async (repoId: string) => {
     setHfModelInput("");
+    setLitertSearchActive(false);
     setLitertDetail({ repoId, entry: null, loading: true });
     addModelScrollRef.current?.scrollTo({ y: 0, animated: false });
     fetchModelDescription(repoId).then((description) =>
@@ -2189,8 +2217,8 @@ export default function SettingsDrawer({
         const cardWidth = isLastOdd
           ? "100%"
           : cardGridWidth > 0
-          ? Math.floor((cardGridWidth - Spacing.md) / 2) - 1
-          : "47%";
+            ? Math.floor((cardGridWidth - Spacing.md) / 2) - 1
+            : "47%";
 
         return (
           <Pressable
@@ -2284,7 +2312,10 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={pressStyle([styles.navItem, styles.navItemLast], styles.navItemPressed)}
+          style={pressStyle(
+            [styles.navItem, styles.navItemLast],
+            styles.navItemPressed,
+          )}
           onPress={() => setActiveSubPage("cloud")}
         >
           <View style={styles.menuIconWrap}>
@@ -2370,7 +2401,10 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={pressStyle([styles.navItem, !advancedMode && styles.navItemLast], styles.navItemPressed)}
+          style={pressStyle(
+            [styles.navItem, !advancedMode && styles.navItemLast],
+            styles.navItemPressed,
+          )}
           onPress={() => setActiveSubPage("tools")}
         >
           <View style={styles.menuIconWrap}>
@@ -2392,7 +2426,10 @@ export default function SettingsDrawer({
 
         {advancedMode && (
           <Pressable
-            style={pressStyle([styles.navItem, styles.navItemLast], styles.navItemPressed)}
+            style={pressStyle(
+              [styles.navItem, styles.navItemLast],
+              styles.navItemPressed,
+            )}
             onPress={() => setActiveSubPage("advanced")}
           >
             <View style={styles.menuIconWrap}>
@@ -2458,7 +2495,10 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={pressStyle([styles.navItem, styles.navItemLast], styles.navItemPressed)}
+          style={pressStyle(
+            [styles.navItem, styles.navItemLast],
+            styles.navItemPressed,
+          )}
           onPress={() => setActiveSubPage("sociallinks")}
         >
           <View style={styles.menuIconWrap}>
@@ -2549,12 +2589,12 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.nav.profile.title"))}
 
       <View style={styles.contentCard}>
-        <View style={styles.settingRowVertical}>
-          <Group>
-            <ProfileCard name={name} />
-          </Group>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <ProfileCard name={confirmedName} />
         </View>
+      </View>
 
+      <View style={styles.contentCard}>
         <View style={styles.settingRowVertical}>
           <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
             {t("settings.profile.name")}
@@ -2565,6 +2605,7 @@ export default function SettingsDrawer({
               placeholder={t("onboarding.name.placeholder")}
               value={name}
               onChangeText={setName}
+              onSubmitEditing={() => setConfirmedName(name)}
             />
           </Group>
         </View>
@@ -2580,6 +2621,14 @@ export default function SettingsDrawer({
               value={instruction}
               onChangeText={setInstruction}
             />
+          </Group>
+        </View>
+      </View>
+
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Group>
+            <ActionButton icon={exportIcon} label="Export my Profile Card" />
           </Group>
         </View>
       </View>
@@ -3004,7 +3053,10 @@ export default function SettingsDrawer({
       <Group style={styles.groupSpacing}>
         {!!BETA_SERVER_URL && (
           <Pressable
-            style={pressStyle(styles.toggleGroupRowItem, styles.toggleGroupCardPressed)}
+            style={pressStyle(
+              styles.toggleGroupRowItem,
+              styles.toggleGroupCardPressed,
+            )}
             onPress={() => setActiveSubPage("beta")}
           >
             <View style={styles.toggleGroupRow}>
@@ -3026,7 +3078,10 @@ export default function SettingsDrawer({
         )}
 
         <Pressable
-          style={pressStyle(styles.toggleGroupRowItem, styles.toggleGroupCardPressed)}
+          style={pressStyle(
+            styles.toggleGroupRowItem,
+            styles.toggleGroupCardPressed,
+          )}
           onPress={() => setActiveSubPage("local")}
         >
           <View style={styles.toggleGroupRow}>
@@ -3051,7 +3106,10 @@ export default function SettingsDrawer({
 
         {isProviderSupported("litert") && (
           <Pressable
-            style={pressStyle(styles.toggleGroupRowItem, styles.toggleGroupCardPressed)}
+            style={pressStyle(
+              styles.toggleGroupRowItem,
+              styles.toggleGroupCardPressed,
+            )}
             onPress={() => setActiveSubPage("litert")}
           >
             <View style={styles.toggleGroupRow}>
@@ -3073,7 +3131,10 @@ export default function SettingsDrawer({
         )}
 
         <Pressable
-          style={pressStyle([styles.toggleGroupRowItem, styles.navItemLast], styles.toggleGroupCardPressed)}
+          style={pressStyle(
+            [styles.toggleGroupRowItem, styles.navItemLast],
+            styles.toggleGroupCardPressed,
+          )}
           onPress={() => setActiveSubPage("ollama")}
         >
           <View style={styles.toggleGroupRow}>
@@ -3224,8 +3285,8 @@ export default function SettingsDrawer({
                   const cardWidth = isLastOdd
                     ? "100%"
                     : localGridWidth > 0
-                    ? Math.floor((localGridWidth - Spacing.md) / 2) - 1
-                    : "47%";
+                      ? Math.floor((localGridWidth - Spacing.md) / 2) - 1
+                      : "47%";
 
                   return (
                     <Pressable
@@ -3243,11 +3304,17 @@ export default function SettingsDrawer({
                         setSelectedLocalModelId(model.id);
                       }}
                     >
-                      <Text style={styles.localModelCardTitle} numberOfLines={2}>
+                      <Text
+                        style={styles.localModelCardTitle}
+                        numberOfLines={2}
+                      >
                         {model.label}
                       </Text>
                       {!!model.status && (
-                        <Text style={styles.localModelCardStatus} numberOfLines={1}>
+                        <Text
+                          style={styles.localModelCardStatus}
+                          numberOfLines={1}
+                        >
                           {t(`settings.local.status.${model.status}`)}
                         </Text>
                       )}
@@ -3273,10 +3340,6 @@ export default function SettingsDrawer({
   const renderLitertSubPage = () => (
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.litert.title"))}
-
-      <View style={styles.contentCard}>
-        <ImageCard source={huggingImage} width="100%" alt="Hugging Face" />
-      </View>
 
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -3354,11 +3417,6 @@ export default function SettingsDrawer({
   const renderOllamaSubPage = () => (
     <View style={styles.subPageContainer}>
       {renderSubPageHeader("Ollama")}
-
-      {/* ollama image card */}
-      <View style={styles.contentCard}>
-        <ImageCard source={ollamaImage} width="100%" alt="Ollama" />
-      </View>
 
       {/* ollama servers card */}
       <View style={styles.contentCard}>
@@ -3583,12 +3641,7 @@ export default function SettingsDrawer({
           <Text style={[styles.helpText, { marginBottom: Spacing.xs }]}>
             {t("settings.privacy.externalServices")}
           </Text>
-          <Text
-            style={[
-              styles.helpText,
-              { marginBottom: Spacing.md },
-            ]}
-          >
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
             {t("settings.privacy.noTracking")}
           </Text>
           <Group>
@@ -3804,7 +3857,10 @@ export default function SettingsDrawer({
   //whole row opens the subpage
   const renderToolsNavRow = (page: SubPage, title: string, help: string) => (
     <Pressable
-      style={pressStyle(styles.toggleGroupRowItem, styles.toggleGroupCardPressed)}
+      style={pressStyle(
+        styles.toggleGroupRowItem,
+        styles.toggleGroupCardPressed,
+      )}
       onPress={() => setActiveSubPage(page)}
     >
       <View style={styles.toggleGroupRow}>
@@ -3853,7 +3909,6 @@ export default function SettingsDrawer({
                   onToggle={async (v) => {
                     setPluginStates((prev) => ({ ...prev, [key]: v }));
                     await PluginRegistry.setEnabled("tool", name, v);
-                    //request permission at enable time
                     if (v) await tool.requestPermission?.();
                   }}
                 />
@@ -3885,7 +3940,9 @@ export default function SettingsDrawer({
             t("settings.tools.mobile.title"),
             t("settings.tools.mobile.help", {
               list: mobileTools
-                .map((tool) => tool.displayName ?? tool.definition.function.name)
+                .map(
+                  (tool) => tool.displayName ?? tool.definition.function.name,
+                )
                 .join(", "),
             }),
           )}
@@ -3951,9 +4008,7 @@ export default function SettingsDrawer({
         <View style={styles.contentCard}>
           {status.error ? (
             <View style={styles.settingRowVertical}>
-              <Text
-                style={[styles.helpText, { color: Colors.error }]}
-              >
+              <Text style={[styles.helpText, { color: Colors.error }]}>
                 {status.error}
               </Text>
             </View>
@@ -4411,9 +4466,60 @@ export default function SettingsDrawer({
     </>
   );
 
-  //query searches the hub, else browses
-  const isLitertSearching = hfModelInput.trim().length >= MIN_SEARCH_LENGTH;
+  //focus opens the search view, the hub query still waits for enough chars
+  const isLitertSearching = litertSearchActive;
+  const isLitertQuerying = hfModelInput.trim().length >= MIN_SEARCH_LENGTH;
   const isLitertDetail = !isLitertSearching && litertDetail !== null;
+
+  //android back/gesture steps out of detail then search before the sheet closes
+  const handleLitertBackPress = () => {
+    if (isLitertDetail) {
+      setLitertDetail(null);
+      return true;
+    }
+    if (isLitertSearching) {
+      setHfModelInput("");
+      setLitertSearchActive(false);
+      return true;
+    }
+    return false;
+  };
+
+  //slides the browse/detail body like a settings page push
+  //a fresh value each time avoids a flash at rest before it offsets
+  const [litertShown, setLitertShown] = useState(isLitertDetail);
+  const [litertTransition, setLitertTransition] = useState<{
+    shift: number;
+    progress: Animated.Value;
+  } | null>(null);
+  if (isLitertDetail !== litertShown) {
+    setLitertShown(isLitertDetail);
+    //opening fresh on the list skips the push
+    if (addModelSheetVisible) {
+      setLitertTransition({
+        shift: isLitertDetail ? litertBodyWidth : -litertBodyWidth,
+        progress: new Animated.Value(0),
+      });
+    }
+  }
+  useEffect(() => {
+    if (!litertTransition) return;
+    settlePage(litertTransition.progress, 1, () =>
+      setLitertTransition((cur) => (cur === litertTransition ? null : cur)),
+    );
+  }, [litertTransition]);
+  const litertBodyTranslate = useMemo(() => {
+    if (!litertTransition) return 0;
+    return litertTransition.progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [litertTransition.shift, 0],
+    });
+  }, [litertTransition]);
+  //shared by the two mutually exclusive slide layers below
+  const litertBodySlideStyle = useMemo(
+    () => ({ transform: [{ translateX: litertBodyTranslate }] }),
+    [litertBodyTranslate],
+  );
 
   const renderLitertCard = (repoId: string) => {
     const entry = getCatalogEntry(repoId);
@@ -4441,6 +4547,31 @@ export default function SettingsDrawer({
     );
   };
 
+  const renderLitertSearchResult = (entry: CatalogEntry) => (
+    <Pressable
+      key={entry.repoId}
+      onPress={() => openLitertDetail(entry.repoId)}
+      style={pressStyle(styles.litertSearchResultRow, "surface")}
+    >
+      <View style={styles.litertSearchResultTile}>
+        <Image
+          source={{ uri: modelAvatarUrl(entry, entry.repoId) }}
+          style={styles.litertTileImage}
+        />
+      </View>
+      <View style={styles.litertSearchResultInfo}>
+        <Text style={styles.litertSearchResultName} numberOfLines={1}>
+          {entry.label}
+        </Text>
+        <Text style={styles.litertRowMeta}>
+          {isLiteRTModelDownloaded(entry.repoId)
+            ? t("settings.litert.installed")
+            : formatBytes(entry.sizeBytes)}
+        </Text>
+      </View>
+    </Pressable>
+  );
+
   const renderLitertDetail = () => {
     if (!litertDetail) return null;
     const { repoId, entry: resolved, loading, description } = litertDetail;
@@ -4449,8 +4580,9 @@ export default function SettingsDrawer({
     const canDownload = !!resolved && !installed && !downloadingLitert;
     const publisher = familyPublisher(entry?.family ?? "");
     const capabilities = (resolved?.capabilities ?? [])
-      .filter((c): c is keyof typeof LITERT_CAPABILITY_KEYS =>
-        c in LITERT_CAPABILITY_KEYS,
+      .filter(
+        (c): c is keyof typeof LITERT_CAPABILITY_KEYS =>
+          c in LITERT_CAPABILITY_KEYS,
       )
       .map((c) => ({
         id: c,
@@ -4459,8 +4591,14 @@ export default function SettingsDrawer({
       }));
     //both carousels share one card
     const sections = [
-      { title: t("settings.litert.otherModels"), repoIds: similarModels(repoId) },
-      { title: t("settings.litert.sameFamily"), repoIds: sameFamilyModels(repoId) },
+      {
+        title: t("settings.litert.otherModels"),
+        repoIds: similarModels(repoId),
+      },
+      {
+        title: t("settings.litert.sameFamily"),
+        repoIds: sameFamilyModels(repoId),
+      },
     ].filter((section) => section.repoIds.length > 0);
 
     return (
@@ -4578,25 +4716,11 @@ export default function SettingsDrawer({
           ))}
         </View>
       ) : (
-        <Group>
-          {litertSearchResults.map((entry) => (
-            <ActionButton
-              key={entry.repoId}
-              icon={downloadIcon}
-              label={entry.label}
-              rightElement={
-                <Text style={styles.litertRowMeta}>
-                  {isLiteRTModelDownloaded(entry.repoId)
-                    ? t("settings.litert.installed")
-                    : formatBytes(entry.sizeBytes)}
-                </Text>
-              }
-              onPress={() => openLitertDetail(entry.repoId)}
-            />
-          ))}
-        </Group>
+        litertSearchResults.length > 0 && (
+          <Group>{litertSearchResults.map(renderLitertSearchResult)}</Group>
+        )
       )}
-      {isLitertSearching && litertSearchResults.length === 0 && (
+      {isLitertQuerying && litertSearchResults.length === 0 && (
         <Text style={styles.helpText}>{t("settings.litert.noResults")}</Text>
       )}
     </>
@@ -4609,7 +4733,9 @@ export default function SettingsDrawer({
         setAddModelSheetVisible(false);
         setLitertDetail(null);
         setAddModelScrolled(false);
+        setLitertSearchActive(false);
       }}
+      onBackPress={handleLitertBackPress}
       mode="overlay"
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
@@ -4624,7 +4750,13 @@ export default function SettingsDrawer({
       ]}
       desktopStyle={styles.addModelSheetDesktop}
     >
-      <View style={styles.addModelSheetBody}>
+      <View
+        style={styles.addModelSheetBody}
+        onLayout={(e) => {
+          const width = e.nativeEvent.layout.width;
+          setLitertBodyWidth((prev) => (prev !== width ? width : prev));
+        }}
+      >
         <ScrollView
           ref={addModelScrollRef}
           contentContainerStyle={styles.addModelSheetContent}
@@ -4643,21 +4775,50 @@ export default function SettingsDrawer({
                   : styles.settingRowVertical
               }
             >
-              <Group>
-                <TextInputField
-                  icon={searchIcon}
-                  placeholder={t("settings.litert.addModelPlaceholder")}
-                  value={hfModelInput}
-                  onChangeText={setHfModelInput}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </Group>
+              <View style={styles.litertSearchBarRow}>
+                {isLitertSearching && (
+                  <Pressable
+                    onPress={() => {
+                      setHfModelInput("");
+                      setLitertSearchActive(false);
+                    }}
+                    hitSlop={12}
+                    style={pressStyle(styles.litertSearchBackButton, "fade")}
+                  >
+                    <Image
+                      source={arrowIcon}
+                      style={styles.backIcon}
+                      tintColor={Colors.textPrimary}
+                    />
+                  </Pressable>
+                )}
+                <View style={styles.litertSearchBarGroup}>
+                  <Group>
+                    <TextInputField
+                      icon={searchIcon}
+                      placeholder={t("settings.litert.addModelPlaceholder")}
+                      value={hfModelInput}
+                      onChangeText={setHfModelInput}
+                      onFocus={() => setLitertSearchActive(true)}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </Group>
+                </View>
+              </View>
             </View>
-            {!isLitertDetail && litertList}
+            {!isLitertDetail && (
+              <Animated.View style={litertBodySlideStyle}>
+                {litertList}
+              </Animated.View>
+            )}
           </View>
 
-          {isLitertDetail && renderLitertDetail()}
+          {isLitertDetail && (
+            <Animated.View style={litertBodySlideStyle}>
+              {renderLitertDetail()}
+            </Animated.View>
+          )}
         </ScrollView>
 
         {/* floats over the scroll like the settings back button */}
@@ -4972,9 +5133,14 @@ export default function SettingsDrawer({
           >
             <View style={styles.contentCard}>
               <View
-                style={[styles.settingRowVertical, { marginBottom: Spacing.md }]}
+                style={[
+                  styles.settingRowVertical,
+                  { marginBottom: Spacing.md },
+                ]}
               >
-                <Text style={styles.settingLabel}>{selectedLocalModel.label}</Text>
+                <Text style={styles.settingLabel}>
+                  {selectedLocalModel.label}
+                </Text>
                 {selectedLocalModel.status && (
                   <Text style={[styles.helpText, { marginBottom: 0 }]}>
                     {t(`settings.local.status.${selectedLocalModel.status}`)}
@@ -4988,7 +5154,9 @@ export default function SettingsDrawer({
                     label={t("settings.local.sheet.status")}
                     rightElement={
                       <Text style={styles.litertRowMeta}>
-                        {t(`settings.local.status.${selectedLocalModel.status}`)}
+                        {t(
+                          `settings.local.status.${selectedLocalModel.status}`,
+                        )}
                       </Text>
                     }
                   />
@@ -5009,7 +5177,8 @@ export default function SettingsDrawer({
                     rightElement={
                       <Text style={styles.litertRowMeta}>
                         {t("settings.local.sheet.tokens", {
-                          count: selectedLocalModel.contextTokens.toLocaleString(),
+                          count:
+                            selectedLocalModel.contextTokens.toLocaleString(),
                         })}
                       </Text>
                     }
@@ -5080,7 +5249,10 @@ export default function SettingsDrawer({
           <ScrollView contentContainerStyle={styles.addModelSheetContent}>
             <View style={styles.contentCard}>
               <View
-                style={[styles.settingRowVertical, { marginBottom: Spacing.md }]}
+                style={[
+                  styles.settingRowVertical,
+                  { marginBottom: Spacing.md },
+                ]}
               >
                 <Text style={styles.settingLabel}>
                   {t("settings.litert.downloadingModel", {
@@ -5098,7 +5270,8 @@ export default function SettingsDrawer({
                   label={t("settings.litert.downloaded")}
                   rightElement={
                     <Text style={styles.litertRowMeta}>
-                      {litertDownloadProgress?.sizeStr ?? t("download.starting")}
+                      {litertDownloadProgress?.sizeStr ??
+                        t("download.starting")}
                     </Text>
                   }
                 />
@@ -5106,7 +5279,8 @@ export default function SettingsDrawer({
                   label={t("settings.litert.speed")}
                   rightElement={
                     <Text style={styles.litertRowMeta}>
-                      {litertDownloadProgress?.speedStr ?? t("download.starting")}
+                      {litertDownloadProgress?.speedStr ??
+                        t("download.starting")}
                     </Text>
                   }
                 />
@@ -5165,9 +5339,7 @@ export default function SettingsDrawer({
         ]}
       >
         <View style={{ width: 320, flex: 1 }}>
-          <View style={styles.floatingContent}>
-            {innerContent}
-          </View>
+          <View style={styles.floatingContent}>{innerContent}</View>
         </View>
         {notificationModal}
         {addModelSheet}
@@ -5239,7 +5411,6 @@ const makeStyles = (Colors: ThemeColors) =>
       right: 0,
       backgroundColor: Colors.groupedBackground,
       paddingHorizontal: Spacing.lg2,
-      //pushed pages stay inside the panel
       overflow: "hidden",
     },
     largeScreenContainer: {
@@ -5340,16 +5511,16 @@ const makeStyles = (Colors: ThemeColors) =>
     gradientTop: {
       position: "absolute",
       top: 0,
-      left: 0,
-      right: 0,
+      left: -Spacing.lg2,
+      right: -Spacing.lg2,
       height: 60,
       zIndex: 10,
     },
     gradientBottom: {
       position: "absolute",
       bottom: 0,
-      left: 0,
-      right: 0,
+      left: -Spacing.lg2,
+      right: -Spacing.lg2,
       height: 60,
       zIndex: 10,
     },
@@ -5366,6 +5537,7 @@ const makeStyles = (Colors: ThemeColors) =>
       borderTopLeftRadius: Radius.huge2,
       borderTopRightRadius: Radius.huge2,
       paddingTop: 12,
+      overflow: "hidden",
     },
     sheetHandleContainer: {
       alignItems: "center",
@@ -5508,6 +5680,31 @@ const makeStyles = (Colors: ThemeColors) =>
       fontSize: FontSizes.micro,
       color: Colors.textMuted,
     },
+    litertSearchResultRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: Spacing.lg2,
+      paddingHorizontal: Spacing.lg2,
+      gap: Spacing.lg2,
+    },
+    litertSearchResultTile: {
+      width: 44,
+      height: 44,
+      backgroundColor: Colors.logoTile,
+      borderWidth: 2,
+      borderColor: Colors.logoTileBorder,
+      borderRadius: Radius.xxl,
+      overflow: "hidden",
+    },
+    litertSearchResultInfo: {
+      flex: 1,
+      gap: Spacing.xs2,
+    },
+    litertSearchResultName: {
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.body,
+      color: Colors.textPrimary,
+    },
     addModelSheetBody: {
       flexShrink: 1,
       position: "relative",
@@ -5523,6 +5720,21 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     litertSearchWithBack: {
       marginLeft: 40 + Spacing.md,
+    },
+    litertSearchBarRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Spacing.md,
+    },
+    litertSearchBarGroup: {
+      flex: 1,
+    },
+    litertSearchBackButton: {
+      width: 44,
+      height: 44,
+      justifyContent: "center",
+      alignItems: "center",
+      borderRadius: Radius.xxl,
     },
     addModelSheetContent: {
       paddingHorizontal: Spacing.lg2,

@@ -251,6 +251,8 @@ export default function OnboardingPage() {
 
   const [step, setStep] = useState(0);
   const [name, setName] = useState(() => Settings.getCached().name);
+  //only feeds the card's look, so it doesn't redesign on every keystroke
+  const [confirmedName, setConfirmedName] = useState(name);
   const [statuses, setStatuses] = useState<Partial<Record<PermissionId, PermissionStatus>>>({});
   const contentOpacity = useAnimatedValue(1);
   const backButtonProgress = useAnimatedValue(0);
@@ -372,7 +374,10 @@ export default function OnboardingPage() {
             onChangeText={setName}
             placeholder={t("onboarding.name.placeholder")}
             returnKeyType="next"
-            onSubmitEditing={() => goTo(step + 1)}
+            onSubmitEditing={() => {
+              setConfirmedName(name);
+              goTo(step + 1);
+            }}
             autoCapitalize="words"
             autoCorrect={false}
           />
@@ -381,7 +386,7 @@ export default function OnboardingPage() {
       <Reveal delay={300}>
         <Text style={styles.sectionLabel}>{t("onboarding.profile.card")}</Text>
         <Group>
-          <ProfileCard name={name} />
+          <ProfileCard name={confirmedName} />
         </Group>
       </Reveal>
     </>

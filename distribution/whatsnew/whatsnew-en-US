@@ -1,3 +1,9 @@
-• Ollama model lists now load faster and are cached per server
-• Network errors while loading models are shown instead of being silently dropped
-• Smaller download, and the app no longer requests permissions it does not use
+• Run Hugging Face models directly on your phone with the new On-Device provider
+• Connect any OpenAI-compatible server (Mistral, LM Studio…) with securely stored API keys
+• Opera is now available in French
+• Mention tools and MCP servers with @ in your messages
+• New onboarding with a personal profile card
+• Full-screen code and image previews
+• Opera now asks before running a tool
+• Faster, lighter cloud sync
+• Android predictive back gesture

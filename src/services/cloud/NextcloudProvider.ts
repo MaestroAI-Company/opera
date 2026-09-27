@@ -4,6 +4,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 import { arrayBufferToBase64 } from '../ai/utils/base64';
 import { universalFetch } from '../ai/utils/universalFetch';
+import { utf8Decode } from '../crypto/encoding';
 import { CloudDownload, CloudProvider, CloudUpload, CloudUserInfo } from './CloudProvider';
 
 const SERVER_URL_KEY = 'nextcloud_server_url';
@@ -269,7 +270,7 @@ export class NextcloudProvider implements CloudProvider {
       if (response.status === 304) return { status: 'unchanged' };
       if (response.status === 404) return { status: 'missing' };
       if (!response.ok) return { status: 'error' };
-      return { status: 'ok', content: await response.text(), tag: response.headers.get('etag') };
+      return { status: 'ok', content: utf8Decode(new Uint8Array(await response.arrayBuffer())), tag: response.headers.get('etag') };
     } catch (e) {
       console.error('Failed to download file:', e);
       return { status: 'error' };

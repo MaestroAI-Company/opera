@@ -17,10 +17,15 @@ object ScreenshotHolder {
     @Volatile
     private var screenText: String? = null
 
+    //android settings may forbid screen access
+    @Volatile
+    private var screenAccess: Boolean = false
+
     @JvmStatic
     fun set(bitmap: Bitmap) {
         Log.i(TAG, "capture ${bitmap.width}x${bitmap.height}")
         capture = bitmap
+        screenAccess = true
     }
 
     //recycled bitmap still answers getWidth
@@ -33,6 +38,15 @@ object ScreenshotHolder {
         }
         return bitmap
     }
+
+    //session owns the screenshot
+    @JvmStatic
+    fun setScreenAccess(allowed: Boolean) {
+        screenAccess = allowed
+    }
+
+    @JvmStatic
+    fun isScreenAccessAllowed(): Boolean = screenAccess
 
     @JvmStatic
     fun setAppPackage(pkg: String?) {
@@ -56,5 +70,6 @@ object ScreenshotHolder {
         capture = null
         appPackage = null
         screenText = null
+        screenAccess = false
     }
 }

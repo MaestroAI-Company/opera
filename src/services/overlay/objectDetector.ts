@@ -12,7 +12,7 @@ const MIN_SIDE = 0.005;
 //vulkan returns zeroed scores
 const MODEL_SOURCES = [
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  { backend: 'cpu', source: require('../../../assets/models/deki-yolo.pte') },
+  { backend: 'cpu', source: require('../../../assets/models/deki-yolo-int8.pte') },
   // { backend: 'vulkan', source: require('../../../assets/models/deki-yolo-vulkan.pte') },
 ];
 

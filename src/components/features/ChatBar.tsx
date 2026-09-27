@@ -5,26 +5,30 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library/legacy';
 import { TextInputWrapper } from "expo-paste-input";
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { Fragment, forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   Animated,
   BackHandler,
   Easing,
   Image,
   Keyboard,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TextLayoutEventData,
+  TextLayoutLine,
   Vibration,
   View
 } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useT } from "../../i18n";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import {
   DOCUMENT_MIME_TYPES,
@@ -33,10 +37,12 @@ import {
   formatDocumentsForPrompt,
   type ExtractedDocument,
 } from "../../services/documents/DocumentService";
+import { findMentionSpans, listMentionables, MentionSpan } from "../../services/ai/mentions";
 import { Settings } from "../../services/settings/SettingsService";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
 import NotificationModal from "../ui/NotificationModal";
-import AttachmentSheet, { ATTACHMENT_SHEET_LIFTS, SelectedFile } from "./AttachmentSheet";
+import AttachmentSheet, { SelectedFile } from "./AttachmentSheet";
+import { pressStyle } from "../ui/pressStyle";
 
 const nextWhiteIcon = require("../../../assets/icons/arrow.png");
 const micIcon = require("../../../assets/icons/microphone.png");
@@ -50,6 +56,9 @@ const IMAGE_COMPRESS_QUALITY = 0.7;
 //only two audio containers accepted
 const SUPPORTED_AUDIO_EXTENSIONS = ['wav', 'mp3'];
 const AUDIO_EXTENSION_PATTERN = /\.(wav|mp3|m4a|aac|flac|ogg)$/;
+
+//@query typed at the text end
+const MENTION_QUERY_RE = /(^|\s)@([\w-]*)$/;
 
 type AttachmentKind = 'image' | 'audio' | 'document' | 'unsupported';
 
@@ -95,11 +104,10 @@ type ChatInputBarProps = {
   placeholder?: string;
   incognito?: boolean;
   isGenerating?: boolean;
-  supportsFiles?: boolean;
+  modelCapabilities?: string[];
   canTranscribeRemotely?: boolean;
   onOpenSettings?: () => void;
   onAttachmentSheetVisibilityChange?: (visible: boolean) => void;
-  enabled?: boolean;
   autoStartMic?: boolean;
   //screen-selection attachment from overlay
   selection?: { uri: string; label: string } | null;
@@ -161,8 +169,85 @@ const VAD_SILENCE_MS = 1500;
 const VAD_GRACE_MS = 600;
 const VAD_WEB_RMS_THRESHOLD = 0.01;
 
+//deletion inside a mention keeps @
+function collapseMention(base: string, next: string): string | null {
+  if (next.length >= base.length) return null;
+  let start = 0;
+  while (start < next.length && next[start] === base[start]) start++;
+  let tail = 0;
+  while (tail < next.length - start && next[next.length - 1 - tail] === base[base.length - 1 - tail]) tail++;
+  if (start + tail !== next.length) return null;
+  const end = base.length - tail;
+  const span = findMentionSpans(base).find(m => start > m.start && end <= m.end);
+  return span ? base.slice(0, span.start + 1) + base.slice(span.end) : null;
+}
+
+const INPUT_PADDING_VERTICAL = 6;
+const MENTION_LIST_MAX_HEIGHT = 200;
+const INPUT_LINE_HEIGHT = 20;
+const WEB_INPUT_LINE_HEIGHT = 22;
+
+//mention boxes drawn behind the input
+function MentionBoxes({ text, spans, scrollY }: { text: string; spans: MentionSpan[]; scrollY: number }) {
+  const styles = useThemedStyles(makeStyles);
+  const [lastLines, setLastLines] = useState<Record<string, TextLayoutLine>>({});
+  const [widths, setWidths] = useState<Record<string, number>>({});
+  const keys = spans.map(span => `${span.start}:${text.slice(0, span.end)}`);
+  //keep only measures of current mentions
+  const withMeasure = <T,>(prev: Record<string, T>, key: string, value: T) => {
+    const next: Record<string, T> = { [key]: value };
+    keys.forEach(k => { if (k !== key && k in prev) next[k] = prev[k]; });
+    return next;
+  };
+
+  return (
+    <View pointerEvents="none" style={styles.inputMirrorClip}>
+      {spans.map((span, i) => {
+        //key drops stale measures
+        const key = keys[i];
+        const line = lastLines[key];
+        const width = widths[key];
+        return (
+          <Fragment key={key}>
+            {/* mention line from prefix end */}
+            <Text
+              style={[styles.input, styles.mentionMeasure]}
+              textBreakStrategy="simple"
+              onTextLayout={(e: NativeSyntheticEvent<TextLayoutEventData>) => {
+                const lines = e.nativeEvent.lines;
+                if (lines.length > 0) setLastLines(prev => withMeasure(prev, key, lines[lines.length - 1]));
+              }}
+            >
+              {text.slice(0, span.end)}
+            </Text>
+            <Text
+              style={[styles.input, styles.mentionMeasureWord]}
+              numberOfLines={1}
+              onTextLayout={(e: NativeSyntheticEvent<TextLayoutEventData>) => {
+                const lines = e.nativeEvent.lines;
+                if (lines.length > 0) setWidths(prev => withMeasure(prev, key, lines[0].width));
+              }}
+            >
+              {text.slice(span.start, span.end)}
+            </Text>
+            {line && width != null && (
+              <View
+                style={[styles.mentionBox, {
+                  left: line.x + line.width - width,
+                  top: INPUT_PADDING_VERTICAL + line.y - scrollY,
+                  width,
+                  height: line.height,
+                }]}
+              />
+            )}
+          </Fragment>
+        );
+      })}
+    </View>
+  );
+}
+
 function VoiceIndicator() {
-  const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const anims = useMemo(() => Array.from({ length: 7 }).map(() => new Animated.Value(1)), []);
   useEffect(() => {
@@ -202,14 +287,13 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   onStop,
   onTranscribe,
   onTranscribeError,
-  placeholder = "Ask",
+  placeholder,
   incognito = false,
   isGenerating = false,
-  supportsFiles = false,
+  modelCapabilities = [],
   canTranscribeRemotely = false,
   onOpenSettings,
   onAttachmentSheetVisibilityChange,
-  enabled = true,
   autoStartMic = false,
   selection = null,
   onSelectionRemove,
@@ -218,9 +302,17 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 }, ref) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const insets = useSafeAreaInsets();
-  const bottomInsetToFill = insets.bottom + 16;
+  const supportsImages = modelCapabilities.includes('vision');
+  const supportsAudio = modelCapabilities.includes('audio');
+  const supportsFiles = supportsImages || supportsAudio;
   const [text, setText] = useState("");
+  //latest text before react rerenders
+  const textRef = useRef("");
+  const lastCollapseRef = useRef<{ from: string; to: string } | null>(null);
+  useEffect(() => { textRef.current = text; }, [text]);
+  const [webInputHeight, setWebInputHeight] = useState<number | undefined>(undefined);
   const [, setWhisperAvailable] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -230,9 +322,20 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const [isAttachmentSheetVisible, setIsAttachmentSheetVisible] = useState(false);
   const [recentPhotos, setRecentPhotos] = useState<any[]>([]);
   const autoStartedRef = useRef(false);
+  const inputRef = useRef<TextInput>(null);
+  //web mirror follows the textarea scroll
+  const [inputScrollY, setInputScrollY] = useState(0);
   const transcribeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   //cache extraction so send stays instant
   const documentsRef = useRef(new Map<string, Promise<ExtractedDocument>>());
+
+  //the picker rejects the format, the model rejects what it cannot read
+  const attachmentError = (kind: AttachmentKind, formatMessage: string) => {
+    if (kind === 'unsupported') return { title: t("chatbar.unsupportedFormat"), message: formatMessage };
+    if (kind === 'image' && !supportsImages) return { title: t("chatbar.unsupportedByModel"), message: t("chatbar.modelNoImages") };
+    if (kind === 'audio' && !supportsAudio) return { title: t("chatbar.unsupportedByModel"), message: t("chatbar.modelNoAudio") };
+    return null;
+  };
 
   const readDocument = (file: SelectedFile): Promise<ExtractedDocument> => {
     let pending = documentsRef.current.get(file.uri);
@@ -253,12 +356,12 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
           documentsRef.current.delete(file.uri);
           if (cancelled) return;
           setSelectedFiles(prev => prev.filter(f => f.uri !== file.uri));
-          setModalConfig({ title: "Unreadable Document", message: `${file.name}: ${e.message}` });
+          setModalConfig({ title: t("chatbar.unreadableDocument"), message: `${file.name}: ${e.message}` });
           setModalVisible(true);
         });
       });
     return () => { cancelled = true; };
-  }, [selectedFiles]);
+  }, [selectedFiles, t]);
 
   useImperativeHandle(ref, () => ({
     stopRecording: () => {
@@ -301,6 +404,13 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const nativeAudioUriRef = useRef<string | null>(null);
   const stopResolverRef = useRef<((text: string | null) => void) | null>(null);
   const sendCancelledRef = useRef(false);
+  //repeat taps during a freeze resend stale text
+  const sendingRef = useRef(false);
+  const [sentCount, setSentCount] = useState(0);
+  //unlock once the cleared input rendered
+  useEffect(() => {
+    sendingRef.current = false;
+  }, [sentCount]);
 
   //web vad state (rms threshold)
   const vadHasSpeechRef = useRef(false);
@@ -409,8 +519,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       if (!granted) {
         setIsRecording(false);
         setModalConfig({
-          title: "Microphone Permission",
-          message: "Microphone access is required for voice input. Please enable it in your device settings.",
+          title: t("chatbar.micPermission.title"),
+          message: t("chatbar.micPermission.message"),
           buttons: [{ text: "OK", onPress: () => setModalVisible(false), style: "primary" }]
         });
         setModalVisible(true);
@@ -573,7 +683,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const handleCamera = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
     if (permissionResult.granted === false) {
-      setModalConfig({ title: "Permission Denied", message: "You've refused to allow this app to access your camera!" });
+      setModalConfig({ title: t("chatbar.permissionDenied"), message: t("chatbar.cameraDenied") });
       setModalVisible(true);
       return;
     }
@@ -595,7 +705,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const handlePhotos = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (permissionResult.granted === false) {
-      setModalConfig({ title: "Permission Denied", message: "You've refused to allow this app to access your photos!" });
+      setModalConfig({ title: t("chatbar.permissionDenied"), message: t("chatbar.photosDenied") });
       setModalVisible(true);
       return;
     }
@@ -765,19 +875,20 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       });
       if (!result.canceled && result.assets) {
         const validFiles: SelectedFile[] = [];
-        let hasInvalidFile = false;
+        let rejection: { title: string; message: string } | null = null;
 
         for (const a of result.assets) {
           const kind = classifyAttachment(a.name, a.mimeType);
-          if (kind === 'unsupported') {
-            hasInvalidFile = true;
+          const error = attachmentError(kind, t("chatbar.unsupportedAudio"));
+          if (error) {
+            rejection = error;
             continue;
           }
           validFiles.push({ uri: a.uri, type: kind, name: a.name, mimeType: a.mimeType ?? undefined });
         }
 
-        if (hasInvalidFile) {
-          setModalConfig({ title: "Unsupported Format", message: "Audio must be WAV or MP3. Documents must be PDF, Word or plain text." });
+        if (rejection) {
+          setModalConfig(rejection);
           setModalVisible(true);
         }
 
@@ -796,12 +907,12 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       const modelName = Settings.getCached().whisperModel || "base";
       if (modelName === "none") {
         setModalConfig({
-          title: "Whisper Not Configured",
-          message: "You have disabled on-device transcription. Please select a Whisper model in settings to enable it.",
+          title: t("whisper.notConfigured.title"),
+          message: t("whisper.notConfigured.message"),
           buttons: [
-            { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
+            { text: t("common.cancel"), onPress: () => setModalVisible(false), style: "secondary" },
             {
-              text: "Settings", onPress: () => {
+              text: t("chatbar.settings"), onPress: () => {
                 setModalVisible(false);
                 if (onOpenSettings) onOpenSettings();
               }, style: "primary"
@@ -816,12 +927,12 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       const isInstalled = await WhisperSTT.isModelInstalled(modelName);
       if (!isInstalled) {
         setModalConfig({
-          title: "Whisper Not Installed",
-          message: `The Whisper ${modelName} model is required for on-device transcription. Would you like to install it?`,
+          title: t("whisper.notInstalled.title"),
+          message: t("whisper.notInstalled.messageInstall", { model: modelName }),
           buttons: [
-            { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
+            { text: t("common.cancel"), onPress: () => setModalVisible(false), style: "secondary" },
             {
-              text: "Install", onPress: () => {
+              text: t("chatbar.install"), onPress: () => {
                 setModalVisible(false);
                 if (onOpenSettings) onOpenSettings();
               }, style: "primary"
@@ -836,12 +947,12 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       const initialized = await WhisperSTT.init(modelName);
       if (!initialized) {
         setModalConfig({
-          title: "Initialization Error",
-          message: `Failed to load the Whisper ${modelName} model. It might be corrupted or incompatible. Please try reinstalling it from the settings.`,
+          title: t("whisper.initError.title"),
+          message: t("whisper.initError.messageReinstall", { model: modelName }),
           buttons: [
-            { text: "Cancel", onPress: () => setModalVisible(false), style: "secondary" },
+            { text: t("common.cancel"), onPress: () => setModalVisible(false), style: "secondary" },
             {
-              text: "Settings", onPress: () => {
+              text: t("chatbar.settings"), onPress: () => {
                 setModalVisible(false);
                 if (onOpenSettings) onOpenSettings();
               }, style: "primary"
@@ -922,23 +1033,44 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   };
 
   const handleSend = async () => {
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    let sent = false;
+    try {
+      sent = await sendOnce();
+    } finally {
+      if (!sent) sendingRef.current = false;
+    }
+  };
+
+  const sendOnce = async (): Promise<boolean> => {
     const wasRecording = isRecording;
     let voiceText: string | null = null;
     if (wasRecording) {
       voiceText = await stopSTT();
       const cancelled = sendCancelledRef.current;
       sendCancelledRef.current = false;
-      if (cancelled) return;
+      if (cancelled) return false;
     }
     const finalText = (voiceText ?? text).trim();
     if ((finalText || attachments.length > 0) && onSend) {
+      //camera and gallery never pass through the picker checks
+      const blocked = selectedFiles
+        .map(f => attachmentError(f.type as AttachmentKind, t("chatbar.unsupportedFile")))
+        .find(e => e !== null);
+      if (blocked) {
+        setModalConfig(blocked);
+        setModalVisible(true);
+        return false;
+      }
+
       let documents: ExtractedDocument[];
       try {
         documents = await Promise.all(selectedFiles.filter(f => f.type === 'document').map(readDocument));
       } catch (e: any) {
-        setModalConfig({ title: "Unreadable Document", message: e.message });
+        setModalConfig({ title: t("chatbar.unreadableDocument"), message: e.message });
         setModalVisible(true);
-        return;
+        return false;
       }
       const images = await buildImages();
       onSend(
@@ -947,18 +1079,111 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         voiceText != null
       );
       setText("");
+      if (Platform.OS === 'web') setWebInputHeight(undefined);
       setSelectedFiles([]);
       documentsRef.current.clear();
+      setSentCount(n => n + 1);
       Keyboard.dismiss();
+      return true;
     } else if (voiceText === null && wasRecording && autoStartMic) {
       onTranscribeError?.();
     }
+    return false;
+  };
+
+  //live list shows new items instantly
+  const mentionQuery = isRecording || isTranscribing ? null : text.match(MENTION_QUERY_RE)?.[2]?.toLowerCase() ?? null;
+  const mentionOptions = useMemo(() => {
+    if (mentionQuery === null) return [];
+    return listMentionables()
+      .filter(m => m.id.toLowerCase().includes(mentionQuery))
+      .sort((a, b) => Number(b.id.toLowerCase().startsWith(mentionQuery)) - Number(a.id.toLowerCase().startsWith(mentionQuery)));
+  }, [mentionQuery]);
+
+  //tab cursor resets with the query
+  const [mentionCursor, setMentionCursor] = useState({ query: '', index: 0 });
+  const activeMention = mentionCursor.query === mentionQuery && mentionOptions.length > 0
+    ? mentionCursor.index % mentionOptions.length
+    : 0;
+  const mentionListRef = useRef<ScrollView>(null);
+  const mentionRowsRef = useRef<Record<number, { y: number; height: number }>>({});
+
+  const moveMention = (step: number) => {
+    const count = mentionOptions.length;
+    const index = (activeMention + step + count) % count;
+    setMentionCursor({ query: mentionQuery ?? '', index });
+    const row = mentionRowsRef.current[index];
+    if (row) mentionListRef.current?.scrollTo({ y: Math.max(0, row.y + row.height - MENTION_LIST_MAX_HEIGHT), animated: false });
+  };
+
+  const pickMention = (id: string) => {
+    setText(prev => prev.replace(MENTION_QUERY_RE, `$1@${id} `));
+    //web click blurs the input
+    inputRef.current?.focus();
+  };
+
+  const mentionSpans = useMemo(() => findMentionSpans(text), [text]);
+
+  //backspace inside a mention leaves @
+  const handleChangeText = (next: string) => {
+    const last = lastCollapseRef.current;
+    //fast backspaces carry uncollapsed text
+    if (last && collapseMention(last.from, next) === last.to) {
+      textRef.current = last.to;
+      setText(last.to);
+      return;
+    }
+    const collapsed = collapseMention(textRef.current, next);
+    lastCollapseRef.current = collapsed ? { from: textRef.current, to: collapsed } : null;
+    textRef.current = collapsed ?? next;
+    setText(textRef.current);
+  };
+
+  //valid mentions styled, rest plain
+  const renderInputText = () => {
+    if (isTranscribing) return t("chatbar.transcribing");
+    const parts: React.ReactNode[] = [];
+    let cursor = 0;
+    mentionSpans.forEach(span => {
+      if (span.start > cursor) parts.push(text.slice(cursor, span.start));
+      parts.push(
+        <Text key={span.start} style={[styles.inputMention, incognito && styles.inputMentionIncognito, Platform.OS === 'web' && styles.inputMentionWeb]}>
+          {text.slice(span.start, span.end)}
+        </Text>
+      );
+      cursor = span.end;
+    });
+    if (cursor < text.length) parts.push(text.slice(cursor));
+    return parts;
+  };
+
+  const renderMentionName = (id: string, query: string) => {
+    const highlight = incognito ? styles.mentionHighlightIncognito : styles.mentionHighlight;
+    const start = Math.max(0, id.toLowerCase().indexOf(query));
+    const end = start + query.length;
+    return (
+      <Text style={[styles.mentionName, incognito && styles.mentionNameIncognito]}>
+        <Text style={highlight}>@</Text>
+        {id.slice(0, start)}
+        <Text style={highlight}>{id.slice(start, end)}</Text>
+        {id.slice(end)}
+      </Text>
+    );
   };
 
   const handleKeyPress = (e: any) => {
     if (Platform.OS === 'web') {
+      if (e.nativeEvent.key === 'Tab' && mentionOptions.length > 0) {
+        e.preventDefault();
+        moveMention(e.nativeEvent.shiftKey ? -1 : 1);
+        return;
+      }
       if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
         e.preventDefault();
+        if (mentionOptions.length > 0) {
+          pickMention(mentionOptions[activeMention].id);
+          return;
+        }
         if (!isGenerating) {
           handleSend();
         }
@@ -977,15 +1202,18 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       if (pastedFiles.length > 0) {
         e.preventDefault();
 
-        const promises = pastedFiles.map(file => {
+        let rejection: { title: string; message: string } | null = null;
+        const readable = pastedFiles.filter(file => {
+          const kind = classifyAttachment(file.name || "pasted_file", file.type);
+          const error = attachmentError(kind, t("chatbar.unsupportedFile"));
+          if (error) rejection = error;
+          return !error;
+        });
+
+        const promises = readable.map(file => {
           return new Promise<SelectedFile | null>((resolve) => {
             const name = file.name || "pasted_file";
             const kind = classifyAttachment(name, file.type);
-            if (kind === 'unsupported') {
-              resolve(null);
-              return;
-            }
-
             const reader = new FileReader();
             reader.onload = (ev) => {
               resolve({ uri: ev.target?.result as string, type: kind, name, mimeType: file.type });
@@ -998,8 +1226,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         Promise.all(promises).then(results => {
           const validFiles = results.filter(r => r !== null) as SelectedFile[];
 
-          if (validFiles.length < pastedFiles.length) {
-            setModalConfig({ title: "Unsupported Format", message: "Only images, WAV/MP3 audio and PDF, Word or plain text documents are supported." });
+          if (rejection) {
+            setModalConfig(rejection);
             setModalVisible(true);
           }
 
@@ -1012,16 +1240,45 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
     window.addEventListener('paste', handleGlobalPaste);
     return () => window.removeEventListener('paste', handleGlobalPaste);
-  }, [supportsFiles]);
+  }, [supportsImages, supportsAudio, t]);
+
+  //camera, gallery and a model switch can leave an unreadable file attached
+  useEffect(() => {
+    const blocked = selectedFiles
+      .map(f => attachmentError(f.type as AttachmentKind, t("chatbar.unsupportedFile")))
+      .find(e => e !== null);
+    if (!blocked) return;
+    setModalConfig(blocked);
+    setModalVisible(true);
+  }, [selectedFiles, supportsImages, supportsAudio, t]);
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      enabled={enabled}
-      style={{ width: '100%', maxWidth: 840, alignSelf: 'center' }}
-    >
+    <View style={{ width: '100%', maxWidth: 840, alignSelf: 'center' }}>
       <View style={{ width: '100%', alignItems: 'center', zIndex: 2, elevation: 9 }}>
         <Animated.View style={{ width: '100%', maxWidth: 800, zIndex: 2, elevation: 9 }}>
+          {mentionOptions.length > 0 && mentionQuery !== null && (
+            <View style={[styles.mentionPopup, incognito && styles.mentionPopupIncognito]}>
+              <ScrollView ref={mentionListRef} style={styles.mentionList} keyboardShouldPersistTaps="always">
+                {mentionOptions.map((option, index) => (
+                  <Pressable
+                    key={`${option.kind}-${option.id}`}
+                    onPress={() => pickMention(option.id)}
+                    onLayout={e => { mentionRowsRef.current[index] = e.nativeEvent.layout; }}
+                    style={({ pressed, hovered }) => [
+                      styles.mentionRow,
+                      (pressed || hovered || (Platform.OS === 'web' && index === activeMention)) && (incognito ? styles.mentionRowPressedIncognito : styles.mentionRowPressed),
+                    ]}
+                  >
+                    {renderMentionName(option.id, mentionQuery)}
+                    {option.requires.length > 0 && (
+                      <Text style={styles.mentionRequires}>{option.requires.map(r => `+@${r}`).join(' ')}</Text>
+                    )}
+                    <Text style={styles.mentionDescription} numberOfLines={1}>{option.description}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
           <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.pressableWrapper}>
             <Animated.View style={{ transform: [{ scale }] }}>
               {renderFiles ? (
@@ -1037,7 +1294,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                         <View style={styles.filePreviewContainerTop}>
                           <Image source={{ uri: appContextChip.icon }} style={styles.appContextChipIcon} resizeMode="contain" />
                           {onAppContextRemove && (
-                            <Pressable style={({ pressed, hovered }) => [styles.removeFileBtnTop, (pressed || hovered) && { opacity: 0.8 }]} onPress={onAppContextRemove}>
+                            <Pressable style={pressStyle(styles.removeFileBtnTop, "fadeLight")} onPress={onAppContextRemove}>
                               <Text style={styles.removeFileBtnTextTop}>✕</Text>
                             </Pressable>
                           )}
@@ -1056,14 +1313,14 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                               )}
                             </View>
                           )}
-                          <Pressable style={({ pressed, hovered }) => [styles.removeFileBtnTop, (pressed || hovered) && { opacity: 0.8 }]} onPress={chip.onRemove}>
+                          <Pressable style={pressStyle(styles.removeFileBtnTop, "fadeLight")} onPress={chip.onRemove}>
                             <Text style={styles.removeFileBtnTextTop}>✕</Text>
                           </Pressable>
                         </View>
                       ))}
                       <Text style={[styles.filesAddedText, incognito && { color: Colors.textMuted }]}>
                         {(() => {
-                          const filesPart = attachments.length > 0 ? `${attachments.length} File${attachments.length !== 1 ? 's' : ''}` : '';
+                          const filesPart = attachments.length > 0 ? t(attachments.length === 1 ? 'chatbar.fileCount.one' : 'chatbar.fileCount.other', { count: attachments.length }) : '';
                           const appPart = appContextChip ? 'App context' : '';
                           if (filesPart && appPart) return `${filesPart} and app context Added`;
                           if (filesPart) return `${filesPart} Added`;
@@ -1083,13 +1340,13 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 ]}
               >
                 {supportsFiles && (
-                  <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} style={({ pressed, hovered }) => [styles.plusButton, (pressed || hovered) && { opacity: 0.8 }]}>
+                  <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} style={pressStyle(styles.plusButton, "fadeLight")}>
                     <Image source={addIcon} style={styles.plusIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 )}
 
                 {(Platform.OS !== 'web' || Settings.getCached().whisperModel !== 'none' || canTranscribeRemotely) && !isGenerating && (
-                  <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={({ pressed, hovered }) => [styles.micButton, (pressed || hovered) && { opacity: 0.8 }]}>
+                  <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={pressStyle(styles.micButton, "fadeLight")}>
                     <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
                       <Image source={isRecording ? stopIcon : micIcon} style={styles.micIcon} tintColor={Colors.textOnPrimary} />
                     </Animated.View>
@@ -1100,9 +1357,20 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                   <VoiceIndicator />
                 ) : (
                   <View style={{ flex: 1, marginLeft: 8, justifyContent: 'center' }}>
+                    {Platform.OS !== 'web' && !isTranscribing && mentionSpans.length > 0 && (
+                      <MentionBoxes text={text} spans={mentionSpans} scrollY={inputScrollY} />
+                    )}
+                    {/* mirror drawn behind the web textarea */}
+                    {Platform.OS === 'web' && mentionSpans.length > 0 && (
+                      <View pointerEvents="none" style={styles.inputMirrorClip}>
+                        <Text style={[styles.input, styles.inputMirror, { transform: [{ translateY: -inputScrollY }] }]}>
+                          {renderInputText()}
+                        </Text>
+                      </View>
+                    )}
                     <TextInputWrapper
                       onPaste={(payload) => {
-                        if (supportsFiles && payload.type === "images") {
+                        if (supportsImages && payload.type === "images") {
                           const newFiles = payload.uris.map(uri => ({
                             uri,
                             type: "image",
@@ -1113,31 +1381,62 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                       }}
                     >
                       <TextInput
+                        ref={inputRef}
                         style={[
                           styles.input,
-                          { maxHeight: 132, minHeight: 32, lineHeight: 20 },
-                          Platform.OS === 'web' && { outlineStyle: 'none', margin: 0, paddingHorizontal: 0, overflow: 'hidden' } as any
+                          { maxHeight: 132, minHeight: Platform.OS === 'web' ? 22 : 32, lineHeight: Platform.OS === 'web' ? WEB_INPUT_LINE_HEIGHT : INPUT_LINE_HEIGHT },
+                          //default edittext padding offsets the boxes
+                          Platform.OS === 'android' && { paddingHorizontal: 0 },
+                          Platform.OS === 'web' && ({
+                            outlineStyle: 'none',
+                            margin: 0,
+                            paddingHorizontal: 0,
+                            paddingVertical: 0,
+                            minHeight: 22,
+                            height: text ? webInputHeight : 22,
+                            overflow: 'auto',
+                            resize: 'none',
+                            fieldSizing: 'content',
+                            scrollbarWidth: 'none',
+                            msOverflowStyle: 'none',
+                          } as any),
+                          Platform.OS === 'web' && mentionSpans.length > 0 && [styles.inputUnderMirror, { caretColor: Colors.textOnPrimary } as any],
                         ]}
-                        value={isTranscribing ? "Transcribing..." : text}
-                        onChangeText={isTranscribing ? undefined : setText}
-                        placeholder={placeholder}
+                        value={Platform.OS === 'web' ? (isTranscribing ? t("chatbar.transcribing") : text) : undefined}
+                        onChangeText={isTranscribing ? undefined : (newText) => {
+                          if (!newText && webInputHeight !== undefined) setWebInputHeight(undefined);
+                          handleChangeText(newText);
+                        }}
+                        onScroll={(e: any) => setInputScrollY(e.nativeEvent.contentOffset?.y ?? e.nativeEvent.target?.scrollTop ?? 0)}
+                        placeholder={placeholder ?? t("chatbar.placeholder")}
                         placeholderTextColor={Colors.whiteSoft}
                         multiline={true}
+                        numberOfLines={Platform.OS === 'web' ? 1 : undefined}
+                        onContentSizeChange={Platform.OS === 'web' ? (e) => {
+                          const h = e.nativeEvent.contentSize?.height;
+                          if (h && h > 0) {
+                            setWebInputHeight(Math.min(132, Math.max(22, h)));
+                          }
+                        } : undefined}
                         editable={!isTranscribing}
                         onTouchStart={handlePressIn}
                         onTouchEnd={handlePressOut}
                         onKeyPress={handleKeyPress}
-                      />
+                        {...(Platform.OS === 'web' && ({ dataSet: { chatbarInput: true } } as any))}
+                      >
+                        {/* native span colors the mention */}
+                        {Platform.OS !== 'web' && <Text>{renderInputText()}</Text>}
+                      </TextInput>
                     </TextInputWrapper>
                   </View>
                 )}
 
                 {isGenerating ? (
-                  <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} style={({ pressed, hovered }) => [styles.sendButton, (pressed || hovered) && { opacity: 0.8 }]}>
+                  <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} style={pressStyle(styles.sendButton, "fadeLight")}>
                     <Image source={stopIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 ) : (
-                  <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} style={({ pressed, hovered }) => [styles.sendButton, (pressed || hovered) && { opacity: 0.8 }]}>
+                  <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} style={pressStyle(styles.sendButton, "fadeLight")}>
                     <Image source={nextWhiteIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 )}
@@ -1148,11 +1447,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         </Animated.View>
       </View>
 
-      {/* lifting sheet needs safe area below */}
-      {!ATTACHMENT_SHEET_LIFTS && <View style={{ width: '100%', height: insets.bottom }} />}
-
       <AttachmentSheet
-        bottomInset={ATTACHMENT_SHEET_LIFTS ? insets.bottom : bottomInsetToFill}
+        bottomInset={insets.bottom}
         visible={isAttachmentSheetVisible}
         incognito={incognito}
         onClose={closeSheet}
@@ -1165,7 +1461,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         onLongPressRecentPhoto={handleSelectRecentPhoto}
       />
 
-      {ATTACHMENT_SHEET_LIFTS && <View style={{ width: '100%', height: insets.bottom }} />}
+      {/* lifting sheet needs safe area below */}
+      <View style={{ width: '100%', height: insets.bottom }} />
 
       <NotificationModal
         visible={modalVisible}
@@ -1174,7 +1471,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         buttons={modalConfig.buttons}
         onClose={() => setModalVisible(false)}
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 });
 
@@ -1226,7 +1523,58 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   input: {
     color: Colors.textOnPrimary,
     fontSize: FontSizes.md,
-    paddingVertical: 6,
+    paddingVertical: INPUT_PADDING_VERTICAL,
+  },
+  inputMention: {
+    color: Colors.primary,
+  },
+  inputMentionIncognito: {
+    color: Colors.incognito,
+  },
+  //ring outside, mirror stays aligned
+  inputMentionWeb: {
+    backgroundColor: Colors.textOnPrimary,
+    borderRadius: Radius.sm,
+    boxShadow: `0px 0px 0px 2px ${Colors.textOnPrimary}, 0px 0px 0px 4px ${Colors.borderOnPrimary}`,
+  },
+  mentionBox: {
+    position: 'absolute',
+    backgroundColor: Colors.textOnPrimary,
+    borderRadius: Radius.sm,
+    boxShadow: `0px 0px 0px 2px ${Colors.textOnPrimary}, 0px 0px 0px 4px ${Colors.borderOnPrimary}`,
+  },
+  mentionMeasure: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 0,
+    lineHeight: INPUT_LINE_HEIGHT,
+    opacity: 0,
+  },
+  mentionMeasureWord: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    paddingVertical: 0,
+    lineHeight: INPUT_LINE_HEIGHT,
+    opacity: 0,
+  },
+  inputMirrorClip: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
+  //matches the web textarea metrics
+  inputMirror: {
+    lineHeight: WEB_INPUT_LINE_HEIGHT,
+    paddingVertical: 0,
+  },
+  inputUnderMirror: {
+    color: 'transparent',
   },
   voiceIndicatorContainer: {
     flex: 1,
@@ -1331,6 +1679,60 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     color: 'white',
     fontSize: FontSizes.labelSm,
     fontWeight: 'bold',
+  },
+  mentionPopup: {
+    backgroundColor: Colors.surface,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    borderRadius: Radius.xxl,
+    marginHorizontal: Spacing.xl2,
+    marginBottom: Spacing.md,
+    overflow: 'hidden',
+    boxShadow: `-4px 4px 0px ${Colors.shadowInk}`,
+  },
+  mentionPopupIncognito: {
+    backgroundColor: Colors.incognitoSurface,
+  },
+  mentionList: {
+    maxHeight: MENTION_LIST_MAX_HEIGHT,
+  },
+  mentionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg2,
+    paddingVertical: Spacing.md,
+  },
+  mentionRowPressed: {
+    backgroundColor: Colors.surfacePressed,
+  },
+  mentionRowPressedIncognito: {
+    backgroundColor: Colors.incognitoPressed,
+  },
+  mentionName: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.bodyMd,
+    color: Colors.textPrimary,
+  },
+  mentionNameIncognito: {
+    color: Colors.textOnPrimary,
+  },
+  mentionHighlight: {
+    color: Colors.primary,
+  },
+  mentionHighlightIncognito: {
+    color: Colors.incognitoBright,
+  },
+  mentionRequires: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.label,
+    color: Colors.textMuted,
+  },
+  mentionDescription: {
+    flex: 1,
+    fontFamily: Fonts.body,
+    fontSize: FontSizes.caption,
+    color: Colors.textMuted,
   },
   filesAddedText: {
     fontFamily: Fonts.mono,

@@ -3,6 +3,8 @@ import { LayoutChangeEvent, LayoutRectangle, Modal, PanResponder, Pressable, Scr
 import Animated, { interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useT } from "../../i18n";
+import { pressStyle } from "./pressStyle";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const arrowDownIcon = require("../../../assets/icons/down_arrow.png");
@@ -41,12 +43,13 @@ export default function Selector({
   options,
   selectedValue,
   onSelect,
-  placeholder = "Select...",
+  placeholder,
   title,
   fullWidth = false,
 }: SelectorProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const [visible, setVisible] = useState(false);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const progress = useSharedValue(0);
@@ -290,16 +293,12 @@ export default function Selector({
     <View style={[styles.container, fullWidth && styles.containerFullWidth]}>
       <Pressable
         onPress={handleOpen}
-        style={({ pressed, hovered }) => [
-          styles.trigger,
-          fullWidth && styles.triggerFullWidth,
-          (pressed || hovered) && { backgroundColor: Colors.surfacePressed }
-        ]}
+        style={pressStyle([styles.trigger, fullWidth && styles.triggerFullWidth], "surface")}
         ref={triggerRef}
       >
         <Animated.Image source={arrowDownIcon} style={[styles.icon, iconStyle]} />
         <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
-          {selectedOption ? selectedOption.label : placeholder}
+          {selectedOption ? selectedOption.label : placeholder ?? t("selector.placeholder")}
         </Text>
       </Pressable>
 
@@ -333,12 +332,10 @@ export default function Selector({
                         Vibration.vibrate(10);
                         handleClose(() => onSelect(option.id));
                       }}
-                      style={({ pressed, hovered }) => [
-                        option.isDownload ? styles.downloadOption : styles.option,
-                        isSpecialActive ? styles.optionSelected : (pressed || hovered) && !option.isDownload && { backgroundColor: Colors.overlaySubtle },
-                        isSpecialActive && (pressed || hovered) && { backgroundColor: Colors.primaryActive },
-                        option.isDownload && (pressed || hovered) && { backgroundColor: Colors.surfacePressed }
-                      ]}
+                      style={pressStyle(
+                        [option.isDownload ? styles.downloadOption : styles.option, isSpecialActive && styles.optionSelected],
+                        isSpecialActive ? { backgroundColor: Colors.primaryActive } : option.isDownload ? "surface" : "subtle"
+                      )}
                     >
                       {option.isDownload && (
                         <Animated.Image source={downloadIcon} style={[styles.downloadIcon, { tintColor: Colors.primary }]} />
@@ -361,7 +358,7 @@ export default function Selector({
                               handleClose(() => option.onRightIconPress?.());
                             }}
                             hitSlop={8}
-                            style={({ pressed, hovered }) => [styles.rightIconPressable, (pressed || hovered) && { backgroundColor: Colors.overlaySubtle }]}
+                            style={pressStyle(styles.rightIconPressable, "subtle")}
                           >
                             <Animated.Image
                               source={option.rightIcon}

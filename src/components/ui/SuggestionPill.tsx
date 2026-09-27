@@ -3,6 +3,7 @@ import { Animated, Easing, Image, ImageSourcePropType, Pressable, StyleSheet, Te
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { pressStyle } from "./pressStyle";
 
 const ENTRANCE_DURATION = 260;
 const ENTRANCE_SCALE = 0.1;
@@ -47,11 +48,7 @@ export default function SuggestionPill({ icon, label, onPress, width, disabled =
       <Pressable
         onPress={onPress}
         disabled={disabled}
-        style={({ pressed, hovered }) => [
-          styles.pill,
-          !disabled && (pressed || hovered) && { backgroundColor: Colors.surfacePressed },
-          disabled && { opacity: 0.4 },
-        ]}
+        style={pressStyle([styles.pill, disabled && { opacity: 0.4 }], !disabled && "surface")}
       >
         <Image source={icon} style={styles.icon} tintColor={Colors.textMuted} />
         <Text style={styles.label}>{label}</Text>

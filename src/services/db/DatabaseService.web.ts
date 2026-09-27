@@ -15,6 +15,12 @@ export type MessageMetrics = {
   timeSec?: number;
   tokens?: number;
   tokensPerSec?: number;
+  //reflection level sent to the model
+  thinking?: string;
+  //prompt tier the model received
+  systemPrompt?: string;
+  //raw provider error shown in details
+  error?: string;
 };
 
 export type Message = {

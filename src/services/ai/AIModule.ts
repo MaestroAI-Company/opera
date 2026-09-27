@@ -4,13 +4,16 @@ import { ToolManager } from './tools/ToolManager';
 import { ToolSource } from './tools/ITool';
 import { sendMessageWithToolPrompt } from './tools/fallbackToolCall';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
-import { LocalProvider } from './providers/LocalProvider';
+import { LocalModelSheet, LocalProvider } from './providers/LocalProvider';
+import { LiteRTProvider } from './providers/LiteRTProvider';
 import { MessageMetrics } from '../db/DatabaseService';
 import { LocationService } from '../location/LocationService';
 import { Settings } from '../settings/SettingsService';
 import { DEFAULT_OLLAMA_URL, imageToBase64 } from './utils/imageToBase64';
 import { resolveQuickFlow, QuickFlowTarget } from './quickFlow';
-import { BETA_SERVER_URL } from './providers/sources';
+import { activeSourceKey, BETA_SERVER_URL, buildSources, getOllamaTuning, OPENAI_PROVIDER_ID, ModelSource } from './providers/sources';
+import { OpenAIProvider } from './providers/OpenAIProvider';
+import { getCachedModels, hydrateModelCache } from './providers/modelCache';
 
 const DEFAULT_URL = DEFAULT_OLLAMA_URL;
 
@@ -43,8 +46,12 @@ class CentralAIModule {
     this.providers.set('OLLAMA', new OllamaProvider(DEFAULT_URL));
     //universal on-device provider (routes to the platform local backend)
     this.providers.set('LOCAL', new LocalProvider());
+    //litert-lm runs on-device hugging face models
+    this.providers.set('LITERT', new LiteRTProvider());
     //hosted beta server, its own provider even though it speaks ollama
     if (BETA_SERVER_URL) this.providers.set('BETA', new OllamaProvider(BETA_SERVER_URL));
+    //url arrives with first configure
+    this.providers.set('OPENAI', new OpenAIProvider(''));
   }
 
   //switch active provider from settings
@@ -54,12 +61,15 @@ class CentralAIModule {
     this.modeConfigured = true;
   }
 
-  //reconfigure ollama provider with url from settings
-  configure(ollamaUrl: string, contextLength?: number, keepAlive?: number): void {
-    const url = ollamaUrl.trim().length > 0 ? ollamaUrl.trim() : DEFAULT_URL;
+  //rebuild server providers with active url
+  configure(activeUrl: string, contextLength?: number, keepAlive?: number): void {
+    const raw = activeUrl.trim();
+    const url = raw.length > 0 ? raw : DEFAULT_URL;
     this.providers.set('OLLAMA', new OllamaProvider(url, {}, contextLength, keepAlive));
     //beta shares the tuning, never the url
     if (BETA_SERVER_URL) this.providers.set('BETA', new OllamaProvider(BETA_SERVER_URL, {}, contextLength, keepAlive));
+    //openai servers have no tuning
+    this.providers.set('OPENAI', new OpenAIProvider(raw));
     //new server can serve different models
     this.capabilitiesCache.clear();
   }
@@ -89,18 +99,23 @@ class CentralAIModule {
     }
   }
 
+  //built-in backend reports its models
+  async getLocalModelSheet(): Promise<LocalModelSheet | null> {
+    const provider = this.providers.get('LOCAL') as LocalProvider | undefined;
+    return provider ? provider.getModelSheet() : null;
+  }
+
   async getAvailableModels(): Promise<string[]> {
     const provider = this.getActiveProvider();
     return provider.getAvailableModels();
   }
 
   //build provider without touching active one
-  private providerFor(mode: string, ollamaUrl?: string): IAIProvider | null {
+  private providerFor(mode: string, serverUrl?: string): IAIProvider | null {
     const key = (mode || 'ollama').toUpperCase() === 'AICORE' ? 'LOCAL' : (mode || 'ollama').toUpperCase();
-    if (key === 'OLLAMA') {
-      const url = (ollamaUrl ?? '').trim();
-      return url.length > 0 ? new OllamaProvider(url) : null;
-    }
+    const url = (serverUrl ?? '').trim();
+    if (key === 'OLLAMA') return url.length > 0 ? new OllamaProvider(url) : null;
+    if (key === 'OPENAI') return url.length > 0 ? new OpenAIProvider(url) : null;
     return this.providers.get(key) ?? null;
   }
 
@@ -132,6 +147,43 @@ class CentralAIModule {
     }
   }
 
+  //cached matches are tried first
+  private async findSourceForModel(service: string, modelName: string, excludeKey?: string): Promise<ModelSource | null> {
+    if (!modelName) return null;
+    await hydrateModelCache();
+    const candidates = buildSources(false)
+      .filter((source) => source.service === service && source.key !== excludeKey)
+      .sort((a, b) => Number(getCachedModels(b.key).includes(modelName)) - Number(getCachedModels(a.key).includes(modelName)));
+    for (const source of candidates) {
+      const models = await this.getModelsFor(source.service, source.url);
+      if (models.includes(modelName)) return source;
+    }
+    return null;
+  }
+
+  //persist the switch for both screens
+  private async switchToSource(source: ModelSource): Promise<void> {
+    this.setMode(source.service);
+    if (source.url) {
+      const tuning = getOllamaTuning(source.url);
+      this.configure(source.url, tuning.contextLength, tuning.keepAlive);
+    }
+    await Settings.setMany({ aiService: source.service, ollamaUrl: source.url });
+  }
+
+  //fail over to another source
+  private async failoverIfUnreachable(modelName: string): Promise<void> {
+    const settings = Settings.getCached();
+    if (!modelName || !settings.modelFailover) return;
+    //only servers can fail over
+    if (settings.aiService !== 'ollama' && settings.aiService !== OPENAI_PROVIDER_ID) return;
+    if (await this.isAvailable().catch(() => false)) return;
+    const source = await this.findSourceForModel(settings.aiService, modelName, activeSourceKey(settings.aiService, settings.ollamaUrl));
+    if (!source) return;
+    console.warn(`[AIModule] server ${settings.ollamaUrl} unreachable, ${modelName} moved to ${source.key}`);
+    await this.switchToSource(source);
+  }
+
   async preloadModel(modelName: string): Promise<void> {
     //no provider until settings land
     if (!this.modeConfigured) return;
@@ -145,6 +197,15 @@ class CentralAIModule {
       return provider.downloadService(modelName, onProgress);
     }
     throw new Error('Download service not supported by active provider');
+  }
+
+  //download without switching source
+  async downloadFor(mode: string, ollamaUrl: string | undefined, modelName: string, onProgress?: (progress: number, etaSeconds: number, speedStr: string, sizeStr: string) => void): Promise<void> {
+    const provider = this.providerFor(mode, ollamaUrl);
+    if (!provider?.downloadService) {
+      throw new Error(`Download service not supported by ${mode}`);
+    }
+    return provider.downloadService(modelName, onProgress);
   }
 
   async getModelCapabilities(modelName: string): Promise<string[]> {
@@ -161,6 +222,21 @@ class CentralAIModule {
     return capabilities;
   }
 
+  //caps of any model, not just active
+  async getModelCapabilitiesFor(mode: string, ollamaUrl: string | undefined, modelName: string): Promise<string[]> {
+    const provider = this.providerFor(mode, ollamaUrl);
+    if (!provider?.getModelCapabilities) return [];
+
+    const cacheKey = `${mode}:${ollamaUrl ?? ''}:${modelName}`;
+    const cached = this.capabilitiesCache.get(cacheKey);
+    if (cached) return cached;
+
+    const capabilities = await provider.getModelCapabilities(modelName);
+    //empty may mean failure, skip cache
+    if (capabilities.length > 0) this.capabilitiesCache.set(cacheKey, capabilities);
+    return capabilities;
+  }
+
   //convert local image uris to base64
   private async processImages(messages: { role: string; content: string; images?: string[]; tool_calls?: any[] }[]): Promise<{ role: string; content: string; images?: string[]; tool_calls?: any[] }[]> {
     return Promise.all(
@@ -169,11 +245,14 @@ class CentralAIModule {
         const base64Images = await Promise.all(
           msg.images.map(async (uri) => {
             try {
-              if (uri.startsWith('data:')) return uri.split(',')[1];
-              return await imageToBase64(uri);
+              //picker query param breaks blob and data uris
+              const clean = uri.split('?name=')[0];
+              if (clean.startsWith('data:')) return clean.split(',')[1];
+              return await imageToBase64(clean);
             } catch (e) {
               console.error('Failed to read image as base64:', e);
-              return uri;
+              //sending the raw uri would fail as invalid base64 server side
+              throw new Error('failed to read an attachment');
             }
           })
         );
@@ -183,7 +262,7 @@ class CentralAIModule {
   }
 
     //append context lines when present
-  private async buildContextBlock(): Promise<string> {
+  buildContextBlock(): string {
     //use cached location refresh async
     if (!LocationService.getCached()) {
       LocationService.hasPermission().then((granted) => {
@@ -213,9 +292,10 @@ class CentralAIModule {
     options?: { think?: boolean | string },
     onMetrics?: (metrics: MessageMetrics) => void
   ): Promise<void> {
+    await this.failoverIfUnreachable(modelName);
     const provider = this.getActiveProvider();
     const processedMessages = await this.processImages(messages);
-    const enhancedPrompt = systemPrompt + (await this.buildContextBlock());
+    const enhancedPrompt = systemPrompt + this.buildContextBlock();
     await provider.sendMessage(modelName, enhancedPrompt, processedMessages, onChunk, signal, options, onMetrics);
   }
 
@@ -233,7 +313,7 @@ class CentralAIModule {
       : this.getActiveProvider();
     if (!provider) throw new Error(`No AI provider for quick flow source: ${target.service}`);
     const processedMessages = await this.processImages(messages);
-    const enhancedPrompt = systemPrompt + (await this.buildContextBlock());
+    const enhancedPrompt = systemPrompt + this.buildContextBlock();
     await provider.sendMessage(target.model, enhancedPrompt, processedMessages, onChunk, signal, options);
   }
 
@@ -246,8 +326,10 @@ class CentralAIModule {
     signal?: AbortSignal,
     options?: { think?: boolean | string },
     onMetrics?: (metrics: MessageMetrics) => void,
-    onSources?: (sources: ToolSource[]) => void
+    onSources?: (sources: ToolSource[]) => void,
+    toolFilter?: string[]
   ): Promise<void> {
+    await this.failoverIfUnreachable(modelName);
     const provider = this.getActiveProvider();
 
     //check if model supports tools
@@ -257,9 +339,9 @@ class CentralAIModule {
       supportsTools = caps.includes('tools');
     } catch {}
 
-    const tools = ToolManager.getDefinitions();
+    const tools = ToolManager.getDefinitions(toolFilter);
     const processedMessages = await this.processImages(messages);
-    const enhancedPrompt = systemPrompt + (await this.buildContextBlock());
+    const enhancedPrompt = systemPrompt + this.buildContextBlock();
 
     if (tools.length === 0) {
       await provider.sendMessage(modelName, enhancedPrompt, processedMessages, onChunk, signal, options, onMetrics);
@@ -319,7 +401,7 @@ class CentralAIModule {
       }
 
       //inject tool_calls json
-      //show ui bubble, keep tool call in history
+      //tool call shows in ui and history
       const roundChunk = accumulated.substring(beforeLen);
       if (!roundChunk.includes('"tool_calls"')) {
         for (const tc of result.toolCalls) {
@@ -350,7 +432,7 @@ class CentralAIModule {
         this.SharedGenerationState.activeToolArgs = null;
         this.SharedGenerationState.notify();
 
-        //widget block replaces tool bubble
+        //widget block shows the result
         const widgetBlock = ToolManager.buildWidgetBlock(toolName, tc.function.arguments, toolResult);
         if (widgetBlock) streamingOnChunk(widgetBlock);
 

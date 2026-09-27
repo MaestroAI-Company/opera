@@ -138,6 +138,8 @@ public class MaestroSession extends VoiceInteractionSession {
 
         boolean screenshotPromised = (showFlags & VoiceInteractionSession.SHOW_WITH_SCREENSHOT) != 0;
         Log.d(TAG, "onShow flags=" + showFlags + " screenshotPromised=" + screenshotPromised);
+        //overlay disables screen features without it
+        ScreenshotHolder.setScreenAccess(screenshotPromised);
 
         //wait for promised screenshot
         if (screenshotPromised) {

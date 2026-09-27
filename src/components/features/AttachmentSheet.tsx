@@ -1,5 +1,6 @@
-import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useT } from "../../i18n";
 import {
   Image,
   Platform,
@@ -10,14 +11,13 @@ import {
   Text,
   View,
 } from 'react-native';
+import Group from "../ui/Group";
 import DrawerSheet from "./DrawerSheet";
+import { pressStyle } from "../ui/pressStyle";
 
 const cameraIcon = require("../../../assets/icons/camera.png");
 const fileIcon = require("../../../assets/icons/file.png");
 const photoIcon = require("../../../assets/icons/photo.png");
-
-//lifts bar instead of overlaying
-export const ATTACHMENT_SHEET_LIFTS = true;
 
 export type SelectedFile = { uri: string; type: string; name: string; id?: string; mimeType?: string };
 
@@ -50,11 +50,13 @@ export default function AttachmentSheet({
 }: AttachmentSheetProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
 
   return (
     <DrawerSheet
       visible={visible}
-      mode={ATTACHMENT_SHEET_LIFTS ? "lift" : "overlay"}
+      //lifts the bar instead of overlaying it
+      mode="lift"
       //sheet pads its own safe area and overlaps the inset below
       liftOffset={bottomInset}
       onClose={onClose}
@@ -66,19 +68,24 @@ export default function AttachmentSheet({
         { paddingBottom: (Platform.OS === 'ios' ? 20 : 10) + bottomInset },
       ]}
     >
-      <View style={styles.sheetButtonsRow}>
-        <Pressable style={({ pressed, hovered }) => [styles.sheetIconButton, incognito && styles.sheetIconButtonIncognito, (pressed || hovered) && { backgroundColor: incognito ? Colors.incognito : Colors.surfacePressed }]} onPress={onCamera}>
-          <Image source={cameraIcon} style={[styles.sheetIcon, incognito && styles.sheetIconIncognito]} />
-          <Text style={[styles.sheetIconText, incognito && styles.sheetTextIncognito]}>Camera</Text>
-        </Pressable>
-        <Pressable style={({ pressed, hovered }) => [styles.sheetIconButton, incognito && styles.sheetIconButtonIncognito, (pressed || hovered) && { backgroundColor: incognito ? Colors.incognito : Colors.surfacePressed }]} onPress={onPickFiles}>
-          <Image source={fileIcon} style={[styles.sheetIcon, incognito && styles.sheetIconIncognito]} />
-          <Text style={[styles.sheetIconText, incognito && styles.sheetTextIncognito]}>File</Text>
-        </Pressable>
-        <Pressable style={({ pressed, hovered }) => [styles.sheetIconButton, incognito && styles.sheetIconButtonIncognito, (pressed || hovered) && { backgroundColor: incognito ? Colors.incognito : Colors.surfacePressed }]} onPress={onPhotos}>
-          <Image source={photoIcon} style={[styles.sheetIcon, incognito && styles.sheetIconIncognito]} />
-          <Text style={[styles.sheetIconText, incognito && styles.sheetTextIncognito]}>Photos</Text>
-        </Pressable>
+      <View style={styles.sheetButtonsWrapper}>
+        <Group style={[styles.sheetButtonsRow, incognito && styles.sheetButtonsRowIncognito]}>
+          {[
+            { icon: cameraIcon, label: t("attachment.camera"), onPress: onCamera },
+            { icon: fileIcon, label: t("attachment.file"), onPress: onPickFiles },
+            { icon: photoIcon, label: t("attachment.photos"), onPress: onPhotos },
+          ].map(({ icon, label, onPress }) => (
+            //flex on cell since group adds a layer
+            <View key={label} style={styles.sheetIconButtonCell}>
+              <Group style={incognito && styles.sheetIconButtonGroupIncognito}>
+                <Pressable style={pressStyle(styles.sheetIconButton, { backgroundColor: incognito ? Colors.incognito : Colors.surfacePressed })} onPress={onPress}>
+                  <Image source={icon} style={[styles.sheetIcon, incognito && styles.sheetIconIncognito]} />
+                  <Text style={[styles.sheetIconText, incognito && styles.sheetTextIncognito]}>{label}</Text>
+                </Pressable>
+              </Group>
+            </View>
+          ))}
+        </Group>
       </View>
 
       {recentPhotos.length > 0 && (
@@ -114,7 +121,7 @@ export default function AttachmentSheet({
 
 const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   sheet: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.groupedBackground,
     borderTopLeftRadius: Radius.huge2,
     borderTopRightRadius: Radius.huge2,
     paddingTop: 12,
@@ -129,7 +136,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   sheetHandleContainer: {
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: Spacing.xs2,
     paddingVertical: 10,
     marginTop: -10,
   },
@@ -142,31 +149,36 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   sheetHandleIncognito: {
     backgroundColor: Colors.incognito,
   },
-  sheetButtonsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
+  sheetButtonsWrapper: {
+    paddingHorizontal: Spacing.lg2,
     marginBottom: 12,
   },
-  sheetIconButton: {
-    flex: 1,
-    height: 70,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xxl,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: Colors.border,
+  sheetButtonsRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: Radius.xxl + Spacing.md,
+    borderWidth: 0,
   },
-  sheetIconButtonIncognito: {
+  sheetButtonsRowIncognito: {
+    backgroundColor: Colors.incognitoSurface,
+  },
+  sheetIconButtonCell: {
+    flex: 1,
+  },
+  sheetIconButtonGroupIncognito: {
     backgroundColor: Colors.incognitoPressed,
     borderColor: Colors.incognito,
   },
+  sheetIconButton: {
+    height: 84,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   sheetIcon: {
-    width: 18,
-    height: 18,
-    marginBottom: 4,
+    width: 22,
+    height: 22,
+    marginBottom: 6,
     tintColor: Colors.textPrimary,
   },
   sheetIconIncognito: {
@@ -181,7 +193,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     color: Colors.textOnPrimary,
   },
   sheetRecentPhotosContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg2,
     paddingBottom: 8,
   },
   sheetRecentPhotoWrapper: {

@@ -1,0 +1,15 @@
+diff --git a/node_modules/react-native-executorch-expo-resource-fetcher/lib/handlers.js b/node_modules/react-native-executorch-expo-resource-fetcher/lib/handlers.js
+index 54edf7a..0543011 100644
+--- a/node_modules/react-native-executorch-expo-resource-fetcher/lib/handlers.js
++++ b/node_modules/react-native-executorch-expo-resource-fetcher/lib/handlers.js
+@@ -32,8 +32,8 @@ export async function handleAsset(source, progressCallback, downloads) {
+     const fileUri = `${RNEDirectory}${filename}`;
+     // On Android, the bundled URI has no extension, so we append it manually
+     const fileUriWithType = Platform.OS === 'android' ? `${fileUri}.${asset.type}` : fileUri;
+-    if (await ResourceFetcherUtils.checkFileExists(fileUri)) {
+-        return ResourceFetcherUtils.removeFilePrefix(fileUri);
++    if (await ResourceFetcherUtils.checkFileExists(fileUriWithType)) {
++        return ResourceFetcherUtils.removeFilePrefix(fileUriWithType);
+     }
+     await ResourceFetcherUtils.createDirectoryIfNoExists();
+     await copyAsync({ from: uri, to: fileUriWithType });

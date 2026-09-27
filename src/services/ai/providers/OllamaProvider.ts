@@ -317,11 +317,13 @@ export class OllamaProvider implements IAIProvider {
             const evalNs = parsed.eval_duration || 0;
             const timeSec = evalNs > 0 ? evalNs / 1e9 : (parsed.total_duration || 0) / 1e9;
             const tokens = parsed.eval_count;
+            const promptTokens = parsed.prompt_eval_count;
             onMetrics({
               model: modelName,
               timeSec,
               tokens: tokens || undefined,
-              tokensPerSec: timeSec > 0 && tokens ? tokens / timeSec : undefined
+              tokensPerSec: timeSec > 0 && tokens ? tokens / timeSec : undefined,
+              contextTokens: promptTokens ? promptTokens + (tokens || 0) : undefined
             });
           }
         } catch {

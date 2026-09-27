@@ -17,32 +17,58 @@ import {
   ViewStyle,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Reanimated, { interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Reanimated, {
+  interpolateColor,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import {
+  Fonts,
+  FontSizes,
+  Radius,
+  Spacing,
+  ThemeColors,
+} from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useT } from "../../i18n";
 import { AIModule } from "../../services/ai/AIModule";
-import { getAICoreModelLabel } from "../../services/ai/providers/AICoreProvider";
-import { getCachedModels, hydrateModelCache, setCachedModels } from "../../services/ai/providers/modelCache";
-import { buildSources, ModelSource } from "../../services/ai/providers/sources";
+import { getLocalModelLabel, isLocalModel } from "../../services/ai/providers/LocalProvider";
+import { getLiteRTModelLabel, isLiteRTModel, subscribeLiteRTDownload } from "../../services/ai/providers/LiteRTProvider";
+import { getCachedModels, getLastModel, hydrateModelCache, setCachedModels, setLastModel } from "../../services/ai/providers/modelCache";
+import { buildSources, getOllamaTuning, ModelSource } from "../../services/ai/providers/sources";
+import { estimateContextTokens } from "../../services/ai/generation/chatGeneration";
+import { MessageMetrics } from "../../services/db/DatabaseService";
 import { AppEvents } from "../../services/events";
+import { Settings } from "../../services/settings/SettingsService";
 import Group from "../ui/Group";
-import DrawerSheet from "./DrawerSheet";
 import NotificationModal from "../ui/NotificationModal";
+import ProgressBar from "../ui/ProgressBar";
 import SliderToggle, { SliderToggleOption } from "../ui/SliderToggle";
-import { settleDrawer } from "./drawerAnimation";
+import DrawerSheet from "./DrawerSheet";
+import { pressStyle } from "../ui/pressStyle";
 
 const botIcon = require("../../../assets/icons/bot.png");
 const downloadIcon = require("../../../assets/icons/download.png");
+const tokenIcon = require("../../../assets/icons/token.png");
 const quickIcon = require("../../../assets/icons/Quick.png");
 const lowIcon = require("../../../assets/icons/Low.png");
 const highIcon = require("../../../assets/icons/High.png");
+const visionIcon = require("../../../assets/icons/vision.png");
+const micIcon = require("../../../assets/icons/micro.png");
+const toolIcon = require("../../../assets/icons/tool2.png");
+const brainIcon = require("../../../assets/icons/brain.png");
 const loadingAnimation = require("../../../assets/animations/loading.json");
 
-const REFLECTIONS: SliderToggleOption[] = [
-  { id: "none", label: "Quick", icon: quickIcon },
-  { id: "low", label: "Low", icon: lowIcon },
-  { id: "high", label: "High", icon: highIcon },
+const REFLECTION_ICONS = { none: quickIcon, low: lowIcon, high: highIcon };
+//first entry sits far right
+const CAPABILITY_ICONS = [
+  { id: "vision", icon: visionIcon },
+  { id: "audio", icon: micIcon },
+  { id: "thinking", icon: brainIcon },
+  { id: "tools", icon: toolIcon },
 ];
 
 const LONG_PRESS_DELAY = 180;
@@ -54,6 +80,14 @@ const MAX_MODELS_HEIGHT = 240;
 const ANCHOR_GAP = 8;
 const ANCHOR_MARGIN = 8;
 const DESKTOP_CARD_WIDTH = 320;
+
+//context size configured for the active source
+const contextWindowFor = (service: string, ollamaUrl: string) => {
+  if (service === "litert") return Settings.getCached().litertContextLength;
+  //beta shares the ollama tuning
+  if (service === "ollama" || service === "beta") return getOllamaTuning(ollamaUrl).contextLength;
+  return 0;
+};
 
 type RowLayout = { y: number; height: number } | null;
 
@@ -80,11 +114,12 @@ export function ModelSelectorTrigger({
   style,
   viewRef,
 }: ModelSelectorTriggerProps) {
-  const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
 
   const displayName = (model: string) =>
-    model.startsWith("aicore-") ? getAICoreModelLabel(model) : model;
+    isLocalModel(model) ? getLocalModelLabel(model, true)
+      : isLiteRTModel(model) ? getLiteRTModelLabel(model)
+        : model;
 
   return (
     <View style={[styles.container, style]} ref={viewRef} collapsable={false}>
@@ -92,10 +127,7 @@ export function ModelSelectorTrigger({
         <View style={styles.shadowBlock} />
         <Pressable
           onPress={onPress}
-          style={({ pressed, hovered }) => [
-            styles.trigger,
-            (pressed || hovered) && { backgroundColor: Colors.surfacePressed },
-          ]}
+          style={pressStyle(styles.trigger, "surface")}
         >
           <Image source={botIcon} style={styles.icon} />
           <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
@@ -125,6 +157,8 @@ export type ModelSelectorDrawerProps = {
   isDesktop?: boolean;
   //trigger to hang panel under
   triggerRef?: React.RefObject<View | null>;
+  //current conversation, fills the token window
+  messages?: { content: string; images?: string[]; metrics?: MessageMetrics }[];
 };
 
 //fluid drawer, built the same way as ConversationsDrawer/SettingsDrawer: mounted at the screen
@@ -144,17 +178,35 @@ export function ModelSelectorDrawer({
   isLargeScreen = false,
   isDesktop = false,
   triggerRef,
+  messages = [],
 }: ModelSelectorDrawerProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
+
+  //reflection labels follow the locale
+  const reflections: SliderToggleOption[] = useMemo(
+    () =>
+      (["none", "low", "high"] as const).map((id) => ({
+        id,
+        label: t(`reflection.${id}`),
+        icon: REFLECTION_ICONS[id],
+      })),
+    [t],
+  );
 
   //anchor must match drawersheet layout
   const anchored = isDesktop || isLargeScreen;
 
   //remeasured on every open
-  const [anchor, setAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [anchor, setAnchor] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
   useEffect(() => {
     if (!anchored || !triggerRef?.current) return;
     triggerRef.current.measureInWindow((x, y, width, height) => {
@@ -166,6 +218,8 @@ export function ModelSelectorDrawer({
   const [loading, setLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  //whole percents keep the repaints down
+  const [downloadPercent, setDownloadPercent] = useState(0);
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
   const [localAvailable, setLocalAvailable] = useState(false);
@@ -173,16 +227,14 @@ export function ModelSelectorDrawer({
   const [sourcesRevision, setSourcesRevision] = useState(0);
   const [browsedKey, setBrowsedKey] = useState<string | null>(null);
 
-  //dismiss settles progress before callback, used when picking a model closes the sheet
-  const dismiss = useCallback(() => {
-    settleDrawer(progress, false);
-    onClose();
-  }, [progress, onClose]);
-
   useEffect(() => {
     AIModule.isModeAvailable("local").then(setLocalAvailable).catch(() => setLocalAvailable(false));
     const sub = DeviceEventEmitter.addListener(AppEvents.settingsChanged, () => setSourcesRevision((r) => r + 1));
-    return () => sub.remove();
+    //downloaded models must appear here too
+    const unsubscribe = subscribeLiteRTDownload((_, snapshot) => {
+      if (!snapshot) setSourcesRevision((r) => r + 1);
+    });
+    return () => { sub.remove(); unsubscribe(); };
   }, []);
 
   //settings may have changed while the panel was closed
@@ -193,18 +245,21 @@ export function ModelSelectorDrawer({
   const sources = useMemo(
     () => buildSources(localAvailable),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- revision tracks the settings behind buildSources
-    [localAvailable, sourcesRevision]
+    [localAvailable, sourcesRevision],
   );
 
   //the source the app currently generates with, falls back to the first tab
   const matchesActive = (source?: ModelSource) =>
-    !!source && source.service === aiService && (source.service !== "ollama" || source.url === ollamaUrl);
+    !!source &&
+    source.service === aiService &&
+    (!source.url || source.url === ollamaUrl);
   const activeSource = useMemo(
     () => sources.find(matchesActive) ?? sources[0],
     // eslint-disable-next-line react-hooks/exhaustive-deps -- matchesActive only reads the deps below
-    [sources, aiService, ollamaUrl]
+    [sources, aiService, ollamaUrl],
   );
-  const browsedSource = sources.find((s) => s.key === browsedKey) ?? activeSource;
+  const browsedSource =
+    sources.find((s) => s.key === browsedKey) ?? activeSource;
   const isBrowsingActive = matchesActive(browsedSource);
 
   useEffect(() => {
@@ -226,7 +281,8 @@ export function ModelSelectorDrawer({
       const kept = sameSource ? prev.filter((m) => next.includes(m)) : [];
       const merged = [...kept, ...next.filter((m) => !kept.includes(m))];
       //nothing moved, keep the same list so the rows are not touched
-      const same = merged.length === prev.length && merged.every((m, i) => m === prev[i]);
+      const same =
+        merged.length === prev.length && merged.every((m, i) => m === prev[i]);
       return same ? prev : merged;
     });
   };
@@ -249,13 +305,19 @@ export function ModelSelectorDrawer({
     if (pendingKey.current !== key) return;
     applyModels(getCachedModels(key), key);
     try {
-      const available = await AIModule.isSourceAvailable(source.service, source.url);
+      const available = await AIModule.isSourceAvailable(
+        source.service,
+        source.url,
+      );
       if (pendingKey.current !== key) return;
       setIsAvailable(available);
-      const fetched = available ? await AIModule.getModelsFor(source.service, source.url) : [];
+      const fetched = available
+        ? await AIModule.getModelsFor(source.service, source.url)
+        : [];
       if (pendingKey.current !== key) return;
       applyModels(fetched, key);
-      if (available) setCachedModels(key, fetched);
+      //offline rows must not be cached
+      setCachedModels(key, fetched);
     } catch (error) {
       console.warn(`[ModelSelector] refresh failed for ${key}:`, error);
       if (pendingKey.current !== key) return;
@@ -268,24 +330,42 @@ export function ModelSelectorDrawer({
     }
   }, []);
 
+  //picking a model must not refetch
+  const needsModel = !selectedModel;
   useEffect(() => {
     //refetch on open and source change
     //picks a model without opening
-    if (visible || !selectedModel) fetchModels(browsedSource);
+    if (visible || needsModel) fetchModels(browsedSource);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only the source key should trigger a refetch
-  }, [visible, selectedModel, fetchModels, browsedSource?.key]);
+  }, [visible, needsModel, fetchModels, browsedSource?.key]);
 
   useEffect(() => {
+    //cache may be from offline server
+    if (!hasFetched || loading) return;
     //only the active source may correct the selected model
-    if (!isBrowsingActive) return;
+    if (!isBrowsingActive || !browsedSource) return;
+    //rows stay with the browsed source
+    if (shownKey.current !== browsedSource.key) return;
     if (models.length > 0) {
       if (!selectedModel || !models.includes(selectedModel)) {
-        onModelChange(models[0]);
+        const last = getLastModel(browsedSource.key);
+        onModelChange(models.includes(last) ? last : models[0]);
+      } else {
+        setLastModel(browsedSource.key, selectedModel);
       }
-    } else if (hasFetched && !loading && selectedModel) {
+    } else if (selectedModel) {
       onModelChange("");
     }
-  }, [models, selectedModel, loading, hasFetched, isBrowsingActive, onModelChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the source key stands for browsedSource
+  }, [
+    models,
+    selectedModel,
+    loading,
+    hasFetched,
+    isBrowsingActive,
+    onModelChange,
+    browsedSource?.key,
+  ]);
 
   useEffect(() => {
     if (selectedModel) {
@@ -294,30 +374,102 @@ export function ModelSelectorDrawer({
   }, [selectedModel, aiService]);
 
   const handlePullModel = () => {
+    const source = browsedSource;
+    if (!source) return;
     setDownloadModalVisible(false);
     setIsDownloading(true);
-    AIModule.downloadService("gemma4")
-      .then(() => fetchModels(browsedSource))
+    setDownloadPercent(0);
+    AIModule.downloadFor(source.service, source.url, "gemma4", (progress) =>
+      setDownloadPercent(Math.round(progress * 100)),
+    )
+      .then(() => fetchModels(source))
       .catch(console.error)
       .finally(() => setIsDownloading(false));
   };
 
   const handleSelectModel = (model: string) => {
     const source = browsedSource;
-    if (source && !isBrowsingActive) onServiceChange(source.service, source.url);
+    if (source && !isBrowsingActive)
+      onServiceChange(source.service, source.url);
+    if (source) setLastModel(source.key, model);
     onModelChange(model);
-    dismiss();
   };
 
-  //friendly label for aicore variants
+  //tab switch restores its last model
+  const handleSelectSource = (source: ModelSource) => {
+    setBrowsedKey(source.key);
+    if (matchesActive(source)) return;
+    onServiceChange(source.service, source.url);
+    const last = getLastModel(source.key);
+    if (last) onModelChange(last);
+  };
+
+  //friendly label for local variants
   const displayName = (model: string) =>
-    model.startsWith("aicore-") ? getAICoreModelLabel(model) : model;
+    isLocalModel(model) ? getLocalModelLabel(model, true)
+      : isLiteRTModel(model) ? getLiteRTModelLabel(model)
+        : model;
 
   const displayModels = useMemo(() => {
     return [...models].sort((a, b) => a.localeCompare(b));
   }, [models]);
 
-  const selectedIndex = isBrowsingActive ? displayModels.findIndex((m) => m === selectedModel) : -1;
+  //keyed by source and model
+  const [capabilities, setCapabilities] = useState<Record<string, string[]>>({});
+  const capsKey = (model: string) => `${browsedSource?.key}:${model}`;
+  useEffect(() => {
+    //confirmed rows, offline would hang
+    if (!visible || !hasFetched || !isAvailable || !browsedSource) return;
+    if (shownKey.current !== browsedSource.key) return;
+    const source = browsedSource;
+    Promise.all(
+      models.map((model) =>
+        AIModule.getModelCapabilitiesFor(source.service, source.url, model)
+          .then((caps) => [`${source.key}:${model}`, caps] as const)
+          .catch(() => [`${source.key}:${model}`, [] as string[]] as const),
+      ),
+    ).then((entries) =>
+      setCapabilities((prev) => ({ ...prev, ...Object.fromEntries(entries) })),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the source key stands for browsedSource
+  }, [visible, hasFetched, isAvailable, models, browsedSource?.key]);
+
+  const renderCapabilities = (model: string, onPrimary: boolean) => {
+    const caps = capabilities[capsKey(model)] ?? [];
+    const shown = CAPABILITY_ICONS.filter((c) => caps.includes(c.id));
+    if (shown.length === 0) return null;
+    return (
+      <View style={styles.capabilitiesRow}>
+        {shown.map((c) => (
+          <Image
+            key={c.id}
+            source={c.icon}
+            style={[styles.capabilityIcon, onPrimary && styles.capabilityIconOnPrimary]}
+          />
+        ))}
+      </View>
+    );
+  };
+
+  //visible refreshes instruction and tools
+  const usedTokens = useMemo(
+    () => estimateContextTokens(selectedModel, Settings.getCached().instruction, messages),
+    [messages, selectedModel, visible],
+  );
+  //built-in models report their own window
+  const [localContextTokens, setLocalContextTokens] = useState(0);
+  useEffect(() => {
+    if (!visible || aiService !== "local") return;
+    AIModule.getLocalModelSheet()
+      .then((sheet) => setLocalContextTokens(sheet?.models.find((m) => m.id === selectedModel)?.contextTokens ?? 0))
+      .catch(() => setLocalContextTokens(0));
+  }, [visible, aiService, selectedModel]);
+  const contextWindow = aiService === "local" ? localContextTokens : contextWindowFor(aiService, ollamaUrl);
+  const showTokenWindow = messages.length > 0 && contextWindow > 0;
+
+  const selectedIndex = isBrowsingActive
+    ? displayModels.findIndex((m) => m === selectedModel)
+    : -1;
 
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [rowLayoutsVersion, setRowLayoutsVersion] = useState(0);
@@ -329,42 +481,46 @@ export function ModelSelectorDrawer({
   const dragStartY = useSharedValue(0);
   const dragIndex = useSharedValue(0);
 
-  const rowLayoutsRef = useRef<({ y: number; height: number } | undefined)[]>([]);
+  //keyed by model, skips unchanged rows
+  const rowLayoutsRef = useRef<Record<string, { y: number; height: number }>>(
+    {},
+  );
 
   const activeIndex = previewIndex ?? (selectedIndex >= 0 ? selectedIndex : 0);
   const hasPill = isBrowsingActive && selectedIndex >= 0;
 
-  const handleRowLayout = (index: number) => (e: LayoutChangeEvent) => {
+  const handleRowLayout = (model: string) => (e: LayoutChangeEvent) => {
     const { y, height } = e.nativeEvent.layout;
-    const existing = rowLayoutsRef.current[index];
+    const existing = rowLayoutsRef.current[model];
     if (existing && existing.y === y && existing.height === height) return;
-    rowLayoutsRef.current[index] = { y, height };
+    rowLayoutsRef.current[model] = { y, height };
     setRowLayoutsVersion((v) => v + 1);
   };
 
-  //reset measured rows on change
-  const modelsKey = displayModels.join("|");
-  useEffect(() => {
-    rowLayoutsRef.current = [];
-    setRowLayoutsVersion((v) => v + 1);
-  }, [modelsKey]);
+  //dense snapshot the drag worklet can read
+  const rowLayouts = useMemo<RowLayout[]>(
+    () => displayModels.map((m) => rowLayoutsRef.current[m] ?? null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- version tracks the mutable ref
+    [displayModels, rowLayoutsVersion],
+  );
+  //row highlights itself until measured
+  const pillShown = hasPill && !!rowLayouts[activeIndex];
 
   //park pill on selected slot
   useEffect(() => {
     if (previewIndex !== null) return;
-    if (selectedIndex < 0 || selectedIndex >= displayModels.length) return;
-    const layout = rowLayoutsRef.current[selectedIndex];
+    const layout = rowLayouts[selectedIndex];
     if (!layout) return;
     pillY.value = withTiming(layout.y, { duration: 180 });
     pillHeight.value = withTiming(layout.height, { duration: 180 });
-  }, [selectedModel, rowLayoutsVersion, visible, selectedIndex, displayModels.length, pillY, pillHeight]);
-
-  //dense snapshot the drag worklet can read
-  const rowLayouts = useMemo<RowLayout[]>(
-    () => Array.from({ length: displayModels.length }, (_, i) => rowLayoutsRef.current[i] ?? null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- version tracks the mutable ref
-    [displayModels.length, rowLayoutsVersion]
-  );
+  }, [
+    previewIndex,
+    rowLayouts,
+    visible,
+    selectedIndex,
+    pillY,
+    pillHeight,
+  ]);
 
   const previewCrossed = (index: number) => {
     setPreviewIndex(index);
@@ -437,107 +593,157 @@ export function ModelSelectorDrawer({
   const pillAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: pillY.value }, { scale: pillScale.value }],
     height: pillHeight.value,
-    backgroundColor: interpolateColor(pillLit.value, [0, 1], [Colors.primary, Colors.primaryBright]),
+    backgroundColor: interpolateColor(
+      pillLit.value,
+      [0, 1],
+      [Colors.primary, Colors.primaryBright],
+    ),
   }));
 
   const innerContent = (
     <View style={styles.sheetInner}>
-      <View style={styles.tabsRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        style={styles.tabsScroll}
+        contentContainerStyle={styles.tabsRow}
+      >
         {sources.map((source) => {
           const active = source.key === browsedSource?.key;
           return (
             <Pressable
               key={source.key}
-              onPress={() => setBrowsedKey(source.key)}
-              style={({ pressed, hovered }) => [styles.tab, (pressed || hovered) && { backgroundColor: Colors.overlaySubtle }]}
+              onPress={() => handleSelectSource(source)}
+              style={pressStyle(styles.tab, "subtle")}
             >
-              <Text style={[styles.tabText, active && styles.tabTextActive]} numberOfLines={1}>
+              <Text
+                style={[styles.tabText, active && styles.tabTextActive]}
+                numberOfLines={1}
+              >
                 {source.label}
               </Text>
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
 
-      <View style={styles.modelsBox}>
-        <ScrollView
-          style={{ maxHeight: MAX_MODELS_HEIGHT }}
-          contentContainerStyle={styles.modelsScrollContent}
-          showsVerticalScrollIndicator={false}
-          nestedScrollEnabled={true}
-        >
-          {sources.length === 0 ? (
-            <Text style={styles.emptyText}>No provider enabled, turn one on in Settings → Service</Text>
-          ) : loading && models.length === 0 ? (
-            <View style={styles.loadingRow}>
-              <LottieView source={loadingAnimation} autoPlay loop style={{ width: 24, height: 16 }} />
-              <Text style={styles.modelStatus}>Loading...</Text>
-            </View>
-          ) : models.length === 0 ? (
-            <View>
+      <View style={styles.contentCard}>
+        <View style={styles.modelsBox}>
+          <ScrollView
+            style={{ maxHeight: MAX_MODELS_HEIGHT }}
+            contentContainerStyle={styles.modelsScrollContent}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+          >
+            {sources.length === 0 ? (
               <Text style={styles.emptyText}>
-                {isAvailable ? "No models found" : "Unable to fetch models / server unreachable"}
+                No provider enabled, turn one on in Settings → Service
               </Text>
-              {isAvailable && isBrowsingActive && (
-                <Pressable
-                  onPress={() => setDownloadModalVisible(true)}
-                  style={({ pressed, hovered }) => [styles.downloadOption, (pressed || hovered) && { backgroundColor: Colors.surfacePressed }]}
-                >
-                  <Image source={downloadIcon} style={styles.downloadIcon} />
-                  <Text style={styles.downloadText}>
-                    {isDownloading ? "Downloading..." : "gemma4"}
-                  </Text>
-                </Pressable>
-              )}
-            </View>
-          ) : (
-            <View style={styles.optionsList}>
-              {displayModels.map((model, index) => {
-                const selected = isBrowsingActive && model === selectedModel;
-                const isSpecialActive = !hasPill && selected;
-                return (
+            ) : loading && models.length === 0 ? (
+              <View style={styles.loadingRow}>
+                <LottieView
+                  source={loadingAnimation}
+                  autoPlay
+                  loop
+                  style={{ width: 24, height: 16 }}
+                />
+                <Text style={styles.modelStatus}>
+                  {t("modelSelector.loading")}
+                </Text>
+              </View>
+            ) : models.length === 0 ? (
+              <View>
+                <Text style={styles.emptyText}>
+                  {isAvailable
+                    ? t("modelSelector.noModels")
+                    : t("modelSelector.unreachable")}
+                </Text>
+                {isAvailable && browsedSource?.service === "ollama" && (
                   <Pressable
-                    key={model}
-                    onLayout={handleRowLayout(index)}
-                    onPress={() => {
-                      Vibration.vibrate(10);
-                      handleSelectModel(model);
-                    }}
-                    style={({ pressed, hovered }) => [
-                      styles.option,
-                      isSpecialActive ? styles.optionSelected : (pressed || hovered) && { backgroundColor: Colors.overlaySubtle },
-                      isSpecialActive && (pressed || hovered) && { backgroundColor: Colors.primaryActive }
-                    ]}
+                    disabled={isDownloading}
+                    onPress={() => setDownloadModalVisible(true)}
+                    style={pressStyle(styles.downloadOption, "surface")}
                   >
-                    <Text style={[styles.optionText, isSpecialActive && styles.optionTextSelected]} numberOfLines={1}>
-                      {displayName(model)}
+                    <Image source={downloadIcon} style={styles.downloadIcon} />
+                    <Text style={styles.downloadText}>
+                      {isDownloading
+                        ? `${t("modelSelector.downloading")} ${downloadPercent}%`
+                        : "gemma4"}
                     </Text>
                   </Pressable>
-                );
-              })}
-              {hasPill && rowLayoutsRef.current[activeIndex] && (
-                <GestureDetector gesture={pillPan}>
-                  <Reanimated.View style={[styles.pill, pillAnimatedStyle]}>
-                    <Text style={[styles.optionText, styles.optionTextSelected]} numberOfLines={1}>
-                      {displayName(displayModels[activeIndex])}
-                    </Text>
-                  </Reanimated.View>
-                </GestureDetector>
-              )}
-            </View>
-          )}
-        </ScrollView>
+                )}
+              </View>
+            ) : (
+              <View style={styles.optionsList}>
+                {displayModels.map((model) => {
+                  const selected = isBrowsingActive && model === selectedModel;
+                  const isSpecialActive = !pillShown && selected;
+                  return (
+                    <Pressable
+                      key={model}
+                      onLayout={handleRowLayout(model)}
+                      onPress={() => {
+                        Vibration.vibrate(10);
+                        handleSelectModel(model);
+                      }}
+                      style={pressStyle(
+                        [styles.option, isSpecialActive && styles.optionSelected],
+                        isSpecialActive
+                          ? { backgroundColor: Colors.primaryActive }
+                          : "subtle",
+                      )}
+                    >
+                      <Text
+                        style={[
+                          styles.optionText,
+                          isSpecialActive && styles.optionTextSelected,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {displayName(model)}
+                      </Text>
+                      {renderCapabilities(model, isSpecialActive)}
+                    </Pressable>
+                  );
+                })}
+                {pillShown && (
+                  <GestureDetector gesture={pillPan}>
+                    <Reanimated.View style={[styles.pill, pillAnimatedStyle]}>
+                      <Text
+                        style={[styles.optionText, styles.optionTextSelected]}
+                        numberOfLines={1}
+                      >
+                        {displayName(displayModels[activeIndex])}
+                      </Text>
+                      {renderCapabilities(displayModels[activeIndex], true)}
+                    </Reanimated.View>
+                  </GestureDetector>
+                )}
+              </View>
+            )}
+          </ScrollView>
+        </View>
+
+        {showReflection && (
+          <View style={styles.reflectionRow}>
+            <Group>
+              <SliderToggle
+                selectedValue={selectedReflection}
+                onSelect={onReflectionChange}
+                options={reflections}
+              />
+            </Group>
+          </View>
+        )}
       </View>
 
-      {showReflection && (
-        <View style={styles.reflectionRow}>
-          <Group>
-            <SliderToggle
-              selectedValue={selectedReflection}
-              onSelect={onReflectionChange}
-              options={REFLECTIONS}
-            />
-          </Group>
+      {showTokenWindow && (
+        <View style={[styles.contentCard, styles.downloadProgressRow]}>
+          <ProgressBar progress={usedTokens / contextWindow} icon={tokenIcon} />
+          <Text style={styles.tokenMaxLabel}>
+            {t("modelSelector.tokenWindow")} : {usedTokens} / {contextWindow}
+          </Text>
         </View>
       )}
     </View>
@@ -546,13 +752,16 @@ export function ModelSelectorDrawer({
   //card hangs under its trigger
   const anchoredStyle = anchor
     ? {
-      position: "absolute" as const,
-      top: anchor.y + anchor.height + ANCHOR_GAP,
-      left: Math.max(
-        ANCHOR_MARGIN,
-        Math.min(anchor.x + anchor.width / 2 - DESKTOP_CARD_WIDTH / 2, windowWidth - DESKTOP_CARD_WIDTH - ANCHOR_MARGIN)
-      ),
-    }
+        position: "absolute" as const,
+        top: anchor.y + anchor.height + ANCHOR_GAP,
+        left: Math.max(
+          ANCHOR_MARGIN,
+          Math.min(
+            anchor.x + anchor.width / 2 - DESKTOP_CARD_WIDTH / 2,
+            windowWidth - DESKTOP_CARD_WIDTH - ANCHOR_MARGIN,
+          ),
+        ),
+      }
     : null;
 
   return (
@@ -564,7 +773,10 @@ export function ModelSelectorDrawer({
         progress={progress}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
-        sheetStyle={[styles.mobileSheet, { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + insets.bottom }]}
+        sheetStyle={[
+          styles.mobileSheet,
+          { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + insets.bottom },
+        ]}
         desktopStyle={[styles.desktopCard, anchoredStyle]}
         handleContainerStyle={styles.handleContainer}
         handleStyle={styles.dragHandle}
@@ -574,211 +786,260 @@ export function ModelSelectorDrawer({
 
       <NotificationModal
         visible={downloadModalVisible}
-        title="Download Gemma4"
+        title={t("modelSelector.download.title")}
         icon={downloadIcon}
-        message="Do you want to download the Gemma4 model to your Ollama server? This model is several GB in size."
+        message={t("modelSelector.download.message")}
         onClose={() => setDownloadModalVisible(false)}
         buttons={[
-          { text: "Cancel", onPress: () => setDownloadModalVisible(false), style: "secondary" },
-          { text: "Download", onPress: handlePullModel, style: "primary" },
+          {
+            text: t("common.cancel"),
+            onPress: () => setDownloadModalVisible(false),
+            style: "secondary",
+          },
+          {
+            text: t("modelSelector.download.confirm"),
+            onPress: handlePullModel,
+            style: "primary",
+          },
         ]}
       />
     </>
   );
 }
 
-const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  shadowLayer: {
-    position: "relative",
-  },
-  shadowBlock: {
-    position: "absolute",
-    top: 4,
-    left: -4,
-    right: 4,
-    height: 44,
-    backgroundColor: Colors.shadowInk,
-    borderRadius: Radius.xxl,
-  },
-  trigger: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: Colors.border,
-    paddingHorizontal: 12,
-    height: 44,
-    backgroundColor: Colors.surface,
-    gap: 8,
-    borderRadius: Radius.xxl,
-    maxWidth: 180,
-    overflow: "hidden",
-    position: "relative",
-    zIndex: 1,
-  },
-  icon: {
-    width: 18,
-    height: 18,
-    tintColor: Colors.textPrimary,
-  },
-  label: {
-    fontSize: FontSizes.body,
-    color: Colors.textPrimary,
-    fontFamily: Fonts.mono,
-    flexShrink: 1,
-  },
-  desktopCard: {
-    width: DESKTOP_CARD_WIDTH,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
-    elevation: 5,
-    overflow: "hidden",
-    padding: 16,
-  },
-  mobileSheet: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.huge2,
-    borderTopRightRadius: Radius.huge2,
-    borderBottomLeftRadius: Radius.xxl,
-    borderBottomRightRadius: Radius.xxl,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  handleContainer: {
-    alignItems: "center",
-    paddingVertical: 6,
-    marginBottom: 8,
-  },
-  dragHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.textMuted,
-  },
-  sheetInner: {
-    width: "100%",
-  },
-  tabsRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: Spacing.xxl,
-    marginBottom: 12,
-  },
-  tab: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: Radius.md,
-    flexShrink: 1,
-  },
-  tabText: {
-    fontSize: FontSizes.body,
-    color: Colors.textPrimary,
-    fontFamily: Fonts.mono,
-  },
-  tabTextActive: {
-    color: Colors.primary,
-  },
-  modelsBox: {
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: Radius.xxl,
-    overflow: "hidden",
-  },
-  modelsScrollContent: {
-    paddingHorizontal: 6,
-    paddingVertical: 6,
-  },
-  loadingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  modelStatus: {
-    fontSize: FontSizes.label,
-    color: Colors.textMuted,
-    fontStyle: "italic",
-  },
-  emptyText: {
-    color: Colors.error,
-    textAlign: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: FontSizes.caption,
-    fontFamily: Fonts.body,
-  },
-  optionsList: {
-    position: "relative",
-  },
-  pill: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    borderRadius: Radius.md,
-    borderWidth: 2,
-    borderColor: Colors.borderOnPrimary,
-  },
-  option: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: Radius.md,
-    marginBottom: 4,
-    borderWidth: 2,
-    borderColor: "transparent",
-  },
-  optionSelected: {
-    backgroundColor: Colors.primary,
-    borderWidth: 2,
-    borderColor: Colors.borderOnPrimary,
-  },
-  optionText: {
-    fontSize: FontSizes.body,
-    color: Colors.textPrimary,
-    fontFamily: Fonts.mono,
-  },
-  optionTextSelected: {
-    color: Colors.textOnPrimary,
-  },
-  reflectionRow: {
-    marginTop: 12,
-  },
-  downloadOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surfaceSubtle,
-    padding: 10,
-    borderRadius: Radius.xl,
-    borderWidth: 1,
-    borderColor: Colors.codeBlockText,
-    borderStyle: "dashed",
-    gap: 8,
-    marginVertical: 4,
-  },
-  downloadIcon: {
-    width: 16,
-    height: 16,
-    tintColor: Colors.textPrimary,
-  },
-  downloadText: {
-    fontSize: FontSizes.caption,
-    color: Colors.linkAlt,
-    fontFamily: Fonts.mono,
-  },
-});
+const makeStyles = (Colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    shadowLayer: {
+      position: "relative",
+      zIndex: 6,
+    },
+    shadowBlock: {
+      position: "absolute",
+      top: 4,
+      left: -4,
+      right: 4,
+      height: 44,
+      backgroundColor: Colors.shadowInk,
+      borderRadius: Radius.xxl,
+    },
+    trigger: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      height: 44,
+      backgroundColor: Colors.surface,
+      gap: 8,
+      borderRadius: Radius.xxl,
+      maxWidth: 180,
+      overflow: "hidden",
+      position: "relative",
+      zIndex: 1,
+    },
+    icon: {
+      width: 18,
+      height: 18,
+      tintColor: Colors.textPrimary,
+    },
+    label: {
+      fontSize: FontSizes.body,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.mono,
+      flexShrink: 1,
+    },
+    desktopCard: {
+      width: DESKTOP_CARD_WIDTH,
+      backgroundColor: Colors.groupedBackground,
+      borderRadius: Radius.xxl,
+      borderWidth: 2,
+      borderColor: Colors.border,
+      boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
+      elevation: 5,
+      overflow: "hidden",
+      paddingVertical: 16,
+      paddingHorizontal: Spacing.lg2,
+    },
+    mobileSheet: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: Colors.groupedBackground,
+      borderTopLeftRadius: Radius.huge2,
+      borderTopRightRadius: Radius.huge2,
+      borderBottomLeftRadius: Radius.xxl,
+      borderBottomRightRadius: Radius.xxl,
+      paddingHorizontal: Spacing.lg2,
+      paddingTop: 8,
+    },
+    handleContainer: {
+      alignItems: "center",
+      paddingVertical: 6,
+      marginBottom: 8,
+    },
+    dragHandle: {
+      width: 36,
+      height: 4,
+      borderRadius: Radius.pill,
+      backgroundColor: Colors.textMuted,
+    },
+    sheetInner: {
+      width: "100%",
+    },
+    tabsScroll: {
+      flexGrow: 0,
+      marginBottom: Spacing.lg2,
+    },
+    tabsRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Spacing.xxl,
+      paddingHorizontal: Spacing.xs,
+    },
+    tab: {
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: Spacing.xs,
+      borderRadius: Radius.md,
+      flexShrink: 0,
+    },
+    tabText: {
+      fontSize: FontSizes.body,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.mono,
+    },
+    tabTextActive: {
+      color: Colors.primary,
+    },
+    contentCard: {
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
+      padding: Spacing.md,
+      marginBottom: Spacing.lg2,
+    },
+    modelsBox: {
+      borderWidth: 2,
+      borderColor: Colors.border,
+      borderRadius: Radius.xxl,
+      overflow: "hidden",
+    },
+    modelsScrollContent: {
+      paddingHorizontal: 6,
+      paddingVertical: 6,
+    },
+    loadingRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      gap: 8,
+    },
+    modelStatus: {
+      fontSize: FontSizes.label,
+      color: Colors.textMuted,
+      fontStyle: "italic",
+    },
+    emptyText: {
+      color: Colors.error,
+      textAlign: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      fontSize: FontSizes.caption,
+      fontFamily: Fonts.body,
+    },
+    optionsList: {
+      position: "relative",
+    },
+    pill: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      top: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      borderRadius: Radius.md,
+      borderWidth: 2,
+      borderColor: Colors.borderOnPrimary,
+    },
+    option: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: Radius.md,
+      marginBottom: 4,
+      borderWidth: 2,
+      borderColor: "transparent",
+    },
+    optionSelected: {
+      backgroundColor: Colors.primary,
+      borderWidth: 2,
+      borderColor: Colors.borderOnPrimary,
+    },
+    optionText: {
+      fontSize: FontSizes.body,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.mono,
+      flexShrink: 1,
+    },
+    optionTextSelected: {
+      color: Colors.textOnPrimary,
+    },
+    capabilitiesRow: {
+      flexDirection: "row-reverse",
+      alignItems: "center",
+      gap: Spacing.md,
+      marginLeft: "auto",
+      paddingLeft: Spacing.md,
+    },
+    capabilityIcon: {
+      width: 16,
+      height: 16,
+      tintColor: Colors.textPrimary,
+      opacity: 0.5,
+    },
+    capabilityIconOnPrimary: {
+      tintColor: Colors.textOnPrimary,
+    },
+    reflectionRow: {
+      marginTop: Spacing.md,
+    },
+    downloadProgressRow: {
+      padding: 0,
+      paddingVertical: Spacing.xs,
+      marginBottom: 0,
+    },
+    tokenMaxLabel: {
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.label,
+      color: Colors.textSecondary,
+      paddingHorizontal: Spacing.lg2,
+      paddingBottom: Spacing.sm,
+    },
+    downloadOption: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: Colors.surfaceSubtle,
+      padding: 10,
+      borderRadius: Radius.xl,
+      borderWidth: 1,
+      borderColor: Colors.codeBlockText,
+      borderStyle: "dashed",
+      gap: 8,
+      marginVertical: 4,
+    },
+    downloadIcon: {
+      width: 16,
+      height: 16,
+      tintColor: Colors.textPrimary,
+    },
+    downloadText: {
+      fontSize: FontSizes.caption,
+      color: Colors.linkAlt,
+      fontFamily: Fonts.mono,
+    },
+  });

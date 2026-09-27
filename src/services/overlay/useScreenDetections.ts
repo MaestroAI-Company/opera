@@ -6,10 +6,14 @@ import { CaptureRegion, ScreenCapture } from './screenCapture';
 const NONE: CaptureRegion[] = [];
 
 //capture ui boxes guide selection
-export function useScreenDetections(session: number): CaptureRegion[] {
+export function useScreenDetections(session: number, enabled: boolean): CaptureRegion[] {
   const [found, setFound] = useState<{ session: number; boxes: CaptureRegion[] } | null>(null);
 
   useEffect(() => {
+    //no screen access no detector
+    if (!enabled) return;
+    //load during entry and capture
+    ObjectDetector.prepare();
     let cancelled = false;
     //boxes unread when overlay hidden
     const appState = AppState.addEventListener('change', state => {
@@ -20,7 +24,6 @@ export function useScreenDetections(session: number): CaptureRegion[] {
       //one analysis after capture lands
       const size = await ScreenCapture.waitForSize(() => cancelled);
       if (!size || cancelled) return;
-      ObjectDetector.prepare();
       const boxes = await ObjectDetector.detect();
       if (boxes && boxes.length > 0 && !cancelled) setFound({ session, boxes });
     });
@@ -30,7 +33,7 @@ export function useScreenDetections(session: number): CaptureRegion[] {
       appState.remove();
       task.cancel();
     };
-  }, [session]);
+  }, [session, enabled]);
 
   //stale capture boxes dropped
   return found?.session === session ? found.boxes : NONE;

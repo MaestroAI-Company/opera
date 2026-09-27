@@ -1,4 +1,4 @@
-const { withAndroidManifest, withMainApplication, withDangerousMod, withAppBuildGradle, AndroidConfig } = require('@expo/config-plugins');
+const { withAndroidManifest, withMainApplication, withDangerousMod, withAppBuildGradle, withProjectBuildGradle, withGradleProperties, AndroidConfig } = require('@expo/config-plugins');
 const path = require('path');
 const fs = require('fs');
 
@@ -56,6 +56,23 @@ function withNativeAndroid(config) {
       });
     } else {
       delete existingSession.$['android:process'];
+    }
+
+    //android 14+ stops services without dataSync
+    //gigabyte downloads need the dataSync type
+    const notifeeFgs = application.service.find(s => s.$['android:name'] === 'app.notifee.core.ForegroundService');
+    if (notifeeFgs) {
+      notifeeFgs.$['android:foregroundServiceType'] = 'dataSync';
+      notifeeFgs.$['tools:replace'] = 'android:foregroundServiceType';
+    } else {
+      application.service.push({
+        $: {
+          'android:name': 'app.notifee.core.ForegroundService',
+          'android:exported': 'false',
+          'android:foregroundServiceType': 'dataSync',
+          'tools:replace': 'android:foregroundServiceType',
+        },
+      });
     }
 
     // add recognition service
@@ -165,6 +182,7 @@ function withNativeAndroid(config) {
       copyTemplate('src/TextSelectionView.kt', path.join(javaDir, 'TextSelectionView.kt'), packageName);
       copyTemplate('src/MaestroOverlayPackage.kt', path.join(javaDir, 'MaestroOverlayPackage.kt'), packageName);
       copyTemplate('src/AssistantModule.kt', path.join(javaDir, 'AssistantModule.kt'), packageName);
+      copyTemplate('src/PredictiveBackModule.kt', path.join(javaDir, 'PredictiveBackModule.kt'), packageName);
 
       // AICore (ML Kit GenAI) modules
       copyTemplate('src/AICorePackage.kt', path.join(javaDir, 'AICorePackage.kt'), packageName);
@@ -229,6 +247,22 @@ function withNativeAndroid(config) {
     return config;
   });
 
+  //4. relax a kotlin 2.3 diagnostic
+  config = withProjectBuildGradle(config, (config) => {
+    const marker = 'ProhibitIntersectionReifiedTypeParameter';
+    if (config.modResults.contents.includes(marker)) return config;
+    //litert-lm pins kotlin 2.3, reification errors
+    //breaking expo modules on older rules
+    config.modResults.contents +=
+      '\n\nsubprojects {\n' +
+      '    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {\n' +
+      `        compilerOptions.freeCompilerArgs.add("-XXLanguage:-${marker}")\n` +
+      '    }\n' +
+      '}\n';
+    return config;
+  });
+
+  //5. add ml kit genai aicore deps
   config = withAppBuildGradle(config, (config) => {
     let contents = config.modResults.contents;
     //mlkit compiled with newer kotlin, skip version check
@@ -275,6 +309,15 @@ function withNativeAndroid(config) {
       "        release {\n            // Caution! In production, you need to generate your own keystore file.\n            // see https://reactnative.dev/docs/signed-apk-android.\n            //debug key without an upload keystore\n            signingConfig System.getenv('UPLOAD_STORE_FILE') ? signingConfigs.release : signingConfigs.debug"
     );
     config.modResults.contents = contents;
+    return config;
+  });
+
+  //default gradle heap starves r8
+  config = withGradleProperties(config, (config) => {
+    const value = '-Xmx4096m -XX:MaxMetaspaceSize=1024m';
+    const jvmargs = config.modResults.find((p) => p.key === 'org.gradle.jvmargs');
+    if (jvmargs) jvmargs.value = value;
+    else config.modResults.push({ type: 'property', key: 'org.gradle.jvmargs', value });
     return config;
   });
 

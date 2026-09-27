@@ -7,8 +7,10 @@ import {
   DeviceEventEmitter,
   ImageSourcePropType,
   InteractionManager,
+  Keyboard,
   Linking,
   Platform,
+  Pressable,
   StyleSheet,
   Vibration,
 } from 'react-native';
@@ -19,7 +21,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { Colors } from '../../../constants/theme';
 import { AIModule } from '../../services/ai/AIModule';
-import { migrateModelSources } from '../../services/ai/providers/sources';
+import { getOllamaTuning, migrateModelSources } from '../../services/ai/providers/sources';
 import { buildSystemPrompt } from '../../services/ai/generation/chatGeneration';
 import { GenerationService } from '../../services/ai/generation/GenerationService';
 import { generateSuggestions, Suggestion } from '../../services/ai/generation/suggestions';
@@ -28,10 +30,12 @@ import { arrayBufferToBase64 } from '../../services/ai/utils/base64';
 import { CloudSync } from '../../services/CloudSyncService';
 import { Conversation, DB, Message } from '../../services/db/DatabaseService';
 import { AppEvents } from '../../services/events';
+import { initI18n, useT } from '../../i18n';
 import { AppSettings, Settings } from '../../services/settings/SettingsService';
 import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { TTS } from '../../services/speech/TTSService';
 import NotificationModal from '../ui/NotificationModal';
+import ToolConsentHost from './ToolConsentHost';
 import ChatBar, { ChatBarHandle } from './ChatBar';
 import ChatView from './ChatView';
 import { ModelSelectorDrawer, ModelSelectorTrigger } from './ModelSelector';
@@ -40,6 +44,7 @@ import TextLayer from './TextLayer';
 
 import { useResponsive } from '../../hooks/useResponsive';
 import { AppContext, AppIcon, ScreenCapture } from '../../services/overlay/screenCapture';
+import { useScreenAccess } from '../../services/overlay/useScreenAccess';
 import { useScreenDetections } from '../../services/overlay/useScreenDetections';
 import { useScreenSelection } from '../../services/overlay/useScreenSelection';
 import { useScreenText } from '../../services/overlay/useScreenText';
@@ -57,6 +62,9 @@ const BAR_ENTRY = 120;
 const HALO_SIZE = 88;
 const assistantInfoImage = require('../../../assets/images/ImageCard/AssistantInfo.png');
 
+//the router layout never mounts here
+initI18n();
+
 export default function AssistantOverlayWrapper() {
   return (
     <SafeAreaProvider>
@@ -68,6 +76,7 @@ export default function AssistantOverlayWrapper() {
 }
 
 function AssistantOverlay() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const { isLargeScreen } = useResponsive();
 
@@ -156,10 +165,15 @@ function AssistantOverlay() {
   const [phase, setPhase] = useState<'select' | 'respond'>('select');
   //bump forces fresh screenshot analysis
   const [session, setSession] = useState(0);
-  const { selection, select, clear: clearSelection, attachment } = useScreenSelection(session);
+  //android settings gate every screen feature
+  const screenAccess = useScreenAccess(session);
+  //close bumps session, skip its analysis
+  const [closed, setClosed] = useState(false);
+  const screenLive = screenAccess && !closed;
+  const { selection, select, clear: clearSelection, attachment } = useScreenSelection(session, screenLive);
   //selection works without it
-  const detections = useScreenDetections(session);
-  const screenText = useScreenText(session);
+  const detections = useScreenDetections(session, screenLive);
+  const screenText = useScreenText(session, screenLive);
   //foreground app and screen text
   const appContextRef = useRef<AppContext | null>(null);
   //chip icon and label state
@@ -168,6 +182,7 @@ function AssistantOverlay() {
   const [appContextDismissed, setAppContextDismissed] = useState(false);
   //hide chrome while drawing lasso
   const [isDrawingSelection, setIsDrawingSelection] = useState(false);
+  const [showDetections, setShowDetections] = useState(false);
 
   //lift bottom bar above keyboard
   const keyboardHeight = useSharedValue(0);
@@ -223,6 +238,8 @@ function AssistantOverlay() {
   //capture app context for the ai
   //defer assist and icon reads
   useEffect(() => {
+    //reset already cleared it on close
+    if (closed) return;
     let cancelled = false;
     appContextRef.current = null;
     const handle = InteractionManager.runAfterInteractions(() => {
@@ -241,7 +258,7 @@ function AssistantOverlay() {
         .catch(() => { });
     });
     return () => { cancelled = true; handle.cancel(); };
-  }, [session]);
+  }, [session, closed]);
 
 
   const activeConversationRef = useRef<Conversation | null>(null);
@@ -270,9 +287,11 @@ function AssistantOverlay() {
     setAiService(s.aiService);
     setOllamaUrl(s.ollamaUrl);
     setAlwaysWhisper(s.alwaysWhisper);
+    setShowDetections(s.showDetectionBoxes);
     //store setting for later
     autoStartMicSetting.current = s.autoStartMic ?? true;
-    AIModule.configure(s.ollamaUrl, s.ollamaContextLength, s.ollamaKeepAlive);
+    const tuning = getOllamaTuning(s.ollamaUrl);
+    AIModule.configure(s.ollamaUrl, tuning.contextLength, tuning.keepAlive);
     AIModule.setMode(s.aiService);
     STT.setLanguage(s.whisperLanguage);
   }, []);
@@ -295,10 +314,10 @@ function AssistantOverlay() {
         if (!s.hasSeenAssistantOverlay) {
           Settings.set('hasSeenAssistantOverlay', true);
           setModalConfig({
-            title: 'Welcome to the Assistant View',
-            message: "This is your floating assistant. You can Circle To Ask on your screen with any content. It's here to help you across your usage.",
+            title: t('overlay.welcome.title'),
+            message: t('overlay.welcome.message'),
             image: assistantInfoImage,
-            buttons: [{ text: 'OK', onPress: () => setModalVisible(false), style: 'primary' }]
+            buttons: [{ text: t('common.ok'), onPress: () => setModalVisible(false), style: 'primary' }]
           });
           setModalVisible(true);
         }
@@ -319,7 +338,7 @@ function AssistantOverlay() {
       });
     };
     init();
-  }, [applySettings]);
+  }, [applySettings, t]);
 
   //settings edited elsewhere in this process
   useEffect(() => {
@@ -357,6 +376,7 @@ function AssistantOverlay() {
     const handler = BackHandler.addEventListener('hardwareBackPress', () => {
       if (closingRef.current) return true;
       closingRef.current = true;
+      setClosed(true);
       handOffGeneration();
       playExit(() => {
         resetOverlay();
@@ -393,6 +413,7 @@ function AssistantOverlay() {
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener(AppEvents.overlayReopened, () => {
       closingRef.current = false;
+      setClosed(false);
       resetOverlay();
       //settings may have changed while closed
       reloadSettings();
@@ -406,6 +427,7 @@ function AssistantOverlay() {
   const closeOverlay = useCallback(() => {
     if (closingRef.current) return;
     closingRef.current = true;
+    setClosed(true);
     handOffGeneration();
     //reset only once hidden, so the content does not blank mid exit
     playExit(() => {
@@ -420,6 +442,7 @@ function AssistantOverlay() {
     Linking.openURL(`opera://?convId=${convId}`).catch(() => { });
     if (closingRef.current) return;
     closingRef.current = true;
+    setClosed(true);
     playExit(() => {
       resetOverlay();
       //close overlay only
@@ -535,7 +558,7 @@ function AssistantOverlay() {
     //dismiss chip after first message
     setAppContextDismissed(true);
 
-    const taskSystemPrompt = buildSystemPrompt(instruction, screenContextSegment);
+    const taskSystemPrompt = buildSystemPrompt(model, instruction, screenContextSegment);
     screenContextSegmentsRef.current[userMsg.id] = screenContextSegment;
 
     const assistantMsg = await DB.addMessage(conv.id, 'assistant', '…');
@@ -648,7 +671,7 @@ function AssistantOverlay() {
       msgId: assistantMsg.id,
       prompt: regenUserText,
       model,
-      systemPrompt: buildSystemPrompt(instruction, regenSegment),
+      systemPrompt: buildSystemPrompt(model, instruction, regenSegment),
       history: taskHistory,
       think: reflection === 'none' ? false : reflection,
     });
@@ -711,8 +734,8 @@ function AssistantOverlay() {
       const whisperModelName = Settings.getCached().whisperModel || "base";
       if (whisperModelName === "none") {
         setModalConfig({
-          title: "Whisper Not Configured",
-          message: "You have disabled on-device transcription. Please select a Whisper model in settings to enable it.",
+          title: t("whisper.notConfigured.title"),
+          message: t("whisper.notConfigured.message"),
           buttons: [{ text: "OK", onPress: () => setModalVisible(false), style: "primary" }]
         });
         setModalVisible(true);
@@ -722,8 +745,8 @@ function AssistantOverlay() {
       const isInstalled = await WhisperSTT.isModelInstalled(whisperModelName);
       if (!isInstalled) {
         setModalConfig({
-          title: "Whisper Not Installed",
-          message: `The Whisper ${whisperModelName} model is required for on-device transcription. Please install it in the main app settings.`,
+          title: t("whisper.notInstalled.title"),
+          message: t("whisper.notInstalled.messageMainApp", { model: whisperModelName }),
           buttons: [{ text: "OK", onPress: () => setModalVisible(false), style: "primary" }]
         });
         setModalVisible(true);
@@ -733,8 +756,8 @@ function AssistantOverlay() {
       const initialized = await WhisperSTT.init(whisperModelName);
       if (!initialized) {
         setModalConfig({
-          title: "Initialization Error",
-          message: `Failed to load the Whisper ${whisperModelName} model.`,
+          title: t("whisper.initError.title"),
+          message: t("whisper.initError.message", { model: whisperModelName }),
           buttons: [{ text: "OK", onPress: () => setModalVisible(false), style: "primary" }]
         });
         setModalVisible(true);
@@ -746,7 +769,7 @@ function AssistantOverlay() {
       console.error("Whisper transcription failed:", e);
       return null;
     }
-  }, [alwaysWhisper, modelCapabilities]);
+  }, [alwaysWhisper, modelCapabilities, t]);
 
   //refs drive the render here, they are written from the async generation flow
   /* eslint-disable react-hooks/refs */
@@ -771,20 +794,26 @@ function AssistantOverlay() {
           style={[styles.phaseContainer, { opacity: mountOpacity }]}
         >
           {phase === 'select' ? (
-            <>
-              <SelectionLayer
-                selection={selection}
-                onChange={select}
-                onVibrate={() => Vibration.vibrate(10)}
-                onDrawingChange={setIsDrawingSelection}
-                onDismiss={closeOverlay}
-                detections={detections}
-              />
-              <TextLayer
-                codes={screenText.codes}
-                onVibrate={() => Vibration.vibrate(10)}
-              />
-            </>
+            screenAccess ? (
+              <>
+                <SelectionLayer
+                  selection={selection}
+                  onChange={select}
+                  onVibrate={() => Vibration.vibrate(10)}
+                  onDrawingChange={setIsDrawingSelection}
+                  onDismiss={closeOverlay}
+                  detections={detections}
+                  showDetections={showDetections}
+                />
+                <TextLayer
+                  codes={screenText.codes}
+                  onVibrate={() => Vibration.vibrate(10)}
+                />
+              </>
+            ) : (
+              /* nothing to select without screen access, a tap still leaves */
+              <Pressable style={StyleSheet.absoluteFill} onPress={closeOverlay} />
+            )
           ) : (
             <Animated.View style={[styles.phaseContainer, { opacity: responseOpacity }]} pointerEvents="box-none">
               <LinearGradient
@@ -820,7 +849,10 @@ function AssistantOverlay() {
           >
             <ModelSelectorTrigger
               selectedModel={selectedModel}
-              onPress={() => setModelSelectorVisible(v => !v)}
+              onPress={() => {
+                Keyboard.dismiss();
+                setModelSelectorVisible(v => !v);
+              }}
             />
           </Animated.View>
 
@@ -836,9 +868,8 @@ function AssistantOverlay() {
               onStop={handleStop}
               onTranscribe={handleTranscribe}
               canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes('audio') && !!selectedModel}
-              supportsFiles={modelCapabilities.includes('vision') || modelCapabilities.includes('audio')}
+              modelCapabilities={modelCapabilities}
               onOpenSettings={() => { }}
-              enabled={true}
               autoStartMic={shouldAutoStartMic}
               selection={attachment}
               onSelectionRemove={clearSelection}
@@ -864,6 +895,8 @@ function AssistantOverlay() {
           onClose={() => setModalVisible(false)}
         />
 
+        <ToolConsentHost />
+
         <ModelSelectorDrawer
           visible={modelSelectorVisible}
           onClose={() => setModelSelectorVisible(false)}
@@ -879,9 +912,9 @@ function AssistantOverlay() {
             Settings.set('aiService', service);
             Settings.set('ollamaUrl', url);
             AIModule.setMode(service);
-            if (service === 'ollama') {
-              const cached = Settings.getCached();
-              AIModule.configure(url, cached.ollamaContextLength, cached.ollamaKeepAlive);
+            if (url) {
+              const tuning = getOllamaTuning(url);
+              AIModule.configure(url, tuning.contextLength, tuning.keepAlive);
             }
           }}
           onModelChange={model => {
@@ -893,6 +926,7 @@ function AssistantOverlay() {
           }}
           onReflectionChange={setReflection}
           isLargeScreen={isLargeScreen}
+          messages={messages}
         />
 
         <HeadlessWebView />

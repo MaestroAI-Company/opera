@@ -25,7 +25,7 @@ type State = {
 const blank = (session: number): State => ({ session, selection: { kind: 'none' }, attachment: null });
 
 //selection to chat attachment
-export function useScreenSelection(session: number) {
+export function useScreenSelection(session: number, enabled: boolean) {
   const [state, setState] = useState<State>(() => blank(session));
 
   //full screen cached for instant pick
@@ -44,6 +44,8 @@ export function useScreenSelection(session: number) {
     let cancelled = false;
     cropId.current++;
     fullScreenUri.current = null;
+    //no screen access nothing to crop
+    if (!enabled) return;
 
     ScreenCapture.waitForSize(() => cancelled).then(size => {
       if (cancelled) return;
@@ -58,9 +60,10 @@ export function useScreenSelection(session: number) {
     });
 
     return () => { cancelled = true; };
-  }, [session]);
+  }, [session, enabled]);
 
   const select = useCallback((next: Selection) => {
+    if (!enabled) return;
     const id = ++cropId.current;
 
     if (next.kind === 'none') {
@@ -83,7 +86,7 @@ export function useScreenSelection(session: number) {
       if (full) fullScreenUri.current = uri;
       patch({ attachment: { uri, label } });
     });
-  }, [patch]);
+  }, [patch, enabled]);
 
   const clear = useCallback(() => {
     cropId.current++;

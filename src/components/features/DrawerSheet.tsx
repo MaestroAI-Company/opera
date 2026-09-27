@@ -2,6 +2,7 @@ import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Animated,
   BackHandler,
+  Keyboard,
   LayoutChangeEvent,
   PanResponder,
   Platform,
@@ -11,16 +12,24 @@ import {
   View,
   ViewStyle,
 } from "react-native";
+import Reanimated, { useAnimatedStyle } from "react-native-reanimated";
 import { Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { useKeyboardLift } from "../../hooks/useKeyboardLift";
+import { usePredictiveBack } from "../../hooks/usePredictiveBack";
 import { useThemedStyles } from "../../hooks/useTheme";
-import { dragDrawer, gestureVelocity, settleDrawer } from "./drawerAnimation";
-
-//distance the finger must travel to fully open/close by drag alone
-const PULL_DISTANCE = 280;
+import { dragDrawer, gestureVelocity, releaseOpens, settleDrawer } from "./drawerAnimation";
 
 //slide fallback before real measure
 const CLOSED_SLIDE = 420;
+//closed sheet parks below so no edge peeks
+const CLOSED_MARGIN = 80;
+
+//lets an outside gesture drag a sheet one to one
+const sheetTravels = new WeakMap<Animated.Value, number>();
+export function sheetTravel(progress: Animated.Value): number {
+  return sheetTravels.get(progress) ?? CLOSED_SLIDE;
+}
 
 export type DrawerSheetProps = {
   visible: boolean;
@@ -30,8 +39,11 @@ export type DrawerSheetProps = {
   isLargeScreen?: boolean;
   isDesktop?: boolean;
   liftOffset?: number;
-  //extra native-driven translateY (eg. keyboard follow), composed with the drawer's own slide
-  keyboardTranslateY?: Animated.Value;
+  //sheet sits on the keyboard, needs a maxHeight in sheetStyle
+  avoidKeyboard?: boolean;
+  //android back/gesture checks this first; true means it navigated inside the
+  //sheet itself, so the sheet stays open instead of dismissing
+  onBackPress?: () => boolean;
   children: ReactNode;
   sheetStyle?: StyleProp<ViewStyle>;
   desktopStyle?: StyleProp<ViewStyle>;
@@ -47,7 +59,8 @@ export default function DrawerSheet({
   isLargeScreen = false,
   isDesktop = false,
   liftOffset = 0,
-  keyboardTranslateY,
+  avoidKeyboard = false,
+  onBackPress,
   children,
   sheetStyle,
   desktopStyle,
@@ -59,60 +72,93 @@ export default function DrawerSheet({
   const ownedProgress = useAnimatedValue(0);
   const progress = isLift ? ownedProgress : externalProgress ?? ownedProgress;
   const nativeDriver = !isLift;
+  //outside gesture needs it mounted to show
+  const keepMounted = !isLift && externalProgress !== undefined;
   const [rendered, setRendered] = useState(visible);
   const [contentHeight, setContentHeight] = useState(0);
+  const measured = contentHeight > 0;
+  //sheet slides exactly its own height
+  const travel = contentHeight || CLOSED_SLIDE;
+  //desktop card only fades, no height needed
+  const slides = isLift || !(isLargeScreen || isDesktop);
+
+  useEffect(() => {
+    sheetTravels.set(progress, travel);
+  }, [progress, travel]);
 
   const settle = useCallback(
     (open: boolean, velocity = 0) => {
       settleDrawer(progress, open, velocity, nativeDriver, () => {
-        if (!open) setRendered(false);
+        if (open) return;
+        setRendered(false);
+        //content may differ next time
+        if (!keepMounted) setContentHeight(0);
       });
     },
-    [progress, nativeDriver]
+    [progress, nativeDriver, keepMounted]
   );
 
   useEffect(() => {
-    if (visible) setRendered(true);
+    if (visible) {
+      setRendered(true);
+      //sliding a guessed height pops tall sheets in
+      if (slides && !measured) return;
+    } else if (slides && !measured) {
+      //never shown, nothing to animate out
+      setRendered(false);
+      return;
+    }
     settle(visible);
-  }, [visible, settle]);
+  }, [visible, slides, measured, settle]);
 
-  const dismiss = useCallback(() => {
-    settle(false);
+  const dismiss = useCallback((velocity = 0) => {
+    //keyboard lift would hold it on screen
+    Keyboard.dismiss();
+    settle(false, velocity);
     onClose();
   }, [settle, onClose]);
 
-  //mobile pull down gesture, dismisses past a threshold, otherwise snaps back open
+  //pull down moves the sheet with the finger
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gestureState) =>
           gestureState.dy > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
         onPanResponderMove: (_, gestureState) => {
-          dragDrawer(progress, Math.max(0, Math.min(1, 1 - gestureState.dy / PULL_DISTANCE)));
+          dragDrawer(progress, 1 - gestureState.dy / travel);
         },
         onPanResponderRelease: (_, gestureState) => {
-          const velocity = -gestureVelocity(gestureState.vy, PULL_DISTANCE);
-          if (gestureState.dy > 70 || gestureState.vy > 0.5) {
-            dismiss();
-          } else {
+          const velocity = -gestureVelocity(gestureState.vy, travel);
+          if (releaseOpens(1 - gestureState.dy / travel, -gestureState.vy)) {
             settle(true, velocity);
+          } else {
+            dismiss(velocity);
           }
         },
         onPanResponderTerminate: () => settle(true),
       }),
-    [dismiss, settle, progress]
+    [dismiss, settle, progress, travel]
   );
+
+  //android back gesture pulls the sheet down, release closes it
+  //unless onBackPress claims it to navigate inside the sheet instead
+  usePredictiveBack(visible, {
+    onProgress: (p) => dragDrawer(progress, 1 - p),
+    onCancel: () => settle(true),
+    onBack: () => (onBackPress?.() ? settle(true) : dismiss()),
+  });
 
   //overlay only: hardware back and desktop escape dismiss it, lift sits inside a screen
   //that already arbitrates its own back-press priority (eg. recording > sheet)
   useEffect(() => {
     if (isLift || !visible) return;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (onBackPress?.()) return true;
       dismiss();
       return true;
     });
     return () => sub.remove();
-  }, [isLift, visible, dismiss]);
+  }, [isLift, visible, dismiss, onBackPress]);
 
   useEffect(() => {
     if (isLift || !visible || Platform.OS !== "web") return;
@@ -131,13 +177,12 @@ export default function DrawerSheet({
 
   if (isLift) {
     if (!rendered) return null;
-    const measuring = contentHeight === 0;
     return (
       <Animated.View
         onLayout={(e: LayoutChangeEvent) => setContentHeight(e.nativeEvent.layout.height)}
         pointerEvents={visible ? "auto" : "none"}
         style={
-          measuring
+          !measured
             ? styles.measuring
             : {
               //open state eats the safe area below so the sheet reaches the screen edge
@@ -154,18 +199,15 @@ export default function DrawerSheet({
     );
   }
 
-  if (!rendered) return null;
+  if (!rendered && !keepMounted) return null;
 
-  //tall sheets need their real height
-  const closedOffset = Math.max(contentHeight, CLOSED_SLIDE);
-  const translateYMobile = progress.interpolate({ inputRange: [0, 1], outputRange: [closedOffset, 0] });
+  const translateYMobile = progress.interpolate({ inputRange: [0, 1], outputRange: [travel + CLOSED_MARGIN, 0] });
   const translateYDesktop = progress.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] });
-  const translateYMobileWithKeyboard = keyboardTranslateY ? Animated.add(translateYMobile, keyboardTranslateY) : translateYMobile;
 
   return (
     <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
       <Animated.View style={[styles.overlay, { opacity: progress }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => dismiss()} />
       </Animated.View>
 
       {isLargeScreen || isDesktop ? (
@@ -182,15 +224,23 @@ export default function DrawerSheet({
         <Animated.View
           pointerEvents={visible ? "auto" : "none"}
           onLayout={(e: LayoutChangeEvent) => setContentHeight(e.nativeEvent.layout.height)}
-          style={[sheetStyle, { transform: [{ translateY: translateYMobileWithKeyboard }] }]}
+          style={[sheetStyle, { transform: [{ translateY: translateYMobile }] }, !measured && styles.hidden]}
           {...panResponder.panHandlers}
         >
           {handle}
           {children}
+          {avoidKeyboard && <KeyboardSpacer />}
         </Animated.View>
       )}
     </View>
   );
+}
+
+//grows with the keyboard, maxHeight shrinks the content instead
+function KeyboardSpacer() {
+  const keyboardHeight = useKeyboardLift();
+  const style = useAnimatedStyle(() => ({ height: keyboardHeight.value }));
+  return <Reanimated.View style={style} />;
 }
 
 const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
@@ -209,6 +259,9 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingRight: Spacing.xl2,
     paddingBottom: Spacing.xl2,
     justifyContent: "flex-end",
+  },
+  hidden: {
+    opacity: 0,
   },
   measuring: {
     position: "absolute",

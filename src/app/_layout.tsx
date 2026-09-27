@@ -13,7 +13,10 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import SiteHead from "../components/SiteHead";
 import SplashScreenComponent from "../components/ui/SplashScreen";
 import TauriTitleBar from "../components/features/TauriTitleBar";
+import ToolConsentHost from "../components/features/ToolConsentHost";
+import { IconLabelProvider } from "../components/ui/IconLabel";
 import { Radius } from "../../constants/theme";
+import { initI18n } from "../i18n";
 import { initTheme, useIsDark } from "../hooks/useTheme";
 import { installCrashHandler } from "../services/logging/CrashReporter";
 import { installLogger } from "../services/logging/Logger";
@@ -34,6 +37,9 @@ SplashScreen.preventAutoHideAsync();
 if (typeof window !== "undefined") {
   //resolve palette before first paint
   initTheme();
+
+  //resolve locale before first paint
+  initI18n();
 
   //crash reported on next launch
   installCrashHandler();
@@ -114,9 +120,12 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <KeyboardProvider>
-        <TauriTitleBar />
-        <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
-        <StatusBar style={isDark ? "light" : "dark"} />
+        <IconLabelProvider>
+          <TauriTitleBar />
+          <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
+          <ToolConsentHost />
+          <StatusBar style={isDark ? "light" : "dark"} />
+        </IconLabelProvider>
       </KeyboardProvider>
     </GestureHandlerRootView>
   );

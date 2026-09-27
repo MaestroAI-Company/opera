@@ -33,7 +33,7 @@ import { AppEvents } from '../../services/events';
 import { initI18n, useT } from '../../i18n';
 import { AppSettings, Settings } from '../../services/settings/SettingsService';
 import { STT, WhisperSTT } from "../../services/speech/STTService";
-import { TTS } from '../../services/speech/TTSService';
+import { speakReplyLive } from '../../services/speech/liveReply';
 import NotificationModal from '../ui/NotificationModal';
 import ToolConsentHost from './ToolConsentHost';
 import ChatBar, { ChatBarHandle } from './ChatBar';
@@ -569,6 +569,8 @@ function AssistantOverlay() {
     streamingMsgIdRef.current = assistantMsg.id;
     streamingContentRef.current = '';
 
+    //speak voice replies as they stream
+    const finishSpeech = viaVoice && Settings.getCached().autoSpeak ? speakReplyLive(assistantMsg.id) : null;
     const run = await GenerationService.start({
       convId: conv.id,
       msgId: assistantMsg.id,
@@ -578,6 +580,7 @@ function AssistantOverlay() {
       history: taskHistory,
       think: reflection === 'none' ? false : reflection,
     });
+    finishSpeech?.(run);
 
     const isError = run.status === 'error';
     const isAborted = run.status === 'aborted';
@@ -600,11 +603,6 @@ function AssistantOverlay() {
       }).then(items => {
         if (items.length > 0) setSuggestions({ msgId: assistantMsg.id, items });
       });
-    }
-
-    //auto-read the reply aloud when it was requested via voice
-    if (viaVoice && !isError && Settings.getCached().autoSpeak) {
-      TTS.speak(streamingContentRef.current, { language: Settings.getCached().language, id: assistantMsg.id });
     }
 
     //a newer run may own it

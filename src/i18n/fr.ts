@@ -530,6 +530,27 @@ export const fr: Translations = {
     "Voulez-vous vraiment télécharger le modèle Whisper {model} ({size}) ?",
   "settings.whisper.download.confirm": "Télécharger",
 
+  "settings.tts.label": "Moteur de voix",
+  "settings.tts.help":
+    "Kokoro et Supertonic sont des voix naturelles hors ligne. Kokoro parle anglais, français, espagnol, italien, portugais et hindi. Supertonic parle 31 langues dont l'allemand, le japonais, le coréen, l'arabe et le russe. Les autres langues utilisent la voix du système.",
+  "settings.tts.select": "Choisir le moteur de voix",
+  "settings.tts.system": "Système",
+  "settings.tts.kokoro": "Kokoro",
+  "settings.tts.supertonic": "Supertonic",
+  "settings.tts.voiceLabel": "Voix",
+  "settings.tts.selectVoice": "Choisir la voix",
+  "settings.tts.speed": "Vitesse de lecture",
+  "settings.tts.downloading": "Téléchargement de {engine}...",
+  "settings.tts.downloadSuccess": "Voix {engine} téléchargée avec succès.",
+  "settings.tts.downloadFailed": "Échec du téléchargement de la voix {engine}.",
+  "settings.tts.delete.title": "Supprimer la voix {engine}",
+  "settings.tts.delete.message":
+    "Voulez-vous vraiment supprimer la voix {engine} ? Maestro utilisera la voix du système.",
+  "settings.tts.download.title": "Télécharger la voix {engine}",
+  "settings.tts.download.message":
+    "Voulez-vous vraiment télécharger la voix {engine} ({size}) ?",
+  "settings.tts.download.confirm": "Télécharger",
+
   "settings.privacy.data": "Confidentialité des données",
   "settings.privacy.intro":
     "Par défaut, tout reste sur votre téléphone : vos conversations, réglages et modèles locaux fonctionnent hors ligne, sans passer par internet.",

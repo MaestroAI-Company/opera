@@ -79,7 +79,7 @@ import { NEW_CHAT_ACTION_ID } from "../services/quickActions/QuickActionsService
 import { clearShareFromUrl, fetchSharedConversation, resolvePasteHost, shareConversation, tryOpenSharedInApp, usesDefaultPasteHost } from "../services/share/ShareService";
 import { Settings } from "../services/settings/SettingsService";
 import { STT, WhisperSTT } from "../services/speech/STTService";
-import { TTS } from "../services/speech/TTSService";
+import { speakReplyLive } from "../services/speech/liveReply";
 import { pressStyle } from "../components/ui/pressStyle";
 
 
@@ -1135,6 +1135,8 @@ export default function Index() {
         setStreamingMessageId(assistantMsg.id);
         streamingContentRef.current = "";
 
+        //speak voice replies as they stream
+        const finishSpeech = viaVoice && Settings.getCached().autoSpeak ? speakReplyLive(assistantMsg.id) : null;
         const run = await GenerationService.start({
           convId: taskConv.id,
           msgId: assistantMsg.id,
@@ -1146,6 +1148,7 @@ export default function Index() {
           persist: !isIncognitoTask,
           noModelMessage: t("chat.noModel"),
         });
+        finishSpeech?.(run);
 
         const isError = run.status === "error";
         const isAborted = run.status === "aborted";
@@ -1175,11 +1178,6 @@ export default function Index() {
           }).then((items) => {
             if (items.length > 0) setSuggestions(taskConv.id, { msgId: assistantMsg.id, items });
           });
-        }
-
-        //auto-read the reply aloud when it was requested via voice
-        if (viaVoice && !isError && Settings.getCached().autoSpeak) {
-          TTS.speak(streamingContentRef.current, { language: Settings.getCached().language, id: assistantMsg.id });
         }
       };
 

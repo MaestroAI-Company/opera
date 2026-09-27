@@ -160,7 +160,16 @@
         }
       ],
       "react-native-quick-crypto",
-      "react-native-litert-lm"
+      "react-native-litert-lm",
+      [
+        "react-native-audio-api",
+        {
+          "iosBackgroundMode": false,
+          "androidPermissions": [],
+          "androidForegroundService": false,
+          "disableFFmpeg": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

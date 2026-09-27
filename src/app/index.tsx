@@ -37,7 +37,7 @@ import ConversationsDrawer from "../components/features/ConversationsDrawer";
 import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, releaseOpens, settingsProgress, settleDrawer } from "../components/features/drawerAnimation";
 import { sheetTravel } from "../components/features/DrawerSheet";
 import { ModelSelectorDrawer, ModelSelectorTrigger } from "../components/features/ModelSelector";
-import SettingsDrawer from "../components/features/SettingsDrawer";
+import SettingsDrawer, { SubPage } from "../components/features/SettingsDrawer";
 import TopBar from "../components/features/TopBar";
 import ActionButton from "../components/ui/ActionButton";
 import Group from "../components/ui/Group";
@@ -291,7 +291,7 @@ export default function Index() {
   const [modelSelectorVisible, setModelSelectorVisible] = useState(false);
   //shared with the panResponder below so the swipe-up gesture can drag it live
   const modelSelectorProgress = useAnimatedValue(0);
-  const [settingsInitialSubPage, setSettingsInitialSubPage] = useState<"main" | "general" | "confidentiality" | "tools" | "reports">("main");
+  const [settingsInitialSubPage, setSettingsInitialSubPage] = useState<SubPage>("main");
   const [dbReady, setDbReady] = useState(false);
   const [dbFailed, setDbFailed] = useState(false);
   const [showDataWarning, setShowDataWarning] = useState(false);
@@ -1727,6 +1727,14 @@ export default function Index() {
         isDesktop={isDesktop}
         triggerRef={modelTriggerRef}
         messages={messages}
+        onOpenProviderSettings={(provider) => {
+          setModelSelectorVisible(false);
+          openDrawerSafely(() => {
+            const page = (["beta", "local", "litert", "ollama", "openai"].includes(provider) ? provider : "service") as SubPage;
+            setSettingsInitialSubPage(page);
+            setSettingsDrawerVisible(true);
+          });
+        }}
       />
 
       <HeadlessWebView />

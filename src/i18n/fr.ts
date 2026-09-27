@@ -311,6 +311,8 @@ export const fr: Translations = {
     "Retrouvez Opera en ligne, suivez nos actualités et contribuez au projet.",
   "settings.info.website": "Site web",
 
+  "settings.profile.personalize": "Personnaliser mon profil",
+  "settings.profile.exportCard": "Exporter ma carte de profil",
   "settings.profile.name": "Nom",
   "settings.profile.instructions": "Écrivez vos instructions pour l'IA",
   "settings.profile.instructionsPlaceholder": "écrire",
@@ -327,6 +329,8 @@ export const fr: Translations = {
   "settings.general.autoRead": "Lecture automatique des réponses",
   "settings.general.autoReadHelp":
     "Lit la réponse à voix haute quand vous demandez à la voix.",
+  "settings.general.voice.title": "Voix",
+  "settings.general.voice.help": "Lecture auto, moteur de voix, vitesse de lecture.",
   "settings.general.advancedMode": "Mode avancé",
   "settings.general.advancedModeHelp":
     "Ajoute une section Avancé au menu avec les réglages les plus techniques.",
@@ -415,7 +419,7 @@ export const fr: Translations = {
   "settings.service.ollama": "Ollama",
   "settings.service.ollamaHelp":
     "Utilisez vos serveurs Ollama pour exécuter de puissants modèles d'IA chez vous.",
-  "settings.service.openai": "Compatible OpenAI",
+  "settings.service.openai": "API Cloud",
   "settings.service.openaiHelp":
     "Connectez OpenAI, Gemini, Mistral, LM Studio ou tout serveur qui parle l'API OpenAI.",
   "settings.service.local": "Intégré",

@@ -66,6 +66,16 @@ type IntroPhase = "logo" | "phrases";
 const WORDMARK = { width: 260, height: 44 };
 const WORDMARK_LARGE = { width: 360, height: 61 };
 
+//colorFilters are ignored on web and miss on android
+const tintWordmark = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const source = JSON.parse(JSON.stringify(wordmarkAnimation));
+  for (const layer of source.layers)
+    for (const group of layer.shapes)
+      for (const item of group.it) if (item.ty === "fl") item.c.k = [r, g, b, 1];
+  return source;
+};
+
 const PHRASE_HOLD = 3500;
 const INTRO_PHRASES = [
   "personal",
@@ -218,17 +228,17 @@ function IntroStage({ phase, onLogoGone, onReady }: IntroStageProps) {
   const t = useT();
   const { isLargeScreen } = useResponsive();
   const phrases = useMemo(() => INTRO_PHRASES.map((id) => t(`onboarding.intro.${id}`)), [t]);
+  const wordmark = useMemo(() => tintWordmark(Colors.textPrimary), [Colors.textPrimary]);
 
   return (
     <View style={styles.stage}>
       {phase === "logo" && (
         <LottieView
-          source={wordmarkAnimation}
+          source={wordmark}
           autoPlay
           loop={false}
           style={isLargeScreen ? WORDMARK_LARGE : WORDMARK}
           resizeMode="contain"
-          colorFilters={[{ keypath: "**", color: Colors.textPrimary }]}
           onAnimationFinish={(isCancelled) => {
             if (!isCancelled) onLogoGone();
           }}

@@ -373,11 +373,14 @@ export default function ConversationsDrawer({
             })
           )}
         </KeyboardAwareScrollView>
-        <LinearGradient
-          colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
-          style={styles.gradientTop}
-          pointerEvents="none"
-        />
+        {/* floating drawers keep their titles visible */}
+        {!isDesktop && (
+          <LinearGradient
+            colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
+            style={styles.gradientTop}
+            pointerEvents="none"
+          />
+        )}
         <LinearGradient
           colors={[Colors.groupedBackgroundClear, Colors.groupedBackgroundFade, Colors.groupedBackground]}
           style={styles.gradientBottom}
@@ -441,11 +444,14 @@ export default function ConversationsDrawer({
           </View>
         ))}
       </ScrollView>
-      <LinearGradient
-        colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
-        style={styles.screenGradientTop}
-        pointerEvents="none"
-      />
+      {/* floating drawers keep their titles visible */}
+      {!isDesktop && (
+        <LinearGradient
+          colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
+          style={styles.screenGradientTop}
+          pointerEvents="none"
+        />
+      )}
       <LinearGradient
         colors={[Colors.groupedBackgroundClear, Colors.groupedBackgroundFade, Colors.groupedBackground]}
         style={styles.screenGradientBottom}

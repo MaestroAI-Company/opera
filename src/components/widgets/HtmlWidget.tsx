@@ -3,6 +3,7 @@ import { WebView } from 'react-native-webview';
 import { IWidget } from '../../services/widgets/WidgetManager';
 import { Radius, ThemeColors } from '../../../constants/theme';
 import { useThemedStyles } from '../../hooks/useTheme';
+import { useT } from '../../i18n';
 import WidgetTouchArea from './WidgetTouchArea';
 
 export interface HtmlWidgetData {
@@ -25,7 +26,8 @@ export const HtmlWidget: IWidget<HtmlWidgetData> = {
   }`,
   component: function HtmlWidgetView({ data }) {
     const styles = useThemedStyles(makeStyles);
-    const source = data.html ? { html: data.html } : data.url ? { uri: data.url } : { html: '<p>No content provided</p>' };
+    const t = useT();
+    const source = data.html ? { html: data.html } : data.url ? { uri: data.url } : { html: `<p>${t('widget.html.empty')}</p>` };
     const widgetHeight = data.height || 300;
 
     return (

@@ -17,6 +17,14 @@ export type MessageMetrics = {
   timeSec?: number;
   tokens?: number;
   tokensPerSec?: number;
+  //prompt plus reply, provider reported
+  contextTokens?: number;
+  //reflection level sent to the model
+  thinking?: string;
+  //prompt tier the model received
+  systemPrompt?: string;
+  //raw provider error shown in details
+  error?: string;
 };
 
 //web page consulted during generation

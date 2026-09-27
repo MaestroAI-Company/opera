@@ -1,5 +1,3 @@
-import { McpServerConfig } from './types';
-
 //one server pulled out of a pasted configuration
 export interface ParsedServer {
   name: string;
@@ -112,19 +110,4 @@ export function parseServerInput(text: string): ParseResult {
     throw new Error('Paste a server link or an mcp.json block.');
   }
   return parseServerConfig(trimmed);
-}
-
-//report shown after an import
-export function describeImport(added: McpServerConfig[], skipped: string[]): string {
-  const lines: string[] = [];
-  if (added.length > 0) {
-    lines.push(added.length === 1 ? 'Added 1 server:' : `Added ${added.length} servers:`);
-    lines.push(...added.map((s) => `- ${s.name}`));
-  } else {
-    lines.push('No server was added.');
-  }
-  if (skipped.length > 0) {
-    lines.push('', ...skipped.map((s) => `- ${s}`));
-  }
-  return lines.join('\n');
 }

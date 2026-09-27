@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
-import { useKeyboardAnimation, useKeyboardState } from "react-native-keyboard-controller";
+import { useKeyboardState } from "react-native-keyboard-controller";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
-import { REPORT_CONSENT, useBugReport } from "../../hooks/useBugReport";
+import { useBugReport } from "../../hooks/useBugReport";
+import { useT } from "../../i18n";
 import { useThemedStyles } from "../../hooks/useTheme";
 import type { Crash } from "../../services/logging/CrashReporter";
 import ActionButton from "../ui/ActionButton";
@@ -31,12 +33,12 @@ type BugReportSheetProps = {
 //opens on shake or after crash
 export default function BugReportSheet({ visible, onClose, crash = null, screenshot = null, isLargeScreen = false, isDesktop = false, bottomInset = 0 }: BugReportSheetProps) {
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{ title: string; message: string; buttons?: ModalButton[] }>({ title: "", message: "" });
-  //fluid, native-driven keyboard height, same source as the chatbar's KeyboardAvoidingView
-  const { height: keyboardHeight } = useKeyboardAnimation();
   const isKeyboardOpen = useKeyboardState((state) => state.isVisible);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const notify = useCallback((title: string, message: string, buttons?: ModalButton[]) => {
     setAlertConfig({ title, message, buttons });
@@ -66,72 +68,70 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
         handleContainerStyle={styles.sheetHandleContainer}
-        keyboardTranslateY={keyboardHeight}
+        avoidKeyboard
         sheetStyle={[
           styles.sheet,
-          { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + (isKeyboardOpen ? 0 : bottomInset) },
+          { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + (isKeyboardOpen ? 0 : bottomInset), maxHeight: windowHeight - insets.top - Spacing.xl2 },
         ]}
         desktopStyle={[styles.desktopCard, centeredStyle]}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={styles.title}>{crash ? "Opera closed unexpectedly" : "Report a bug"}</Text>
+          <View style={styles.contentCard}>
+            <Text style={styles.title}>{crash ? t("bugReport.crashTitle") : t("bugReport.title")}</Text>
 
-          {crash && (
-            <Text style={[styles.help, styles.consent]}>
-              The error was saved. Tell us what you were doing, it helps us find it.
-            </Text>
-          )}
+            {crash && (
+              <Text style={styles.help}>
+                {t("bugReport.crashHelp")}
+              </Text>
+            )}
 
-          <View style={styles.settingRowVertical}>
-            <Group>
-              <TextInputField
-                icon={penPlaceholderIcon}
-                placeholder={crash ? "What were you doing?" : "Describe the issue"}
-                value={report.text}
-                onChangeText={report.setText}
-              />
-            </Group>
-          </View>
+            <View style={styles.inputGroup}>
+              <Group>
+                <TextInputField
+                  icon={penPlaceholderIcon}
+                  placeholder={crash ? t("bugReport.crashPlaceholder") : t("bugReport.placeholder")}
+                  value={report.text}
+                  onChangeText={report.setText}
+                />
+              </Group>
+            </View>
 
-          <View style={styles.settingRowVertical}>
             <View style={styles.toggleRow}>
               <Checkbox
-                label="Attach lastest log lines"
+                label={t("bugReport.attachLogs")}
                 checked={report.logs !== null}
                 onToggle={report.toggleLogs}
                 labelFirst
                 style={styles.checkboxRow}
               />
             </View>
-          </View>
 
-          {screenshot && (
-            <View style={styles.settingRowVertical}>
+            {screenshot && (
               <View style={styles.toggleRow}>
                 <Checkbox
-                  label="Attach a screenshot"
+                  label={t("bugReport.attachScreenshot")}
                   checked={report.screenshot !== null}
                   onToggle={(v) => report.setScreenshot(v ? screenshot : null)}
                   labelFirst
                   style={styles.checkboxRow}
                 />
               </View>
-            </View>
-          )}
+            )}
 
-          <Text style={[styles.help, styles.consent]}>
-            {REPORT_CONSENT}
-            {report.screenshot ? " The screenshot taken when you shook the phone goes to your clipboard, paste it into the issue if it helps." : ""}
-          </Text>
+            <Text style={[styles.help, styles.consent]}>
+              {t("bugReport.consent")}
+              {report.screenshot ? " " + t("bugReport.consentScreenshot") : ""}
+            </Text>
 
-          <Group style={styles.highlightGroup}>
-            <ActionButton
-              icon={arrowIcon}
-              label="Send my issue"
-              onPress={() => report.send(onClose)}
-              variant="highlight"
-            />
-          </Group>
+            <Group style={styles.highlightGroup}>
+              <ActionButton
+                icon={arrowIcon}
+                label={t("bugReport.send")}
+                onPress={() => report.send(onClose)}
+                variant="highlight"
+              />
+            </Group>
+          </View>
         </ScrollView>
       </DrawerSheet>
 
@@ -152,14 +152,13 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.groupedBackground,
     borderTopLeftRadius: Radius.huge2,
     borderTopRightRadius: Radius.huge2,
     paddingTop: 12,
-    maxHeight: "85%",
   },
   desktopCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.groupedBackground,
     borderRadius: Radius.xxl,
     borderWidth: 2,
     borderColor: Colors.border,
@@ -170,38 +169,48 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   sheetHandleContainer: {
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: Spacing.xs2,
     paddingVertical: 10,
     marginTop: -10,
   },
   content: {
-    paddingHorizontal: Spacing.xl2,
-    paddingTop: Spacing.md,
+    paddingHorizontal: Spacing.lg2,
     paddingBottom: Spacing.lg,
+  },
+  contentCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl + Spacing.md,
+    borderWidth: 0,
+    padding: Spacing.md,
   },
   title: {
     fontSize: FontSizes.body,
     color: Colors.textPrimary,
     fontFamily: Fonts.mono,
+    paddingTop: Spacing.xs,
+    paddingHorizontal: Spacing.md,
     marginBottom: 6,
   },
   help: {
     fontSize: FontSizes.caption,
     color: Colors.textMuted,
     fontFamily: Fonts.body,
+    paddingHorizontal: Spacing.md,
+  },
+  inputGroup: {
+    marginBottom: Spacing.md,
+    marginTop: Spacing.sm,
   },
   consent: {
     marginTop: 12,
     marginBottom: 12,
-  },
-  settingRowVertical: {
-    marginBottom: 30,
   },
   toggleRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginTop: 8,
+    paddingHorizontal: Spacing.md,
   },
   checkboxRow: {
     flex: 1,

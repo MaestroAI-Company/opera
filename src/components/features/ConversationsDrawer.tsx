@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, BackHandler, Image, Keyboard, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Animated, BackHandler, Image, Keyboard, NativeScrollEvent, NativeSyntheticEvent, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useResponsive } from "../../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useT, type TranslationFn } from "../../i18n";
 import { CloudSync } from "../../services/CloudSyncService";
 import { Conversation, DB } from "../../services/db/DatabaseService";
 import ActionButton from "../ui/ActionButton";
@@ -11,7 +14,10 @@ import Group from "../ui/Group";
 import IconButton from "../ui/IconButton";
 import NotificationModal from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
-import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, playPageTransition, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
+import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, releaseOpens, settleDrawer, settleLayoutDrawer } from "./drawerAnimation";
+import DrawerBackButton from "./DrawerBackButton";
+import PageStack from "./PageStack";
+import { pressStyle } from "../ui/pressStyle";
 
 const searchIcon = require("../../../assets/icons/search.png");
 const newIcon = require("../../../assets/icons/add.png");
@@ -19,9 +25,11 @@ const deleteIcon = require("../../../assets/icons/delete.png");
 const shareIcon = require("../../../assets/icons/share.png");
 const pinIcon = require("../../../assets/icons/pin.png");
 const unpinIcon = require("../../../assets/icons/unpin.png");
-const arrowIcon = require("../../../assets/icons/arrow.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
+
+type DrawerPage = "list" | "search";
+const drawerPageParent = (page: DrawerPage) => (page === "search" ? "list" : null);
 
 type ConversationsDrawerProps = {
   visible: boolean;
@@ -33,24 +41,21 @@ type ConversationsDrawerProps = {
   onDeleteConversation?: (id: string) => void;
   onTogglePinConversation?: (id: string, pinned: boolean) => void;
   onShareConversation?: (conv: Conversation) => void;
-  isLargeScreen?: boolean;
   isDesktop?: boolean;
 };
 
 //format group title based on date
-function getGroupTitle(timestamp: number): string {
+function getGroupTitle(timestamp: number, t: TranslationFn): string {
   const date = new Date(timestamp);
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const diffTime = startOfToday - timestamp;
 
-  if (diffTime <= 0) return "LAST DISCUSSION";
+  if (diffTime <= 0) return t("conversations.group.last");
 
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-  if (diffDays === 1) return "1 day ago";
-  if (diffDays === 2) return "2 day ago";
-  if (diffDays === 3) return "3 day ago";
+  if (diffDays <= 3) return t("conversations.group.daysAgo", { count: diffDays });
 
   const dd = String(date.getDate()).padStart(2, '0');
   const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -73,11 +78,11 @@ export default function ConversationsDrawer({
   onDeleteConversation,
   onTogglePinConversation,
   onShareConversation,
-  isLargeScreen = false,
   isDesktop = false,
 }: ConversationsDrawerProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const { width } = useResponsive();
   const drawerWidth = drawerWidthFor(width);
 
@@ -88,43 +93,67 @@ export default function ConversationsDrawer({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Conversation[]>([]);
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null);
-  const pageAnim = useAnimatedValue(1);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
-    if (!visible && (isSearching || searchQuery !== "" || selectedSearchId !== null)) {
+    //a morph while sliding out would show
+    if (!visible) return;
+    setIsScrolled(false);
+  }, [isSearching, visible]);
+
+  //detect scroll to morph close button
+  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const scrolled = e.nativeEvent.contentOffset.y > 10;
+    setIsScrolled((prev) => (prev !== scrolled ? scrolled : prev));
+  }, []);
+
+  //search clears before paint on open, never while sliding out
+  const [prevVisible, setPrevVisible] = useState(visible);
+  if (visible !== prevVisible) {
+    setPrevVisible(visible);
+    if (visible) {
       setIsSearching(false);
       setSearchQuery("");
       setSearchResults([]);
       setSelectedSearchId(null);
     }
+  }
+
+  const wasVisibleRef = useRef(visible);
+  useEffect(() => {
+    //search input stays mounted while closing, it would keep the keyboard
+    if (!visible && wasVisibleRef.current) Keyboard.dismiss();
+    wasVisibleRef.current = visible;
   }, [visible]);
 
-  const prevSearchingRef = useRef(isSearching);
-  useEffect(() => {
-    if (visible && isSearching !== prevSearchingRef.current) {
-      playPageTransition(pageAnim);
-    }
-    prevSearchingRef.current = isSearching;
-  }, [isSearching, visible, pageAnim]);
+  //query is reset on entry so results stay while the page slides out
+  const enterSearch = () => {
+    setSearchQuery("");
+    setSearchResults([]);
+    setSelectedSearchId(null);
+    setIsSearching(true);
+  };
+  const exitSearch = useCallback(() => {
+    Keyboard.dismiss();
+    setIsSearching(false);
+  }, []);
 
   //native back exits search mode, then lets parent close the drawer
   useEffect(() => {
     if (!visible) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (isSearching) {
-        Keyboard.dismiss();
-        setIsSearching(false);
-        setSearchQuery("");
-        setSelectedSearchId(null);
+        exitSearch();
         return true;
       }
       return false;
     });
     return () => sub.remove();
-  }, [visible, isSearching]);
+  }, [visible, isSearching, exitSearch]);
 
   useEffect(() => {
-    if (!isSearching || searchQuery.trim().length === 0) {
+    if (!isSearching) return;
+    if (searchQuery.trim().length === 0) {
       setSearchResults([]);
       return;
     }
@@ -139,16 +168,12 @@ export default function ConversationsDrawer({
         return gestureState.dx < -10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
       },
       onPanResponderMove: (_, gestureState) => {
-        dragDrawer(progress, Math.max(0, Math.min(1, 1 + gestureState.dx / drawerWidth)));
+        dragDrawer(progress, 1 + gestureState.dx / drawerWidth);
       },
       onPanResponderRelease: (_, gestureState) => {
-        const velocity = gestureVelocity(gestureState.vx, drawerWidth);
-        if (gestureState.dx < -drawerWidth * 0.35 || gestureState.vx < -0.5) {
-          settleDrawer(progress, false, velocity);
-          onClose();
-        } else {
-          settleDrawer(progress, true, velocity);
-        }
+        const open = releaseOpens(1 + gestureState.dx / drawerWidth, gestureState.vx);
+        settleDrawer(progress, open, gestureVelocity(gestureState.vx, drawerWidth));
+        if (!open) onClose();
       },
       onPanResponderTerminate: () => {
         settleDrawer(progress, true);
@@ -169,10 +194,12 @@ export default function ConversationsDrawer({
         settleDrawer(progress, true);
       }
     } else {
+      //reset once the close settles
+      const reset = () => setIsSearching(false);
       if (isDesktop) {
-        settleLayoutDrawer(largeScreenAnim, false);
+        settleLayoutDrawer(largeScreenAnim, false, reset);
       } else {
-        settleDrawer(progress, false);
+        settleDrawer(progress, false, undefined, undefined, reset);
       }
     }
   }, [visible, isDesktop, largeScreenAnim, progress]);
@@ -184,7 +211,7 @@ export default function ConversationsDrawer({
     const groupMap = new Map<string, Conversation[]>();
 
     conversations.forEach(c => {
-      const title = getGroupTitle(c.updatedAt);
+      const title = getGroupTitle(c.updatedAt, t);
       if (!groupMap.has(title)) {
         groupMap.set(title, []);
         grouped.push({ title, data: groupMap.get(title)! });
@@ -193,14 +220,14 @@ export default function ConversationsDrawer({
     });
 
     return { pinnedConversations: pinned, groups: grouped };
-  }, [conversations]);
+  }, [conversations, t]);
 
   const renderConversationRow = (conv: Conversation) => {
     const isSelected = conv.id === selectedConversationId;
     return (
       <View key={conv.id} style={[styles.discussionRow, isSelected && styles.discussionRowSelected]}>
         <Pressable
-          style={({ pressed, hovered }) => [styles.discussionTextContainer, (pressed || hovered) && { opacity: 0.6 }]}
+          style={pressStyle(styles.discussionTextContainer, "fade")}
           onPress={() => {
             onSelectConversation(conv);
             onClose();
@@ -219,6 +246,7 @@ export default function ConversationsDrawer({
             <>
               <IconButton
                 icon={shareIcon}
+                label={t("common.share")}
                 onPress={() => onShareConversation?.(conv)}
                 size={22}
                 tintColor={Colors.textOnPrimary}
@@ -227,6 +255,7 @@ export default function ConversationsDrawer({
               />
               <IconButton
                 icon={conv.pinned ? unpinIcon : pinIcon}
+                label={conv.pinned ? t("common.unpin") : t("common.pin")}
                 onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
                 size={22}
                 tintColor={Colors.textOnPrimary}
@@ -235,6 +264,7 @@ export default function ConversationsDrawer({
               />
               <IconButton
                 icon={deleteIcon}
+                label={t("common.delete")}
                 onPress={() => setDeleteConfirmId(conv.id)}
                 size={22}
                 tintColor={Colors.textOnPrimary}
@@ -255,124 +285,151 @@ export default function ConversationsDrawer({
   };
 
   const searchContent = (
-    <View style={{ flex: 1 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Text style={styles.title}>Search</Text>
+    <View style={{ flex: 1, paddingTop: isDesktop ? 0 : 60 }}>
+      <View style={styles.header}>
+        <DrawerBackButton kind="back" onPress={exitSearch} pulseKey="search" />
+        <Text style={styles.title} numberOfLines={1}>{t("conversations.search.title")}</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
-      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24, gap: 12 }}>
-        <Pressable hitSlop={12} onPress={() => { Keyboard.dismiss(); setIsSearching(false); setSearchQuery(""); setSelectedSearchId(null); }} style={({ pressed, hovered }) => [(pressed || hovered) && { opacity: 0.6 }]}>
-          <Image source={arrowIcon} style={{ width: 18, height: 18, transform: [{ rotate: '-180deg' }] }} tintColor={Colors.textPrimary} />
-        </Pressable>
-
-        <View style={{ flex: 1 }}>
-          <Group>
-            <TextInputField
-              icon={searchIcon}
-              placeholder="Search conversations"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoFocus
-            />
-          </Group>
-        </View>
+      <View style={styles.contentCard}>
+        <Group>
+          <TextInputField
+            icon={searchIcon}
+            placeholder={t("conversations.search.placeholder")}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+          />
+        </Group>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.sectionTitle}>RESULTS</Text>
-        {searchResults.length === 0 && searchQuery.length > 0 ? (
-          <Text style={styles.emptyText}>No results found</Text>
-        ) : (
-          searchResults.map((conv) => {
-            const isSelected = conv.id === selectedSearchId;
-            const formattedDate = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(conv.updatedAt));
+      <View style={styles.scrollListContainer}>
+        {/* results under the keyboard stay reachable */}
+        <KeyboardAwareScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.sectionTitle}>{t("conversations.search.results")}</Text>
+          {searchResults.length === 0 && searchQuery.length > 0 ? (
+            <Text style={styles.emptyText}>{t("conversations.search.empty")}</Text>
+          ) : (
+            searchResults.map((conv) => {
+              const isSelected = conv.id === selectedSearchId;
+              const formattedDate = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(conv.updatedAt));
 
-            return (
-              <View key={conv.id} style={[styles.discussionRow, isSelected && styles.discussionRowSelected]}>
-                <Pressable
-                  style={({ pressed, hovered }) => [styles.discussionTextContainer, (pressed || hovered) && { opacity: 0.6 }]}
-                  onPress={() => {
-                    Keyboard.dismiss();
-                    setSelectedSearchId(conv.id);
-                    onSelectConversation(conv, searchQuery);
-                    if (!isDesktop) onClose();
-                  }}
-                >
-                  <Text style={[styles.discussionText, isSelected && styles.discussionTextSelected]} numberOfLines={1}>
-                    {conv.name}
-                  </Text>
-                </Pressable>
-
-                <View style={styles.rowActions}>
-                  {isSelected ? (
-                    <>
-                      <IconButton
-                        icon={shareIcon}
-                        onPress={() => onShareConversation?.(conv)}
-                        size={22}
-                        tintColor={Colors.textOnPrimary}
-                        containerSize={32}
-                        pressedColor={Colors.overlayHover}
-                      />
-                      <IconButton
-                        icon={conv.pinned ? unpinIcon : pinIcon}
-                        onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
-                        size={22}
-                        tintColor={Colors.textOnPrimary}
-                        containerSize={32}
-                        pressedColor={Colors.overlayHover}
-                      />
-                      <IconButton
-                        icon={deleteIcon}
-                        onPress={() => setDeleteConfirmId(conv.id)}
-                        size={22}
-                        tintColor={Colors.textOnPrimary}
-                        containerSize={32}
-                        pressedColor={Colors.overlayHover}
-                      />
-                    </>
-                  ) : (
-                    <Text style={{ fontSize: FontSizes.label, color: Colors.textMuted, fontFamily: Fonts.mono }}>
-                      {formattedDate}
+              return (
+                <View key={conv.id} style={[styles.discussionRow, isSelected && styles.discussionRowSelected]}>
+                  <Pressable
+                    style={pressStyle(styles.discussionTextContainer, "fade")}
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setSelectedSearchId(conv.id);
+                      onSelectConversation(conv, searchQuery);
+                      if (!isDesktop) onClose();
+                    }}
+                  >
+                    <Text style={[styles.discussionText, isSelected && styles.discussionTextSelected]} numberOfLines={1}>
+                      {conv.name}
                     </Text>
-                  )}
+                  </Pressable>
+
+                  <View style={styles.rowActions}>
+                    {isSelected ? (
+                      <>
+                        <IconButton
+                          icon={shareIcon}
+                          label={t("common.share")}
+                          onPress={() => onShareConversation?.(conv)}
+                          size={22}
+                          tintColor={Colors.textOnPrimary}
+                          containerSize={32}
+                          pressedColor={Colors.overlayHover}
+                        />
+                        <IconButton
+                          icon={conv.pinned ? unpinIcon : pinIcon}
+                          label={conv.pinned ? t("common.unpin") : t("common.pin")}
+                          onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
+                          size={22}
+                          tintColor={Colors.textOnPrimary}
+                          containerSize={32}
+                          pressedColor={Colors.overlayHover}
+                        />
+                        <IconButton
+                          icon={deleteIcon}
+                          label={t("common.delete")}
+                          onPress={() => setDeleteConfirmId(conv.id)}
+                          size={22}
+                          tintColor={Colors.textOnPrimary}
+                          containerSize={32}
+                          pressedColor={Colors.overlayHover}
+                        />
+                      </>
+                    ) : (
+                      <Text style={{ fontSize: FontSizes.label, color: Colors.textMuted, fontFamily: Fonts.mono }}>
+                        {formattedDate}
+                      </Text>
+                    )}
+                  </View>
                 </View>
-              </View>
-            );
-          })
-        )}
-      </ScrollView>
+              );
+            })
+          )}
+        </KeyboardAwareScrollView>
+        <LinearGradient
+          colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
+          style={styles.gradientTop}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={[Colors.groupedBackgroundClear, Colors.groupedBackgroundFade, Colors.groupedBackground]}
+          style={styles.gradientBottom}
+          pointerEvents="none"
+        />
+      </View>
     </View>
   );
 
   const innerContent = (
-    <>
-      <Text style={styles.title}>Discussions</Text>
+    <View style={styles.scrollListContainer}>
+      <View style={[styles.fixedCloseWrapper, { top: isDesktop ? 0 : 60 }]} pointerEvents="box-none">
+        <DrawerBackButton kind="close" onPress={onClose} scrolled={isScrolled} />
+      </View>
 
-      <Group style={styles.quickActionsSpacing}>
-        <ActionButton
-          icon={newIcon}
-          label="New discussion"
-          onPress={() => {
-            onNewConversation();
-            if (!isDesktop) onClose();
-          }}
-        />
-        <ActionButton
-          icon={searchIcon}
-          label="Search"
-          onPress={() => setIsSearching(true)}
-        />
-      </Group>
+      <ScrollView
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: isDesktop ? 0 : 60, paddingBottom: 40 }}
+      >
+        <View style={styles.header}>
+          <View style={styles.headerSpacer} />
+          <Text style={styles.title} numberOfLines={1}>{t("conversations.title")}</Text>
+          <View style={styles.headerSpacer} />
+        </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <Group style={styles.quickActionsSpacing}>
+          <ActionButton
+            icon={newIcon}
+            iconBadge
+            label={t("conversations.new")}
+            onPress={() => {
+              onNewConversation();
+              if (!isDesktop) onClose();
+            }}
+          />
+          <ActionButton
+            icon={searchIcon}
+            iconBadge
+            label={t("conversations.search.action")}
+            onPress={enterSearch}
+          />
+        </Group>
+
         {conversations.length === 0 && (
-          <Text style={styles.emptyText}>No conversation</Text>
+          <Text style={styles.emptyText}>{t("conversations.empty")}</Text>
         )}
 
         {pinnedConversations.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>PINS</Text>
+            <Text style={styles.sectionTitle}>{t("conversations.pins")}</Text>
             {pinnedConversations.map(renderConversationRow)}
           </View>
         )}
@@ -384,18 +441,39 @@ export default function ConversationsDrawer({
           </View>
         ))}
       </ScrollView>
-    </>
+      <LinearGradient
+        colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
+        style={styles.screenGradientTop}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={[Colors.groupedBackgroundClear, Colors.groupedBackgroundFade, Colors.groupedBackground]}
+        style={styles.screenGradientBottom}
+        pointerEvents="none"
+      />
+    </View>
+  );
+
+  const pages = (
+    <PageStack
+      page={isSearching ? "search" : "list"}
+      visible={visible}
+      width={isDesktop ? 320 : drawerWidth}
+      parentOf={drawerPageParent}
+      onBack={exitSearch}
+      renderPage={(page) => (page === "search" ? searchContent : innerContent)}
+    />
   );
 
   const notificationModal = (
     <NotificationModal
       visible={!!deleteConfirmId}
-      title="Delete Conversation"
-      message="Are you sure you want to delete this conversation? This action cannot be undone."
+      title={t("conversations.delete.title")}
+      message={t("conversations.delete.message")}
       onClose={() => setDeleteConfirmId(null)}
       buttons={[
         {
-          text: "Delete",
+          text: t("common.delete"),
           style: "secondary",
           onPress: () => {
             if (deleteConfirmId) {
@@ -405,7 +483,7 @@ export default function ConversationsDrawer({
           }
         },
         {
-          text: "Cancel",
+          text: t("common.cancel"),
           style: "danger",
           onPress: () => setDeleteConfirmId(null)
         },
@@ -430,20 +508,18 @@ export default function ConversationsDrawer({
     return (
       <Animated.View style={[
         styles.largeScreenContainer,
-        isDesktop ? styles.floatingContainer : styles.attachedContainer,
+        styles.floatingContainer,
         {
           width: largeScreenWidth,
           opacity: largeScreenOpacity,
-          marginLeft: isDesktop ? largeScreenMargin : 0,
-          marginRight: isDesktop ? largeScreenMargin : 0,
+          marginLeft: largeScreenMargin,
+          marginRight: largeScreenMargin,
           alignItems: 'flex-end',
         }
       ]}>
         <View style={{ width: 320, flex: 1 }}>
-          <View style={isDesktop ? styles.floatingContent : styles.attachedContent}>
-            <Animated.View style={{ flex: 1, opacity: pageAnim, transform: [{ translateY: pageAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
-              {isSearching ? searchContent : innerContent}
-            </Animated.View>
+          <View style={styles.floatingContent}>
+            {pages}
           </View>
         </View>
         {notificationModal}
@@ -472,9 +548,7 @@ export default function ConversationsDrawer({
         style={[styles.content, { width: drawerWidth }, { transform: [{ translateX }] }]}
         {...panResponder.panHandlers}
       >
-        <Animated.View style={{ flex: 1, opacity: pageAnim, transform: [{ translateY: pageAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
-          {isSearching ? searchContent : innerContent}
-        </Animated.View>
+        {pages}
       </Animated.View>
 
       {notificationModal}
@@ -499,13 +573,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     top: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: Colors.surface,
-    paddingTop: 60,
-    paddingHorizontal: 16,
+    backgroundColor: Colors.groupedBackground,
+    paddingHorizontal: Spacing.lg2,
+    //pushed pages stay inside the panel
+    overflow: "hidden",
   },
   largeScreenContainer: {
     width: 320,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.groupedBackground,
     zIndex: 10,
   },
   floatingContainer: {
@@ -519,30 +594,89 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     elevation: 5,
     overflow: "hidden",
   },
-  attachedContainer: {
-    borderRightWidth: 1,
-    borderRightColor: Colors.overlaySubtle,
-  },
   floatingContent: {
     paddingTop: 24,
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg2,
     flex: 1,
   },
-  attachedContent: {
-    paddingTop: 60,
-    paddingHorizontal: 16,
-    flex: 1,
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.xxxl,
+    minHeight: 40,
+  },
+  headerSpacer: {
+    width: 40,
+    height: 40,
   },
   title: {
+    flex: 1,
     fontSize: FontSizes.xxxl,
     color: Colors.textPrimary,
-    marginBottom: 24,
     fontFamily: Fonts.display,
+    textAlign: "center",
+    includeFontPadding: false,
+    lineHeight: 40,
+  },
+  contentCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl + Spacing.md,
+    borderWidth: 0,
+    padding: Spacing.md,
+    marginBottom: Spacing.xxl,
   },
   quickActionsSpacing: {
-    marginBottom: 12,
+    marginBottom: Spacing.xxl,
+    borderRadius: Radius.xxl + Spacing.md,
+    borderWidth: 0,
+  },
+  scrollListContainer: {
+    flex: 1,
+    position: "relative",
+  },
+  gradientTop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 30,
+    zIndex: 10,
+  },
+  gradientBottom: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 40,
+    zIndex: 10,
+  },
+  screenGradientTop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    zIndex: 10,
+  },
+  screenGradientBottom: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    zIndex: 10,
+  },
+  fixedCloseWrapper: {
+    position: "absolute",
+    right: 0,
+    zIndex: 100,
+    elevation: 10,
+    width: 40,
+    height: 40,
   },
   scrollContent: {
+    paddingTop: 30,
     paddingBottom: 40,
   },
   section: {
@@ -554,6 +688,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     fontFamily: Fonts.body,
     textTransform: "uppercase",
     marginBottom: 8,
+    paddingHorizontal: Spacing.lg,
   },
   emptyText: {
     fontSize: FontSizes.bodyMd,

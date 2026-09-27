@@ -2,7 +2,7 @@
   "expo": {
     "name": "Opera",
     "slug": "opera",
-    "version": "0.9.13",
+    "version": "0.9.14",
     "orientation": "default",
     "icon": "./assets/icons/opera.png",
     "scheme": [
@@ -14,7 +14,10 @@
     "ios": {
       "icon": "./assets/icons/opera.png",
       "supportsTablet": true,
-      "bundleIdentifier": "ai.maestro.opera"
+      "bundleIdentifier": "ai.maestro.opera",
+      "entitlements": {
+        "com.apple.developer.kernel.extended-virtual-addressing": true
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -51,6 +54,18 @@
     "plugins": [
       "expo-router",
       [
+        "expo-font",
+        {
+          "android": {
+            "fonts": [
+              { "fontFamily": "Petrona", "fontDefinitions": [{ "path": "./assets/fonts/Petrona-Medium.ttf", "weight": 400 }] },
+              { "fontFamily": "Figtree", "fontDefinitions": [{ "path": "./assets/fonts/Figtree-Regular.ttf", "weight": 400 }] },
+              { "fontFamily": "FragmentMono", "fontDefinitions": [{ "path": "./assets/fonts/FragmentMono-Regular.ttf", "weight": 400 }] }
+            ]
+          }
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#FF1A1A",
@@ -74,7 +89,7 @@
             "usesCleartextTraffic": true,
             "enableMinifyInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
-            "extraProguardRules": "# nitro codegen classes are looked up by name from c++\n-keep class com.margelo.nitro.** { *; }\n\n# executorch jni bindings\n-keep class com.swmansion.rnexecutorch.** { *; }\n-keep class org.pytorch.executorch.** { *; }\n\n# optional resource classes referenced but not always present\n-dontwarn com.airbnb.lottie.R$*\n-dontwarn com.canhub.cropper.R$*\n-dontwarn com.google.android.gms.base.R$*\n-dontwarn com.google.android.gms.common.R$*\n-dontwarn com.google.android.material.R$*\n-dontwarn com.reactnativekeyboardcontroller.R$*\n-dontwarn com.swmansion.rnscreens.R$*\n-dontwarn expo.modules.imagepicker.R$*\n-dontwarn expo.modules.medialibrary.R$*\n-dontwarn expo.modules.statusbar.R$*\n-dontwarn expo.modules.systemui.R$*\n"
+            "extraProguardRules": "# nitro codegen classes are looked up by name from c++\n-keep class com.margelo.nitro.** { *; }\n\n# litert-lm jni looks up config getters by name\n-keep class com.google.ai.edge.litertlm.** { *; }\n\n# executorch jni bindings\n-keep class com.swmansion.rnexecutorch.** { *; }\n-keep class org.pytorch.executorch.** { *; }\n\n# kotlin metadata still names these supertypes\n-keep interface expo.modules.kotlin.records.Record\n-keep interface expo.modules.kotlin.types.Enumerable\n\n# optional resource classes referenced but not always present\n-dontwarn com.airbnb.lottie.R$*\n-dontwarn com.canhub.cropper.R$*\n-dontwarn com.google.android.gms.base.R$*\n-dontwarn com.google.android.gms.common.R$*\n-dontwarn com.google.android.material.R$*\n-dontwarn com.reactnativekeyboardcontroller.R$*\n-dontwarn com.swmansion.rnscreens.R$*\n-dontwarn expo.modules.imagepicker.R$*\n-dontwarn expo.modules.medialibrary.R$*\n-dontwarn expo.modules.statusbar.R$*\n-dontwarn expo.modules.systemui.R$*\n"
           }
         }
       ],
@@ -144,7 +159,8 @@
           ]
         }
       ],
-      "react-native-quick-crypto"
+      "react-native-quick-crypto",
+      "react-native-litert-lm"
     ],
     "experiments": {
       "typedRoutes": true,

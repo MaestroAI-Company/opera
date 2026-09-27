@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Point
 import android.graphics.Rect
 import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
@@ -105,6 +106,12 @@ class ScreenCaptureModule(context: ReactApplicationContext) : ReactContextBaseJa
     })
   }
 
+  //settings may forbid reading the screen
+  @ReactMethod
+  fun isScreenAccessAllowed(promise: Promise) {
+    promise.resolve(ScreenshotHolder.isScreenAccessAllowed())
+  }
+
   //region as jpeg data uri
   @ReactMethod
   fun cropRegion(x: Double, y: Double, w: Double, h: Double, promise: Promise) {
@@ -193,21 +200,22 @@ class ScreenCaptureModule(context: ReactApplicationContext) : ReactContextBaseJa
       .addOnSuccessListener { text ->
         //words are the selection unit
         val words = mutableListOf<TextSelectionLayer.Word>()
-        fun add(bounds: Rect?, value: String?, line: Int) {
-          val box = bounds ?: return
+        fun add(cornerPoints: Array<Point>?, bounds: Rect?, value: String?, line: Int) {
           val token = value?.trim() ?: return
           if (token.isEmpty()) return
+          //corners keep rotated text oriented
+          val points = cornerPoints?.takeIf { it.size == 4 }
+            ?: bounds?.let {
+              arrayOf(Point(it.left, it.top), Point(it.right, it.top), Point(it.right, it.bottom), Point(it.left, it.bottom))
+            }
+            ?: return
           //normalized so the layer maps onto the display
-          words.add(
-            TextSelectionLayer.Word(
-              box.left.toFloat() / capture.width,
-              box.top.toFloat() / capture.height,
-              box.width().toFloat() / capture.width,
-              box.height().toFloat() / capture.height,
-              token,
-              line
-            )
-          )
+          val corners = FloatArray(8)
+          points.forEachIndexed { i, point ->
+            corners[2 * i] = point.x.toFloat() / capture.width
+            corners[2 * i + 1] = point.y.toFloat() / capture.height
+          }
+          words.add(TextSelectionLayer.Word(corners, token, line))
         }
 
         var lineIndex = 0
@@ -215,9 +223,9 @@ class ScreenCaptureModule(context: ReactApplicationContext) : ReactContextBaseJa
           for (line in block.lines) {
             //no elements means the line is one token
             if (line.elements.isEmpty()) {
-              add(line.boundingBox, line.text, lineIndex)
+              add(line.cornerPoints, line.boundingBox, line.text, lineIndex)
             } else {
-              for (element in line.elements) add(element.boundingBox, element.text, lineIndex)
+              for (element in line.elements) add(element.cornerPoints, element.boundingBox, element.text, lineIndex)
             }
             lineIndex++
           }

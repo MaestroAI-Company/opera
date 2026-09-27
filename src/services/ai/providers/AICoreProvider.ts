@@ -1,5 +1,5 @@
 import { DeviceEventEmitter, NativeModules, Platform } from 'react-native';
-import { IAIProvider } from './IAIProvider';
+import type { LocalBackend, LocalModelSheet, LocalModelStatus } from './LocalProvider';
 import { MessageMetrics } from '../../db/DatabaseService';
 import { ToolCall, ToolDefinition } from "../tools/ITool";
 import {
@@ -12,18 +12,29 @@ import {
 const MODULE =
   Platform.OS === "android" ? (NativeModules.AICoreModule as any) : null;
 
-const MODEL_LABELS: Record<string, string> = {
-  "aicore-nano-full-stable": "Gemini Nano - Full (Stable)",
-  "aicore-nano-fast-stable": "Gemini Nano - Fast (Stable)",
-  "aicore-nano-full-preview": "Gemini Nano - Full (Preview)",
-  "aicore-nano-fast-preview": "Gemini Nano - Fast (Preview)",
+//short label drops the family
+const MODEL_LABELS: Record<string, { label: string; shortLabel?: string }> = {
+  "aicore-nano-full-stable": { label: "Gemini Nano - Full (Stable)", shortLabel: "Full (Stable)" },
+  "aicore-nano-fast-stable": { label: "Gemini Nano - Fast (Stable)", shortLabel: "Fast (Stable)" },
+  "aicore-nano-full-preview": { label: "Gemini Nano - Full (Preview)", shortLabel: "Full (Preview)" },
+  "aicore-nano-fast-preview": { label: "Gemini Nano - Fast (Preview)", shortLabel: "Fast (Preview)" },
 };
 
-export function getAICoreModelLabel(modelName: string): string {
-  return MODEL_LABELS[modelName] || modelName;
+export function getAICoreModelLabel(modelName: string, short = false): string {
+  const entry = MODEL_LABELS[modelName];
+  if (!entry) return modelName;
+  return (short && entry.shortLabel) || entry.label;
 }
 
-export class AICoreProvider implements IAIProvider {
+//ml kit FeatureStatus codes
+const STATUS: Record<number, LocalModelStatus> = {
+  0: "unavailable",
+  1: "downloadable",
+  2: "downloading",
+  3: "available",
+};
+
+export class AICoreProvider implements LocalBackend {
   private supported(): boolean {
     return MODULE !== null;
   }
@@ -69,6 +80,28 @@ export class AICoreProvider implements IAIProvider {
       console.warn("AICore isThinkingModeAvailable error:", e);
     }
     return caps;
+  }
+
+  async getModelSheet(): Promise<LocalModelSheet> {
+    const ids: string[] = this.supported() ? await this.getAvailableModels() : [];
+    const models = await Promise.all(ids.map(async (id) => {
+      let info: { status?: number; baseModelName?: string; tokenLimit?: number; thinking?: boolean } = {};
+      try {
+        info = await MODULE.getModelInfo(id);
+      } catch (e) {
+        console.warn("AICore getModelInfo error:", e);
+      }
+      return {
+        id,
+        label: getAICoreModelLabel(id),
+        status: info.status !== undefined ? STATUS[info.status] : undefined,
+        version: info.baseModelName || undefined,
+        contextTokens: info.tokenLimit,
+        thinking: info.thinking,
+      };
+    }));
+    //ml kit api, gemini nano only
+    return { runtime: "ML Kit GenAI · AICore", family: "Gemini Nano", models };
   }
 
   //transient aicore inference error

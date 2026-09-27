@@ -2,6 +2,7 @@ import { Image, ImageSourcePropType, Pressable, StyleProp, StyleSheet, Text, Vie
 import { FontSizes, Fonts, Spacing, ThemeColors } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
 import Group from "./Group";
+import { pressStyle } from "./pressStyle";
 
 export type NotificationCardProps = {
   image: ImageSourcePropType;
@@ -28,7 +29,7 @@ export default function NotificationCard({
   return (
     <Group style={style}>
       <Pressable
-        style={({ pressed, hovered }) => [styles.row, (pressed || hovered) && !!onPress && styles.rowPressed]}
+        style={pressStyle(styles.row, !!onPress && styles.rowPressed)}
         onPress={onPress}
         disabled={!onPress}
       >
@@ -43,7 +44,7 @@ export default function NotificationCard({
         <Pressable
           onPress={onDismiss}
           hitSlop={12}
-          style={({ pressed, hovered }) => [styles.close, (pressed || hovered) && styles.closePressed]}
+          style={pressStyle(styles.close, styles.closePressed)}
         >
           <Text style={styles.closeLabel}>✕</Text>
         </Pressable>

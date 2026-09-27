@@ -1,77 +1,12 @@
 import { DeviceEventEmitter } from 'react-native';
 import { AppEvents } from '../events';
 import { DEFAULT_OLLAMA_URL } from '../ai/utils/imageToBase64';
+import { BASE_DEFAULTS, isBooleanKey, isNumberKey, type AppSettings } from './schema';
 
-export type AppSettings = {
-  language: string;
-  theme: string;
-  aiService: string;
-  ollamaUrl: string;
-  ollamaUrls: string;
-  mcpServers: string;
-  enabledProviders: string;
-  ollamaModel: string;
-  ollamaContextLength: number;
-  ollamaKeepAlive: number;
-  quickFlowService: string;
-  quickFlowUrl: string;
-  quickFlowModel: string;
-  whisperModel: string;
-  whisperLanguage: string;
-  instruction: string;
-  speaker: boolean;
-  autoSpeak: boolean;
-  alwaysWhisper: boolean;
-  autoStartMic: boolean;
-  hasSeenOnboarding: boolean;
-  name: string;
-  includeDateTime: boolean;
-  advancedMode: boolean;
-  dataWarningDismissed: boolean;
-  useAppContext: boolean;
-  shakeToReport: boolean;
-  assistantPromptDismissed: boolean;
-  hasSeenAssistantOverlay: boolean;
-};
+export type { AppSettings } from './schema';
 
-const DEFAULTS: AppSettings = {
-  language: 'fr',
-  theme: 'system',
-  aiService: 'ollama',
-  ollamaUrl: DEFAULT_OLLAMA_URL,
-  ollamaUrls: '[]',
-  mcpServers: '[]',
-  enabledProviders: 'local,ollama,beta',
-  ollamaModel: '',
-  ollamaContextLength: 8192,
-  ollamaKeepAlive: 300,
-  //empty means chores use main model
-  quickFlowService: '',
-  quickFlowUrl: '',
-  quickFlowModel: '',
-  whisperModel: 'base',
-  whisperLanguage: (() => {
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().locale.split('-')[0] || 'auto';
-    } catch {
-      return 'auto';
-    }
-  })(),
-  instruction: '',
-  speaker: true,
-  autoSpeak: true,
-  alwaysWhisper: false,
-  autoStartMic: true,
-  hasSeenOnboarding: false,
-  name: '',
-  includeDateTime: true,
-  advancedMode: false,
-  dataWarningDismissed: false,
-  useAppContext: true,
-  shakeToReport: true,
-  assistantPromptDismissed: false,
-  hasSeenAssistantOverlay: false,
-};
+//web talks to ollama on the same machine
+const DEFAULTS: AppSettings = { ...BASE_DEFAULTS, ollamaUrl: DEFAULT_OLLAMA_URL };
 
 class SettingsService {
   private cache: AppSettings | null = null;
@@ -90,39 +25,16 @@ class SettingsService {
     try {
       const stored = localStorage.getItem('opera_settings');
       const parsed = stored ? JSON.parse(stored) : {};
-      
-      const settings: AppSettings = {
-        language: parsed.language ?? DEFAULTS.language,
-        theme: parsed.theme ?? DEFAULTS.theme,
-        aiService: parsed.aiService ?? DEFAULTS.aiService,
-        ollamaUrl: parsed.ollamaUrl ?? DEFAULTS.ollamaUrl,
-        ollamaUrls: parsed.ollamaUrls ?? DEFAULTS.ollamaUrls,
-        mcpServers: parsed.mcpServers ?? DEFAULTS.mcpServers,
-        enabledProviders: parsed.enabledProviders ?? DEFAULTS.enabledProviders,
-        ollamaModel: parsed.ollamaModel ?? DEFAULTS.ollamaModel,
-        ollamaContextLength: typeof parsed.ollamaContextLength === 'number' ? parsed.ollamaContextLength : DEFAULTS.ollamaContextLength,
-        ollamaKeepAlive: typeof parsed.ollamaKeepAlive === 'number' ? parsed.ollamaKeepAlive : DEFAULTS.ollamaKeepAlive,
-        quickFlowService: parsed.quickFlowService ?? DEFAULTS.quickFlowService,
-        quickFlowUrl: parsed.quickFlowUrl ?? DEFAULTS.quickFlowUrl,
-        quickFlowModel: parsed.quickFlowModel ?? DEFAULTS.quickFlowModel,
-        whisperModel: parsed.whisperModel ?? DEFAULTS.whisperModel,
-        whisperLanguage: parsed.whisperLanguage ?? DEFAULTS.whisperLanguage,
-        instruction: parsed.instruction ?? DEFAULTS.instruction,
-        speaker: typeof parsed.speaker === 'boolean' ? parsed.speaker : DEFAULTS.speaker,
-        autoSpeak: typeof parsed.autoSpeak === 'boolean' ? parsed.autoSpeak : DEFAULTS.autoSpeak,
-        alwaysWhisper: typeof parsed.alwaysWhisper === 'boolean' ? parsed.alwaysWhisper : DEFAULTS.alwaysWhisper,
-        autoStartMic: typeof parsed.autoStartMic === 'boolean' ? parsed.autoStartMic : DEFAULTS.autoStartMic,
-        hasSeenOnboarding: typeof parsed.hasSeenOnboarding === 'boolean' ? parsed.hasSeenOnboarding : DEFAULTS.hasSeenOnboarding,
-        name: parsed.name ?? DEFAULTS.name,
-        includeDateTime: typeof parsed.includeDateTime === 'boolean' ? parsed.includeDateTime : DEFAULTS.includeDateTime,
-        advancedMode: typeof parsed.advancedMode === 'boolean' ? parsed.advancedMode : DEFAULTS.advancedMode,
-        dataWarningDismissed: typeof parsed.dataWarningDismissed === 'boolean' ? parsed.dataWarningDismissed : DEFAULTS.dataWarningDismissed,
-        useAppContext: typeof parsed.useAppContext === 'boolean' ? parsed.useAppContext : DEFAULTS.useAppContext,
-        shakeToReport: typeof parsed.shakeToReport === 'boolean' ? parsed.shakeToReport : DEFAULTS.shakeToReport,
-        assistantPromptDismissed: typeof parsed.assistantPromptDismissed === 'boolean' ? parsed.assistantPromptDismissed : DEFAULTS.assistantPromptDismissed,
-        hasSeenAssistantOverlay: typeof parsed.hasSeenAssistantOverlay === 'boolean' ? parsed.hasSeenAssistantOverlay : DEFAULTS.hasSeenAssistantOverlay,
-      };
-      
+
+      //one reader rule for all keys
+      const settings = { ...DEFAULTS };
+      for (const key of Object.keys(DEFAULTS) as (keyof AppSettings)[]) {
+        const value = parsed[key];
+        if (value === undefined || value === null) continue;
+        const expected = isBooleanKey(key) ? 'boolean' : isNumberKey(key) ? 'number' : 'string';
+        if (typeof value === expected) (settings as any)[key] = value;
+      }
+
       this.cache = settings;
       return settings;
     } catch (e) {

@@ -1,6 +1,7 @@
 import { Pressable, StyleProp, StyleSheet, Text, Vibration, View, ViewStyle } from "react-native";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
-import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useThemedStyles } from "../../hooks/useTheme";
+import { pressStyle } from "./pressStyle";
 
 type CheckboxProps = {
   label: string;
@@ -12,16 +13,13 @@ type CheckboxProps = {
 };
 
 export default function Checkbox({ label, checked, onToggle, disabled = false, labelFirst = false, style }: CheckboxProps) {
-  const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const box = (
     <Pressable
-      style={({ pressed, hovered }) => [
-        styles.box,
-        checked && styles.boxChecked,
-        (pressed || hovered) && !disabled && (checked ? styles.boxCheckedActive : styles.boxActive),
-        disabled && { opacity: 0.5 },
-      ]}
+      style={pressStyle(
+        [styles.box, checked && styles.boxChecked, disabled && { opacity: 0.5 }],
+        !disabled && (checked ? styles.boxCheckedActive : styles.boxActive)
+      )}
       onPress={() => {
         if (!disabled) {
           Vibration.vibrate(10);
@@ -76,12 +74,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   boxCheckedActive: {
     backgroundColor: Colors.primaryPressed,
-  },
-  checkmark: {
-    color: Colors.textOnPrimary,
-    fontSize: FontSizes.caption,
-    fontWeight: "bold",
-    lineHeight: 16,
   },
   label: {
     fontSize: FontSizes.body,

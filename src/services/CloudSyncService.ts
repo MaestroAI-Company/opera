@@ -1,6 +1,8 @@
 import 'react-native-get-random-values';
-import { gunzipSync, gzipSync, strFromU8, strToU8 } from 'fflate';
+import { strToU8 } from 'fflate';
 import { BackupCryptoImpl } from './crypto/backupCrypto';
+import { b64ToBytes, bytesToB64, utf8Decode } from './crypto/encoding';
+import { gunzip, gzip } from './cloud/compress';
 import { BackupData } from './BackupService';
 import { DB, Conversation, Message, SyncTombstone } from './db/DatabaseService';
 import { Settings, AppSettings } from './settings/SettingsService';
@@ -19,7 +21,10 @@ const SYNC_PAUSED_KEY = 'cloud_sync_paused';
 const REMOTE_STATE_KEY = 'cloud_sync_remote_state';
 
 //a full migration flow (prompt, gating, local snapshot) lives in 78bd429
-const ENC_VERSION = 1;
+const ENC_VERSION = 2;
+//v1 gzipped everything, images included
+const LEGACY_ENC_VERSION = 1;
+const BLOB_REF_PREFIX = 'opera-blob:';
 const PBKDF2_ITERATIONS = 50000;
 const AES_KEY_BYTES = 32;
 const IV_BYTES = 16;
@@ -34,7 +39,11 @@ type SyncOutcome = { success: boolean; error?: string; retryable?: boolean };
 //tag and hash of last upload
 type RemoteState = { tag: string; hash: string };
 
-type DecryptOutcome = { text: string | null; unsupportedVersion?: boolean };
+type DecryptOutcome = { backup: unknown; unsupportedVersion?: boolean };
+
+//image bytes trail the gzipped json
+type BlobEntry = { id: string; prefix: string; length: number };
+type PackedBackup = { backup: BackupData; blobs: BlobEntry[] };
 
 //separate keys from one pbkdf2 pass
 type DerivedKeys = {
@@ -56,6 +65,8 @@ class CloudSyncServiceImpl {
   private paused: boolean = false;
   //lets sync skip when nothing moved
   private remoteState: RemoteState | null = null;
+  //pin check result, spares a second decrypt
+  private verifiedDownload: { tag: string; backup: unknown } | null = null;
   private retryAttempt = 0;
 
   private async setStorageItem(key: string, value: string | null) {
@@ -194,6 +205,7 @@ class CloudSyncServiceImpl {
     this.retryAttempt = 0;
     await this.setRemoteState(null);
     await this.setStorageItem(CLOUD_PROVIDER_KEY, null);
+    await this.setStorageItem(LAST_SYNC_TIME_KEY, null);
     await this.setStorageItem(LAST_SYNC_SIZE_KEY, null);
     await this.setPaused(false);
   }
@@ -278,9 +290,10 @@ class CloudSyncServiceImpl {
       if (download.status !== 'ok') return false;
 
       const decrypted = await this.decrypt(download.content, pin);
-      if (decrypted.text) {
+      if (decrypted.backup) {
         //decrypt already validated json
         await this.setPin(pin);
+        if (download.tag) this.verifiedDownload = { tag: download.tag, backup: decrypted.backup };
         return true;
       }
     } catch (e) {
@@ -322,6 +335,7 @@ class CloudSyncServiceImpl {
 
   //written only after successful uploads
   private async setRemoteState(state: RemoteState | null): Promise<void> {
+    this.verifiedDownload = null;
     this.remoteState = state;
     await this.setStorageItem(REMOTE_STATE_KEY, state ? JSON.stringify(state) : null);
   }
@@ -356,13 +370,78 @@ class CloudSyncServiceImpl {
     return BackupCryptoImpl.hmacSha256B64(macKey, `${version}|${iterations}|${saltB64}|${ivB64}|${ctB64}`);
   }
 
-  private async encrypt(data: string, pin: string): Promise<string> {
+  //base64 wastes gzip, ship raw bytes
+  private async packBackup(backup: BackupData): Promise<{ json: string; blobs: Uint8Array[] }> {
+    const entries: BlobEntry[] = [];
+    const blobs: Uint8Array[] = [];
+    const packedIds = new Set<string>();
+    const messages: Message[] = [];
+    for (const message of backup.messages) {
+      if (!message.images?.length) {
+        messages.push(message);
+        continue;
+      }
+      const images: string[] = [];
+      for (const uri of message.images) {
+        const comma = uri.indexOf(',');
+        const prefix = uri.slice(0, comma + 1);
+        if (!uri.startsWith('data:') || !prefix.endsWith(';base64,')) {
+          images.push(uri);
+          continue;
+        }
+        //content hash dedupes identical images
+        const id = await BackupCryptoImpl.sha256B64(uri);
+        if (!packedIds.has(id)) {
+          const b64 = uri.slice(comma + 1);
+          const bytes = b64ToBytes(b64);
+          //stay inline unless restore is exact
+          if (bytesToB64(bytes) !== b64) {
+            images.push(uri);
+            continue;
+          }
+          packedIds.add(id);
+          entries.push({ id, prefix, length: bytes.length });
+          blobs.push(bytes);
+        }
+        images.push(BLOB_REF_PREFIX + id);
+      }
+      messages.push({ ...message, images });
+    }
+    const packed: PackedBackup = { backup: { ...backup, messages }, blobs: entries };
+    return { json: JSON.stringify(packed), blobs };
+  }
+
+  private unpackBackup(packed: PackedBackup, blobBytes: Uint8Array): BackupData {
+    const uris = new Map<string, string>();
+    let offset = 0;
+    for (const entry of packed.blobs) {
+      uris.set(BLOB_REF_PREFIX + entry.id, entry.prefix + bytesToB64(blobBytes.subarray(offset, offset + entry.length)));
+      offset += entry.length;
+    }
+    const messages = packed.backup.messages.map((message) =>
+      message.images?.length
+        ? { ...message, images: message.images.map((uri) => uris.get(uri) ?? uri) }
+        : message
+    );
+    return { ...packed.backup, messages };
+  }
+
+  private async encrypt(json: string, blobs: Uint8Array[], pin: string): Promise<string> {
     const saltB64 = this.lastSaltB64 ?? (await BackupCryptoImpl.randomBytesB64(SALT_BYTES));
     this.lastSaltB64 = saltB64;
     const keys = await this.deriveKeys(pin, saltB64, PBKDF2_ITERATIONS);
     const ivB64 = await BackupCryptoImpl.randomBytesB64(IV_BYTES);
     //gzip shrinks chat json about fivefold
-    const payload = gzipSync(strToU8(data), { mtime: 0 });
+    const gzipped = await gzip(strToU8(json));
+    //u32 length, gzipped json, image bytes
+    const payload = new Uint8Array(4 + gzipped.length + blobs.reduce((sum, blob) => sum + blob.length, 0));
+    new DataView(payload.buffer).setUint32(0, gzipped.length);
+    payload.set(gzipped, 4);
+    let offset = 4 + gzipped.length;
+    for (const blob of blobs) {
+      payload.set(blob, offset);
+      offset += blob.length;
+    }
     const ctB64 = await BackupCryptoImpl.aesCbcEncryptBytesB64(keys.encryptionKey, ivB64, payload);
     return JSON.stringify({
       v: ENC_VERSION,
@@ -378,12 +457,12 @@ class CloudSyncServiceImpl {
   private async decrypt(data: string, pin: string): Promise<DecryptOutcome> {
     try {
       const env = JSON.parse(data);
-      if (!env || env.kdf !== 'pbkdf2-sha256') return { text: null };
+      if (!env || env.kdf !== 'pbkdf2-sha256') return { backup: null };
 
-      if (env.v !== ENC_VERSION) {
+      if (env.v !== ENC_VERSION && env.v !== LEGACY_ENC_VERSION) {
         //pin fine, file written by another version
         console.warn(`Unsupported cloud backup version: ${env.v}`);
-        return { text: null, unsupportedVersion: true };
+        return { backup: null, unsupportedVersion: true };
       }
 
       const iterations = typeof env.iter === 'number' ? env.iter : PBKDF2_ITERATIONS;
@@ -392,21 +471,24 @@ class CloudSyncServiceImpl {
       const expectedMac = await this.computeMac(keys.macKey, env.v, iterations, env.salt, env.iv, env.ct);
       if (env.mac !== expectedMac) {
         console.warn('Cloud backup failed its integrity check, refusing to import it');
-        return { text: null };
+        return { backup: null };
       }
 
       this.lastSaltB64 = env.salt;
       //wrong pin throws padding error
-      const decrypted = strFromU8(gunzipSync(await BackupCryptoImpl.aesCbcDecryptBytes(keys.encryptionKey, env.iv, env.ct)));
-      if (!decrypted) return { text: null };
-      JSON.parse(decrypted); //ensure valid json
+      const bytes = await BackupCryptoImpl.aesCbcDecryptBytes(keys.encryptionKey, env.iv, env.ct);
+      if (env.v === LEGACY_ENC_VERSION) {
+        return { backup: JSON.parse(utf8Decode(await gunzip(bytes))) };
+      }
 
-      return { text: decrypted };
+      const jsonLength = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0);
+      const packed: PackedBackup = JSON.parse(utf8Decode(await gunzip(bytes.subarray(4, 4 + jsonLength))));
+      return { backup: this.unpackBackup(packed, bytes.subarray(4 + jsonLength)) };
     } catch (e) {
       //caller decides what to report
       console.warn('Could not decrypt cloud payload:', e);
     }
-    return { text: null };
+    return { backup: null };
   }
 
   async sync(isBackground = false): Promise<SyncOutcome> {
@@ -458,13 +540,16 @@ class CloudSyncServiceImpl {
     try {
       //1. download unless unchanged since upload
       const knownState = this.remoteState;
-      const download = await provider.downloadFile(SYNC_FILE_NAME, knownState?.tag ?? null);
+      const verified = this.verifiedDownload;
+      this.verifiedDownload = null;
+      const download = await provider.downloadFile(SYNC_FILE_NAME, knownState?.tag ?? verified?.tag ?? null);
       if (download.status === 'error') {
         //blind upload would drop remote changes
         return { success: false, error: 'Could not reach the cloud.', retryable: true };
       }
 
       let cloudBackup: BackupData | null = null;
+      let fetched: unknown = null;
 
       if (download.status === 'ok') {
         const decrypted = await this.decrypt(download.content, pin);
@@ -472,22 +557,25 @@ class CloudSyncServiceImpl {
           //newer build wrote it, leave untouched
           return { success: false, error: 'Cloud backup was written by a newer version of Opera.' };
         }
-        if (!decrypted.text) {
+        if (!decrypted.backup) {
           //code no longer valid, clear stored pin
           await this.clearPin();
           DeviceEventEmitter.emit(AppEvents.syncPinInvalidated);
           return { success: false, error: 'Invalid PIN. Could not decrypt cloud backup.' };
         }
-        try {
-          const parsed = JSON.parse(decrypted.text);
-          if (!parsed || typeof parsed !== 'object' || !parsed.settings || !Array.isArray(parsed.conversations) || !Array.isArray(parsed.messages)) {
-            throw new Error('Invalid backup structure');
-          }
-          cloudBackup = parsed;
-        } catch (e) {
-          console.warn('Cloud backup is unreadable:', e);
+        fetched = decrypted.backup;
+      } else if (download.status === 'unchanged' && !knownState && verified) {
+        //file the pin check just decrypted
+        fetched = verified.backup;
+      }
+
+      if (fetched) {
+        const parsed = fetched as BackupData;
+        if (typeof parsed !== 'object' || !parsed.settings || !Array.isArray(parsed.conversations) || !Array.isArray(parsed.messages)) {
+          console.warn('Cloud backup is unreadable: invalid backup structure');
           return { success: false, error: 'Cloud backup is corrupted or incompatible.' };
         }
+        cloudBackup = parsed;
       }
 
       //2. merge cloud into local
@@ -518,8 +606,8 @@ class CloudSyncServiceImpl {
       };
 
       //4. nothing moved, no transfer needed
-      const jsonStr = JSON.stringify(newBackup);
-      const hash = await BackupCryptoImpl.sha256B64(jsonStr);
+      const { json, blobs } = await this.packBackup(newBackup);
+      const hash = await BackupCryptoImpl.sha256B64(json);
       if (download.status === 'unchanged' && knownState?.hash === hash) {
         await this.setStorageItem(LAST_SYNC_TIME_KEY, Date.now().toString());
         DeviceEventEmitter.emit(AppEvents.syncCompleted);
@@ -527,7 +615,7 @@ class CloudSyncServiceImpl {
       }
 
       //5. compress, encrypt and upload
-      const encryptedToUpload = await this.encrypt(jsonStr, pin);
+      const encryptedToUpload = await this.encrypt(json, blobs, pin);
       const upload = await provider.uploadFile(SYNC_FILE_NAME, encryptedToUpload);
 
       if (!upload.ok) {

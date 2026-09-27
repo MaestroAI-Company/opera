@@ -8,6 +8,7 @@ import {
   AppState,
   BackHandler,
   DeviceEventEmitter,
+  Easing,
   Image,
   ImageBackground,
   PanResponder,
@@ -19,33 +20,41 @@ import {
   Vibration,
   View
 } from "react-native";
-import { KeyboardAvoidingView, KeyboardController } from "react-native-keyboard-controller";
+import { KeyboardController } from "react-native-keyboard-controller";
+import Reanimated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import HeadlessWebView from "../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../constants/theme";
 import BugReportSheet from "../components/features/BugReportSheet";
+import ButterflyCluster from "../components/features/ButterflyCluster";
+import ImagePreviewSheet, { PreviewImage } from "../components/features/ImagePreviewSheet";
+import CodePreviewSheet, { PreviewCode } from "../components/features/CodePreviewSheet";
+import MessageDetailsSheet, { PreviewDetails } from "../components/features/MessageDetailsSheet";
 import ChatBar from "../components/features/ChatBar";
 import ChatView from "../components/features/ChatView";
 import ConversationsDrawer from "../components/features/ConversationsDrawer";
-import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, settingsProgress, settleDrawer } from "../components/features/drawerAnimation";
+import { conversationsProgress, dragDrawer, drawerWidthFor, gestureVelocity, releaseOpens, settingsProgress, settleDrawer } from "../components/features/drawerAnimation";
+import { sheetTravel } from "../components/features/DrawerSheet";
 import { ModelSelectorDrawer, ModelSelectorTrigger } from "../components/features/ModelSelector";
 import SettingsDrawer from "../components/features/SettingsDrawer";
 import TopBar from "../components/features/TopBar";
 import ActionButton from "../components/ui/ActionButton";
 import Group from "../components/ui/Group";
 import NotificationModal from "../components/ui/NotificationModal";
-import { hasOpenOverlaySheet } from "../components/ui/SheetSurface";
 import { isWidgetTouchActive } from "../components/widgets/WidgetTouchArea";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
 import { useBugReportTrigger } from "../hooks/useBugReportTrigger";
+import { useKeyboardLift } from "../hooks/useKeyboardLift";
 import { takePendingCrash, type Crash } from "../services/logging/CrashReporter";
 import { captureScreen } from "../services/logging/ReportScreenshot";
 import { useResponsive } from "../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
+import { t, useT, type TranslationFn } from "../i18n";
 import { CloudSync } from "../services/CloudSyncService";
 import { AIModule } from "../services/ai/AIModule";
-import { migrateModelSources } from "../services/ai/providers/sources";
+import { hydrateLiteRTCatalog } from "../services/ai/providers/huggingFaceCatalog";
+import { getOllamaTuning, migrateModelSources } from "../services/ai/providers/sources";
 import { buildSystemPrompt } from "../services/ai/generation/chatGeneration";
 import { GenerationService } from "../services/ai/generation/GenerationService";
 import { generateSuggestions, Suggestion } from "../services/ai/generation/suggestions";
@@ -71,9 +80,9 @@ import { clearShareFromUrl, fetchSharedConversation, resolvePasteHost, shareConv
 import { Settings } from "../services/settings/SettingsService";
 import { STT, WhisperSTT } from "../services/speech/STTService";
 import { TTS } from "../services/speech/TTSService";
+import { pressStyle } from "../components/ui/pressStyle";
 
-const butterflyImage = require("../../assets/images/butterfly5.png");
-const butterflyGrey = require("../../assets/images/butterfly2_grey.png");
+
 const texture2 = require("../../assets/images/texture2.png");
 const settingsIcon = require("../../assets/icons/settings.png");
 const addIcon = require("../../assets/icons/add.png");
@@ -81,15 +90,9 @@ const addIcon = require("../../assets/icons/add.png");
 function shareConsentMessage(): string {
   const host = resolvePasteHost().replace(/^https?:\/\//, "").replace(/\/+$/, "");
   const retention = usesDefaultPasteHost()
-    ? "The link expires after 3 days and cannot be revoked before then."
-    : "The link expires according to that instance's own retention policy, and cannot be revoked before then.";
-  return (
-    `Opera encrypts this conversation on your device, then uploads the encrypted copy to ${host}. ` +
-    "The decryption key stays inside the link and is never sent to any server.\n\n" +
-    "Anyone holding the link can read the whole conversation, attached images included. " +
-    retention +
-    "\n\nYou can point Opera at another PrivateBin instance, including your own, in Settings > Confidentiality."
-  );
+    ? t("share.consent.retentionDefault")
+    : t("share.consent.retentionCustom");
+  return t("share.consent.body", { host, retention });
 }
 
 //unified modal for both directions
@@ -103,15 +106,12 @@ type ShareNotice =
 //matches welcomeText's lineHeight, reserved upfront so the second line doesn't shift layout
 const WELCOME_LINE_HEIGHT = 40;
 
-//swipe-up distance that fully drags the model selector into view
-const MODEL_SELECTOR_DRAG_DISTANCE = 280;
-
 //time-of-day greeting shown on the home screen
-function getGreeting(): string {
+function getGreeting(t: TranslationFn): string {
   const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
+  if (hour < 12) return t("home.greeting.morning");
+  if (hour < 18) return t("home.greeting.afternoon");
+  return t("home.greeting.evening");
 }
 
 //fades in then types out text character by character, like a typewriter
@@ -174,16 +174,116 @@ function DissolveIn({ delay, style, children }: { delay: number; style?: any; ch
   return <Animated.View style={[style, { opacity }]}>{children}</Animated.View>;
 }
 
+//both labels have a different length, so the pill eases between their widths instead of jumping
+function IncognitoToggle({ incognito, onPress }: { incognito: boolean; onPress: () => void }) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
+  const t = useT();
+  const [widths, setWidths] = useState({ on: 0, off: 0 });
+  const [label, setLabel] = useState(incognito);
+  const width = useAnimatedValue(0);
+  const labelOpacity = useAnimatedValue(1);
+  const sizedFor = useRef<boolean | null>(null);
+
+  const target = incognito ? widths.on : widths.off;
+  const measured = widths.on > 0 && widths.off > 0;
+
+  useEffect(() => {
+    if (!target) return;
+    //only a mode change is worth easing, a fresh measure just sets the size
+    const modeChanged = sizedFor.current !== null && sizedFor.current !== incognito;
+    sizedFor.current = incognito;
+    if (!modeChanged) {
+      width.setValue(target);
+      return;
+    }
+    Animated.timing(width, {
+      toValue: target,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [target, incognito, width]);
+
+  //swaps the label while it is faded out, so the text is never clipped mid resize
+  useEffect(() => {
+    if (label === incognito) return;
+    Animated.timing(labelOpacity, {
+      toValue: 0,
+      duration: 110,
+      easing: Easing.in(Easing.quad),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (!finished) return;
+      setLabel(incognito);
+      Animated.timing(labelOpacity, {
+        toValue: 1,
+        duration: 190,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [incognito, label, labelOpacity]);
+
+  return (
+    <>
+      <View style={styles.incognitoMeasure}>
+        <View
+          style={styles.incognitoBox}
+          onLayout={(e) => {
+            const w = e.nativeEvent.layout.width;
+            setWidths((prev) => (prev.off === w ? prev : { ...prev, off: w }));
+          }}
+        >
+          <Text style={styles.incognitoButtonText}>{t("home.incognito.enable")}</Text>
+        </View>
+        <View
+          style={styles.incognitoBox}
+          onLayout={(e) => {
+            const w = e.nativeEvent.layout.width;
+            setWidths((prev) => (prev.on === w ? prev : { ...prev, on: w }));
+          }}
+        >
+          <Text style={styles.incognitoButtonText}>{t("home.incognito.disable")}</Text>
+        </View>
+      </View>
+      <Animated.View style={measured ? { width } : null}>
+        <Pressable
+          onPress={onPress}
+          style={pressStyle(
+            [styles.incognitoBox, incognito && styles.incognitoBoxActive],
+            incognito ? { backgroundColor: Colors.incognitoPressed } : "surface"
+          )}
+        >
+          <Animated.Text
+            numberOfLines={1}
+            style={[
+              styles.incognitoButtonText,
+              label && styles.incognitoButtonTextActive,
+              { opacity: labelOpacity },
+            ]}
+          >
+            {label
+              ? t("home.incognito.disable")
+              : t("home.incognito.enable")}
+          </Animated.Text>
+        </Pressable>
+      </Animated.View>
+    </>
+  );
+}
+
 export default function Index() {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { width, isLargeScreen, isDesktop } = useResponsive();
   //edge drag maps to drawer progress
   const dragWidth = drawerWidthFor(width);
   //computed once per mount so it doesn't shift mid-session
-  const greeting = useMemo(() => getGreeting(), []);
+  const greeting = useMemo(() => getGreeting(t), [t]);
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedReflection, setSelectedReflection] = useState("none");
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -215,6 +315,16 @@ export default function Index() {
   }, [drawerVisible, settingsDrawerVisible, isDesktop]);
 
   const [incognitoMode, setIncognitoMode] = useState(false);
+  //fades the incognito blurb in and out instead of snapping it
+  const incognitoProgress = useAnimatedValue(0);
+  useEffect(() => {
+    Animated.timing(incognitoProgress, {
+      toValue: incognitoMode ? 1 : 0,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [incognitoMode, incognitoProgress]);
   const [userName, setUserName] = useState("");
   const [userInstruction, setUserInstruction] = useState("");
   const [aiService, setAiService] = useState("ollama");
@@ -272,11 +382,24 @@ export default function Index() {
     activeConversationRef.current = activeConversation;
   }, [activeConversation]);
 
+  //every close path must pick up what changed in settings
+  const closeSettings = useCallback(() => {
+    setSettingsDrawerVisible(false);
+    setSettingsInitialSubPage("main");
+    const cached = Settings.getCached();
+    if (cached.ollamaModel) setSelectedModel(cached.ollamaModel);
+    setAiService(cached.aiService);
+    setOllamaUrl(cached.ollamaUrl);
+    setSpeakerEnabled(cached.speaker);
+    setAlwaysWhisper(cached.alwaysWhisper);
+    setShowTechnicalDetails(cached.showTechnicalDetails);
+  }, []);
+
   useEffect(() => {
     const handleBackButton = () => {
       //close drawers on android back press, after drawer-level handlers
       if (settingsDrawerVisibleRef.current) {
-        setSettingsDrawerVisible(false);
+        closeSettings();
         return true;
       }
       if (drawerVisibleRef.current) {
@@ -292,7 +415,7 @@ export default function Index() {
     );
 
     return () => backHandler.remove();
-  }, []);
+  }, [closeSettings]);
 
   const openDrawerSafely = useCallback((openFn: () => void) => {
     //skip pointless native round trip
@@ -321,6 +444,9 @@ export default function Index() {
   //reopen crash report from last run
   const [pendingCrash, setPendingCrash] = useState<Crash | null>(takePendingCrash);
   const [bugReportVisible, setBugReportVisible] = useState(pendingCrash !== null);
+  const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
+  const [previewCode, setPreviewCode] = useState<PreviewCode | null>(null);
+  const [previewDetails, setPreviewDetails] = useState<PreviewDetails | null>(null);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const rootRef = useRef<View>(null);
 
@@ -328,6 +454,13 @@ export default function Index() {
   useEffect(() => {
     bugReportVisibleRef.current = bugReportVisible;
   }, [bugReportVisible]);
+
+  //overlay inputs must not lift the chat
+  const keyboardLift = useKeyboardLift(!drawerVisible && !settingsDrawerVisible && !bugReportVisible);
+  const keyboardLiftStyle = useAnimatedStyle(() => ({
+    //bar's safe area spacer sits under the keyboard
+    paddingBottom: Math.max(keyboardLift.value - insets.bottom, 0),
+  }));
 
   const openBugReport = useCallback(async () => {
     //shakes ignored while sheet is open
@@ -342,102 +475,76 @@ export default function Index() {
   useBugReportTrigger(openBugReport);
 
   const [pendingConvIds, setPendingConvIds] = useState<string[]>([]);
+  const [pendingMsgIds, setPendingMsgIds] = useState<string[]>([]);
   const requestQueueRef = useRef<{ convId: string, task: () => Promise<void>, assistantMsgId: string, isIncognito: boolean }[]>([]);
   const isProcessingRef = useRef(false);
   const generatingConvIdRef = useRef<string | null>(null);
   //composer owns its own drags, text selection is not a swipe
   const touchInComposerRef = useRef(false);
 
+  //grant resets dx and dy, so the axis is picked before it
+  const swipeAxisRef = useRef<"x" | "y">("x");
+
   //state read lets compiler memoize
   const panResponder = useMemo(() =>
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        //a sheet floats over the ui, it owns the gesture
-        if (hasOpenOverlaySheet() || modelSelectorVisible) return false;
+        //an open panel covers the screen and owns its gestures
+        if (drawerVisible || settingsDrawerVisible || modelSelectorVisible) return false;
         //an interactive widget owns the gesture it started
         if (isWidgetTouchActive()) return false;
-        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-        if (isHorizontal) {
+        //locked for the whole drag, a diagonal must not flip it
+        if (Math.abs(gestureState.dx) > Math.abs(gestureState.dy)) {
+          swipeAxisRef.current = "x";
           if (Math.abs(gestureState.dx) <= 10) return false;
-          if (settingsDrawerVisible && gestureState.dx > 0) return true;
-          if (drawerVisible && gestureState.dx < 0) return true;
-
           const isLeftEdge = gestureState.x0 < 40;
-          if (isLeftEdge && gestureState.dx > 0) return true;
-          return gestureState.dx < 0;
+          return gestureState.dx < 0 || isLeftEdge;
         }
+        swipeAxisRef.current = "y";
 
         if (touchInComposerRef.current) return false;
 
         //swipe up on homepage opens model selector
-        if (!drawerVisible && !settingsDrawerVisible && !modelSelectorVisible && !activeConversation) {
-          return gestureState.dy < -15;
-        }
-
-        return false;
+        return !activeConversation && gestureState.dy < -15;
       },
       onPanResponderGrant: () => {
         //retract before keyboard shrinks panel
-        if (!drawerVisible && !settingsDrawerVisible && !modelSelectorVisible) KeyboardController.dismiss();
+        KeyboardController.dismiss();
       },
       onPanResponderMove: (evt, gestureState) => {
-        //gesture drives panel directly
-        if (drawerVisible || settingsDrawerVisible || modelSelectorVisible) return;
-        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-        if (isHorizontal) {
-          const ratio = Math.min(1, Math.abs(gestureState.dx) / dragWidth);
-          //crossing start leaves other panel out
-          dragDrawer(conversationsProgress, gestureState.dx > 0 ? ratio : 0);
-          dragDrawer(settingsProgress, gestureState.dx > 0 ? 0 : ratio);
-        } else if (gestureState.dy < 0 && !activeConversation) {
+        if (swipeAxisRef.current === "x") {
+          //clamp keeps the other panel out
+          dragDrawer(conversationsProgress, gestureState.dx / dragWidth);
+          dragDrawer(settingsProgress, -gestureState.dx / dragWidth);
+        } else {
           //carries the model selector up with the finger, same as the horizontal drawers
-          const ratio = Math.min(1, Math.abs(gestureState.dy) / MODEL_SELECTOR_DRAG_DISTANCE);
-          dragDrawer(modelSelectorProgress, ratio);
+          dragDrawer(modelSelectorProgress, -gestureState.dy / sheetTravel(modelSelectorProgress));
         }
       },
       onPanResponderRelease: (evt, gestureState) => {
-        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-        if (!isHorizontal) {
-          if (!drawerVisible && !settingsDrawerVisible && !modelSelectorVisible && !activeConversation) {
-            const velocity = -gestureVelocity(gestureState.vy, MODEL_SELECTOR_DRAG_DISTANCE);
-            if (gestureState.dy < -40 || gestureState.vy < -0.5) {
-              settleDrawer(modelSelectorProgress, true, velocity);
-              setModelSelectorVisible(true);
-            } else {
-              //send peeked panel back off
-              settleDrawer(modelSelectorProgress, false, velocity);
-            }
-          }
+        if (swipeAxisRef.current === "y") {
+          const travel = sheetTravel(modelSelectorProgress);
+          const opens = releaseOpens(-gestureState.dy / travel, -gestureState.vy);
+          settleDrawer(modelSelectorProgress, opens, -gestureVelocity(gestureState.vy, travel));
+          if (opens) setModelSelectorVisible(true);
           return;
         }
 
         const velocity = gestureVelocity(gestureState.vx, dragWidth);
-        //short flicks still commit
-        const opensLeft = gestureState.dx > 40 || gestureState.vx > 0.5;
-        const opensRight = gestureState.dx < -40 || gestureState.vx < -0.5;
-
-        if (opensLeft) {
-          if (settingsDrawerVisible) {
-            setSettingsDrawerVisible(false);
-          } else {
-            settleDrawer(conversationsProgress, true, velocity);
-            setDrawerVisible(true);
-          }
-        } else if (opensRight) {
-          if (drawerVisible) {
-            setDrawerVisible(false);
-          } else {
-            settleDrawer(settingsProgress, true, -velocity);
-            setSettingsDrawerVisible(true);
-          }
-        } else if (!drawerVisible && !settingsDrawerVisible) {
+        //same release rule as the drawers
+        if (gestureState.dx > 0 && releaseOpens(gestureState.dx / dragWidth, gestureState.vx)) {
+          settleDrawer(conversationsProgress, true, velocity);
+          setDrawerVisible(true);
+        } else if (gestureState.dx < 0 && releaseOpens(-gestureState.dx / dragWidth, -gestureState.vx)) {
+          settleDrawer(settingsProgress, true, -velocity);
+          setSettingsDrawerVisible(true);
+        } else {
           //send peeked panel back off
           settleDrawer(conversationsProgress, false, velocity);
           settleDrawer(settingsProgress, false, -velocity);
         }
       },
       onPanResponderTerminate: () => {
-        if (drawerVisible || settingsDrawerVisible || modelSelectorVisible) return;
         settleDrawer(conversationsProgress, false);
         settleDrawer(settingsProgress, false);
         settleDrawer(modelSelectorProgress, false);
@@ -469,7 +576,7 @@ export default function Index() {
       handled = true;
       if (total >= SWIPE_THRESHOLD) {
         if (settingsDrawerVisibleRef.current) {
-          setSettingsDrawerVisible(false);
+          closeSettings();
         } else {
           openDrawerSafely(() => setDrawerVisible(true));
         }
@@ -525,7 +632,7 @@ export default function Index() {
       window.removeEventListener("wheel", handleWheel);
       if (resetTimer) clearTimeout(resetTimer);
     };
-  }, [openDrawerSafely]);
+  }, [openDrawerSafely, closeSettings]);
 
   const processQueue = async () => {
     if (isProcessingRef.current) return;
@@ -535,6 +642,7 @@ export default function Index() {
       while (requestQueueRef.current.length > 0) {
         const item = requestQueueRef.current.shift();
         setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
+        setPendingMsgIds(requestQueueRef.current.map(i => i.assistantMsgId));
         if (!item) continue;
         try {
           await item.task();
@@ -639,7 +747,7 @@ export default function Index() {
         //onboarding flow is native/desktop only, browser web skips straight to the app
         const isBrowserWeb = Platform.OS === "web" && !(typeof window !== "undefined" && "__TAURI_INTERNALS__" in window);
         if (!s.hasSeenOnboarding && !isBrowserWeb) {
-          router.replace("/starting");
+          router.replace("/onboarding");
           return;
         }
 
@@ -653,8 +761,11 @@ export default function Index() {
         setSpeakerEnabled(s.speaker);
         setAlwaysWhisper(s.alwaysWhisper);
         setShowTechnicalDetails(s.showTechnicalDetails);
-        AIModule.configure(s.ollamaUrl, s.ollamaContextLength, s.ollamaKeepAlive);
+        const tuning = getOllamaTuning(s.ollamaUrl);
+        AIModule.configure(s.ollamaUrl, tuning.contextLength, tuning.keepAlive);
         AIModule.setMode(s.aiService);
+        //model name comes from the catalog
+        await hydrateLiteRTCatalog();
         STT.setLanguage(s.whisperLanguage);
       } catch (e) {
         console.warn("Failed to load settings at boot", e);
@@ -717,16 +828,19 @@ export default function Index() {
       setAiService(Settings.getCached().aiService);
       setOllamaUrl(Settings.getCached().ollamaUrl);
       setUserName(Settings.getCached().name);
+      setShowTechnicalDetails(Settings.getCached().showTechnicalDetails);
     });
     const modelSelectorSub = DeviceEventEmitter.addListener(AppEvents.openModelSelector, () => {
       openDrawerSafely(() => setModelSelectorVisible(true));
     });
+    const codePreviewSub = DeviceEventEmitter.addListener(AppEvents.openCodePreview, setPreviewCode);
 
     return () => {
       if (reloadTimer) clearTimeout(reloadTimer);
       conversationsSub.remove();
       settingsSub.remove();
       modelSelectorSub.remove();
+      codePreviewSub.remove();
     };
   }, [dbReady, loadConversations, openDrawerSafely]);
 
@@ -749,6 +863,9 @@ export default function Index() {
     setMessages([]);
   }, []);
 
+  //stable ref keeps drawer rows memoized
+  const closeConversationsDrawer = useCallback(() => setDrawerVisible(false), []);
+
   //defer upload until accepted
   const askToShareConversation = useCallback((conv: Conversation) => {
     setShareNotice({ kind: "confirm", conv });
@@ -760,7 +877,7 @@ export default function Index() {
     try {
       const msgs = await DB.getMessages(conv.id);
       if (msgs.length === 0) {
-        setShareNotice({ kind: "error", message: "This conversation is empty, there is nothing to share yet." });
+        setShareNotice({ kind: "error", message: t("share.error.empty") });
         return;
       }
       const link = await shareConversation(conv, msgs);
@@ -773,9 +890,9 @@ export default function Index() {
       //android share only reads message
       await Share.share(Platform.OS === "ios" ? { url: link } : { message: link });
     } catch (e: any) {
-      setShareNotice({ kind: "error", message: e?.message || "The share link could not be created." });
+      setShareNotice({ kind: "error", message: e?.message || t("share.error.create") });
     }
-  }, []);
+  }, [t]);
 
   //decrypt shared convo, no db write yet
   const openSharedConversation = useCallback(async (pasteId: string, secret: string) => {
@@ -789,9 +906,9 @@ export default function Index() {
       setShareNotice(null);
       clearShareFromUrl();
     } catch (e: any) {
-      setShareNotice({ kind: "error", message: e?.message || "This shared conversation could not be opened." });
+      setShareNotice({ kind: "error", message: e?.message || t("share.error.open") });
     }
-  }, []);
+  }, [t]);
 
   const saveSharedConversation = useCallback(async () => {
     if (!activeConversation || activeConversation.id !== sharedPreviewId) return;
@@ -989,7 +1106,7 @@ export default function Index() {
       taskHistory.push({ role: "user", content: text, images });
 
       const taskSelectedModel = selectedModel;
-      const taskSystemPrompt = buildSystemPrompt(userInstruction);
+      const taskSystemPrompt = buildSystemPrompt(selectedModel, userInstruction);
       const taskReflection = selectedReflection;
       const taskConv = conv;
 
@@ -1027,7 +1144,7 @@ export default function Index() {
           history: taskHistory,
           think: taskReflection === "none" ? false : taskReflection,
           persist: !isIncognitoTask,
-          noModelMessage: "Please select a model from the top menu before sending a message.",
+          noModelMessage: t("chat.noModel"),
         });
 
         const isError = run.status === "error";
@@ -1073,6 +1190,7 @@ export default function Index() {
         isIncognito: isIncognitoTask
       });
       setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
+      setPendingMsgIds(requestQueueRef.current.map(i => i.assistantMsgId));
       processQueue().catch((e) => console.error("Queue processing failed:", e));
     },
     //processQueue is recreated every render, keeping it out avoids churn
@@ -1087,9 +1205,9 @@ export default function Index() {
     Settings.set("aiService", service);
     Settings.set("ollamaUrl", url);
     AIModule.setMode(service);
-    if (service === "ollama") {
-      const cached = Settings.getCached();
-      AIModule.configure(url, cached.ollamaContextLength, cached.ollamaKeepAlive);
+    if (url) {
+      const tuning = getOllamaTuning(url);
+      AIModule.configure(url, tuning.contextLength, tuning.keepAlive);
     }
   }, []);
 
@@ -1143,6 +1261,10 @@ export default function Index() {
     if (generatingConvId === activeConversation.id) {
       GenerationService.stop(activeConversation.id);
     }
+    //queued replies get deleted below
+    requestQueueRef.current = requestQueueRef.current.filter(i => i.convId !== activeConversation.id);
+    setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
+    setPendingMsgIds(requestQueueRef.current.map(i => i.assistantMsgId));
 
     const msgIndex = messagesRef.current.findIndex(m => m.id === aiMessageId);
     if (msgIndex === -1) return;
@@ -1162,7 +1284,7 @@ export default function Index() {
     setMessages([...historyUpToHere]);
 
     const taskSelectedModel = selectedModel;
-    const taskSystemPrompt = buildSystemPrompt(userInstruction);
+    const taskSystemPrompt = buildSystemPrompt(selectedModel, userInstruction);
     const taskReflection = selectedReflection;
     const taskConv = activeConversation;
     const isIncognitoTask = taskConv.id.startsWith("incognito_");
@@ -1200,7 +1322,7 @@ export default function Index() {
         history: taskHistory,
         think: taskReflection === "none" ? false : taskReflection,
         persist: !isIncognitoTask,
-        noModelMessage: "Please select a model from the top menu before sending a message.",
+        noModelMessage: t("chat.noModel"),
       });
 
       const isError = run.status === "error";
@@ -1233,6 +1355,7 @@ export default function Index() {
       isIncognito: isIncognitoTask
     });
     setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
+    setPendingMsgIds(requestQueueRef.current.map(i => i.assistantMsgId));
     processQueue().catch((e) => console.error("Queue processing failed:", e));
 
     //processQueue is recreated every render, keeping it out avoids churn
@@ -1250,6 +1373,7 @@ export default function Index() {
       const tasksToCancel = requestQueueRef.current.filter(i => i.convId === currentConvId);
       requestQueueRef.current = requestQueueRef.current.filter(i => i.convId !== currentConvId);
       setPendingConvIds([...requestQueueRef.current.map(i => i.convId)]);
+      setPendingMsgIds(requestQueueRef.current.map(i => i.assistantMsgId));
 
       for (const item of tasksToCancel) {
         if (!item.isIncognito) {
@@ -1268,9 +1392,9 @@ export default function Index() {
   if (dbFailed) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.welcomeText}>Something went wrong</Text>
+        <Text style={styles.welcomeText}>{t("home.dbFailed.title")}</Text>
         <Text style={styles.incognitoDescription}>
-          Opera could not open its local database. Please restart the app. If the problem persists, reinstall it.
+          {t("home.dbFailed.message")}
         </Text>
       </View>
     );
@@ -1285,14 +1409,14 @@ export default function Index() {
 
   const shareNoticeButtons = shareNotice?.kind === "confirm"
     ? [
-      { text: "Cancel", style: "secondary" as const, onPress: () => setShareNotice(null) },
-      { text: "Create link", style: "primary" as const, onPress: () => createShareLink(shareNotice.conv) },
+      { text: t("common.cancel"), style: "secondary" as const, onPress: () => setShareNotice(null) },
+      { text: t("share.createLink"), style: "primary" as const, onPress: () => createShareLink(shareNotice.conv) },
     ]
     : shareNotice?.kind === "link"
       ? [
-        { text: "Close", style: "secondary" as const, onPress: () => setShareNotice(null) },
+        { text: t("common.close"), style: "secondary" as const, onPress: () => setShareNotice(null) },
         {
-          text: "Copy link",
+          text: t("share.copyLink"),
           style: "primary" as const,
           onPress: () => {
             Clipboard.setStringAsync(shareNotice.link);
@@ -1300,14 +1424,13 @@ export default function Index() {
           },
         },
       ]
-      : [{ text: "Close", style: "secondary" as const, onPress: () => setShareNotice(null) }];
+      : [{ text: t("common.close"), style: "secondary" as const, onPress: () => setShareNotice(null) }];
 
   const conversationsDrawer = (
     <ConversationsDrawer
-      isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
       visible={drawerVisible}
-      onClose={() => setDrawerVisible(false)}
+      onClose={closeConversationsDrawer}
       conversations={conversations}
       selectedConversationId={activeConversation?.id ?? null}
       onSelectConversation={selectConversation}
@@ -1324,19 +1447,7 @@ export default function Index() {
       isDesktop={isDesktop}
       visible={settingsDrawerVisible}
       initialSubPage={settingsInitialSubPage}
-      onClose={() => {
-        setSettingsDrawerVisible(false);
-        setSettingsInitialSubPage("main");
-        const cached = Settings.getCached();
-        if (cached.ollamaModel && cached.ollamaModel !== selectedModel) {
-          setSelectedModel(cached.ollamaModel);
-        }
-        setAiService(cached.aiService);
-        setOllamaUrl(cached.ollamaUrl);
-        setSpeakerEnabled(cached.speaker);
-        setAlwaysWhisper(cached.alwaysWhisper);
-        setShowTechnicalDetails(cached.showTechnicalDetails);
-      }}
+      onClose={closeSettings}
       onDataChanged={async () => {
         await loadConversations();
         startNewConversation();
@@ -1367,10 +1478,8 @@ export default function Index() {
         end={{ x: 0.5, y: 1 }}
         style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
       />
-      <KeyboardAvoidingView
-        style={[styles.container, { backgroundColor: "transparent" }]}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        enabled={!drawerVisible && !settingsDrawerVisible && !bugReportVisible}
+      <Reanimated.View
+        style={[styles.container, { backgroundColor: "transparent" }, keyboardLiftStyle]}
         {...(isLargeScreen ? {} : panResponder.panHandlers)}
       >
 
@@ -1382,10 +1491,9 @@ export default function Index() {
           <View style={{ flex: 1, backgroundColor: "transparent" }} pointerEvents="box-none">
             {!activeConversation && (
               <View style={styles.centerContent}>
-                <Image
-                  source={incognitoMode ? butterflyGrey : butterflyImage}
+                <ButterflyCluster
+                  incognito={incognitoMode}
                   style={styles.butterfly}
-                  resizeMode="contain"
                 />
                 <TypewriterWelcome
                   text={userName ? `${greeting}\n${userName}` : greeting}
@@ -1393,37 +1501,30 @@ export default function Index() {
                   reserveLines={userName ? 2 : 1}
                 />
                 <DissolveIn delay={2800}>
-                  <Pressable
+                  <IncognitoToggle
+                    incognito={incognitoMode}
                     onPress={() => {
                       Vibration.vibrate(10);
                       setIncognitoMode((prev) => !prev);
                     }}
-                    style={({ pressed, hovered }) => [
-                      styles.incognitoBox,
-                      incognitoMode && styles.incognitoBoxActive,
-                      (pressed || hovered) && (incognitoMode ? { backgroundColor: Colors.incognitoPressed } : { backgroundColor: Colors.surfacePressed })
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.incognitoButtonText,
-                        incognitoMode && styles.incognitoButtonTextActive,
-                      ]}
-                    >
-                      {incognitoMode
-                        ? "Disable incognito mode"
-                        : "Enable incognito mode"}
-                    </Text>
-                  </Pressable>
+                  />
                 </DissolveIn>
-                <Text
+                <Animated.Text
                   style={[
                     styles.incognitoDescription,
-                    { opacity: incognitoMode ? 1 : 0 },
+                    {
+                      opacity: incognitoProgress,
+                      transform: [{
+                        translateY: incognitoProgress.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [6, 0],
+                        }),
+                      }],
+                    },
                   ]}
                 >
                   Welcome to incognito mode. You can ask quick questions without leaving a trace. Once you close the window, your conversation disappears forever.
-                </Text>
+                </Animated.Text>
               </View>
             )}
 
@@ -1440,6 +1541,7 @@ export default function Index() {
                 speakerEnabled={speakerEnabled}
                 showMetrics={showTechnicalDetails}
                 generatingMessageId={generatingConvId === activeConversation.id ? streamingMsgId : null}
+                queuedMessageIds={pendingMsgIds}
                 hideGradients={isDesktop}
                 onOpenConfidentiality={() => {
                   openDrawerSafely(() => {
@@ -1448,6 +1550,8 @@ export default function Index() {
                   });
                 }}
                 canThink={modelCapabilities.includes("thinking") && selectedReflection !== "none"}
+                onImagePress={setPreviewImage}
+                onDetailsPress={setPreviewDetails}
               />
             )}
 
@@ -1463,7 +1567,6 @@ export default function Index() {
                   openDrawerSafely(() => setDrawerVisible(prev => !prev));
                 }}
                 onNewPress={startNewConversation}
-                isLargeScreen={isLargeScreen}
                 isDesktop={isDesktop}
                 centerElement={
                   <ModelSelectorTrigger
@@ -1479,29 +1582,18 @@ export default function Index() {
                   <View style={styles.settingsShadowLayer}>
                     <View style={styles.settingsShadowBlock} />
                     <Pressable
-                      style={({ pressed, hovered }) => {
-                        const showText = isDesktop;
-                        return [
-                          styles.settingsButton,
-                          (pressed || hovered) && { backgroundColor: Colors.surfacePressed },
-                          !showText && { paddingHorizontal: 0, width: 44 }
-                        ];
-                      }}
+                      style={pressStyle(
+                        [styles.settingsButton, !isDesktop && { paddingHorizontal: 0, width: 44 }],
+                        "surface"
+                      )}
                       onPress={() => {
                         if (!isDesktop && drawerVisible) return;
                         openDrawerSafely(() => {
                           if (settingsDrawerVisible) {
-                            const cached = Settings.getCached();
-                            if (cached.ollamaModel && cached.ollamaModel !== selectedModel) {
-                              setSelectedModel(cached.ollamaModel);
-                            }
-                            setAiService(cached.aiService);
-                            setOllamaUrl(cached.ollamaUrl);
-                            setSpeakerEnabled(cached.speaker);
-                            setAlwaysWhisper(cached.alwaysWhisper);
-                            setShowTechnicalDetails(cached.showTechnicalDetails);
+                            closeSettings();
+                          } else {
+                            setSettingsDrawerVisible(true);
                           }
-                          setSettingsDrawerVisible(!settingsDrawerVisible);
                         });
                       }}
                     >
@@ -1510,7 +1602,7 @@ export default function Index() {
                         style={[styles.settingsIcon, !isDesktop && { marginRight: 0 }]}
                       />
                       {isDesktop && (
-                        <Text style={styles.settingsButtonText}>Settings</Text>
+                        <Text style={styles.settingsButtonText}>{t("home.settings")}</Text>
                       )}
                     </Pressable>
                   </View>
@@ -1533,7 +1625,7 @@ export default function Index() {
                       <Group style={{ backgroundColor: Colors.dangerBgSoft, borderColor: Colors.dangerBorderSoft }}>
                         <View style={styles.shareWarningBox}>
                           <Text style={styles.shareWarningText}>
-                            This conversation was shared by someone else. Only add it if you trust the sender — it may contain misleading content, including attempts to manipulate the assistant.
+                            {t("share.preview.warning")}
                           </Text>
                         </View>
                       </Group>
@@ -1542,7 +1634,7 @@ export default function Index() {
                       <Group>
                         <ActionButton
                           icon={addIcon}
-                          label="Add to conversations"
+                          label={t("share.preview.add")}
                           labelStyle={styles.addSharedLabel}
                           onPress={saveSharedConversation}
                           style={styles.addSharedButton}
@@ -1560,7 +1652,7 @@ export default function Index() {
                   onStop={handleStop}
                   onTranscribe={handleTranscribe}
                   canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes("audio") && !!selectedModel}
-                  supportsFiles={modelCapabilities.includes("vision") || modelCapabilities.includes("audio")}
+                  modelCapabilities={modelCapabilities}
                   onOpenSettings={() => {
                     openDrawerSafely(() => {
                       setSettingsInitialSubPage("main");
@@ -1568,7 +1660,6 @@ export default function Index() {
                     });
                   }}
                   onAttachmentSheetVisibilityChange={setAttachmentSheetVisible}
-                  enabled={!settingsDrawerVisible && (isLargeScreen || !drawerVisible)}
                 />
               )}
             </View>
@@ -1576,7 +1667,7 @@ export default function Index() {
 
           {isDesktop ? settingsDrawer : null}
         </View>
-      </KeyboardAvoidingView>
+      </Reanimated.View>
 
       {isDesktop ? null : conversationsDrawer}
       {isDesktop ? null : settingsDrawer}
@@ -1590,6 +1681,30 @@ export default function Index() {
           setPendingCrash(null);
           setScreenshot(null);
         }}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        bottomInset={insets.bottom}
+      />
+
+      <ImagePreviewSheet
+        image={previewImage}
+        onClose={() => setPreviewImage(null)}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        bottomInset={insets.bottom}
+      />
+
+      <CodePreviewSheet
+        code={previewCode}
+        onClose={() => setPreviewCode(null)}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        bottomInset={insets.bottom}
+      />
+
+      <MessageDetailsSheet
+        details={previewDetails}
+        onClose={() => setPreviewDetails(null)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
         bottomInset={insets.bottom}
@@ -1613,17 +1728,18 @@ export default function Index() {
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
         triggerRef={modelTriggerRef}
+        messages={messages}
       />
 
       <HeadlessWebView />
 
       <NotificationModal
         visible={!!shareNotice}
-        title={shareNotice?.kind === "opening" ? "Shared conversation" : "Share conversation"}
+        title={shareNotice?.kind === "opening" ? t("share.modal.openTitle") : t("share.modal.title")}
         message={
           shareNotice?.kind === "confirm" ? shareConsentMessage()
-            : shareNotice?.kind === "creating" ? "Encrypting the conversation and uploading it..."
-              : shareNotice?.kind === "opening" ? "Downloading and decrypting the conversation..."
+            : shareNotice?.kind === "creating" ? t("share.modal.creating")
+              : shareNotice?.kind === "opening" ? t("share.modal.opening")
                 : shareNotice?.kind === "error" ? shareNotice.message
                   : shareNotice?.kind === "link" ? shareNotice.link
                     : undefined
@@ -1634,12 +1750,12 @@ export default function Index() {
 
       <NotificationModal
         visible={showDataWarning}
-        title="Possible data inconsistency"
-        message="After this update, some saved data may be inconsistent. If you encounter any problems, go to Settings → Confidentiality to export your data or delete all conversations."
+        title={t("home.dataWarning.title")}
+        message={t("home.dataWarning.message")}
         onClose={() => setShowDataWarning(false)}
         buttons={[
           {
-            text: "Go to Settings",
+            text: t("home.dataWarning.goToSettings"),
             style: "primary",
             onPress: () => {
               setShowDataWarning(false);
@@ -1650,7 +1766,7 @@ export default function Index() {
             },
           },
           {
-            text: "Later", style: "secondary", onPress: () => {
+            text: t("home.dataWarning.later"), style: "secondary", onPress: () => {
               Settings.set("dataWarningDismissed", true);
               setShowDataWarning(false);
             }
@@ -1743,6 +1859,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   settingsShadowLayer: {
     position: "relative",
     marginLeft: 6,
+    zIndex: 6,
   },
   settingsShadowBlock: {
     position: "absolute",
@@ -1760,8 +1877,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: Colors.surface,
-    borderWidth: 2,
-    borderColor: Colors.border,
     borderRadius: Radius.xxl,
     position: "relative",
     zIndex: 1,
@@ -1779,8 +1894,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   incognitoBox: {
     position: "relative",
-    borderWidth: 2,
-    borderColor: Colors.border,
     borderRadius: Radius.xxl,
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -1788,9 +1901,16 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     zIndex: 1,
     marginTop: 20,
   },
+  //off screen copies of the pill, measured to know both target widths up front
+  incognitoMeasure: {
+    position: "absolute",
+    width: 400,
+    alignItems: "flex-start",
+    opacity: 0,
+    pointerEvents: "none",
+  },
   incognitoBoxActive: {
     backgroundColor: Colors.incognito,
-    borderColor: Colors.incognito,
   },
   incognitoButtonText: {
     fontSize: FontSizes.caption,

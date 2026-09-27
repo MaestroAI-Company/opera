@@ -17,6 +17,7 @@ export type DetectionInput = {
 
 type NativeCapture = {
   getScreenshotInfo(): Promise<CaptureSize>;
+  isScreenAccessAllowed?(): Promise<boolean>;
   cropRegion(x: number, y: number, w: number, h: number): Promise<string>;
   getDetectionInput?(size: number): Promise<DetectionInput>;
   showTextLayer?(): Promise<void>;
@@ -55,6 +56,12 @@ export const ScreenCapture = {
   supported: (): boolean => Native != null,
 
   getSize: (): Promise<CaptureSize | null> => attempt('getSize', n => n.getScreenshotInfo()),
+
+  //android settings may forbid the screenshot
+  async screenAccessAllowed(): Promise<boolean> {
+    if (typeof Native?.isScreenAccessAllowed !== 'function') return false;
+    return (await attempt('screenAccessAllowed', n => n.isScreenAccessAllowed!())) === true;
+  },
 
   //poll until capture lands
   async waitForSize(isCancelled: () => boolean, timeoutMs = CAPTURE_TIMEOUT_MS): Promise<CaptureSize | null> {

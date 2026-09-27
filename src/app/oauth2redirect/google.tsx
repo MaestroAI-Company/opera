@@ -20,7 +20,10 @@ export default function OAuthRedirect() {
       if (Platform.OS === 'web') {
         const params = new URLSearchParams(window.location.hash.slice(1));
         const accessToken = params.get('access_token');
-        if (accessToken) {
+        if (GoogleDriveProvider.handOffToOpenerTab(params)) {
+          //opener tab finishes the connect
+          window.close();
+        } else if (accessToken) {
           const expiresIn = parseInt(params.get('expires_in') || '3600', 10);
           try {
             const provider = new GoogleDriveProvider();

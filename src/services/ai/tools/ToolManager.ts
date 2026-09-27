@@ -10,6 +10,7 @@ import { ContactsTool } from './ContactsTool';
 import { CalendarTool } from './CalendarTool';
 import { SystemSettingsTool } from './SystemSettingsTool';
 import { AlarmTool } from './AlarmTool';
+import { ToolConsent } from './ToolConsent';
 import { PluginRegistry } from '../../plugins/PluginRegistry';
 import type { McpTool } from '../../mcp/McpTool';
 
@@ -69,15 +70,21 @@ class ToolManagerService {
     return this.getAllTools().filter(t => !this.mcpToolNames.has(t.definition.function.name));
   }
 
-  //get enabled tools
-  getDefinitions(): ToolDefinition[] {
+  //enabled and supported on this platform
+  getEnabledTools(): ITool[] {
     return Array.from(this.tools.values())
       .filter(t => this.isSupportedOnPlatform(t))
       .filter(t => {
         const name = t.definition.function.name;
         const defaultEnabled = t.enabledByDefault ?? false;
         return PluginRegistry.isEnabled('tool', name, defaultEnabled);
-      })
+      });
+  }
+
+  //enabled tools, filtered by names
+  getDefinitions(only?: string[]): ToolDefinition[] {
+    return this.getEnabledTools()
+      .filter(t => !only || only.includes(t.definition.function.name))
       .map(t => t.definition);
   }
 
@@ -93,7 +100,7 @@ class ToolManagerService {
     try {
       const data = tool.widget.build(args, result);
       if (!data) {
-        if (__DEV__) console.log(`[ToolManager] ${name} produced no widget data, keeping the bubble`);
+        if (__DEV__) console.log(`[ToolManager] ${name} produced no widget data`);
         return null;
       }
       return `\n\n\`\`\`toolwidget id="${name}"\n${JSON.stringify(data)}\n\`\`\`\n\n`;
@@ -120,6 +127,18 @@ class ToolManagerService {
     const defaultEnabled = tool.enabledByDefault ?? false;
     if (!PluginRegistry.isEnabled('tool', name, defaultEnabled)) {
       return `Tool "${name}" is disabled.`;
+    }
+
+    if (tool.consent && !PluginRegistry.isEnabled('consent', name, false)) {
+      const granted = await ToolConsent.request(name, tool.consent);
+      if (granted === null) {
+        return `Tool "${name}" needs the user's approval, which cannot be asked right now. Answer without it.`;
+      }
+      if (!granted) {
+        await PluginRegistry.setEnabled('tool', name, false);
+        return `The user declined tool "${name}" and it is now disabled. Do not call it again, answer without it.`;
+      }
+      await PluginRegistry.setEnabled('consent', name, true);
     }
 
     if (__DEV__) {

@@ -28,7 +28,7 @@
       },
       "predictiveBackGestureEnabled": true,
       "package": "ai.maestro.opera",
-      "versionCode": 5,
+      "versionCode": 6,
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.FOREGROUND_SERVICE",

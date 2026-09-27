@@ -5,6 +5,7 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import * as MediaLibrary from "expo-media-library/legacy";
+import * as Sharing from "expo-sharing";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
 import {
   Dispatch,
@@ -37,6 +38,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { captureRef, releaseCapture } from "react-native-view-shot";
 import {
   Fonts,
   FontSizes,
@@ -465,6 +467,7 @@ export default function SettingsDrawer({
     description?: string | null;
   } | null>(null);
   const addModelScrollRef = useRef<ScrollView>(null);
+  const profileCardRef = useRef<View>(null);
   //measured width, the slide's push distance
   const [litertBodyWidth, setLitertBodyWidth] = useState(320);
 
@@ -2192,10 +2195,12 @@ export default function SettingsDrawer({
         settleDrawer(progress, true);
       }
     } else {
+      //reset once the close settles
+      const reset = () => setActiveSubPage("main");
       if (isDesktop) {
-        settleLayoutDrawer(largeScreenAnim, false);
+        settleLayoutDrawer(largeScreenAnim, false, reset);
       } else {
-        settleDrawer(progress, false);
+        settleDrawer(progress, false, undefined, undefined, reset);
       }
     }
   }, [visible, isDesktop, largeScreenAnim, progress]);
@@ -2602,12 +2607,28 @@ export default function SettingsDrawer({
     </View>
   );
 
+  const exportProfileCard = async () => {
+    let uri: string | null = null;
+    try {
+      uri = await captureRef(profileCardRef, { format: "png", quality: 1 });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType: "image/png", UTI: "public.png" });
+      }
+    } catch (e) {
+      console.warn("[Profile] card export failed:", e);
+    } finally {
+      //drop the cached png
+      if (uri) releaseCapture(uri);
+    }
+  };
+
   // profile subpage
   const renderProfileSubPage = () => (
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.profile.title"))}
 
-      <View style={styles.contentCard}>
+      {/* android needs a real view */}
+      <View ref={profileCardRef} collapsable={false} style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <ProfileCard name={confirmedName} />
         </View>
@@ -2647,7 +2668,11 @@ export default function SettingsDrawer({
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Group>
-            <ActionButton icon={exportIcon} label="Export my Profile Card" />
+            <ActionButton
+              icon={exportIcon}
+              label="Export my Profile Card"
+              onPress={exportProfileCard}
+            />
           </Group>
         </View>
       </View>

@@ -167,10 +167,13 @@ function AssistantOverlay() {
   const [session, setSession] = useState(0);
   //android settings gate every screen feature
   const screenAccess = useScreenAccess(session);
-  const { selection, select, clear: clearSelection, attachment } = useScreenSelection(session, screenAccess);
+  //close bumps session, skip its analysis
+  const [closed, setClosed] = useState(false);
+  const screenLive = screenAccess && !closed;
+  const { selection, select, clear: clearSelection, attachment } = useScreenSelection(session, screenLive);
   //selection works without it
-  const detections = useScreenDetections(session, screenAccess);
-  const screenText = useScreenText(session, screenAccess);
+  const detections = useScreenDetections(session, screenLive);
+  const screenText = useScreenText(session, screenLive);
   //foreground app and screen text
   const appContextRef = useRef<AppContext | null>(null);
   //chip icon and label state
@@ -235,6 +238,8 @@ function AssistantOverlay() {
   //capture app context for the ai
   //defer assist and icon reads
   useEffect(() => {
+    //reset already cleared it on close
+    if (closed) return;
     let cancelled = false;
     appContextRef.current = null;
     const handle = InteractionManager.runAfterInteractions(() => {
@@ -253,7 +258,7 @@ function AssistantOverlay() {
         .catch(() => { });
     });
     return () => { cancelled = true; handle.cancel(); };
-  }, [session]);
+  }, [session, closed]);
 
 
   const activeConversationRef = useRef<Conversation | null>(null);
@@ -371,6 +376,7 @@ function AssistantOverlay() {
     const handler = BackHandler.addEventListener('hardwareBackPress', () => {
       if (closingRef.current) return true;
       closingRef.current = true;
+      setClosed(true);
       handOffGeneration();
       playExit(() => {
         resetOverlay();
@@ -407,6 +413,7 @@ function AssistantOverlay() {
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener(AppEvents.overlayReopened, () => {
       closingRef.current = false;
+      setClosed(false);
       resetOverlay();
       //settings may have changed while closed
       reloadSettings();
@@ -420,6 +427,7 @@ function AssistantOverlay() {
   const closeOverlay = useCallback(() => {
     if (closingRef.current) return;
     closingRef.current = true;
+    setClosed(true);
     handOffGeneration();
     //reset only once hidden, so the content does not blank mid exit
     playExit(() => {
@@ -434,6 +442,7 @@ function AssistantOverlay() {
     Linking.openURL(`opera://?convId=${convId}`).catch(() => { });
     if (closingRef.current) return;
     closingRef.current = true;
+    setClosed(true);
     playExit(() => {
       resetOverlay();
       //close overlay only

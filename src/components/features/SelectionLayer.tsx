@@ -231,7 +231,7 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
 
   const target = selection.kind === 'box' ? toPixels(selection.region, size) : null;
   const hadTarget = useRef(false);
-  //resize already settles the rect live, skip the pop on release
+  //rect already placed, skip the pop
   const skipPop = useRef(false);
   useEffect(() => {
     if (!target) {
@@ -252,7 +252,20 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
 
   const commit = (rect: Rect) => {
     const state = latest.current;
-    state.onChange({ kind: 'box', region: toRegion(rect, state.size) });
+    const region = toRegion(rect, state.size);
+    const next = toPixels(region, state.size);
+    const prev = state.selection.kind === 'box' ? toPixels(state.selection.region, state.size) : null;
+    //place box before remount
+    if (!prev || prev.x1 !== next.x1 || prev.y1 !== next.y1 || prev.x2 !== next.x2 || prev.y2 !== next.y2) {
+      x1.value = next.x1;
+      y1.value = next.y1;
+      x2.value = next.x2;
+      y2.value = next.y2;
+      boxScale.value = 0.6;
+      boxScale.value = withTiming(1, { duration: SETTLE_MS, easing: Easing.out(Easing.cubic) });
+      skipPop.current = true;
+    }
+    state.onChange({ kind: 'box', region });
     state.onVibrate?.();
   };
 

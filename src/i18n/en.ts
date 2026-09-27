@@ -509,6 +509,27 @@ export const en = {
     "Are you sure you want to download the Whisper {model} model ({size})?",
   "settings.whisper.download.confirm": "Download",
 
+  "settings.tts.label": "Voice engine",
+  "settings.tts.help":
+    "Kokoro and Supertonic are natural offline voices. Kokoro speaks English, French, Spanish, Italian, Portuguese and Hindi. Supertonic speaks 31 languages including German, Japanese, Korean, Arabic and Russian. Other languages use the system voice.",
+  "settings.tts.select": "Select voice engine",
+  "settings.tts.system": "System",
+  "settings.tts.kokoro": "Kokoro",
+  "settings.tts.supertonic": "Supertonic",
+  "settings.tts.voiceLabel": "Voice",
+  "settings.tts.selectVoice": "Select voice",
+  "settings.tts.speed": "Speaking speed",
+  "settings.tts.downloading": "Downloading {engine}...",
+  "settings.tts.downloadSuccess": "{engine} voice downloaded successfully.",
+  "settings.tts.downloadFailed": "Failed to download the {engine} voice.",
+  "settings.tts.delete.title": "Delete {engine} voice",
+  "settings.tts.delete.message":
+    "Are you sure you want to delete the {engine} voice? Maestro will use the system voice.",
+  "settings.tts.download.title": "Download {engine} voice",
+  "settings.tts.download.message":
+    "Are you sure you want to download the {engine} voice ({size})?",
+  "settings.tts.download.confirm": "Download",
+
   "settings.privacy.data": "Data privacy",
   "settings.privacy.intro":
     "By default, everything stays on your phone: your conversations, settings, and local models work offline without the internet.",

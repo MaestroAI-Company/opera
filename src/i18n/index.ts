@@ -85,3 +85,8 @@ function getSnapshot(): TranslationFn {
 export function useT(): TranslationFn {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
+
+//current app language, e.g. for Intl.DateTimeFormat's locale argument
+export function getLocale(): SupportedLocale {
+  return locale;
+}

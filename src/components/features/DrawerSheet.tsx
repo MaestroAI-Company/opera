@@ -41,6 +41,9 @@ export type DrawerSheetProps = {
   liftOffset?: number;
   //sheet sits on the keyboard, needs a maxHeight in sheetStyle
   avoidKeyboard?: boolean;
+  //android back/gesture checks this first; true means it navigated inside the
+  //sheet itself, so the sheet stays open instead of dismissing
+  onBackPress?: () => boolean;
   children: ReactNode;
   sheetStyle?: StyleProp<ViewStyle>;
   desktopStyle?: StyleProp<ViewStyle>;
@@ -57,6 +60,7 @@ export default function DrawerSheet({
   isDesktop = false,
   liftOffset = 0,
   avoidKeyboard = false,
+  onBackPress,
   children,
   sheetStyle,
   desktopStyle,
@@ -137,10 +141,11 @@ export default function DrawerSheet({
   );
 
   //android back gesture pulls the sheet down, release closes it
+  //unless onBackPress claims it to navigate inside the sheet instead
   usePredictiveBack(visible, {
     onProgress: (p) => dragDrawer(progress, 1 - p),
     onCancel: () => settle(true),
-    onBack: () => dismiss(),
+    onBack: () => (onBackPress?.() ? settle(true) : dismiss()),
   });
 
   //overlay only: hardware back and desktop escape dismiss it, lift sits inside a screen
@@ -148,11 +153,12 @@ export default function DrawerSheet({
   useEffect(() => {
     if (isLift || !visible) return;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (onBackPress?.()) return true;
       dismiss();
       return true;
     });
     return () => sub.remove();
-  }, [isLift, visible, dismiss]);
+  }, [isLift, visible, dismiss, onBackPress]);
 
   useEffect(() => {
     if (isLift || !visible || Platform.OS !== "web") return;

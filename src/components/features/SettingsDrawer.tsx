@@ -281,6 +281,7 @@ export type SubPage =
   | "main"
   | "general"
   | "advanced"
+  | "maestro"
   | "assistantoverlay"
   | "service"
   | "beta"
@@ -310,7 +311,8 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   general: "main",
   voice: "general",
   advanced: "main",
-  assistantoverlay: "main",
+  maestro: "main",
+  assistantoverlay: "maestro",
   service: "main",
   beta: "service",
   local: "service",
@@ -2741,21 +2743,21 @@ export default function SettingsDrawer({
         {!isDesktop && (
           <Pressable
             style={pressStyle(styles.navItem, styles.navItemPressed)}
-            onPress={() => setActiveSubPage("assistantoverlay")}
+            onPress={() => setActiveSubPage("maestro")}
           >
             <View style={styles.menuIconWrap}>
               <Image
-                source={micIcon}
+                source={operaIcon}
                 style={styles.menuIcon}
                 tintColor={Colors.textOnPrimary}
               />
             </View>
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>
-                {t("settings.nav.overlay.title")}
+                {t("settings.nav.maestro.title")}
               </Text>
               <Text style={styles.navSubtitle}>
-                {t("settings.nav.overlay.subtitle")}
+                {t("settings.nav.maestro.subtitle")}
               </Text>
             </View>
           </Pressable>
@@ -3017,7 +3019,7 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.profile.personalize"))}
 
       <View style={styles.contentCard}>
-        <View style={styles.settingRowVertical}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
             {t("settings.profile.name")}
           </Text>
@@ -3028,20 +3030,6 @@ export default function SettingsDrawer({
               value={name}
               onChangeText={setName}
               onSubmitEditing={() => setConfirmedName(name)}
-            />
-          </Group>
-        </View>
-
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-            {t("settings.profile.instructions")}
-          </Text>
-          <Group>
-            <TextInputField
-              icon={penPlaceholderIcon}
-              placeholder={t("settings.profile.instructionsPlaceholder")}
-              value={instruction}
-              onChangeText={setInstruction}
             />
           </Group>
         </View>
@@ -3307,6 +3295,37 @@ export default function SettingsDrawer({
     </View>
   );
 
+  // maestro subpage
+  const renderMaestroSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader(t("settings.nav.maestro.title"))}
+
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+            {t("settings.profile.instructions")}
+          </Text>
+          <Group>
+            <TextInputField
+              icon={penPlaceholderIcon}
+              placeholder={t("settings.profile.instructionsPlaceholder")}
+              value={instruction}
+              onChangeText={setInstruction}
+            />
+          </Group>
+        </View>
+      </View>
+
+      <Group style={styles.groupSpacing}>
+        {renderToolsNavRow(
+          "assistantoverlay",
+          t("settings.nav.overlay.title"),
+          t("settings.nav.overlay.subtitle"),
+        )}
+      </Group>
+    </View>
+  );
+
   // assistant overlay subpage
   const renderAssistantOverlaySubPage = () => (
     <View style={styles.subPageContainer}>
@@ -3435,56 +3454,56 @@ export default function SettingsDrawer({
         {cloudDef && cloudUserInfo && (
           <View style={styles.contentCard}>
             <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <Text style={styles.settingLabel}>{cloudDef.label}</Text>
+              <View style={styles.cloudAccount}>
+                {cloudUserInfo.picture ? (
+                  <Image
+                    source={{ uri: cloudUserInfo.picture }}
+                    style={styles.cloudAvatar}
+                  />
+                ) : (
+                  <View style={styles.cloudAvatar}>
+                    <Image
+                      source={profilIcon}
+                      style={styles.cloudAvatarIcon}
+                      tintColor={Colors.textMuted}
+                    />
+                  </View>
+                )}
+                {!!cloudUserInfo.name && (
+                  <Text style={styles.cloudName} numberOfLines={1}>
+                    {cloudUserInfo.name}
+                  </Text>
+                )}
+                <Text style={styles.cloudEmail} numberOfLines={1}>
+                  {cloudUserInfo.email}
+                </Text>
+              </View>
+
+              {cloudRows.length > 0 && (
+                <View style={styles.groupSpacingTight}>
+                  {cloudRows.map((row) => (
+                    <ActionButton
+                      key={row.label}
+                      label={row.label}
+                      rightElement={
+                        <Text
+                          style={styles.infoValue}
+                          numberOfLines={1}
+                          ellipsizeMode="middle"
+                        >
+                          {row.value}
+                        </Text>
+                      }
+                    />
+                  ))}
+                </View>
+              )}
+
               <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
                 {hasSyncPin
                   ? t("cloudSync.ready")
                   : t("cloudSync.setupIncomplete")}
               </Text>
-
-              <Group style={styles.groupSpacingTight}>
-                <View style={styles.navItem}>
-                  {cloudUserInfo.picture ? (
-                    <Image
-                      source={{ uri: cloudUserInfo.picture }}
-                      style={styles.cloudAvatar}
-                    />
-                  ) : (
-                    <View style={styles.cloudAvatar}>
-                      <Image
-                        source={profilIcon}
-                        style={styles.menuIcon}
-                        tintColor={Colors.textMuted}
-                      />
-                    </View>
-                  )}
-                  <View style={styles.navTextContainer}>
-                    {!!cloudUserInfo.name && (
-                      <Text style={styles.navTitle} numberOfLines={1}>
-                        {cloudUserInfo.name}
-                      </Text>
-                    )}
-                    <Text style={styles.navSubtitle} numberOfLines={1}>
-                      {cloudUserInfo.email}
-                    </Text>
-                  </View>
-                </View>
-                {cloudRows.map((row) => (
-                  <ActionButton
-                    key={row.label}
-                    label={row.label}
-                    rightElement={
-                      <Text
-                        style={styles.infoValue}
-                        numberOfLines={1}
-                        ellipsizeMode="middle"
-                      >
-                        {row.value}
-                      </Text>
-                    }
-                  />
-                ))}
-              </Group>
 
               {!hasSyncPin && (
                 <Group
@@ -5000,6 +5019,8 @@ export default function SettingsDrawer({
         return renderGeneralSubPage();
       case "voice":
         return renderVoiceSubPage();
+      case "maestro":
+        return renderMaestroSubPage();
       case "assistantoverlay":
         return renderAssistantOverlaySubPage();
       case "service":
@@ -6604,15 +6625,40 @@ const makeStyles = (Colors: ThemeColors) =>
       fontFamily: Fonts.mono,
       fontSize: FontSizes.label,
     },
+    cloudAccount: {
+      alignItems: "center",
+      paddingVertical: Spacing.xl2,
+      paddingHorizontal: Spacing.md,
+      marginBottom: Spacing.lg2,
+    },
     cloudAvatar: {
-      width: 36,
-      height: 36,
-      borderRadius: Radius.pill,
+      width: 80,
+      height: 80,
+      //stays a circle at this size
+      borderRadius: Radius.pill * 2,
       borderWidth: 2,
       borderColor: Colors.border,
       backgroundColor: Colors.surfaceSubtle,
       alignItems: "center",
       justifyContent: "center",
+      marginBottom: Spacing.lg2,
+    },
+    cloudAvatarIcon: {
+      width: 32,
+      height: 32,
+    },
+    cloudName: {
+      fontSize: FontSizes.lg,
+      fontFamily: Fonts.mono,
+      color: Colors.textPrimary,
+      textAlign: "center",
+      marginBottom: Spacing.xs2,
+    },
+    cloudEmail: {
+      fontSize: FontSizes.bodyMd,
+      fontFamily: Fonts.body,
+      color: Colors.textMuted,
+      textAlign: "center",
     },
     navTitle: {
       fontSize: FontSizes.lg,

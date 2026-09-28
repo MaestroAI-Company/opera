@@ -165,7 +165,6 @@ import {
   settingsProgress,
   settleDrawer,
   settleLayoutDrawer,
-  settlePage,
 } from "./drawerAnimation";
 import DrawerBackButton from "./DrawerBackButton";
 import PageStack from "./PageStack";
@@ -338,6 +337,8 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
 const subPageParent = (page: SubPage) =>
   page === "main" ? null : SUB_PAGE_PARENT[page];
 
+type LitertPage = "browse" | "search" | "model";
+
 export default function SettingsDrawer({
   visible,
   onClose,
@@ -496,6 +497,11 @@ export default function SettingsDrawer({
   const [cloudSetupVisible, setCloudSetupVisible] = useState(false);
   const [cloudSetupId, setCloudSetupId] = useState("");
   const [addModelScrolled, setAddModelScrolled] = useState(false);
+  const [litertPage, setLitertPage] = useState<LitertPage>("browse");
+  //model steps back to the list it came from
+  const [litertModelFrom, setLitertModelFrom] = useState<"browse" | "search">(
+    "browse",
+  );
   const [litertDetail, setLitertDetail] = useState<{
     repoId: string;
     entry: CatalogEntry | null;
@@ -519,8 +525,8 @@ export default function SettingsDrawer({
     selectedLocalModel !== null;
 
   const [hfModelInput, setHfModelInput] = useState("");
-  //true as soon as the search field is focused, no typing needed
-  const [litertSearchActive, setLitertSearchActive] = useState(false);
+  //entry fields hand their focus to the search page
+  const [litertSearchHandoff, setLitertSearchHandoff] = useState(false);
   const [litertForceLoad, setLitertForceLoadState] = useState(false);
   const [litertContextLength, setLitertContextLengthState] = useState("8192");
   const [installedLitertModels, setInstalledLitertModels] = useState<
@@ -538,6 +544,9 @@ export default function SettingsDrawer({
   >([]);
   const [litertBrowserLoading, setLitertBrowserLoading] = useState(false);
   const [litertBrowserFailed, setLitertBrowserFailed] = useState(false);
+  //kept apart so the catalog never shows a search state
+  const [litertSearchLoading, setLitertSearchLoading] = useState(false);
+  const [litertSearchFailed, setLitertSearchFailed] = useState(false);
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   //sheet may grow up to just under the status bar
@@ -1957,9 +1966,10 @@ export default function SettingsDrawer({
   };
 
   const openAddModelSheet = async () => {
+    setLitertPage("browse");
     setLitertDetail(null);
     setHfModelInput("");
-    setLitertSearchActive(false);
+    setLitertSearchHandoff(false);
     setLitertSearchResults([]);
     setAddModelSheetVisible(true);
     //cache paints, hub refreshes behind
@@ -1980,27 +1990,51 @@ export default function SettingsDrawer({
   //queries hit the hub, not families
   const runLitertSearch = useCallback(
     async (query: string, signal: AbortSignal) => {
-      setLitertBrowserFailed(false);
-      setLitertBrowserLoading(true);
+      setLitertSearchFailed(false);
+      setLitertSearchLoading(true);
       try {
         const results = await searchModels(query, signal);
         if (!signal.aborted) setLitertSearchResults(results);
       } catch (e) {
         console.warn("Could not search the hugging face models:", e);
-        if (!signal.aborted) setLitertBrowserFailed(true);
+        if (!signal.aborted) setLitertSearchFailed(true);
       } finally {
-        if (!signal.aborted) setLitertBrowserLoading(false);
+        if (!signal.aborted) setLitertSearchLoading(false);
       }
     },
     [],
   );
 
+  //each page opens at the top
+  const showLitertPage = (page: LitertPage) => {
+    setAddModelScrolled(false);
+    setLitertPage(page);
+  };
+
+  //a model found by search steps back to its results
+  const openLitertSearch = () => {
+    if (litertPage !== "model" || litertModelFrom !== "search") {
+      setHfModelInput("");
+      setLitertSearchResults([]);
+      setLitertSearchLoading(false);
+      setLitertSearchFailed(false);
+    }
+    setLitertSearchHandoff(true);
+    showLitertPage("search");
+  };
+
   //sizes resolve on open, not on listing
   const openLitertDetail = async (repoId: string) => {
-    setHfModelInput("");
-    setLitertSearchActive(false);
+    //keyboard slides away with the push
+    Keyboard.dismiss();
+    if (litertPage === "model") {
+      //similar model swaps in place
+      addModelScrollRef.current?.scrollTo({ y: 0, animated: false });
+    } else {
+      setLitertModelFrom(litertPage);
+    }
+    showLitertPage("model");
     setLitertDetail({ repoId, entry: null, loading: true });
-    addModelScrollRef.current?.scrollTo({ y: 0, animated: false });
     fetchModelDescription(repoId).then((description) =>
       setLitertDetail((prev) =>
         prev?.repoId === repoId ? { ...prev, description } : prev,
@@ -5193,60 +5227,23 @@ export default function SettingsDrawer({
     </>
   );
 
-  //focus opens the search view, the hub query still waits for enough chars
-  const isLitertSearching = litertSearchActive;
+  //the hub query waits for enough chars
   const isLitertQuerying = hfModelInput.trim().length >= MIN_SEARCH_LENGTH;
-  const isLitertDetail = !isLitertSearching && litertDetail !== null;
 
-  //android back/gesture steps out of detail then search before the sheet closes
+  const litertPageParent = (page: LitertPage) =>
+    page === "model" ? litertModelFrom : page === "search" ? "browse" : null;
+
+  //android back steps up the pages before the sheet closes
   const handleLitertBackPress = () => {
-    if (isLitertDetail) {
-      setLitertDetail(null);
-      return true;
-    }
-    if (isLitertSearching) {
-      setHfModelInput("");
-      setLitertSearchActive(false);
-      return true;
-    }
-    return false;
+    const parent = litertPageParent(litertPage);
+    if (parent === null) return false;
+    //keyboard slides away with the pop
+    Keyboard.dismiss();
+    //a page reached by back never grabs focus
+    setLitertSearchHandoff(false);
+    showLitertPage(parent);
+    return true;
   };
-
-  //slides the browse/detail body like a settings page push
-  //a fresh value each time avoids a flash at rest before it offsets
-  const [litertShown, setLitertShown] = useState(isLitertDetail);
-  const [litertTransition, setLitertTransition] = useState<{
-    shift: number;
-    progress: Animated.Value;
-  } | null>(null);
-  if (isLitertDetail !== litertShown) {
-    setLitertShown(isLitertDetail);
-    //opening fresh on the list skips the push
-    if (addModelSheetVisible) {
-      setLitertTransition({
-        shift: isLitertDetail ? litertBodyWidth : -litertBodyWidth,
-        progress: new Animated.Value(0),
-      });
-    }
-  }
-  useEffect(() => {
-    if (!litertTransition) return;
-    settlePage(litertTransition.progress, 1, () =>
-      setLitertTransition((cur) => (cur === litertTransition ? null : cur)),
-    );
-  }, [litertTransition]);
-  const litertBodyTranslate = useMemo(() => {
-    if (!litertTransition) return 0;
-    return litertTransition.progress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [litertTransition.shift, 0],
-    });
-  }, [litertTransition]);
-  //shared by the two mutually exclusive slide layers below
-  const litertBodySlideStyle = useMemo(
-    () => ({ transform: [{ translateX: litertBodyTranslate }] }),
-    [litertBodyTranslate],
-  );
 
   const renderLitertCard = (repoId: string) => {
     const entry = getCatalogEntry(repoId);
@@ -5424,31 +5421,102 @@ export default function SettingsDrawer({
   ) : litertBrowserFailed ? (
     <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
   ) : (
-    <>
-      {!isLitertSearching ? (
-        <View style={styles.litertFamilies}>
-          {litertFamilies.map((family) => (
-            <View key={family.id}>
-              <Text style={[styles.settingLabel, styles.litertFamilyTitle]}>
-                {litertFamilyName(family)}
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.litertCarousel}
-              >
-                {family.repoIds.map(renderLitertCard)}
-              </ScrollView>
-            </View>
-          ))}
+    <View style={styles.litertFamilies}>
+      {litertFamilies.map((family) => (
+        <View key={family.id}>
+          <Text style={[styles.settingLabel, styles.litertFamilyTitle]}>
+            {litertFamilyName(family)}
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.litertCarousel}
+          >
+            {family.repoIds.map(renderLitertCard)}
+          </ScrollView>
         </View>
-      ) : (
-        litertSearchResults.length > 0 && (
-          <Group>{litertSearchResults.map(renderLitertSearchResult)}</Group>
-        )
-      )}
-      {isLitertQuerying && litertSearchResults.length === 0 && (
-        <Text style={styles.helpText}>{t("settings.litert.noResults")}</Text>
+      ))}
+    </View>
+  );
+
+  //nothing until a query goes out
+  const litertSearchList = litertSearchLoading ? (
+    <Text style={styles.helpText}>{t("settings.litert.loading")}</Text>
+  ) : litertSearchFailed ? (
+    <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
+  ) : litertSearchResults.length > 0 ? (
+    <Group>{litertSearchResults.map(renderLitertSearchResult)}</Group>
+  ) : (
+    isLitertQuerying && (
+      <Text style={styles.helpText}>{t("settings.litert.noResults")}</Text>
+    )
+  );
+
+  const renderLitertSearchField = (page: LitertPage) => (
+    <Group>
+      <TextInputField
+        icon={searchIcon}
+        placeholder={t("settings.litert.addModelPlaceholder")}
+        //other pages only lead to the search page
+        value={page === "search" ? hfModelInput : ""}
+        onChangeText={setHfModelInput}
+        onFocus={
+          page === "search"
+            ? () => setLitertSearchHandoff(false)
+            : openLitertSearch
+        }
+        autoFocus={page === "search" && litertSearchHandoff}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+    </Group>
+  );
+
+  //catalog, search and model push like settings pages
+  const renderLitertPage = (page: LitertPage, active: boolean) => (
+    <>
+      <ScrollView
+        ref={active ? addModelScrollRef : undefined}
+        contentContainerStyle={styles.addModelSheetContent}
+        keyboardShouldPersistTaps="handled"
+        onScroll={
+          active
+            ? (e) => setAddModelScrolled(e.nativeEvent.contentOffset.y > 4)
+            : undefined
+        }
+        scrollEventThrottle={16}
+      >
+        {page === "browse" ? (
+          <View style={styles.contentCard}>
+            <View style={styles.settingRowVertical}>
+              {renderLitertSearchField(page)}
+            </View>
+            {litertList}
+          </View>
+        ) : (
+          <>
+            <View style={[styles.contentCard, styles.litertSearchWithBack]}>
+              {renderLitertSearchField(page)}
+            </View>
+            {page === "model"
+              ? renderLitertDetail()
+              : litertSearchList && (
+                  <View style={styles.contentCard}>{litertSearchList}</View>
+                )}
+          </>
+        )}
+      </ScrollView>
+
+      {/* floats over the scroll like the settings back button */}
+      {page !== "browse" && (
+        <View style={styles.litertBackWrapper} pointerEvents="box-none">
+          <DrawerBackButton
+            kind="back"
+            onPress={handleLitertBackPress}
+            scrolled={addModelScrolled}
+            pulseKey={page === "model" ? litertDetail?.repoId : page}
+          />
+        </View>
       )}
     </>
   );
@@ -5456,12 +5524,7 @@ export default function SettingsDrawer({
   const addModelSheet = (
     <DrawerSheet
       visible={addModelSheetVisible}
-      onClose={() => {
-        setAddModelSheetVisible(false);
-        setLitertDetail(null);
-        setAddModelScrolled(false);
-        setLitertSearchActive(false);
-      }}
+      onClose={() => setAddModelSheetVisible(false)}
       onBackPress={handleLitertBackPress}
       mode="overlay"
       isLargeScreen={isLargeScreen}
@@ -5472,109 +5535,27 @@ export default function SettingsDrawer({
         styles.addModelSheet,
         {
           paddingBottom: Platform.OS === "ios" ? 34 : 20,
-          maxHeight: sheetMaxHeight,
+          //stacked pages cannot size the sheet
+          height: sheetMaxHeight,
         },
       ]}
-      desktopStyle={styles.addModelSheetDesktop}
+      desktopStyle={[styles.addModelSheetDesktop, { height: sheetMaxHeight }]}
     >
       <View
-        style={styles.addModelSheetBody}
+        style={styles.litertSheetBody}
         onLayout={(e) => {
           const width = e.nativeEvent.layout.width;
           setLitertBodyWidth((prev) => (prev !== width ? width : prev));
         }}
       >
-        <ScrollView
-          ref={addModelScrollRef}
-          contentContainerStyle={styles.addModelSheetContent}
-          keyboardShouldPersistTaps="handled"
-          onScroll={(e) =>
-            setAddModelScrolled(e.nativeEvent.contentOffset.y > 4)
-          }
-          scrollEventThrottle={16}
-        >
-          {/* same slot keeps the field focused */}
-          <View style={!isLitertDetail && styles.contentCard}>
-            <View
-              style={
-                isLitertDetail
-                  ? [styles.contentCard, styles.litertSearchWithBack]
-                  : styles.settingRowVertical
-              }
-            >
-              <View style={styles.litertSearchBarRow}>
-                {isLitertSearching && (
-                  <Pressable
-                    onPress={() => {
-                      setHfModelInput("");
-                      setLitertSearchActive(false);
-                    }}
-                    hitSlop={12}
-                    style={pressStyle(styles.litertSearchBackButton, "fade")}
-                  >
-                    <Image
-                      source={arrowIcon}
-                      style={styles.backIcon}
-                      tintColor={Colors.textPrimary}
-                    />
-                  </Pressable>
-                )}
-                <View style={styles.litertSearchBarGroup}>
-                  <Group>
-                    <TextInputField
-                      icon={searchIcon}
-                      placeholder={t("settings.litert.addModelPlaceholder")}
-                      value={hfModelInput}
-                      onChangeText={setHfModelInput}
-                      onFocus={() => setLitertSearchActive(true)}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </Group>
-                </View>
-              </View>
-            </View>
-            {!isLitertDetail && (
-              <Animated.View style={litertBodySlideStyle}>
-                {litertList}
-              </Animated.View>
-            )}
-          </View>
-
-          {isLitertDetail && (
-            <Animated.View style={litertBodySlideStyle}>
-              {renderLitertDetail()}
-            </Animated.View>
-          )}
-        </ScrollView>
-
-        {/* floats over the scroll like the settings back button */}
-        {isLitertDetail && (
-          <View style={styles.litertBackWrapper} pointerEvents="box-none">
-            {addModelScrolled && (
-              <View style={styles.fixedBackShadow} pointerEvents="none" />
-            )}
-            <Pressable
-              onPress={() => setLitertDetail(null)}
-              hitSlop={12}
-              style={pressStyle(
-                [
-                  styles.fixedBackButton,
-                  addModelScrolled
-                    ? styles.fixedBackButtonScrolled
-                    : styles.fixedBackButtonUnscrolled,
-                ],
-                addModelScrolled ? "surface" : "fade",
-              )}
-            >
-              <Image
-                source={arrowIcon}
-                style={styles.backIcon}
-                tintColor={Colors.textPrimary}
-              />
-            </Pressable>
-          </View>
-        )}
+        <PageStack
+          page={litertPage}
+          visible={addModelSheetVisible}
+          width={litertBodyWidth}
+          parentOf={litertPageParent}
+          onBack={handleLitertBackPress}
+          renderPage={renderLitertPage}
+        />
       </View>
     </DrawerSheet>
   );
@@ -6283,31 +6264,6 @@ const makeStyles = (Colors: ThemeColors) =>
       width: 40,
       height: 40,
     },
-    fixedBackShadow: {
-      position: "absolute",
-      top: 4,
-      left: -4,
-      width: 40,
-      height: 40,
-      backgroundColor: Colors.shadowInk,
-      borderRadius: Radius.xxl,
-    },
-    fixedBackButton: {
-      width: 40,
-      height: 40,
-      justifyContent: "center",
-      alignItems: "center",
-      position: "relative",
-      zIndex: 1,
-    },
-    fixedBackButtonScrolled: {
-      backgroundColor: Colors.surface,
-      borderRadius: Radius.xxl,
-    },
-    fixedBackButtonUnscrolled: {
-      backgroundColor: "transparent",
-      borderRadius: Radius.xxl,
-    },
     header: {
       flexDirection: "row",
       alignItems: "center",
@@ -6336,11 +6292,6 @@ const makeStyles = (Colors: ThemeColors) =>
       borderWidth: 0,
       padding: Spacing.md,
       marginBottom: Spacing.xxl2,
-    },
-    backIcon: {
-      width: 18,
-      height: 18,
-      transform: [{ rotate: "-180deg" }],
     },
     gradientTop: {
       position: "absolute",
@@ -6543,6 +6494,9 @@ const makeStyles = (Colors: ThemeColors) =>
       flexShrink: 1,
       position: "relative",
     },
+    litertSheetBody: {
+      flex: 1,
+    },
     litertBackWrapper: {
       position: "absolute",
       top: Spacing.md + 4,
@@ -6554,21 +6508,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     litertSearchWithBack: {
       marginLeft: 40 + Spacing.md,
-    },
-    litertSearchBarRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: Spacing.md,
-    },
-    litertSearchBarGroup: {
-      flex: 1,
-    },
-    litertSearchBackButton: {
-      width: 44,
-      height: 44,
-      justifyContent: "center",
-      alignItems: "center",
-      borderRadius: Radius.xxl,
     },
     addModelSheetContent: {
       paddingHorizontal: Spacing.lg2,

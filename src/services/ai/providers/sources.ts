@@ -150,14 +150,36 @@ function serverLabel(url: string): string {
   return url.replace(/^https?:\/\//, '').replace(/\/+$/, '');
 }
 
+//domain name like api.mistral.ai gives Mistral
+function apiNameFromUrl(url: string): string | null {
+  const parts = serverLabel(url.trim()).split(/[/:]/)[0].toLowerCase().split('.');
+  //skip ips and bare hosts like localhost
+  if (parts.length < 2 || parts.every((p) => /^\d+$/.test(p))) return null;
+  const domain = parts[parts.length - 2];
+  return domain ? domain.charAt(0).toUpperCase() + domain.slice(1) : null;
+}
+
+//user name, else service name numbered on repeats
+export function openAIServerNames(servers: OllamaServer[]): (string | null)[] {
+  const seen: Record<string, number> = {};
+  return servers.map((server) => {
+    if (server.name) return server.name;
+    const known = apiNameFromUrl(server.url);
+    if (!known) return null;
+    seen[known] = (seen[known] ?? 0) + 1;
+    return seen[known] > 1 ? `${known} #${seen[known]}` : known;
+  });
+}
+
 //one tab per configured server
 function serverSources(service: string, servers: OllamaServer[], fallback: string): ModelSource[] {
   const kept = servers.filter((s) => s.url.length > 0);
-  return kept.map((server) => ({
+  const names = service === OPENAI_PROVIDER_ID ? openAIServerNames(kept) : kept.map((s) => s.name || null);
+  return kept.map((server, i) => ({
     key: `${service}:${server.url}`,
     service,
     //name wins over host then provider
-    label: server.name || (kept.length > 1 ? serverLabel(server.url) : fallback),
+    label: names[i] || (kept.length > 1 ? serverLabel(server.url) : fallback),
     url: server.url,
   }));
 }
@@ -180,7 +202,7 @@ export function buildSources(localAvailable: boolean): ModelSource[] {
     sources.push(...serverSources('ollama', getOllamaServers(), 'Ollama'));
   }
   if (isProviderSupported(OPENAI_PROVIDER_ID) && enabled.includes(OPENAI_PROVIDER_ID)) {
-    sources.push(...serverSources(OPENAI_PROVIDER_ID, getOpenAIServers(), t('settings.service.openai')));
+    sources.push(...serverSources(OPENAI_PROVIDER_ID, getOpenAIServers(), t('settings.service.cloudapi')));
   }
   return sources;
 }

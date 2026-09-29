@@ -93,6 +93,7 @@ import {
   newOpenAIServerId,
   OllamaServer,
   OPENAI_PROVIDER_ID,
+  openAIServerNames,
   serializeServers,
   serializeProviders,
   setOpenAIApiKey,
@@ -1516,7 +1517,7 @@ export default function SettingsDrawer({
       if (!(await new OpenAIProvider(url, openaiKeyDraft).isAvailable())) {
         showAlert(
           t("settings.ollama.unreachableTitle"),
-          t("settings.openai.unreachableInfo"),
+          t("settings.cloudapi.unreachableInfo"),
           undefined,
           { messageAlign: "left" },
         );
@@ -1604,6 +1605,10 @@ export default function SettingsDrawer({
       .replace(/^https?:\/\//, "")
       .replace(/\/+$/, "") ||
     t("settings.ollama.newServer");
+
+  const openAIServerLabel = (index: number): string =>
+    openAIServerNames(openaiServers)[index] ||
+    ollamaServerLabel(openaiServers[index]);
 
   //undefined falls back to global
   const serverContextLength = (server: OllamaServer) =>
@@ -1849,7 +1854,7 @@ export default function SettingsDrawer({
     const server = openaiServers[index];
     showAlert(
       t("settings.ollama.remove.title"),
-      t("settings.ollama.remove.message", { name: ollamaServerLabel(server) }),
+      t("settings.ollama.remove.message", { name: openAIServerLabel(index) }),
       [
         {
           text: t("common.cancel"),
@@ -3709,10 +3714,10 @@ export default function SettingsDrawer({
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>
               <Text style={styles.settingLabel}>
-                {t("settings.service.openai")}
+                {t("settings.service.cloudapi")}
               </Text>
               <Text style={styles.helpText}>
-                {t("settings.service.openaiHelp")}
+                {t("settings.service.cloudapiHelp")}
               </Text>
             </View>
             <View style={styles.toggleDivider} />
@@ -4198,14 +4203,14 @@ export default function SettingsDrawer({
   //openai server list subpage
   const renderOpenAISubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.service.openai"))}
+      {renderSubPageHeader(t("settings.service.cloudapi"))}
 
       {/* openai servers card */}
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{t("settings.openai.title")}</Text>
+          <Text style={styles.settingLabel}>{t("settings.cloudapi.title")}</Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.openai.help")}
+            {t("settings.cloudapi.help")}
           </Text>
 
           <Group style={styles.highlightGroup}>
@@ -4221,7 +4226,7 @@ export default function SettingsDrawer({
             renderCardGrid(
               openaiServers.map((server, index) => ({
                 key: String(index),
-                title: ollamaServerLabel(server),
+                title: openAIServerLabel(index),
                 status: ollamaStatusLabel(server),
                 error: serverErrors[server.url.trim()] === true,
                 onPress: () => openOpenAIServer(index),
@@ -4260,7 +4265,7 @@ export default function SettingsDrawer({
 
     return (
       <View style={styles.subPageContainer}>
-        {renderSubPageHeader(ollamaServerLabel(server))}
+        {renderSubPageHeader(openAIServerLabel(index))}
 
         <View style={styles.contentCard}>
           <View style={styles.settingRowVertical}>
@@ -4298,7 +4303,7 @@ export default function SettingsDrawer({
                 onRightIconPress={() =>
                   showAlert(
                     t("settings.ollama.unreachableTitle"),
-                    t("settings.openai.unreachableInfo"),
+                    t("settings.cloudapi.unreachableInfo"),
                     undefined,
                     { messageAlign: "left" },
                   )
@@ -4309,15 +4314,15 @@ export default function SettingsDrawer({
 
           <View style={styles.settingRowVertical}>
             <Text style={styles.settingLabel}>
-              {t("settings.openai.apiKey")}
+              {t("settings.cloudapi.apiKey")}
             </Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.openai.apiKeyHelp")}
+              {t("settings.cloudapi.apiKeyHelp")}
             </Text>
             <Group>
               <TextInputField
                 icon={penPlaceholderIcon}
-                placeholder={t("settings.openai.apiKeyPlaceholder")}
+                placeholder={t("settings.cloudapi.apiKeyPlaceholder")}
                 autoCapitalize="none"
                 autoCorrect={false}
                 secureTextEntry
@@ -5706,15 +5711,15 @@ export default function SettingsDrawer({
 
           <View style={styles.settingRowVertical}>
             <Text style={styles.settingLabel}>
-              {t("settings.openai.apiKey")}
+              {t("settings.cloudapi.apiKey")}
             </Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.openai.apiKeyHelp")}
+              {t("settings.cloudapi.apiKeyHelp")}
             </Text>
             <Group>
               <TextInputField
                 icon={penPlaceholderIcon}
-                placeholder={t("settings.openai.apiKeyPlaceholder")}
+                placeholder={t("settings.cloudapi.apiKeyPlaceholder")}
                 autoCapitalize="none"
                 autoCorrect={false}
                 secureTextEntry

@@ -189,12 +189,14 @@ class AICoreModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
     var fullText = ""
     var seenThought = ""
     var thinkOpened = false
+    var textStarted = false
     model.generateContentStream(request).collect { response ->
       val thought = response.thoughtProcess.joinToString("") { it.text ?: "" }
       if (thought != seenThought) {
         val delta = if (thought.startsWith(seenThought)) thought.removePrefix(seenThought) else thought
         seenThought = thought
-        if (delta.isNotEmpty()) {
+        //late thought would split the answer
+        if (delta.isNotEmpty() && !textStarted) {
           if (!thinkOpened) {
             fullText += "<think>\n"
             emit("AICoreToken", mapOf("requestId" to requestId, "chunk" to "<think>\n"))
@@ -206,6 +208,7 @@ class AICoreModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
       }
       val text = response.candidates.firstOrNull()?.text ?: ""
       if (text.isNotEmpty()) {
+        textStarted = true
         if (thinkOpened) {
           fullText += "\n</think>\n"
           emit("AICoreToken", mapOf("requestId" to requestId, "chunk" to "\n</think>\n"))

@@ -3,6 +3,7 @@ import { OllamaProvider } from './providers/OllamaProvider';
 import { ToolManager } from './tools/ToolManager';
 import { ToolSource } from './tools/ITool';
 import { sendMessageWithToolPrompt } from './tools/fallbackToolCall';
+import { describeToolCallError } from './tools/toolCallParser';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { LocalModelSheet, LocalProvider } from './providers/LocalProvider';
 import { LiteRTProvider } from './providers/LiteRTProvider';
@@ -397,6 +398,15 @@ class CentralAIModule {
       if (!result?.toolCalls || result.toolCalls.length === 0) {
         //empty means the model stayed silent
         const producedText = accumulated.substring(beforeLen).replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
+        //unparsed tool call, tell the model why
+        if (producedText.includes('tool_calls')) {
+          currentMessages.push({ role: 'assistant', content: producedText });
+          currentMessages.push({
+            role: 'user',
+            content: `[SYSTEM] Your tool call could not be read: ${describeToolCallError(producedText)}. If you still need the tool, output the tool call JSON again in the exact required format. Otherwise answer the user.`,
+          });
+          return 'tools';
+        }
         return producedText.length > 0 ? 'answered' : 'empty';
       }
 

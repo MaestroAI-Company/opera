@@ -65,6 +65,22 @@ export function parseToolCalls(text: string, knownNames: string[]): ToolCall[] |
   return result.length > 0 ? result : null;
 }
 
+//why a tool call block failed to parse
+export function describeToolCallError(text: string): string {
+  const start = text.lastIndexOf("{", text.indexOf("tool_calls"));
+  if (start === -1) return "missing opening brace";
+  const block = extractBracesBlock(text, start);
+  if (!block) return "incomplete JSON, braces are not closed";
+  try {
+    const fn = JSON.parse(block)?.tool_calls?.[0]?.function;
+    if (typeof fn?.name !== "string") return "missing function name";
+    if (typeof fn?.arguments !== "object") return "arguments must be a JSON object";
+    return "unexpected format";
+  } catch (e: any) {
+    return `invalid JSON (${e?.message ?? e})`;
+  }
+}
+
 //build system prompt with tool instructions
 export function buildToolSystemPrompt(systemPrompt: string, tools: ToolDefinition[]): string {
   return systemPrompt +

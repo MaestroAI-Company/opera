@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { LayoutChangeEvent, LayoutRectangle, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, Vibration, View } from "react-native";
-import Animated, { interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { Easing, interpolate, interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
@@ -64,6 +64,7 @@ export default function Selector({
   const pillHeight = useSharedValue(0);
   const pillScale = useSharedValue(1);
   const pillLit = useSharedValue(0);
+  const labelPulse = useSharedValue(0);
 
   const rowLayoutsRef = useRef<({ y: number; height: number } | undefined)[]>([]);
   const armedRef = useRef(false);
@@ -116,6 +117,15 @@ export default function Selector({
     pillHeight.value = withTiming(layout.height, { duration: 180 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedValue, rowLayoutsVersion, visible]);
+
+  //pulse the pill label on each drag swap
+  useEffect(() => {
+    if (previewIndex === null) return;
+    labelPulse.set(withSequence(
+      withTiming(1, { duration: 120, easing: Easing.out(Easing.quad) }),
+      withTiming(0, { duration: 160, easing: Easing.in(Easing.quad) }),
+    ));
+  }, [previewIndex, labelPulse]);
 
   const pillPanResponder = useRef(
     PanResponder.create({
@@ -206,6 +216,11 @@ export default function Selector({
     transform: [{ translateY: pillY.value }, { scale: pillScale.value }],
     height: pillHeight.value,
     backgroundColor: interpolateColor(pillLit.value, [0, 1], [Colors.primary, Colors.primaryBright]),
+  }));
+
+  const labelPulseStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(labelPulse.value, [0, 1], [1, 0.6]),
+    transform: [{ scale: interpolate(labelPulse.value, [0, 1], [1, 1.2]) }],
   }));
 
   const iconStyle = useAnimatedStyle(() => {
@@ -377,9 +392,9 @@ export default function Selector({
                 })}
                 {rowLayoutsRef.current[activeIndex] && isPlainOption(activeIndex) && (
                   <Animated.View style={[styles.pill, pillAnimatedStyle]} {...pillPanResponder.panHandlers}>
-                    <Text style={[styles.optionText, styles.optionTextSelected]} numberOfLines={1}>
+                    <Animated.Text style={[styles.optionText, styles.optionTextSelected, labelPulseStyle]} numberOfLines={1}>
                       {options[activeIndex]?.label}
-                    </Text>
+                    </Animated.Text>
                   </Animated.View>
                 )}
               </View>

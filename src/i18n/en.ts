@@ -280,6 +280,8 @@ export const en = {
   "settings.nav.cloud.subtitle": "Cloud storage, Backup",
   "settings.nav.general.title": "General",
   "settings.nav.general.subtitle": "Language, Theme",
+  "settings.nav.maestro.title": "Maestro",
+  "settings.nav.maestro.subtitle": "Assistant overlay",
   "settings.nav.overlay.title": "Assistant Overlay",
   "settings.nav.overlay.subtitle": "Voice, Screen context",
   "settings.nav.service.title": "Service",

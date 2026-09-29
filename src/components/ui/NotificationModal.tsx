@@ -197,8 +197,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.window,
-    borderWidth: 2,
-    borderColor: Colors.border,
     padding: 24,
     width: "100%",
     maxWidth: 400,

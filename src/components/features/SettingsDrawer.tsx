@@ -137,6 +137,7 @@ import Group from "../ui/Group";
 import NotificationBanner from "../ui/NotificationBanner";
 import NotificationCard from "../ui/NotificationCard";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
+import PixelSphere from "../ui/PixelSphere";
 import ProgressBar from "../ui/ProgressBar";
 import Selector, { SelectorOption } from "../ui/Selector";
 import Slider from "../ui/Slider";
@@ -3338,6 +3339,10 @@ export default function SettingsDrawer({
   const renderMaestroSubPage = () => (
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.maestro.title"))}
+
+      <View style={{ paddingVertical: Spacing.xxl2, marginBottom: Spacing.xxl2 }}>
+        <PixelSphere />
+      </View>
 
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>

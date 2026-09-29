@@ -157,6 +157,7 @@
       ],
       "./plugins/withNotifeeRepo.js",
       "./plugins/withNativeAndroid",
+      "./plugins/withDebugVariant",
       "expo-speech-recognition",
       [
         "expo-quick-actions",

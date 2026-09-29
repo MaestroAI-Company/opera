@@ -165,7 +165,6 @@ import {
   settingsProgress,
   settleDrawer,
   settleLayoutDrawer,
-  settlePage,
 } from "./drawerAnimation";
 import DrawerBackButton from "./DrawerBackButton";
 import PageStack from "./PageStack";
@@ -281,6 +280,7 @@ export type SubPage =
   | "main"
   | "general"
   | "advanced"
+  | "maestro"
   | "assistantoverlay"
   | "service"
   | "beta"
@@ -310,7 +310,8 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   general: "main",
   voice: "general",
   advanced: "main",
-  assistantoverlay: "main",
+  maestro: "main",
+  assistantoverlay: "maestro",
   service: "main",
   beta: "service",
   local: "service",
@@ -335,6 +336,8 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
 
 const subPageParent = (page: SubPage) =>
   page === "main" ? null : SUB_PAGE_PARENT[page];
+
+type LitertPage = "browse" | "search" | "model";
 
 export default function SettingsDrawer({
   visible,
@@ -494,6 +497,11 @@ export default function SettingsDrawer({
   const [cloudSetupVisible, setCloudSetupVisible] = useState(false);
   const [cloudSetupId, setCloudSetupId] = useState("");
   const [addModelScrolled, setAddModelScrolled] = useState(false);
+  const [litertPage, setLitertPage] = useState<LitertPage>("browse");
+  //model steps back to the list it came from
+  const [litertModelFrom, setLitertModelFrom] = useState<"browse" | "search">(
+    "browse",
+  );
   const [litertDetail, setLitertDetail] = useState<{
     repoId: string;
     entry: CatalogEntry | null;
@@ -517,8 +525,8 @@ export default function SettingsDrawer({
     selectedLocalModel !== null;
 
   const [hfModelInput, setHfModelInput] = useState("");
-  //true as soon as the search field is focused, no typing needed
-  const [litertSearchActive, setLitertSearchActive] = useState(false);
+  //entry fields hand their focus to the search page
+  const [litertSearchHandoff, setLitertSearchHandoff] = useState(false);
   const [litertForceLoad, setLitertForceLoadState] = useState(false);
   const [litertContextLength, setLitertContextLengthState] = useState("8192");
   const [installedLitertModels, setInstalledLitertModels] = useState<
@@ -536,6 +544,9 @@ export default function SettingsDrawer({
   >([]);
   const [litertBrowserLoading, setLitertBrowserLoading] = useState(false);
   const [litertBrowserFailed, setLitertBrowserFailed] = useState(false);
+  //kept apart so the catalog never shows a search state
+  const [litertSearchLoading, setLitertSearchLoading] = useState(false);
+  const [litertSearchFailed, setLitertSearchFailed] = useState(false);
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   //sheet may grow up to just under the status bar
@@ -1955,9 +1966,10 @@ export default function SettingsDrawer({
   };
 
   const openAddModelSheet = async () => {
+    setLitertPage("browse");
     setLitertDetail(null);
     setHfModelInput("");
-    setLitertSearchActive(false);
+    setLitertSearchHandoff(false);
     setLitertSearchResults([]);
     setAddModelSheetVisible(true);
     //cache paints, hub refreshes behind
@@ -1978,27 +1990,51 @@ export default function SettingsDrawer({
   //queries hit the hub, not families
   const runLitertSearch = useCallback(
     async (query: string, signal: AbortSignal) => {
-      setLitertBrowserFailed(false);
-      setLitertBrowserLoading(true);
+      setLitertSearchFailed(false);
+      setLitertSearchLoading(true);
       try {
         const results = await searchModels(query, signal);
         if (!signal.aborted) setLitertSearchResults(results);
       } catch (e) {
         console.warn("Could not search the hugging face models:", e);
-        if (!signal.aborted) setLitertBrowserFailed(true);
+        if (!signal.aborted) setLitertSearchFailed(true);
       } finally {
-        if (!signal.aborted) setLitertBrowserLoading(false);
+        if (!signal.aborted) setLitertSearchLoading(false);
       }
     },
     [],
   );
 
+  //each page opens at the top
+  const showLitertPage = (page: LitertPage) => {
+    setAddModelScrolled(false);
+    setLitertPage(page);
+  };
+
+  //a model found by search steps back to its results
+  const openLitertSearch = () => {
+    if (litertPage !== "model" || litertModelFrom !== "search") {
+      setHfModelInput("");
+      setLitertSearchResults([]);
+      setLitertSearchLoading(false);
+      setLitertSearchFailed(false);
+    }
+    setLitertSearchHandoff(true);
+    showLitertPage("search");
+  };
+
   //sizes resolve on open, not on listing
   const openLitertDetail = async (repoId: string) => {
-    setHfModelInput("");
-    setLitertSearchActive(false);
+    //keyboard slides away with the push
+    Keyboard.dismiss();
+    if (litertPage === "model") {
+      //similar model swaps in place
+      addModelScrollRef.current?.scrollTo({ y: 0, animated: false });
+    } else {
+      setLitertModelFrom(litertPage);
+    }
+    showLitertPage("model");
     setLitertDetail({ repoId, entry: null, loading: true });
-    addModelScrollRef.current?.scrollTo({ y: 0, animated: false });
     fetchModelDescription(repoId).then((description) =>
       setLitertDetail((prev) =>
         prev?.repoId === repoId ? { ...prev, description } : prev,
@@ -2741,21 +2777,21 @@ export default function SettingsDrawer({
         {!isDesktop && (
           <Pressable
             style={pressStyle(styles.navItem, styles.navItemPressed)}
-            onPress={() => setActiveSubPage("assistantoverlay")}
+            onPress={() => setActiveSubPage("maestro")}
           >
             <View style={styles.menuIconWrap}>
               <Image
-                source={micIcon}
+                source={operaIcon}
                 style={styles.menuIcon}
                 tintColor={Colors.textOnPrimary}
               />
             </View>
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>
-                {t("settings.nav.overlay.title")}
+                {t("settings.nav.maestro.title")}
               </Text>
               <Text style={styles.navSubtitle}>
-                {t("settings.nav.overlay.subtitle")}
+                {t("settings.nav.maestro.subtitle")}
               </Text>
             </View>
           </Pressable>
@@ -3017,7 +3053,7 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.profile.personalize"))}
 
       <View style={styles.contentCard}>
-        <View style={styles.settingRowVertical}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
             {t("settings.profile.name")}
           </Text>
@@ -3028,20 +3064,6 @@ export default function SettingsDrawer({
               value={name}
               onChangeText={setName}
               onSubmitEditing={() => setConfirmedName(name)}
-            />
-          </Group>
-        </View>
-
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-            {t("settings.profile.instructions")}
-          </Text>
-          <Group>
-            <TextInputField
-              icon={penPlaceholderIcon}
-              placeholder={t("settings.profile.instructionsPlaceholder")}
-              value={instruction}
-              onChangeText={setInstruction}
             />
           </Group>
         </View>
@@ -3307,6 +3329,37 @@ export default function SettingsDrawer({
     </View>
   );
 
+  // maestro subpage
+  const renderMaestroSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader(t("settings.nav.maestro.title"))}
+
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+            {t("settings.profile.instructions")}
+          </Text>
+          <Group>
+            <TextInputField
+              icon={penPlaceholderIcon}
+              placeholder={t("settings.profile.instructionsPlaceholder")}
+              value={instruction}
+              onChangeText={setInstruction}
+            />
+          </Group>
+        </View>
+      </View>
+
+      <Group style={styles.groupSpacing}>
+        {renderToolsNavRow(
+          "assistantoverlay",
+          t("settings.nav.overlay.title"),
+          t("settings.nav.overlay.subtitle"),
+        )}
+      </Group>
+    </View>
+  );
+
   // assistant overlay subpage
   const renderAssistantOverlaySubPage = () => (
     <View style={styles.subPageContainer}>
@@ -3435,56 +3488,56 @@ export default function SettingsDrawer({
         {cloudDef && cloudUserInfo && (
           <View style={styles.contentCard}>
             <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <Text style={styles.settingLabel}>{cloudDef.label}</Text>
+              <View style={styles.cloudAccount}>
+                {cloudUserInfo.picture ? (
+                  <Image
+                    source={{ uri: cloudUserInfo.picture }}
+                    style={styles.cloudAvatar}
+                  />
+                ) : (
+                  <View style={styles.cloudAvatar}>
+                    <Image
+                      source={profilIcon}
+                      style={styles.cloudAvatarIcon}
+                      tintColor={Colors.textMuted}
+                    />
+                  </View>
+                )}
+                {!!cloudUserInfo.name && (
+                  <Text style={styles.cloudName} numberOfLines={1}>
+                    {cloudUserInfo.name}
+                  </Text>
+                )}
+                <Text style={styles.cloudEmail} numberOfLines={1}>
+                  {cloudUserInfo.email}
+                </Text>
+              </View>
+
+              {cloudRows.length > 0 && (
+                <View style={styles.groupSpacingTight}>
+                  {cloudRows.map((row) => (
+                    <ActionButton
+                      key={row.label}
+                      label={row.label}
+                      rightElement={
+                        <Text
+                          style={styles.infoValue}
+                          numberOfLines={1}
+                          ellipsizeMode="middle"
+                        >
+                          {row.value}
+                        </Text>
+                      }
+                    />
+                  ))}
+                </View>
+              )}
+
               <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
                 {hasSyncPin
                   ? t("cloudSync.ready")
                   : t("cloudSync.setupIncomplete")}
               </Text>
-
-              <Group style={styles.groupSpacingTight}>
-                <View style={styles.navItem}>
-                  {cloudUserInfo.picture ? (
-                    <Image
-                      source={{ uri: cloudUserInfo.picture }}
-                      style={styles.cloudAvatar}
-                    />
-                  ) : (
-                    <View style={styles.cloudAvatar}>
-                      <Image
-                        source={profilIcon}
-                        style={styles.menuIcon}
-                        tintColor={Colors.textMuted}
-                      />
-                    </View>
-                  )}
-                  <View style={styles.navTextContainer}>
-                    {!!cloudUserInfo.name && (
-                      <Text style={styles.navTitle} numberOfLines={1}>
-                        {cloudUserInfo.name}
-                      </Text>
-                    )}
-                    <Text style={styles.navSubtitle} numberOfLines={1}>
-                      {cloudUserInfo.email}
-                    </Text>
-                  </View>
-                </View>
-                {cloudRows.map((row) => (
-                  <ActionButton
-                    key={row.label}
-                    label={row.label}
-                    rightElement={
-                      <Text
-                        style={styles.infoValue}
-                        numberOfLines={1}
-                        ellipsizeMode="middle"
-                      >
-                        {row.value}
-                      </Text>
-                    }
-                  />
-                ))}
-              </Group>
 
               {!hasSyncPin && (
                 <Group
@@ -5000,6 +5053,8 @@ export default function SettingsDrawer({
         return renderGeneralSubPage();
       case "voice":
         return renderVoiceSubPage();
+      case "maestro":
+        return renderMaestroSubPage();
       case "assistantoverlay":
         return renderAssistantOverlaySubPage();
       case "service":
@@ -5172,60 +5227,23 @@ export default function SettingsDrawer({
     </>
   );
 
-  //focus opens the search view, the hub query still waits for enough chars
-  const isLitertSearching = litertSearchActive;
+  //the hub query waits for enough chars
   const isLitertQuerying = hfModelInput.trim().length >= MIN_SEARCH_LENGTH;
-  const isLitertDetail = !isLitertSearching && litertDetail !== null;
 
-  //android back/gesture steps out of detail then search before the sheet closes
+  const litertPageParent = (page: LitertPage) =>
+    page === "model" ? litertModelFrom : page === "search" ? "browse" : null;
+
+  //android back steps up the pages before the sheet closes
   const handleLitertBackPress = () => {
-    if (isLitertDetail) {
-      setLitertDetail(null);
-      return true;
-    }
-    if (isLitertSearching) {
-      setHfModelInput("");
-      setLitertSearchActive(false);
-      return true;
-    }
-    return false;
+    const parent = litertPageParent(litertPage);
+    if (parent === null) return false;
+    //keyboard slides away with the pop
+    Keyboard.dismiss();
+    //a page reached by back never grabs focus
+    setLitertSearchHandoff(false);
+    showLitertPage(parent);
+    return true;
   };
-
-  //slides the browse/detail body like a settings page push
-  //a fresh value each time avoids a flash at rest before it offsets
-  const [litertShown, setLitertShown] = useState(isLitertDetail);
-  const [litertTransition, setLitertTransition] = useState<{
-    shift: number;
-    progress: Animated.Value;
-  } | null>(null);
-  if (isLitertDetail !== litertShown) {
-    setLitertShown(isLitertDetail);
-    //opening fresh on the list skips the push
-    if (addModelSheetVisible) {
-      setLitertTransition({
-        shift: isLitertDetail ? litertBodyWidth : -litertBodyWidth,
-        progress: new Animated.Value(0),
-      });
-    }
-  }
-  useEffect(() => {
-    if (!litertTransition) return;
-    settlePage(litertTransition.progress, 1, () =>
-      setLitertTransition((cur) => (cur === litertTransition ? null : cur)),
-    );
-  }, [litertTransition]);
-  const litertBodyTranslate = useMemo(() => {
-    if (!litertTransition) return 0;
-    return litertTransition.progress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [litertTransition.shift, 0],
-    });
-  }, [litertTransition]);
-  //shared by the two mutually exclusive slide layers below
-  const litertBodySlideStyle = useMemo(
-    () => ({ transform: [{ translateX: litertBodyTranslate }] }),
-    [litertBodyTranslate],
-  );
 
   const renderLitertCard = (repoId: string) => {
     const entry = getCatalogEntry(repoId);
@@ -5403,31 +5421,102 @@ export default function SettingsDrawer({
   ) : litertBrowserFailed ? (
     <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
   ) : (
-    <>
-      {!isLitertSearching ? (
-        <View style={styles.litertFamilies}>
-          {litertFamilies.map((family) => (
-            <View key={family.id}>
-              <Text style={[styles.settingLabel, styles.litertFamilyTitle]}>
-                {litertFamilyName(family)}
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.litertCarousel}
-              >
-                {family.repoIds.map(renderLitertCard)}
-              </ScrollView>
-            </View>
-          ))}
+    <View style={styles.litertFamilies}>
+      {litertFamilies.map((family) => (
+        <View key={family.id}>
+          <Text style={[styles.settingLabel, styles.litertFamilyTitle]}>
+            {litertFamilyName(family)}
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.litertCarousel}
+          >
+            {family.repoIds.map(renderLitertCard)}
+          </ScrollView>
         </View>
-      ) : (
-        litertSearchResults.length > 0 && (
-          <Group>{litertSearchResults.map(renderLitertSearchResult)}</Group>
-        )
-      )}
-      {isLitertQuerying && litertSearchResults.length === 0 && (
-        <Text style={styles.helpText}>{t("settings.litert.noResults")}</Text>
+      ))}
+    </View>
+  );
+
+  //nothing until a query goes out
+  const litertSearchList = litertSearchLoading ? (
+    <Text style={styles.helpText}>{t("settings.litert.loading")}</Text>
+  ) : litertSearchFailed ? (
+    <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
+  ) : litertSearchResults.length > 0 ? (
+    <Group>{litertSearchResults.map(renderLitertSearchResult)}</Group>
+  ) : (
+    isLitertQuerying && (
+      <Text style={styles.helpText}>{t("settings.litert.noResults")}</Text>
+    )
+  );
+
+  const renderLitertSearchField = (page: LitertPage) => (
+    <Group>
+      <TextInputField
+        icon={searchIcon}
+        placeholder={t("settings.litert.addModelPlaceholder")}
+        //other pages only lead to the search page
+        value={page === "search" ? hfModelInput : ""}
+        onChangeText={setHfModelInput}
+        onFocus={
+          page === "search"
+            ? () => setLitertSearchHandoff(false)
+            : openLitertSearch
+        }
+        autoFocus={page === "search" && litertSearchHandoff}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+    </Group>
+  );
+
+  //catalog, search and model push like settings pages
+  const renderLitertPage = (page: LitertPage, active: boolean) => (
+    <>
+      <ScrollView
+        ref={active ? addModelScrollRef : undefined}
+        contentContainerStyle={styles.addModelSheetContent}
+        keyboardShouldPersistTaps="handled"
+        onScroll={
+          active
+            ? (e) => setAddModelScrolled(e.nativeEvent.contentOffset.y > 4)
+            : undefined
+        }
+        scrollEventThrottle={16}
+      >
+        {page === "browse" ? (
+          <View style={styles.contentCard}>
+            <View style={styles.settingRowVertical}>
+              {renderLitertSearchField(page)}
+            </View>
+            {litertList}
+          </View>
+        ) : (
+          <>
+            <View style={[styles.contentCard, styles.litertSearchWithBack]}>
+              {renderLitertSearchField(page)}
+            </View>
+            {page === "model"
+              ? renderLitertDetail()
+              : litertSearchList && (
+                  <View style={styles.contentCard}>{litertSearchList}</View>
+                )}
+          </>
+        )}
+      </ScrollView>
+
+      {/* floats over the scroll like the settings back button */}
+      {page !== "browse" && (
+        <View style={styles.litertBackWrapper} pointerEvents="box-none">
+          <DrawerBackButton
+            kind="back"
+            onPress={handleLitertBackPress}
+            scrolled={addModelScrolled}
+            pulseKey={page === "model" ? litertDetail?.repoId : page}
+          />
+        </View>
       )}
     </>
   );
@@ -5435,12 +5524,7 @@ export default function SettingsDrawer({
   const addModelSheet = (
     <DrawerSheet
       visible={addModelSheetVisible}
-      onClose={() => {
-        setAddModelSheetVisible(false);
-        setLitertDetail(null);
-        setAddModelScrolled(false);
-        setLitertSearchActive(false);
-      }}
+      onClose={() => setAddModelSheetVisible(false)}
       onBackPress={handleLitertBackPress}
       mode="overlay"
       isLargeScreen={isLargeScreen}
@@ -5451,109 +5535,27 @@ export default function SettingsDrawer({
         styles.addModelSheet,
         {
           paddingBottom: Platform.OS === "ios" ? 34 : 20,
-          maxHeight: sheetMaxHeight,
+          //stacked pages cannot size the sheet
+          height: sheetMaxHeight,
         },
       ]}
-      desktopStyle={styles.addModelSheetDesktop}
+      desktopStyle={[styles.addModelSheetDesktop, { height: sheetMaxHeight }]}
     >
       <View
-        style={styles.addModelSheetBody}
+        style={styles.litertSheetBody}
         onLayout={(e) => {
           const width = e.nativeEvent.layout.width;
           setLitertBodyWidth((prev) => (prev !== width ? width : prev));
         }}
       >
-        <ScrollView
-          ref={addModelScrollRef}
-          contentContainerStyle={styles.addModelSheetContent}
-          keyboardShouldPersistTaps="handled"
-          onScroll={(e) =>
-            setAddModelScrolled(e.nativeEvent.contentOffset.y > 4)
-          }
-          scrollEventThrottle={16}
-        >
-          {/* same slot keeps the field focused */}
-          <View style={!isLitertDetail && styles.contentCard}>
-            <View
-              style={
-                isLitertDetail
-                  ? [styles.contentCard, styles.litertSearchWithBack]
-                  : styles.settingRowVertical
-              }
-            >
-              <View style={styles.litertSearchBarRow}>
-                {isLitertSearching && (
-                  <Pressable
-                    onPress={() => {
-                      setHfModelInput("");
-                      setLitertSearchActive(false);
-                    }}
-                    hitSlop={12}
-                    style={pressStyle(styles.litertSearchBackButton, "fade")}
-                  >
-                    <Image
-                      source={arrowIcon}
-                      style={styles.backIcon}
-                      tintColor={Colors.textPrimary}
-                    />
-                  </Pressable>
-                )}
-                <View style={styles.litertSearchBarGroup}>
-                  <Group>
-                    <TextInputField
-                      icon={searchIcon}
-                      placeholder={t("settings.litert.addModelPlaceholder")}
-                      value={hfModelInput}
-                      onChangeText={setHfModelInput}
-                      onFocus={() => setLitertSearchActive(true)}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </Group>
-                </View>
-              </View>
-            </View>
-            {!isLitertDetail && (
-              <Animated.View style={litertBodySlideStyle}>
-                {litertList}
-              </Animated.View>
-            )}
-          </View>
-
-          {isLitertDetail && (
-            <Animated.View style={litertBodySlideStyle}>
-              {renderLitertDetail()}
-            </Animated.View>
-          )}
-        </ScrollView>
-
-        {/* floats over the scroll like the settings back button */}
-        {isLitertDetail && (
-          <View style={styles.litertBackWrapper} pointerEvents="box-none">
-            {addModelScrolled && (
-              <View style={styles.fixedBackShadow} pointerEvents="none" />
-            )}
-            <Pressable
-              onPress={() => setLitertDetail(null)}
-              hitSlop={12}
-              style={pressStyle(
-                [
-                  styles.fixedBackButton,
-                  addModelScrolled
-                    ? styles.fixedBackButtonScrolled
-                    : styles.fixedBackButtonUnscrolled,
-                ],
-                addModelScrolled ? "surface" : "fade",
-              )}
-            >
-              <Image
-                source={arrowIcon}
-                style={styles.backIcon}
-                tintColor={Colors.textPrimary}
-              />
-            </Pressable>
-          </View>
-        )}
+        <PageStack
+          page={litertPage}
+          visible={addModelSheetVisible}
+          width={litertBodyWidth}
+          parentOf={litertPageParent}
+          onBack={handleLitertBackPress}
+          renderPage={renderLitertPage}
+        />
       </View>
     </DrawerSheet>
   );
@@ -6262,31 +6264,6 @@ const makeStyles = (Colors: ThemeColors) =>
       width: 40,
       height: 40,
     },
-    fixedBackShadow: {
-      position: "absolute",
-      top: 4,
-      left: -4,
-      width: 40,
-      height: 40,
-      backgroundColor: Colors.shadowInk,
-      borderRadius: Radius.xxl,
-    },
-    fixedBackButton: {
-      width: 40,
-      height: 40,
-      justifyContent: "center",
-      alignItems: "center",
-      position: "relative",
-      zIndex: 1,
-    },
-    fixedBackButtonScrolled: {
-      backgroundColor: Colors.surface,
-      borderRadius: Radius.xxl,
-    },
-    fixedBackButtonUnscrolled: {
-      backgroundColor: "transparent",
-      borderRadius: Radius.xxl,
-    },
     header: {
       flexDirection: "row",
       alignItems: "center",
@@ -6315,11 +6292,6 @@ const makeStyles = (Colors: ThemeColors) =>
       borderWidth: 0,
       padding: Spacing.md,
       marginBottom: Spacing.xxl2,
-    },
-    backIcon: {
-      width: 18,
-      height: 18,
-      transform: [{ rotate: "-180deg" }],
     },
     gradientTop: {
       position: "absolute",
@@ -6522,6 +6494,9 @@ const makeStyles = (Colors: ThemeColors) =>
       flexShrink: 1,
       position: "relative",
     },
+    litertSheetBody: {
+      flex: 1,
+    },
     litertBackWrapper: {
       position: "absolute",
       top: Spacing.md + 4,
@@ -6533,21 +6508,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     litertSearchWithBack: {
       marginLeft: 40 + Spacing.md,
-    },
-    litertSearchBarRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: Spacing.md,
-    },
-    litertSearchBarGroup: {
-      flex: 1,
-    },
-    litertSearchBackButton: {
-      width: 44,
-      height: 44,
-      justifyContent: "center",
-      alignItems: "center",
-      borderRadius: Radius.xxl,
     },
     addModelSheetContent: {
       paddingHorizontal: Spacing.lg2,
@@ -6604,15 +6564,40 @@ const makeStyles = (Colors: ThemeColors) =>
       fontFamily: Fonts.mono,
       fontSize: FontSizes.label,
     },
+    cloudAccount: {
+      alignItems: "center",
+      paddingVertical: Spacing.xl2,
+      paddingHorizontal: Spacing.md,
+      marginBottom: Spacing.lg2,
+    },
     cloudAvatar: {
-      width: 36,
-      height: 36,
-      borderRadius: Radius.pill,
+      width: 80,
+      height: 80,
+      //stays a circle at this size
+      borderRadius: Radius.pill * 2,
       borderWidth: 2,
       borderColor: Colors.border,
       backgroundColor: Colors.surfaceSubtle,
       alignItems: "center",
       justifyContent: "center",
+      marginBottom: Spacing.lg2,
+    },
+    cloudAvatarIcon: {
+      width: 32,
+      height: 32,
+    },
+    cloudName: {
+      fontSize: FontSizes.lg,
+      fontFamily: Fonts.mono,
+      color: Colors.textPrimary,
+      textAlign: "center",
+      marginBottom: Spacing.xs2,
+    },
+    cloudEmail: {
+      fontSize: FontSizes.bodyMd,
+      fontFamily: Fonts.body,
+      color: Colors.textMuted,
+      textAlign: "center",
     },
     navTitle: {
       fontSize: FontSizes.lg,

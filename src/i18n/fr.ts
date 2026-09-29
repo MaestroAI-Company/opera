@@ -24,45 +24,45 @@ export const fr: Translations = {
 
   "onboarding.next": "Continuer",
   "onboarding.back": "Retour",
-  "onboarding.intro.personal": "Votre assistant IA, vraiment personnel.",
-  "onboarding.intro.choice": "Conçu pour vous.",
-  "onboarding.intro.freedom": "Découvrez la vraie liberté d'échanger.",
-  "onboarding.intro.pocket": "Des modèles puissants, dans votre poche.",
-  "onboarding.intro.control": "Vos données, vos règles.",
-  "onboarding.intro.cloud": "Créé pour votre quotidien.",
+  "onboarding.intro.personal": "Ton assistant IA, vraiment personnel.",
+  "onboarding.intro.choice": "Conçu pour toi.",
+  "onboarding.intro.freedom": "Découvre la vraie liberté d'échanger.",
+  "onboarding.intro.pocket": "Des modèles puissants, dans ta poche.",
+  "onboarding.intro.control": "Tes données, tes règles.",
+  "onboarding.intro.cloud": "Créé pour ton quotidien.",
   "onboarding.intro.noTracking": "Aucune publicité. Aucun traqueur.",
-  "onboarding.intro.privacy": "Pensé pour respecter votre vie privée.",
+  "onboarding.intro.privacy": "Pensé pour respecter ta vie privée.",
   "onboarding.intro.noAccount": "Sans compte obligatoire. Prêt à l'emploi.",
   "onboarding.intro.openSource": "Open source, transparent et indépendant.",
   "onboarding.welcome.title": "L'IA pour tous,\nla confidentialité pour la liberté.",
   "onboarding.welcome.subtitle":
-    "Voici Maestro, l'assistant d'Opera. Il travaille pour vous, et seulement pour vous.",
+    "Voici Maestro, l'assistant d'Opera. Il travaille pour toi, et seulement pour toi.",
   "onboarding.welcome.local.title": "Local d'abord",
   "onboarding.welcome.local.description":
-    "Fonctionne sur votre appareil, sans serveur requis.",
+    "Fonctionne sur ton appareil, sans serveur requis.",
   "onboarding.welcome.account.title": "Sans compte",
   "onboarding.welcome.account.description":
-    "Ouvrez l'application et lancez-vous.",
+    "Ouvre l'application et lance-toi.",
   "onboarding.welcome.open.title": "Open source",
   "onboarding.welcome.open.description":
     "Un code que chacun peut lire et vérifier.",
   "onboarding.welcome.cta": "Commencer",
-  "onboarding.name.placeholder": "Entrez votre nom",
-  "onboarding.profile.title": "Comment Maestro doit-il vous appeler ?",
+  "onboarding.name.placeholder": "Entre ton nom",
+  "onboarding.profile.title": "Comment Maestro doit-il t'appeler ?",
   "onboarding.profile.subtitle":
-    "Maestro l'utilisera pour vous saluer. Vous pourrez le modifier à tout moment dans les paramètres.",
+    "Maestro l'utilisera pour te saluer. Tu pourras le modifier à tout moment dans les paramètres.",
   "onboarding.profile.card": "Carte",
-  "profileCard.placeholder": "Votre nom",
+  "profileCard.placeholder": "Ton nom",
   "onboarding.permissions.title": "À quoi Maestro peut-il accéder ?",
   "onboarding.permissions.subtitle":
-    "Seulement à ce que vous autorisez. Vous pourrez changer d'avis à tout moment dans les",
+    "Seulement à ce que tu autorises. Tu pourras changer d'avis à tout moment dans les",
   "onboarding.permissions.settingsLink": "paramètres de l'appareil ↗",
   "onboarding.permissions.subtitleWeb":
-    "Seulement à ce que vous autorisez. Vous pourrez changer d'avis à tout moment dans les paramètres du système.",
+    "Seulement à ce que tu autorises. Tu pourras changer d'avis à tout moment dans les paramètres du système.",
   "onboarding.ready.title": "Tout est prêt.",
   "onboarding.ready.titleNamed": "Tout est prêt,\n{name}.",
   "onboarding.ready.subtitle":
-    "Maestro vous attend. Posez-lui vos questions, à l'écrit comme à l'oral.",
+    "Maestro t'attend. Pose-lui tes questions, à l'écrit comme à l'oral.",
   "onboarding.ready.cta": "Commencer avec Maestro",
 
   "permissions.title": "Autorisations",
@@ -70,19 +70,19 @@ export const fr: Translations = {
   "permissions.allowed": "Autorisé",
   "permissions.denied": "Refusé",
   "permissions.microphone.label": "Microphone",
-  "permissions.microphone.description": "Pour dicter vos messages à la voix.",
+  "permissions.microphone.description": "Pour dicter tes messages à la voix.",
   "permissions.camera.label": "Caméra",
   "permissions.camera.description":
     "Pour photographier et analyser des documents.",
   "permissions.photos.label": "Photos",
   "permissions.photos.description":
-    "Pour partager des images depuis votre galerie.",
+    "Pour partager des images depuis ta galerie.",
   "permissions.contacts.label": "Contacts",
   "permissions.contacts.description":
-    "Pour chercher des numéros et des e-mails dans vos contacts.",
+    "Pour chercher des numéros et des e-mails dans tes contacts.",
   "permissions.calendar.label": "Calendrier",
   "permissions.calendar.description":
-    "Pour lire et gérer les événements de votre calendrier.",
+    "Pour lire et gérer les événements de ton calendrier.",
   "permissions.location.label": "Localisation",
   "permissions.location.description":
     "Pour donner à l'assistant un contexte local et des réponses plus pertinentes.",
@@ -115,7 +115,7 @@ export const fr: Translations = {
   "conversations.search.empty": "Aucun résultat",
   "conversations.delete.title": "Supprimer la conversation",
   "conversations.delete.message":
-    "Voulez-vous vraiment supprimer cette conversation ? Cette action est irréversible.",
+    "Veux-tu vraiment supprimer cette conversation ? Cette action est irréversible.",
 
   "cloudSync.setupIncomplete": "Configuration non terminée",
   "cloudSync.lastSynced": "Dernière synchro",
@@ -134,7 +134,7 @@ export const fr: Translations = {
   "modelSelector.downloading": "Téléchargement...",
   "modelSelector.download.title": "Télécharger Gemma4",
   "modelSelector.download.message":
-    "Voulez-vous télécharger le modèle Gemma4 sur votre serveur Ollama ? Ce modèle pèse plusieurs Go.",
+    "Veux-tu télécharger le modèle Gemma4 sur ton serveur Ollama ? Ce modèle pèse plusieurs Go.",
   "modelSelector.download.confirm": "Télécharger",
   "modelSelector.tokenWindow": "Fenêtre de token",
 
@@ -148,13 +148,13 @@ export const fr: Translations = {
   "markdown.thinking": "Réflexion...",
 
   "nextcloud.connect": "Connecter",
-  "nextcloud.waiting": "En attente de votre validation dans le navigateur...",
+  "nextcloud.waiting": "En attente de ta validation dans le navigateur...",
   "nextcloud.failed":
-    "Échec ou expiration de la connexion. Vérifiez l'adresse et réessayez.",
+    "Échec ou expiration de la connexion. Vérifie l'adresse et réessaie.",
   "nextcloud.help":
-    "Saisissez l'adresse de votre serveur, puis validez la connexion dans la fenêtre du navigateur qui s'ouvre.",
+    "Saisis l'adresse de ton serveur, puis valide la connexion dans la fenêtre du navigateur qui s'ouvre.",
   "nextcloud.cors":
-    "Bloqué par CORS : un navigateur refuse d'appeler un autre domaine si celui-ci ne l'autorise pas. Il faut ajouter des en-têtes CORS sur le reverse proxy de votre Nextcloud, sinon utilisez l'application desktop ou mobile.",
+    "Bloqué par CORS : un navigateur refuse d'appeler un autre domaine si celui-ci ne l'autorise pas. Il faut ajouter des en-têtes CORS sur le reverse proxy de ton Nextcloud, sinon utilise l'application desktop ou mobile.",
 
   "codePreview.name": "Nom",
   "codePreview.language": "Langage",
@@ -177,20 +177,20 @@ export const fr: Translations = {
   "bugReport.title": "Signaler un bug",
   "bugReport.crashTitle": "Opera s'est fermé de manière inattendue",
   "bugReport.crashHelp":
-    "L'erreur a été enregistrée. Dites-nous ce que vous faisiez, ça nous aidera à comprendre ce qui s'est passé.",
-  "bugReport.placeholder": "Décrivez le problème",
-  "bugReport.crashPlaceholder": "Que faisiez-vous ?",
+    "L'erreur a été enregistrée. Dis-nous ce que tu faisais, ça nous aidera à comprendre ce qui s'est passé.",
+  "bugReport.placeholder": "Décris le problème",
+  "bugReport.crashPlaceholder": "Que faisais-tu ?",
   "bugReport.attachLogs": "Joindre les dernières lignes de log",
   "bugReport.attachScreenshot": "Joindre une capture d'écran",
   "bugReport.consent":
-    "Publié publiquement sur GitHub : votre description, ces logs, votre appareil et la version de l'app, et votre nom d'utilisateur GitHub.",
+    "Publié publiquement sur GitHub : ta description, ces logs, ton appareil et la version de l'app, et ton nom d'utilisateur GitHub.",
   "bugReport.consentScreenshot":
-    "La capture prise quand vous avez secoué le téléphone va dans votre presse-papiers, collez-la dans le ticket si cela aide.",
+    "La capture prise quand tu as secoué le téléphone va dans ton presse-papiers, colle-la dans le ticket si cela aide.",
   "bugReport.send": "Envoyer mon problème",
   "bugReport.empty.title": "Rien à envoyer",
-  "bugReport.empty.message": "Décrivez d'abord le problème.",
+  "bugReport.empty.message": "Décris d'abord le problème.",
   "bugReport.githubFailed.title": "Impossible d'ouvrir GitHub",
-  "bugReport.githubFailed.message": "Veuillez réessayer.",
+  "bugReport.githubFailed.message": "Réessaie.",
 
   "home.greeting.morning": "Bonjour",
   "home.greeting.afternoon": "Bon après-midi",
@@ -200,15 +200,15 @@ export const fr: Translations = {
   "home.incognito.disable": "Désactiver le mode incognito",
   "home.dbFailed.title": "Une erreur est survenue",
   "home.dbFailed.message":
-    "Opera n'a pas pu ouvrir sa base de données locale. Redémarrez l'application. Si le problème persiste, réinstallez-la.",
+    "Opera n'a pas pu ouvrir sa base de données locale. Redémarre l'application. Si le problème persiste, réinstalle-la.",
   "home.dataWarning.title": "Incohérence possible des données",
   "home.dataWarning.message":
-    "Après cette mise à jour, certaines données enregistrées peuvent être incohérentes. En cas de problème, allez dans Réglages → Confidentialité pour exporter vos données ou supprimer toutes les conversations.",
+    "Après cette mise à jour, certaines données enregistrées peuvent être incohérentes. En cas de problème, va dans Réglages → Confidentialité pour exporter tes données ou supprimer toutes les conversations.",
   "home.dataWarning.goToSettings": "Ouvrir les réglages",
   "home.dataWarning.later": "Plus tard",
 
   "chat.noModel":
-    "Sélectionnez un modèle dans le menu du haut avant d'envoyer un message.",
+    "Sélectionne un modèle dans le menu du haut avant d'envoyer un message.",
 
   "share.modal.title": "Partager la conversation",
   "share.modal.openTitle": "Conversation partagée",
@@ -218,7 +218,7 @@ export const fr: Translations = {
   "share.createLink": "Créer le lien",
   "share.copyLink": "Copier le lien",
   "share.consent.body":
-    "Opera chiffre cette conversation sur votre appareil, puis envoie la copie chiffrée vers {host}. La clé de déchiffrement reste dans le lien et n'est jamais envoyée à un serveur.\n\nToute personne disposant du lien peut lire l'intégralité de la conversation, images jointes comprises. {retention}\n\nVous pouvez pointer Opera vers une autre instance PrivateBin, y compris la vôtre, dans Réglages > Confidentialité.",
+    "Opera chiffre cette conversation sur ton appareil, puis envoie la copie chiffrée vers {host}. La clé de déchiffrement reste dans le lien et n'est jamais envoyée à un serveur.\n\nToute personne disposant du lien peut lire l'intégralité de la conversation, images jointes comprises. {retention}\n\nTu peux pointer Opera vers une autre instance PrivateBin, y compris la tienne, dans Réglages > Confidentialité.",
   "share.consent.retentionDefault":
     "Le lien expire au bout de 3 jours et ne peut pas être révoqué avant.",
   "share.consent.retentionCustom":
@@ -228,7 +228,7 @@ export const fr: Translations = {
   "share.error.create": "Le lien de partage n'a pas pu être créé.",
   "share.error.open": "Cette conversation partagée n'a pas pu être ouverte.",
   "share.preview.warning":
-    "Cette conversation a été partagée par quelqu'un d'autre. Ne l'ajoutez que si vous faites confiance à l'expéditeur — elle peut contenir du contenu trompeur, y compris des tentatives de manipulation de l'assistant.",
+    "Cette conversation a été partagée par quelqu'un d'autre. Ne l'ajoute que si tu fais confiance à l'expéditeur — elle peut contenir du contenu trompeur, y compris des tentatives de manipulation de l'assistant.",
   "share.preview.add": "Ajouter aux conversations",
 
   "chat.copied": "Copié dans le presse-papiers",
@@ -248,34 +248,34 @@ export const fr: Translations = {
     "Seuls les images, l'audio WAV/MP3 et les documents PDF, Word ou texte brut sont pris en charge.",
   "chatbar.unsupportedByModel": "Non pris en charge par le modèle",
   "chatbar.modelNoImages":
-    "Ce modèle ne peut pas lire les images. Choisissez un modèle avec la vision pour en joindre une.",
+    "Ce modèle ne peut pas lire les images. Choisis un modèle avec la vision pour en joindre une.",
   "chatbar.modelNoAudio":
-    "Ce modèle ne peut pas lire l'audio. Choisissez un modèle avec l'audio pour en joindre un.",
+    "Ce modèle ne peut pas lire l'audio. Choisis un modèle avec l'audio pour en joindre un.",
   "chatbar.permissionDenied": "Autorisation refusée",
   "chatbar.cameraDenied":
-    "Vous avez refusé l'accès de cette application à votre caméra.",
+    "Tu as refusé l'accès de cette application à ta caméra.",
   "chatbar.photosDenied":
-    "Vous avez refusé l'accès de cette application à vos photos.",
+    "Tu as refusé l'accès de cette application à tes photos.",
   "chatbar.micPermission.title": "Autorisation du microphone",
   "chatbar.micPermission.message":
-    "L'accès au microphone est nécessaire pour la saisie vocale. Activez-le dans les réglages de votre appareil.",
+    "L'accès au microphone est nécessaire pour la saisie vocale. Active-le dans les réglages de ton appareil.",
 
   "whisper.notConfigured.title": "Whisper non configuré",
   "whisper.notConfigured.message":
-    "Vous avez désactivé la transcription sur l'appareil. Sélectionnez un modèle Whisper dans les réglages pour l'activer.",
+    "Tu as désactivé la transcription sur l'appareil. Sélectionne un modèle Whisper dans les réglages pour l'activer.",
   "whisper.notInstalled.title": "Whisper non installé",
   "whisper.notInstalled.messageInstall":
-    "Le modèle Whisper {model} est nécessaire pour la transcription sur l'appareil. Voulez-vous l'installer ?",
+    "Le modèle Whisper {model} est nécessaire pour la transcription sur l'appareil. Veux-tu l'installer ?",
   "whisper.notInstalled.messageMainApp":
-    "Le modèle Whisper {model} est nécessaire pour la transcription sur l'appareil. Installez-le depuis les réglages de l'application principale.",
+    "Le modèle Whisper {model} est nécessaire pour la transcription sur l'appareil. Installe-le depuis les réglages de l'application principale.",
   "whisper.initError.title": "Erreur d'initialisation",
   "whisper.initError.message": "Échec du chargement du modèle Whisper {model}.",
   "whisper.initError.messageReinstall":
-    "Échec du chargement du modèle Whisper {model}. Il est peut-être corrompu ou incompatible. Essayez de le réinstaller depuis les réglages.",
+    "Échec du chargement du modèle Whisper {model}. Il est peut-être corrompu ou incompatible. Essaie de le réinstaller depuis les réglages.",
 
   "overlay.welcome.title": "Bienvenue dans l'Assistant Overlay",
   "overlay.welcome.message":
-    "Voici votre Assistant Overlay. Vous pouvez entourer pour demander n'importe quel contenu à l'écran. Il est là pour vous aider tout au long de votre usage.",
+    "Voici ton Assistant Overlay. Tu peux entourer pour demander n'importe quel contenu à l'écran. Il est là pour t'aider tout au long de ton usage.",
 
   "settings.title": "Réglages",
   "settings.notice.assistant": "Ajouter Opera comme assistant",
@@ -310,13 +310,13 @@ export const fr: Translations = {
   "settings.info.version": "Version",
   "settings.info.links": "Liens",
   "settings.info.linksHelp":
-    "Retrouvez Opera en ligne, suivez nos actualités et contribuez au projet.",
+    "Retrouve Opera en ligne, suis nos actualités et contribue au projet.",
   "settings.info.website": "Site web",
 
   "settings.profile.personalize": "Personnaliser mon profil",
   "settings.profile.exportCard": "Exporter ma carte de profil",
   "settings.profile.name": "Nom",
-  "settings.profile.instructions": "Écrivez vos instructions pour l'IA",
+  "settings.profile.instructions": "Écris tes instructions pour l'IA",
   "settings.profile.instructionsPlaceholder": "écrire",
 
   "settings.general.language": "Langue",
@@ -330,7 +330,7 @@ export const fr: Translations = {
     "Entoure les éléments de l'écran sur lesquels la sélection de l'overlay s'aimante.",
   "settings.general.autoRead": "Lecture automatique des réponses",
   "settings.general.autoReadHelp":
-    "Lit la réponse à voix haute quand vous demandez à la voix.",
+    "Lit la réponse à voix haute quand tu demandes à la voix.",
   "settings.general.voice.title": "Voix",
   "settings.general.voice.help": "Lecture auto, moteur de voix, vitesse de lecture.",
   "settings.general.advancedMode": "Mode avancé",
@@ -345,23 +345,23 @@ export const fr: Translations = {
 
   "settings.transcribeLocally.label": "Toujours transcrire localement",
   "settings.transcribeLocally.help":
-    "Utilise la reconnaissance vocale intégrée à votre appareil plutôt que le modèle sélectionné.",
+    "Utilise la reconnaissance vocale intégrée à ton appareil plutôt que le modèle sélectionné.",
   "settings.transcribeLocally.helpWeb":
-    "Traite les transcriptions audio localement sur votre appareil plutôt qu'avec le modèle sélectionné.",
+    "Traite les transcriptions audio localement sur ton appareil plutôt qu'avec le modèle sélectionné.",
 
   "settings.sharing.label": "Partage de conversation",
   "settings.sharing.help":
-    "Les conversations partagées sont chiffrées sur votre appareil avant d'être envoyées, et la clé de déchiffrement ne voyage que dans le lien, jamais vers le serveur.",
+    "Les conversations partagées sont chiffrées sur ton appareil avant d'être envoyées, et la clé de déchiffrement ne voyage que dans le lien, jamais vers le serveur.",
   "settings.sharing.instanceHelp":
-    "Elles sont stockées sur une instance PrivateBin. Laissez ce champ vide pour utiliser privatebin.net, ou saisissez l'adresse d'une autre instance, y compris la vôtre. L'adresse est portée par les liens que vous créez, de sorte que vos destinataires atteignent le bon serveur d'eux-mêmes.",
+    "Elles sont stockées sur une instance PrivateBin. Laisse ce champ vide pour utiliser privatebin.net, ou saisis l'adresse d'une autre instance, y compris la tienne. L'adresse est portée par les liens que tu crées, de sorte que tes destinataires atteignent le bon serveur d'eux-mêmes.",
 
   "settings.overlay.default": "Assistant par défaut",
   "settings.overlay.defaultHelp":
-    "Obtenez l'aide d'Opera partout sur votre appareil, depuis n'importe quelle app.",
+    "Obtiens l'aide d'Opera partout sur ton appareil, depuis n'importe quelle app.",
   "settings.overlay.isDefault":
-    "Opera est défini comme votre assistant par défaut.",
+    "Opera est défini comme ton assistant par défaut.",
   "settings.overlay.isNotDefault":
-    "Opera n'est pas défini comme votre assistant par défaut.",
+    "Opera n'est pas défini comme ton assistant par défaut.",
   "settings.overlay.setDefault": "Définir comme assistant par défaut",
   "settings.overlay.autoMic": "Démarrage automatique du micro",
   "settings.overlay.autoMicHelp":
@@ -375,61 +375,61 @@ export const fr: Translations = {
   "settings.cloud.none": "Aucun",
   "settings.cloud.connectionError": "Erreur de connexion",
   "settings.cloud.connectFailed":
-    "Impossible de se connecter à {provider}. Vérifiez vos réglages et réessayez.",
+    "Impossible de se connecter à {provider}. Vérifie tes réglages et réessaie.",
   "settings.cloud.disconnect.title": "Déconnecter {name} ?",
   "settings.cloud.disconnect.message":
-    "Votre compte sera délié et les sauvegardes automatiques s'arrêteront. Votre sauvegarde cloud existante ne sera pas supprimée.",
+    "Ton compte sera délié et les sauvegardes automatiques s'arrêteront. Ta sauvegarde cloud existante ne sera pas supprimée.",
   "settings.cloud.syncSuccess": "Données synchronisées avec succès.",
   "settings.cloud.syncError": "Erreur de synchronisation",
   "settings.cloud.unknownError": "Une erreur inconnue est survenue.",
-  "settings.cloud.progress.connecting": "Connexion à votre compte...",
+  "settings.cloud.progress.connecting": "Connexion à ton compte...",
   "settings.cloud.progress.checking":
     "Recherche d'une sauvegarde existante...",
   "settings.cloud.progress.unlocking":
-    "Téléchargement et déchiffrement de votre sauvegarde...",
+    "Téléchargement et déchiffrement de ta sauvegarde...",
   "settings.cloud.progress.resetting":
     "Suppression de l'ancienne sauvegarde...",
 
   "settings.pin.create.title": "Créer un code PIN de synchronisation",
   "settings.pin.create.message":
-    "Aucune sauvegarde cloud trouvée. Créez un code PIN de 4 à 6 chiffres. Si vous l'oubliez, vous perdrez l'accès à vos sauvegardes cloud.",
+    "Aucune sauvegarde cloud trouvée. Crée un code PIN de 4 à 6 chiffres. Si tu l'oublies, tu perdras l'accès à tes sauvegardes cloud.",
   "settings.pin.create.confirm": "Créer",
   "settings.pin.unlock.title": "Déverrouiller la sauvegarde cloud",
   "settings.pin.unlock.message":
-    "Une sauvegarde cloud a été trouvée. Saisissez votre code PIN pour la déverrouiller et reprendre la synchronisation.",
+    "Une sauvegarde cloud a été trouvée. Saisis ton code PIN pour la déverrouiller et reprendre la synchronisation.",
   "settings.pin.unlock.confirm": "Déverrouiller",
   "settings.pin.incorrect":
     "Code PIN incorrect. Impossible de déchiffrer la sauvegarde.",
   "settings.pin.invalid": "Le code PIN doit contenir 4 à 6 chiffres.",
-  "settings.pin.placeholder": "Saisissez 4 à 6 chiffres",
+  "settings.pin.placeholder": "Saisis 4 à 6 chiffres",
   "settings.pin.forgot": "Code oublié",
   "settings.pin.tryAgain": "Réessayer",
   "settings.pin.reset.title": "Réinitialiser la sauvegarde ?",
   "settings.pin.reset.message":
-    "Cela supprimera définitivement votre sauvegarde cloud existante afin de créer un nouveau code PIN. Voulez-vous continuer ?",
+    "Cela supprimera définitivement ta sauvegarde cloud existante afin de créer un nouveau code PIN. Veux-tu continuer ?",
   "settings.pin.reset.confirm": "Supprimer et réinitialiser",
 
   "settings.service.beta": "Serveur Opera Beta",
   "settings.service.betaHelp":
     "Un serveur de test que nous hébergeons pour essayer Opera sans en installer un.",
   "settings.beta.intro":
-    "Un serveur de test que nous hébergeons pour essayer Opera sans en installer un. Tout ce qui sert à répondre passe par lui : vos messages, vos pièces jointes, ce qu'un outil lit pour vous (contacts, agenda, texte de l'écran) et votre adresse IP.",
+    "Un serveur de test que nous hébergeons pour essayer Opera sans en installer un. Tout ce qui sert à répondre passe par lui : tes messages, tes pièces jointes, ce qu'un outil lit pour toi (contacts, agenda, texte de l'écran) et ton adresse IP.",
   "settings.beta.privacy":
     "Nous n'en lisons rien, nous n'en gardons rien et nous ne l'utiliserons jamais pour quoi que ce soit. Le serveur sera arrêté et effacé à la fin de la bêta Play Store.",
   "settings.beta.testing":
-    "Il sert uniquement aux tests. Pour un usage quotidien, installez votre propre serveur Ollama et rien ne quittera votre réseau.",
+    "Il sert uniquement aux tests. Pour un usage quotidien, installe ton propre serveur Ollama et rien ne quittera ton réseau.",
   "settings.service.ollama": "Ollama",
   "settings.service.ollamaHelp":
-    "Utilisez vos serveurs Ollama pour exécuter de puissants modèles d'IA chez vous.",
+    "Utilise tes serveurs Ollama pour exécuter de puissants modèles d'IA chez toi.",
   "settings.service.cloudapi": "API Cloud",
   "settings.service.cloudapiHelp":
-    "Connectez Mistral, LM Studio ou tout serveur qui parle l'API OpenAI.",
+    "Connecte Mistral, LM Studio ou tout serveur qui parle l'API OpenAI.",
   "settings.service.local": "Intégré",
   "settings.service.localHelp":
-    "Utilisez le modèle d'IA fourni avec votre appareil. Rien à télécharger.",
+    "Utilise le modèle d'IA fourni avec ton appareil. Rien à télécharger.",
   "settings.local.title": "Intégré",
   "settings.local.help":
-    "Votre appareil embarque son propre modèle d'IA. Il est toujours disponible et ne demande aucune installation.",
+    "Ton appareil embarque son propre modèle d'IA. Il est toujours disponible et ne demande aucune installation.",
   "settings.local.browserModel": "Modèle du navigateur",
   "settings.local.sheetTitle": "Fiche du modèle",
   "settings.local.sheetHelp": "Seules les informations fournies par le système sont affichées.",
@@ -450,14 +450,14 @@ export const fr: Translations = {
   "settings.local.status.unavailable": "Indisponible",
   "settings.local.download": "Télécharger le modèle",
   "settings.local.downloading": "Téléchargement du modèle du navigateur",
-  "settings.local.notDownloaded": "Le modèle du navigateur n'est pas encore téléchargé. Téléchargez-le depuis Réglages > Intégré.",
+  "settings.local.notDownloaded": "Le modèle du navigateur n'est pas encore téléchargé. Télécharge-le depuis Réglages > Intégré.",
   "settings.service.litert": "Sur l'appareil",
   "settings.service.litertHelp":
-    "Téléchargez des modèles ouverts depuis Hugging Face et exécutez-les sur cet appareil.",
+    "Télécharge des modèles ouverts depuis Hugging Face et exécute-les sur cet appareil.",
   "settings.litert.title": "Sur l'appareil",
   "settings.litert.modelTitle": "Modèle d'IA",
   "settings.litert.help":
-    "Ajoutez et gérez vos modèles d'IA depuis Hugging Face.",
+    "Ajoute et gère tes modèles d'IA depuis Hugging Face.",
   "settings.litert.addModel": "Ajouter un modèle d'IA",
   "settings.litert.addModelPlaceholder": "rechercher un modèle",
   "settings.litert.installed": "Installé",
@@ -472,7 +472,7 @@ export const fr: Translations = {
   "settings.litert.otherModels": "Autres modèles",
   "settings.litert.sameFamily": "Même famille",
   "settings.litert.loadFailed":
-    "La liste des modèles n'a pas pu être chargée. Vérifiez votre connexion.",
+    "La liste des modèles n'a pas pu être chargée. Vérifie ta connexion.",
   "settings.litert.downloadingModel": "Téléchargement de {name}",
   "settings.litert.cancelDownload": "Annuler le téléchargement",
   "settings.litert.downloadingPercent": "Téléchargement {percent}%",
@@ -482,11 +482,11 @@ export const fr: Translations = {
   "settings.litert.noResults": "Aucun modèle compatible ne correspond à cette recherche.",
   "settings.litert.downloadTitle": "Télécharger {name} ?",
   "settings.litert.downloadMessage":
-    "{name} pèse {size} et sera téléchargé via votre connexion actuelle.",
+    "{name} pèse {size} et sera téléchargé via ta connexion actuelle.",
   "settings.litert.downloadAction": "Télécharger",
   "settings.litert.deleteTitle": "Supprimer {name} ?",
   "settings.litert.deleteMessage":
-    "Le modèle est retiré de cet appareil. Vous pourrez le télécharger de nouveau plus tard.",
+    "Le modèle est retiré de cet appareil. Tu pourras le télécharger de nouveau plus tard.",
   "settings.litert.contextTitle": "Longueur de contexte",
   "settings.litert.contextHelp":
     "Budget du cache KV — des valeurs basses consomment moins de mémoire.",
@@ -494,20 +494,20 @@ export const fr: Translations = {
   "settings.litert.forceLoadHelp":
     "Ignore la vérification de mémoire préalable. Peut planter si l'appareil manque de mémoire.",
   "generation.error.contextLength":
-    "Cette conversation est trop longue pour le modèle. Lancez une nouvelle discussion, ou augmentez la longueur de contexte dans les réglages.",
+    "Cette conversation est trop longue pour le modèle. Lance une nouvelle discussion, ou augmente la longueur de contexte dans les réglages.",
   "generation.error.memory":
-    "Pas assez de mémoire libre pour charger ce modèle. Fermez quelques applications, ou choisissez-en un plus petit.",
+    "Pas assez de mémoire libre pour charger ce modèle. Ferme quelques applications, ou choisis-en un plus petit.",
   "generation.error.unreachable":
-    "Le serveur est injoignable. Vérifiez son adresse et votre connexion.",
+    "Le serveur est injoignable. Vérifie son adresse et ta connexion.",
   "generation.error.refused":
-    "Le serveur a refusé la connexion. Vérifiez la clé d'API.",
+    "Le serveur a refusé la connexion. Vérifie la clé d'API.",
   "generation.error.missingModel": "Ce modèle n'est pas disponible sur le serveur.",
   "generation.error.onDevice":
-    "Le modèle sur l'appareil n'a pas pu s'exécuter. Réessayez, ou changez de modèle dans les réglages.",
+    "Le modèle sur l'appareil n'a pas pu s'exécuter. Réessaie, ou change de modèle dans les réglages.",
   "generation.error.unknown":
     "La génération a échoué pour une raison inconnue.",
   "generation.error.generic":
-    "La génération a échoué. Réessayez, ou changez de modèle dans les réglages.",
+    "La génération a échoué. Réessaie, ou change de modèle dans les réglages.",
   "settings.service.serverLink": "lien du serveur",
   "settings.service.failover": "Bascule automatique",
   "settings.service.failoverHelp":
@@ -530,10 +530,10 @@ export const fr: Translations = {
     "Échec du chargement du modèle Whisper {model}. Il est peut-être corrompu.",
   "settings.whisper.delete.title": "Supprimer le modèle Whisper",
   "settings.whisper.delete.message":
-    "Voulez-vous vraiment supprimer le modèle Whisper {model} ?",
+    "Veux-tu vraiment supprimer le modèle Whisper {model} ?",
   "settings.whisper.download.title": "Télécharger le modèle Whisper",
   "settings.whisper.download.message":
-    "Voulez-vous vraiment télécharger le modèle Whisper {model} ({size}) ?",
+    "Veux-tu vraiment télécharger le modèle Whisper {model} ({size}) ?",
   "settings.whisper.download.confirm": "Télécharger",
 
   "settings.tts.label": "Moteur de voix",
@@ -551,31 +551,31 @@ export const fr: Translations = {
   "settings.tts.downloadFailed": "Échec du téléchargement de la voix {engine}.",
   "settings.tts.delete.title": "Supprimer la voix {engine}",
   "settings.tts.delete.message":
-    "Voulez-vous vraiment supprimer la voix {engine} ? Maestro utilisera la voix du système.",
+    "Veux-tu vraiment supprimer la voix {engine} ? Maestro utilisera la voix du système.",
   "settings.tts.download.title": "Télécharger la voix {engine}",
   "settings.tts.download.message":
-    "Voulez-vous vraiment télécharger la voix {engine} ({size}) ?",
+    "Veux-tu vraiment télécharger la voix {engine} ({size}) ?",
   "settings.tts.download.confirm": "Télécharger",
 
   "settings.privacy.data": "Confidentialité des données",
   "settings.privacy.intro":
-    "Par défaut, tout reste sur votre téléphone : vos conversations, réglages et modèles locaux fonctionnent hors ligne, sans passer par internet.",
+    "Par défaut, tout reste sur ton téléphone : tes conversations, réglages et modèles locaux fonctionnent hors ligne, sans passer par internet.",
   "settings.privacy.externalServices":
-    "Des données ne sortent que si vous le choisissez : pour synchroniser un cloud (Google Drive, Nextcloud), utiliser un modèle en ligne ou faire une recherche web.",
+    "Des données ne sortent que si tu le choisis : pour synchroniser un cloud (Google Drive, Nextcloud), utiliser un modèle en ligne ou faire une recherche web.",
   "settings.privacy.noTracking":
-    "Aucune publicité, aucun traqueur caché et aucune revente de données. Vous gardez le contrôle total.",
+    "Aucune publicité, aucun traqueur caché et aucune revente de données. Tu gardes le contrôle total.",
   "settings.privacy.policy": "Politique de confidentialité",
   "settings.privacy.permissionsWeb":
-    "Opera a besoin de quelques autorisations pour fonctionner au mieux. Vous pouvez les gérer dans les paramètres de site de votre navigateur.",
+    "Opera a besoin de quelques autorisations pour fonctionner au mieux. Tu peux les gérer dans les paramètres de site de ton navigateur.",
   "settings.privacy.permissionsNative":
-    "Opera a besoin de quelques autorisations pour fonctionner au mieux. Vous pouvez les modifier dans les réglages de votre appareil.",
+    "Opera a besoin de quelques autorisations pour fonctionner au mieux. Tu peux les modifier dans les réglages de ton appareil.",
 
   "settings.data.management": "Gestion des données",
   "settings.data.managementHelp":
-    "Gérez localement les données de vos conversations et de vos réglages.",
+    "Gère localement les données de tes conversations et de tes réglages.",
   "settings.data.export": "Exporter",
   "settings.data.exportAction": "Exporter les données",
-  "settings.data.exportScope": "Sélectionnez ce que vous souhaitez exporter.",
+  "settings.data.exportScope": "Sélectionne ce que tu souhaites exporter.",
   "settings.data.exportSuccess": "Données exportées avec succès.",
   "settings.data.exportFailed": "Échec de l'export des données.",
   "settings.data.conversations": "Conversations",
@@ -594,10 +594,10 @@ export const fr: Translations = {
     "Échec de la suppression des conversations.",
 
   "settings.support.report": "Signalement",
-  "settings.support.reportHelp": "Décrivez le problème rencontré.",
+  "settings.support.reportHelp": "Décris le problème rencontré.",
   "settings.support.more": "Besoin de plus d'aide",
   "settings.support.moreHelp":
-    "Contactez notre équipe de support pour obtenir de l'aide et des ressources supplémentaires.",
+    "Contacte notre équipe de support pour obtenir de l'aide et des ressources supplémentaires.",
   "settings.support.contact": "Contacter le support",
 
   "settings.tools.widgets.title": "Widgets",
@@ -605,7 +605,7 @@ export const fr: Translations = {
     "Résultats structurés que l'assistant peut afficher : {list}.",
   "settings.tools.mcp.title": "Serveurs MCP",
   "settings.tools.mcp.help":
-    "Connectez Opera à des serveurs MCP externes pour que l'assistant puisse utiliser leurs outils.",
+    "Connecte Opera à des serveurs MCP externes pour que l'assistant puisse utiliser leurs outils.",
   "settings.tools.mobile.title": "Actions mobiles",
   "settings.tools.mobile.help":
     "Autorise l'assistant à s'intégrer aux applications installées : {list}.",
@@ -626,11 +626,11 @@ export const fr: Translations = {
   "settings.mcp.tools": "Outils ({count})",
   "settings.server.settings": "Réglages",
   "settings.mcp.headerHelp":
-    "Un en-tête envoyé avec chaque requête, pour les serveurs qui acceptent un jeton d'accès plutôt qu'une connexion. Pour GitHub, utilisez Authorization et Bearer suivi de votre jeton.",
+    "Un en-tête envoyé avec chaque requête, pour les serveurs qui acceptent un jeton d'accès plutôt qu'une connexion. Pour GitHub, utilise Authorization et Bearer suivi de ton jeton.",
   "settings.mcp.headerName": "nom de l'en-tête",
   "settings.mcp.headerValue": "valeur de l'en-tête",
   "settings.mcp.clientIdHelp":
-    "Nécessaire uniquement quand un serveur propose une connexion mais n'enregistre pas Opera automatiquement. Sinon, laissez ce champ vide.",
+    "Nécessaire uniquement quand un serveur propose une connexion mais n'enregistre pas Opera automatiquement. Sinon, laisse ce champ vide.",
   "settings.mcp.clientId": "identifiant client oauth",
   "settings.mcp.remove.action": "Retirer le serveur",
   "settings.mcp.remove.title": "Retirer le serveur",
@@ -640,14 +640,14 @@ export const fr: Translations = {
   "settings.server.add": "Ajouter un serveur",
   "settings.server.name": "Nom",
   "settings.server.nameHelp":
-    "Facultatif. Le nom du serveur lui-même est utilisé si vous le laissez vide.",
+    "Facultatif. Le nom du serveur lui-même est utilisé si tu le laisses vide.",
   "settings.server.namePlaceholder": "nom du serveur",
   "settings.server.checking": "Vérification...",
   "settings.server.addFailed": "Impossible d'ajouter le serveur",
   "settings.server.duplicate": "Ce serveur est déjà dans la liste.",
   "settings.ollama.title": "Serveurs Ollama",
   "settings.ollama.help":
-    "Ajoutez les liens de vos serveurs Ollama pour y connecter Opera.",
+    "Ajoute les liens de tes serveurs Ollama pour y connecter Opera.",
   "settings.ollama.newServer": "Nouveau serveur",
   "settings.ollama.noLink": "Aucun lien",
   "settings.ollama.checking": "Vérification...",
@@ -666,20 +666,20 @@ export const fr: Translations = {
   "settings.ollama.keepAliveHelp":
     "Combien de temps le modèle reste chargé en mémoire après une requête.",
   "settings.ollama.keepAliveHelpAdvanced":
-    "Combien de temps le modèle reste chargé en mémoire après une requête, en secondes. Utilisez -1 pour le garder chargé indéfiniment.",
+    "Combien de temps le modèle reste chargé en mémoire après une requête, en secondes. Utilise -1 pour le garder chargé indéfiniment.",
   "settings.ollama.unreachableTitle": "Serveur injoignable",
   "settings.ollama.unreachableInfo":
-    "Ce serveur n'a pas pu être joint.\n\n- Vérifiez que le serveur est démarré.\n- Vérifiez la connexion réseau du serveur.\n- Assurez-vous que l'URL et le port sont corrects.",
+    "Ce serveur n'a pas pu être joint.\n\n- Vérifie que le serveur est démarré.\n- Vérifie la connexion réseau du serveur.\n- Assure-toi que l'URL et le port sont corrects.",
   "settings.ollama.remove.action": "Retirer le serveur",
   "settings.cloudapi.title": "Serveurs compatibles OpenAI",
   "settings.cloudapi.help":
-    "Ajoutez le lien API de votre service ou serveur, par exemple https://api.mistral.ai/v1 pour Mistral ou http://localhost:1234/v1 pour LM Studio.",
+    "Ajoute le lien API de ton service ou serveur, par exemple https://api.mistral.ai/v1 pour Mistral ou http://localhost:1234/v1 pour LM Studio.",
   "settings.cloudapi.apiKey": "Clé API",
   "settings.cloudapi.apiKeyHelp":
-    "Nécessaire pour les services cloud comme Mistral. Laissez vide pour un serveur local comme LM Studio.",
+    "Nécessaire pour les services cloud comme Mistral. Laisse vide pour un serveur local comme LM Studio.",
   "settings.cloudapi.apiKeyPlaceholder": "clé api",
   "settings.cloudapi.unreachableInfo":
-    "Ce serveur n'a pas pu être joint.\n\n- Vérifiez que le serveur est démarré.\n- Assurez-vous que le lien est le lien API, qui finit souvent par /v1.\n- Vérifiez la clé API si le service en demande une.",
+    "Ce serveur n'a pas pu être joint.\n\n- Vérifie que le serveur est démarré.\n- Assure-toi que le lien est le lien API, qui finit souvent par /v1.\n- Vérifie la clé API si le service en demande une.",
   "settings.ollama.remove.title": "Retirer le serveur",
   "settings.ollama.remove.message":
     "Retirer {name} ? Opera ne proposera plus ses modèles.",
@@ -687,5 +687,5 @@ export const fr: Translations = {
   "permissions.undefined": "Non défini",
 
   "settings.mcp.signInInfo":
-    "Opera a besoin que vous vous connectiez à ce serveur avant de pouvoir utiliser ses outils.\n\nCertains serveurs, dont GitHub, ne proposent pas de connexion aux applications comme Opera. Pour ceux-là, ajoutez plutôt un jeton d'accès sous Réglages.",
+    "Opera a besoin que tu te connectes à ce serveur avant de pouvoir utiliser ses outils.\n\nCertains serveurs, dont GitHub, ne proposent pas de connexion aux applications comme Opera. Pour ceux-là, ajoute plutôt un jeton d'accès sous Réglages.",
 };

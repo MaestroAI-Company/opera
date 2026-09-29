@@ -484,6 +484,7 @@ export const fr: Translations = {
   "settings.litert.downloadMessage":
     "{name} pèse {size} et sera téléchargé via ta connexion actuelle.",
   "settings.litert.downloadAction": "Télécharger",
+  "settings.litert.deleteModel": "Supprimer le modèle",
   "settings.litert.deleteTitle": "Supprimer {name} ?",
   "settings.litert.deleteMessage":
     "Le modèle est retiré de cet appareil. Tu pourras le télécharger de nouveau plus tard.",

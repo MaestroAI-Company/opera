@@ -92,6 +92,15 @@ npm run android    # run on a connected device/emulator
 npm run web        # run in the browser
 ```
 
+**Dev builds on Android** — debug builds install as **Opera Dev** (`ai.maestro.opera.dev`, blue icon), so they sit next to the Play Store version instead of clashing with its signature. Expo CLI doesn't see the suffix, so launch with `--app-id` (the npm scripts already pass it):
+
+```bash
+npm run android           # debug build, JS served by Metro
+npm run android:preview   # release build (R8, bundled JS, no Metro) for testing real performance, e.g. on-device AI
+```
+
+Both share the same app slot and data, so downloaded models survive switching between them. Once installed, JS-only changes just need `npm start` and opening Opera Dev; rebuild only after native changes (plugins, `app.json`, Kotlin modules, native deps).
+
 Then, only if you need it:
 
 ```bash
@@ -102,7 +111,6 @@ cp .env.example .env   # Google Drive OAuth and beta server vars — irrelevant 
 
 ```bash
 npm run build:android   # Expo prebuild + Gradle release APK
-npm run build:desktop   # Tauri desktop bundle
 npm run lint            # ESLint
 ```
 

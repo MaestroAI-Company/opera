@@ -11,11 +11,11 @@ import {
   ViewStyle,
 } from "react-native";
 import { Gyroscope } from "expo-sensors";
+import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { MAESTRO_BUTTERFLIES, useMaestroButterfly } from "./maestroButterfly";
 
-const butterflyLeft = require("../../../assets/images/butterfly4.png");
-const butterflyTopRight = require("../../../assets/images/butterfly2.png");
-const butterflyBottom = require("../../../assets/images/butterfly3.png");
-const butterflyGrey = require("../../../assets/images/butterfly2_grey.png");
+const butterflyLeft = MAESTRO_BUTTERFLIES.butterfly4.color;
+const butterflyBottom = MAESTRO_BUTTERFLIES.butterfly3.color;
 
 const MAX_SHIFT = 16;
 const DECAY = 0.92;
@@ -29,8 +29,14 @@ export type ButterflyClusterProps = {
 
 //cluster with gyro parallax
 function ButterflyCluster({ style, incognito, delay = 250 }: ButterflyClusterProps) {
+  const maestro = useMaestroButterfly();
+  //a single butterfly takes the lead spot
+  const lead = MAESTRO_BUTTERFLIES[maestro === "cluster" ? "butterfly2" : maestro];
+  //lead alone, same layout as incognito
+  const alone = incognito || maestro !== "cluster";
   const [containerSize, setContainerSize] = useState({ width: 250, height: 250 });
   const incognitoAnim = useRef(new Animated.Value(incognito ? 1 : 0)).current;
+  const aloneAnim = useAnimatedValue(alone ? 1 : 0);
   const introAnim = useRef(new Animated.Value(0)).current;
 
   //reveal cluster on screen load
@@ -49,13 +55,15 @@ function ButterflyCluster({ style, incognito, delay = 250 }: ButterflyClusterPro
 
   //animate between cluster and incognito
   useEffect(() => {
-    Animated.timing(incognitoAnim, {
-      toValue: incognito ? 1 : 0,
-      duration: 160,
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-      useNativeDriver: true,
-    }).start();
-  }, [incognito, incognitoAnim]);
+    const timing = (value: Animated.Value, on: boolean) =>
+      Animated.timing(value, {
+        toValue: on ? 1 : 0,
+        duration: 160,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        useNativeDriver: true,
+      });
+    Animated.parallel([timing(incognitoAnim, !!incognito), timing(aloneAnim, alone)]).start();
+  }, [incognito, alone, incognitoAnim, aloneAnim]);
 
   const leftGyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const topRightGyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -96,7 +104,7 @@ function ButterflyCluster({ style, incognito, delay = 250 }: ButterflyClusterPro
               friction: 9,
               useNativeDriver: true,
             }).start();
-            if (!incognito) {
+            if (!alone) {
               Animated.spring(leftGyro, {
                 toValue: { x: 0, y: 0 },
                 tension: 22,
@@ -131,7 +139,7 @@ function ButterflyCluster({ style, incognito, delay = 250 }: ButterflyClusterPro
             useNativeDriver: true,
           }).start();
 
-          if (!incognito) {
+          if (!alone) {
             //side butterfly glides with gentle drag
             Animated.spring(leftGyro, {
               toValue: { x: tx * 0.85, y: ty * 1.1 },
@@ -175,52 +183,52 @@ function ButterflyCluster({ style, incognito, delay = 250 }: ButterflyClusterPro
       unsubscribe();
       appStateSub.remove();
     };
-  }, [incognito, leftGyro, topRightGyro, bottomGyro]);
+  }, [alone, leftGyro, topRightGyro, bottomGyro]);
 
-  const topRightIncognitoTransform = useMemo(
+  const topRightAloneTransform = useMemo(
     () => [
       {
-        translateX: incognitoAnim.interpolate({
+        translateX: aloneAnim.interpolate({
           inputRange: [0, 1],
           outputRange: [0, -0.1937 * containerSize.width],
         }),
       },
       {
-        translateY: incognitoAnim.interpolate({
+        translateY: aloneAnim.interpolate({
           inputRange: [0, 1],
           outputRange: [0, 0.20135 * containerSize.height],
         }),
       },
       {
-        scale: incognitoAnim.interpolate({
+        scale: aloneAnim.interpolate({
           inputRange: [0, 1],
           outputRange: [1, 1.550388],
         }),
       },
     ],
-    [containerSize.width, containerSize.height, incognitoAnim],
+    [containerSize.width, containerSize.height, aloneAnim],
   );
 
-  const otherIncognitoTransform = useMemo(
+  const otherAloneTransform = useMemo(
     () => [
       {
-        scale: incognitoAnim.interpolate({
+        scale: aloneAnim.interpolate({
           inputRange: [0, 1],
           outputRange: [1, 0.85],
         }),
       },
     ],
-    [incognitoAnim],
+    [aloneAnim],
   );
 
   const otherOpacity = useMemo(
     () =>
-      incognitoAnim.interpolate({
+      aloneAnim.interpolate({
         inputRange: [0, 0.45, 1],
         outputRange: [1, 0, 0],
         extrapolate: "clamp",
       }),
-    [incognitoAnim],
+    [aloneAnim],
   );
 
   const coloredOpacity = useMemo(
@@ -428,7 +436,7 @@ function ButterflyCluster({ style, incognito, delay = 250 }: ButterflyClusterPro
             styles.imageFill,
             {
               opacity: otherOpacity,
-              transform: otherIncognitoTransform,
+              transform: otherAloneTransform,
             },
           ]}
         >
@@ -455,7 +463,7 @@ function ButterflyCluster({ style, incognito, delay = 250 }: ButterflyClusterPro
             styles.imageFill,
             {
               opacity: otherOpacity,
-              transform: otherIncognitoTransform,
+              transform: otherAloneTransform,
             },
           ]}
         >
@@ -473,7 +481,7 @@ function ButterflyCluster({ style, incognito, delay = 250 }: ButterflyClusterPro
           {
             opacity: introOpacity,
             transform: topRightIntroTransform,
-            zIndex: incognito ? 5 : 3,
+            zIndex: alone ? 5 : 3,
           },
         ]}
       >
@@ -481,7 +489,7 @@ function ButterflyCluster({ style, incognito, delay = 250 }: ButterflyClusterPro
           style={[
             styles.imageFill,
             {
-              transform: topRightIncognitoTransform,
+              transform: topRightAloneTransform,
             },
           ]}
         >
@@ -489,12 +497,12 @@ function ButterflyCluster({ style, incognito, delay = 250 }: ButterflyClusterPro
             style={[styles.imageFill, { transform: topRightGyroTransform }]}
           >
             <Animated.Image
-              source={butterflyTopRight}
+              source={lead.color}
               style={[styles.imageFill, { opacity: coloredOpacity }]}
               resizeMode="contain"
             />
             <Animated.Image
-              source={butterflyGrey}
+              source={lead.grey}
               style={[styles.imageFill, StyleSheet.absoluteFill, { opacity: greyOpacity }]}
               resizeMode="contain"
             />

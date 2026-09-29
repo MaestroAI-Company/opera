@@ -469,6 +469,7 @@ export const en = {
   "settings.litert.downloadMessage":
     "{name} takes {size} and will be downloaded over your current connection.",
   "settings.litert.downloadAction": "Download",
+  "settings.litert.deleteModel": "Delete model",
   "settings.litert.deleteTitle": "Delete {name}?",
   "settings.litert.deleteMessage":
     "The model is removed from this device. You can download it again later.",

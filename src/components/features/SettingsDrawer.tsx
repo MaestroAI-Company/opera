@@ -137,7 +137,6 @@ import Group from "../ui/Group";
 import NotificationBanner from "../ui/NotificationBanner";
 import NotificationCard from "../ui/NotificationCard";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
-import PixelSphere from "../ui/PixelSphere";
 import ProgressBar from "../ui/ProgressBar";
 import Selector, { SelectorOption } from "../ui/Selector";
 import Slider from "../ui/Slider";
@@ -145,6 +144,7 @@ import SliderToggle from "../ui/SliderToggle";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 import DrawerSheet from "./DrawerSheet";
+import MaestroCard from "./MaestroCard";
 import ProfileCard from "./ProfileCard";
 
 import {
@@ -288,6 +288,7 @@ export type SubPage =
   | "beta"
   | "local"
   | "litert"
+  | "litertmodel"
   | "ollama"
   | "ollamaserver"
   | "openai"
@@ -318,6 +319,7 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   beta: "service",
   local: "service",
   litert: "service",
+  litertmodel: "litert",
   ollama: "service",
   ollamaserver: "ollama",
   openai: "service",
@@ -509,6 +511,11 @@ export default function SettingsDrawer({
     entry: CatalogEntry | null;
     loading: boolean;
     //undefined while the card loads
+    description?: string | null;
+  } | null>(null);
+  //installed model shown on its own subpage
+  const [installedModel, setInstalledModel] = useState<{
+    id: string;
     description?: string | null;
   } | null>(null);
   const addModelScrollRef = useRef<ScrollView>(null);
@@ -1960,6 +1967,8 @@ export default function SettingsDrawer({
               console.warn("Could not delete the model:", e);
             }
             refreshLitertModels();
+            setInstalledModel(null);
+            setActiveSubPage("litert");
           },
         },
         {
@@ -2049,6 +2058,16 @@ export default function SettingsDrawer({
     const entry = await fetchCatalogEntry(repoId);
     setLitertDetail((prev) =>
       prev?.repoId === repoId ? { ...prev, entry, loading: false } : prev,
+    );
+  };
+
+  const openInstalledLitert = (repoId: string) => {
+    setInstalledModel({ id: repoId });
+    setActiveSubPage("litertmodel");
+    fetchModelDescription(repoId).then((description) =>
+      setInstalledModel((prev) =>
+        prev?.id === repoId ? { ...prev, description } : prev,
+      ),
     );
   };
 
@@ -2735,6 +2754,29 @@ export default function SettingsDrawer({
           </View>
         </Pressable>
 
+        {!isDesktop && (
+          <Pressable
+            style={pressStyle(styles.navItem, styles.navItemPressed)}
+            onPress={() => setActiveSubPage("maestro")}
+          >
+            <View style={styles.menuIconWrap}>
+              <Image
+                source={operaIcon}
+                style={styles.menuIcon}
+                tintColor={Colors.textOnPrimary}
+              />
+            </View>
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>
+                {t("settings.nav.maestro.title")}
+              </Text>
+              <Text style={styles.navSubtitle}>
+                {t("settings.nav.maestro.subtitle")}
+              </Text>
+            </View>
+          </Pressable>
+        )}
+
         <Pressable
           style={pressStyle(
             [styles.navItem, styles.navItemLast],
@@ -2779,29 +2821,6 @@ export default function SettingsDrawer({
             </Text>
           </View>
         </Pressable>
-
-        {!isDesktop && (
-          <Pressable
-            style={pressStyle(styles.navItem, styles.navItemPressed)}
-            onPress={() => setActiveSubPage("maestro")}
-          >
-            <View style={styles.menuIconWrap}>
-              <Image
-                source={operaIcon}
-                style={styles.menuIcon}
-                tintColor={Colors.textOnPrimary}
-              />
-            </View>
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>
-                {t("settings.nav.maestro.title")}
-              </Text>
-              <Text style={styles.navSubtitle}>
-                {t("settings.nav.maestro.subtitle")}
-              </Text>
-            </View>
-          </Pressable>
-        )}
 
         <Pressable
           style={pressStyle(styles.navItem, styles.navItemPressed)}
@@ -3221,26 +3240,8 @@ export default function SettingsDrawer({
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.advanced.title"))}
 
-      {/* flow, audio and technical card */}
+      {/* audio and technical card */}
       <View style={styles.contentCard}>
-        <View style={styles.settingRowVertical}>
-          <Text style={styles.settingLabel}>
-            {t("settings.quickFlow.label")}
-          </Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.quickFlow.help")}
-          </Text>
-          <Group>
-            <Selector
-              options={quickFlowOptions}
-              selectedValue={quickFlowId}
-              onSelect={handleSelectQuickFlow}
-              title={t("settings.quickFlow.select")}
-              fullWidth
-            />
-          </Group>
-        </View>
-
         <View style={styles.settingRowVertical}>
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>
@@ -3332,6 +3333,27 @@ export default function SettingsDrawer({
           </Group>
         </View>
       </View>
+
+      {/* quick flow card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>
+            {t("settings.quickFlow.label")}
+          </Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.quickFlow.help")}
+          </Text>
+          <Group>
+            <Selector
+              options={quickFlowOptions}
+              selectedValue={quickFlowId}
+              onSelect={handleSelectQuickFlow}
+              title={t("settings.quickFlow.select")}
+              fullWidth
+            />
+          </Group>
+        </View>
+      </View>
     </View>
   );
 
@@ -3341,7 +3363,7 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.nav.maestro.title"))}
 
       <View style={{ paddingVertical: Spacing.xxl2, marginBottom: Spacing.xxl2 }}>
-        <PixelSphere />
+        <MaestroCard />
       </View>
 
       <View style={styles.contentCard}>
@@ -3965,7 +3987,7 @@ export default function SettingsDrawer({
                 title: model.label,
                 status: model.sizeStr,
                 disabled: !!downloadingLitert,
-                onPress: () => handleDeleteLitert(model),
+                onPress: () => openInstalledLitert(model.id),
               })),
             ])}
         </View>
@@ -3991,6 +4013,90 @@ export default function SettingsDrawer({
       </View>
     </View>
   );
+
+  //installed on-device model subpage
+  const renderLitertModelSubPage = () => {
+    const entry = installedModel ? getCatalogEntry(installedModel.id) : null;
+    if (!installedModel || !entry) return renderLitertSubPage();
+
+    const publisher = familyPublisher(entry.family);
+    const capabilities = entry.capabilities
+      .filter(
+        (c): c is keyof typeof LITERT_CAPABILITY_KEYS =>
+          c in LITERT_CAPABILITY_KEYS,
+      )
+      .map((c) => ({
+        id: c,
+        label: t(LITERT_CAPABILITY_KEYS[c]),
+        icon: LITERT_CAPABILITY_ICONS[c],
+      }));
+    const { description } = installedModel;
+
+    return (
+      <View style={styles.subPageContainer}>
+        {renderSubPageHeader(entry.label)}
+
+        <View style={styles.contentCard}>
+          <View style={styles.litertDetailHeader}>
+            <View style={styles.litertDetailTile}>
+              <Image
+                source={{ uri: modelAvatarUrl(entry, entry.repoId) }}
+                style={styles.litertTileImage}
+              />
+            </View>
+            <View style={styles.litertDetailInfo}>
+              <Text style={styles.litertDetailName}>{entry.label}</Text>
+              {!!publisher && (
+                <Text style={styles.litertDetailMeta}>{publisher}</Text>
+              )}
+              <Text style={styles.litertDetailMeta}>
+                {formatBytes(entry.sizeBytes)}
+              </Text>
+              {capabilities.map((capability) => (
+                <View key={capability.id} style={styles.litertCapability}>
+                  <Image
+                    source={capability.icon}
+                    style={styles.litertCapabilityIcon}
+                    tintColor={Colors.textSecondary}
+                  />
+                  <Text style={styles.litertDetailMeta}>
+                    {capability.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <Text style={[styles.settingLabel, styles.litertDetailSection]}>
+            {t("settings.litert.description")}
+          </Text>
+          <Text style={styles.helpText}>
+            {description === undefined
+              ? t("settings.litert.loading")
+              : (description ?? t("settings.litert.noDescription"))}
+          </Text>
+        </View>
+
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Group>
+              <ActionButton
+                icon={binIcon}
+                label={t("settings.litert.deleteModel")}
+                onPress={() =>
+                  handleDeleteLitert({
+                    id: entry.repoId,
+                    label: entry.label,
+                    sizeStr: formatBytes(entry.sizeBytes),
+                  })
+                }
+              />
+            </Group>
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   //ollama server list subpage
   const renderOllamaSubPage = () => (
@@ -5075,6 +5181,8 @@ export default function SettingsDrawer({
         return renderLocalSubPage();
       case "litert":
         return renderLitertSubPage();
+      case "litertmodel":
+        return renderLitertModelSubPage();
       case "ollama":
         return renderOllamaSubPage();
       case "ollamaserver":

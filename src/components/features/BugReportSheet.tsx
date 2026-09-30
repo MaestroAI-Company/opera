@@ -18,7 +18,6 @@ const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
 
 const DESKTOP_CARD_WIDTH = 380;
-const DESKTOP_MARGIN = 24;
 
 type BugReportSheetProps = {
   visible: boolean;
@@ -37,7 +36,7 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{ title: string; message: string; buttons?: ModalButton[] }>({ title: "", message: "" });
   const isKeyboardOpen = useKeyboardState((state) => state.isVisible);
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
   const notify = useCallback((title: string, message: string, buttons?: ModalButton[]) => {
@@ -51,13 +50,6 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
   useEffect(() => {
     if (visible) reset(crash, screenshot);
   }, [visible, crash, screenshot, reset]);
-
-  const centeredStyle = {
-    position: "absolute" as const,
-    left: Math.max(DESKTOP_MARGIN, (windowWidth - DESKTOP_CARD_WIDTH) / 2),
-    top: Math.max(DESKTOP_MARGIN, windowHeight * 0.12),
-    maxHeight: windowHeight * 0.76,
-  };
 
   return (
     <>
@@ -73,7 +65,7 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
           styles.sheet,
           { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + (isKeyboardOpen ? 0 : bottomInset), maxHeight: windowHeight - insets.top - Spacing.xl2 },
         ]}
-        desktopStyle={[styles.desktopCard, centeredStyle]}
+        desktopStyle={styles.desktopCard}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.contentCard}>
@@ -158,14 +150,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingTop: 12,
   },
   desktopCard: {
-    backgroundColor: Colors.groupedBackground,
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
-    elevation: 5,
     width: DESKTOP_CARD_WIDTH,
-    overflow: "hidden",
   },
   sheetHandleContainer: {
     alignItems: "center",

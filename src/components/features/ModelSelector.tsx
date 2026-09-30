@@ -75,11 +75,13 @@ const LONG_PRESS_DELAY = 180;
 const BREAK_RATIO = 0.85;
 const ROW_GAP = 4;
 const MAX_MODELS_HEIGHT = 240;
+const DESKTOP_MODELS_HEIGHT = 400;
 
 //panel hangs this far below trigger
 const ANCHOR_GAP = 8;
 const ANCHOR_MARGIN = 8;
-const DESKTOP_CARD_WIDTH = 320;
+const ANCHORED_CARD_WIDTH = 320;
+const CENTERED_CARD_WIDTH = 640;
 
 //context size configured for the active source
 const contextWindowFor = (service: string, ollamaUrl: string) => {
@@ -199,8 +201,8 @@ export function ModelSelectorDrawer({
     [t],
   );
 
-  //anchor must match drawersheet layout
-  const anchored = isDesktop || isLargeScreen;
+  //tablet hangs the card under its trigger, desktop centers it
+  const anchored = isLargeScreen && !isDesktop;
 
   //remeasured on every open
   const [anchor, setAnchor] = useState<{
@@ -610,38 +612,31 @@ export function ModelSelectorDrawer({
     ),
   }));
 
-  const innerContent = (
-    <View style={styles.sheetInner}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        style={styles.tabsScroll}
-        contentContainerStyle={styles.tabsRow}
+  const tabs = sources.map((source) => {
+    const active = source.key === browsedSource?.key;
+    return (
+      <Pressable
+        key={source.key}
+        onPress={() => handleSelectSource(source)}
+        style={pressStyle(styles.tab, "subtle")}
       >
-        {sources.map((source) => {
-          const active = source.key === browsedSource?.key;
-          return (
-            <Pressable
-              key={source.key}
-              onPress={() => handleSelectSource(source)}
-              style={pressStyle(styles.tab, "subtle")}
-            >
-              <Text
-                style={[styles.tabText, active && styles.tabTextActive]}
-                numberOfLines={1}
-              >
-                {source.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+        <Text
+          style={[styles.tabText, active && styles.tabTextActive]}
+          numberOfLines={1}
+        >
+          {source.label}
+        </Text>
+      </Pressable>
+    );
+  });
 
+  const modelsContent = (
+    <>
       <View style={styles.contentCard}>
         <View style={styles.modelsBox}>
           <ScrollView
-            style={{ maxHeight: MAX_MODELS_HEIGHT }}
+            //fixed on desktop so switching servers never resizes the window
+            style={isDesktop ? { height: DESKTOP_MODELS_HEIGHT } : { maxHeight: MAX_MODELS_HEIGHT }}
             contentContainerStyle={styles.modelsScrollContent}
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled={true}
@@ -756,6 +751,27 @@ export function ModelSelectorDrawer({
           </Text>
         </View>
       )}
+    </>
+  );
+
+  //desktop lists the servers on the left, models on the right
+  const innerContent = isDesktop ? (
+    <View style={styles.desktopBody}>
+      <View style={styles.tabsColumn}>{tabs}</View>
+      <View style={styles.desktopModels}>{modelsContent}</View>
+    </View>
+  ) : (
+    <View style={styles.sheetInner}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        style={styles.tabsScroll}
+        contentContainerStyle={styles.tabsRow}
+      >
+        {tabs}
+      </ScrollView>
+      {modelsContent}
     </View>
   );
 
@@ -767,8 +783,8 @@ export function ModelSelectorDrawer({
         left: Math.max(
           ANCHOR_MARGIN,
           Math.min(
-            anchor.x + anchor.width / 2 - DESKTOP_CARD_WIDTH / 2,
-            windowWidth - DESKTOP_CARD_WIDTH - ANCHOR_MARGIN,
+            anchor.x + anchor.width / 2 - ANCHORED_CARD_WIDTH / 2,
+            windowWidth - ANCHORED_CARD_WIDTH - ANCHOR_MARGIN,
           ),
         ),
       }
@@ -783,11 +799,14 @@ export function ModelSelectorDrawer({
         progress={progress}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
+        anchored={anchored}
         sheetStyle={[
           styles.mobileSheet,
           { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + insets.bottom },
         ]}
-        desktopStyle={[styles.desktopCard, anchoredStyle]}
+        desktopStyle={
+          isDesktop ? styles.centeredCard : [styles.anchoredCard, anchoredStyle]
+        }
         handleContainerStyle={styles.handleContainer}
         handleStyle={styles.dragHandle}
       >
@@ -860,17 +879,26 @@ const makeStyles = (Colors: ThemeColors) =>
       fontFamily: Fonts.mono,
       flexShrink: 1,
     },
-    desktopCard: {
-      width: DESKTOP_CARD_WIDTH,
-      backgroundColor: Colors.groupedBackground,
-      borderRadius: Radius.xxl,
-      borderWidth: 2,
-      borderColor: Colors.border,
-      boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
-      elevation: 5,
-      overflow: "hidden",
+    //no close header, pads itself
+    anchoredCard: {
+      width: ANCHORED_CARD_WIDTH,
       paddingVertical: 16,
       paddingHorizontal: Spacing.lg2,
+    },
+    centeredCard: {
+      width: CENTERED_CARD_WIDTH,
+    },
+    desktopBody: {
+      flexDirection: "row",
+      gap: Spacing.lg2,
+      paddingHorizontal: Spacing.lg2,
+    },
+    tabsColumn: {
+      width: 180,
+      gap: Spacing.xs,
+    },
+    desktopModels: {
+      flex: 1,
     },
     mobileSheet: {
       position: "absolute",

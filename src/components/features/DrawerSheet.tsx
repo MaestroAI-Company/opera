@@ -18,6 +18,7 @@ import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useKeyboardLift } from "../../hooks/useKeyboardLift";
 import { usePredictiveBack } from "../../hooks/usePredictiveBack";
 import { useThemedStyles } from "../../hooks/useTheme";
+import DrawerBackButton from "./DrawerBackButton";
 import { dragDrawer, gestureVelocity, releaseOpens, settleDrawer } from "./drawerAnimation";
 
 //slide fallback before real measure
@@ -38,6 +39,8 @@ export type DrawerSheetProps = {
   progress?: Animated.Value;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
+  //desktop card hangs off its trigger instead of centering, no close button
+  anchored?: boolean;
   liftOffset?: number;
   //sheet sits on the keyboard, needs a maxHeight in sheetStyle
   avoidKeyboard?: boolean;
@@ -46,6 +49,7 @@ export type DrawerSheetProps = {
   onBackPress?: () => boolean;
   children: ReactNode;
   sheetStyle?: StyleProp<ViewStyle>;
+  //size and placement only, the card look is shared
   desktopStyle?: StyleProp<ViewStyle>;
   handleContainerStyle?: StyleProp<ViewStyle>;
   handleStyle?: StyleProp<ViewStyle>;
@@ -58,6 +62,7 @@ export default function DrawerSheet({
   progress: externalProgress,
   isLargeScreen = false,
   isDesktop = false,
+  anchored = false,
   liftOffset = 0,
   avoidKeyboard = false,
   onBackPress,
@@ -215,8 +220,13 @@ export default function DrawerSheet({
           {/* box-none re-enables hit testing on the web, so the closed card has to opt out itself */}
           <Animated.View
             pointerEvents={visible ? "auto" : "none"}
-            style={[desktopStyle, { opacity: progress, transform: [{ translateY: translateYDesktop }] }]}
+            style={[styles.desktopCard, desktopStyle, { opacity: progress, transform: [{ translateY: translateYDesktop }] }]}
           >
+            {!anchored && (
+              <View style={styles.desktopHeader}>
+                <DrawerBackButton kind="close" onPress={() => dismiss()} />
+              </View>
+            )}
             {children}
           </Animated.View>
         </View>
@@ -255,10 +265,27 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   desktopRootWrapper: {
     ...StyleSheet.absoluteFill,
-    alignItems: "flex-end",
-    paddingRight: Spacing.xl2,
-    paddingBottom: Spacing.xl2,
-    justifyContent: "flex-end",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Spacing.xxl2,
+  },
+  desktopCard: {
+    backgroundColor: Colors.groupedBackground,
+    //same as the settings window
+    borderRadius: Radius.window,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
+    elevation: 5,
+    overflow: "hidden",
+    //content scrolls instead of leaving the screen
+    maxHeight: "100%",
+    paddingBottom: Spacing.lg,
+  },
+  desktopHeader: {
+    paddingTop: Spacing.lg2,
+    paddingHorizontal: Spacing.lg2,
+    paddingBottom: Spacing.md,
   },
   hidden: {
     opacity: 0,

@@ -289,6 +289,7 @@ export const fr: Translations = {
   "settings.nav.general.subtitle": "Langue, thème",
   "settings.nav.maestro.title": "Maestro",
   "settings.nav.maestro.subtitle": "Assistant overlay",
+  "settings.nav.maestro.subtitleDesktop": "Instructions",
   "settings.nav.overlay.title": "Assistant Overlay",
   "settings.nav.overlay.subtitle": "Voix, contexte de l'écran",
   "settings.nav.service.title": "Service",

@@ -2062,13 +2062,11 @@ export default function Index() {
               )}
             </View>
           </View>
-
-          {isDesktop ? settingsDrawer : null}
         </View>
       </Reanimated.View>
 
       {isDesktop ? null : conversationsDrawer}
-      {isDesktop ? null : settingsDrawer}
+      {settingsDrawer}
 
       <BugReportSheet
         visible={bugReportVisible}

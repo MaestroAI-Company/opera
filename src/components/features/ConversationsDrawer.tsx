@@ -28,6 +28,16 @@ const unpinIcon = require("../../../assets/icons/unpin.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
 
+//docked desktop panel, resized from its right border
+const DOCKED_WIDTH = 320;
+const DOCKED_MIN_WIDTH = 240;
+const DOCKED_MAX_WIDTH = 480;
+
+//cursor holds while the pointer leaves the thin handle
+function setPageCursor(cursor: string) {
+  document.body.style.cursor = cursor;
+}
+
 type DrawerPage = "list" | "search";
 const drawerPageParent = (page: DrawerPage) => (page === "search" ? "list" : null);
 
@@ -182,6 +192,25 @@ export default function ConversationsDrawer({
     , [onClose, drawerWidth, progress]);
 
   const largeScreenAnim = useAnimatedValue(visible ? 1 : 0);
+  const [dockedWidth, setDockedWidth] = useState(DOCKED_WIDTH);
+  //panel starts at the window edge, so the pointer x is its width
+  const resizeResponder = useMemo(() =>
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      //widgets and message text would otherwise take the drag over
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: (e) => {
+        //the mousedown default starts a text selection
+        e.preventDefault();
+        setPageCursor("col-resize");
+      },
+      onPanResponderMove: (_, gestureState) => {
+        setDockedWidth(Math.min(DOCKED_MAX_WIDTH, Math.max(DOCKED_MIN_WIDTH, gestureState.moveX)));
+      },
+      onPanResponderRelease: () => setPageCursor(""),
+      onPanResponderTerminate: () => setPageCursor(""),
+    })
+    , []);
 
   useEffect(() => {
     if (visible) {
@@ -285,7 +314,7 @@ export default function ConversationsDrawer({
   };
 
   const searchContent = (
-    <View style={{ flex: 1, paddingTop: isDesktop ? 0 : 60 }}>
+    <View style={{ flex: 1, paddingTop: isDesktop ? Spacing.lg : 60 }}>
       <View style={styles.header}>
         <DrawerBackButton kind="back" onPress={exitSearch} pulseKey="search" />
         <Text style={styles.title} numberOfLines={1}>{t("conversations.search.title")}</Text>
@@ -373,34 +402,40 @@ export default function ConversationsDrawer({
             })
           )}
         </KeyboardAwareScrollView>
-        {/* floating drawers keep their titles visible */}
+        {/* docked desktop panel scrolls to its edges without fades */}
         {!isDesktop && (
-          <LinearGradient
-            colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
-            style={styles.gradientTop}
-            pointerEvents="none"
-          />
+          <>
+            <LinearGradient
+              colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
+              style={styles.gradientTop}
+              pointerEvents="none"
+            />
+            <LinearGradient
+              colors={[Colors.groupedBackgroundClear, Colors.groupedBackgroundFade, Colors.groupedBackground]}
+              style={styles.gradientBottom}
+              pointerEvents="none"
+            />
+          </>
         )}
-        <LinearGradient
-          colors={[Colors.groupedBackgroundClear, Colors.groupedBackgroundFade, Colors.groupedBackground]}
-          style={styles.gradientBottom}
-          pointerEvents="none"
-        />
       </View>
     </View>
   );
 
   const innerContent = (
     <View style={styles.scrollListContainer}>
-      <View style={[styles.fixedCloseWrapper, { top: isDesktop ? 0 : 60 }]} pointerEvents="box-none">
-        <DrawerBackButton kind="close" onPress={onClose} scrolled={isScrolled} />
-      </View>
+      {/* docked desktop panel toggles from the top bar */}
+      {!isDesktop && (
+        <View style={[styles.fixedCloseWrapper, { top: 60 }]} pointerEvents="box-none">
+          <DrawerBackButton kind="close" onPress={onClose} scrolled={isScrolled} />
+        </View>
+      )}
 
       <ScrollView
         onScroll={handleScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: isDesktop ? 0 : 60, paddingBottom: 40 }}
+        //desktop title level with the top bar buttons
+        contentContainerStyle={{ paddingTop: isDesktop ? Spacing.lg : 60, paddingBottom: 40 }}
       >
         <View style={styles.header}>
           <View style={styles.headerSpacer} />
@@ -444,19 +479,20 @@ export default function ConversationsDrawer({
           </View>
         ))}
       </ScrollView>
-      {/* floating drawers keep their titles visible */}
       {!isDesktop && (
-        <LinearGradient
-          colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
-          style={styles.screenGradientTop}
-          pointerEvents="none"
-        />
+        <>
+          <LinearGradient
+            colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
+            style={styles.screenGradientTop}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={[Colors.groupedBackgroundClear, Colors.groupedBackgroundFade, Colors.groupedBackground]}
+            style={styles.screenGradientBottom}
+            pointerEvents="none"
+          />
+        </>
       )}
-      <LinearGradient
-        colors={[Colors.groupedBackgroundClear, Colors.groupedBackgroundFade, Colors.groupedBackground]}
-        style={styles.screenGradientBottom}
-        pointerEvents="none"
-      />
     </View>
   );
 
@@ -464,7 +500,7 @@ export default function ConversationsDrawer({
     <PageStack
       page={isSearching ? "search" : "list"}
       visible={visible}
-      width={isDesktop ? 320 : drawerWidth}
+      width={isDesktop ? dockedWidth : drawerWidth}
       parentOf={drawerPageParent}
       onBack={exitSearch}
       renderPage={(page) => (page === "search" ? searchContent : innerContent)}
@@ -500,11 +536,7 @@ export default function ConversationsDrawer({
   if (isDesktop) {
     const largeScreenWidth = largeScreenAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: [0, 320]
-    });
-    const largeScreenMargin = largeScreenAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 16]
+      outputRange: [0, dockedWidth]
     });
     const largeScreenOpacity = largeScreenAnim.interpolate({
       inputRange: [0, 1],
@@ -514,20 +546,22 @@ export default function ConversationsDrawer({
     return (
       <Animated.View style={[
         styles.largeScreenContainer,
-        styles.floatingContainer,
         {
           width: largeScreenWidth,
           opacity: largeScreenOpacity,
-          marginLeft: largeScreenMargin,
-          marginRight: largeScreenMargin,
           alignItems: 'flex-end',
         }
       ]}>
-        <View style={{ width: 320, flex: 1 }}>
-          <View style={styles.floatingContent}>
+        <View style={[styles.dockedPanel, { width: dockedWidth }]}>
+          <View style={styles.dockedContent}>
             {pages}
           </View>
         </View>
+        <View
+          //rn types only know pointer, the web takes any css cursor
+          style={[styles.resizeHandle, { cursor: "col-resize" } as any]}
+          {...resizeResponder.panHandlers}
+        />
         {notificationModal}
       </Animated.View>
     );
@@ -585,23 +619,27 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     overflow: "hidden",
   },
   largeScreenContainer: {
-    width: 320,
     backgroundColor: Colors.groupedBackground,
     zIndex: 10,
-  },
-  floatingContainer: {
-    margin: 16,
-    marginTop: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window ? 40 : 8,
-    marginBottom: 16,
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
-    elevation: 5,
     overflow: "hidden",
   },
-  floatingContent: {
-    paddingTop: 24,
+  //border rides the inner panel so a closed drawer takes no width
+  dockedPanel: {
+    flex: 1,
+    borderRightWidth: 2,
+    borderRightColor: Colors.border,
+  },
+  //sits over the border
+  resizeHandle: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: 8,
+  },
+  dockedContent: {
+    //clears the tauri title bar
+    paddingTop: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window ? 32 : 0,
     paddingHorizontal: Spacing.lg2,
     flex: 1,
   },

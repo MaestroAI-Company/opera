@@ -13,7 +13,6 @@ import DrawerSheet from "./DrawerSheet";
 const copyIcon = require("../../../assets/icons/copy2.png");
 
 const DESKTOP_CARD_WIDTH = 560;
-const DESKTOP_MARGIN = 24;
 
 export type PreviewCode = { code: string; language?: string; title?: string; incognito?: boolean };
 
@@ -29,7 +28,7 @@ type CodePreviewSheetProps = {
 export default function CodePreviewSheet({ code, onClose, isLargeScreen = false, isDesktop = false, bottomInset = 0 }: CodePreviewSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   //last code stays during close animation
   const [shown, setShown] = useState<PreviewCode | null>(code);
@@ -53,13 +52,6 @@ export default function CodePreviewSheet({ code, onClose, isLargeScreen = false,
     setCopied(true);
   };
 
-  const centeredStyle = {
-    position: "absolute" as const,
-    left: Math.max(DESKTOP_MARGIN, (windowWidth - DESKTOP_CARD_WIDTH) / 2),
-    top: Math.max(DESKTOP_MARGIN, windowHeight * 0.08),
-    maxHeight: windowHeight * 0.84,
-  };
-
   return (
     <DrawerSheet
       visible={!!code}
@@ -70,7 +62,7 @@ export default function CodePreviewSheet({ code, onClose, isLargeScreen = false,
       handleContainerStyle={styles.sheetHandleContainer}
       //sheet may grow up to just under the status bar
       sheetStyle={[styles.sheet, { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + bottomInset, maxHeight: windowHeight - insets.top - Spacing.xl2 }]}
-      desktopStyle={[styles.desktopCard, centeredStyle]}
+      desktopStyle={styles.desktopCard}
     >
       <ScrollView contentContainerStyle={styles.content}>
         {shown && (
@@ -115,14 +107,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingTop: 12,
   },
   desktopCard: {
-    backgroundColor: Colors.groupedBackground,
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
-    elevation: 5,
     width: DESKTOP_CARD_WIDTH,
-    overflow: "hidden",
   },
   sheetHandleContainer: {
     alignItems: "center",

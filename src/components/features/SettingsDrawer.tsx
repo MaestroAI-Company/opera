@@ -341,6 +341,18 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
 const subPageParent = (page: SubPage) =>
   page === "main" ? null : SUB_PAGE_PARENT[page];
 
+//nav entry a subpage lives under
+const sectionOf = (page: SubPage): SubPage => {
+  let p = page;
+  while (SUB_PAGE_PARENT[p] !== "main") p = SUB_PAGE_PARENT[p];
+  return p;
+};
+
+//desktop always shows a page next to the nav
+const DESKTOP_ENTRY_PAGE: SubPage = "general";
+//settings rows stay readable on wide screens
+const DESKTOP_WINDOW_MAX_WIDTH = 960;
+
 type LitertPage = "browse" | "search" | "model";
 
 export default function SettingsDrawer({
@@ -2604,6 +2616,13 @@ export default function SettingsDrawer({
   };
 
   const largeScreenAnim = useAnimatedValue(visible ? 1 : 0);
+  //closed overlay leaves the tree, a live page layer would still catch clicks on the web
+  const [desktopMounted, setDesktopMounted] = useState(visible);
+  if (visible && !desktopMounted) setDesktopMounted(true);
+  const [navScrolled, setNavScrolled] = useState(false);
+  const [desktopPageWidth, setDesktopPageWidth] = useState(0);
+  const desktopPage = activeSubPage === "main" ? DESKTOP_ENTRY_PAGE : activeSubPage;
+  const desktopSection = sectionOf(desktopPage);
 
   useEffect(() => {
     if (visible) {
@@ -2617,7 +2636,11 @@ export default function SettingsDrawer({
       //reset once the close settles
       const reset = () => setActiveSubPage("main");
       if (isDesktop) {
-        settleLayoutDrawer(largeScreenAnim, false, reset);
+        settleLayoutDrawer(largeScreenAnim, false, () => {
+          reset();
+          setDesktopMounted(false);
+          setNavScrolled(false);
+        });
       } else {
         settleDrawer(progress, false, undefined, undefined, reset);
       }
@@ -2698,14 +2721,28 @@ export default function SettingsDrawer({
     </View>
   );
 
+  //desktop nav keeps the open section highlighted
+  const navItemStyle = (page: SubPage, last = false) =>
+    pressStyle(
+      [
+        styles.navItem,
+        last && styles.navItemLast,
+        isDesktop && desktopSection === page && styles.navItemPressed,
+      ],
+      styles.navItemPressed,
+    );
+
   //main navigation page content
   const renderMainPage = () => (
     <View style={styles.menuContainer}>
+      {/* desktop keeps the row for its close button */}
       <View style={styles.header}>
         <View style={styles.headerSpacer} />
-        <Text style={styles.title} numberOfLines={1}>
-          {t("settings.title")}
-        </Text>
+        {!isDesktop && (
+          <Text style={styles.title} numberOfLines={1}>
+            {t("settings.title")}
+          </Text>
+        )}
         <View style={styles.headerSpacer} />
       </View>
 
@@ -2734,7 +2771,7 @@ export default function SettingsDrawer({
       {/* profile section */}
       <Group style={[styles.groupSpacing, styles.mainPageGroup]}>
         <Pressable
-          style={pressStyle(styles.navItem, styles.navItemPressed)}
+          style={navItemStyle("profile")}
           onPress={() => setActiveSubPage("profile")}
         >
           <View style={styles.menuIconWrap}>
@@ -2754,34 +2791,31 @@ export default function SettingsDrawer({
           </View>
         </Pressable>
 
-        {!isDesktop && (
-          <Pressable
-            style={pressStyle(styles.navItem, styles.navItemPressed)}
-            onPress={() => setActiveSubPage("maestro")}
-          >
-            <View style={styles.menuIconWrap}>
-              <Image
-                source={operaIcon}
-                style={styles.menuIcon}
-                tintColor={Colors.textOnPrimary}
-              />
-            </View>
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>
-                {t("settings.nav.maestro.title")}
-              </Text>
-              <Text style={styles.navSubtitle}>
-                {t("settings.nav.maestro.subtitle")}
-              </Text>
-            </View>
-          </Pressable>
-        )}
+        <Pressable
+          style={navItemStyle("maestro")}
+          onPress={() => setActiveSubPage("maestro")}
+        >
+          <View style={styles.menuIconWrap}>
+            <Image
+              source={operaIcon}
+              style={styles.menuIcon}
+              tintColor={Colors.textOnPrimary}
+            />
+          </View>
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>
+              {t("settings.nav.maestro.title")}
+            </Text>
+            <Text style={styles.navSubtitle}>
+              {isDesktop
+                ? t("settings.nav.maestro.subtitleDesktop")
+                : t("settings.nav.maestro.subtitle")}
+            </Text>
+          </View>
+        </Pressable>
 
         <Pressable
-          style={pressStyle(
-            [styles.navItem, styles.navItemLast],
-            styles.navItemPressed,
-          )}
+          style={navItemStyle("cloud", true)}
           onPress={() => setActiveSubPage("cloud")}
         >
           <View style={styles.menuIconWrap}>
@@ -2802,7 +2836,7 @@ export default function SettingsDrawer({
 
       <Group style={[styles.groupSpacing, styles.mainPageGroup]}>
         <Pressable
-          style={pressStyle(styles.navItem, styles.navItemPressed)}
+          style={navItemStyle("general")}
           onPress={() => setActiveSubPage("general")}
         >
           <View style={styles.menuIconWrap}>
@@ -2823,7 +2857,7 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={pressStyle(styles.navItem, styles.navItemPressed)}
+          style={navItemStyle("service")}
           onPress={() => setActiveSubPage("service")}
         >
           <View style={styles.menuIconWrap}>
@@ -2844,10 +2878,7 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={pressStyle(
-            [styles.navItem, !advancedMode && styles.navItemLast],
-            styles.navItemPressed,
-          )}
+          style={navItemStyle("tools", !advancedMode)}
           onPress={() => setActiveSubPage("tools")}
         >
           <View style={styles.menuIconWrap}>
@@ -2869,10 +2900,7 @@ export default function SettingsDrawer({
 
         {advancedMode && (
           <Pressable
-            style={pressStyle(
-              [styles.navItem, styles.navItemLast],
-              styles.navItemPressed,
-            )}
+            style={navItemStyle("advanced", true)}
             onPress={() => setActiveSubPage("advanced")}
           >
             <View style={styles.menuIconWrap}>
@@ -2896,7 +2924,7 @@ export default function SettingsDrawer({
 
       <Group style={[styles.groupSpacing, styles.mainPageGroup]}>
         <Pressable
-          style={pressStyle(styles.navItem, styles.navItemPressed)}
+          style={navItemStyle("confidentiality")}
           onPress={() => setActiveSubPage("confidentiality")}
         >
           <View style={styles.menuIconWrap}>
@@ -2917,7 +2945,7 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={pressStyle(styles.navItem, styles.navItemPressed)}
+          style={navItemStyle("reports")}
           onPress={() => setActiveSubPage("reports")}
         >
           <View style={styles.menuIconWrap}>
@@ -2938,10 +2966,7 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={pressStyle(
-            [styles.navItem, styles.navItemLast],
-            styles.navItemPressed,
-          )}
+          style={navItemStyle("sociallinks", true)}
           onPress={() => setActiveSubPage("sociallinks")}
         >
           <View style={styles.menuIconWrap}>
@@ -3061,11 +3086,14 @@ export default function SettingsDrawer({
               label={t("settings.profile.personalize")}
               onPress={() => setActiveSubPage("profileedit")}
             />
-            <ActionButton
-              icon={exportIcon}
-              label={t("settings.profile.exportCard")}
-              onPress={exportProfileCard}
-            />
+            {/* export ends in the mobile share sheet */}
+            {!isDesktop && (
+              <ActionButton
+                icon={exportIcon}
+                label={t("settings.profile.exportCard")}
+                onPress={exportProfileCard}
+              />
+            )}
           </Group>
         </View>
       </View>
@@ -3382,13 +3410,16 @@ export default function SettingsDrawer({
         </View>
       </View>
 
-      <Group style={styles.groupSpacing}>
-        {renderToolsNavRow(
-          "assistantoverlay",
-          t("settings.nav.overlay.title"),
-          t("settings.nav.overlay.subtitle"),
-        )}
-      </Group>
+      {/* the overlay is an android assistant feature */}
+      {!isDesktop && (
+        <Group style={styles.groupSpacing}>
+          {renderToolsNavRow(
+            "assistantoverlay",
+            t("settings.nav.overlay.title"),
+            t("settings.nav.overlay.subtitle"),
+          )}
+        </Group>
+      )}
     </View>
   );
 
@@ -5217,10 +5248,28 @@ export default function SettingsDrawer({
     }
   };
 
+  const renderScrollPage = (page: SubPage, active: boolean) => (
+    //focused field scrolls just above the keyboard
+    <KeyboardAwareScrollView
+      ref={active ? scrollRef : undefined}
+      bottomOffset={Spacing.xl2}
+      onScroll={active ? handleScroll : undefined}
+      scrollEventThrottle={16}
+      contentContainerStyle={{
+        paddingTop: isDesktop ? Spacing.xxl2 : 60,
+        paddingBottom: 40,
+        flexGrow: 1,
+      }}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={{ flex: 1 }}>{getSubPageContent(page)}</View>
+    </KeyboardAwareScrollView>
+  );
+
   const innerContent = (
     <View style={styles.innerContainer}>
       <View
-        style={[styles.fixedBackWrapper, { top: isDesktop ? 0 : 60 }]}
+        style={[styles.fixedBackWrapper, { top: 60 }]}
         pointerEvents="box-none"
       >
         <DrawerBackButton
@@ -5235,41 +5284,22 @@ export default function SettingsDrawer({
         page={activeSubPage}
         visible={visible}
         //push travels the whole panel, padding included
-        width={isDesktop ? 320 : drawerWidth}
+        width={drawerWidth}
         parentOf={subPageParent}
         gestureEnabled={!sheetOpen}
         onBack={handleBack}
-        renderPage={(page, active) => (
-          //focused field scrolls just above the keyboard
-          <KeyboardAwareScrollView
-            ref={active ? scrollRef : undefined}
-            bottomOffset={Spacing.xl2}
-            onScroll={active ? handleScroll : undefined}
-            scrollEventThrottle={16}
-            contentContainerStyle={{
-              paddingTop: isDesktop ? 0 : 60,
-              paddingBottom: 40,
-              flexGrow: 1,
-            }}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={{ flex: 1 }}>{getSubPageContent(page)}</View>
-          </KeyboardAwareScrollView>
-        )}
+        renderPage={renderScrollPage}
       />
 
-      {/* floating drawers keep their titles visible */}
-      {!isDesktop && (
-        <LinearGradient
-          colors={[
-            Colors.groupedBackground,
-            Colors.groupedBackgroundFade,
-            Colors.groupedBackgroundClear,
-          ]}
-          style={styles.gradientTop}
-          pointerEvents="none"
-        />
-      )}
+      <LinearGradient
+        colors={[
+          Colors.groupedBackground,
+          Colors.groupedBackgroundFade,
+          Colors.groupedBackgroundClear,
+        ]}
+        style={styles.gradientTop}
+        pointerEvents="none"
+      />
       <LinearGradient
         colors={[
           Colors.groupedBackgroundClear,
@@ -5657,7 +5687,8 @@ export default function SettingsDrawer({
           height: sheetMaxHeight,
         },
       ]}
-      desktopStyle={[styles.addModelSheetDesktop, { height: sheetMaxHeight }]}
+      //fills the settings window, stacked pages cannot size it
+      desktopStyle={[styles.addModelSheetDesktop, { height: "100%" }]}
     >
       <View
         style={styles.litertSheetBody}
@@ -6242,45 +6273,99 @@ export default function SettingsDrawer({
   );
 
   if (isDesktop) {
-    const largeScreenWidth = largeScreenAnim.interpolate({
+    if (!desktopMounted) return null;
+    const windowTranslateY = largeScreenAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: [0, 320],
-    });
-    const largeScreenMargin = largeScreenAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 16],
-    });
-    const largeScreenOpacity = largeScreenAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 1],
+      outputRange: [-10, 0],
     });
 
     return (
-      <Animated.View
-        style={[
-          styles.largeScreenContainer,
-          styles.floatingContainer,
-          {
-            width: largeScreenWidth,
-            opacity: largeScreenOpacity,
-            marginLeft: largeScreenMargin,
-            marginRight: largeScreenMargin,
-            overflow: "hidden",
-          },
-        ]}
-      >
-        <View style={{ width: 320, flex: 1 }}>
-          <View style={styles.floatingContent}>{innerContent}</View>
+      <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
+        <Animated.View style={[styles.overlay, { opacity: largeScreenAnim }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        </Animated.View>
+
+        <View style={styles.desktopWindowWrapper} pointerEvents="box-none">
+          <Animated.View
+            style={[
+              styles.desktopWindow,
+              {
+                opacity: largeScreenAnim,
+                transform: [{ translateY: windowTranslateY }],
+              },
+            ]}
+          >
+            <View style={styles.desktopNav}>
+              <View style={styles.innerContainer}>
+                <View
+                  style={[styles.fixedBackWrapper, { top: Spacing.xxl2 }]}
+                  pointerEvents="box-none"
+                >
+                  <DrawerBackButton
+                    kind="close"
+                    onPress={onClose}
+                    scrolled={navScrolled}
+                  />
+                </View>
+                <ScrollView
+                  onScroll={(e) =>
+                    setNavScrolled(e.nativeEvent.contentOffset.y > 10)
+                  }
+                  scrollEventThrottle={16}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{
+                    paddingTop: Spacing.xxl2,
+                    paddingBottom: 40,
+                  }}
+                >
+                  {renderMainPage()}
+                </ScrollView>
+              </View>
+            </View>
+
+            <View
+              style={styles.desktopPage}
+              onLayout={(e) => setDesktopPageWidth(e.nativeEvent.layout.width)}
+            >
+              <View style={styles.innerContainer}>
+                {SUB_PAGE_PARENT[desktopPage] !== "main" && (
+                  <View
+                    style={[styles.fixedBackWrapper, { top: Spacing.xxl2 }]}
+                    pointerEvents="box-none"
+                  >
+                    <DrawerBackButton
+                      kind="back"
+                      onPress={handleBack}
+                      scrolled={isScrolled}
+                      pulseKey={desktopPage}
+                    />
+                  </View>
+                )}
+                {/* switching section swaps pages, only nested pages push */}
+                <PageStack
+                  key={desktopSection}
+                  page={desktopPage}
+                  visible={visible}
+                  width={desktopPageWidth || DESKTOP_WINDOW_MAX_WIDTH}
+                  parentOf={subPageParent}
+                  gestureEnabled={!sheetOpen}
+                  onBack={handleBack}
+                  renderPage={renderScrollPage}
+                />
+              </View>
+            </View>
+
+            {addModelSheet}
+            {ollamaAddServerSheet}
+            {openaiAddServerSheet}
+            {mcpAddServerSheet}
+            {cloudSetupSheet}
+            {localModelDetailSheet}
+            {litertDownloadSheet}
+          </Animated.View>
         </View>
         {notificationModal}
-        {addModelSheet}
-        {ollamaAddServerSheet}
-        {openaiAddServerSheet}
-        {mcpAddServerSheet}
-        {cloudSetupSheet}
-        {localModelDetailSheet}
-        {litertDownloadSheet}
-      </Animated.View>
+      </View>
     );
   }
 
@@ -6346,29 +6431,38 @@ const makeStyles = (Colors: ThemeColors) =>
       paddingHorizontal: Spacing.lg2,
       overflow: "hidden",
     },
-    largeScreenContainer: {
-      width: 320,
-      backgroundColor: Colors.groupedBackground,
-      zIndex: 10,
+    desktopWindowWrapper: {
+      ...StyleSheet.absoluteFill,
+      padding: Spacing.xxl2,
+      //clears the tauri title bar
+      paddingTop:
+        Spacing.xxl2 +
+        (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+          ? 32
+          : 0),
     },
-    floatingContainer: {
-      margin: 16,
-      marginTop:
-        typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
-          ? 40
-          : 8,
-      marginBottom: 16,
-      borderRadius: Radius.xxl,
+    desktopWindow: {
+      flex: 1,
+      width: "100%",
+      maxWidth: DESKTOP_WINDOW_MAX_WIDTH,
+      alignSelf: "center",
+      flexDirection: "row",
+      backgroundColor: Colors.groupedBackground,
+      borderRadius: Radius.window,
       borderWidth: 2,
       borderColor: Colors.border,
-      boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
-      elevation: 5,
       overflow: "hidden",
     },
-    floatingContent: {
-      flex: 1,
-      paddingTop: 24,
+    desktopNav: {
+      width: 320,
       paddingHorizontal: Spacing.lg2,
+      borderRightWidth: 2,
+      borderRightColor: Colors.border,
+    },
+    desktopPage: {
+      flex: 1,
+      paddingHorizontal: Spacing.lg2,
+      overflow: "hidden",
     },
     innerContainer: {
       flex: 1,
@@ -6449,15 +6543,7 @@ const makeStyles = (Colors: ThemeColors) =>
       marginTop: -10,
     },
     addModelSheetDesktop: {
-      backgroundColor: Colors.groupedBackground,
-      borderRadius: Radius.xxl,
-      borderWidth: 2,
-      borderColor: Colors.border,
-      boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
-      elevation: 5,
       width: 380,
-      overflow: "hidden",
-      paddingVertical: 16,
     },
     localModelsGrid: {
       flexDirection: "row",

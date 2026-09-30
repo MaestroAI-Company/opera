@@ -1,7 +1,3 @@
-//mobile sized ui scaled down to desktop proportions
-#[cfg(desktop)]
-const UI_ZOOM: f64 = 0.9;
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -17,13 +13,6 @@ pub fn run() {
         .plugin(tauri_plugin_oauth::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            //page zoom keeps layout and pointer coordinates consistent, unlike css zoom
-            #[cfg(desktop)]
-            {
-                use tauri::Manager;
-                app.get_webview_window("main").unwrap().set_zoom(UI_ZOOM)?;
-            }
-
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             {
                 use tauri::Manager;

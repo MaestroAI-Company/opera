@@ -21,7 +21,7 @@ export const MAESTRO_BUTTERFLIES: Record<MaestroButterflyId, MaestroButterfly> =
     //still image of the home trio
     cluster: {
       color: require("../../../assets/images/butterfly5.png"),
-      grey: butterfly2.grey,
+      grey: require("../../../assets/images/butterfly5_grey.png"),
     },
     butterfly2,
     butterfly3: {

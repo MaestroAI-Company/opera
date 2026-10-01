@@ -323,8 +323,6 @@ export const en = {
   "settings.general.autoRead": "Auto-read replies",
   "settings.general.autoReadHelp":
     "Speak the answer aloud when you ask by voice.",
-  "settings.general.voice.title": "Voice",
-  "settings.general.voice.help": "Auto read, voice engine, reading speed.",
   "settings.general.advancedMode": "Advanced mode",
   "settings.general.advancedModeHelp":
     "Add an Advanced section to the menu with the more technical settings.",

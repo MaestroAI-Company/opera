@@ -1,10 +1,8 @@
-import { Image, StyleSheet } from "react-native";
-import { MAESTRO_BUTTERFLIES, useMaestroButterfly } from "./maestroButterfly";
+import { StyleSheet } from "react-native";
+import ButterflyCluster from "./ButterflyCluster";
 
 export default function MaestroCard() {
-  const butterfly = MAESTRO_BUTTERFLIES[useMaestroButterfly()];
-
-  return <Image source={butterfly.color} style={styles.butterfly} resizeMode="contain" />;
+  return <ButterflyCluster style={styles.butterfly} />;
 }
 
 const styles = StyleSheet.create({

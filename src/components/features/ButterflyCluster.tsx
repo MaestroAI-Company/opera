@@ -1,4 +1,13 @@
-import { memo, useEffect, useMemo, useRef } from "react";
+import {
+  memo,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 import {
   Animated,
   AppState,
@@ -11,40 +20,73 @@ import {
   ViewStyle,
 } from "react-native";
 import { Gyroscope } from "expo-sensors";
+import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { MAESTRO_BUTTERFLIES, useMaestroButterfly } from "./maestroButterfly";
 
 const MAX_SHIFT = 16;
 const DECAY = 0.92;
 const GYRO_SPEED = 3.2;
+//shared by the intro and the flight
+const EASE_OUT = Easing.bezier(0.16, 1, 0.3, 1);
 
 export type ButterflyClusterProps = {
   style?: StyleProp<ViewStyle>;
   incognito?: boolean;
   delay?: number;
+  //flies in from this frame, skips intro
+  from?: DOMRect | null;
+  ref?: Ref<View>;
+  parallax?: boolean;
 };
 
 //maestro butterfly with gyro parallax
-function ButterflyCluster({ style, incognito, delay = 250 }: ButterflyClusterProps) {
+function ButterflyCluster({
+  style,
+  incognito,
+  delay = 250,
+  from,
+  ref,
+  parallax = true,
+}: ButterflyClusterProps) {
   const butterfly = MAESTRO_BUTTERFLIES[useMaestroButterfly()];
-  const introAnim = useRef(new Animated.Value(0)).current;
+  const introAnim = useAnimatedValue(from ? 1 : 0);
   const gyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const flightAnim = useAnimatedValue(0);
+  //window frame it lands on
+  const [landing, setLanding] = useState<DOMRect | null>(null);
+  const viewRef = useRef<View>(null);
+  useImperativeHandle(ref, () => viewRef.current!, []);
+
+  //sync read so the chat never paints unpushed
+  useLayoutEffect(() => {
+    if (!from || !viewRef.current) return;
+    setLanding(viewRef.current.getBoundingClientRect());
+    //layout props need the js driver
+    Animated.timing(flightAnim, {
+      toValue: 1,
+      duration: 700,
+      easing: EASE_OUT,
+      useNativeDriver: false,
+    }).start();
+  }, [from, flightAnim]);
 
   //reveal butterfly on screen load
   useEffect(() => {
+    if (from) return;
     const timer = setTimeout(() => {
       Animated.timing(introAnim, {
         toValue: 1,
         duration: 1100,
-        easing: Easing.bezier(0.16, 1, 0.3, 1),
+        easing: EASE_OUT,
         useNativeDriver: true,
       }).start();
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [introAnim, delay]);
+  }, [introAnim, delay, from]);
 
   useEffect(() => {
-    if (Platform.OS === "web") {
+    if (Platform.OS === "web" || !parallax) {
       gyro.setValue({ x: 0, y: 0 });
       return;
     }
@@ -122,7 +164,7 @@ function ButterflyCluster({ style, incognito, delay = 250 }: ButterflyClusterPro
       unsubscribe();
       appStateSub.remove();
     };
-  }, [gyro]);
+  }, [gyro, parallax]);
 
   const gyroTransform = useMemo(
     () => [
@@ -168,8 +210,29 @@ function ButterflyCluster({ style, incognito, delay = 250 }: ButterflyClusterPro
     [introAnim],
   );
 
+  const flightStyle = useMemo(() => {
+    if (!from) return null;
+    //hidden until measured
+    if (!landing) return { opacity: 0 };
+    //starts at home size, pushes chat down
+    return {
+      marginTop: flightAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [from.y - landing.y, 0],
+      }),
+      width: flightAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [from.width, landing.width],
+      }),
+      height: flightAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [from.height, landing.height],
+      }),
+    };
+  }, [from, landing, flightAnim]);
+
   return (
-    <View pointerEvents="none" style={style}>
+    <Animated.View ref={viewRef} pointerEvents="none" style={[style, flightStyle]}>
       <Animated.View
         style={[styles.imageFill, { opacity: introOpacity, transform: introTransform }]}
       >
@@ -179,7 +242,7 @@ function ButterflyCluster({ style, incognito, delay = 250 }: ButterflyClusterPro
           resizeMode="contain"
         />
       </Animated.View>
-    </View>
+    </Animated.View>
   );
 }
 

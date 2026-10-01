@@ -32,12 +32,11 @@ import IconButton from "../ui/IconButton";
 import { deriveChatDisplay, describeToolCall, renderMarkdown } from "../ui/MarkdownText";
 import SuggestionPill from "../ui/SuggestionPill";
 import ThinkingIcon from "../ui/ThinkingIcon";
+import ButterflyCluster from "./ButterflyCluster";
 import type { PreviewImage } from "./ImagePreviewSheet";
 import type { PreviewDetails } from "./MessageDetailsSheet";
 import { pressStyle } from "../ui/pressStyle";
 
-const butterflyImage = require("../../../assets/images/butterfly5.png");
-const butterflyGreyImage = require("../../../assets/images/butterfly2_grey.png");
 const speakerIcon = require("../../../assets/icons/speaker.png");
 const reloadIcon = require("../../../assets/icons/reload.png");
 const copyIcon = require("../../../assets/icons/copy.png");
@@ -168,6 +167,8 @@ type ChatViewProps = {
   onSuggestionPress?: (text: string) => void;
   onImagePress?: (image: PreviewImage) => void;
   onDetailsPress?: (details: PreviewDetails) => void;
+  //home butterfly frame to fly from
+  butterflyFrom?: DOMRect | null;
 };
 
 const stripMarkdown = (md: string) => {
@@ -495,13 +496,14 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   prev.onDetailsPress === next.onDetailsPress);
 MessageItem.displayName = "MessageItem";
 
-export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, queuedMessageIds, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress }: ChatViewProps) {
+export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, queuedMessageIds, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress, butterflyFrom }: ChatViewProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const listRef = useRef<FlatList>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
   const isAtBottomRef = useRef(true);
-  const initialScrollDone = useRef(false);
+  //chat from home keeps its header in view
+  const initialScrollDone = useRef(!!butterflyFrom);
 
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
 
@@ -579,12 +581,16 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
           !hideHeader && conversation ? (
             <View
               style={styles.headerBlock}
-              onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
+              //only the initial scroll reads it
+              onLayout={(e) => {
+                if (!initialScrollDone.current) setHeaderHeight(e.nativeEvent.layout.height);
+              }}
             >
-              <Image
-                source={incognito ? butterflyGreyImage : butterflyImage}
+              <ButterflyCluster
+                incognito={incognito}
                 style={styles.headerButterfly}
-                resizeMode="contain"
+                from={butterflyFrom}
+                parallax={false}
               />
               <Text style={styles.headerTitle} numberOfLines={2}>
                 {conversation.name}

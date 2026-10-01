@@ -297,7 +297,6 @@ export type SubPage =
   | "reports"
   | "tools"
   | "widgets"
-  | "voice"
   | "profile"
   | "profileedit"
   | "cloud"
@@ -311,7 +310,6 @@ export type SubPage =
 const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   main: "main",
   general: "main",
-  voice: "general",
   advanced: "main",
   maestro: "main",
   assistantoverlay: "maestro",
@@ -3169,98 +3167,6 @@ export default function SettingsDrawer({
           </View>
         </View>
       </View>
-
-      {/* voice nav */}
-      <Group style={styles.groupSpacing}>
-        {renderToolsNavRow(
-          "voice",
-          t("settings.general.voice.title"),
-          t("settings.general.voice.help"),
-        )}
-      </Group>
-    </View>
-  );
-
-  // voice subpage
-  const renderVoiceSubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.general.voice.title"))}
-
-      {/* voice engine card */}
-      {ttsEngines.length > 0 && (
-        <View style={styles.contentCard}>
-          <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>{t("settings.tts.label")}</Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.tts.help")}
-            </Text>
-            <Group>
-              <Selector
-                options={ttsEngineOptions}
-                selectedValue={ttsEngine}
-                onSelect={handleSelectTtsEngine}
-                title={t("settings.tts.select")}
-                fullWidth
-              />
-            </Group>
-            {downloadingEngine && (
-              <DownloadProgress
-                title={t("settings.tts.downloading", {
-                  engine: engineName(downloadingEngine),
-                })}
-                progress={engineDownloadProgress?.progress || 0}
-                sizeStr={engineDownloadProgress?.sizeStr}
-              />
-            )}
-          </View>
-          {ttsVoiceOptions.length > 0 && installedEngines[ttsEngine] && (
-            <View style={styles.settingRowVertical}>
-              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-                {t("settings.tts.voiceLabel")}
-              </Text>
-              <Group>
-                <Selector
-                  options={ttsVoiceOptions}
-                  selectedValue={selectedTtsVoice}
-                  onSelect={setTtsVoice}
-                  title={t("settings.tts.selectVoice")}
-                  fullWidth
-                />
-              </Group>
-            </View>
-          )}
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {t("settings.tts.speed")}
-            </Text>
-            <Group>
-              <Slider
-                icon={timeIcon}
-                options={ttsSpeedOptions}
-                selectedValue={ttsSpeed}
-                onSelect={setTtsSpeed}
-              />
-            </Group>
-          </View>
-        </View>
-      )}
-
-      {/* auto read card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <View style={styles.toggleGroupRow}>
-            <View style={styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>
-                {t("settings.general.autoRead")}
-              </Text>
-              <Text style={styles.helpText}>
-                {t("settings.general.autoReadHelp")}
-              </Text>
-            </View>
-            <Toggle checked={autoSpeak} onToggle={setAutoSpeak} />
-          </View>
-        </View>
-      </View>
     </View>
   );
 
@@ -3394,6 +3300,66 @@ export default function SettingsDrawer({
         <MaestroCard />
       </View>
 
+      {/* voice engine card */}
+      {ttsEngines.length > 0 && (
+        <View style={styles.contentCard}>
+          <View style={styles.settingRowVertical}>
+            <Text style={styles.settingLabel}>{t("settings.tts.label")}</Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {t("settings.tts.help")}
+            </Text>
+            <Group>
+              <Selector
+                options={ttsEngineOptions}
+                selectedValue={ttsEngine}
+                onSelect={handleSelectTtsEngine}
+                title={t("settings.tts.select")}
+                fullWidth
+              />
+            </Group>
+            {downloadingEngine && (
+              <DownloadProgress
+                title={t("settings.tts.downloading", {
+                  engine: engineName(downloadingEngine),
+                })}
+                progress={engineDownloadProgress?.progress || 0}
+                sizeStr={engineDownloadProgress?.sizeStr}
+              />
+            )}
+          </View>
+          {ttsVoiceOptions.length > 0 && installedEngines[ttsEngine] && (
+            <View style={styles.settingRowVertical}>
+              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+                {t("settings.tts.voiceLabel")}
+              </Text>
+              <Group>
+                <Selector
+                  options={ttsVoiceOptions}
+                  selectedValue={selectedTtsVoice}
+                  onSelect={setTtsVoice}
+                  title={t("settings.tts.selectVoice")}
+                  fullWidth
+                />
+              </Group>
+            </View>
+          )}
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.tts.speed")}
+            </Text>
+            <Group>
+              <Slider
+                icon={timeIcon}
+                options={ttsSpeedOptions}
+                selectedValue={ttsSpeed}
+                onSelect={setTtsSpeed}
+              />
+            </Group>
+          </View>
+        </View>
+      )}
+
+      {/* instructions card */}
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
@@ -3407,6 +3373,23 @@ export default function SettingsDrawer({
               onChangeText={setInstruction}
             />
           </Group>
+        </View>
+      </View>
+
+      {/* auto read card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.general.autoRead")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.general.autoReadHelp")}
+              </Text>
+            </View>
+            <Toggle checked={autoSpeak} onToggle={setAutoSpeak} />
+          </View>
         </View>
       </View>
 
@@ -5198,8 +5181,6 @@ export default function SettingsDrawer({
         return renderCloudSubPage();
       case "general":
         return renderGeneralSubPage();
-      case "voice":
-        return renderVoiceSubPage();
       case "maestro":
         return renderMaestroSubPage();
       case "assistantoverlay":

@@ -28,7 +28,10 @@ import {
   View,
 } from "react-native";
 import { KeyboardController } from "react-native-keyboard-controller";
-import Reanimated, { useAnimatedStyle } from "react-native-reanimated";
+import Reanimated, {
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import HeadlessWebView from "../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
@@ -414,6 +417,9 @@ export default function Index() {
   const [activeConversation, setActiveConversation] =
     useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  //home butterfly flies to the chat header
+  const homeButterflyRef = useRef<View>(null);
+  const [butterflyFrom, setButterflyFrom] = useState<DOMRect | null>(null);
   //per conversation, tied to their reply
   const [suggestionsByConv, setSuggestionsByConv] = useState<
     Record<string, { msgId: string; items: Suggestion[] }>
@@ -552,6 +558,16 @@ export default function Index() {
   const keyboardLiftStyle = useAnimatedStyle(() => ({
     //bar's safe area spacer sits under the keyboard
     paddingBottom: Math.max(keyboardLift.value - insets.bottom, 0),
+  }));
+  //lift at send, -1 when not sending
+  const sendLift = useSharedValue(-1);
+  const homeFreezeStyle = useAnimatedStyle(() => ({
+    //home keeps its height while keyboard closes
+    marginBottom:
+      sendLift.value < 0
+        ? 0
+        : Math.max(sendLift.value - insets.bottom, 0) -
+          Math.max(keyboardLift.value - insets.bottom, 0),
   }));
 
   const openBugReport = useCallback(async () => {
@@ -1040,7 +1056,9 @@ export default function Index() {
   const startNewConversation = useCallback(() => {
     setActiveConversation(null);
     setMessages([]);
-  }, []);
+    setButterflyFrom(null);
+    sendLift.set(-1);
+  }, [sendLift]);
 
   //stable ref keeps drawer rows memoized
   const closeConversationsDrawer = useCallback(
@@ -1280,6 +1298,11 @@ export default function Index() {
       //create conversation if this is the first message
       if (!conv) {
         isFirstMessage = true;
+        //chatbar dismisses the keyboard right after
+        sendLift.set(keyboardLift.get());
+        //read before the home screen unmounts
+        const homeButterfly =
+          homeButterflyRef.current?.getBoundingClientRect() ?? null;
         const name = text.length > 30 ? text.slice(0, 30) + "…" : text;
         if (isIncognitoTask) {
           conv = {
@@ -1293,6 +1316,7 @@ export default function Index() {
           conv = await DB.createConversation(selectedModel || "unknown", name);
           setConversations((prev) => [conv!, ...prev]);
         }
+        setButterflyFrom(homeButterfly);
         setActiveConversation(conv);
       }
 
@@ -1441,6 +1465,8 @@ export default function Index() {
       userInstruction,
       aiService,
       ollamaUrl,
+      sendLift,
+      keyboardLift,
     ],
   );
 
@@ -1830,8 +1856,9 @@ export default function Index() {
             pointerEvents="box-none"
           >
             {!activeConversation && (
-              <View style={styles.centerContent}>
+              <Reanimated.View style={[styles.centerContent, homeFreezeStyle]}>
                 <ButterflyCluster
+                  ref={homeButterflyRef}
                   incognito={incognitoMode}
                   style={styles.butterfly}
                 />
@@ -1869,7 +1896,7 @@ export default function Index() {
                   leaving a trace. Once you close the window, your conversation
                   disappears forever.
                 </Animated.Text>
-              </View>
+              </Reanimated.View>
             )}
 
             {activeConversation && (
@@ -1903,6 +1930,7 @@ export default function Index() {
                 }
                 onImagePress={setPreviewImage}
                 onDetailsPress={setPreviewDetails}
+                butterflyFrom={butterflyFrom}
               />
             )}
 

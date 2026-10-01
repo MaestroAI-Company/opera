@@ -332,8 +332,6 @@ export const fr: Translations = {
   "settings.general.autoRead": "Lecture automatique des réponses",
   "settings.general.autoReadHelp":
     "Lit la réponse à voix haute quand tu demandes à la voix.",
-  "settings.general.voice.title": "Voix",
-  "settings.general.voice.help": "Lecture auto, moteur de voix, vitesse de lecture.",
   "settings.general.advancedMode": "Mode avancé",
   "settings.general.advancedModeHelp":
     "Ajoute une section Avancé au menu avec les réglages les plus techniques.",

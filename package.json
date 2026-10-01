@@ -8,6 +8,7 @@
     "@lottiefiles/dotlottie-react": "^0.13.5",
     "@notifee/react-native": "^9.1.8",
     "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-clipboard-manager": "^2.4.1",
     "@tauri-apps/plugin-deep-link": "^2.4.9",
     "@tauri-apps/plugin-http": "^2.5.9",
     "@tauri-apps/plugin-opener": "^2.5.4",

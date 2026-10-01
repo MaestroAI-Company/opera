@@ -1804,7 +1804,7 @@ export default function Index() {
           `${Colors.background}1A`,
           "transparent",
         ]}
-        locations={[0.1, 0.4, 0.5, 0.75, 0.8, 0.9, 0.95, 1]}
+        locations={[0.1, 0.4, 0.5, 0.75, 0.8, 0.9, 0.95]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}

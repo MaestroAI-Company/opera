@@ -1,5 +1,20 @@
 import * as Clipboard from 'expo-clipboard';
 import { ITool, ToolDefinition } from './ITool';
+import { isTauri } from '../../platform';
+
+//webview clipboard api is unreliable
+async function writeText(text: string): Promise<boolean> {
+  if (!isTauri) return Clipboard.setStringAsync(text);
+  const { writeText } = await import('@tauri-apps/plugin-clipboard-manager');
+  await writeText(text);
+  return true;
+}
+
+async function readText(): Promise<string> {
+  if (!isTauri) return Clipboard.getStringAsync();
+  const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
+  return readText();
+}
 
 export class ClipboardTool implements ITool {
   displayName = 'Clipboard';
@@ -37,22 +52,18 @@ export class ClipboardTool implements ITool {
       return 'Error: "action" must be "copy" or "read".';
     }
 
-    try {
-      if (action === 'copy') {
-        const text = args.text;
-        if (typeof text !== 'string' || text.length === 0) {
-          return 'Error: missing "text" to copy.';
-        }
-        await Clipboard.setStringAsync(text);
-        const preview = text.length > 120 ? `${text.slice(0, 120)}…` : text;
-        return `Copied to clipboard: "${preview}"`;
+    if (action === 'copy') {
+      const text = args.text;
+      if (typeof text !== 'string' || text.length === 0) {
+        return 'Error: missing "text" to copy.';
       }
-
-      const text = await Clipboard.getStringAsync();
-      return text ? `Clipboard contents: "${text}"` : 'Clipboard is empty.';
-    } catch (e: any) {
-      console.error('[ClipboardTool] error:', e?.message || e);
-      return `Clipboard error: ${e.message}`;
+      //web returns false instead of throwing
+      if (!(await writeText(text))) throw new Error('could not write to the clipboard');
+      const preview = text.length > 120 ? `${text.slice(0, 120)}…` : text;
+      return `Copied to clipboard: "${preview}"`;
     }
+
+    const text = await readText();
+    return text ? `Clipboard contents: "${text}"` : 'Clipboard is empty.';
   }
 }

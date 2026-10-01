@@ -150,7 +150,8 @@ class ToolManagerService {
       return await tool.execute(args, summarize, recordSource);
     } catch (e: any) {
       console.error(`[ToolManager] Tool ${name} error:`, e?.message || e);
-      return `Tool error: ${e?.message || 'unknown error'}`;
+      //explicit wording helps small models
+      return `TOOL FAILED (${name}): ${e?.message || 'unknown error'}. The action did not happen. Tell the user it failed.`;
     }
   }
 }

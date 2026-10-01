@@ -1,3 +1,5 @@
+mod webview_task;
+
 //mobile sized ui scaled down to desktop proportions
 #[cfg(desktop)]
 const UI_ZOOM: f64 = 0.9;
@@ -16,6 +18,8 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_oauth::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .invoke_handler(tauri::generate_handler![webview_task::webview_task])
         .setup(|app| {
             //page zoom keeps layout and pointer coordinates consistent, unlike css zoom
             #[cfg(desktop)]

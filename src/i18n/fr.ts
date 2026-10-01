@@ -302,7 +302,7 @@ export const fr: Translations = {
   "settings.nav.advanced.subtitle": "Flux rapide, transcription, partage",
   "settings.nav.privacy.title": "Confidentialité",
   "settings.nav.privacy.subtitle":
-    "Confidentialité des données, analyse d'usage",
+    "Confidentialité des données, permissions",
   "settings.nav.support.title": "Support",
   "settings.nav.support.subtitle": "Signaler un problème, contacter le support",
   "settings.nav.info.title": "Informations",

@@ -1,0 +1,48 @@
+Opera
+Copyright (C) 2026 MaestroAI (Ethan Caillat, Charly Charteux)
+
+The source code of Opera is licensed under the GNU Affero General Public
+License v3.0 (see LICENSE).
+
+## Trademarks and branding
+
+Maestroai.Company their logos, wordmarks, the butterfly mark,
+the icons, illustrations and animations under assets/ and website/assets/ are
+the property of MaestroAI and are NOT covered by the AGPL. They may not be
+used to name, brand or promote a modified or redistributed version of the
+software without prior written permission. Forks must use their own name and
+visual identity.
+
+## Third-party software
+
+Opera is built on the open source components below. Each one remains under
+its own license; the full license text ships in the package of the component
+(node_modules/<name>/LICENSE) and is available from its repository.
+
+MIT
+React, React Native, React Native Web, Expo and the expo-_ modules,
+@expo/ui, react-native-_ libraries (gesture-handler, reanimated, worklets,
+screens, safe-area-context, svg, webview, view-shot, keyboard-controller,
+quick-base64, quick-crypto, get-random-values, audio-api, executorch,
+litert-lm, nitro-modules, code-highlighter), onnxruntime-react-native,
+KaTeX, fflate, buffer, @lottiefiles/dotlottie-react, core-js (bundled in
+pdf.js), Whisper (OpenAI), Tauri plugins (oauth, deep-link, http, opener)
+
+Apache License 2.0
+@notifee/react-native, lottie-react-native, @xenova/transformers,
+@tauri-apps/api, pdf.js (Mozilla, vendored in
+src/services/documents/vendor), Kokoro text-to-speech, Tauri plugins
+(dual licensed MIT OR Apache-2.0)
+
+ISC
+react-native-autoheight-webview
+
+SIL Open Font License 1.1
+Figtree, Petrona, Fragment Mono (assets/fonts)
+
+## Models downloaded by the user
+
+Language, speech and voice models are not distributed with Opera. They are
+downloaded on request from their publishers (for example Hugging Face) and
+stay under the license chosen by their authors (Gemma Terms of Use, Apache
+2.0, OpenRAIL...). The user is responsible for accepting those terms.

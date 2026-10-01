@@ -293,7 +293,7 @@ export const en = {
   "settings.nav.advanced.title": "Advanced",
   "settings.nav.advanced.subtitle": "Quick flow, Transcription, Sharing",
   "settings.nav.privacy.title": "Confidentiality",
-  "settings.nav.privacy.subtitle": "Data privacy, Usage analytics",
+  "settings.nav.privacy.subtitle": "Data privacy, Permissions",
   "settings.nav.support.title": "Support",
   "settings.nav.support.subtitle": "Send an issue, contact support",
   "settings.nav.info.title": "Informations",

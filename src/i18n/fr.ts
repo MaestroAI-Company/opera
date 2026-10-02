@@ -670,6 +670,7 @@ export const fr: Translations = {
   "settings.ollama.disableAll": "Tout désactiver",
   "settings.ollama.noMatch": "Aucun modèle ne correspond à cette recherche.",
   "settings.ollama.showMore": "Afficher plus ({count})",
+  "settings.ollama.capabilities": "Capacités",
   "settings.ollama.contextLength": "Longueur de contexte",
   "settings.ollama.contextHelp":
     "Nombre maximal de tokens que le modèle peut utiliser.",

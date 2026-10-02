@@ -33,7 +33,7 @@ export default function DrawerBackButton({
   useEffect(() => {
     Animated.timing(scrolledAnim, {
       toValue: scrolled ? 1 : 0,
-      duration: 200,
+      duration: 100,
       easing: Easing.out(Easing.quad),
       useNativeDriver: DRAWER_NATIVE_DRIVER,
     }).start();

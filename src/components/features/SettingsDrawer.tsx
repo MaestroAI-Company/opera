@@ -9,6 +9,7 @@ import * as Sharing from "expo-sharing";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
 import {
   Dispatch,
+  memo,
   SetStateAction,
   useCallback,
   useEffect,
@@ -194,6 +195,7 @@ const cloudDownloadIcon = require("../../../assets/icons/clouddownload.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
 const rightArrowIcon = require("../../../assets/icons/right.png");
 const cancelIcon = require("../../../assets/icons/cancel.png");
+const validIcon = require("../../../assets/icons/valid.png");
 const generalIcon = require("../../../assets/icons/general.png");
 const advancedIcon = require("../../../assets/icons/settings.png");
 const serverIcon = require("../../../assets/icons/server.png");
@@ -352,6 +354,157 @@ const DESKTOP_ENTRY_PAGE: SubPage = "general";
 const DESKTOP_WINDOW_MAX_WIDTH = 960;
 
 type LitertPage = "browse" | "search" | "model";
+
+const MODEL_PAGE_SIZE = 50;
+const NO_DISABLED_MODELS: string[] = [];
+
+const ModelToggleRow = memo(function ModelToggleRow({
+  model,
+  enabled,
+  last,
+  onToggle,
+}: {
+  model: string;
+  enabled: boolean;
+  last: boolean;
+  onToggle: (model: string, enabled: boolean) => void;
+}) {
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <View style={[styles.toggleGroupRow, !last && { marginBottom: Spacing.lg }]}>
+      <View style={styles.toggleGroupContent}>
+        <Text style={styles.settingLabel} numberOfLines={1}>
+          {model}
+        </Text>
+      </View>
+      <Toggle checked={enabled} onToggle={(v) => onToggle(model, v)} />
+    </View>
+  );
+});
+
+//local search avoids drawer redraws
+const ModelToggleList = memo(function ModelToggleList({
+  models,
+  loading,
+  disabled = NO_DISABLED_MODELS,
+  onChange,
+}: {
+  models: string[];
+  loading: boolean;
+  disabled?: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const styles = useThemedStyles(makeStyles);
+  const t = useT();
+  const [search, setSearch] = useState("");
+  const [limit, setLimit] = useState(MODEL_PAGE_SIZE);
+
+  const disabledSet = useMemo(() => new Set(disabled), [disabled]);
+  const shown = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return query
+      ? models.filter((m) => m.toLowerCase().includes(query))
+      : models;
+  }, [models, search]);
+  const enabledCount = models.filter((m) => !disabledSet.has(m)).length;
+
+  //stable handler keeps memo rows still
+  const latest = useRef({ disabled, onChange });
+  useEffect(() => {
+    latest.current = { disabled, onChange };
+  });
+  const toggleModel = useCallback((model: string, enabled: boolean) => {
+    const { disabled: current, onChange: save } = latest.current;
+    save(enabled ? current.filter((m) => m !== model) : [...current, model]);
+  }, []);
+
+  //bulk buttons act on the filtered rows
+  const setShown = (enabled: boolean) => {
+    const shownSet = new Set(shown);
+    onChange(
+      enabled
+        ? disabled.filter((m) => !shownSet.has(m))
+        : [...new Set([...disabled, ...shown])],
+    );
+  };
+
+  const visible = shown.slice(0, limit);
+
+  return (
+    <View style={styles.contentCard}>
+      <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+        <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+          {models.length > 0
+            ? t("settings.ollama.modelsCount", {
+                count: `${enabledCount}/${models.length}`,
+              })
+            : t("settings.ollama.models")}
+        </Text>
+        {models.length === 0 ? (
+          <Text style={styles.helpText}>
+            {loading
+              ? t("settings.ollama.modelsLoading")
+              : t("settings.ollama.noModels")}
+          </Text>
+        ) : (
+          <>
+            <Group style={{ marginBottom: Spacing.md }}>
+              <TextInputField
+                icon={searchIcon}
+                placeholder={t("settings.ollama.searchModels")}
+                value={search}
+                onChangeText={(v) => {
+                  setSearch(v);
+                  setLimit(MODEL_PAGE_SIZE);
+                }}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </Group>
+            <Group style={{ marginBottom: Spacing.xxl }}>
+              <ActionButton
+                icon={validIcon}
+                label={t("settings.ollama.enableAll")}
+                disabled={shown.every((m) => !disabledSet.has(m))}
+                onPress={() => setShown(true)}
+              />
+              <ActionButton
+                icon={cancelIcon}
+                label={t("settings.ollama.disableAll")}
+                disabled={shown.every((m) => disabledSet.has(m))}
+                onPress={() => setShown(false)}
+              />
+            </Group>
+            {shown.length === 0 ? (
+              <Text style={styles.helpText}>{t("settings.ollama.noMatch")}</Text>
+            ) : (
+              visible.map((model, index) => (
+                <ModelToggleRow
+                  key={model}
+                  model={model}
+                  enabled={!disabledSet.has(model)}
+                  last={index === visible.length - 1}
+                  onToggle={toggleModel}
+                />
+              ))
+            )}
+            {shown.length > limit && (
+              <Group style={{ marginTop: Spacing.xxl }}>
+                <ActionButton
+                  icon={addIcon}
+                  label={t("settings.ollama.showMore", {
+                    count: shown.length - limit,
+                  })}
+                  onPress={() => setLimit((l) => l + MODEL_PAGE_SIZE)}
+                />
+              </Group>
+            )}
+          </>
+        )}
+      </View>
+    </View>
+  );
+});
 
 export default function SettingsDrawer({
   visible,
@@ -1715,7 +1868,7 @@ export default function SettingsDrawer({
     }
     setOllamaModelsLoading(true);
     try {
-      const models = await AIModule.getModelsFor("ollama", target);
+      const models = await AIModule.getModelsFor("ollama", target, true);
       if (ollamaModelsRequest.current === request) setOllamaModels(models);
     } catch {
       if (ollamaModelsRequest.current === request) setOllamaModels([]);
@@ -1812,7 +1965,11 @@ export default function SettingsDrawer({
     }
     setOpenAIModelsLoading(true);
     try {
-      const models = await AIModule.getModelsFor(OPENAI_PROVIDER_ID, target);
+      const models = await AIModule.getModelsFor(
+        OPENAI_PROVIDER_ID,
+        target,
+        true,
+      );
       if (openaiModelsRequest.current === request) setOpenAIModels(models);
     } catch {
       if (openaiModelsRequest.current === request) setOpenAIModels([]);
@@ -4251,7 +4408,7 @@ export default function SettingsDrawer({
             </Group>
           </View>
 
-          <View style={styles.settingRowVertical}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>
               {t("settings.ollama.keepAlive")}
             </Text>
@@ -4279,24 +4436,17 @@ export default function SettingsDrawer({
               )}
             </Group>
           </View>
-
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {ollamaModels.length > 0
-                ? t("settings.ollama.modelsCount", {
-                    count: ollamaModels.length,
-                  })
-                : t("settings.ollama.models")}
-            </Text>
-            <Text style={styles.helpText}>
-              {ollamaModels.length > 0
-                ? ollamaModels.join(", ")
-                : ollamaModelsLoading
-                  ? t("settings.ollama.modelsLoading")
-                  : t("settings.ollama.noModels")}
-            </Text>
-          </View>
         </View>
+
+        <ModelToggleList
+          key={url}
+          models={ollamaModels}
+          loading={ollamaModelsLoading}
+          disabled={server.disabledModels}
+          onChange={(next) =>
+            patchOllamaServer(index, { disabledModels: next })
+          }
+        />
 
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -4437,7 +4587,7 @@ export default function SettingsDrawer({
             </Group>
           </View>
 
-          <View style={styles.settingRowVertical}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>
               {t("settings.cloudapi.apiKey")}
             </Text>
@@ -4457,24 +4607,17 @@ export default function SettingsDrawer({
               />
             </Group>
           </View>
-
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {openaiModels.length > 0
-                ? t("settings.ollama.modelsCount", {
-                    count: openaiModels.length,
-                  })
-                : t("settings.ollama.models")}
-            </Text>
-            <Text style={styles.helpText}>
-              {openaiModels.length > 0
-                ? openaiModels.join(", ")
-                : openaiModelsLoading
-                  ? t("settings.ollama.modelsLoading")
-                  : t("settings.ollama.noModels")}
-            </Text>
-          </View>
         </View>
+
+        <ModelToggleList
+          key={url}
+          models={openaiModels}
+          loading={openaiModelsLoading}
+          disabled={server.disabledModels}
+          onChange={(next) =>
+            patchOpenAIServer(index, { disabledModels: next })
+          }
+        />
 
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>

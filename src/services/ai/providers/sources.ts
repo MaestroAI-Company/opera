@@ -55,6 +55,8 @@ export type OllamaServer = {
   keepAlive?: number;
   //names the stored openai api key
   id?: string;
+  //disabled ones hidden from pickers
+  disabledModels?: string[];
 };
 
 //legacy entries are plain url strings
@@ -69,6 +71,10 @@ function readServer(entry: unknown): OllamaServer | null {
   if (typeof raw.contextLength === 'number') server.contextLength = raw.contextLength;
   if (typeof raw.keepAlive === 'number') server.keepAlive = raw.keepAlive;
   if (typeof raw.id === 'string' && raw.id.length > 0) server.id = raw.id;
+  if (Array.isArray(raw.disabledModels)) {
+    const disabled = raw.disabledModels.filter((m): m is string => typeof m === 'string');
+    if (disabled.length > 0) server.disabledModels = disabled;
+  }
   return server;
 }
 
@@ -120,6 +126,11 @@ export function serializeServers(servers: OllamaServer[]): string {
     .map((s) => ({ ...s, url: s.url.trim(), name: s.name.trim() }))
     .filter((s) => s.url.length > 0 || s.name.length > 0);
   return JSON.stringify(kept);
+}
+
+export function getDisabledModels(service: string, url: string): string[] {
+  const servers = service === 'ollama' ? getOllamaServers() : service === OPENAI_PROVIDER_ID ? getOpenAIServers() : [];
+  return servers.find((s) => s.url === url.trim())?.disabledModels ?? [];
 }
 
 //undefined falls back to global

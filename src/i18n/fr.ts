@@ -659,6 +659,11 @@ export const fr: Translations = {
   "settings.ollama.modelsCount": "Modèles ({count})",
   "settings.ollama.modelsLoading": "Recherche des modèles...",
   "settings.ollama.noModels": "Aucun modèle sur ce serveur pour l'instant.",
+  "settings.ollama.searchModels": "rechercher un modèle",
+  "settings.ollama.enableAll": "Tout activer",
+  "settings.ollama.disableAll": "Tout désactiver",
+  "settings.ollama.noMatch": "Aucun modèle ne correspond à cette recherche.",
+  "settings.ollama.showMore": "Afficher plus ({count})",
   "settings.ollama.contextLength": "Longueur de contexte",
   "settings.ollama.contextHelp":
     "Nombre maximal de tokens que le modèle peut utiliser.",

@@ -38,6 +38,7 @@ import type { PreviewDetails } from "./MessageDetailsSheet";
 import { pressStyle } from "../ui/pressStyle";
 
 const speakerIcon = require("../../../assets/icons/speaker.png");
+const videoIcon = require("../../../assets/icons/camera.png");
 const reloadIcon = require("../../../assets/icons/reload.png");
 const copyIcon = require("../../../assets/icons/copy.png");
 const infoIcon = require("../../../assets/icons/info.png");
@@ -117,7 +118,8 @@ const SourcePill = ({ source }: { source: MessageSource }) => {
 
 //readable name from a data uri or path
 function attachmentFilename(path: string): string {
-  if (path.startsWith('data:')) return 'Audio Recording.wav';
+  //pasted files carry their own name
+  if (path.startsWith('data:') && !path.includes('?name=')) return 'Audio Recording.wav';
   if (path.includes('?name=')) {
     try {
       return decodeURIComponent(path.split('?name=')[1]);
@@ -324,8 +326,9 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               )}
               {item.images?.map((uri, i) => {
                 const isAudio = uri.startsWith('data:audio') || /\.(wav|mp3|m4a|aac|flac|ogg)(?:\?.*)?$/i.test(uri);
-                return isAudio ? (
-                  <AttachmentChip key={i} icon={speakerIcon} label={attachmentFilename(uri)} />
+                const isVideo = uri.startsWith('data:video') || /\.(mp4|mov|webm)(?:\?.*)?$/i.test(uri);
+                return isAudio || isVideo ? (
+                  <AttachmentChip key={i} icon={isVideo ? videoIcon : speakerIcon} label={attachmentFilename(uri)} />
                 ) : (
                   <Pressable key={i} onPress={() => onImagePress?.({ uri })} style={pressStyle(null, "fadeLight")}>
                     <Image source={{ uri }} style={styles.messageImage} />

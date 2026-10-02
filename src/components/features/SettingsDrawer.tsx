@@ -8,9 +8,7 @@ import * as MediaLibrary from "expo-media-library/legacy";
 import * as Sharing from "expo-sharing";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
 import {
-  Dispatch,
   memo,
-  SetStateAction,
   useCallback,
   useEffect,
   useMemo,
@@ -128,18 +126,11 @@ import { McpService } from "../../services/mcp/McpService";
 import { McpServerConfig } from "../../services/mcp/types";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { Settings } from "../../services/settings/SettingsService";
-import {
-  NEURAL_ENGINES,
-  TTS_SPEEDS,
-  getVoice,
-  setVoice,
-  supportedEngineIds,
-} from "../../services/speech/engines";
 import { WhisperSTT } from "../../services/speech/STTService";
 import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
 import ActionButton from "../ui/ActionButton";
 import Checkbox from "../ui/Checkbox";
-import DownloadProgress from "../ui/DownloadProgress";
+import DownloadProgress, { throttleProgress } from "../ui/DownloadProgress";
 import Group from "../ui/Group";
 import NotificationBanner from "../ui/NotificationBanner";
 import NotificationCard from "../ui/NotificationCard";
@@ -152,6 +143,7 @@ import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 import DrawerSheet from "./DrawerSheet";
 import MaestroCard from "./MaestroCard";
+import VoiceEngineCard from "./VoiceEngineCard";
 import ProfileCard from "./ProfileCard";
 
 import {
@@ -191,10 +183,6 @@ const LITERT_CAPABILITY_IDS: readonly ModelCapabilityId[] = [
   "audio",
   "thinking",
 ];
-const TTS_ENGINE_KEYS = {
-  kokoro: "settings.tts.kokoro",
-  supertonic: "settings.tts.supertonic",
-} as const;
 const searchIcon =require("../../../assets/icons/search.png");
 const profilIcon = require("../../../assets/icons/profil.png");
 const cloudIcon = require("../../../assets/icons/cloud.png");
@@ -245,22 +233,6 @@ const reconnectIcon = require("../../../assets/icons/reconnect.png");
 const hyperlinkIcon = require("../../../assets/icons/hyperlink2.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
-
-//downloads tick per chunk, repaint on whole percents or twice a second
-function throttleProgress<T extends { progress: number }>(
-  set: Dispatch<SetStateAction<T | null>>,
-) {
-  let lastPercent = -1;
-  let lastTime = 0;
-  return (value: T) => {
-    const percent = Math.floor(value.progress * 100);
-    const now = Date.now();
-    if (percent === lastPercent && now - lastTime < 500) return;
-    lastPercent = percent;
-    lastTime = now;
-    set(value);
-  };
-}
 
 //plugin help shows the first sentence only
 function shortDescription(text: string) {
@@ -953,19 +925,6 @@ export default function SettingsDrawer({
     speedStr: string;
     sizeStr: string;
   } | null>(null);
-  const [ttsEngine, setTtsEngineState] = useState("system");
-  const [ttsVoice, setTtsVoiceState] = useState("");
-  const [ttsSpeed, setTtsSpeedState] = useState("1");
-  const [installedEngines, setInstalledEngines] = useState<
-    Record<string, boolean>
-  >({});
-  const [downloadingEngine, setDownloadingEngine] = useState<string | null>(
-    null,
-  );
-  const [engineDownloadProgress, setEngineDownloadProgress] = useState<{
-    progress: number;
-    sizeStr: string;
-  } | null>(null);
   const [, setWhisperLanguageState] = useState(() => {
     try {
       return (
@@ -1329,138 +1288,6 @@ export default function SettingsDrawer({
     }
   };
 
-  const ttsEngines = supportedEngineIds();
-  const engineName = (id: string) =>
-    t(TTS_ENGINE_KEYS[id as keyof typeof TTS_ENGINE_KEYS]);
-
-  const setTtsEngine = (v: string) => {
-    setTtsEngineState(v);
-    setTtsVoiceState(getVoice(v));
-    Settings.set("ttsEngine", v);
-  };
-
-  const setTtsVoice = (v: string) => {
-    setTtsVoiceState(v);
-    setVoice(ttsEngine, v);
-  };
-
-  const setTtsSpeed = (v: string) => {
-    setTtsSpeedState(v);
-    Settings.set("ttsSpeed", v);
-  };
-
-  const handleDownloadEngine = async (id: string) => {
-    const engine = NEURAL_ENGINES[id];
-    setDownloadingEngine(id);
-    setEngineDownloadProgress(null);
-    const reportProgress = throttleProgress(setEngineDownloadProgress);
-    try {
-      await engine.download((progress) =>
-        reportProgress({
-          progress,
-          sizeStr: `${formatBytes(progress * engine.sizeBytes)} / ${formatBytes(engine.sizeBytes)}`,
-        }),
-      );
-      setInstalledEngines((prev) => ({ ...prev, [id]: true }));
-      setTtsEngine(id);
-      showAlert(
-        t("common.success"),
-        t("settings.tts.downloadSuccess", { engine: engineName(id) }),
-      );
-    } catch (e) {
-      console.error(`Failed to download ${id} voice`, e);
-      showAlert(
-        t("common.error"),
-        t("settings.tts.downloadFailed", { engine: engineName(id) }),
-      );
-    } finally {
-      setDownloadingEngine(null);
-      setEngineDownloadProgress(null);
-    }
-  };
-
-  const handleSelectTtsEngine = (v: string) => {
-    if (v === "system" || installedEngines[v]) {
-      setTtsEngine(v);
-      return;
-    }
-    if (downloadingEngine) return;
-    showAlert(
-      t("settings.tts.download.title", { engine: engineName(v) }),
-      t("settings.tts.download.message", {
-        engine: engineName(v),
-        size: formatBytes(NEURAL_ENGINES[v].sizeBytes),
-      }),
-      [
-        {
-          text: t("common.cancel"),
-          onPress: () => setAlertModalVisible(false),
-          style: "secondary",
-        },
-        {
-          text: t("settings.tts.download.confirm"),
-          onPress: () => {
-            setAlertModalVisible(false);
-            handleDownloadEngine(v);
-          },
-        },
-      ],
-    );
-  };
-
-  const handleDeleteEngine = (id: string) => {
-    showAlert(
-      t("settings.tts.delete.title", { engine: engineName(id) }),
-      t("settings.tts.delete.message", { engine: engineName(id) }),
-      [
-        {
-          text: t("common.cancel"),
-          onPress: () => setAlertModalVisible(false),
-          style: "secondary",
-        },
-        {
-          text: t("common.delete"),
-          style: "danger",
-          onPress: async () => {
-            setAlertModalVisible(false);
-            try {
-              await NEURAL_ENGINES[id].remove();
-              setInstalledEngines((prev) => ({ ...prev, [id]: false }));
-              setTtsEngine("system");
-            } catch (e) {
-              console.error(`Failed to delete ${id} voice`, e);
-            }
-          },
-        },
-      ],
-    );
-  };
-
-  const ttsEngineOptions = [
-    { id: "system", label: t("settings.tts.system") },
-    ...ttsEngines.map((id) => ({
-      id,
-      label: engineName(id),
-      isDownload: !installedEngines[id],
-      ...(installedEngines[id] && ttsEngine === id
-        ? {
-            rightIcon: deleteIcon,
-            rightIconTintColor: Colors.surface,
-            onRightIconPress: () => handleDeleteEngine(id),
-          }
-        : {}),
-    })),
-  ];
-
-  const ttsVoiceOptions =
-    NEURAL_ENGINES[ttsEngine]?.voiceOptions(language) ?? [];
-  //kokoro may lack the slot
-  const selectedTtsVoice = ttsVoiceOptions.some((o) => o.id === ttsVoice)
-    ? ttsVoice
-    : (ttsVoiceOptions[0]?.id ?? "");
-
-  const ttsSpeedOptions = TTS_SPEEDS.map((id) => ({ id, label: `${id}×` }));
-
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -1489,17 +1316,6 @@ export default function SettingsDrawer({
         setConfirmedName(s.name || "");
         setAlwaysWhisperState(s.alwaysWhisper);
         setAutoSpeakState(s.autoSpeak);
-        setTtsEngineState(s.ttsEngine);
-        setTtsVoiceState(getVoice(s.ttsEngine));
-        setTtsSpeedState(s.ttsSpeed);
-        setInstalledEngines(
-          Object.fromEntries(
-            supportedEngineIds().map((id) => [
-              id,
-              NEURAL_ENGINES[id].isInstalled(),
-            ]),
-          ),
-        );
         setShowTechnicalDetailsState(s.showTechnicalDetails);
         setShowDetectionBoxesState(s.showDetectionBoxes);
         setAdvancedModeState(s.advancedMode);
@@ -3641,63 +3457,7 @@ export default function SettingsDrawer({
       </View>
 
       {/* voice engine card */}
-      {ttsEngines.length > 0 && (
-        <View style={styles.contentCard}>
-          <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>{t("settings.tts.label")}</Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.tts.help")}
-            </Text>
-            <Group>
-              <Selector
-                options={ttsEngineOptions}
-                selectedValue={ttsEngine}
-                onSelect={handleSelectTtsEngine}
-                title={t("settings.tts.select")}
-                fullWidth
-              />
-            </Group>
-            {downloadingEngine && (
-              <DownloadProgress
-                title={t("settings.tts.downloading", {
-                  engine: engineName(downloadingEngine),
-                })}
-                progress={engineDownloadProgress?.progress || 0}
-                sizeStr={engineDownloadProgress?.sizeStr}
-              />
-            )}
-          </View>
-          {ttsVoiceOptions.length > 0 && installedEngines[ttsEngine] && (
-            <View style={styles.settingRowVertical}>
-              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-                {t("settings.tts.voiceLabel")}
-              </Text>
-              <Group>
-                <Selector
-                  options={ttsVoiceOptions}
-                  selectedValue={selectedTtsVoice}
-                  onSelect={setTtsVoice}
-                  title={t("settings.tts.selectVoice")}
-                  fullWidth
-                />
-              </Group>
-            </View>
-          )}
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {t("settings.tts.speed")}
-            </Text>
-            <Group>
-              <Slider
-                icon={timeIcon}
-                options={ttsSpeedOptions}
-                selectedValue={ttsSpeed}
-                onSelect={setTtsSpeed}
-              />
-            </Group>
-          </View>
-        </View>
-      )}
+      <VoiceEngineCard />
 
       {/* instructions card */}
       <View style={styles.contentCard}>

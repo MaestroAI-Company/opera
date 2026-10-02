@@ -1,8 +1,24 @@
-import React from 'react';
+import React, { Dispatch, SetStateAction } from 'react';
 import { View, Text } from 'react-native';
 import { FontSizes, Fonts, Radius } from "../../../constants/theme";
 import { useColors } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+
+//downloads tick per chunk, repaint on whole percents or twice a second
+export function throttleProgress<T extends { progress: number }>(
+  set: Dispatch<SetStateAction<T | null>>,
+) {
+  let lastPercent = -1;
+  let lastTime = 0;
+  return (value: T) => {
+    const percent = Math.floor(value.progress * 100);
+    const now = Date.now();
+    if (percent === lastPercent && now - lastTime < 500) return;
+    lastPercent = percent;
+    lastTime = now;
+    set(value);
+  };
+}
 
 type DownloadProgressProps = {
   title: string;

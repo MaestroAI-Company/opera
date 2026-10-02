@@ -33,23 +33,13 @@ export const en = {
   "onboarding.intro.privacy": "Made to respect your privacy.",
   "onboarding.intro.noAccount": "No account required. Ready to go.",
   "onboarding.intro.openSource": "Open source, transparent, and independent.",
-  "onboarding.welcome.title": "AI for all,\nprivacy for freedom.",
-  "onboarding.welcome.subtitle":
-    "Meet Maestro, the assistant inside Opera. It works for you, and only for you.",
-  "onboarding.welcome.local.title": "Local first",
-  "onboarding.welcome.local.description":
-    "Runs on your device, no server required.",
-  "onboarding.welcome.account.title": "No account",
-  "onboarding.welcome.account.description": "Open the app and start talking.",
-  "onboarding.welcome.open.title": "Open source",
-  "onboarding.welcome.open.description": "Code anyone can read and verify.",
   "onboarding.welcome.cta": "Get started",
   "onboarding.name.placeholder": "Enter your name",
   "onboarding.profile.title": "What should Maestro call you?",
   "onboarding.profile.subtitle":
     "Maestro will use it to greet you. You can change it anytime in settings.",
-  "onboarding.profile.card": "Card",
   "profileCard.placeholder": "Your name",
+  "onboarding.voice.title": "Give Maestro a voice",
   "onboarding.permissions.title": "What can Maestro use?",
   "onboarding.permissions.subtitle":
     "Only what you allow. You can change your mind anytime in your",
@@ -67,20 +57,11 @@ export const en = {
   "permissions.allowed": "Allowed",
   "permissions.denied": "Denied",
   "permissions.microphone.label": "Microphone",
-  "permissions.microphone.description": "To dictate your messages by voice.",
   "permissions.camera.label": "Camera",
-  "permissions.camera.description": "To photograph and analyze documents.",
   "permissions.photos.label": "Photos",
-  "permissions.photos.description": "To share images from your gallery.",
   "permissions.contacts.label": "Contacts",
-  "permissions.contacts.description":
-    "To search your contacts for phone numbers and emails.",
   "permissions.calendar.label": "Calendar",
-  "permissions.calendar.description":
-    "To read and manage events on your calendar.",
   "permissions.location.label": "Location",
-  "permissions.location.description":
-    "To give the assistant local context for more relevant answers.",
 
   "theme.system": "Auto",
   "theme.light": "Light",
@@ -523,7 +504,7 @@ export const en = {
 
   "settings.tts.label": "Voice engine",
   "settings.tts.help":
-    "Kokoro and Supertonic are natural offline voices. Kokoro speaks English, French, Spanish, Italian, Portuguese and Hindi. Supertonic speaks 31 languages including German, Japanese, Korean, Arabic and Russian. Other languages use the system voice.",
+    "Natural voices that run offline. Unsupported languages use the system voice.",
   "settings.tts.select": "Select voice engine",
   "settings.tts.system": "System",
   "settings.tts.kokoro": "Kokoro",

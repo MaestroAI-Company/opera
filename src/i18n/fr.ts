@@ -34,25 +34,13 @@ export const fr: Translations = {
   "onboarding.intro.privacy": "Pensé pour respecter ta vie privée.",
   "onboarding.intro.noAccount": "Sans compte obligatoire. Prêt à l'emploi.",
   "onboarding.intro.openSource": "Open source, transparent et indépendant.",
-  "onboarding.welcome.title": "L'IA pour tous,\nla confidentialité pour la liberté.",
-  "onboarding.welcome.subtitle":
-    "Voici Maestro, l'assistant d'Opera. Il travaille pour toi, et seulement pour toi.",
-  "onboarding.welcome.local.title": "Local d'abord",
-  "onboarding.welcome.local.description":
-    "Fonctionne sur ton appareil, sans serveur requis.",
-  "onboarding.welcome.account.title": "Sans compte",
-  "onboarding.welcome.account.description":
-    "Ouvre l'application et lance-toi.",
-  "onboarding.welcome.open.title": "Open source",
-  "onboarding.welcome.open.description":
-    "Un code que chacun peut lire et vérifier.",
   "onboarding.welcome.cta": "Commencer",
   "onboarding.name.placeholder": "Entre ton nom",
   "onboarding.profile.title": "Comment Maestro doit-il t'appeler ?",
   "onboarding.profile.subtitle":
     "Maestro l'utilisera pour te saluer. Tu pourras le modifier à tout moment dans les paramètres.",
-  "onboarding.profile.card": "Carte",
   "profileCard.placeholder": "Ton nom",
+  "onboarding.voice.title": "Donne une voix à Maestro",
   "onboarding.permissions.title": "À quoi Maestro peut-il accéder ?",
   "onboarding.permissions.subtitle":
     "Seulement à ce que tu autorises. Tu pourras changer d'avis à tout moment dans les",
@@ -70,22 +58,11 @@ export const fr: Translations = {
   "permissions.allowed": "Autorisé",
   "permissions.denied": "Refusé",
   "permissions.microphone.label": "Microphone",
-  "permissions.microphone.description": "Pour dicter tes messages à la voix.",
   "permissions.camera.label": "Caméra",
-  "permissions.camera.description":
-    "Pour photographier et analyser des documents.",
   "permissions.photos.label": "Photos",
-  "permissions.photos.description":
-    "Pour partager des images depuis ta galerie.",
   "permissions.contacts.label": "Contacts",
-  "permissions.contacts.description":
-    "Pour chercher des numéros et des e-mails dans tes contacts.",
   "permissions.calendar.label": "Calendrier",
-  "permissions.calendar.description":
-    "Pour lire et gérer les événements de ton calendrier.",
   "permissions.location.label": "Localisation",
-  "permissions.location.description":
-    "Pour donner à l'assistant un contexte local et des réponses plus pertinentes.",
 
   "theme.system": "Auto",
   "theme.light": "Clair",
@@ -544,7 +521,7 @@ export const fr: Translations = {
 
   "settings.tts.label": "Moteur de voix",
   "settings.tts.help":
-    "Kokoro et Supertonic sont des voix naturelles hors ligne. Kokoro parle anglais, français, espagnol, italien, portugais et hindi. Supertonic parle 31 langues dont l'allemand, le japonais, le coréen, l'arabe et le russe. Les autres langues utilisent la voix du système.",
+    "Des voix naturelles qui fonctionnent hors ligne. Les langues non prises en charge utilisent la voix du système.",
   "settings.tts.select": "Choisir le moteur de voix",
   "settings.tts.system": "Système",
   "settings.tts.kokoro": "Kokoro",

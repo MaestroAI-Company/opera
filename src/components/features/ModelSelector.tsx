@@ -76,6 +76,7 @@ const BREAK_RATIO = 0.85;
 const ROW_GAP = 4;
 const MAX_MODELS_HEIGHT = 240;
 const DESKTOP_MODELS_HEIGHT = 400;
+const MODELS_PADDING = 6;
 
 //panel hangs this far below trigger
 const ANCHOR_GAP = 8;
@@ -92,6 +93,10 @@ const contextWindowFor = (service: string, ollamaUrl: string) => {
 };
 
 type RowLayout = { y: number; height: number } | null;
+
+//clamps centered offset to scroll bounds
+const centeredOffset = (start: number, size: number, viewport: number, content: number) =>
+  Math.max(0, Math.min(start + size / 2 - viewport / 2, content - viewport));
 
 //rubber-band curve for vertical pull
 const rubberBand = (d: number, dim: number) => {
@@ -534,6 +539,56 @@ export function ModelSelectorDrawer({
     pillHeight,
   ]);
 
+  //content remounts on every open
+  const tabsScrollRef = useRef<ScrollView>(null);
+  const modelsScrollRef = useRef<ScrollView>(null);
+  const tabLayoutsRef = useRef<Record<string, { x: number; width: number }>>({});
+  const tabsBox = useRef({ viewport: 0, content: 0 });
+  const modelsBox = useRef({ viewport: 0, content: 0 });
+  const [tabsLayoutVersion, setTabsLayoutVersion] = useState(0);
+  const [modelsLayoutVersion, setModelsLayoutVersion] = useState(0);
+  //no glide before layout settles
+  const tabsAnimated = useRef(false);
+  const pendingModelScroll = useRef(false);
+
+  //keep the browsed tab in view
+  useEffect(() => {
+    if (!visible) {
+      tabsAnimated.current = false;
+      return;
+    }
+    const layout = browsedSource && tabLayoutsRef.current[browsedSource.key];
+    const { viewport, content } = tabsBox.current;
+    if (!layout || !viewport || !content) return;
+    tabsScrollRef.current?.scrollTo({
+      x: centeredOffset(layout.x, layout.width, viewport, content),
+      animated: tabsAnimated.current,
+    });
+    tabsAnimated.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the source key stands for browsedSource
+  }, [visible, browsedSource?.key, tabsLayoutVersion]);
+
+  //recenter on open or source switch
+  useEffect(() => {
+    if (visible) pendingModelScroll.current = true;
+  }, [visible, browsedSource?.key]);
+
+  useEffect(() => {
+    if (!pendingModelScroll.current) return;
+    const layout = rowLayouts[selectedIndex];
+    const { viewport, content } = modelsBox.current;
+    if (!layout || !viewport || !content) {
+      //nothing selected in this source
+      if (selectedIndex < 0 && hasFetched && !loading) pendingModelScroll.current = false;
+      return;
+    }
+    modelsScrollRef.current?.scrollTo({
+      y: centeredOffset(layout.y + MODELS_PADDING, layout.height, viewport, content),
+      animated: false,
+    });
+    pendingModelScroll.current = false;
+  }, [rowLayouts, selectedIndex, modelsLayoutVersion, hasFetched, loading]);
+
   const previewCrossed = (index: number) => {
     setPreviewIndex(index);
     Vibration.vibrate(10);
@@ -617,6 +672,11 @@ export function ModelSelectorDrawer({
     return (
       <Pressable
         key={source.key}
+        onLayout={(e) => {
+          const { x, width } = e.nativeEvent.layout;
+          tabLayoutsRef.current[source.key] = { x, width };
+          setTabsLayoutVersion((v) => v + 1);
+        }}
         onPress={() => handleSelectSource(source)}
         style={pressStyle(styles.tab, "subtle")}
       >
@@ -635,6 +695,15 @@ export function ModelSelectorDrawer({
       <View style={styles.contentCard}>
         <View style={styles.modelsBox}>
           <ScrollView
+            ref={modelsScrollRef}
+            onLayout={(e) => {
+              modelsBox.current.viewport = e.nativeEvent.layout.height;
+              setModelsLayoutVersion((v) => v + 1);
+            }}
+            onContentSizeChange={(_w, h) => {
+              modelsBox.current.content = h;
+              setModelsLayoutVersion((v) => v + 1);
+            }}
             //fixed on desktop so switching servers never resizes the window
             style={isDesktop ? { height: DESKTOP_MODELS_HEIGHT } : { maxHeight: MAX_MODELS_HEIGHT }}
             contentContainerStyle={styles.modelsScrollContent}
@@ -763,6 +832,15 @@ export function ModelSelectorDrawer({
   ) : (
     <View style={styles.sheetInner}>
       <ScrollView
+        ref={tabsScrollRef}
+        onLayout={(e) => {
+          tabsBox.current.viewport = e.nativeEvent.layout.width;
+          setTabsLayoutVersion((v) => v + 1);
+        }}
+        onContentSizeChange={(w) => {
+          tabsBox.current.content = w;
+          setTabsLayoutVersion((v) => v + 1);
+        }}
         horizontal
         showsHorizontalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -966,7 +1044,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     modelsScrollContent: {
       paddingHorizontal: 6,
-      paddingVertical: 6,
+      paddingVertical: MODELS_PADDING,
     },
     loadingRow: {
       flexDirection: "row",

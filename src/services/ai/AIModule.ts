@@ -12,7 +12,7 @@ import { LocationService } from '../location/LocationService';
 import { Settings } from '../settings/SettingsService';
 import { DEFAULT_OLLAMA_URL, imageToBase64 } from './utils/imageToBase64';
 import { resolveQuickFlow, QuickFlowTarget } from './quickFlow';
-import { activeSourceKey, BETA_SERVER_URL, buildSources, getOllamaTuning, OPENAI_PROVIDER_ID, ModelSource } from './providers/sources';
+import { activeSourceKey, BETA_SERVER_URL, buildSources, getDisabledModels, getOllamaTuning, OPENAI_PROVIDER_ID, ModelSource } from './providers/sources';
 import { OpenAIProvider } from './providers/OpenAIProvider';
 import { getCachedModels, hydrateModelCache } from './providers/modelCache';
 
@@ -134,14 +134,18 @@ class CentralAIModule {
     }
   }
 
-  async getModelsFor(mode: string, ollamaUrl?: string): Promise<string[]> {
+  //settings need disabled models too
+  async getModelsFor(mode: string, ollamaUrl?: string, includeDisabled = false): Promise<string[]> {
     const provider = this.providerFor(mode, ollamaUrl);
     if (!provider) {
       console.warn(`[AIModule] no provider for source ${mode} ${ollamaUrl ?? ''}`);
       return [];
     }
     try {
-      return await provider.getAvailableModels();
+      const models = await provider.getAvailableModels();
+      if (includeDisabled) return models;
+      const disabled = new Set(getDisabledModels(mode, ollamaUrl ?? ''));
+      return disabled.size > 0 ? models.filter((m) => !disabled.has(m)) : models;
     } catch (error) {
       console.warn(`[AIModule] model listing threw for ${mode} ${ollamaUrl ?? ''}:`, error);
       return [];

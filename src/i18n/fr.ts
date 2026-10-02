@@ -251,6 +251,8 @@ export const fr: Translations = {
     "Ce modèle ne peut pas lire les images. Choisis un modèle avec la vision pour en joindre une.",
   "chatbar.modelNoAudio":
     "Ce modèle ne peut pas lire l'audio. Choisis un modèle avec l'audio pour en joindre un.",
+  "chatbar.modelNoVideo":
+    "Ce modèle ne peut pas lire la vidéo. Choisis un modèle avec la vidéo pour en joindre une.",
   "chatbar.permissionDenied": "Autorisation refusée",
   "chatbar.cameraDenied":
     "Tu as refusé l'accès de cette application à ta caméra.",
@@ -450,6 +452,13 @@ export const fr: Translations = {
   "settings.local.download": "Télécharger le modèle",
   "settings.local.downloading": "Téléchargement du modèle du navigateur",
   "settings.local.notDownloaded": "Le modèle du navigateur n'est pas encore téléchargé. Télécharge-le depuis Réglages > Intégré.",
+
+  "settings.model.capTools": "Outils",
+  "settings.model.capVision": "Vision",
+  "settings.model.capThinking": "Réflexion",
+  "settings.model.capAudio": "Audio",
+  "settings.model.capVideo": "Vidéo",
+
   "settings.service.litert": "Sur l'appareil",
   "settings.service.litertHelp":
     "Télécharge des modèles ouverts depuis Hugging Face et exécute-les sur cet appareil.",
@@ -463,9 +472,6 @@ export const fr: Translations = {
   "settings.litert.loading": "Chargement...",
   "settings.litert.familyOther": "Autres",
   "settings.litert.unavailable": "Ce modèle ne tient pas sur cet appareil ou n'a pas pu être chargé.",
-  "settings.litert.capVision": "Vision",
-  "settings.litert.capAudio": "Audio",
-  "settings.litert.capThinking": "Réflexion",
   "settings.litert.description": "Description",
   "settings.litert.noDescription": "Aucune description disponible sur Hugging Face.",
   "settings.litert.otherModels": "Autres modèles",

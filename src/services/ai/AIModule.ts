@@ -12,7 +12,7 @@ import { LocationService } from '../location/LocationService';
 import { Settings } from '../settings/SettingsService';
 import { DEFAULT_OLLAMA_URL, imageToBase64 } from './utils/imageToBase64';
 import { resolveQuickFlow, QuickFlowTarget } from './quickFlow';
-import { activeSourceKey, BETA_SERVER_URL, buildSources, getDisabledModels, getOllamaTuning, OPENAI_PROVIDER_ID, ModelSource } from './providers/sources';
+import { activeSourceKey, BETA_SERVER_URL, buildSources, getCapabilityOverride, getDisabledModels, getOllamaTuning, OPENAI_PROVIDER_ID, ModelSource } from './providers/sources';
 import { OpenAIProvider } from './providers/OpenAIProvider';
 import { getCachedModels, hydrateModelCache } from './providers/modelCache';
 
@@ -40,6 +40,8 @@ class CentralAIModule {
   private modeConfigured = false;
   //model caps need an http call
   private capabilitiesCache = new Map<string, string[]>();
+  //server of the active provider
+  private activeUrl = '';
 
   constructor() {
     this.providers = new Map();
@@ -66,6 +68,7 @@ class CentralAIModule {
   configure(activeUrl: string, contextLength?: number, keepAlive?: number): void {
     const raw = activeUrl.trim();
     const url = raw.length > 0 ? raw : DEFAULT_URL;
+    this.activeUrl = raw;
     this.providers.set('OLLAMA', new OllamaProvider(url, {}, contextLength, keepAlive));
     //beta shares the tuning, never the url
     if (BETA_SERVER_URL) this.providers.set('BETA', new OllamaProvider(BETA_SERVER_URL, {}, contextLength, keepAlive));
@@ -218,6 +221,9 @@ class CentralAIModule {
     const provider = this.getActiveProvider();
     if (!provider.getModelCapabilities) return [];
 
+    const override = getCapabilityOverride(this.activeMode.toLowerCase(), this.activeUrl, modelName);
+    if (override) return override;
+
     const cacheKey = `${this.activeMode}:${modelName}`;
     const cached = this.capabilitiesCache.get(cacheKey);
     if (cached) return cached;
@@ -229,6 +235,8 @@ class CentralAIModule {
 
   //caps of any model, not just active
   async getModelCapabilitiesFor(mode: string, ollamaUrl: string | undefined, modelName: string): Promise<string[]> {
+    const override = getCapabilityOverride(mode, ollamaUrl ?? '', modelName);
+    if (override) return override;
     const provider = this.providerFor(mode, ollamaUrl);
     if (!provider?.getModelCapabilities) return [];
 

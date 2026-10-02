@@ -4,7 +4,7 @@ import { useThemedStyles } from "../../hooks/useTheme";
 import { pressStyle } from "./pressStyle";
 
 type CheckboxProps = {
-  label: string;
+  label?: string;
   checked: boolean;
   onToggle: (value: boolean) => void;
   disabled?: boolean;
@@ -31,6 +31,9 @@ export default function Checkbox({ label, checked, onToggle, disabled = false, l
       {checked}
     </Pressable>
   );
+
+  //row renders its own label
+  if (!label) return box;
 
   return (
     <View style={[styles.container, style]}>

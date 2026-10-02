@@ -4,6 +4,7 @@ import {
   Animated,
   DeviceEventEmitter,
   Image,
+  ImageSourcePropType,
   LayoutChangeEvent,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -27,6 +28,7 @@ import Reanimated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { type ModelCapabilityId } from "../../../constants/modelCapabilities";
 import {
   Fonts,
   FontSizes,
@@ -60,18 +62,24 @@ const lowIcon = require("../../../assets/icons/Low.png");
 const highIcon = require("../../../assets/icons/High.png");
 const visionIcon = require("../../../assets/icons/vision.png");
 const micIcon = require("../../../assets/icons/micro.png");
+const videoIcon = require("../../../assets/icons/camera.png");
 const toolIcon = require("../../../assets/icons/tool2.png");
 const brainIcon = require("../../../assets/icons/brain.png");
 const loadingAnimation = require("../../../assets/animations/loading.json");
 
 const REFLECTION_ICONS = { none: quickIcon, low: lowIcon, high: highIcon };
 //first entry sits far right
+//sheet draws its own icons
 const CAPABILITY_ICONS = [
   { id: "vision", icon: visionIcon },
+  { id: "video", icon: videoIcon },
   { id: "audio", icon: micIcon },
   { id: "thinking", icon: brainIcon },
   { id: "tools", icon: toolIcon },
-];
+] as const satisfies readonly {
+  id: ModelCapabilityId;
+  icon: ImageSourcePropType;
+}[];
 
 const LONG_PRESS_DELAY = 180;
 const BREAK_RATIO = 0.85;

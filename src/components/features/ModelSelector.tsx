@@ -1,10 +1,12 @@
 import LottieView from "lottie-react-native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   DeviceEventEmitter,
   Image,
   LayoutChangeEvent,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
@@ -76,6 +78,10 @@ const BREAK_RATIO = 0.85;
 const ROW_GAP = 4;
 const MAX_MODELS_HEIGHT = 240;
 const DESKTOP_MODELS_HEIGHT = 400;
+const MODELS_PADDING = 6;
+//stepped window, buffered both sides
+const WINDOW_STEP = 10;
+const WINDOW_BUFFER = 20;
 
 //panel hangs this far below trigger
 const ANCHOR_GAP = 8;
@@ -92,6 +98,10 @@ const contextWindowFor = (service: string, ollamaUrl: string) => {
 };
 
 type RowLayout = { y: number; height: number } | null;
+
+//clamps centered offset to scroll bounds
+const centeredOffset = (start: number, size: number, viewport: number, content: number) =>
+  Math.max(0, Math.min(start + size / 2 - viewport / 2, content - viewport));
 
 //rubber-band curve for vertical pull
 const rubberBand = (d: number, dim: number) => {
@@ -140,6 +150,69 @@ export function ModelSelectorTrigger({
     </View>
   );
 }
+
+function Capabilities({ caps, onPrimary = false }: { caps: string; onPrimary?: boolean }) {
+  const styles = useThemedStyles(makeStyles);
+  const shown = CAPABILITY_ICONS.filter((c) => caps.split(",").includes(c.id));
+  if (shown.length === 0) return null;
+  return (
+    <View style={styles.capabilitiesRow}>
+      {shown.map((c) => (
+        <Image
+          key={c.id}
+          source={c.icon}
+          style={[styles.capabilityIcon, onPrimary && styles.capabilityIconOnPrimary]}
+        />
+      ))}
+    </View>
+  );
+}
+
+type ModelRowProps = {
+  model: string;
+  label: string;
+  caps: string;
+  highlighted: boolean;
+  //0 until measured
+  height: number;
+  onSelect: (model: string) => void;
+  onRowLayout: (e: LayoutChangeEvent) => void;
+};
+
+//memoized, drawer state skips these rows
+const ModelRow = memo(function ModelRow({
+  model,
+  label,
+  caps,
+  highlighted,
+  height,
+  onSelect,
+  onRowLayout,
+}: ModelRowProps) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <Pressable
+      onLayout={onRowLayout}
+      onPress={() => {
+        Vibration.vibrate(10);
+        onSelect(model);
+      }}
+      style={pressStyle(
+        [styles.option, highlighted && styles.optionSelected, height > 0 && { height }],
+        highlighted ? { backgroundColor: Colors.primaryActive } : "subtle",
+      )}
+    >
+      <Text
+        style={[styles.optionText, highlighted && styles.optionTextSelected]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+      <Capabilities caps={caps} onPrimary={highlighted} />
+    </Pressable>
+  );
+});
 
 export type ModelSelectorDrawerProps = {
   visible: boolean;
@@ -219,6 +292,8 @@ export function ModelSelectorDrawer({
   }, [visible, anchored, triggerRef]);
 
   const [models, setModels] = useState<string[]>([]);
+  //source the shown rows belong to
+  const [modelsKey, setModelsKey] = useState("");
   const [loading, setLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -281,6 +356,7 @@ export function ModelSelectorDrawer({
   const applyModels = (next: string[], sourceKey: string) => {
     const sameSource = shownKey.current === sourceKey;
     shownKey.current = sourceKey;
+    setModelsKey(sourceKey);
     setModels((prev) => {
       const kept = sameSource ? prev.filter((m) => next.includes(m)) : [];
       const merged = [...kept, ...next.filter((m) => !kept.includes(m))];
@@ -391,6 +467,9 @@ export function ModelSelectorDrawer({
       .finally(() => setIsDownloading(false));
   };
 
+  //selected row waits to be centered
+  const pendingModelScroll = useRef(false);
+
   const handleSelectModel = (model: string) => {
     const source = browsedSource;
     if (source && !isBrowsingActive)
@@ -398,6 +477,17 @@ export function ModelSelectorDrawer({
     if (source) setLastModel(source.key, model);
     onModelChange(model);
   };
+
+  //ref keeps callback stable for memo
+  const selectModelRef = useRef(handleSelectModel);
+  useEffect(() => {
+    selectModelRef.current = handleSelectModel;
+  });
+  const handleRowSelect = useCallback((model: string) => {
+    //tapped row is already in view
+    pendingModelScroll.current = false;
+    selectModelRef.current(model);
+  }, []);
 
   //tab switch restores its last model
   const handleSelectSource = (source: ModelSource) => {
@@ -446,22 +536,8 @@ export function ModelSelectorDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the source key stands for browsedSource
   }, [visible, hasFetched, isAvailable, models, browsedSource?.key]);
 
-  const renderCapabilities = (model: string, onPrimary: boolean) => {
-    const caps = capabilities[capsKey(model)] ?? [];
-    const shown = CAPABILITY_ICONS.filter((c) => caps.includes(c.id));
-    if (shown.length === 0) return null;
-    return (
-      <View style={styles.capabilitiesRow}>
-        {shown.map((c) => (
-          <Image
-            key={c.id}
-            source={c.icon}
-            style={[styles.capabilityIcon, onPrimary && styles.capabilityIconOnPrimary]}
-          />
-        ))}
-      </View>
-    );
-  };
+  //joined, memo compares by value
+  const capsOf = (model: string) => (capabilities[capsKey(model)] ?? []).join(",");
 
   //visible refreshes instruction and tools
   const usedTokens = useMemo(
@@ -484,7 +560,6 @@ export function ModelSelectorDrawer({
     : -1;
 
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
-  const [rowLayoutsVersion, setRowLayoutsVersion] = useState(0);
 
   const pillY = useSharedValue(0);
   const pillHeight = useSharedValue(0);
@@ -493,36 +568,85 @@ export function ModelSelectorDrawer({
   const dragStartY = useSharedValue(0);
   const dragIndex = useSharedValue(0);
 
-  //keyed by model, skips unchanged rows
-  const rowLayoutsRef = useRef<Record<string, { y: number; height: number }>>(
-    {},
-  );
-
   const activeIndex = previewIndex ?? (selectedIndex >= 0 ? selectedIndex : 0);
   const hasPill = isBrowsingActive && selectedIndex >= 0;
 
-  const handleRowLayout = (model: string) => (e: LayoutChangeEvent) => {
-    const { y, height } = e.nativeEvent.layout;
-    const existing = rowLayoutsRef.current[model];
-    if (existing && existing.y === y && existing.height === height) return;
-    rowLayoutsRef.current[model] = { y, height };
-    setRowLayoutsVersion((v) => v + 1);
+  //one height, scroll math stays exact
+  const [rowHeight, setRowHeight] = useState(0);
+  const rowStride = rowHeight + ROW_GAP;
+  const handleRowLayout = useCallback((e: LayoutChangeEvent) => {
+    const measured = e.nativeEvent.layout.height;
+    //fallback glyphs grow rows, min wins
+    setRowHeight((h) => (h === 0 ? measured : Math.min(h, measured)));
+  }, []);
+
+  //viewport height drives mounted rows
+  const [listViewport, setListViewport] = useState(0);
+  //keyed by source, resets on switch
+  const [windowState, setWindowState] = useState({ key: "", start: 0 });
+  const visibleRows = rowHeight ? Math.ceil(listViewport / rowStride) : 0;
+  //stepped so scrolling rerenders rarely
+  const stepStart = (row: number) => Math.max(0, Math.floor(row / WINDOW_STEP) * WINDOW_STEP);
+  //new list opens at its selection
+  const windowStart =
+    windowState.key === modelsKey
+      ? windowState.start
+      : stepStart(selectedIndex - Math.floor(visibleRows / 2));
+  //shorter list after a source switch
+  const clampedStart = Math.min(windowStart, Math.max(0, displayModels.length - visibleRows));
+  const firstRow = rowHeight ? Math.max(0, clampedStart - WINDOW_BUFFER) : 0;
+  const lastRow = rowHeight
+    ? clampedStart + visibleRows + WINDOW_STEP + WINDOW_BUFFER
+    : WINDOW_BUFFER;
+
+  const moveWindowTo = (offsetY: number) => {
+    if (!rowHeight) return;
+    const start = stepStart(Math.floor((offsetY - MODELS_PADDING) / rowStride));
+    setWindowState((prev) =>
+      prev.key === modelsKey && prev.start === start ? prev : { key: modelsKey, start },
+    );
   };
+
+  const handleModelsScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) =>
+    moveWindowTo(e.nativeEvent.contentOffset.y);
 
   //dense snapshot the drag worklet can read
   const rowLayouts = useMemo<RowLayout[]>(
-    () => displayModels.map((m) => rowLayoutsRef.current[m] ?? null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- version tracks the mutable ref
-    [displayModels, rowLayoutsVersion],
+    () => displayModels.map((_, i) => (rowHeight ? { y: i * rowStride, height: rowHeight } : null)),
+    [displayModels, rowHeight, rowStride],
   );
   //row highlights itself until measured
   const pillShown = hasPill && !!rowLayouts[activeIndex];
 
-  //park pill on selected slot
-  useEffect(() => {
+  //centers a row, 0 if none
+  const offsetFor = (index: number) => {
+    const layout = rowLayouts[index];
+    if (!layout || !listViewport) return 0;
+    const content = displayModels.length * rowStride + MODELS_PADDING * 2;
+    return centeredOffset(layout.y + MODELS_PADDING, layout.height, listViewport, content);
+  };
+  //once per source, later moves scrollTo
+  const initialOffset = useMemo(
+    () => offsetFor(selectedIndex),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a tap must not move a mounted list
+    [modelsKey, rowHeight, listViewport],
+  );
+
+  //pill parked on this list
+  const parkedKey = useRef<string | null>(null);
+
+  //parks pill on selected before paint
+  useLayoutEffect(() => {
     if (previewIndex !== null) return;
     const layout = rowLayouts[selectedIndex];
     if (!layout) return;
+    //new list, no sliding in
+    if (parkedKey.current !== modelsKey) {
+      parkedKey.current = modelsKey;
+      pillY.value = layout.y;
+      pillHeight.value = layout.height;
+      return;
+    }
     pillY.value = withTiming(layout.y, { duration: 180 });
     pillHeight.value = withTiming(layout.height, { duration: 180 });
   }, [
@@ -530,9 +654,62 @@ export function ModelSelectorDrawer({
     rowLayouts,
     visible,
     selectedIndex,
+    modelsKey,
     pillY,
     pillHeight,
   ]);
+
+  //tab geometry in refs, no rerender
+  const tabsScrollRef = useRef<ScrollView>(null);
+  const modelsScrollRef = useRef<ScrollView>(null);
+  const tabLayoutsRef = useRef<Record<string, { x: number; width: number }>>({});
+  const tabsBox = useRef({ viewport: 0, content: 0 });
+  //no glide before layout settles
+  const tabsAnimated = useRef(false);
+
+  const scrollTabIntoView = () => {
+    const layout = browsedSource && tabLayoutsRef.current[browsedSource.key];
+    const { viewport, content } = tabsBox.current;
+    if (!visible || !layout || !viewport || !content) return;
+    tabsScrollRef.current?.scrollTo({
+      x: centeredOffset(layout.x, layout.width, viewport, content),
+      animated: tabsAnimated.current,
+    });
+    tabsAnimated.current = true;
+  };
+
+  const scrollModelIntoView = () => {
+    if (!pendingModelScroll.current) return;
+    //rows may be previous source
+    if (shownKey.current !== browsedSource?.key) return;
+    if (!rowHeight || !listViewport) return;
+    const layout = rowLayouts[selectedIndex];
+    const y = offsetFor(selectedIndex);
+    modelsScrollRef.current?.scrollTo({ y, animated: false });
+    //programmatic scroll may not fire onScroll
+    moveWindowTo(y);
+    //selection may arrive after fetch
+    if (layout) pendingModelScroll.current = false;
+  };
+
+  //recenter on open or source switch
+  useLayoutEffect(() => {
+    if (!visible) {
+      tabsAnimated.current = false;
+      return;
+    }
+    pendingModelScroll.current = true;
+    scrollTabIntoView();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- window follows the native scroll
+    scrollModelIntoView();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the source key stands for browsedSource
+  }, [visible, browsedSource?.key]);
+
+  useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- window follows the native scroll
+    scrollModelIntoView();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- retries once rows or selection settle
+  }, [rowLayouts, selectedIndex, listViewport]);
 
   const previewCrossed = (index: number) => {
     setPreviewIndex(index);
@@ -617,6 +794,11 @@ export function ModelSelectorDrawer({
     return (
       <Pressable
         key={source.key}
+        onLayout={(e) => {
+          const { x, width } = e.nativeEvent.layout;
+          tabLayoutsRef.current[source.key] = { x, width };
+          scrollTabIntoView();
+        }}
         onPress={() => handleSelectSource(source)}
         style={pressStyle(styles.tab, "subtle")}
       >
@@ -635,6 +817,13 @@ export function ModelSelectorDrawer({
       <View style={styles.contentCard}>
         <View style={styles.modelsBox}>
           <ScrollView
+            ref={modelsScrollRef}
+            onLayout={(e) => setListViewport(e.nativeEvent.layout.height)}
+            onScroll={handleModelsScroll}
+            scrollEventThrottle={16}
+            //fresh view, old content clamps offset
+            key={modelsKey}
+            contentOffset={{ x: 0, y: initialOffset }}
             //fixed on desktop so switching servers never resizes the window
             style={isDesktop ? { height: DESKTOP_MODELS_HEIGHT } : { maxHeight: MAX_MODELS_HEIGHT }}
             contentContainerStyle={styles.modelsScrollContent}
@@ -680,38 +869,25 @@ export function ModelSelectorDrawer({
                 )}
               </View>
             ) : (
-              <View style={styles.optionsList}>
-                {displayModels.map((model) => {
-                  const selected = isBrowsingActive && model === selectedModel;
-                  const isSpecialActive = !pillShown && selected;
-                  return (
-                    <Pressable
-                      key={model}
-                      onLayout={handleRowLayout(model)}
-                      onPress={() => {
-                        Vibration.vibrate(10);
-                        handleSelectModel(model);
-                      }}
-                      style={pressStyle(
-                        [styles.option, isSpecialActive && styles.optionSelected],
-                        isSpecialActive
-                          ? { backgroundColor: Colors.primaryActive }
-                          : "subtle",
-                      )}
-                    >
-                      <Text
-                        style={[
-                          styles.optionText,
-                          isSpecialActive && styles.optionTextSelected,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {displayName(model)}
-                      </Text>
-                      {renderCapabilities(model, isSpecialActive)}
-                    </Pressable>
-                  );
-                })}
+              <View
+                style={[
+                  styles.optionsList,
+                  rowHeight > 0 && { height: displayModels.length * rowStride },
+                ]}
+              >
+                <View style={{ height: firstRow * rowStride }} />
+                {displayModels.slice(firstRow, lastRow).map((model) => (
+                  <ModelRow
+                    key={model}
+                    model={model}
+                    label={displayName(model)}
+                    caps={capsOf(model)}
+                    highlighted={!pillShown && isBrowsingActive && model === selectedModel}
+                    height={rowHeight}
+                    onSelect={handleRowSelect}
+                    onRowLayout={handleRowLayout}
+                  />
+                ))}
                 {pillShown && (
                   <GestureDetector gesture={pillPan}>
                     <Reanimated.View style={[styles.pill, pillAnimatedStyle]}>
@@ -721,7 +897,7 @@ export function ModelSelectorDrawer({
                       >
                         {displayName(displayModels[activeIndex])}
                       </Text>
-                      {renderCapabilities(displayModels[activeIndex], true)}
+                      <Capabilities caps={capsOf(displayModels[activeIndex])} onPrimary />
                     </Reanimated.View>
                   </GestureDetector>
                 )}
@@ -763,6 +939,15 @@ export function ModelSelectorDrawer({
   ) : (
     <View style={styles.sheetInner}>
       <ScrollView
+        ref={tabsScrollRef}
+        onLayout={(e) => {
+          tabsBox.current.viewport = e.nativeEvent.layout.width;
+          scrollTabIntoView();
+        }}
+        onContentSizeChange={(w) => {
+          tabsBox.current.content = w;
+          scrollTabIntoView();
+        }}
         horizontal
         showsHorizontalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -966,7 +1151,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     modelsScrollContent: {
       paddingHorizontal: 6,
-      paddingVertical: 6,
+      paddingVertical: MODELS_PADDING,
     },
     loadingRow: {
       flexDirection: "row",

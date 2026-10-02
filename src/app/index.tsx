@@ -1474,8 +1474,8 @@ export default function Index() {
   const handleServiceChange = useCallback((service: string, url: string) => {
     setAiService(service);
     setOllamaUrl(url);
-    Settings.set("aiService", service);
-    Settings.set("ollamaUrl", url);
+    //atomic pair, no half-saved state
+    Settings.setMany({ aiService: service, ollamaUrl: url });
     AIModule.setMode(service);
     if (url) {
       const tuning = getOllamaTuning(url);

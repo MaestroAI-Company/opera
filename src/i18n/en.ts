@@ -244,6 +244,8 @@ export const en = {
     "This model cannot read images. Pick a model with vision support to attach one.",
   "chatbar.modelNoAudio":
     "This model cannot read audio. Pick a model with audio support to attach one.",
+  "chatbar.modelNoVideo":
+    "This model cannot read video. Pick a model with video support to attach one.",
   "chatbar.permissionDenied": "Permission Denied",
   "chatbar.cameraDenied":
     "You've refused to allow this app to access your camera!",
@@ -437,6 +439,13 @@ export const en = {
   "settings.local.download": "Download the model",
   "settings.local.downloading": "Downloading the browser model",
   "settings.local.notDownloaded": "The browser model is not downloaded yet. Download it in Settings, Built-in.",
+
+  "settings.model.capTools": "Tools",
+  "settings.model.capVision": "Vision",
+  "settings.model.capThinking": "Thinking",
+  "settings.model.capAudio": "Audio",
+  "settings.model.capVideo": "Video",
+
   "settings.service.litert": "On-Device",
   "settings.service.litertHelp":
     "Download open models from Hugging Face and run them on this device.",
@@ -449,9 +458,6 @@ export const en = {
   "settings.litert.loading": "Loading...",
   "settings.litert.familyOther": "Other",
   "settings.litert.unavailable": "This model does not fit this device or could not be loaded.",
-  "settings.litert.capVision": "Vision",
-  "settings.litert.capAudio": "Audio",
-  "settings.litert.capThinking": "Thinking",
   "settings.litert.description": "Description",
   "settings.litert.noDescription": "No description available on Hugging Face.",
   "settings.litert.otherModels": "Other models",

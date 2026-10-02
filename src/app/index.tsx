@@ -408,6 +408,8 @@ export default function Index() {
   const [ollamaUrl, setOllamaUrl] = useState("");
   const [speakerEnabled, setSpeakerEnabled] = useState(false);
   const [modelCapabilities, setModelCapabilities] = useState<string[]>([]);
+  //bumped so edited capabilities reload
+  const [capsRevision, setCapsRevision] = useState(0);
   const [alwaysWhisper, setAlwaysWhisper] = useState(false);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
@@ -955,7 +957,7 @@ export default function Index() {
       }
     };
     fetchCapabilities();
-  }, [selectedModel, aiService, ollamaUrl]);
+  }, [selectedModel, aiService, ollamaUrl, capsRevision]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextAppState) => {
@@ -1013,6 +1015,7 @@ export default function Index() {
         setOllamaUrl(Settings.getCached().ollamaUrl);
         setUserName(Settings.getCached().name);
         setShowTechnicalDetails(Settings.getCached().showTechnicalDetails);
+        setCapsRevision((r) => r + 1);
       },
     );
     const modelSelectorSub = DeviceEventEmitter.addListener(

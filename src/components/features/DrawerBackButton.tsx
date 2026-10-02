@@ -27,6 +27,17 @@ export default function DrawerBackButton({
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const pulse = useAnimatedValue(0);
+  const scrolledAnim = useAnimatedValue(scrolled ? 1 : 0);
+
+  //dissolve surface and shadow in and out
+  useEffect(() => {
+    Animated.timing(scrolledAnim, {
+      toValue: scrolled ? 1 : 0,
+      duration: 200,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: DRAWER_NATIVE_DRIVER,
+    }).start();
+  }, [scrolled, scrolledAnim]);
 
   useEffect(() => {
     if (pulseKey === undefined) return;
@@ -58,15 +69,13 @@ export default function DrawerBackButton({
 
   return (
     <View style={styles.container}>
-      {scrolled && <View style={styles.shadow} pointerEvents="none" />}
+      <Animated.View style={[styles.shadow, { opacity: scrolledAnim }]} pointerEvents="none" />
       <Animated.View style={pulseStyle}>
+        <Animated.View style={[styles.surface, { opacity: scrolledAnim }]} pointerEvents="none" />
         <Pressable
           onPress={onPress}
           hitSlop={12}
-          style={pressStyle(
-            [styles.button, scrolled && styles.buttonScrolled],
-            scrolled ? "surface" : "fade",
-          )}
+          style={pressStyle(styles.button, scrolled ? "surface" : "fade")}
         >
           <Image
             source={kind === "close" ? cancelIcon : arrowIcon}
@@ -101,8 +110,10 @@ const makeStyles = (Colors: ThemeColors) =>
       alignItems: "center",
       borderRadius: Radius.xxl,
     },
-    buttonScrolled: {
+    surface: {
+      ...StyleSheet.absoluteFill,
       backgroundColor: Colors.surface,
+      borderRadius: Radius.xxl,
     },
     closeIcon: {
       width: 18,

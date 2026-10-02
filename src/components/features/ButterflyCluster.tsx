@@ -20,6 +20,13 @@ import {
   ViewStyle,
 } from "react-native";
 import { Gyroscope } from "expo-sensors";
+import Reanimated, {
+  Easing as ReanimatedEasing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { MAESTRO_BUTTERFLIES, useMaestroButterfly } from "./maestroButterfly";
 
@@ -27,7 +34,15 @@ const MAX_SHIFT = 16;
 const DECAY = 0.92;
 const GYRO_SPEED = 3.2;
 //shared by the intro and the flight
-const EASE_OUT = Easing.bezier(0.16, 1, 0.3, 1);
+const EASE_OUT = [0.16, 1, 0.3, 1] as const;
+
+type Flight = {
+  top: number;
+  width: number;
+  height: number;
+  toWidth: number;
+  toHeight: number;
+};
 
 export type ButterflyClusterProps = {
   style?: StyleProp<ViewStyle>;
@@ -37,6 +52,7 @@ export type ButterflyClusterProps = {
   from?: DOMRect | null;
   ref?: Ref<View>;
   parallax?: boolean;
+  intro?: boolean;
 };
 
 //maestro butterfly with gyro parallax
@@ -47,43 +63,64 @@ function ButterflyCluster({
   from,
   ref,
   parallax = true,
+  intro = true,
 }: ButterflyClusterProps) {
   const butterfly = MAESTRO_BUTTERFLIES[useMaestroButterfly()];
-  const introAnim = useAnimatedValue(from ? 1 : 0);
+  //flight or no intro starts fully shown
+  const introAnim = useAnimatedValue(from || !intro ? 1 : 0);
   const gyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-  const flightAnim = useAnimatedValue(0);
-  //window frame it lands on
-  const [landing, setLanding] = useState<DOMRect | null>(null);
+  const flightProgress = useSharedValue(0);
+  //plain numbers, worklets cannot read DOMRect getters
+  const [flight, setFlight] = useState<Flight | null>(null);
   const viewRef = useRef<View>(null);
   useImperativeHandle(ref, () => viewRef.current!, []);
 
   //sync read so the chat never paints unpushed
   useLayoutEffect(() => {
     if (!from || !viewRef.current) return;
-    setLanding(viewRef.current.getBoundingClientRect());
-    //layout props need the js driver
-    Animated.timing(flightAnim, {
-      toValue: 1,
-      duration: 700,
-      easing: EASE_OUT,
-      useNativeDriver: false,
-    }).start();
-  }, [from, flightAnim]);
+    const to = viewRef.current.getBoundingClientRect();
+    setFlight({
+      top: from.y - to.y,
+      width: from.width,
+      height: from.height,
+      toWidth: to.width,
+      toHeight: to.height,
+    });
+  }, [from]);
+
+  //ui thread keeps it smooth while the chat mounts
+  const flightStyle = useAnimatedStyle(() => {
+    if (!flight) return {};
+    const p = flightProgress.value;
+    return {
+      marginTop: interpolate(p, [0, 1], [flight.top, 0]),
+      width: interpolate(p, [0, 1], [flight.width, flight.toWidth]),
+      height: interpolate(p, [0, 1], [flight.height, flight.toHeight]),
+    };
+  });
+
+  //after the style mapper so it starts at zero
+  useEffect(() => {
+    if (!flight) return;
+    flightProgress.set(
+      withTiming(1, { duration: 700, easing: ReanimatedEasing.bezier(...EASE_OUT) }),
+    );
+  }, [flight, flightProgress]);
 
   //reveal butterfly on screen load
   useEffect(() => {
-    if (from) return;
+    if (from || !intro) return;
     const timer = setTimeout(() => {
       Animated.timing(introAnim, {
         toValue: 1,
         duration: 1100,
-        easing: EASE_OUT,
+        easing: Easing.bezier(...EASE_OUT),
         useNativeDriver: true,
       }).start();
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [introAnim, delay, from]);
+  }, [introAnim, delay, from, intro]);
 
   useEffect(() => {
     if (Platform.OS === "web" || !parallax) {
@@ -210,29 +247,19 @@ function ButterflyCluster({
     [introAnim],
   );
 
-  const flightStyle = useMemo(() => {
-    if (!from) return null;
-    //hidden until measured
-    if (!landing) return { opacity: 0 };
-    //starts at home size, pushes chat down
-    return {
-      marginTop: flightAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [from.y - landing.y, 0],
-      }),
-      width: flightAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [from.width, landing.width],
-      }),
-      height: flightAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [from.height, landing.height],
-      }),
-    };
-  }, [from, landing, flightAnim]);
-
   return (
-    <Animated.View ref={viewRef} pointerEvents="none" style={[style, flightStyle]}>
+    <Reanimated.View
+      ref={viewRef}
+      pointerEvents="none"
+      style={[
+        style,
+        //hidden until measured
+        from && !flight && styles.hidden,
+        //starts at home size, pushes chat down
+        flight && { marginTop: flight.top, width: flight.width, height: flight.height },
+        flightStyle,
+      ]}
+    >
       <Animated.View
         style={[styles.imageFill, { opacity: introOpacity, transform: introTransform }]}
       >
@@ -242,7 +269,7 @@ function ButterflyCluster({
           resizeMode="contain"
         />
       </Animated.View>
-    </Animated.View>
+    </Reanimated.View>
   );
 }
 
@@ -250,6 +277,9 @@ const styles = StyleSheet.create({
   imageFill: {
     width: "100%",
     height: "100%",
+  },
+  hidden: {
+    opacity: 0,
   },
 });
 

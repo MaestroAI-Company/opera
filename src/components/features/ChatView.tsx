@@ -591,6 +591,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
                 style={styles.headerButterfly}
                 from={butterflyFrom}
                 parallax={false}
+                intro={false}
               />
               <Text style={styles.headerTitle} numberOfLines={2}>
                 {conversation.name}

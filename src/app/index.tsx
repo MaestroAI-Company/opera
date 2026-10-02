@@ -1867,7 +1867,7 @@ export default function Index() {
                   style={styles.welcomeText}
                   reserveLines={userName ? 2 : 1}
                 />
-                <DissolveIn delay={2800}>
+                <DissolveIn delay={2200}>
                   <IncognitoToggle
                     incognito={incognitoMode}
                     onPress={() => {

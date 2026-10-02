@@ -399,6 +399,11 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const sampleRateRef = useRef<number>(16000);
   const pulseAnim = useAnimatedValue(1);
   const pressAnim = useAnimatedValue(0);
+  const incognitoAnim = useAnimatedValue(incognito ? 1 : 0);
+
+  useEffect(() => {
+    Animated.timing(incognitoAnim, { toValue: incognito ? 1 : 0, duration: 200, useNativeDriver: false }).start();
+  }, [incognito, incognitoAnim]);
 
   const liveTextRef = useRef<string>("");
   const nativeAudioUriRef = useRef<string | null>(null);
@@ -792,9 +797,13 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   };
 
   const scale = pressAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] });
-  const backgroundColor = pressAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: incognito ? [Colors.incognito, Colors.incognitoBright] : [Colors.primary, Colors.primaryBright],
+  //one color line, press walks outward from either mode
+  const backgroundColor = Animated.add(
+    incognitoAnim,
+    Animated.multiply(pressAnim, incognitoAnim.interpolate({ inputRange: [0, 1], outputRange: [-1, 1] }))
+  ).interpolate({
+    inputRange: [-1, 0, 1, 2],
+    outputRange: [Colors.primaryBright, Colors.primary, Colors.incognito, Colors.incognitoBright],
   });
 
   const startRecording = async () => {

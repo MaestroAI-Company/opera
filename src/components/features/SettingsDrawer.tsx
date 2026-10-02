@@ -32,11 +32,13 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StyleProp,
   StyleSheet,
   Text,
   useWindowDimensions,
   Vibration,
   View,
+  ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { captureRef, releaseCapture } from "react-native-view-shot";
@@ -181,6 +183,7 @@ const addIcon = require("../../../assets/icons/add.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 const deleteIcon = require("../../../assets/icons/delete.png");
 const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
+const keyIcon = require("../../../assets/icons/key.png");
 
 //tools and video stay hidden here
 const LITERT_CAPABILITY_IDS: readonly ModelCapabilityId[] = [
@@ -200,11 +203,12 @@ const cloudDownloadIcon = require("../../../assets/icons/clouddownload.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
 const rightArrowIcon = require("../../../assets/icons/right.png");
 const cancelIcon = require("../../../assets/icons/cancel.png");
-const validIcon = require("../../../assets/icons/valid.png");
+const activateIcon = require("../../../assets/icons/activate.png");
 const generalIcon = require("../../../assets/icons/general.png");
 const advancedIcon = require("../../../assets/icons/settings.png");
 const serverIcon = require("../../../assets/icons/server.png");
 const toolIcon = require("../../../assets/icons/tool.png");
+const tool2Icon = require("../../../assets/icons/tool2.png");
 const confidentialityIcon = require("../../../assets/icons/confidentiality.png");
 const reportsIcon = require("../../../assets/icons/bug.png");
 const supportIcon = require("../../../assets/icons/support.png");
@@ -215,16 +219,17 @@ const instagramIcon = require("../../../assets/icons/instagram.png");
 const tiktokIcon = require("../../../assets/icons/tiktok.png");
 const micIcon = require("../../../assets/icons/microphone.png");
 const cameraIcon = require("../../../assets/icons/camera.png");
+const videocamIcon = require("../../../assets/icons/videocam.png");
 const visionIcon = require("../../../assets/icons/vision.png");
 const microIcon = require("../../../assets/icons/micro.png");
 const brainIcon = require("../../../assets/icons/brain.png");
 //icon set differs from the sheet
 const MODEL_CAPABILITY_ICONS = {
-  tools: toolIcon,
+  tools: tool2Icon,
   vision: visionIcon,
   thinking: brainIcon,
   audio: microIcon,
-  video: cameraIcon,
+  video: videocamIcon,
 } as const satisfies Record<ModelCapabilityId, ImageSourcePropType>;
 const photoIcon = require("../../../assets/icons/photo.png");
 const locationIcon = require("../../../assets/icons/location.png");
@@ -361,8 +366,11 @@ const DESKTOP_ENTRY_PAGE: SubPage = "general";
 const DESKTOP_WINDOW_MAX_WIDTH = 960;
 
 type LitertPage = "browse" | "search" | "model";
+type CloudModelsPage = "list" | "model";
 
 const MODEL_PAGE_SIZE = 50;
+//cloud page previews before the full sheet
+const MODEL_PREVIEW_SIZE = 10;
 const NO_DISABLED_MODELS: string[] = [];
 const NO_CAPABILITY_OVERRIDES: Record<string, string[]> = {};
 const MODEL_CAPABILITY_ROWS = [
@@ -372,6 +380,82 @@ const MODEL_CAPABILITY_ROWS = [
   "audio",
   "video",
 ] as const satisfies readonly ModelCapabilityId[];
+
+//override wins over server caps
+const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
+  model,
+  service,
+  url,
+  onCapabilitiesChange,
+  style,
+  labelStyle,
+  checkboxes = false,
+}: {
+  model: string;
+  service: string;
+  url: string;
+  onCapabilitiesChange: (model: string, capabilities: string[]) => void;
+  style?: StyleProp<ViewStyle>;
+  labelStyle?: StyleProp<ViewStyle>;
+  checkboxes?: boolean;
+}) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
+  const t = useT();
+  const [capabilities, setCapabilities] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    AIModule.getModelCapabilitiesFor(service, url, model)
+      .catch(() => [] as string[])
+      .then((caps) => {
+        if (!cancelled) setCapabilities(caps);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [service, url, model]);
+
+  const toggleCapability = (id: string, on: boolean) => {
+    const current = capabilities ?? [];
+    const next = MODEL_CAPABILITY_ROWS.filter((c) =>
+      c === id ? on : current.includes(c),
+    );
+    setCapabilities(next);
+    onCapabilitiesChange(model, next);
+  };
+
+  if (!capabilities) return null;
+  return (
+    <View style={style}>
+      {MODEL_CAPABILITY_ROWS.map((c) => (
+        <View key={c} style={styles.toggleGroupRow}>
+          <View style={[styles.litertCapability, labelStyle]}>
+            <Image
+              source={MODEL_CAPABILITY_ICONS[c]}
+              style={styles.litertCapabilityIcon}
+              tintColor={Colors.textSecondary}
+            />
+            <Text style={styles.litertDetailMeta}>
+              {t(MODEL_CAPABILITY_KEYS[c])}
+            </Text>
+          </View>
+          {checkboxes ? (
+            <Checkbox
+              checked={capabilities.includes(c)}
+              onToggle={(v) => toggleCapability(c, v)}
+            />
+          ) : (
+            <Toggle
+              checked={capabilities.includes(c)}
+              onToggle={(v) => toggleCapability(c, v)}
+            />
+          )}
+        </View>
+      ))}
+    </View>
+  );
+});
 
 const ModelToggleRow = memo(function ModelToggleRow({
   model,
@@ -396,31 +480,6 @@ const ModelToggleRow = memo(function ModelToggleRow({
 }) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
-  const t = useT();
-  const [capabilities, setCapabilities] = useState<string[] | null>(null);
-
-  //override wins over server caps
-  useEffect(() => {
-    if (!expanded) return;
-    let cancelled = false;
-    AIModule.getModelCapabilitiesFor(service, url, model)
-      .catch(() => [] as string[])
-      .then((caps) => {
-        if (!cancelled) setCapabilities(caps);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [expanded, service, url, model]);
-
-  const toggleCapability = (id: string, on: boolean) => {
-    const current = capabilities ?? [];
-    const next = MODEL_CAPABILITY_ROWS.filter((c) =>
-      c === id ? on : current.includes(c),
-    );
-    setCapabilities(next);
-    onCapabilitiesChange(model, next);
-  };
 
   return (
     <View style={!last && { marginBottom: Spacing.lg }}>
@@ -440,27 +499,14 @@ const ModelToggleRow = memo(function ModelToggleRow({
         </Pressable>
         <Checkbox checked={enabled} onToggle={(v) => onToggle(model, v)} />
       </View>
-      {expanded && capabilities && (
-        <View style={styles.modelCapabilities}>
-          {MODEL_CAPABILITY_ROWS.map((c) => (
-            <View key={c} style={styles.toggleGroupRow}>
-              <View style={styles.litertCapability}>
-                <Image
-                  source={MODEL_CAPABILITY_ICONS[c]}
-                  style={styles.litertCapabilityIcon}
-                  tintColor={Colors.textSecondary}
-                />
-                <Text style={styles.litertDetailMeta}>
-                  {t(MODEL_CAPABILITY_KEYS[c])}
-                </Text>
-              </View>
-              <Toggle
-                checked={capabilities.includes(c)}
-                onToggle={(v) => toggleCapability(c, v)}
-              />
-            </View>
-          ))}
-        </View>
+      {expanded && (
+        <ModelCapabilityToggles
+          model={model}
+          service={service}
+          url={url}
+          onCapabilitiesChange={onCapabilitiesChange}
+          style={styles.modelCapabilities}
+        />
       )}
     </View>
   );
@@ -476,6 +522,11 @@ const ModelToggleList = memo(function ModelToggleList({
   capabilities = NO_CAPABILITY_OVERRIDES,
   onChange,
   onCapabilitiesChange,
+  onShowAll,
+  onOpenModel,
+  showAll = false,
+  autoFocusSearch = false,
+  onSearchFocus,
 }: {
   models: string[];
   loading: boolean;
@@ -485,11 +536,23 @@ const ModelToggleList = memo(function ModelToggleList({
   capabilities?: Record<string, string[]>;
   onChange: (next: string[]) => void;
   onCapabilitiesChange: (next: Record<string, string[]>) => void;
+  //show more opens the full list instead of paging
+  onShowAll?: () => void;
+  //rows open a model page instead of expanding
+  onOpenModel?: (model: string) => void;
+  showAll?: boolean;
+  autoFocusSearch?: boolean;
+  onSearchFocus?: () => void;
 }) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
+  const pageSize = showAll
+    ? Infinity
+    : onShowAll
+      ? MODEL_PREVIEW_SIZE
+      : MODEL_PAGE_SIZE;
   const [search, setSearch] = useState("");
-  const [limit, setLimit] = useState(MODEL_PAGE_SIZE);
+  const [limit, setLimit] = useState(pageSize);
 
   const disabledSet = useMemo(() => new Set(disabled), [disabled]);
   const shown = useMemo(() => {
@@ -555,15 +618,17 @@ const ModelToggleList = memo(function ModelToggleList({
                 value={search}
                 onChangeText={(v) => {
                   setSearch(v);
-                  setLimit(MODEL_PAGE_SIZE);
+                  setLimit(pageSize);
                 }}
+                autoFocus={autoFocusSearch}
+                onFocus={onSearchFocus}
                 autoCapitalize="none"
                 autoCorrect={false}
               />
             </Group>
             <Group style={{ marginBottom: Spacing.xxl }}>
               <ActionButton
-                icon={validIcon}
+                icon={activateIcon}
                 label={t("settings.ollama.enableAll")}
                 disabled={shown.every((m) => !disabledSet.has(m))}
                 onPress={() => setShown(true)}
@@ -588,7 +653,7 @@ const ModelToggleList = memo(function ModelToggleList({
                   service={service}
                   url={url}
                   onToggle={toggleModel}
-                  onExpand={toggleExpanded}
+                  onExpand={onOpenModel ?? toggleExpanded}
                   onCapabilitiesChange={setModelCapabilities}
                 />
               ))
@@ -600,7 +665,7 @@ const ModelToggleList = memo(function ModelToggleList({
                   label={t("settings.ollama.showMore", {
                     count: shown.length - limit,
                   })}
-                  onPress={() => setLimit((l) => l + MODEL_PAGE_SIZE)}
+                  onPress={onShowAll ?? (() => setLimit((l) => l + pageSize))}
                 />
               </Group>
             )}
@@ -763,6 +828,17 @@ export default function SettingsDrawer({
   const [addModelSheetVisible, setAddModelSheetVisible] = useState(false);
   const [ollamaAddVisible, setOllamaAddVisible] = useState(false);
   const [openaiAddVisible, setOpenAIAddVisible] = useState(false);
+  const [openaiModelsVisible, setOpenAIModelsVisible] = useState(false);
+  const [openaiModelsPage, setOpenAIModelsPage] =
+    useState<CloudModelsPage>("list");
+  const [openaiModelDetail, setOpenAIModelDetail] = useState<string | null>(
+    null,
+  );
+  const [openaiModelsScrolled, setOpenAIModelsScrolled] = useState(false);
+  const [openaiModelsWidth, setOpenAIModelsWidth] = useState(320);
+  //model page search hands focus to the list
+  const [openaiModelsSearchHandoff, setOpenAIModelsSearchHandoff] =
+    useState(false);
   const [mcpAddVisible, setMcpAddVisible] = useState(false);
   const [litertDownloadVisible, setLitertDownloadVisible] = useState(false);
   //id outlives the close so the sheet keeps its content
@@ -796,6 +872,7 @@ export default function SettingsDrawer({
     addModelSheetVisible ||
     ollamaAddVisible ||
     openaiAddVisible ||
+    openaiModelsVisible ||
     mcpAddVisible ||
     litertDownloadVisible ||
     cloudSetupVisible ||
@@ -4640,6 +4717,28 @@ export default function SettingsDrawer({
     </View>
   );
 
+  //each page opens at the top
+  const showOpenAIModelsPage = (page: CloudModelsPage, model?: string) => {
+    if (model) setOpenAIModelDetail(model);
+    setOpenAIModelsScrolled(false);
+    setOpenAIModelsPage(page);
+  };
+
+  const openOpenAIModels = (page: CloudModelsPage, model?: string) => {
+    showOpenAIModelsPage(page, model);
+    setOpenAIModelsVisible(true);
+  };
+
+  //android back steps up to the list before the sheet closes
+  const handleOpenAIModelsBack = () => {
+    if (openaiModelsPage === "list") return false;
+    //keyboard slides away with the pop
+    Keyboard.dismiss();
+    setOpenAIModelsSearchHandoff(false);
+    showOpenAIModelsPage("list");
+    return true;
+  };
+
   //openai server detail page
   const renderOpenAIServerSubPage = () => {
     const index = openaiDetailIndex ?? -1;
@@ -4707,7 +4806,7 @@ export default function SettingsDrawer({
             </Text>
             <Group>
               <TextInputField
-                icon={penPlaceholderIcon}
+                icon={keyIcon}
                 placeholder={t("settings.cloudapi.apiKeyPlaceholder")}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -4734,6 +4833,8 @@ export default function SettingsDrawer({
           onCapabilitiesChange={(next) =>
             patchOpenAIServer(index, { capabilities: next })
           }
+          onShowAll={() => openOpenAIModels("list")}
+          onOpenModel={(model) => openOpenAIModels("model", model)}
         />
 
         <View style={styles.contentCard}>
@@ -6034,6 +6135,172 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
+  const openaiModelsServer =
+    openaiDetailIndex !== null ? openaiServers[openaiDetailIndex] : undefined;
+
+  const renderOpenAIModelsPage = (page: CloudModelsPage, active: boolean) => {
+    const server = openaiModelsServer;
+    const index = openaiDetailIndex;
+    if (!server || index === null) return null;
+    const url = server.url.trim();
+    const disabled = server.disabledModels ?? NO_DISABLED_MODELS;
+    const model = openaiModelDetail;
+
+    return (
+      <>
+        <ScrollView
+          contentContainerStyle={styles.addModelSheetContent}
+          keyboardShouldPersistTaps="handled"
+          onScroll={
+            active
+              ? (e) =>
+                  setOpenAIModelsScrolled(e.nativeEvent.contentOffset.y > 4)
+              : undefined
+          }
+          scrollEventThrottle={16}
+        >
+          {page === "list" ? (
+            <ModelToggleList
+              key={url}
+              models={openaiModels}
+              loading={openaiModelsLoading}
+              service={OPENAI_PROVIDER_ID}
+              url={url}
+              disabled={server.disabledModels}
+              capabilities={server.capabilities}
+              onChange={(next) =>
+                patchOpenAIServer(index, { disabledModels: next })
+              }
+              onCapabilitiesChange={(next) =>
+                patchOpenAIServer(index, { capabilities: next })
+              }
+              onOpenModel={(m) => {
+                Keyboard.dismiss();
+                showOpenAIModelsPage("model", m);
+              }}
+              showAll
+              autoFocusSearch={openaiModelsSearchHandoff}
+              onSearchFocus={() => setOpenAIModelsSearchHandoff(false)}
+            />
+          ) : (
+            model && (
+              <>
+                <View style={[styles.contentCard, styles.litertSearchWithBack]}>
+                  <Group>
+                    <TextInputField
+                      icon={searchIcon}
+                      placeholder={t("settings.ollama.searchModels")}
+                      //only leads to the list search
+                      value=""
+                      onFocus={() => {
+                        setOpenAIModelsSearchHandoff(true);
+                        showOpenAIModelsPage("list");
+                      }}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </Group>
+                </View>
+                <View style={styles.contentCard}>
+                  <View style={styles.toggleGroupRow}>
+                    <View
+                      style={[styles.toggleGroupContent, styles.cloudModelText]}
+                    >
+                      <Text style={styles.litertDetailName}>{model}</Text>
+                      <Text style={styles.litertDetailMeta}>
+                        {openAIServerLabel(index)}
+                      </Text>
+                    </View>
+                    <Toggle
+                      checked={!disabled.includes(model)}
+                      onToggle={(on) =>
+                        patchOpenAIServer(index, {
+                          disabledModels: on
+                            ? disabled.filter((m) => m !== model)
+                            : [...disabled, model],
+                        })
+                      }
+                    />
+                  </View>
+                  <Text
+                    style={[styles.settingLabel, styles.litertDetailSection]}
+                  >
+                    {t("settings.ollama.capabilities")}
+                  </Text>
+                  <ModelCapabilityToggles
+                    key={model}
+                    model={model}
+                    service={OPENAI_PROVIDER_ID}
+                    url={url}
+                    onCapabilitiesChange={(m, caps) =>
+                      patchOpenAIServer(index, {
+                        capabilities: { ...server.capabilities, [m]: caps },
+                      })
+                    }
+                    style={styles.cloudModelCapabilities}
+                    labelStyle={styles.cloudModelCapabilityLabel}
+                    checkboxes
+                  />
+                </View>
+              </>
+            )
+          )}
+        </ScrollView>
+
+        {/* floats over the scroll like the settings back button */}
+        {page !== "list" && (
+          <View style={styles.litertBackWrapper} pointerEvents="box-none">
+            <DrawerBackButton
+              kind="back"
+              onPress={handleOpenAIModelsBack}
+              scrolled={openaiModelsScrolled}
+              pulseKey={model ?? page}
+            />
+          </View>
+        )}
+      </>
+    );
+  };
+
+  const openaiModelsSheet = (
+    <DrawerSheet
+      visible={openaiModelsVisible && !!openaiModelsServer}
+      onClose={() => setOpenAIModelsVisible(false)}
+      onBackPress={handleOpenAIModelsBack}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      avoidKeyboard
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          //stacked pages cannot size the sheet
+          height: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={[styles.addModelSheetDesktop, { height: "100%" }]}
+    >
+      <View
+        style={styles.litertSheetBody}
+        onLayout={(e) => {
+          const width = e.nativeEvent.layout.width;
+          setOpenAIModelsWidth((prev) => (prev !== width ? width : prev));
+        }}
+      >
+        <PageStack
+          page={openaiModelsPage}
+          visible={openaiModelsVisible}
+          width={openaiModelsWidth}
+          parentOf={(page) => (page === "model" ? "list" : null)}
+          onBack={handleOpenAIModelsBack}
+          renderPage={renderOpenAIModelsPage}
+        />
+      </View>
+    </DrawerSheet>
+  );
+
   const openaiAddServerSheet = (
     <DrawerSheet
       visible={openaiAddVisible}
@@ -6102,7 +6369,7 @@ export default function SettingsDrawer({
             </Text>
             <Group>
               <TextInputField
-                icon={penPlaceholderIcon}
+                icon={keyIcon}
                 placeholder={t("settings.cloudapi.apiKeyPlaceholder")}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -6598,6 +6865,7 @@ export default function SettingsDrawer({
             {addModelSheet}
             {ollamaAddServerSheet}
             {openaiAddServerSheet}
+            {openaiModelsSheet}
             {mcpAddServerSheet}
             {cloudSetupSheet}
             {localModelDetailSheet}
@@ -6641,6 +6909,7 @@ export default function SettingsDrawer({
       {addModelSheet}
       {ollamaAddServerSheet}
       {openaiAddServerSheet}
+      {openaiModelsSheet}
       {mcpAddServerSheet}
       {cloudSetupSheet}
       {localModelDetailSheet}
@@ -6884,6 +7153,18 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     litertDetailSection: {
       marginTop: Spacing.xxl,
+    },
+    //texts inset like settingLabel, controls stay on the edge
+    cloudModelText: {
+      paddingTop: Spacing.xs,
+      paddingHorizontal: Spacing.md,
+    },
+    cloudModelCapabilityLabel: {
+      paddingHorizontal: Spacing.md,
+    },
+    cloudModelCapabilities: {
+      gap: Spacing.md,
+      marginTop: Spacing.md,
     },
     litertFamilies: {
       gap: Spacing.xxl,

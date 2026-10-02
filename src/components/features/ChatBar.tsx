@@ -56,17 +56,21 @@ const IMAGE_COMPRESS_QUALITY = 0.7;
 //only two audio containers accepted
 const SUPPORTED_AUDIO_EXTENSIONS = ['wav', 'mp3'];
 const AUDIO_EXTENSION_PATTERN = /\.(wav|mp3|m4a|aac|flac|ogg)$/;
+const VIDEO_EXTENSION_PATTERN = /\.(mp4|mov|webm)$/;
+const VIDEO_MIME_TYPES = ['video/mp4', 'video/quicktime', 'video/webm'];
 
 //@query typed at the text end
 const MENTION_QUERY_RE = /(^|\s)@([\w-]*)$/;
 
-type AttachmentKind = 'image' | 'audio' | 'document' | 'unsupported';
+type AttachmentKind = 'image' | 'audio' | 'video' | 'document' | 'unsupported';
 
 //one attach rule for all pickers
 function classifyAttachment(name: string, mimeType?: string | null): AttachmentKind {
   if (mimeType?.startsWith('image/')) return 'image';
 
   const lowerName = name.toLowerCase();
+  if (VIDEO_EXTENSION_PATTERN.test(lowerName) || VIDEO_MIME_TYPES.includes(mimeType ?? '')) return 'video';
+  if (mimeType?.startsWith('video/')) return 'unsupported';
   const looksLikeAudio = mimeType?.startsWith('audio/') || AUDIO_EXTENSION_PATTERN.test(lowerName);
   if (!looksLikeAudio) return classifyDocument(name, mimeType) ? 'document' : 'unsupported';
 
@@ -306,7 +310,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const insets = useSafeAreaInsets();
   const supportsImages = modelCapabilities.includes('vision');
   const supportsAudio = modelCapabilities.includes('audio');
-  const supportsFiles = supportsImages || supportsAudio;
+  const supportsVideo = modelCapabilities.includes('video');
+  const supportsFiles = supportsImages || supportsAudio || supportsVideo;
   const [text, setText] = useState("");
   //latest text before react rerenders
   const textRef = useRef("");
@@ -334,6 +339,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     if (kind === 'unsupported') return { title: t("chatbar.unsupportedFormat"), message: formatMessage };
     if (kind === 'image' && !supportsImages) return { title: t("chatbar.unsupportedByModel"), message: t("chatbar.modelNoImages") };
     if (kind === 'audio' && !supportsAudio) return { title: t("chatbar.unsupportedByModel"), message: t("chatbar.modelNoAudio") };
+    if (kind === 'video' && !supportsVideo) return { title: t("chatbar.unsupportedByModel"), message: t("chatbar.modelNoVideo") };
     return null;
   };
 
@@ -670,7 +676,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       const { status } = await MediaLibrary.getPermissionsAsync();
       if (status === 'granted') {
         const media = await MediaLibrary.getAssetsAsync({
-          mediaType: 'photo',
+          mediaType: supportsVideo ? ['photo', 'video'] : 'photo',
           first: 10,
           sortBy: ['creationTime'],
         });
@@ -678,7 +684,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       }
     };
     getRecentPhotos();
-  }, [isAttachmentSheetVisible]);
+  }, [isAttachmentSheetVisible, supportsVideo]);
 
   const handleCamera = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
@@ -710,32 +716,35 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: supportsVideo ? ['images', 'videos'] : ['images'],
       allowsMultipleSelection: true,
       quality: 1,
     });
     if (!result.canceled && result.assets) {
-      const newFiles = result.assets.map(asset => ({
-        uri: asset.uri,
-        type: 'image',
-        name: asset.fileName || 'photo.jpg'
-      }));
+      const newFiles = result.assets.map(asset => asset.type === 'video'
+        ? { uri: asset.uri, type: 'video', name: asset.fileName || 'video.mp4', mimeType: asset.mimeType ?? undefined }
+        : { uri: asset.uri, type: 'image', name: asset.fileName || 'photo.jpg' });
       setSelectedFiles(prev => [...prev, ...newFiles]);
       setIsAttachmentSheetVisible(false);
     }
   };
 
-  const handleSelectRecentPhoto = (photo: any) => {
+  const handleSelectRecentPhoto = async (photo: any) => {
+    const isVideo = photo.mediaType === 'video';
+    //ios ph uri is not a file
+    const videoUri = isVideo && Platform.OS === 'ios'
+      ? (await MediaLibrary.getAssetInfoAsync(photo)).localUri
+      : undefined;
     setSelectedFiles(prev => {
-      const targetUri = photo.uri || photo.localUri;
+      const targetUri = videoUri || photo.uri || photo.localUri;
       const isSelected = prev.some(f => (f.id && f.id === photo.id) || f.uri === targetUri);
       if (isSelected) {
         return prev.filter(f => !((f.id && f.id === photo.id) || f.uri === targetUri));
       } else {
         return [...prev, {
           uri: targetUri,
-          type: 'image',
-          name: photo.filename || 'recent_photo.jpg',
+          type: isVideo ? 'video' : 'image',
+          name: photo.filename || (isVideo ? 'recent_video.mp4' : 'recent_photo.jpg'),
           id: photo.id
         }];
       }
@@ -869,7 +878,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const handlePickFiles = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['image/*', 'audio/wav', 'audio/x-wav', 'audio/mpeg', 'audio/mp3', ...DOCUMENT_MIME_TYPES],
+        type: ['image/*', 'audio/wav', 'audio/x-wav', 'audio/mpeg', 'audio/mp3', ...(supportsVideo ? VIDEO_MIME_TYPES : []), ...DOCUMENT_MIME_TYPES],
         multiple: true,
         copyToCacheDirectory: true
       });
@@ -1240,7 +1249,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
     window.addEventListener('paste', handleGlobalPaste);
     return () => window.removeEventListener('paste', handleGlobalPaste);
-  }, [supportsImages, supportsAudio, t]);
+  }, [supportsImages, supportsAudio, supportsVideo, t]);
 
   //camera, gallery and a model switch can leave an unreadable file attached
   useEffect(() => {
@@ -1250,7 +1259,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     if (!blocked) return;
     setModalConfig(blocked);
     setModalVisible(true);
-  }, [selectedFiles, supportsImages, supportsAudio, t]);
+  }, [selectedFiles, supportsImages, supportsAudio, supportsVideo, t]);
 
   return (
     <View style={{ width: '100%', maxWidth: 840, alignSelf: 'center' }}>

@@ -41,6 +41,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { captureRef, releaseCapture } from "react-native-view-shot";
 import {
+  MODEL_CAPABILITY_KEYS,
+  type ModelCapabilityId,
+} from "../../../constants/modelCapabilities";
+import {
   Fonts,
   FontSizes,
   Radius,
@@ -178,11 +182,12 @@ const downloadIcon = require("../../../assets/icons/download.png");
 const deleteIcon = require("../../../assets/icons/delete.png");
 const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
 
-const LITERT_CAPABILITY_KEYS = {
-  vision: "settings.litert.capVision",
-  audio: "settings.litert.capAudio",
-  thinking: "settings.litert.capThinking",
-} as const;
+//tools and video stay hidden here
+const LITERT_CAPABILITY_IDS: readonly ModelCapabilityId[] = [
+  "vision",
+  "audio",
+  "thinking",
+];
 const TTS_ENGINE_KEYS = {
   kokoro: "settings.tts.kokoro",
   supertonic: "settings.tts.supertonic",
@@ -213,12 +218,14 @@ const cameraIcon = require("../../../assets/icons/camera.png");
 const visionIcon = require("../../../assets/icons/vision.png");
 const microIcon = require("../../../assets/icons/micro.png");
 const brainIcon = require("../../../assets/icons/brain.png");
-//same icons as the model drawer
-const LITERT_CAPABILITY_ICONS = {
+//icon set differs from the sheet
+const MODEL_CAPABILITY_ICONS = {
+  tools: toolIcon,
   vision: visionIcon,
-  audio: microIcon,
   thinking: brainIcon,
-};
+  audio: microIcon,
+  video: cameraIcon,
+} as const satisfies Record<ModelCapabilityId, ImageSourcePropType>;
 const photoIcon = require("../../../assets/icons/photo.png");
 const locationIcon = require("../../../assets/icons/location.png");
 const calendarIcon = require("../../../assets/icons/calendar.png");
@@ -357,27 +364,104 @@ type LitertPage = "browse" | "search" | "model";
 
 const MODEL_PAGE_SIZE = 50;
 const NO_DISABLED_MODELS: string[] = [];
+const NO_CAPABILITY_OVERRIDES: Record<string, string[]> = {};
+const MODEL_CAPABILITY_ROWS = [
+  "tools",
+  "vision",
+  "thinking",
+  "audio",
+  "video",
+] as const satisfies readonly ModelCapabilityId[];
 
 const ModelToggleRow = memo(function ModelToggleRow({
   model,
   enabled,
   last,
+  expanded,
+  service,
+  url,
   onToggle,
+  onExpand,
+  onCapabilitiesChange,
 }: {
   model: string;
   enabled: boolean;
   last: boolean;
+  expanded: boolean;
+  service: string;
+  url: string;
   onToggle: (model: string, enabled: boolean) => void;
+  onExpand: (model: string) => void;
+  onCapabilitiesChange: (model: string, capabilities: string[]) => void;
 }) {
+  const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
+  const [capabilities, setCapabilities] = useState<string[] | null>(null);
+
+  //override wins over server caps
+  useEffect(() => {
+    if (!expanded) return;
+    let cancelled = false;
+    AIModule.getModelCapabilitiesFor(service, url, model)
+      .catch(() => [] as string[])
+      .then((caps) => {
+        if (!cancelled) setCapabilities(caps);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, service, url, model]);
+
+  const toggleCapability = (id: string, on: boolean) => {
+    const current = capabilities ?? [];
+    const next = MODEL_CAPABILITY_ROWS.filter((c) =>
+      c === id ? on : current.includes(c),
+    );
+    setCapabilities(next);
+    onCapabilitiesChange(model, next);
+  };
+
   return (
-    <View style={[styles.toggleGroupRow, !last && { marginBottom: Spacing.lg }]}>
-      <View style={styles.toggleGroupContent}>
-        <Text style={styles.settingLabel} numberOfLines={1}>
-          {model}
-        </Text>
+    <View style={!last && { marginBottom: Spacing.lg }}>
+      <View style={styles.toggleGroupRow}>
+        <Pressable
+          style={pressStyle(styles.modelToggleName, "fadeLight")}
+          onPress={() => onExpand(model)}
+        >
+          <Text style={[styles.settingLabel, styles.modelToggleLabel]} numberOfLines={1}>
+            {model}
+          </Text>
+          <Image
+            source={rightArrowIcon}
+            style={[styles.litertCapabilityIcon, expanded && styles.modelToggleArrowOpen]}
+            tintColor={Colors.textMuted}
+          />
+        </Pressable>
+        <Checkbox checked={enabled} onToggle={(v) => onToggle(model, v)} />
       </View>
-      <Toggle checked={enabled} onToggle={(v) => onToggle(model, v)} />
+      {expanded && capabilities && (
+        <View style={styles.modelCapabilities}>
+          {MODEL_CAPABILITY_ROWS.map((c) => (
+            <View key={c} style={styles.toggleGroupRow}>
+              <View style={styles.litertCapability}>
+                <Image
+                  source={MODEL_CAPABILITY_ICONS[c]}
+                  style={styles.litertCapabilityIcon}
+                  tintColor={Colors.textSecondary}
+                />
+                <Text style={styles.litertDetailMeta}>
+                  {t(MODEL_CAPABILITY_KEYS[c])}
+                </Text>
+              </View>
+              <Toggle
+                checked={capabilities.includes(c)}
+                onToggle={(v) => toggleCapability(c, v)}
+              />
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 });
@@ -386,13 +470,21 @@ const ModelToggleRow = memo(function ModelToggleRow({
 const ModelToggleList = memo(function ModelToggleList({
   models,
   loading,
+  service,
+  url,
   disabled = NO_DISABLED_MODELS,
+  capabilities = NO_CAPABILITY_OVERRIDES,
   onChange,
+  onCapabilitiesChange,
 }: {
   models: string[];
   loading: boolean;
+  service: string;
+  url: string;
   disabled?: string[];
+  capabilities?: Record<string, string[]>;
   onChange: (next: string[]) => void;
+  onCapabilitiesChange: (next: Record<string, string[]>) => void;
 }) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
@@ -409,13 +501,21 @@ const ModelToggleList = memo(function ModelToggleList({
   const enabledCount = models.filter((m) => !disabledSet.has(m)).length;
 
   //stable handler keeps memo rows still
-  const latest = useRef({ disabled, onChange });
+  const latest = useRef({ disabled, onChange, capabilities, onCapabilitiesChange });
   useEffect(() => {
-    latest.current = { disabled, onChange };
+    latest.current = { disabled, onChange, capabilities, onCapabilitiesChange };
   });
   const toggleModel = useCallback((model: string, enabled: boolean) => {
     const { disabled: current, onChange: save } = latest.current;
     save(enabled ? current.filter((m) => m !== model) : [...current, model]);
+  }, []);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const toggleExpanded = useCallback((model: string) => {
+    setExpanded((current) => (current === model ? null : model));
+  }, []);
+  const setModelCapabilities = useCallback((model: string, caps: string[]) => {
+    const { capabilities: current, onCapabilitiesChange: save } = latest.current;
+    save({ ...current, [model]: caps });
   }, []);
 
   //bulk buttons act on the filtered rows
@@ -484,7 +584,12 @@ const ModelToggleList = memo(function ModelToggleList({
                   model={model}
                   enabled={!disabledSet.has(model)}
                   last={index === visible.length - 1}
+                  expanded={expanded === model}
+                  service={service}
+                  url={url}
                   onToggle={toggleModel}
+                  onExpand={toggleExpanded}
+                  onCapabilitiesChange={setModelCapabilities}
                 />
               ))
             )}
@@ -1801,10 +1906,11 @@ export default function SettingsDrawer({
       : t("settings.ollama.connected");
   };
 
-  //keep active server in the list
+  //move url only while ollama active
   const saveOllamaServers = (servers: OllamaServer[]) => {
     setOllamaServersState(servers);
     Settings.set("ollamaUrls", serializeServers(servers));
+    if (aiService !== "ollama") return;
     const filled = servers.filter((s) => s.url.trim().length > 0);
     const active =
       filled.find((s) => s.url.trim() === ollamaUrl.trim()) ?? filled[0];
@@ -4192,14 +4298,13 @@ export default function SettingsDrawer({
 
     const publisher = familyPublisher(entry.family);
     const capabilities = entry.capabilities
-      .filter(
-        (c): c is keyof typeof LITERT_CAPABILITY_KEYS =>
-          c in LITERT_CAPABILITY_KEYS,
+      .filter((c): c is ModelCapabilityId =>
+        LITERT_CAPABILITY_IDS.includes(c as ModelCapabilityId),
       )
       .map((c) => ({
         id: c,
-        label: t(LITERT_CAPABILITY_KEYS[c]),
-        icon: LITERT_CAPABILITY_ICONS[c],
+        label: t(MODEL_CAPABILITY_KEYS[c]),
+        icon: MODEL_CAPABILITY_ICONS[c],
       }));
     const { description } = installedModel;
 
@@ -4442,9 +4547,15 @@ export default function SettingsDrawer({
           key={url}
           models={ollamaModels}
           loading={ollamaModelsLoading}
+          service="ollama"
+          url={url}
           disabled={server.disabledModels}
+          capabilities={server.capabilities}
           onChange={(next) =>
             patchOllamaServer(index, { disabledModels: next })
+          }
+          onCapabilitiesChange={(next) =>
+            patchOllamaServer(index, { capabilities: next })
           }
         />
 
@@ -4613,9 +4724,15 @@ export default function SettingsDrawer({
           key={url}
           models={openaiModels}
           loading={openaiModelsLoading}
+          service={OPENAI_PROVIDER_ID}
+          url={url}
           disabled={server.disabledModels}
+          capabilities={server.capabilities}
           onChange={(next) =>
             patchOpenAIServer(index, { disabledModels: next })
+          }
+          onCapabilitiesChange={(next) =>
+            patchOpenAIServer(index, { capabilities: next })
           }
         />
 
@@ -5576,14 +5693,13 @@ export default function SettingsDrawer({
     const canDownload = !!resolved && !installed && !downloadingLitert;
     const publisher = familyPublisher(entry?.family ?? "");
     const capabilities = (resolved?.capabilities ?? [])
-      .filter(
-        (c): c is keyof typeof LITERT_CAPABILITY_KEYS =>
-          c in LITERT_CAPABILITY_KEYS,
+      .filter((c): c is ModelCapabilityId =>
+        LITERT_CAPABILITY_IDS.includes(c as ModelCapabilityId),
       )
       .map((c) => ({
         id: c,
-        label: t(LITERT_CAPABILITY_KEYS[c]),
-        icon: LITERT_CAPABILITY_ICONS[c],
+        label: t(MODEL_CAPABILITY_KEYS[c]),
+        icon: MODEL_CAPABILITY_ICONS[c],
       }));
     //both carousels share one card
     const sections = [
@@ -6745,6 +6861,23 @@ const makeStyles = (Colors: ThemeColors) =>
     litertCapabilityIcon: {
       width: 14,
       height: 14,
+    },
+    modelToggleName: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      marginRight: Spacing.lg2,
+    },
+    modelToggleLabel: {
+      flexShrink: 1,
+    },
+    modelToggleArrowOpen: {
+      transform: [{ rotate: "90deg" }],
+    },
+    modelCapabilities: {
+      gap: Spacing.md,
+      marginTop: Spacing.lg,
+      paddingLeft: Spacing.xxl,
     },
     litertDetailDownload: {
       marginTop: Spacing.lg2,

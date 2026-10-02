@@ -408,7 +408,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const incognitoAnim = useAnimatedValue(incognito ? 1 : 0);
 
   useEffect(() => {
-    Animated.timing(incognitoAnim, { toValue: incognito ? 1 : 0, duration: 200, useNativeDriver: false }).start();
+    incognitoAnim.setValue(incognito ? 1 : 0);
   }, [incognito, incognitoAnim]);
 
   const liveTextRef = useRef<string>("");

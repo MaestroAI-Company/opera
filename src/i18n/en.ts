@@ -647,6 +647,7 @@ export const en = {
   "settings.ollama.disableAll": "Disable all",
   "settings.ollama.noMatch": "No model matches this search.",
   "settings.ollama.showMore": "Show more ({count})",
+  "settings.ollama.capabilities": "Capabilities",
   "settings.ollama.contextLength": "Context Length",
   "settings.ollama.contextHelp": "Maximum number of tokens the model can use.",
   "settings.ollama.keepAlive": "Model Keep Alive",

@@ -145,6 +145,7 @@ type ShareNotice =
   | { kind: "creating" }
   | { kind: "link"; link: string }
   | { kind: "opening" }
+  | { kind: "untrusted" }
   | { kind: "error"; message: string };
 
 //matches welcomeText's lineHeight, reserved upfront so the second line doesn't shift layout
@@ -1116,7 +1117,8 @@ export default function Index() {
         setSharedPreviewId(conversation.id);
         setActiveConversation(conversation);
         setMessages(sharedMessages);
-        setShareNotice(null);
+        //warn upfront instead of a footer
+        setShareNotice({ kind: "untrusted" });
         clearShareFromUrl();
       } catch (e: any) {
         setShareNotice({
@@ -1780,7 +1782,10 @@ export default function Index() {
           ]
         : [
             {
-              text: t("common.close"),
+              text:
+                shareNotice?.kind === "untrusted"
+                  ? t("common.ok")
+                  : t("common.close"),
               style: "secondary" as const,
               onPress: () => setShareNotice(null),
             },
@@ -2032,20 +2037,6 @@ export default function Index() {
               {isSharedPreview ? (
                 <View style={styles.addSharedContainer}>
                   <View style={styles.addSharedInner}>
-                    <View style={styles.shareWarningWrapper}>
-                      <Group
-                        style={{
-                          backgroundColor: Colors.dangerBgSoft,
-                          borderColor: Colors.dangerBorderSoft,
-                        }}
-                      >
-                        <View style={styles.shareWarningBox}>
-                          <Text style={styles.shareWarningText}>
-                            {t("share.preview.warning")}
-                          </Text>
-                        </View>
-                      </Group>
-                    </View>
                     <View style={styles.addSharedWrapper}>
                       <Group>
                         <ActionButton
@@ -2159,10 +2150,13 @@ export default function Index() {
         onOpenProviderSettings={(provider) => {
           setModelSelectorVisible(false);
           openDrawerSafely(() => {
+            //built-in models live under on-device
             const page = (
-              ["beta", "local", "litert", "ollama", "openai"].includes(provider)
-                ? provider
-                : "service"
+              provider === "local"
+                ? "litert"
+                : ["beta", "litert", "ollama", "openai"].includes(provider)
+                  ? provider
+                  : "service"
             ) as SubPage;
             setSettingsInitialSubPage(page);
             setSettingsDrawerVisible(true);
@@ -2175,7 +2169,7 @@ export default function Index() {
       <NotificationModal
         visible={!!shareNotice}
         title={
-          shareNotice?.kind === "opening"
+          shareNotice?.kind === "opening" || shareNotice?.kind === "untrusted"
             ? t("share.modal.openTitle")
             : t("share.modal.title")
         }
@@ -2186,11 +2180,13 @@ export default function Index() {
               ? t("share.modal.creating")
               : shareNotice?.kind === "opening"
                 ? t("share.modal.opening")
-                : shareNotice?.kind === "error"
-                  ? shareNotice.message
-                  : shareNotice?.kind === "link"
-                    ? shareNotice.link
-                    : undefined
+                : shareNotice?.kind === "untrusted"
+                  ? t("share.preview.warning")
+                  : shareNotice?.kind === "error"
+                    ? shareNotice.message
+                    : shareNotice?.kind === "link"
+                      ? shareNotice.link
+                      : undefined
         }
         onClose={() => setShareNotice(null)}
         buttons={shareNoticeButtons}
@@ -2266,20 +2262,6 @@ const makeStyles = (Colors: ThemeColors) =>
     addSharedWrapper: {
       marginHorizontal: 16,
       marginBottom: 16,
-    },
-    shareWarningWrapper: {
-      marginHorizontal: 16,
-      marginBottom: 8,
-    },
-    shareWarningBox: {
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-    },
-    shareWarningText: {
-      fontSize: FontSizes.bodyMd,
-      fontFamily: Fonts.body,
-      color: Colors.textPrimary,
-      lineHeight: 20,
     },
     addSharedButton: {
       height: 56,

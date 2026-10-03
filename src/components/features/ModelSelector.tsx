@@ -135,6 +135,7 @@ export function ModelSelectorTrigger({
   viewRef,
 }: ModelSelectorTriggerProps) {
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
 
   const displayName = (model: string) =>
     isLocalModel(model) ? getLocalModelLabel(model, true)
@@ -151,7 +152,7 @@ export function ModelSelectorTrigger({
         >
           <Image source={botIcon} style={styles.icon} />
           <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
-            {selectedModel ? displayName(selectedModel) : "Modèle"}
+            {selectedModel ? displayName(selectedModel) : t("modelSelector.placeholder")}
           </Text>
         </Pressable>
       </View>
@@ -840,7 +841,7 @@ export function ModelSelectorDrawer({
           >
             {sources.length === 0 ? (
               <Text style={styles.emptyText}>
-                No provider enabled, turn one on in Settings → Service
+                {t("modelSelector.noProvider")}
               </Text>
             ) : loading && models.length === 0 ? (
               <View style={styles.loadingRow}>

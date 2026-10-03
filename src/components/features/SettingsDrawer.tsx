@@ -136,6 +136,7 @@ import NotificationBanner from "../ui/NotificationBanner";
 import NotificationCard from "../ui/NotificationCard";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import ProgressBar from "../ui/ProgressBar";
+import IconSelector from "../ui/IconSelector";
 import Selector, { SelectorOption } from "../ui/Selector";
 import Slider from "../ui/Slider";
 import SliderToggle from "../ui/SliderToggle";
@@ -227,10 +228,16 @@ const exportIcon = require("../../../assets/icons/export.png");
 const messageIcon = require("../../../assets/icons/message.png");
 const timeIcon = require("../../../assets/icons/time.png");
 const errorIcon = require("../../../assets/icons/error.png");
-const ollamaErrorImage = require("../../../assets/images/ImageCard/OllamaError.png");
+const errorImage = require("../../../assets/images/ImageCard/error.png");
 const infoIcon = require("../../../assets/icons/info.png");
 const reconnectIcon = require("../../../assets/icons/reconnect.png");
 const hyperlinkIcon = require("../../../assets/icons/hyperlink2.png");
+const ICON_SELECTOR_OPTIONS = [
+  { id: "a", icon: operaIcon },
+  { id: "b", icon: require("../../../assets/icons/operaicon2.png") },
+  { id: "c", icon: require("../../../assets/icons/operaicon3.png") },
+  { id: "d", icon: require("../../../assets/icons/operaicon4.png") },
+];
 
 const DRAWER_SYNC_DELAY_MS = 1500;
 
@@ -269,10 +276,10 @@ export type SubPage =
   | "general"
   | "advanced"
   | "maestro"
+  | "maestropreferences"
   | "assistantoverlay"
   | "service"
   | "beta"
-  | "local"
   | "litert"
   | "litertmodel"
   | "ollama"
@@ -284,7 +291,6 @@ export type SubPage =
   | "tools"
   | "widgets"
   | "profile"
-  | "profileedit"
   | "cloud"
   | "mobileactions"
   | "mcpservers"
@@ -298,10 +304,10 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   general: "main",
   advanced: "main",
   maestro: "main",
+  maestropreferences: "maestro",
   assistantoverlay: "maestro",
   service: "main",
   beta: "service",
-  local: "service",
   litert: "service",
   litertmodel: "litert",
   ollama: "service",
@@ -312,7 +318,6 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   reports: "main",
   tools: "main",
   profile: "main",
-  profileedit: "profile",
   cloud: "main",
   sociallinks: "main",
   widgets: "tools",
@@ -507,7 +512,8 @@ const ModelToggleList = memo(function ModelToggleList({
   disabled?: string[];
   capabilities?: Record<string, string[]>;
   onChange: (next: string[]) => void;
-  onCapabilitiesChange: (next: Record<string, string[]>) => void;
+  //only the inline expand edits capabilities
+  onCapabilitiesChange?: (next: Record<string, string[]>) => void;
   //show more opens the full list instead of paging
   onShowAll?: () => void;
   //rows open a model page instead of expanding
@@ -550,7 +556,7 @@ const ModelToggleList = memo(function ModelToggleList({
   }, []);
   const setModelCapabilities = useCallback((model: string, caps: string[]) => {
     const { capabilities: current, onCapabilitiesChange: save } = latest.current;
-    save({ ...current, [model]: caps });
+    save?.({ ...current, [model]: caps });
   }, []);
 
   //bulk buttons act on the filtered rows
@@ -764,7 +770,6 @@ export default function SettingsDrawer({
   const [selectedLocalModelId, setSelectedLocalModelId] = useState<
     string | null
   >(null);
-  const [localGridWidth, setLocalGridWidth] = useState(0);
   const [cardGridWidth, setCardGridWidth] = useState(0);
   const selectedLocalModel =
     localSheet?.models.find((m) => m.id === selectedLocalModelId) ?? null;
@@ -812,6 +817,7 @@ export default function SettingsDrawer({
   const [openaiModelsSearchHandoff, setOpenAIModelsSearchHandoff] =
     useState(false);
   const [mcpAddVisible, setMcpAddVisible] = useState(false);
+  const [profileEditVisible, setProfileEditVisible] = useState(false);
   const [litertDownloadVisible, setLitertDownloadVisible] = useState(false);
   //id outlives the close so the sheet keeps its content
   const [cloudSetupVisible, setCloudSetupVisible] = useState(false);
@@ -841,6 +847,7 @@ export default function SettingsDrawer({
 
   //open sheets keep the back press for themselves
   const sheetOpen =
+    profileEditVisible ||
     addModelSheetVisible ||
     ollamaAddVisible ||
     openaiAddVisible ||
@@ -910,6 +917,7 @@ export default function SettingsDrawer({
   };
   //empty id means chores follow the main model
   const [quickFlowId, setQuickFlowIdState] = useState("");
+  const [iconSelectorDemo, setIconSelectorDemo] = useState("a");
   const [quickFlowOptions, setQuickFlowOptions] = useState<SelectorOption[]>(
     [],
   );
@@ -1402,7 +1410,7 @@ export default function SettingsDrawer({
 
   //built-in facts, read on page open
   useEffect(() => {
-    if (activeSubPage !== "local") return;
+    if (activeSubPage !== "litert" || !localAvailable) return;
     let cancelled = false;
     AIModule.getLocalModelSheet()
       .then((sheet) => {
@@ -1412,7 +1420,7 @@ export default function SettingsDrawer({
     return () => {
       cancelled = true;
     };
-  }, [activeSubPage]);
+  }, [activeSubPage, localAvailable]);
 
   //browsers need a user gesture
   const handleDownloadLocal = async (modelId: string) => {
@@ -1645,7 +1653,7 @@ export default function SettingsDrawer({
           t("settings.ollama.unreachableTitle"),
           t("settings.ollama.unreachableInfo"),
           undefined,
-          { image: ollamaErrorImage, messageAlign: "left" },
+          { image: errorImage, messageAlign: "left" },
         );
         return;
       }
@@ -2242,19 +2250,26 @@ export default function SettingsDrawer({
       ? t("settings.litert.familyOther")
       : family.label;
 
-  const setProviderEnabled = (id: string, enabled: boolean) => {
-    const next = enabled
-      ? [...enabledProviders.filter((p) => p !== id), id]
-      : enabledProviders.filter((p) => p !== id);
+  const setProviderEnabled = (ids: string | string[], enabled: boolean) => {
+    const list = typeof ids === "string" ? [ids] : ids;
+    const rest = enabledProviders.filter((p) => !list.includes(p));
+    const next = enabled ? [...rest, ...list] : rest;
     setEnabledProvidersState(next);
     Settings.set("enabledProviders", serializeProviders(next));
     //the active service has to stay on an enabled provider
-    if (!enabled && aiService === id && next.length > 0) {
+    if (!enabled && list.includes(aiService) && next.length > 0) {
       setAiService(next[0]);
     } else if (enabled && !enabledProviders.includes(aiService)) {
-      setAiService(id);
+      setAiService(list[0]);
     }
   };
+
+  //built-in models live under on-device
+  const litertSupported = isProviderSupported("litert");
+  const onDeviceProviders = [
+    ...(litertSupported ? ["litert"] : []),
+    ...(localAvailable ? ["local"] : []),
+  ];
 
   //dead downloads resume from disk
   useEffect(() => {
@@ -3238,7 +3253,7 @@ export default function SettingsDrawer({
             <ActionButton
               icon={penPlaceholderIcon}
               label={t("settings.profile.personalize")}
-              onPress={() => setActiveSubPage("profileedit")}
+              onPress={() => setProfileEditVisible(true)}
             />
             {/* export ends in the mobile share sheet */}
             {!isDesktop && (
@@ -3248,30 +3263,6 @@ export default function SettingsDrawer({
                 onPress={exportProfileCard}
               />
             )}
-          </Group>
-        </View>
-      </View>
-    </View>
-  );
-
-  // profile edit subpage
-  const renderProfileEditSubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.profile.personalize"))}
-
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-            {t("settings.profile.name")}
-          </Text>
-          <Group>
-            <TextInputField
-              icon={penPlaceholderIcon}
-              placeholder={t("onboarding.name.placeholder")}
-              value={name}
-              onChangeText={setName}
-              onSubmitEditing={() => setConfirmedName(name)}
-            />
           </Group>
         </View>
       </View>
@@ -3456,8 +3447,44 @@ export default function SettingsDrawer({
         <MaestroCard />
       </View>
 
+      {/* icon selector demo card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+            {t("settings.maestro.voice")}
+          </Text>
+          <IconSelector
+            options={ICON_SELECTOR_OPTIONS}
+            selectedValue={iconSelectorDemo}
+            onSelect={setIconSelectorDemo}
+          />
+        </View>
+      </View>
+
       {/* voice engine card */}
       <VoiceEngineCard />
+
+      {/* navigation to maestro subpages */}
+      <Group style={styles.groupSpacing}>
+        {!isDesktop &&
+          renderToolsNavRow(
+            "assistantoverlay",
+            t("settings.nav.overlay.title"),
+            t("settings.nav.overlay.subtitle"),
+          )}
+        {renderToolsNavRow(
+          "maestropreferences",
+          t("settings.nav.maestroPreferences.title"),
+          t("settings.nav.maestroPreferences.subtitle"),
+        )}
+      </Group>
+    </View>
+  );
+
+  //maestro preferences subpage
+  const renderMaestroPreferencesSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader(t("settings.nav.maestroPreferences.title"))}
 
       {/* instructions card */}
       <View style={styles.contentCard}>
@@ -3492,17 +3519,6 @@ export default function SettingsDrawer({
           </View>
         </View>
       </View>
-
-      {/* the overlay is an android assistant feature */}
-      {!isDesktop && (
-        <Group style={styles.groupSpacing}>
-          {renderToolsNavRow(
-            "assistantoverlay",
-            t("settings.nav.overlay.title"),
-            t("settings.nav.overlay.subtitle"),
-          )}
-        </Group>
-      )}
     </View>
   );
 
@@ -3768,34 +3784,7 @@ export default function SettingsDrawer({
           </Pressable>
         )}
 
-        <Pressable
-          style={pressStyle(
-            styles.toggleGroupRowItem,
-            styles.toggleGroupCardPressed,
-          )}
-          onPress={() => setActiveSubPage("local")}
-        >
-          <View style={styles.toggleGroupRow}>
-            <View style={styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>
-                {t("settings.service.local")}
-              </Text>
-              <Text style={styles.helpText}>
-                {t("settings.service.localHelp")}
-              </Text>
-            </View>
-            <View style={styles.toggleDivider} />
-            <Toggle
-              checked={localAvailable && enabledProviders.includes("local")}
-              disabled={!localAvailable}
-              onToggle={(v) => {
-                if (localAvailable) setProviderEnabled("local", v);
-              }}
-            />
-          </View>
-        </Pressable>
-
-        {isProviderSupported("litert") && (
+        {onDeviceProviders.length > 0 && (
           <Pressable
             style={pressStyle(
               styles.toggleGroupRowItem,
@@ -3809,13 +3798,19 @@ export default function SettingsDrawer({
                   {t("settings.service.litert")}
                 </Text>
                 <Text style={styles.helpText}>
-                  {t("settings.service.litertHelp")}
+                  {t(
+                    litertSupported
+                      ? "settings.service.litertHelp"
+                      : "settings.service.localHelp",
+                  )}
                 </Text>
               </View>
               <View style={styles.toggleDivider} />
               <Toggle
-                checked={enabledProviders.includes("litert")}
-                onToggle={(v) => setProviderEnabled("litert", v)}
+                checked={onDeviceProviders.some((id) =>
+                  enabledProviders.includes(id),
+                )}
+                onToggle={(v) => setProviderEnabled(onDeviceProviders, v)}
               />
             </View>
           </Pressable>
@@ -3929,128 +3924,6 @@ export default function SettingsDrawer({
     </View>
   );
 
-  //built-in provider, model ships with device
-  const renderLocalSubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.local.title"))}
-
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{t("settings.local.title")}</Text>
-          <Text style={[styles.helpText, { marginBottom: 0 }]}>
-            {t("settings.local.help")}
-          </Text>
-        </View>
-      </View>
-
-      {localSheet && (
-        <View style={styles.contentCard}>
-          <View
-            style={
-              localSheet.models.length > 0
-                ? styles.settingRowVertical
-                : [styles.settingRowVertical, { marginBottom: 0 }]
-            }
-          >
-            <Text style={styles.settingLabel}>
-              {t("settings.local.sheetTitle")}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.local.sheetHelp")}
-            </Text>
-            <Group>
-              {(
-                [
-                  ["family", localSheet.family],
-                  ["runtime", localSheet.runtime],
-                  ["browser", localSheet.browser],
-                ] as const
-              )
-                .filter(([, value]) => !!value)
-                .map(([key, value]) => (
-                  <ActionButton
-                    key={key}
-                    label={t(`settings.local.sheet.${key}`)}
-                    rightElement={
-                      <Text style={styles.litertRowMeta}>{value}</Text>
-                    }
-                  />
-                ))}
-            </Group>
-          </View>
-
-          {localSheet.models.length > 0 && (
-            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-                {t("settings.local.modelsTitle")}
-              </Text>
-              {/* measure available grid width for columns */}
-              <View
-                style={styles.localModelsGrid}
-                onLayout={(e) => {
-                  const w = e.nativeEvent.layout.width;
-                  if (w > 0 && w !== localGridWidth) setLocalGridWidth(w);
-                }}
-              >
-                {localSheet.models.map((model, i) => {
-                  const isOdd = localSheet.models.length % 2 !== 0;
-                  //expand lone odd model to full row
-                  const isLastOdd = isOdd && i === localSheet.models.length - 1;
-                  //prevent wrapping subpixel overflow
-                  const cardWidth = isLastOdd
-                    ? "100%"
-                    : localGridWidth > 0
-                      ? Math.floor((localGridWidth - Spacing.md) / 2) - 1
-                      : "47%";
-
-                  return (
-                    <Pressable
-                      key={model.id}
-                      style={pressStyle(
-                        [
-                          styles.localModelCard,
-                          { width: cardWidth, flexGrow: isLastOdd ? 1 : 1 },
-                          isLastOdd && styles.localModelCardWide,
-                        ],
-                        "surface",
-                      )}
-                      onPress={() => {
-                        Vibration.vibrate(8);
-                        setSelectedLocalModelId(model.id);
-                      }}
-                    >
-                      <Text
-                        style={styles.localModelCardTitle}
-                        numberOfLines={2}
-                      >
-                        {model.label}
-                      </Text>
-                      {!!model.status && (
-                        <Text
-                          style={styles.localModelCardStatus}
-                          numberOfLines={1}
-                        >
-                          {t(`settings.local.status.${model.status}`)}
-                        </Text>
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </View>
-              {!!localDownload && (
-                <DownloadProgress
-                  title={t("settings.local.downloading")}
-                  progress={localDownload.progress}
-                  sizeStr={localDownload.sizeStr}
-                />
-              )}
-            </View>
-          )}
-        </View>
-      )}
-    </View>
-  );
-
   //on-device provider, models the browser installed
   const renderLitertSubPage = () => (
     <View style={styles.subPageContainer}>
@@ -4062,26 +3935,41 @@ export default function SettingsDrawer({
             {t("settings.litert.modelTitle")}
           </Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.litert.help")}
+            {t(
+              litertSupported ? "settings.litert.help" : "settings.local.help",
+            )}
           </Text>
 
-          <Group
-            style={[
-              styles.highlightGroup,
-              !!downloadingLitert && styles.highlightGroupDisabled,
-            ]}
-          >
-            <ActionButton
-              icon={addIcon}
-              label={t("settings.litert.addModel")}
-              variant="highlight"
-              disabled={!!downloadingLitert}
-              onPress={openAddModelSheet}
-            />
-          </Group>
+          {/* web has the built-in model only */}
+          {litertSupported && (
+            <Group
+              style={[
+                styles.highlightGroup,
+                !!downloadingLitert && styles.highlightGroupDisabled,
+              ]}
+            >
+              <ActionButton
+                icon={addIcon}
+                label={t("settings.litert.addModel")}
+                variant="highlight"
+                disabled={!!downloadingLitert}
+                onPress={openAddModelSheet}
+              />
+            </Group>
+          )}
 
-          {(installedLitertModels.length > 0 || !!downloadingLitert) &&
+          {(!!localSheet?.models.length ||
+            installedLitertModels.length > 0 ||
+            !!downloadingLitert) &&
             renderCardGrid([
+              ...(localSheet?.models ?? []).map((model) => ({
+                key: model.id,
+                title: model.label,
+                status: model.status
+                  ? t(`settings.local.status.${model.status}`)
+                  : "",
+                onPress: () => setSelectedLocalModelId(model.id),
+              })),
               ...(downloadingLitert
                 ? [
                     {
@@ -4107,24 +3995,26 @@ export default function SettingsDrawer({
         </View>
       </View>
 
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>
-            {t("settings.litert.contextTitle")}
-          </Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.litert.contextHelp")}
-          </Text>
-          <Group>
-            <Slider
-              icon={messageIcon}
-              options={litertContextLengthOptions}
-              selectedValue={litertContextLength}
-              onSelect={setLitertContextLength}
-            />
-          </Group>
+      {litertSupported && (
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={styles.settingLabel}>
+              {t("settings.litert.contextTitle")}
+            </Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {t("settings.litert.contextHelp")}
+            </Text>
+            <Group>
+              <Slider
+                icon={messageIcon}
+                options={litertContextLengthOptions}
+                selectedValue={litertContextLength}
+                onSelect={setLitertContextLength}
+              />
+            </Group>
+          </View>
         </View>
-      </View>
+      )}
     </View>
   );
 
@@ -4316,7 +4206,7 @@ export default function SettingsDrawer({
                     t("settings.ollama.unreachableTitle"),
                     t("settings.ollama.unreachableInfo"),
                     undefined,
-                    { image: ollamaErrorImage, messageAlign: "left" },
+                    { image: errorImage, messageAlign: "left" },
                   )
                 }
               />
@@ -4586,12 +4476,8 @@ export default function SettingsDrawer({
           service={OPENAI_PROVIDER_ID}
           url={url}
           disabled={server.disabledModels}
-          capabilities={server.capabilities}
           onChange={(next) =>
             patchOpenAIServer(index, { disabledModels: next })
-          }
-          onCapabilitiesChange={(next) =>
-            patchOpenAIServer(index, { capabilities: next })
           }
           onShowAll={() => openOpenAIModels("list")}
           onOpenModel={(model) => openOpenAIModels("model", model)}
@@ -5296,22 +5182,20 @@ export default function SettingsDrawer({
     switch (page) {
       case "profile":
         return renderProfileSubPage();
-      case "profileedit":
-        return renderProfileEditSubPage();
       case "cloud":
         return renderCloudSubPage();
       case "general":
         return renderGeneralSubPage();
       case "maestro":
         return renderMaestroSubPage();
+      case "maestropreferences":
+        return renderMaestroPreferencesSubPage();
       case "assistantoverlay":
         return renderAssistantOverlaySubPage();
       case "service":
         return renderServiceSubPage();
       case "beta":
         return renderBetaSubPage();
-      case "local":
-        return renderLocalSubPage();
       case "litert":
         return renderLitertSubPage();
       case "litertmodel":
@@ -5927,12 +5811,8 @@ export default function SettingsDrawer({
               service={OPENAI_PROVIDER_ID}
               url={url}
               disabled={server.disabledModels}
-              capabilities={server.capabilities}
               onChange={(next) =>
                 patchOpenAIServer(index, { disabledModels: next })
-              }
-              onCapabilitiesChange={(next) =>
-                patchOpenAIServer(index, { capabilities: next })
               }
               onOpenModel={(m) => {
                 Keyboard.dismiss();
@@ -6361,75 +6241,69 @@ export default function SettingsDrawer({
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.contentCard}>
-              <View
-                style={[
-                  styles.settingRowVertical,
-                  { marginBottom: Spacing.md },
-                ]}
-              >
-                <Text style={styles.settingLabel}>
-                  {selectedLocalModel.label}
-                </Text>
-                {selectedLocalModel.status && (
-                  <Text style={[styles.helpText, { marginBottom: 0 }]}>
-                    {t(`settings.local.status.${selectedLocalModel.status}`)}
-                  </Text>
-                )}
-              </View>
+              <Group style={styles.localModelFacts}>
+                <ActionButton
+                  label={selectedLocalModel.label}
+                  rightElement={
+                    selectedLocalModel.status && (
+                      <Text
+                        style={styles.localModelFactValue}
+                        numberOfLines={1}
+                      >
+                        {t(`settings.local.status.${selectedLocalModel.status}`)}
+                      </Text>
+                    )
+                  }
+                />
+                {(
+                  [
+                    ["family", localSheet?.family],
+                    ["runtime", localSheet?.runtime],
+                    ["browser", localSheet?.browser],
+                    ["version", selectedLocalModel.version],
+                    [
+                      "context",
+                      selectedLocalModel.contextTokens !== undefined
+                        ? t("settings.local.sheet.tokens", {
+                            count:
+                              selectedLocalModel.contextTokens.toLocaleString(),
+                          })
+                        : undefined,
+                    ],
+                    [
+                      "thinking",
+                      selectedLocalModel.thinking !== undefined
+                        ? t(
+                            selectedLocalModel.thinking
+                              ? "settings.local.sheet.yes"
+                              : "settings.local.sheet.no",
+                          )
+                        : undefined,
+                    ],
+                  ] as const
+                )
+                  .filter(([, value]) => !!value)
+                  .map(([key, value]) => (
+                    <ActionButton
+                      key={key}
+                      label={t(`settings.local.sheet.${key}`)}
+                      rightElement={
+                        <Text
+                          style={styles.localModelFactValue}
+                          numberOfLines={1}
+                          ellipsizeMode="middle"
+                        >
+                          {value}
+                        </Text>
+                      }
+                    />
+                  ))}
+              </Group>
 
-              <Group>
-                {selectedLocalModel.status && (
-                  <ActionButton
-                    label={t("settings.local.sheet.status")}
-                    rightElement={
-                      <Text style={styles.litertRowMeta}>
-                        {t(
-                          `settings.local.status.${selectedLocalModel.status}`,
-                        )}
-                      </Text>
-                    }
-                  />
-                )}
-                {!!selectedLocalModel.version && (
-                  <ActionButton
-                    label={t("settings.local.sheet.version")}
-                    rightElement={
-                      <Text style={styles.litertRowMeta}>
-                        {selectedLocalModel.version}
-                      </Text>
-                    }
-                  />
-                )}
-                {selectedLocalModel.contextTokens !== undefined && (
-                  <ActionButton
-                    label={t("settings.local.sheet.context")}
-                    rightElement={
-                      <Text style={styles.litertRowMeta}>
-                        {t("settings.local.sheet.tokens", {
-                          count:
-                            selectedLocalModel.contextTokens.toLocaleString(),
-                        })}
-                      </Text>
-                    }
-                  />
-                )}
-                {selectedLocalModel.thinking !== undefined && (
-                  <ActionButton
-                    label={t("settings.local.sheet.thinking")}
-                    rightElement={
-                      <Text style={styles.litertRowMeta}>
-                        {t(
-                          selectedLocalModel.thinking
-                            ? "settings.local.sheet.yes"
-                            : "settings.local.sheet.no",
-                        )}
-                      </Text>
-                    }
-                  />
-                )}
-                {localSheet?.canDownload &&
-                  (selectedLocalModel.status === "downloadable" ||
-                    selectedLocalModel.status === "downloading") && (
+              {localSheet?.canDownload &&
+                (selectedLocalModel.status === "downloadable" ||
+                  selectedLocalModel.status === "downloading") && (
+                  <Group style={styles.litertDetailDownload}>
                     <ActionButton
                       icon={downloadIcon}
                       label={t("settings.local.download")}
@@ -6438,8 +6312,8 @@ export default function SettingsDrawer({
                         handleDownloadLocal(selectedLocalModel.id);
                       }}
                     />
-                  )}
-              </Group>
+                  </Group>
+                )}
 
               {!!localDownload && (
                 <DownloadProgress
@@ -6539,6 +6413,51 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
+  const profileEditSheet = (
+    <DrawerSheet
+      visible={profileEditVisible}
+      onClose={() => {
+        setConfirmedName(name);
+        setProfileEditVisible(false);
+      }}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      avoidKeyboard
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.addModelSheetDesktop}
+    >
+      <ScrollView
+        contentContainerStyle={styles.addModelSheetContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.profile.name")}
+            </Text>
+            <Group>
+              <TextInputField
+                icon={penPlaceholderIcon}
+                placeholder={t("onboarding.name.placeholder")}
+                value={name}
+                onChangeText={setName}
+                onSubmitEditing={() => setConfirmedName(name)}
+              />
+            </Group>
+          </View>
+        </View>
+      </ScrollView>
+    </DrawerSheet>
+  );
+
   if (isDesktop) {
     if (!desktopMounted) return null;
     const windowTranslateY = largeScreenAnim.interpolate({
@@ -6630,6 +6549,7 @@ export default function SettingsDrawer({
             {cloudSetupSheet}
             {localModelDetailSheet}
             {litertDownloadSheet}
+            {profileEditSheet}
           </Animated.View>
         </View>
         {notificationModal}
@@ -6674,6 +6594,7 @@ export default function SettingsDrawer({
       {cloudSetupSheet}
       {localModelDetailSheet}
       {litertDownloadSheet}
+      {profileEditSheet}
     </View>
   );
 
@@ -6849,6 +6770,18 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     litertCancelRow: {
       marginTop: Spacing.md,
+    },
+    //rows like the chat details sheet
+    localModelFacts: {
+      borderWidth: 0,
+    },
+    localModelFactValue: {
+      flexShrink: 1,
+      maxWidth: "60%",
+      textAlign: "right",
+      color: Colors.textMuted,
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.label,
     },
     litertDetailHeader: {
       flexDirection: "row",

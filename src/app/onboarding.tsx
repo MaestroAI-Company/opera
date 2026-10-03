@@ -453,8 +453,10 @@ export default function OnboardingPage() {
       <Reveal>
         <Text style={styles.title}>{t("onboarding.voice.title")}</Text>
       </Reveal>
-      <ButterflyCluster parallax={false} intro={false} style={styles.voiceButterfly} />
       <Reveal delay={100}>
+        <ButterflyCluster parallax={false} intro={false} style={styles.voiceButterfly} />
+      </Reveal>
+      <Reveal delay={200}>
         <VoiceEngineCard />
       </Reveal>
     </>

@@ -112,6 +112,9 @@ export const en = {
     "Do you want to download the Gemma4 model to your Ollama server? This model is several GB in size.",
   "modelSelector.download.confirm": "Download",
   "modelSelector.tokenWindow": "Token window",
+  "modelSelector.placeholder": "Model",
+  "modelSelector.noProvider":
+    "No provider enabled, turn one on in Settings → Service",
 
   "selector.placeholder": "Select...",
 

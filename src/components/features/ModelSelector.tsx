@@ -209,7 +209,7 @@ const ModelRow = memo(function ModelRow({
       }}
       style={pressStyle(
         [styles.option, highlighted && styles.optionSelected, height > 0 && { height }],
-        highlighted ? { backgroundColor: Colors.primaryActive } : "subtle",
+        highlighted ? { backgroundColor: Colors.primaryBright } : "subtle",
       )}
     >
       <Text
@@ -1271,7 +1271,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     downloadText: {
       fontSize: FontSizes.caption,
-      color: Colors.linkAlt,
+      color: Colors.primary,
       fontFamily: Fonts.mono,
     },
   });

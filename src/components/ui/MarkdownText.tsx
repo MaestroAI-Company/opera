@@ -48,7 +48,7 @@ const makeS = (Colors: ThemeColors) => StyleSheet.create({
   },
   codeTitle: {
     fontFamily: Fonts.mono,
-    fontSize: FontSizes.title,
+    fontSize: FontSizes.lg,
     color: Colors.textPrimary,
     flex: 1,
     marginRight: Spacing.sm,
@@ -67,7 +67,7 @@ const makeS = (Colors: ThemeColors) => StyleSheet.create({
   },
   h1: { fontSize: FontSizes.displaySm, fontWeight: "bold", marginTop: 8, marginBottom: 4, color: Colors.textPrimary },
   h2: { fontSize: FontSizes.xl, fontWeight: "bold", marginTop: 7, marginBottom: 3, color: Colors.textPrimary },
-  h3: { fontSize: FontSizes.title, fontWeight: "bold", marginTop: 6, marginBottom: 3, color: Colors.textPrimary },
+  h3: { fontSize: FontSizes.lg, fontWeight: "bold", marginTop: 6, marginBottom: 3, color: Colors.textPrimary },
   h4: { fontSize: FontSizes.lg, fontWeight: "bold", marginTop: 5, marginBottom: 3, color: Colors.textPrimary },
   paragraph: { marginVertical: 2 },
   spacing: { height: 8 },

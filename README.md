@@ -74,7 +74,7 @@ constants/             design tokens (theme.ts) and system prompts
 native/android/        native Kotlin/Java modules (assistant service, overlay, screen capture)
 plugins/               custom Expo config plugins
 src-tauri/             desktop shell
-design/                standalone design system showcase (index.html)
+design/                design system rules (DESIGN.md)
 assets/                icons, images, fonts, animations, on-device models
 ```
 

@@ -160,7 +160,7 @@ export default function NotificationModal({
                           btn.disabled && styles.buttonDisabled,
                         ],
                         !btn.disabled && (isPrimary || isDanger
-                          ? { backgroundColor: Colors.primaryPressed, borderColor: Colors.primaryPressed }
+                          ? { backgroundColor: Colors.primaryBright, borderColor: Colors.primaryBright }
                           : "surface")
                       )}
                       onPress={() => !btn.disabled && btn.onPress()}

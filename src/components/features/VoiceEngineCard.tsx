@@ -185,7 +185,7 @@ export default function VoiceEngineCard() {
     <View style={styles.contentCard}>
       <View style={styles.settingRowVertical}>
         <Text style={styles.settingLabel}>{t("settings.tts.label")}</Text>
-        <Text style={styles.helpText}>{t("settings.tts.help")}</Text>
+        <Text style={[styles.helpText, styles.labelGap]}>{t("settings.tts.help")}</Text>
         <Group>
           <Selector
             options={ttsEngineOptions}
@@ -267,7 +267,6 @@ const makeStyles = (Colors: ThemeColors) =>
       lineHeight: 20,
       color: Colors.textMuted,
       marginTop: Spacing.xs,
-      marginBottom: Spacing.md,
       paddingHorizontal: Spacing.md,
     },
   });

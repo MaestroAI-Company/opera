@@ -36,7 +36,7 @@ export default function DownloadProgress({ title, progress, sizeStr, etaSeconds 
         {title}
       </Text>
       <View style={{ height: 6, backgroundColor: Colors.surfacePressed, borderRadius: Radius.xxs, overflow: "hidden", marginBottom: 8 }}>
-        <View style={{ width: `${progress * 100}%`, height: "100%", backgroundColor: Colors.linkAlt }} />
+        <View style={{ width: `${progress * 100}%`, height: "100%", backgroundColor: Colors.primary }} />
       </View>
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
         <Text style={{ fontFamily: Fonts.mono, color: Colors.textMuted, fontSize: FontSizes.micro }}>

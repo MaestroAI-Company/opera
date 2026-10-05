@@ -104,7 +104,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     backgroundColor: Colors.groupedBackground,
     borderTopLeftRadius: Radius.huge2,
     borderTopRightRadius: Radius.huge2,
-    paddingTop: 12,
+    paddingTop: Spacing.lg2,
   },
   desktopCard: {
     width: DESKTOP_CARD_WIDTH,
@@ -112,8 +112,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   sheetHandleContainer: {
     alignItems: "center",
     marginBottom: Spacing.xs2,
-    paddingVertical: 10,
-    marginTop: -10,
+    paddingVertical: Spacing.lg,
+    marginTop: -Spacing.lg,
   },
   content: {
     paddingHorizontal: Spacing.lg2,

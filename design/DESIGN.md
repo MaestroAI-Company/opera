@@ -4,8 +4,6 @@ name: Opera
 description: Warm editorial privacy-first design system for Opera, a local on-device AI assistant. The app is Opera; the assistant persona is Maestro.
 colors:
   primary: "#FF1A1A"
-  primary-pressed: "#D61515"
-  primary-active: "#CC1414"
   primary-bright: "#FF4D4D"
   background: "#FDF8F1"
   surface: "#FFFFFF"
@@ -20,18 +18,13 @@ colors:
   text-secondary: "#444444"
   text-muted: "#888888"
   text-on-primary: "#FFFFFF"
-  link: "#3B82F6"
-  link-alt: "#0066CC"
   error: "#FF4444"
-  danger-border: "#FF1A1A22"
-  danger-bg: "#FFF0F0"
-  danger-bg-soft: "#FFF5F5"
-  danger-border-soft: "#FFCCCC"
   code-block-bg: "#1E1E1E"
   code-block-text: "#D4D4D4"
   code-inline-text: "#D63384"
   window-close: "#E81123"
   window-close-pressed: "#F1707A"
+  snackbar-bg: "#444444"
   incognito: "#565A75"
   incognito-pressed: "#3E4157"
   incognito-bright: "#70748E"
@@ -55,7 +48,7 @@ typography:
     lineHeight: 1.2
   title:
     fontFamily: FragmentMono
-    fontSize: 17px
+    fontSize: 18px
     fontWeight: 500
   label:
     fontFamily: FragmentMono
@@ -112,7 +105,7 @@ components:
     rounded: "{rounded.xxl}"
     padding: 12px
   button-primary-pressed:
-    backgroundColor: "{colors.primary-pressed}"
+    backgroundColor: "{colors.primary-bright}"
   button-ghost:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.text-secondary}"
@@ -121,12 +114,6 @@ components:
     padding: 12px
   button-ghost-pressed:
     backgroundColor: "{colors.surface-pressed}"
-  button-danger:
-    backgroundColor: "{colors.danger-bg}"
-    textColor: "{colors.primary}"
-    typography: "{typography.label}"
-    rounded: "{rounded.xxl}"
-    padding: 12px
   input-field:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.text-secondary}"
@@ -172,7 +159,7 @@ components:
     height: 26px
     width: 44px
   snackbar:
-    backgroundColor: "{colors.text-tertiary}"
+    backgroundColor: "{colors.snackbar-bg}"
     textColor: "{colors.text-on-primary}"
     typography: "{typography.label}"
     rounded: "{rounded.pill}"
@@ -188,13 +175,13 @@ Emotionally the app should feel trustworthy and calm — like a premium broadshe
 
 The palette is rooted in a warm cream foundation, a single red accent, and a full purple-gray recolor for incognito mode.
 
-- **Primary — Opera Red (#FF1A1A):** The sole interaction color. Drives primary actions, the chat composer, user chat bubbles, CTAs, and text selection. Use for the single most important action per screen; never for decoration.
-- **Primary pressed/active (#D61515 / #CC1414):** Slightly darker red for pressed and active states of red surfaces.
+- **Primary — Opera Red (#FF1A1A):** The sole interaction color. Drives primary actions, the chat composer, user chat bubbles, CTAs, and text selection. It also marks the active state of controls (checked Toggle and Checkbox, selected pill, selected IconSelector tile, granted permission badge) and the icon badges of top-level navigation (settings home, conversations quick actions). Use it for the single most important action per screen; never for decoration.
+- **Primary bright (#FF4D4D):** The pressed color. Every pressed, hovered or lit red surface goes to this lighter red, never to a darker one. Incognito does the same with its own bright tone (#70748E).
 - **Background (#FDF8F1):** A warm cream canvas, softer than white, giving the editorial feel. Every screen sits on it.
 - **Surfaces (#FFFFFF + muted/subtle/pressed):** White cards and fields on the cream canvas; muted grays for pressed rows and subtle fills.
 - **Text ramp (#000000 → #888888):** Three neutral steps — primary (#000000), secondary (#444444) and muted (#888888) — plus white on colored surfaces. Full-black text on cream keeps maximum readability. Do not introduce intermediate greys outside these tokens.
 - **Incognito (#565A75):** A purple-gray identity that swaps out every red element when ephemeral mode is on. Base #565A75 acts like the red's role, with a dark surface #2A2A35 for the composer.
-- **Link (#3B82F6):** Blue reserved for hyperlinks and "Confidentiality" links.
+- **Links:** Opera Red with an underline, in markdown and onboarding. There is no separate link blue.
 - **Code (#1E1E1E blocks / #D63384 inline):** Dark blocks with light-gray text; pink inline code.
 
 ## Typography
@@ -202,8 +189,8 @@ The palette is rooted in a warm cream foundation, a single red accent, and a ful
 Three fonts with strict roles — never swap them.
 
 - **Petrona (serif):** Display only. Drawer titles ("Settings", "Discussions"), conversation headers, welcome and onboarding screens. Sizes 22–48px. It carries the editorial, literary identity.
-- **Figtree:** Reading content. Chat bubbles, markdown body, captions, help text. Sizes 13–16px.
-- **Fragment Mono:** UI chrome. Buttons, labels, nav items, timestamps, dropdown options, setting names, section headers. Sizes 10–17px. Its technical construction gives the terminal/engineer feel that matches a local AI tool.
+- **Figtree:** Reading content. Chat bubbles, markdown body, captions, help text. Sizes 13–18px; chat text and widget captions use the 18px size.
+- **Fragment Mono:** UI chrome. Buttons, labels, nav items, timestamps, dropdown options, setting names, section headers. Sizes 10–18px. Titles (modal, notification, navigation, item names) share one 18px size, `FontSizes.lg` in code. Its technical construction gives the terminal/engineer feel that matches a local AI tool.
 
 ## Layout
 
@@ -234,13 +221,14 @@ The shape language is **sticker-like**: 2px outlines on nearly every interactive
 
 ## Components
 
-- **Buttons:** Primary is solid Opera Red with white mono text (pressed → #D61515). Ghost is white with a 2px ink outline and mono secondary text (pressed → surface-pressed). Danger is a soft red-tinted fill (#FFF0F0) with red mono text.
+- **Buttons:** Primary is solid Opera Red with white mono text (pressed → lighter #FF4D4D). Ghost is white with a 2px ink outline and mono secondary text (pressed → surface-pressed). In drawers and sheets, buttons are `ActionButton` rows (see Component Placement). In a `NotificationModal`, `primary` and `danger` buttons are both solid red and come last; `secondary` is the white one.
 - **Input fields:** A borderless 44px row, mono 14px text, placeholder `text-muted`, optional 18×18 leading icon. The outline and 10px radius come from the `Group` around it (see Component Placement).
 - **Chat messages:** User messages are right-aligned red pills (10px radius, max-width 80%) with white Figtree text — purple #565A75 in incognito. Assistant messages are transparent and full-width, rendered as markdown with no bubble.
 - **Chat composer:** A 56px colored pill (red, or dark #2A2A35 incognito) with a glow shadow; white 16px text, 28×28 plus/mic/send icon buttons.
 - **Code blocks:** Dark #1E1E1E background, #D4D4D4 text, 6px radius, mono 13px, VS2015-style highlighting. Inline code is #F0F0F0 with pink #D63384 text.
 - **Drawers & modals:** Drawers and sheets sit on the grouped background with a drawer scrim (rgba(0,0,0,0.25)), modals are white windows on a modal scrim (rgba(0,0,0,0.4)); desktop sheet cards use the sticker shadow (see Drawers). Confirmation/info modals (`NotificationModal`) use a 15px window radius, with their buttons and text input kept at the 10px default.
-- **Snackbar:** A #333333 pill floating above the composer, white mono text.
+- **Snackbar:** A dark pill (`snackbar-bg`: #444444 in light, #3A3A3A in dark) floating above the composer, white mono text.
+- **Pressed state:** any element with a pressed or hover feedback lightens its main color, never darkens it. Red surfaces (buttons, checked checkbox, selected rows, banner, call-to-action) go to `primary-bright` (#FF4D4D), incognito surfaces go to `incognito-bright` (#70748E), and the chat composer and the Selector, Slider and model pills already do. An icon button on a red row lifts it with a white tint. Neutral surfaces keep their gray fill (`surface-pressed`), since white cannot get lighter. In code, use `pressStyle(base, "primary")` or `Colors.primaryBright`; never hardcode a darker red.
 
 ## Page Structure
 
@@ -257,7 +245,7 @@ Drawer or sheet        SettingsDrawer, ConversationsDrawer, DrawerSheet
             └─ Controls    ActionButton, TextInputField, Selector, Slider...
 ```
 
-The structure styles live in `makeStyles` of `src/components/features/SettingsDrawer.tsx`. Components built outside it (`VoiceEngineCard`, `BugReportSheet`, `MessageDetailsSheet`) copy the same values and must stay identical.
+The structure styles live in `makeStyles` of `src/components/features/SettingsDrawer.tsx`. Components built outside it (`VoiceEngineCard`, `NextcloudSetup`, `BugReportSheet`, `MessageDetailsSheet`) copy the same values and must stay identical.
 
 | Between                         | Style                             | Value                                   |
 | ------------------------------- | --------------------------------- | --------------------------------------- |
@@ -275,7 +263,7 @@ The structure styles live in `makeStyles` of `src/components/features/SettingsDr
 - One `<View style={styles.subPageContainer}>` per page, opened by `renderSubPageHeader(title)`.
 - The header is a 40px spacer, the title, a 40px spacer. Title: Petrona `FontSizes.xxxl`, centered, line height 40. The left spacer keeps room for the floating back button.
 - The drawer wraps each page in its own `KeyboardAwareScrollView` (top padding 60 on mobile, `Spacing.xxl2` on desktop, bottom 40). A page never adds its own scroll view.
-- Order: optional notices (NotificationCard, NotificationBanner), sections, then page-level navigation Groups.
+- Order: optional notices (NotificationCard, NotificationBanner) first, then sections and page-level navigation Groups. A navigation Group usually closes the page. It opens the page when navigation is its main content (Services) or when it leads to the page's own settings (MCP server).
 
 ```tsx
 const renderGeneralSubPage = () => (
@@ -293,7 +281,6 @@ const renderGeneralSubPage = () => (
 - `<View style={styles.contentCard}>`: `Colors.surface`, no outline, radius `Radius.xxl + Spacing.md` (18), padding `Spacing.md`, `marginBottom: Spacing.xxl2`.
 - The radius is the Group radius plus the card padding, so a Group inside keeps concentric corners.
 - One section per topic. Start a new section instead of drawing a divider.
-- Name each section with a JSX comment: `{/* sharing instance card */}`.
 
 ### Row
 
@@ -353,32 +340,35 @@ A toggle row puts label and help on the left and the Toggle on the right, with n
 | `groupSpacingTight`          | first of two Groups stacked in one row                                                                                                  |
 | `highlightGroup`             | the main action: `Colors.primary` fill, `borderOnPrimary` outline, one `ActionButton variant="highlight"` inside. One per page or sheet |
 | `highlightGroupDisabled`     | opacity 0.5 on a highlight Group whose action is disabled                                                                               |
+| `infoGroup`                  | static info rows on a white card: no outline, so they read as a plain list                                                              |
 
 ```tsx
-{
-  /* page-level navigation group */
-}
-<Group style={styles.groupSpacing}>
-  {renderToolsNavRow("widgets", t("settings.tools.widgets.title"), widgetsHelp)}
-  {renderToolsNavRow(
-    "mcpservers",
-    t("settings.tools.mcp.title"),
-    t("settings.tools.mcp.help"),
-  )}
-</Group>;
+<>
+  {/* page-level navigation group */}
+  <Group style={styles.groupSpacing}>
+    {renderToolsNavRow(
+      "widgets",
+      t("settings.tools.widgets.title"),
+      widgetsHelp,
+    )}
+    {renderToolsNavRow(
+      "mcpservers",
+      t("settings.tools.mcp.title"),
+      t("settings.tools.mcp.help"),
+    )}
+  </Group>
 
-{
-  /* main action */
-}
-<Group style={[styles.highlightGroup, busy && styles.highlightGroupDisabled]}>
-  <ActionButton
-    icon={addIcon}
-    label={t("settings.server.add")}
-    variant="highlight"
-    disabled={busy}
-    onPress={submit}
-  />
-</Group>;
+  {/* main action */}
+  <Group style={[styles.highlightGroup, busy && styles.highlightGroupDisabled]}>
+    <ActionButton
+      icon={addIcon}
+      label={t("settings.server.add")}
+      variant="highlight"
+      disabled={busy}
+      onPress={submit}
+    />
+  </Group>
+</>
 ```
 
 ## Component Placement
@@ -412,31 +402,32 @@ Two families:
 - A row with 12px padding, an 18×18 icon and a one-line Fragment Mono `FontSizes.body` label.
 - `variant="highlight"` only inside a `highlightGroup`.
 - `iconBadge` puts the icon on a 36×36 red tile, for top-level actions (conversations drawer).
-- Without `onPress` it is a static info row: put the value in `rightElement` with the `infoValue` style (mono `FontSizes.label`, `textMuted`, right aligned, max 60%).
+- Without `onPress` it is a static info row: put the value in `rightElement` with the `infoValue` style (mono `FontSizes.label`, `textMuted`, right aligned, max 60%). Info rows sit in a `<Group style={styles.infoGroup}>` (no outline) so they read as a plain list on the white card. Under a ProgressBar they share its outlined Group instead.
+- Destructive actions (delete, remove, disconnect) are plain ActionButtons with a bin or cancel icon, never red. They always ask for confirmation in a NotificationModal.
 
 ```tsx
-<Group>
-  <ActionButton
-    icon={operaIcon}
-    label={t("settings.info.website")}
-    onPress={openWebsite}
-  />
-  <ActionButton icon={githubIcon} label="Github" onPress={openGithub} />
-</Group>;
+<>
+  <Group>
+    <ActionButton
+      icon={operaIcon}
+      label={t("settings.info.website")}
+      onPress={openWebsite}
+    />
+    <ActionButton icon={githubIcon} label="Github" onPress={openGithub} />
+  </Group>
 
-{
-  /* info rows */
-}
-<Group>
-  <ActionButton
-    label={t("messageDetails.model")}
-    rightElement={
-      <Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="middle">
-        {model}
-      </Text>
-    }
-  />
-</Group>;
+  {/* info rows */}
+  <Group style={styles.infoGroup}>
+    <ActionButton
+      label={t("messageDetails.model")}
+      rightElement={
+        <Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="middle">
+          {model}
+        </Text>
+      }
+    />
+  </Group>
+</>
 ```
 
 ### TextInputField
@@ -618,7 +609,18 @@ A pattern, not a component. Rows that open a subpage go in a page-level `<Group 
 - Confirmations and alerts: a centered white window, `Radius.window`, max 400 wide, on `scrimModal`.
 - Mounted at the root of the drawer or screen, next to the content, driven by `visible`.
 - Buttons take `style: "primary" | "secondary" | "danger"`. One optional input (`showInput`, wrapped in a Group inside) and one optional checkbox list (`options`).
+- A destructive confirmation pairs a `secondary` cancel button with a `danger` button for the action, which the modal shows last, in red.
 - A form with more than one field is a DrawerSheet, not a modal.
+
+### Other patterns
+
+Layouts used across pages that are not components:
+
+- **Card grid** (`renderCardGrid` in `SettingsDrawer.tsx`): the items the user added or installed (servers, models) as two-column framed tiles under the section's main action. A lone last tile takes the full row. A tile opens the item's page or sheet.
+- **Detail header** (`litertDetailHeader`): the first block of an item page or sheet. A 120px logo tile, then the name (Fragment Mono `FontSizes.lg`), Figtree meta lines and capability icons. Related items follow as horizontal carousels of 96px tiles.
+- **Hero** (`MaestroCard`, `ProfileCard`, the cloud account avatar): an illustration that introduces a page, centered above its sections or at the top of its section.
+- **Actions section**: the reconnect, delete and remove actions of an item page close it in their own section, as one Group with no label.
+- **Conversation list**: rows sit straight on the grouped background under Fragment Mono uppercase titles (`sectionTitle`). The selected row turns into the red pill and shows its actions (share, pin, delete) as white IconButtons.
 
 ## Drawers
 
@@ -637,7 +639,7 @@ Three containers hold pages. All sit on `Colors.groupedBackground`, pad their co
 - Opened and closed with `settleDrawer` (spring, stiffness 500, damping 45). Their progress values (`conversationsProgress`, `settingsProgress` in `drawerAnimation.ts`) live at module scope so the chat screen's edge swipe drags them one to one.
 - The scrim (`Colors.scrimDrawer`) fades with the progress; a tap on it closes the drawer.
 - Content is a `PageStack` of pages.
-- `DrawerBackButton` floats top left in `fixedBackWrapper` (top 60), above the scroll, never inside a page. `kind="close"` on the root page, `kind="back"` on a subpage. `scrolled` adds a surface and a sticker shadow once content passes under it, `pulseKey={activeSubPage}` pulses it on each page change.
+- `DrawerBackButton` floats top left in `fixedBackWrapper` (top 60), above the scroll, never inside a page. `kind="close"` on the root page, `kind="back"` on a subpage. `scrolled` adds a surface and a sticker shadow once content passes under it, `pulseKey={activeSubPage}` pulses it on each page change. A page whose header does not scroll (conversation search) keeps the button in the header's left slot instead.
 - Mobile only: 60px `LinearGradient` fades at the top and bottom (grouped background to clear). None on desktop.
 - Sheets owned by a drawer are rendered after its panel, inside the drawer root, so they cover it.
 
@@ -659,8 +661,8 @@ To add a settings subpage:
 
 - `mode="overlay"`: above everything on a scrim, slides up its own measured height, closes on pull down or flick, on Android back and on Escape.
 - `mode="lift"`: inside the layout, pushes the content above instead of covering it (attachment sheet under the chat bar). The parent screen handles back.
-- Large screen and desktop: a centered card (`Radius.window`, 2px outline, sticker shadow `-6px 6px 0px shadowInk`) with a close button top left. The card look lives only in DrawerSheet; consumers pass nothing but a width through `desktopStyle`. `anchored` hangs the card under its trigger with no close button (model selector on tablet).
-- `avoidKeyboard` when it holds a TextInputField; it then needs a `maxHeight` in `sheetStyle`.
+- Large screen and desktop: a centered card (`Radius.window`, 2px outline, sticker shadow `-6px 6px 0px shadowInk`) with a close button top left. The card look lives only in DrawerSheet; consumers pass nothing but a width through `desktopStyle`, plus `height: "100%"` when the sheet holds a PageStack, since stacked pages cannot size it. `anchored` hangs the card under its trigger with no close button (model selector on tablet).
+- `avoidKeyboard` when it holds a TextInputField; it then needs a `maxHeight` in `sheetStyle`. A sheet too tall to ride the keyboard scrolls in a `KeyboardAwareScrollView` instead (MCP add server).
 - `onBackPress` returns `true` when the sheet popped one of its own pages instead of closing.
 - Content: a `ScrollView` padded `Spacing.lg2` on the sides, then sections, rows and Groups like a page, without the Petrona header. The first row label acts as the title.
 - A sheet with several pages puts a `PageStack` in its body, a floating `DrawerBackButton kind="back"` on non-root pages, and pops pages in `onBackPress` (add model sheet).
@@ -711,13 +713,13 @@ sheet: {
   backgroundColor: Colors.groupedBackground,
   borderTopLeftRadius: Radius.huge2,
   borderTopRightRadius: Radius.huge2,
-  paddingTop: 12,
+  paddingTop: Spacing.lg2,
 },
 sheetHandleContainer: {
   alignItems: "center",
   marginBottom: Spacing.xs2,
-  paddingVertical: 10,
-  marginTop: -10,
+  paddingVertical: Spacing.lg,
+  marginTop: -Spacing.lg,
 },
 desktopCard: {
   width: DESKTOP_CARD_WIDTH,
@@ -741,12 +743,14 @@ Structured results (weather, contact lookup, calendar events, timers, math) shar
 
 ## Do's and Don'ts
 
-- Do use Opera Red only for the single most important action per screen.
+- Do keep Opera Red for the main action of a screen, the active state of controls and top-level navigation badges; never for decoration.
 - Do always pull values from the design tokens in `constants/theme.ts` (Colors, Fonts, FontSizes, Spacing, Radius) — never hardcode colors, fonts, or radii.
 - Do use Petrona for display headings, Figtree for reading, and Fragment Mono for UI chrome.
 - Do keep the incognito recolor coherent: swap every red element to the purple-gray #565A75 family.
+- Do lighten the main color on press and hover (`primary-bright`, `incognito-bright` in incognito), the same way on every element.
 
+- Don't darken the main color for a pressed state.
 - Don't add heavy drop shadows; prefer sticker shadows and 2px outlines.
 - Don't mix serif display and monospace in the same heading.
 - Don't exceed the 10px default radius on data-dense cards.
-- Do keep body text at WCAG AA contrast. Note: white text on Opera Red is ~3.9:1, so use red surfaces for large or bold text and chrome, not small body copy.
+- Do keep body text at WCAG AA contrast. Note: white text on Opera Red is ~3.9:1, so use red surfaces for large or bold text and chrome, not small body copy. A pressed red surface drops to ~3.3:1, which is acceptable for the brief feedback of chrome and bold labels.

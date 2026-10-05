@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { LayoutChangeEvent, LayoutRectangle, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, Vibration, View } from "react-native";
 import Animated, { Easing, interpolate, interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
-import { Fonts, FontSizes, Radius, ThemeColors } from "../../../constants/theme";
+import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { pressStyle } from "./pressStyle";
@@ -349,7 +349,7 @@ export default function Selector({
                       }}
                       style={pressStyle(
                         [option.isDownload ? styles.downloadOption : styles.option, isSpecialActive && styles.optionSelected],
-                        isSpecialActive ? { backgroundColor: Colors.primaryActive } : option.isDownload ? "surface" : "subtle"
+                        isSpecialActive ? { backgroundColor: Colors.primaryBright } : option.isDownload ? "surface" : "subtle"
                       )}
                     >
                       {option.isDownload && (
@@ -461,9 +461,9 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   sectionTitle: {
     fontSize: FontSizes.label,
     color: Colors.textMuted,
-    marginBottom: 8,
-    marginTop: 8,
-    fontFamily: Fonts.body,
+    marginBottom: Spacing.md,
+    marginTop: Spacing.md,
+    fontFamily: Fonts.mono,
     textTransform: "uppercase",
     letterSpacing: 1,
   },

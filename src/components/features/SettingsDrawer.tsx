@@ -589,7 +589,7 @@ const ModelToggleList = memo(function ModelToggleList({
           </Text>
         ) : (
           <>
-            <Group style={{ marginBottom: Spacing.md }}>
+            <Group style={styles.groupSpacingTight}>
               <TextInputField
                 icon={searchIcon}
                 placeholder={t("settings.ollama.searchModels")}
@@ -3676,7 +3676,7 @@ export default function SettingsDrawer({
               </View>
 
               {cloudRows.length > 0 && (
-                <View style={styles.groupSpacingTight}>
+                <Group style={[styles.infoGroup, styles.groupSpacingTight]}>
                   {cloudRows.map((row) => (
                     <ActionButton
                       key={row.label}
@@ -3692,7 +3692,7 @@ export default function SettingsDrawer({
                       }
                     />
                   ))}
-                </View>
+                </Group>
               )}
 
               <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
@@ -3717,6 +3717,7 @@ export default function SettingsDrawer({
                         : t("cloudSync.createPin")
                     }
                     variant="highlight"
+                    disabled={isSyncing}
                     onPress={
                       hasCloudBackup ? handleUnlockSyncPin : handleCreateSyncPin
                     }
@@ -4888,29 +4889,24 @@ export default function SettingsDrawer({
       <View style={styles.subPageContainer}>
         {renderSubPageHeader(server.name)}
 
-        {/* server settings card */}
-        <View style={styles.contentCard}>
-          {status.error ? (
-            <View style={styles.settingRowVertical}>
+        {status.error ? (
+          <View style={styles.contentCard}>
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
               <Text style={[styles.helpText, { color: Colors.error }]}>
                 {status.error}
               </Text>
             </View>
-          ) : null}
-
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {server.name}
-            </Text>
-            <Group>
-              <ActionButton
-                icon={arrowIcon}
-                label={t("settings.server.settings")}
-                onPress={() => setActiveSubPage("mcpserversettings")}
-              />
-            </Group>
           </View>
-        </View>
+        ) : null}
+
+        {/* server settings link */}
+        <Group style={styles.groupSpacing}>
+          {renderToolsNavRow(
+            "mcpserversettings",
+            t("settings.server.settings"),
+            server.url,
+          )}
+        </Group>
 
         {/* tools card */}
         {tools.length > 0 && (
@@ -5025,6 +5021,9 @@ export default function SettingsDrawer({
           </View>
 
           <View style={styles.settingRowVertical}>
+            <Text style={styles.settingLabel}>
+              {t("settings.mcp.headerLabel")}
+            </Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
               {t("settings.mcp.headerHelp")}
             </Text>
@@ -5066,6 +5065,9 @@ export default function SettingsDrawer({
           </View>
 
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={styles.settingLabel}>
+              {t("settings.mcp.clientIdLabel")}
+            </Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
               {t("settings.mcp.clientIdHelp")}
             </Text>
@@ -6107,6 +6109,9 @@ export default function SettingsDrawer({
           </View>
 
           <View style={styles.settingRowVertical}>
+            <Text style={styles.settingLabel}>
+              {t("settings.mcp.headerLabel")}
+            </Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
               {t("settings.mcp.headerHelp")}
             </Text>
@@ -6135,6 +6140,9 @@ export default function SettingsDrawer({
           </View>
 
           <View style={styles.settingRowVertical}>
+            <Text style={styles.settingLabel}>
+              {t("settings.mcp.clientIdLabel")}
+            </Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
               {t("settings.mcp.clientIdHelp")}
             </Text>
@@ -6241,7 +6249,7 @@ export default function SettingsDrawer({
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.contentCard}>
-              <Group style={styles.localModelFacts}>
+              <Group style={styles.infoGroup}>
                 <ActionButton
                   label={selectedLocalModel.label}
                   rightElement={
@@ -6303,10 +6311,17 @@ export default function SettingsDrawer({
               {localSheet?.canDownload &&
                 (selectedLocalModel.status === "downloadable" ||
                   selectedLocalModel.status === "downloading") && (
-                  <Group style={styles.litertDetailDownload}>
+                  <Group
+                    style={[
+                      styles.highlightGroup,
+                      styles.litertDetailDownload,
+                      !!localDownload && styles.highlightGroupDisabled,
+                    ]}
+                  >
                     <ActionButton
                       icon={downloadIcon}
                       label={t("settings.local.download")}
+                      variant="highlight"
                       disabled={!!localDownload}
                       onPress={() => {
                         handleDownloadLocal(selectedLocalModel.id);
@@ -6351,61 +6366,58 @@ export default function SettingsDrawer({
         <View style={styles.addModelSheetBody}>
           <ScrollView contentContainerStyle={styles.addModelSheetContent}>
             <View style={styles.contentCard}>
-              <View
-                style={[
-                  styles.settingRowVertical,
-                  { marginBottom: Spacing.md },
-                ]}
-              >
-                <Text style={styles.settingLabel}>
+              <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+                <Text
+                  style={[styles.settingLabel, { marginBottom: Spacing.md }]}
+                >
                   {t("settings.litert.downloadingModel", {
                     name: getLiteRTModelLabel(downloadingLitert),
                   })}
                 </Text>
+
+                <Group style={styles.groupSpacingTight}>
+                  <ProgressBar
+                    progress={litertDownloadProgress?.progress ?? 0}
+                    icon={downloadIcon}
+                  />
+                  <ActionButton
+                    label={t("settings.litert.downloaded")}
+                    rightElement={
+                      <Text style={styles.litertRowMeta}>
+                        {litertDownloadProgress?.sizeStr ??
+                          t("download.starting")}
+                      </Text>
+                    }
+                  />
+                  <ActionButton
+                    label={t("settings.litert.speed")}
+                    rightElement={
+                      <Text style={styles.litertRowMeta}>
+                        {litertDownloadProgress?.speedStr ??
+                          t("download.starting")}
+                      </Text>
+                    }
+                  />
+                  <ActionButton
+                    label={t("settings.litert.timeLeft")}
+                    rightElement={
+                      <Text style={styles.litertRowMeta}>
+                        {litertDownloadProgress?.etaSeconds
+                          ? `${Math.round(litertDownloadProgress.etaSeconds)}s`
+                          : t("download.starting")}
+                      </Text>
+                    }
+                  />
+                </Group>
+
+                <Group>
+                  <ActionButton
+                    icon={cancelIcon}
+                    label={t("settings.litert.cancelDownload")}
+                    onPress={handleCancelLitert}
+                  />
+                </Group>
               </View>
-
-              <Group>
-                <ProgressBar
-                  progress={litertDownloadProgress?.progress ?? 0}
-                  icon={downloadIcon}
-                />
-                <ActionButton
-                  label={t("settings.litert.downloaded")}
-                  rightElement={
-                    <Text style={styles.litertRowMeta}>
-                      {litertDownloadProgress?.sizeStr ??
-                        t("download.starting")}
-                    </Text>
-                  }
-                />
-                <ActionButton
-                  label={t("settings.litert.speed")}
-                  rightElement={
-                    <Text style={styles.litertRowMeta}>
-                      {litertDownloadProgress?.speedStr ??
-                        t("download.starting")}
-                    </Text>
-                  }
-                />
-                <ActionButton
-                  label={t("settings.litert.timeLeft")}
-                  rightElement={
-                    <Text style={styles.litertRowMeta}>
-                      {litertDownloadProgress?.etaSeconds
-                        ? `${Math.round(litertDownloadProgress.etaSeconds)}s`
-                        : t("download.starting")}
-                    </Text>
-                  }
-                />
-              </Group>
-
-              <Group style={styles.litertCancelRow}>
-                <ActionButton
-                  icon={cancelIcon}
-                  label={t("settings.litert.cancelDownload")}
-                  onPress={handleCancelLitert}
-                />
-              </Group>
             </View>
           </ScrollView>
         </View>
@@ -6723,14 +6735,14 @@ const makeStyles = (Colors: ThemeColors) =>
       backgroundColor: Colors.groupedBackground,
       borderTopLeftRadius: Radius.huge2,
       borderTopRightRadius: Radius.huge2,
-      paddingTop: 12,
+      paddingTop: Spacing.lg2,
       overflow: "hidden",
     },
     sheetHandleContainer: {
       alignItems: "center",
       marginBottom: Spacing.xs2,
-      paddingVertical: 10,
-      marginTop: -10,
+      paddingVertical: Spacing.lg,
+      marginTop: -Spacing.lg,
     },
     addModelSheetDesktop: {
       width: 380,
@@ -6768,11 +6780,8 @@ const makeStyles = (Colors: ThemeColors) =>
       color: Colors.textSecondary,
       textAlign: "center",
     },
-    litertCancelRow: {
-      marginTop: Spacing.md,
-    },
     //rows like the chat details sheet
-    localModelFacts: {
+    infoGroup: {
       borderWidth: 0,
     },
     localModelFactValue: {
@@ -6805,7 +6814,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     litertDetailName: {
       fontFamily: Fonts.mono,
-      fontSize: FontSizes.title,
+      fontSize: FontSizes.lg,
       color: Colors.textPrimary,
       marginBottom: Spacing.xs,
     },
@@ -7038,7 +7047,7 @@ const makeStyles = (Colors: ThemeColors) =>
       fontSize: FontSizes.lg,
       fontFamily: Fonts.mono,
       color: Colors.textPrimary,
-      marginBottom: 2,
+      marginBottom: Spacing.xs2,
     },
     navSubtitle: {
       fontSize: FontSizes.bodyMd,
@@ -7047,7 +7056,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     permissionBadge: {
       paddingVertical: 3,
-      paddingHorizontal: 8,
+      paddingHorizontal: Spacing.md,
       borderRadius: Radius.md,
       borderWidth: 2,
       borderColor: Colors.border,
@@ -7055,7 +7064,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     permissionBadgeAllowed: {
       backgroundColor: Colors.primary,
-      borderColor: Colors.primaryBright,
+      borderColor: Colors.borderOnPrimary,
     },
     permissionBadgeText: {
       fontFamily: Fonts.mono,
@@ -7112,16 +7121,17 @@ const makeStyles = (Colors: ThemeColors) =>
       fontSize: FontSizes.bodyMd,
       color: Colors.textMuted,
       fontFamily: Fonts.body,
-      marginTop: 4,
+      marginTop: Spacing.xs,
       lineHeight: 20,
       paddingHorizontal: Spacing.md,
     },
     assistantStatusText: {
       fontSize: FontSizes.bodyMd,
       fontFamily: Fonts.body,
-      marginTop: 6,
-      marginBottom: 12,
+      marginTop: Spacing.sm,
+      marginBottom: Spacing.md,
       lineHeight: 20,
+      paddingHorizontal: Spacing.md,
     },
     assistantStatusOn: {
       color: Colors.primary,

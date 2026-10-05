@@ -133,7 +133,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     backgroundColor: Colors.groupedBackground,
     borderTopLeftRadius: Radius.huge2,
     borderTopRightRadius: Radius.huge2,
-    paddingTop: 12,
+    paddingTop: Spacing.lg2,
     width: '100%',
   },
   inlineSheetIncognito: {
@@ -146,8 +146,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   sheetHandleContainer: {
     alignItems: 'center',
     marginBottom: Spacing.xs2,
-    paddingVertical: 10,
-    marginTop: -10,
+    paddingVertical: Spacing.lg,
+    marginTop: -Spacing.lg,
   },
   sheetHandle: {
     width: 40,

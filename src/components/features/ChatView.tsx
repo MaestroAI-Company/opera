@@ -726,8 +726,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingBottom: 32,
   },
   headerButterfly: {
-    width: 100,
-    height: 90,
+    width: 140,
+    height: 126,
     marginBottom: 22,
   },
   headerTitle: {

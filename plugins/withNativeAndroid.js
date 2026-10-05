@@ -119,6 +119,26 @@ function withNativeAndroid(config) {
       });
     }
 
+    //offer opera as a system screensaver
+    if (!application.service.some(s => s.$['android:name'] === '.OperaDreamService')) {
+      application.service.push({
+        $: {
+          'android:name': '.OperaDreamService',
+          'android:permission': 'android.permission.BIND_DREAM_SERVICE',
+          'android:exported': 'true',
+          'android:description': '@string/dream_description',
+        },
+        'intent-filter': [{
+          action: [{ $: { 'android:name': 'android.service.dreams.DreamService' } }],
+          category: [{ $: { 'android:name': 'android.intent.category.DEFAULT' } }]
+        }],
+        //preview shown in the system picker
+        'meta-data': [{
+          $: { 'android:name': 'android.service.dream', 'android:resource': '@xml/dream_info' }
+        }]
+      });
+    }
+
     //expo-sensors pedometer permission unused by app
     manifestDoc.manifest['uses-permission'] = (manifestDoc.manifest['uses-permission'] || []).filter(
       (p) => p.$['android:name'] !== 'android.permission.ACTIVITY_RECOGNITION'
@@ -162,6 +182,13 @@ function withNativeAndroid(config) {
       // copy XML resources
       copyTemplate('res/xml/voice_interaction.xml', path.join(xmlDir, 'voice_interaction.xml'), packageName);
       copyTemplate('res/xml/recognition_service.xml', path.join(xmlDir, 'recognition_service.xml'), packageName);
+      copyTemplate('res/xml/dream_info.xml', path.join(xmlDir, 'dream_info.xml'), packageName);
+      copyTemplate('res/values/dream_strings.xml', path.join(valuesDir, 'dream_strings.xml'), packageName);
+      copyTemplate('res/values-fr/dream_strings.xml', path.join(projectRoot, 'app', 'src', 'main', 'res', 'values-fr', 'dream_strings.xml'), packageName);
+      //binary file, no package substitution
+      const drawableDir = path.join(projectRoot, 'app', 'src', 'main', 'res', 'drawable-nodpi');
+      fs.mkdirSync(drawableDir, { recursive: true });
+      fs.copyFileSync(path.join(TEMPLATES_DIR, 'res/drawable-nodpi/dream_preview.png'), path.join(drawableDir, 'dream_preview.png'));
 
       // copy themes
       const themesPath = path.join(valuesDir, 'themes.xml');
@@ -183,6 +210,7 @@ function withNativeAndroid(config) {
       copyTemplate('src/MaestroOverlayPackage.kt', path.join(javaDir, 'MaestroOverlayPackage.kt'), packageName);
       copyTemplate('src/AssistantModule.kt', path.join(javaDir, 'AssistantModule.kt'), packageName);
       copyTemplate('src/PredictiveBackModule.kt', path.join(javaDir, 'PredictiveBackModule.kt'), packageName);
+      copyTemplate('src/OperaDreamService.kt', path.join(javaDir, 'OperaDreamService.kt'), packageName);
 
       // AICore (ML Kit GenAI) modules
       copyTemplate('src/AICorePackage.kt', path.join(javaDir, 'AICorePackage.kt'), packageName);

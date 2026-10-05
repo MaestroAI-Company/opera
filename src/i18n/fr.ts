@@ -207,6 +207,10 @@ export const fr: Translations = {
   "home.dataWarning.goToSettings": "Ouvrir les réglages",
   "home.dataWarning.later": "Plus tard",
 
+  "dream.model": "Modèle",
+  "dream.incognito": "Mode incognito",
+  "dream.noModel": "Choisissez un modèle avec le bouton en bas, puis reposez votre question.",
+
   "chat.noModel":
     "Sélectionnez un modèle dans le menu du haut avant d'envoyer un message.",
 

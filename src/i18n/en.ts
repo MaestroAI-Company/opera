@@ -201,6 +201,10 @@ export const en = {
   "home.dataWarning.goToSettings": "Go to Settings",
   "home.dataWarning.later": "Later",
 
+  "dream.model": "Model",
+  "dream.incognito": "Incognito mode",
+  "dream.noModel": "Choose a model with the button below, then ask your question again.",
+
   "chat.noModel":
     "Please select a model from the top menu before sending a message.",
 

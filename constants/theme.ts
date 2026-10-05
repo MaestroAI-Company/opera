@@ -165,6 +165,7 @@ export const FontSizes = {
   //display serif
   displayHero: 48,
   displayHuge: 64,
+  displayClock: 120,
   displayXl: 34,
   displayLg: 36,
   displayMd: 26,

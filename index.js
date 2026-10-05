@@ -1,6 +1,7 @@
 import 'expo-router/entry';
 import { AppRegistry } from 'react-native';
 import AssistantOverlay from './src/components/features/AssistantOverlay';
+import OperaDream from './src/components/features/OperaDream';
 
 //optional fetcher loaded before models
 try {
@@ -13,3 +14,4 @@ try {
 
 // Register the secondary entry point for the assistant overlay
 AppRegistry.registerComponent('AssistantOverlay', () => AssistantOverlay);
+AppRegistry.registerComponent('OperaDream', () => OperaDream);

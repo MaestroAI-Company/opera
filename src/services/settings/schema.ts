@@ -21,6 +21,7 @@ export type AppSettings = {
   instruction: string;
   speaker: boolean;
   autoSpeak: boolean;
+  maestroButterfly: string;
   ttsEngine: string;
   ttsVoices: string;
   ttsSpeed: string;
@@ -71,6 +72,8 @@ export const BASE_DEFAULTS: AppSettings = {
   instruction: '',
   speaker: true,
   autoSpeak: true,
+  //empty means the first butterfly
+  maestroButterfly: '',
   //neural engine once its model loads
   ttsEngine: 'system',
   //engine id to voice json

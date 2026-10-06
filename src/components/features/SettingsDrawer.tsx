@@ -144,6 +144,7 @@ import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 import DrawerSheet from "./DrawerSheet";
 import MaestroCard from "./MaestroCard";
+import { useMaestroButterfly } from "./maestroButterfly";
 import VoiceEngineCard from "./VoiceEngineCard";
 import ProfileCard from "./ProfileCard";
 
@@ -233,10 +234,10 @@ const infoIcon = require("../../../assets/icons/info.png");
 const reconnectIcon = require("../../../assets/icons/reconnect.png");
 const hyperlinkIcon = require("../../../assets/icons/hyperlink2.png");
 const ICON_SELECTOR_OPTIONS = [
-  { id: "a", icon: operaIcon },
-  { id: "b", icon: require("../../../assets/icons/operaicon2.png") },
-  { id: "c", icon: require("../../../assets/icons/operaicon3.png") },
-  { id: "d", icon: require("../../../assets/icons/operaicon4.png") },
+  { id: "butterfly1", icon: operaIcon },
+  { id: "butterfly2", icon: require("../../../assets/icons/operaicon2.png") },
+  { id: "butterfly3", icon: require("../../../assets/icons/operaicon3.png") },
+  { id: "butterfly4", icon: require("../../../assets/icons/operaicon4.png") },
 ];
 
 const DRAWER_SYNC_DELAY_MS = 1500;
@@ -305,7 +306,7 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   advanced: "main",
   maestro: "main",
   maestropreferences: "maestro",
-  assistantoverlay: "maestro",
+  assistantoverlay: "general",
   service: "main",
   beta: "service",
   litert: "service",
@@ -917,7 +918,7 @@ export default function SettingsDrawer({
   };
   //empty id means chores follow the main model
   const [quickFlowId, setQuickFlowIdState] = useState("");
-  const [iconSelectorDemo, setIconSelectorDemo] = useState("a");
+  const maestroButterfly = useMaestroButterfly();
   const [quickFlowOptions, setQuickFlowOptions] = useState<SelectorOption[]>(
     [],
   );
@@ -3314,6 +3315,15 @@ export default function SettingsDrawer({
           </View>
         </View>
       </View>
+
+      <Group style={styles.groupSpacing}>
+        {!isDesktop &&
+          renderToolsNavRow(
+            "assistantoverlay",
+            t("settings.nav.overlay.title"),
+            t("settings.nav.overlay.subtitle"),
+          )}
+      </Group>
     </View>
   );
 
@@ -3447,7 +3457,7 @@ export default function SettingsDrawer({
         <MaestroCard />
       </View>
 
-      {/* icon selector demo card */}
+      {/* butterfly selector card */}
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
@@ -3455,8 +3465,8 @@ export default function SettingsDrawer({
           </Text>
           <IconSelector
             options={ICON_SELECTOR_OPTIONS}
-            selectedValue={iconSelectorDemo}
-            onSelect={setIconSelectorDemo}
+            selectedValue={maestroButterfly}
+            onSelect={(id) => Settings.set("maestroButterfly", id)}
           />
         </View>
       </View>
@@ -3466,12 +3476,6 @@ export default function SettingsDrawer({
 
       {/* navigation to maestro subpages */}
       <Group style={styles.groupSpacing}>
-        {!isDesktop &&
-          renderToolsNavRow(
-            "assistantoverlay",
-            t("settings.nav.overlay.title"),
-            t("settings.nav.overlay.subtitle"),
-          )}
         {renderToolsNavRow(
           "maestropreferences",
           t("settings.nav.maestroPreferences.title"),

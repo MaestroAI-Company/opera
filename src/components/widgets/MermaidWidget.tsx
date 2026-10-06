@@ -108,7 +108,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   title: {
     fontFamily: Fonts.mono,
-    fontSize: FontSizes.title,
+    fontSize: FontSizes.lg,
     color: Colors.textPrimary,
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.sm,

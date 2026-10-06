@@ -590,10 +590,12 @@ export const en = {
   "settings.mcp.reconnect": "Reconnect",
   "settings.mcp.tools": "Tools ({count})",
   "settings.server.settings": "Settings",
+  "settings.mcp.headerLabel": "Header",
   "settings.mcp.headerHelp":
     "A header sent with every request, for servers that take an access token instead of a sign-in. For GitHub, use Authorization and Bearer followed by your token.",
   "settings.mcp.headerName": "header name",
   "settings.mcp.headerValue": "header value",
+  "settings.mcp.clientIdLabel": "Client ID",
   "settings.mcp.clientIdHelp":
     "Only needed when a server offers a sign-in but will not register Opera on its own. Leave empty otherwise.",
   "settings.mcp.clientId": "oauth client id",

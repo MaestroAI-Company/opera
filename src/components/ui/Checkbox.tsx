@@ -76,7 +76,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     backgroundColor: Colors.surfacePressed,
   },
   boxCheckedActive: {
-    backgroundColor: Colors.primaryPressed,
+    backgroundColor: Colors.primaryBright,
   },
   label: {
     fontSize: FontSizes.body,

@@ -804,7 +804,7 @@ const makeStyles = (Colors: ThemeColors) =>
       backgroundColor: Colors.primary,
     },
     ctaPressed: {
-      backgroundColor: Colors.primaryPressed,
+      backgroundColor: Colors.primaryBright,
     },
     ctaText: {
       fontFamily: Fonts.mono,

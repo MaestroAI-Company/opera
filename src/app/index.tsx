@@ -330,7 +330,7 @@ function IncognitoToggle({
           style={pressStyle(
             [styles.incognitoBox, incognito && styles.incognitoBoxActive],
             incognito
-              ? { backgroundColor: Colors.incognitoPressed }
+              ? { backgroundColor: Colors.incognitoBright }
               : "surface",
           )}
         >
@@ -2282,7 +2282,7 @@ const makeStyles = (Colors: ThemeColors) =>
       marginBottom: 16,
     },
     welcomeText: {
-      fontSize: FontSizes.displayXl,
+      fontSize: FontSizes.displayLg,
       lineHeight: WELCOME_LINE_HEIGHT,
       color: Colors.textPrimary,
       letterSpacing: 1,

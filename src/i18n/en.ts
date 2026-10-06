@@ -267,7 +267,7 @@ export const en = {
   "settings.nav.general.title": "General",
   "settings.nav.general.subtitle": "Language, Theme",
   "settings.nav.maestro.title": "Maestro",
-  "settings.nav.maestro.subtitle": "Assistant overlay",
+  "settings.nav.maestro.subtitle": "Voice, preferences",
   "settings.nav.maestro.subtitleDesktop": "Instructions",
   "settings.maestro.voice": "Voice",
   "settings.nav.overlay.title": "Assistant Overlay",

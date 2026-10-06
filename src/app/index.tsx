@@ -78,7 +78,7 @@ import { useResponsive } from "../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
 import { t, useT, type TranslationFn } from "../i18n";
 import { AIModule } from "../services/ai/AIModule";
-import { buildSystemPrompt } from "../services/ai/generation/chatGeneration";
+import { buildSystemPrompt, screenContextSegment } from "../services/ai/generation/chatGeneration";
 import { GenerationService } from "../services/ai/generation/GenerationService";
 import {
   generateSuggestions,
@@ -1359,6 +1359,7 @@ export default function Index() {
       const taskSystemPrompt = buildSystemPrompt(
         selectedModel,
         userInstruction,
+        screenContextSegment(messagesRef.current),
       );
       const taskReflection = selectedReflection;
       const taskConv = conv;
@@ -1590,6 +1591,7 @@ export default function Index() {
       const taskSystemPrompt = buildSystemPrompt(
         selectedModel,
         userInstruction,
+        screenContextSegment(historyUpToHere),
       );
       const taskReflection = selectedReflection;
       const taskConv = activeConversation;

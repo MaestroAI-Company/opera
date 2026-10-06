@@ -609,10 +609,12 @@ export const fr: Translations = {
   "settings.mcp.reconnect": "Reconnecter",
   "settings.mcp.tools": "Outils ({count})",
   "settings.server.settings": "Réglages",
+  "settings.mcp.headerLabel": "En-tête",
   "settings.mcp.headerHelp":
     "Un en-tête envoyé avec chaque requête, pour les serveurs qui acceptent un jeton d'accès plutôt qu'une connexion. Pour GitHub, utilise Authorization et Bearer suivi de ton jeton.",
   "settings.mcp.headerName": "nom de l'en-tête",
   "settings.mcp.headerValue": "valeur de l'en-tête",
+  "settings.mcp.clientIdLabel": "Identifiant client",
   "settings.mcp.clientIdHelp":
     "Nécessaire uniquement quand un serveur propose une connexion mais n'enregistre pas Opera automatiquement. Sinon, laisse ce champ vide.",
   "settings.mcp.clientId": "identifiant client oauth",

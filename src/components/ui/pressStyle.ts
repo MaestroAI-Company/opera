@@ -5,7 +5,7 @@ import { getThemedStyles } from "../../hooks/useTheme";
 //shared looks while pressed or hovered
 const makeLooks = (Colors: ThemeColors) => StyleSheet.create({
   surface: { backgroundColor: Colors.surfacePressed },
-  primary: { backgroundColor: Colors.primaryPressed },
+  primary: { backgroundColor: Colors.primaryBright },
   subtle: { backgroundColor: Colors.overlaySubtle },
   fade: { opacity: 0.6 },
   fadeLight: { opacity: 0.8 },

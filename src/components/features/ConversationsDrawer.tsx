@@ -516,7 +516,7 @@ export default function ConversationsDrawer({
       buttons={[
         {
           text: t("common.delete"),
-          style: "secondary",
+          style: "danger",
           onPress: () => {
             if (deleteConfirmId) {
               onDeleteConversation?.(deleteConfirmId);
@@ -526,7 +526,7 @@ export default function ConversationsDrawer({
         },
         {
           text: t("common.cancel"),
-          style: "danger",
+          style: "secondary",
           onPress: () => setDeleteConfirmId(null)
         },
       ]}
@@ -724,14 +724,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingBottom: 40,
   },
   section: {
-    marginBottom: 16,
+    marginBottom: Spacing.xl2,
   },
   sectionTitle: {
     fontSize: FontSizes.label,
     color: Colors.textMuted,
-    fontFamily: Fonts.body,
+    fontFamily: Fonts.mono,
     textTransform: "uppercase",
-    marginBottom: 8,
+    marginBottom: Spacing.md,
     paddingHorizontal: Spacing.lg,
   },
   emptyText: {
@@ -739,32 +739,32 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     color: Colors.textMuted,
     fontFamily: Fonts.body,
     textAlign: "center",
-    marginTop: 20,
+    marginTop: Spacing.xxl,
   },
   discussionRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
     borderRadius: Radius.xxl,
-    marginBottom: 2,
+    marginBottom: Spacing.xs2,
     borderWidth: 2,
     borderColor: "transparent",
   },
   discussionRowSelected: {
     backgroundColor: Colors.primary,
     borderColor: Colors.borderOnPrimary,
-    paddingVertical: 4,
+    paddingVertical: Spacing.xs,
   },
   discussionTextContainer: {
     flex: 1,
-    marginRight: 8,
+    marginRight: Spacing.md,
   },
   discussionText: {
     fontSize: FontSizes.body,
     color: Colors.textPrimary,
-    fontFamily: Fonts.mono,
+    fontFamily: Fonts.body,
   },
   discussionTextSelected: {
     color: Colors.textOnPrimary,
@@ -772,10 +772,10 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   rowActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: Spacing.xs,
   },
   pinnedIndicator: {
-    paddingHorizontal: 4,
+    paddingHorizontal: Spacing.xs,
     justifyContent: "center",
     alignItems: "center",
   },

@@ -147,7 +147,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     backgroundColor: Colors.groupedBackground,
     borderTopLeftRadius: Radius.huge2,
     borderTopRightRadius: Radius.huge2,
-    paddingTop: 12,
+    paddingTop: Spacing.lg2,
   },
   desktopCard: {
     width: DESKTOP_CARD_WIDTH,
@@ -155,8 +155,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   sheetHandleContainer: {
     alignItems: "center",
     marginBottom: Spacing.xs2,
-    paddingVertical: 10,
-    marginTop: -10,
+    paddingVertical: Spacing.lg,
+    marginTop: -Spacing.lg,
   },
   content: {
     paddingHorizontal: Spacing.lg2,
@@ -174,10 +174,11 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     fontFamily: Fonts.mono,
     paddingTop: Spacing.xs,
     paddingHorizontal: Spacing.md,
-    marginBottom: 6,
+    marginBottom: Spacing.sm,
   },
   help: {
-    fontSize: FontSizes.caption,
+    fontSize: FontSizes.bodyMd,
+    lineHeight: 20,
     color: Colors.textMuted,
     fontFamily: Fonts.body,
     paddingHorizontal: Spacing.md,
@@ -187,14 +188,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     marginTop: Spacing.sm,
   },
   consent: {
-    marginTop: 12,
-    marginBottom: 12,
+    marginTop: Spacing.lg2,
+    marginBottom: Spacing.lg2,
   },
   toggleRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 8,
+    marginTop: Spacing.md,
     paddingHorizontal: Spacing.md,
   },
   checkboxRow: {

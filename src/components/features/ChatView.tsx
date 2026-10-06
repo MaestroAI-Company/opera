@@ -726,8 +726,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingBottom: 32,
   },
   headerButterfly: {
-    width: 100,
-    height: 90,
+    width: 140,
+    height: 126,
     marginBottom: 22,
   },
   headerTitle: {
@@ -846,7 +846,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     zIndex: 1000,
   },
   snackbar: {
-    backgroundColor: Colors.textSecondary,
+    backgroundColor: Colors.snackbarBg,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: Radius.pill,
@@ -854,7 +854,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     elevation: 5,
   },
   snackbarText: {
-    color: Colors.surface,
+    color: Colors.textOnPrimary,
+    fontFamily: Fonts.mono,
     fontSize: FontSizes.bodyMd,
   },
   messageImage: {

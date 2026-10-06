@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   AppState,
@@ -22,7 +22,7 @@ import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { Colors } from '../../../constants/theme';
 import { AIModule } from '../../services/ai/AIModule';
 import { getOllamaTuning, migrateModelSources } from '../../services/ai/providers/sources';
-import { buildSystemPrompt } from '../../services/ai/generation/chatGeneration';
+import { buildSystemPrompt, screenContextSegment } from '../../services/ai/generation/chatGeneration';
 import { GenerationService } from '../../services/ai/generation/GenerationService';
 import { generateSuggestions, Suggestion } from '../../services/ai/generation/suggestions';
 import { resolveQuickFlow } from '../../services/ai/quickFlow';
@@ -64,6 +64,12 @@ const assistantInfoImage = require('../../../assets/images/ImageCard/AssistantIn
 
 //the router layout never mounts here
 initI18n();
+
+//skip re-render per streamed token
+const OverlayChatBar = memo(ChatBar);
+const noop = () => { };
+//tools survive between overlay opens
+let toolsBooted = false;
 
 export default function AssistantOverlayWrapper() {
   return (
@@ -121,7 +127,6 @@ function AssistantOverlay() {
   useEffect(() => { generatingConvIdRef.current = generatingConvId; }, [generatingConvId]);
   const streamingMsgIdRef = useRef<string | null>(null);
   const streamingContentRef = useRef<string>('');
-  const screenContextSegmentsRef = useRef<Record<string, string>>({});
   const chatBarRef = useRef<ChatBarHandle>(null);
 
   //modal state for whisper errors
@@ -207,6 +212,8 @@ function AssistantOverlay() {
   const haloOpacity = useAnimatedValue(0);
   //exit runs once, a second dismiss must not cut it short
   const closingRef = useRef(false);
+  //bumped on each close
+  const closeCountRef = useRef(0);
 
   //replayed when the activity is reused instead of remounted
   const playEntry = useCallback(() => {
@@ -230,7 +237,8 @@ function AssistantOverlay() {
     Animated.spring(topBarEntry, { toValue: -BAR_ENTRY, useNativeDriver: true, bounciness: 9, speed: 14 }).start();
     bottomBarEntry.value = withSpring(BAR_ENTRY, { duration: 500, dampingRatio: 0.65 });
     //fade owns the timing, everything is hidden once it lands
-    Animated.spring(mountOpacity, { toValue: 0, useNativeDriver: true, bounciness: 0, speed: 20 }).start(() => done());
+    //reopen interrupts it, keep new session
+    Animated.spring(mountOpacity, { toValue: 0, useNativeDriver: true, bounciness: 0, speed: 20 }).start(({ finished }) => { if (finished) done(); });
   }, [mountOpacity, topBarEntry, bottomBarEntry]);
 
   useEffect(() => { playEntry(); }, [playEntry]);
@@ -333,6 +341,8 @@ function AssistantOverlay() {
       }
       //only needed once tools are used
       InteractionManager.runAfterInteractions(() => {
+        if (toolsBooted) return;
+        toolsBooted = true;
         PluginRegistry.init().then(() => PluginRegistry.loadAll()).catch(() => { });
         McpService.init().then(() => McpService.connectAll()).catch(() => { });
       });
@@ -350,7 +360,6 @@ function AssistantOverlay() {
   const resetOverlay = useCallback(() => {
     chatBarRef.current?.stopRecording();
     chatBarRef.current?.clear();
-    screenContextSegmentsRef.current = {};
     ScreenCapture.clearText();
     if (Platform.OS !== 'web') STT.abort();
     setActiveConversation(null);
@@ -376,6 +385,7 @@ function AssistantOverlay() {
     const handler = BackHandler.addEventListener('hardwareBackPress', () => {
       if (closingRef.current) return true;
       closingRef.current = true;
+      closeCountRef.current++;
       setClosed(true);
       handOffGeneration();
       playExit(() => {
@@ -427,6 +437,7 @@ function AssistantOverlay() {
   const closeOverlay = useCallback(() => {
     if (closingRef.current) return;
     closingRef.current = true;
+    closeCountRef.current++;
     setClosed(true);
     handOffGeneration();
     //reset only once hidden, so the content does not blank mid exit
@@ -436,12 +447,19 @@ function AssistantOverlay() {
     });
   }, [playExit, resetOverlay, handOffGeneration]);
 
+  //home leaves like any other close
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(AppEvents.overlayLeaving, closeOverlay);
+    return () => sub.remove();
+  }, [closeOverlay]);
+
   //hand off conversation then close
   const openConversationInApp = useCallback((convId: string) => {
     //app launches while the overlay plays out
     Linking.openURL(`opera://?convId=${convId}`).catch(() => { });
     if (closingRef.current) return;
     closingRef.current = true;
+    closeCountRef.current++;
     setClosed(true);
     playExit(() => {
       resetOverlay();
@@ -498,6 +516,7 @@ function AssistantOverlay() {
     const model = selectedModelRef.current;
     const instruction = userInstructionRef.current;
     const reflection = selectedReflectionRef.current; //always fresh
+    const closes = closeCountRef.current;
 
     //switch to respond phase while streaming
     goToRespond();
@@ -524,7 +543,6 @@ function AssistantOverlay() {
 
     //give model screen context
     //refetch if assist arrived late
-    let screenContextSegment = '';
     const appContextEnabled = Settings.getCached().useAppContext !== false;
     let ctx = appContextDismissed || !appContextEnabled ? null : appContextRef.current;
     if (appContextEnabled && !appContextDismissed && (!ctx || (!ctx.appPackage && !ctx.screenText))) {
@@ -537,31 +555,45 @@ function AssistantOverlay() {
       if (!iconInfo && ctx.appPackage) {
         iconInfo = await ScreenCapture.getAppIcon(ctx.appPackage);
       }
+      const screenText = ctx.screenText?.trim() || null;
       const badge = {
         appPackage: ctx.appPackage ?? null,
-        hasScreenText: !!(ctx.screenText && ctx.screenText.trim().length > 0),
+        hasScreenText: !!screenText,
         icon: iconInfo?.icon ?? null,
         label: iconInfo?.label ?? null,
+        //stored for retries and follow-ups
+        text: screenText,
       };
       userMsg.screenContext = badge;
       //patch bubble to show badge
       setMessages(prev => prev.map(m => m.id === userMsg.id ? { ...m, screenContext: badge } : m));
       //persist badge across reloads
       DB.updateMessageScreenContext(userMsg.id, badge).catch(() => { });
-      const parts: string[] = ['\n\n---\n\n# Screen Context'];
-      if (ctx.appPackage) parts.push(`Foreground app: ${ctx.appPackage}`);
-      if (ctx.screenText && ctx.screenText.trim().length > 0) {
-        parts.push(`Visible text on screen:\n"""\n${ctx.screenText.trim()}\n"""`);
-      }
-      screenContextSegment = parts.join('\n');
     }
     //dismiss chip after first message
     setAppContextDismissed(true);
 
-    const taskSystemPrompt = buildSystemPrompt(model, instruction, screenContextSegment);
-    screenContextSegmentsRef.current[userMsg.id] = screenContextSegment;
+    const taskSystemPrompt = buildSystemPrompt(model, instruction, screenContextSegment([...messagesRef.current, userMsg]));
 
     const assistantMsg = await DB.addMessage(conv.id, 'assistant', '…');
+    const params = {
+      convId: conv.id,
+      msgId: assistantMsg.id,
+      prompt: text,
+      model,
+      systemPrompt: taskSystemPrompt,
+      history: taskHistory,
+      think: reflection === 'none' ? false : reflection,
+    };
+
+    //closed while preparing, reply in shade
+    if (closeCountRef.current !== closes) {
+      const pending = GenerationService.start(params);
+      BackgroundGeneration.begin(conv.id);
+      if (isFirstMessage) pending.then(run => { if (run.status !== 'error') generateTitle(conv.id, text, images); });
+      return;
+    }
+
     setMessages(prev => [...prev, assistantMsg]);
 
     setGeneratingConvId(conv.id);
@@ -571,15 +603,10 @@ function AssistantOverlay() {
 
     //speak voice replies as they stream
     const finishSpeech = viaVoice && Settings.getCached().autoSpeak ? speakReplyLive(assistantMsg.id) : null;
-    const run = await GenerationService.start({
-      convId: conv.id,
-      msgId: assistantMsg.id,
-      prompt: text,
-      model,
-      systemPrompt: taskSystemPrompt,
-      history: taskHistory,
-      think: reflection === 'none' ? false : reflection,
-    });
+    const pendingRun = GenerationService.start(params);
+    //backgrounded, nothing handed off yet
+    if (AppState.currentState === 'background') handOffGeneration();
+    const run = await pendingRun;
     finishSpeech?.(run);
 
     const isError = run.status === 'error';
@@ -611,7 +638,7 @@ function AssistantOverlay() {
       generatingConvIdRef.current = null;
       streamingMsgIdRef.current = null;
     }
-  }, [generateTitle, goToRespond, appContextDismissed, appIconInfo]);
+  }, [generateTitle, goToRespond, appContextDismissed, appIconInfo, handOffGeneration]);
 
   const handleStop = useCallback(() => {
     const convId = activeConversationRef.current?.id;
@@ -642,12 +669,10 @@ function AssistantOverlay() {
     setSuggestions(null);
 
     //last user prompt drives system prompt
-    let regenSegment = '';
     let regenUserText = '';
     for (let i = historyUpToHere.length - 1; i >= 0; i--) {
       if (historyUpToHere[i].role === 'user') {
         regenUserText = historyUpToHere[i].content;
-        regenSegment = screenContextSegmentsRef.current[historyUpToHere[i].id] ?? '';
         break;
       }
     }
@@ -669,7 +694,7 @@ function AssistantOverlay() {
       msgId: assistantMsg.id,
       prompt: regenUserText,
       model,
-      systemPrompt: buildSystemPrompt(model, instruction, regenSegment),
+      systemPrompt: buildSystemPrompt(model, instruction, screenContextSegment(historyUpToHere)),
       history: taskHistory,
       think: reflection === 'none' ? false : reflection,
     });
@@ -775,6 +800,14 @@ function AssistantOverlay() {
   const shouldAutoStartMic = capabilitiesReady && autoStartMicSetting.current;
   /* eslint-enable react-hooks/refs */
 
+  //stable props keep the bar memoized
+  const appContextEnabled = Settings.getCached().useAppContext !== false;
+  const appContextChip = useMemo(
+    () => (appContextEnabled && !appContextDismissed && appIconInfo ? { icon: appIconInfo.icon, label: appIconInfo.label } : null),
+    [appContextEnabled, appContextDismissed, appIconInfo]
+  );
+  const dismissAppContext = useCallback(() => setAppContextDismissed(true), []);
+
   //latest assistant message via reverse scan
   let lastMsg: Message | null = null;
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -858,7 +891,7 @@ function AssistantOverlay() {
             style={[styles.bottomBarOverlay, isLargeScreen && styles.bottomBarOverlayLarge, bottomBarStyle, isDrawingSelection && styles.hiddenBar]}
             pointerEvents={isDrawingSelection ? 'none' : 'box-none'}
           >
-            <ChatBar
+            <OverlayChatBar
               ref={chatBarRef}
               onSend={handleSend}
               incognito={false}
@@ -867,12 +900,12 @@ function AssistantOverlay() {
               onTranscribe={handleTranscribe}
               canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes('audio') && !!selectedModel}
               modelCapabilities={modelCapabilities}
-              onOpenSettings={() => { }}
+              onOpenSettings={noop}
               autoStartMic={shouldAutoStartMic}
               selection={attachment}
               onSelectionRemove={clearSelection}
-              appContextChip={Settings.getCached().useAppContext !== false && !appContextDismissed && appIconInfo ? { icon: appIconInfo.icon, label: appIconInfo.label } : null}
-              onAppContextRemove={() => setAppContextDismissed(true)}
+              appContextChip={appContextChip}
+              onAppContextRemove={dismissAppContext}
             />
           </Reanimated.View>
         </Animated.View>

@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.view.WindowManager;
 import com.facebook.react.ReactActivity;
 import com.facebook.react.ReactActivityDelegate;
@@ -14,6 +15,12 @@ import expo.modules.ReactActivityDelegateWrapper;
 public class OverlayActivity extends ReactActivity {
 
     private static OverlayActivity sInstance;
+    //visible overlay ignores new invocations
+    private static volatile boolean sShown;
+
+    public static boolean isShown() {
+        return sShown;
+    }
 
     //sleep ends the overlay session
     private final BroadcastReceiver screenOffReceiver = new BroadcastReceiver() {
@@ -47,6 +54,35 @@ public class OverlayActivity extends ReactActivity {
         } else {
             registerReceiver(screenOffReceiver, filter);
         }
+    }
+
+    //own launches are not a leave
+    private long launchedAt;
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public void startActivityForResult(Intent intent, int requestCode, Bundle options) {
+        launchedAt = SystemClock.uptimeMillis();
+        super.startActivityForResult(intent, requestCode, options);
+    }
+
+    //home or recents, js handles exit
+    @Override
+    protected void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        if (SystemClock.uptimeMillis() - launchedAt > 1000) ScreenCaptureModule.emitOverlayLeaving();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        sShown = true;
+    }
+
+    @Override
+    protected void onStop() {
+        sShown = false;
+        super.onStop();
     }
 
     @Override

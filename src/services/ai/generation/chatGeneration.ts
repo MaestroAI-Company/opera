@@ -1,6 +1,6 @@
 import { AIModule } from '../AIModule';
 import { isLocalModel } from '../providers/LocalProvider';
-import { MessageMetrics } from '../../db/DatabaseService';
+import { Message, MessageMetrics } from '../../db/DatabaseService';
 import { WidgetManager } from '../../widgets/WidgetManager';
 import { SYSTEM_PROMPTS } from '../../../../constants/prompts';
 import { Settings } from '../../settings/SettingsService';
@@ -65,6 +65,20 @@ const PROMPT_BY_TIER: Record<ModelTier, string> = {
 //instruction then app prompt then extras
 export function buildSystemPrompt(model: string, userInstruction: string, extraSegment = ''): string {
   return promptForTier(modelTier(model), userInstruction, extraSegment);
+}
+
+//latest capture keeps steering the conversation
+export function screenContextSegment(messages: Pick<Message, 'screenContext'>[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const ctx = messages[i].screenContext;
+    if (!ctx) continue;
+    const parts = ['\n\n---\n\n# Screen Context'];
+    if (ctx.appPackage) parts.push(`Foreground app: ${ctx.appPackage}`);
+    const text = ctx.text?.trim();
+    if (text) parts.push(`Visible text on screen:\n"""\n${text}\n"""`);
+    return parts.length > 1 ? parts.join('\n') : '';
+  }
+  return '';
 }
 
 //headroom for the first reply

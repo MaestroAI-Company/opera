@@ -60,6 +60,14 @@ class ScreenCaptureModule(context: ReactApplicationContext) : ReactContextBaseJa
         ?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
         ?.emit("OVERLAY_REOPENED", Arguments.createMap())
     }
+
+    //user left via home or recents
+    @JvmStatic
+    fun emitOverlayLeaving() {
+      instance?.reactApplicationContext
+        ?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+        ?.emit("OVERLAY_LEAVING", Arguments.createMap())
+    }
   }
 
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

@@ -551,7 +551,9 @@ export function ModelSelectorDrawer({
   //visible refreshes instruction and tools
   const usedTokens = useMemo(
     () => estimateContextTokens(selectedModel, Settings.getCached().instruction, messages),
-    [messages, selectedModel, visible],
+    //hidden drawer skips streaming updates
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [visible ? messages : null, selectedModel, visible],
   );
   //built-in models report their own window
   const [localContextTokens, setLocalContextTokens] = useState(0);

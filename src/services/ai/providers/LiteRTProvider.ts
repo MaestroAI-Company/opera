@@ -370,7 +370,12 @@ export class LiteRTProvider implements IAIProvider {
     onMetrics?: (metrics: MessageMetrics) => void
   ): Promise<{ toolCalls?: ToolCall[]; content?: string }> {
     if (signal?.aborted) throw abortError();
-    const lastMessage = messages[messages.length - 1];
+    const latest = messages[messages.length - 1];
+    //text only history, carry last image
+    const carried = latest && !latest.images?.length && getCatalogEntry(modelName)?.capabilities?.includes('vision')
+      ? [...messages].reverse().find((m) => m.images?.length)?.images
+      : undefined;
+    const lastMessage = carried ? { ...latest, images: carried } : latest;
 
     let aborted = false;
     let rejectOnAbort: (error: Error) => void = () => {};

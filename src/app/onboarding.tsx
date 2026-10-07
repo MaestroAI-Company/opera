@@ -166,7 +166,8 @@ const PERMISSIONS: PermissionDef[] = isWeb
   : [
       { id: "microphone", icon: micIcon, request: () => STT.requestPermissions() },
       { id: "camera", icon: cameraIcon, request: async () => (await ImagePicker.requestCameraPermissionsAsync()).granted },
-      { id: "photos", icon: photoIcon, request: async () => (await MediaLibrary.requestPermissionsAsync()).granted },
+      //android uses the system photo picker
+      ...(Platform.OS === "android" ? [] : [{ id: "photos" as const, icon: photoIcon, request: async () => (await MediaLibrary.requestPermissionsAsync()).granted }]),
       { id: "location", icon: locationIcon, request: requestLocation },
     ];
 

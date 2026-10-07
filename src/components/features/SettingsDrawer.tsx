@@ -4597,7 +4597,7 @@ export default function SettingsDrawer({
                   : undefined
               }
             />
-            {Platform.OS !== "web" && (
+            {Platform.OS !== "web" && Platform.OS !== "android" && (
               <ActionButton
                 icon={photoIcon}
                 label={t("permissions.photos.label")}

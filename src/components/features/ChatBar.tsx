@@ -665,17 +665,21 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       closeSheet();
     } else {
       Keyboard.dismiss();
-      const { granted, canAskAgain } = await MediaLibrary.getPermissionsAsync();
-      //a refusal sticks, only prompt while the os still allows it
-      if (!granted && canAskAgain) {
-        await MediaLibrary.requestPermissionsAsync();
+      //no recent photos on android
+      if (Platform.OS !== 'android') {
+        const { granted, canAskAgain } = await MediaLibrary.getPermissionsAsync();
+        //a refusal sticks, only prompt while the os still allows it
+        if (!granted && canAskAgain) {
+          await MediaLibrary.requestPermissionsAsync();
+        }
       }
       setIsAttachmentSheetVisible(true);
     }
   };
 
   useEffect(() => {
-    if (!isAttachmentSheetVisible) return;
+    //play policy forbids broad media access
+    if (!isAttachmentSheetVisible || Platform.OS === 'android') return;
 
     const getRecentPhotos = async () => {
       const { status } = await MediaLibrary.getPermissionsAsync();
@@ -714,11 +718,14 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   };
 
   const handlePhotos = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (permissionResult.granted === false) {
-      setModalConfig({ title: t("chatbar.permissionDenied"), message: t("chatbar.photosDenied") });
-      setModalVisible(true);
-      return;
+    //android system picker needs no permission
+    if (Platform.OS !== 'android') {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permissionResult.granted === false) {
+        setModalConfig({ title: t("chatbar.permissionDenied"), message: t("chatbar.photosDenied") });
+        setModalVisible(true);
+        return;
+      }
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: supportsVideo ? ['images', 'videos'] : ['images'],

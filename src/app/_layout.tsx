@@ -14,6 +14,7 @@ import SiteHead from "../components/SiteHead";
 import SplashScreenComponent from "../components/ui/SplashScreen";
 import TauriTitleBar from "../components/features/TauriTitleBar";
 import ToolConsentHost from "../components/features/ToolConsentHost";
+import VoicePackHost from "../components/features/VoicePackHost";
 import { IconLabelProvider } from "../components/ui/IconLabel";
 import { Radius } from "../../constants/theme";
 import { initI18n } from "../i18n";
@@ -124,6 +125,7 @@ export default function RootLayout() {
           <TauriTitleBar />
           <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
           <ToolConsentHost />
+          <VoicePackHost />
           <StatusBar style={isDark ? "light" : "dark"} />
         </IconLabelProvider>
       </KeyboardProvider>

@@ -36,6 +36,7 @@ import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { speakReplyLive } from '../../services/speech/liveReply';
 import NotificationModal from '../ui/NotificationModal';
 import ToolConsentHost from './ToolConsentHost';
+import VoicePackHost from './VoicePackHost';
 import ChatBar, { ChatBarHandle } from './ChatBar';
 import ChatView from './ChatView';
 import { ModelSelectorDrawer, ModelSelectorTrigger } from './ModelSelector';
@@ -927,6 +928,7 @@ function AssistantOverlay() {
         />
 
         <ToolConsentHost />
+        <VoicePackHost />
 
         <ModelSelectorDrawer
           visible={modelSelectorVisible}

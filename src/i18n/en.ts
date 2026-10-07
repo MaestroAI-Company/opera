@@ -508,7 +508,6 @@ export const en = {
     "Natural voices that run offline. Unsupported languages use the system voice.",
   "settings.tts.select": "Select voice engine",
   "settings.tts.system": "System",
-  "settings.tts.kokoro": "Kokoro",
   "settings.tts.supertonic": "Supertonic",
   "settings.tts.voiceLabel": "Voice",
   "settings.tts.selectVoice": "Select voice",
@@ -523,6 +522,13 @@ export const en = {
   "settings.tts.download.message":
     "Are you sure you want to download the {engine} voice ({size})?",
   "settings.tts.download.confirm": "Download",
+  "settings.tts.voicePack.title": "Install the voice pack",
+  "settings.tts.voicePack.message":
+    "For a better experience, install the offline natural voice pack ({size}). Otherwise Maestro will use the system voice.",
+  "settings.tts.voicePack.install": "Install",
+  "settings.tts.voicePack.system": "System voice",
+  "settings.tts.voicePack.installed": "Voice pack installed",
+  "settings.tts.voicePack.failed": "Failed to download the voice pack",
 
   "settings.privacy.data": "Data privacy",
   "settings.privacy.intro":

@@ -525,7 +525,6 @@ export const fr: Translations = {
     "Des voix naturelles qui fonctionnent hors ligne. Les langues non prises en charge utilisent la voix du système.",
   "settings.tts.select": "Choisir le moteur de voix",
   "settings.tts.system": "Système",
-  "settings.tts.kokoro": "Kokoro",
   "settings.tts.supertonic": "Supertonic",
   "settings.tts.voiceLabel": "Voix",
   "settings.tts.selectVoice": "Choisir la voix",
@@ -540,6 +539,13 @@ export const fr: Translations = {
   "settings.tts.download.message":
     "Veux-tu vraiment télécharger la voix {engine} ({size}) ?",
   "settings.tts.download.confirm": "Télécharger",
+  "settings.tts.voicePack.title": "Installer le pack de voix",
+  "settings.tts.voicePack.message":
+    "Pour une meilleure expérience, installe le pack de voix naturelles hors ligne ({size}). Sinon, Maestro utilisera la voix du système.",
+  "settings.tts.voicePack.install": "Installer",
+  "settings.tts.voicePack.system": "Voix système",
+  "settings.tts.voicePack.installed": "Pack de voix installé",
+  "settings.tts.voicePack.failed": "Échec du téléchargement du pack de voix",
 
   "settings.privacy.data": "Confidentialité des données",
   "settings.privacy.intro":

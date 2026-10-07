@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
@@ -6,13 +6,18 @@ import { getLocale, useT } from "../../i18n";
 import { formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
 import { Settings } from "../../services/settings/SettingsService";
 import {
+  InstallSnapshot,
   NEURAL_ENGINES,
   TTS_SPEEDS,
+  getInstallSnapshot,
   getVoice,
+  install,
+  isInstalling,
   setVoice,
+  subscribeInstall,
   supportedEngineIds,
 } from "../../services/speech/engines";
-import DownloadProgress, { throttleProgress } from "../ui/DownloadProgress";
+import DownloadProgress from "../ui/DownloadProgress";
 import Group from "../ui/Group";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import Selector from "../ui/Selector";
@@ -22,7 +27,6 @@ const deleteIcon = require("../../../assets/icons/delete.png");
 const timeIcon = require("../../../assets/icons/time.png");
 
 const TTS_ENGINE_KEYS = {
-  kokoro: "settings.tts.kokoro",
   supertonic: "settings.tts.supertonic",
 } as const;
 
@@ -38,11 +42,11 @@ export default function VoiceEngineCard() {
   const [installedEngines, setInstalledEngines] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(supportedEngineIds().map((id) => [id, NEURAL_ENGINES[id].isInstalled()])),
   );
-  const [downloadingEngine, setDownloadingEngine] = useState<string | null>(null);
-  const [engineDownloadProgress, setEngineDownloadProgress] = useState<{
-    progress: number;
-    sizeStr: string;
-  } | null>(null);
+  //download may have started in chat
+  const [download, setDownload] = useState<{ id: string; snapshot: InstallSnapshot } | null>(() => {
+    const id = supportedEngineIds().find(isInstalling);
+    return id ? { id, snapshot: getInstallSnapshot(id) ?? { progress: 0, sizeStr: "" } } : null;
+  });
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{
     title: string;
@@ -54,6 +58,15 @@ export default function VoiceEngineCard() {
     setAlertConfig({ title, message, buttons });
     setAlertVisible(true);
   };
+
+  useEffect(
+    () =>
+      subscribeInstall((id, snapshot) => {
+        setDownload(snapshot ? { id, snapshot } : null);
+        if (!snapshot) setInstalledEngines((prev) => ({ ...prev, [id]: NEURAL_ENGINES[id].isInstalled() }));
+      }),
+    [],
+  );
 
   const ttsEngines = supportedEngineIds();
   const engineName = (id: string) => t(TTS_ENGINE_KEYS[id as keyof typeof TTS_ENGINE_KEYS]);
@@ -75,26 +88,13 @@ export default function VoiceEngineCard() {
   };
 
   const handleDownloadEngine = async (id: string) => {
-    const engine = NEURAL_ENGINES[id];
-    setDownloadingEngine(id);
-    setEngineDownloadProgress(null);
-    const reportProgress = throttleProgress(setEngineDownloadProgress);
     try {
-      await engine.download((progress) =>
-        reportProgress({
-          progress,
-          sizeStr: `${formatBytes(progress * engine.sizeBytes)} / ${formatBytes(engine.sizeBytes)}`,
-        }),
-      );
-      setInstalledEngines((prev) => ({ ...prev, [id]: true }));
+      await install(id);
       setTtsEngine(id);
       showAlert(t("common.success"), t("settings.tts.downloadSuccess", { engine: engineName(id) }));
     } catch (e) {
       console.error(`Failed to download ${id} voice`, e);
       showAlert(t("common.error"), t("settings.tts.downloadFailed", { engine: engineName(id) }));
-    } finally {
-      setDownloadingEngine(null);
-      setEngineDownloadProgress(null);
     }
   };
 
@@ -103,7 +103,7 @@ export default function VoiceEngineCard() {
       setTtsEngine(v);
       return;
     }
-    if (downloadingEngine) return;
+    if (download) return;
     showAlert(
       t("settings.tts.download.title", { engine: engineName(v) }),
       t("settings.tts.download.message", {
@@ -172,10 +172,6 @@ export default function VoiceEngineCard() {
   ];
 
   const ttsVoiceOptions = NEURAL_ENGINES[ttsEngine]?.voiceOptions(language) ?? [];
-  //kokoro may lack the slot
-  const selectedTtsVoice = ttsVoiceOptions.some((o) => o.id === ttsVoice)
-    ? ttsVoice
-    : (ttsVoiceOptions[0]?.id ?? "");
 
   const ttsSpeedOptions = TTS_SPEEDS.map((id) => ({ id, label: `${id}×` }));
 
@@ -189,17 +185,17 @@ export default function VoiceEngineCard() {
         <Group>
           <Selector
             options={ttsEngineOptions}
-            selectedValue={ttsEngine}
+            selectedValue={installedEngines[ttsEngine] ? ttsEngine : "system"}
             onSelect={handleSelectTtsEngine}
             title={t("settings.tts.select")}
             fullWidth
           />
         </Group>
-        {downloadingEngine && (
+        {download && (
           <DownloadProgress
-            title={t("settings.tts.downloading", { engine: engineName(downloadingEngine) })}
-            progress={engineDownloadProgress?.progress || 0}
-            sizeStr={engineDownloadProgress?.sizeStr}
+            title={t("settings.tts.downloading", { engine: engineName(download.id) })}
+            progress={download.snapshot.progress}
+            sizeStr={download.snapshot.sizeStr || undefined}
           />
         )}
       </View>
@@ -209,7 +205,7 @@ export default function VoiceEngineCard() {
           <Group>
             <Selector
               options={ttsVoiceOptions}
-              selectedValue={selectedTtsVoice}
+              selectedValue={ttsVoice}
               onSelect={setTtsVoice}
               title={t("settings.tts.selectVoice")}
               fullWidth

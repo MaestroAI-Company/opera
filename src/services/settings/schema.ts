@@ -74,8 +74,8 @@ export const BASE_DEFAULTS: AppSettings = {
   autoSpeak: true,
   //empty means the first butterfly
   maestroButterfly: '',
-  //neural engine once its model loads
-  ttsEngine: 'system',
+  //supertonic until the user picks system
+  ttsEngine: 'supertonic',
   //engine id to voice json
   ttsVoices: '{}',
   //string keeps fractional rates

@@ -31,7 +31,7 @@ pdf.js), Whisper (OpenAI), Tauri plugins (oauth, deep-link, http, opener)
 Apache License 2.0
 @notifee/react-native, lottie-react-native, @xenova/transformers,
 @tauri-apps/api, pdf.js (Mozilla, vendored in
-src/services/documents/vendor), Kokoro text-to-speech, Tauri plugins
+src/services/documents/vendor), Tauri plugins
 (dual licensed MIT OR Apache-2.0)
 
 ISC

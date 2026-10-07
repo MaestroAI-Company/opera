@@ -6,6 +6,7 @@ import { AudioPlayback, createPlayback, prepareAudio } from './AudioPlayback';
 import { activate, getSpeed, getVoice, NEURAL_ENGINES } from './engines';
 import { SynthesisOptions } from './NeuralEngine';
 import { SentenceQueue } from './SentenceQueue';
+import { VoicePack } from './VoicePack';
 
 const CHUNK_MAX = 900;
 //short head starts audio sooner
@@ -149,6 +150,8 @@ class TextToSpeechService {
     this.speakingId = options?.id ?? null;
     this.notify();
 
+    //user picks a voice first
+    await VoicePack.ask();
     //language needs the first sentences
     const head = await queue.peek();
     if (gen === this.generation && head.length > 0) {

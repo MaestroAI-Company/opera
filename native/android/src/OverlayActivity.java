@@ -66,9 +66,9 @@ public class OverlayActivity extends ReactActivity {
         super.startActivityForResult(intent, requestCode, options);
     }
 
-    //home or recents, js handles exit
+    //emit overlay leave event
     @Override
-    protected void onUserLeaveHint() {
+    public void onUserLeaveHint() {
         super.onUserLeaveHint();
         if (SystemClock.uptimeMillis() - launchedAt > 1000) ScreenCaptureModule.emitOverlayLeaving();
     }

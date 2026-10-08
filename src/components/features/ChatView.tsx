@@ -49,6 +49,7 @@ const linkSourceIcon = require("../../../assets/icons/hyperlink.png");
 const arrowIcon = require("../../../assets/icons/return.png");
 const fileIcon = require("../../../assets/icons/file.png");
 const rightArrowIcon = require("../../../assets/icons/right.png");
+const pencilIcon = require("../../../assets/icons/pencil.png");
 
 //android 13+ shows its own clipboard confirmation
 const ANDROID_CLIPBOARD_UI_API = 33;
@@ -169,6 +170,9 @@ type ChatViewProps = {
   onSuggestionPress?: (text: string) => void;
   onImagePress?: (image: PreviewImage) => void;
   onDetailsPress?: (details: PreviewDetails) => void;
+  onEditMessage?: (item: Message) => void;
+  //toggle gates the ai edit button
+  editAiEnabled?: boolean;
   //home butterfly frame to fly from
   butterflyFrom?: DOMRect | null;
 };
@@ -248,7 +252,7 @@ const ToolsPill = ({ calls }: { calls: ToolCall[] }) => {
   );
 };
 
-const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isQueued, isChatGenerating, showMetrics, fallbackModel, canThink, dark, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isQueued?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string; canThink?: boolean; dark?: boolean; onOpenInApp?: (item: Message) => void; suggestions?: Suggestion[]; onSuggestionPress?: (text: string) => void; onImagePress?: (image: PreviewImage) => void; onDetailsPress?: (details: PreviewDetails) => void }) => {
+const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isQueued, isChatGenerating, showMetrics, fallbackModel, canThink, dark, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress, onEditMessage, editAiEnabled }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isQueued?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string; canThink?: boolean; dark?: boolean; onOpenInApp?: (item: Message) => void; suggestions?: Suggestion[]; onSuggestionPress?: (text: string) => void; onImagePress?: (image: PreviewImage) => void; onDetailsPress?: (details: PreviewDetails) => void; onEditMessage?: (item: Message) => void; editAiEnabled?: boolean }) => {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const isUser = item.role === "user";
@@ -354,6 +358,18 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               </Text>
             </View>
           )}
+          {!!visibleContent && !isBusy && !isChatGenerating && (
+            <View style={styles.userToolbar}>
+              <IconButton
+                icon={pencilIcon}
+                label={t("common.edit")}
+                onPress={() => onEditMessage?.(item)}
+                containerSize={32}
+                pressedColor={Colors.surfacePressed}
+                tintColor={dark ? Colors.surface : Colors.textMuted}
+              />
+            </View>
+          )}
         </>
       ) : (
         <View style={styles.aiContainer}>
@@ -432,6 +448,17 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                   tintColor={dark ? Colors.surface : Colors.textMuted}
                 />
               )}
+              {editAiEnabled && !!onEditMessage && (
+                <IconButton
+                  icon={pencilIcon}
+                  label={t("common.edit")}
+                  onPress={() => onEditMessage(item)}
+                  disabled={isChatGenerating}
+                  containerSize={32}
+                  pressedColor={Colors.surfacePressed}
+                  tintColor={dark ? Colors.surface : Colors.textMuted}
+                />
+              )}
               {showMetrics && !!onDetailsPress && (
                 <IconButton
                   icon={infoIcon}
@@ -496,10 +523,12 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   prev.onOpenInApp === next.onOpenInApp &&
   prev.onSuggestionPress === next.onSuggestionPress &&
   prev.onImagePress === next.onImagePress &&
-  prev.onDetailsPress === next.onDetailsPress);
+  prev.onDetailsPress === next.onDetailsPress &&
+  prev.onEditMessage === next.onEditMessage &&
+  prev.editAiEnabled === next.editAiEnabled);
 MessageItem.displayName = "MessageItem";
 
-export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, queuedMessageIds, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress, butterflyFrom }: ChatViewProps) {
+export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, queuedMessageIds, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress, onEditMessage, editAiEnabled, butterflyFrom }: ChatViewProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const listRef = useRef<FlatList>(null);
@@ -568,8 +597,8 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   }, [messages]);
 
   const renderItem = useCallback(({ item }: { item: Message }) => {
-    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isQueued={!!queuedMessageIds?.includes(item.id)} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} suggestions={item.id === lastAssistantId ? suggestions : undefined} onSuggestionPress={onSuggestionPress} onImagePress={onImagePress} onDetailsPress={onDetailsPress} />;
-  }, [incognito, onRegenerate, speakerEnabled, handleSpeak, speakingMessageId, generatingMessageId, queuedMessageIds, showMetrics, conversation?.model, canThink, dark, onOpenInApp, lastAssistantId, suggestions, onSuggestionPress, onImagePress, onDetailsPress]);
+    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isQueued={!!queuedMessageIds?.includes(item.id)} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} suggestions={item.id === lastAssistantId ? suggestions : undefined} onSuggestionPress={onSuggestionPress} onImagePress={onImagePress} onDetailsPress={onDetailsPress} onEditMessage={onEditMessage} editAiEnabled={editAiEnabled} />;
+  }, [incognito, onRegenerate, speakerEnabled, handleSpeak, speakingMessageId, generatingMessageId, queuedMessageIds, showMetrics, conversation?.model, canThink, dark, onOpenInApp, lastAssistantId, suggestions, onSuggestionPress, onImagePress, onDetailsPress, onEditMessage, editAiEnabled]);
 
   return (
     <View style={styles.container}>
@@ -821,6 +850,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginTop: 8,
+    gap: 16,
+  },
+  //right aligned under user bubble
+  userToolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    marginTop: 4,
     gap: 16,
   },
   suggestionBar: {

@@ -17,6 +17,7 @@ export const en = {
   "common.listen": "Listen",
   "common.stop": "Stop",
   "common.details": "Details",
+  "common.edit": "Edit",
   "common.openInApp": "Open in app",
   "common.info": "Info",
   "common.clear": "Clear",
@@ -213,6 +214,7 @@ export const en = {
 
   "chatbar.placeholder": "Ask Maestro",
   "chatbar.transcribing": "Transcribing...",
+  "chatbar.editingMessage": "Editing message...",
   "chatbar.settings": "Settings",
   "chatbar.install": "Install",
   "chatbar.fileCount.one": "{count} File",
@@ -306,6 +308,9 @@ export const en = {
   "settings.general.technicalDetails": "Show technical details",
   "settings.general.technicalDetailsHelp":
     "Add an info button below answers to inspect AI technical data.",
+  "settings.general.editAiMessages": "Edit AI answers",
+  "settings.general.editAiMessagesHelp":
+    "Add an edit button below answers to correct the AI reply text.",
   "settings.general.detectionBoxes": "Show detection boxes",
   "settings.general.detectionBoxesHelp":
     "Outline the screen elements the overlay selection snaps to.",

@@ -49,6 +49,7 @@ const micIcon = require("../../../assets/icons/microphone.png");
 const addIcon = require("../../../assets/icons/add.png");
 const stopIcon = require("../../../assets/icons/stop.png");
 const fileIcon = require("../../../assets/icons/file.png");
+const pencilIcon = require("../../../assets/icons/pencil.png");
 
 const IMAGE_MAX_WIDTH = 1280;
 const IMAGE_COMPRESS_QUALITY = 0.7;
@@ -119,6 +120,11 @@ type ChatInputBarProps = {
   //foreground-app chip from overlay
   appContextChip?: { icon: string; label: string } | null;
   onAppContextRemove?: () => void;
+  //message edit mode
+  editing?: boolean;
+  onEditCancel?: () => void;
+  editDraft?: { id: string; text: string } | null;
+  editFiles?: SelectedFile[] | null;
 };
 
 export type ChatBarHandle = {
@@ -303,6 +309,10 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   onSelectionRemove,
   appContextChip = null,
   onAppContextRemove,
+  editing = false,
+  onEditCancel,
+  editDraft = null,
+  editFiles = null,
 }, ref) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -315,6 +325,17 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const [text, setText] = useState("");
   //latest text before react rerenders
   const textRef = useRef("");
+  //draft loads into the composer
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- draft arrives from the message being edited
+    if (editDraft) setText(editDraft.text);
+  }, [editDraft]);
+  //leaving edit empties the composer
+  const wasEditingRef = useRef(false);
+  useEffect(() => {
+    if (wasEditingRef.current && !editing) setText("");
+    wasEditingRef.current = editing;
+  }, [editing]);
   const lastCollapseRef = useRef<{ from: string; to: string } | null>(null);
   useEffect(() => { textRef.current = text; }, [text]);
   const [webInputHeight, setWebInputHeight] = useState<number | undefined>(undefined);
@@ -322,6 +343,12 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
+  //message files load as chips
+  //leaving edit empties them
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- tray follows the edit session
+    setSelectedFiles(editFiles ?? []);
+  }, [editFiles]);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState<{ title: string, message: string, buttons?: { text: string, onPress: () => void, style?: "primary" | "secondary" | "danger" }[] }>({ title: "", message: "" });
   const [isAttachmentSheetVisible, setIsAttachmentSheetVisible] = useState(false);
@@ -1016,13 +1043,15 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   });
 
   const hasAttachments = attachments.length > 0 || !!appContextChip;
-  const [renderFiles, setRenderFiles] = useState(hasAttachments);
-  const filesAnim = useAnimatedValue(hasAttachments ? 1 : 0);
+  //attachment drawer doubles as banner
+  const trayVisible = hasAttachments || !!editing;
+  const [renderFiles, setRenderFiles] = useState(trayVisible);
+  const filesAnim = useAnimatedValue(trayVisible ? 1 : 0);
   const [drawerHeight, setDrawerHeight] = useState(36);
 
   //keep the drawer mounted through the close slide, unmount when it finishes
   useEffect(() => {
-    if (hasAttachments) {
+    if (trayVisible) {
       setRenderFiles(true);
       const raf = requestAnimationFrame(() => {
         Animated.timing(filesAnim, {
@@ -1043,7 +1072,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         if (finished) setRenderFiles(false);
       });
     }
-  }, [hasAttachments, filesAnim]);
+  }, [trayVisible, filesAnim]);
 
   //compress only picked images
   const buildImages = async (): Promise<string[]> => {
@@ -1315,6 +1344,19 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 >
                   <View style={[styles.filesContainerTop, incognito && styles.filesContainerTopIncognito]}>
                     <View style={styles.fileChipsContainer}>
+                      {editing && (
+                        <View style={styles.editTrayRow}>
+                          <Image source={pencilIcon} style={styles.filePreviewDocumentIconTop} tintColor={Colors.textMuted} />
+                          <Text style={styles.filesAddedText}>{t("chatbar.editingMessage")}</Text>
+                          <Pressable
+                            onPress={onEditCancel}
+                            style={pressStyle([styles.removeFileBtnTop, { position: "relative" as const, right: 0, marginLeft: "auto" as const }], "fadeLight")}
+                          >
+                            <Text style={styles.removeFileBtnTextTop}>✕</Text>
+                          </Pressable>
+                        </View>
+                      )}
+                      {editing && <View style={styles.editTrayDivider} />}
                       {appContextChip && (
                         <View style={styles.filePreviewContainerTop}>
                           <Image source={{ uri: appContextChip.icon }} style={styles.appContextChipIcon} resizeMode="contain" />
@@ -1343,15 +1385,17 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                           </Pressable>
                         </View>
                       ))}
-                      <Text style={[styles.filesAddedText, incognito && { color: Colors.textMuted }]}>
-                        {(() => {
-                          const filesPart = attachments.length > 0 ? t(attachments.length === 1 ? 'chatbar.fileCount.one' : 'chatbar.fileCount.other', { count: attachments.length }) : '';
-                          const appPart = appContextChip ? 'App context' : '';
-                          if (filesPart && appPart) return `${filesPart} and app context Added`;
-                          if (filesPart) return `${filesPart} Added`;
-                          return `${appPart} Added`;
-                        })()}
-                      </Text>
+                      {hasAttachments && (
+                        <Text style={[styles.filesAddedText, incognito && { color: Colors.textMuted }]}>
+                          {(() => {
+                            const filesPart = attachments.length > 0 ? t(attachments.length === 1 ? 'chatbar.fileCount.one' : 'chatbar.fileCount.other', { count: attachments.length }) : '';
+                            const appPart = appContextChip ? 'App context' : '';
+                            if (filesPart && appPart) return `${filesPart} and app context Added`;
+                            if (filesPart) return `${filesPart} Added`;
+                            return `${appPart} Added`;
+                          })()}
+                        </Text>
+                      )}
                     </View>
                   </View>
                 </Animated.View>
@@ -1639,6 +1683,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingBottom: 10,
     marginBottom: -10,
     marginHorizontal: 10,
+    minHeight: 60,
   },
   filesContainerTopIncognito: {
     backgroundColor: Colors.incognitoSurface,
@@ -1764,5 +1809,17 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     color: Colors.textMuted,
     fontSize: FontSizes.bodyMd,
     marginLeft: 4,
+  },
+  editTrayRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    //matches the chip row height
+    minHeight: 32,
+  },
+  editTrayDivider: {
+    width: '100%',
+    height: 2,
+    backgroundColor: Colors.border,
   },
 });

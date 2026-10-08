@@ -413,6 +413,7 @@ export default function Index() {
   const [capsRevision, setCapsRevision] = useState(0);
   const [alwaysWhisper, setAlwaysWhisper] = useState(false);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
+  const [editAiEnabled, setEditAiEnabled] = useState(false);
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
 
   //conversation state
@@ -420,6 +421,13 @@ export default function Index() {
   const [activeConversation, setActiveConversation] =
     useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  //held in the chatbar until confirmed
+  const [editSession, setEditSession] = useState<{
+    messageId: string;
+    role: "user" | "assistant";
+    text: string;
+    images?: string[];
+  } | null>(null);
   //home butterfly flies to the chat header
   const homeButterflyRef = useRef<View>(null);
   const [butterflyFrom, setButterflyFrom] = useState<DOMRect | null>(null);
@@ -458,6 +466,44 @@ export default function Index() {
     return undefined;
   }, [messages, suggestionsByConv, activeConversation]);
 
+  //edited message lives in the chatbar
+  //its successors wait outside
+  const displayMessages = useMemo(() => {
+    if (!editSession) return messages;
+    const idx = messages.findIndex((m) => m.id === editSession.messageId);
+    if (idx === -1) return messages;
+    if (editSession.role === "user") return messages.slice(0, idx);
+    return messages.filter((m) => m.id !== editSession.messageId);
+  }, [messages, editSession]);
+
+  //one stable draft per session
+  const editDraft = useMemo(
+    () =>
+      editSession
+        ? { id: editSession.messageId, text: editSession.text }
+        : null,
+    [editSession],
+  );
+
+  //message files load as removable chips
+  const editFiles = useMemo(
+    () =>
+      editSession?.role === "user"
+        ? (editSession.images ?? []).map((uri, i) => ({
+            uri,
+            type: "image",
+            name: `image-${i}`,
+          }))
+        : null,
+    [editSession],
+  );
+
+  //an edit dies on conv switch
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the composer session on switch
+    setEditSession(null);
+  }, [activeConversation?.id]);
+
   //ref serves streaming callbacks
   const streamingMsgIdRef = useRef<string | null>(null);
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
@@ -486,6 +532,7 @@ export default function Index() {
     setSpeakerEnabled(cached.speaker);
     setAlwaysWhisper(cached.alwaysWhisper);
     setShowTechnicalDetails(cached.showTechnicalDetails);
+    setEditAiEnabled(cached.editAiMessages);
   }, []);
 
   useEffect(() => {
@@ -932,6 +979,7 @@ export default function Index() {
         setSpeakerEnabled(s.speaker);
         setAlwaysWhisper(s.alwaysWhisper);
         setShowTechnicalDetails(s.showTechnicalDetails);
+        setEditAiEnabled(s.editAiMessages);
         const tuning = getOllamaTuning(s.ollamaUrl);
         AIModule.configure(s.ollamaUrl, tuning.contextLength, tuning.keepAlive);
         AIModule.setMode(s.aiService);
@@ -1016,6 +1064,7 @@ export default function Index() {
         setOllamaUrl(Settings.getCached().ollamaUrl);
         setUserName(Settings.getCached().name);
         setShowTechnicalDetails(Settings.getCached().showTechnicalDetails);
+        setEditAiEnabled(Settings.getCached().editAiMessages);
         setCapsRevision((r) => r + 1);
       },
     );
@@ -1697,6 +1746,208 @@ export default function Index() {
     ],
   );
 
+  const handleEditStart = useCallback(
+    (item: Message) => {
+      if (editSession) return;
+      //live or queued reply owns composer
+      if (
+        generatingConvId === activeConversation?.id ||
+        pendingConvIds.includes(activeConversation?.id ?? "")
+      )
+        return;
+      if (item.content === "…") return;
+      setEditSession({
+        messageId: item.id,
+        role: item.role,
+        text: item.content,
+        images: item.images,
+      });
+    },
+    [editSession, generatingConvId, pendingConvIds, activeConversation],
+  );
+
+  const handleEditCancel = useCallback(() => {
+    //nothing written cancel just closes
+    setEditSession(null);
+  }, []);
+
+  const confirmEdit = useCallback(
+    async (text: string, images?: string[]) => {
+      const session = editSession;
+      const conv = activeConversation;
+      if (!session || !conv) return;
+      if (!dbReady && !conv.id.startsWith("incognito_")) return;
+
+      const msgIndex = messagesRef.current.findIndex(
+        (m) => m.id === session.messageId,
+      );
+      if (msgIndex === -1) {
+        setEditSession(null);
+        return;
+      }
+      const original = messagesRef.current[msgIndex];
+
+      //ai reply rewrites text only
+      if (session.role === "assistant") {
+        if (!incognitoMode)
+          await DB.updateMessageContent(session.messageId, text);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === session.messageId ? { ...m, content: text } : m,
+          ),
+        );
+        setEditSession(null);
+        return;
+      }
+
+      //queued replies for this conv replaced
+      requestQueueRef.current = requestQueueRef.current.filter(
+        (i) => i.convId !== conv.id,
+      );
+      setPendingConvIds([...requestQueueRef.current.map((i) => i.convId)]);
+      setPendingMsgIds(requestQueueRef.current.map((i) => i.assistantMsgId));
+
+      const historyUpToHere = messagesRef.current.slice(0, msgIndex);
+      const taskHistory = historyUpToHere
+        .filter((m) => m.content !== "…")
+        .map((m) => ({ role: m.role, content: m.content, images: m.images }));
+
+      const messagesToDelete = messagesRef.current.slice(msgIndex);
+      if (!incognitoMode) {
+        for (const m of messagesToDelete) {
+          await DB.deleteMessage(m.id);
+        }
+      }
+      setMessages([...historyUpToHere]);
+
+      //tray owns attachments while editing
+      const newImages = images ?? original.images;
+      const isIncognitoTask = conv.id.startsWith("incognito_");
+
+      let userMsg: Message;
+      if (isIncognitoTask) {
+        userMsg = {
+          id:
+            "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+          conversationId: conv.id,
+          role: "user",
+          content: text,
+          createdAt: Date.now(),
+          images: newImages,
+          screenContext: original.screenContext,
+        };
+      } else {
+        userMsg = await DB.addMessage(
+          conv.id,
+          "user",
+          text,
+          newImages,
+          original.screenContext,
+        );
+      }
+      setMessages((prev) => [...prev, userMsg]);
+      taskHistory.push({ role: "user", content: text, images: newImages });
+
+      let assistantMsg: Message;
+      if (isIncognitoTask) {
+        assistantMsg = {
+          id:
+            "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+          conversationId: conv.id,
+          role: "assistant",
+          content: "…",
+          createdAt: Date.now(),
+        };
+      } else {
+        assistantMsg = await DB.addMessage(conv.id, "assistant", "…");
+      }
+      setMessages((prev) => [...prev, assistantMsg]);
+      setEditSession(null);
+
+      const taskSelectedModel = selectedModel;
+      const taskSystemPrompt = buildSystemPrompt(
+        selectedModel,
+        userInstruction,
+        screenContextSegment(historyUpToHere),
+      );
+      const taskReflection = selectedReflection;
+      const taskConv = conv;
+
+      const task = async () => {
+        setGeneratingConvId(taskConv.id);
+        generatingConvIdRef.current = taskConv.id;
+        setStreamingMessageId(assistantMsg.id);
+        streamingContentRef.current = "";
+
+        const run = await GenerationService.start({
+          convId: taskConv.id,
+          msgId: assistantMsg.id,
+          prompt: text,
+          model: taskSelectedModel,
+          systemPrompt: taskSystemPrompt,
+          history: taskHistory,
+          think: taskReflection === "none" ? false : taskReflection,
+          persist: !isIncognitoTask,
+          noModelMessage: t("chat.noModel"),
+        });
+
+        const isError = run.status === "error";
+        const isAborted = run.status === "aborted";
+        streamingContentRef.current = run.content;
+        showAssistantContent(assistantMsg.id, taskConv.id, run.content);
+        if (activeConversationRef.current?.id === taskConv.id) {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMsg.id
+                ? {
+                    ...msg,
+                    sources: run.sources ?? msg.sources,
+                    metrics: run.metrics ?? msg.metrics,
+                  }
+                : msg,
+            ),
+          );
+        }
+        if (!isIncognitoTask && !isError) await loadConversations();
+        if (!isError && !isAborted && taskSelectedModel) {
+          generateSuggestions({
+            model: taskSelectedModel,
+            userMessage: text,
+            assistantMessage: streamingContentRef.current,
+            //show each pill once complete
+            onPartial: (items) =>
+              setSuggestions(taskConv.id, { msgId: assistantMsg.id, items }),
+          }).then((items) => {
+            if (items.length > 0)
+              setSuggestions(taskConv.id, { msgId: assistantMsg.id, items });
+          });
+        }
+      };
+
+      requestQueueRef.current.push({
+        convId: taskConv.id,
+        task,
+        assistantMsgId: assistantMsg.id,
+        isIncognito: isIncognitoTask,
+      });
+      setPendingConvIds([...requestQueueRef.current.map((i) => i.convId)]);
+      setPendingMsgIds(requestQueueRef.current.map((i) => i.assistantMsgId));
+      processQueue().catch((e) => console.error("Queue processing failed:", e));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      editSession,
+      activeConversation,
+      dbReady,
+      incognitoMode,
+      selectedModel,
+      userInstruction,
+      selectedReflection,
+      loadConversations,
+      setSuggestions,
+    ],
+  );
+
   const handleStop = useCallback(async () => {
     const currentConvId = activeConversation?.id;
     if (!currentConvId) return;
@@ -1911,14 +2162,16 @@ export default function Index() {
 
             {activeConversation && (
               <ChatView
-                suggestions={activeSuggestions}
+                suggestions={editSession ? undefined : activeSuggestions}
                 onSuggestionPress={handleSend}
-                messages={messages}
+                messages={displayMessages}
                 conversation={activeConversation}
                 contentTopPadding={insets.top + 72}
                 contentBottomPadding={88 + insets.bottom}
                 incognito={activeConversation.id.startsWith("incognito_")}
                 onRegenerate={handleRegenerate}
+                onEditMessage={handleEditStart}
+                editAiEnabled={editAiEnabled}
                 speakerEnabled={speakerEnabled}
                 showMetrics={showTechnicalDetails}
                 generatingMessageId={
@@ -2055,7 +2308,15 @@ export default function Index() {
                 </View>
               ) : (
                 <ChatBar
-                  onSend={handleSend}
+                  onSend={(text, images, viaVoice) =>
+                    editSession
+                      ? confirmEdit(text, images)
+                      : handleSend(text, images, viaVoice)
+                  }
+                  editing={!!editSession}
+                  onEditCancel={handleEditCancel}
+                  editDraft={editDraft}
+                  editFiles={editFiles}
                   incognito={
                     activeConversation
                       ? activeConversation.id.startsWith("incognito_")

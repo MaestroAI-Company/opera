@@ -952,6 +952,7 @@ export default function SettingsDrawer({
   const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
   const [autoSpeak, setAutoSpeakState] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(false);
+  const [editAiMessages, setEditAiMessagesState] = useState(false);
   const [showDetectionBoxes, setShowDetectionBoxesState] = useState(false);
   const [advancedMode, setAdvancedModeState] = useState(false);
   const [useAppContext, setUseAppContextState] = useState(true);
@@ -1326,6 +1327,7 @@ export default function SettingsDrawer({
         setAlwaysWhisperState(s.alwaysWhisper);
         setAutoSpeakState(s.autoSpeak);
         setShowTechnicalDetailsState(s.showTechnicalDetails);
+        setEditAiMessagesState(s.editAiMessages);
         setShowDetectionBoxesState(s.showDetectionBoxes);
         setAdvancedModeState(s.advancedMode);
         setUseAppContextState(s.useAppContext);
@@ -2375,6 +2377,11 @@ export default function SettingsDrawer({
     Settings.set("showTechnicalDetails", v);
   };
 
+  const setEditAiMessages = (v: boolean) => {
+    setEditAiMessagesState(v);
+    Settings.set("editAiMessages", v);
+  };
+
   const setShowDetectionBoxes = (v: boolean) => {
     setShowDetectionBoxesState(v);
     Settings.set("showDetectionBoxes", v);
@@ -3362,6 +3369,23 @@ export default function SettingsDrawer({
             <Toggle
               checked={showTechnicalDetails}
               onToggle={setShowTechnicalDetails}
+            />
+          </View>
+        </View>
+
+        <View style={styles.settingRowVertical}>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.general.editAiMessages")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.general.editAiMessagesHelp")}
+              </Text>
+            </View>
+            <Toggle
+              checked={editAiMessages}
+              onToggle={setEditAiMessages}
             />
           </View>
         </View>

@@ -31,6 +31,7 @@ export type AppSettings = {
   name: string;
   includeDateTime: boolean;
   showTechnicalDetails: boolean;
+  editAiMessages: boolean;
   showDetectionBoxes: boolean;
   advancedMode: boolean;
   dataWarningDismissed: boolean;
@@ -86,6 +87,7 @@ export const BASE_DEFAULTS: AppSettings = {
   name: '',
   includeDateTime: true,
   showTechnicalDetails: false,
+  editAiMessages: false,
   showDetectionBoxes: false,
   advancedMode: false,
   dataWarningDismissed: false,
@@ -109,6 +111,7 @@ const BOOLEAN_KEYS = [
   'hasSeenOnboarding',
   'includeDateTime',
   'showTechnicalDetails',
+  'editAiMessages',
   'showDetectionBoxes',
   'advancedMode',
   'dataWarningDismissed',

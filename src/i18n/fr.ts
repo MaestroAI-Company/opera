@@ -18,6 +18,7 @@ export const fr: Translations = {
   "common.listen": "Écouter",
   "common.stop": "Arrêter",
   "common.details": "Détails",
+  "common.edit": "Modifier",
   "common.openInApp": "Ouvrir dans l'application",
   "common.info": "Info",
   "common.clear": "Effacer",
@@ -216,6 +217,7 @@ export const fr: Translations = {
 
   "chatbar.placeholder": "Demander à Maestro",
   "chatbar.transcribing": "Transcription...",
+  "chatbar.editingMessage": "Modification du message...",
   "chatbar.settings": "Réglages",
   "chatbar.install": "Installer",
   "chatbar.fileCount.one": "{count} fichier",
@@ -311,6 +313,9 @@ export const fr: Translations = {
   "settings.general.technicalDetails": "Afficher les détails techniques",
   "settings.general.technicalDetailsHelp":
     "Ajoute un bouton d'info sous les réponses pour inspecter les données techniques de l'IA.",
+  "settings.general.editAiMessages": "Modifier les réponses de l'IA",
+  "settings.general.editAiMessagesHelp":
+    "Ajoute un bouton modifier sous les réponses pour corriger le texte de l'IA.",
   "settings.general.detectionBoxes": "Afficher les boxes de détection",
   "settings.general.detectionBoxesHelp":
     "Entoure les éléments de l'écran sur lesquels la sélection de l'overlay s'aimante.",

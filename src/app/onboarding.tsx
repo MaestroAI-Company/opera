@@ -29,17 +29,21 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../constants/theme";
 import ButterflyCluster from "../components/features/ButterflyCluster";
 import VoiceEngineCard from "../components/features/VoiceEngineCard";
+import { BUTTERFLY_OPTIONS, selectButterfly, useMaestroButterfly } from "../components/features/maestroButterfly";
 import ActionButton from "../components/ui/ActionButton";
 import Group from "../components/ui/Group";
+import IconSelector from "../components/ui/IconSelector";
+import Slider from "../components/ui/Slider";
 import TextInputField from "../components/ui/TextInputField";
 import LottieView from "lottie-react-native";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
 import { useResponsive } from "../hooks/useResponsive";
+import { useVoicePackInstalled } from "../hooks/useVoicePackInstalled";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
 import { useT } from "../i18n";
 import { LocationService } from "../services/location/LocationService";
 import { Settings } from "../services/settings/SettingsService";
-import { supportedEngineIds } from "../services/speech/engines";
+import { TTS_SPEEDS, supportedEngineIds } from "../services/speech/engines";
 import { STT } from "../services/speech/STTService";
 import { pressStyle } from "../components/ui/pressStyle";
 
@@ -52,6 +56,7 @@ const micIcon = require("../../assets/icons/microphone.png");
 const cameraIcon = require("../../assets/icons/camera.png");
 const photoIcon = require("../../assets/icons/photo.png");
 const locationIcon = require("../../assets/icons/location.png");
+const timeIcon = require("../../assets/icons/time.png");
 
 const isWeb = Platform.OS === "web";
 
@@ -313,6 +318,9 @@ export default function OnboardingPage() {
   //no neural engine on this platform, nothing to pick
   const [hasVoiceEngines] = useState(() => supportedEngineIds().length > 0);
   const [name, setName] = useState(() => Settings.getCached().name);
+  const [ttsSpeed, setTtsSpeedState] = useState(() => Settings.getCached().ttsSpeed);
+  const voicePackInstalled = useVoicePackInstalled();
+  const maestroButterfly = useMaestroButterfly();
   const [statuses, setStatuses] = useState<Partial<Record<PermissionId, PermissionStatus>>>({});
   const contentOpacity = useAnimatedValue(1);
   const backButtonProgress = useAnimatedValue(0);
@@ -459,6 +467,26 @@ export default function OnboardingPage() {
       </Reveal>
       <Reveal delay={200}>
         <VoiceEngineCard />
+        {voicePackInstalled && (
+          <View style={styles.contentCard}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.maestro.voice")}</Text>
+            <IconSelector options={BUTTERFLY_OPTIONS} selectedValue={maestroButterfly} onSelect={selectButterfly} />
+            <Text style={[styles.settingLabel, { marginTop: Spacing.xxl, marginBottom: Spacing.md }]}>
+              {t("settings.tts.speed")}
+            </Text>
+            <Group>
+              <Slider
+                icon={timeIcon}
+                options={TTS_SPEEDS.map((id) => ({ id, label: `${id}×` }))}
+                selectedValue={ttsSpeed}
+                onSelect={(v) => {
+                  setTtsSpeedState(v);
+                  Settings.set("ttsSpeed", v);
+                }}
+              />
+            </Group>
+          </View>
+        )}
       </Reveal>
     </>
   );

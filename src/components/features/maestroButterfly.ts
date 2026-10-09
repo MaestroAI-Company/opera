@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { DeviceEventEmitter, ImageSourcePropType } from "react-native";
 import { AppEvents } from "../../services/events";
 import { Settings } from "../../services/settings/SettingsService";
+import { setVoice } from "../../services/speech/engines";
 
 export type MaestroButterfly = {
   color: ImageSourcePropType;
@@ -49,6 +50,25 @@ export const MAESTRO_BUTTERFLIES: Record<MaestroButterflyId, MaestroButterfly> =
       icon: require("../../../assets/icons/operaicon5.png"),
     },
   };
+
+//selector tiles, butterfly5 stays hidden
+export const BUTTERFLY_OPTIONS = (["butterfly1", "butterfly2", "butterfly3", "butterfly4"] as const).map((id) => ({
+  id,
+  icon: MAESTRO_BUTTERFLIES[id].icon,
+}));
+
+//each butterfly tile picks a supertonic voice
+const BUTTERFLY_VOICES: Record<string, string> = {
+  butterfly1: "F1",
+  butterfly2: "F2",
+  butterfly3: "M1",
+  butterfly4: "M2",
+};
+
+export function selectButterfly(id: string): void {
+  Settings.set("maestroButterfly", id);
+  setVoice("supertonic", BUTTERFLY_VOICES[id]);
+}
 
 //unknown ids fall back to the default
 function getSnapshot(): MaestroButterflyId {

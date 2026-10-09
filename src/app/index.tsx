@@ -422,12 +422,17 @@ export default function Index() {
     useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   //held in the chatbar until confirmed
-  const [editSession, setEditSession] = useState<{
-    messageId: string;
-    role: "user" | "assistant";
-    text: string;
-    images?: string[];
-  } | null>(null);
+const [editSession, setEditSession] = useState<{
+  messageId: string;
+  role: "user" | "assistant";
+  text: string;
+  images?: string[];
+} | null>(null);
+
+const editSessionRef = useRef(editSession);
+useEffect(() => {
+  editSessionRef.current = editSession;
+}, [editSession]);
   //home butterfly flies to the chat header
   const homeButterflyRef = useRef<View>(null);
   const [butterflyFrom, setButterflyFrom] = useState<DOMRect | null>(null);
@@ -537,6 +542,11 @@ export default function Index() {
 
   useEffect(() => {
     const handleBackButton = () => {
+      //cancel edit mode 
+      if (editSessionRef.current) {
+        setEditSession(null);
+        return true;
+      }
       //close drawers on android back press, after drawer-level handlers
       if (settingsDrawerVisibleRef.current) {
         closeSettings();
@@ -553,7 +563,6 @@ export default function Index() {
       "hardwareBackPress",
       handleBackButton,
     );
-
     return () => backHandler.remove();
   }, [closeSettings]);
 

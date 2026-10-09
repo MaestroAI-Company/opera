@@ -127,6 +127,7 @@ import { McpServerConfig } from "../../services/mcp/types";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { Settings } from "../../services/settings/SettingsService";
 import { WhisperSTT } from "../../services/speech/STTService";
+import { TTS_SPEEDS } from "../../services/speech/engines";
 import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
 import ActionButton from "../ui/ActionButton";
 import Checkbox from "../ui/Checkbox";
@@ -144,7 +145,7 @@ import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 import DrawerSheet from "./DrawerSheet";
 import MaestroCard from "./MaestroCard";
-import { useMaestroButterfly } from "./maestroButterfly";
+import { BUTTERFLY_OPTIONS, selectButterfly, useMaestroButterfly } from "./maestroButterfly";
 import VoiceEngineCard from "./VoiceEngineCard";
 import ProfileCard from "./ProfileCard";
 
@@ -154,6 +155,7 @@ import {
 } from "react-native-keyboard-controller";
 import { useResponsive } from "../../hooks/useResponsive";
 import { useSettingsNotices } from "../../hooks/useSettingsNotices";
+import { useVoicePackInstalled } from "../../hooks/useVoicePackInstalled";
 
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useBugReport } from "../../hooks/useBugReport";
@@ -233,12 +235,6 @@ const errorImage = require("../../../assets/images/ImageCard/error.png");
 const infoIcon = require("../../../assets/icons/info.png");
 const reconnectIcon = require("../../../assets/icons/reconnect.png");
 const hyperlinkIcon = require("../../../assets/icons/hyperlink2.png");
-const ICON_SELECTOR_OPTIONS = [
-  { id: "butterfly1", icon: operaIcon },
-  { id: "butterfly2", icon: require("../../../assets/icons/operaicon2.png") },
-  { id: "butterfly3", icon: require("../../../assets/icons/operaicon3.png") },
-  { id: "butterfly4", icon: require("../../../assets/icons/operaicon4.png") },
-];
 
 const DRAWER_SYNC_DELAY_MS = 1500;
 
@@ -919,6 +915,8 @@ export default function SettingsDrawer({
   //empty id means chores follow the main model
   const [quickFlowId, setQuickFlowIdState] = useState("");
   const maestroButterfly = useMaestroButterfly();
+  const [ttsSpeed, setTtsSpeedState] = useState(() => Settings.getCached().ttsSpeed);
+  const voicePackInstalled = useVoicePackInstalled();
   const [quickFlowOptions, setQuickFlowOptions] = useState<SelectorOption[]>(
     [],
   );
@@ -3482,18 +3480,34 @@ export default function SettingsDrawer({
       </View>
 
       {/* butterfly selector card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-            {t("settings.maestro.voice")}
-          </Text>
-          <IconSelector
-            options={ICON_SELECTOR_OPTIONS}
-            selectedValue={maestroButterfly}
-            onSelect={(id) => Settings.set("maestroButterfly", id)}
-          />
+      {voicePackInstalled && (
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.maestro.voice")}
+            </Text>
+            <IconSelector
+              options={BUTTERFLY_OPTIONS}
+              selectedValue={maestroButterfly}
+              onSelect={selectButterfly}
+            />
+            <Text style={[styles.settingLabel, { marginTop: Spacing.xxl, marginBottom: Spacing.md }]}>
+              {t("settings.tts.speed")}
+            </Text>
+            <Group>
+              <Slider
+                icon={timeIcon}
+                options={TTS_SPEEDS.map((id) => ({ id, label: `${id}×` }))}
+                selectedValue={ttsSpeed}
+                onSelect={(v) => {
+                  setTtsSpeedState(v);
+                  Settings.set("ttsSpeed", v);
+                }}
+              />
+            </Group>
+          </View>
         </View>
-      </View>
+      )}
 
       {/* voice engine card */}
       <VoiceEngineCard />

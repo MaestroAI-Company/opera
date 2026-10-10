@@ -1,6 +1,7 @@
 import { File } from "expo-file-system";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   DeviceEventEmitter,
   Image,
   Pressable,
@@ -17,7 +18,6 @@ import HeadlessWebView from "../../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../../constants/prompts";
 import { DarkColors, FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
-import { useResponsive } from "../../hooks/useResponsive";
 import { ColorsOverride, initTheme, useColors, useThemedStyles } from "../../hooks/useTheme";
 import { getLocale, initI18n, useT } from "../../i18n";
 import { AIModule } from "../../services/ai/AIModule";
@@ -50,6 +50,13 @@ const stopIcon = require("../../../assets/icons/stop.png");
 const VAD_SILENCE_MS = 1500;
 //recognizer may never send its end event
 const STOP_TIMEOUT_MS = 3000;
+//inactivity before the sleep phase
+const SLEEP_DELAY_MS = 15000;
+const SLEEP_OPACITY = 0.65;
+const SLEEP_SCALE = 1.1;
+const BUTTON_HEIGHT = 44;
+//anti burn-in distance from the section center
+const BURN_IN_SHIFT = 15;
 
 //the router layout never mounts here
 initTheme();
@@ -57,6 +64,12 @@ initI18n();
 
 type Turn = { role: "user" | "assistant"; content: string };
 type VoiceState = "idle" | "listening" | "transcribing";
+
+//random point on a circle around the center
+function randomShift(): { x: number; y: number } {
+  const angle = Math.random() * 2 * Math.PI;
+  return { x: Math.cos(angle) * BURN_IN_SHIFT, y: Math.sin(angle) * BURN_IN_SHIFT };
+}
 
 function useMinute(): Date {
   const [now, setNow] = useState(() => new Date());
@@ -108,7 +121,6 @@ function OperaDream() {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const insets = useSafeAreaInsets();
-  const { isLargeScreen } = useResponsive();
   const now = useMinute();
 
   const [landscape, setLandscape] = useState(true);
@@ -122,12 +134,15 @@ function OperaDream() {
   const [modelSelectorVisible, setModelSelectorVisible] = useState(false);
   const modelSelectorProgress = useAnimatedValue(0);
   const [incognito, setIncognito] = useState(false);
+  const [showIncognitoButton, setShowIncognitoButton] = useState(true);
+  const [antiBurnIn, setAntiBurnIn] = useState(true);
 
-  const [question, setQuestion] = useState("");
-  const [liveText, setLiveText] = useState("");
   const [answer, setAnswer] = useState<{ msgId: string; content: string } | null>(null);
   const [generatingConvId, setGeneratingConvId] = useState<string | null>(null);
   const [voice, setVoice] = useState<VoiceState>("idle");
+  const [sleeping, setSleeping] = useState(false);
+  const [lastTouch, setLastTouch] = useState(0);
+  const actionsOpacity = useAnimatedValue(1);
 
   //async voice and generation flows read these
   const selectedModelRef = useRef("");
@@ -154,6 +169,8 @@ function OperaDream() {
     if (s.ollamaModel) setSelectedModel(s.ollamaModel);
     setAiService(s.aiService);
     setOllamaUrl(s.ollamaUrl);
+    setShowIncognitoButton(s.dreamIncognitoButton);
+    setAntiBurnIn(s.dreamAntiBurnIn);
     const tuning = getOllamaTuning(s.ollamaUrl);
     AIModule.configure(s.ollamaUrl, tuning.contextLength, tuning.keepAlive);
     AIModule.setMode(s.aiService);
@@ -230,6 +247,8 @@ function OperaDream() {
 
   //same flow as the app home
   const ask = async (text: string) => {
+    //covers the gap before the db rows exist
+    setAnswer({ msgId: "", content: "…" });
     const model = selectedModelRef.current;
     const isIncognito = incognitoRef.current;
     let conv = convRef.current;
@@ -244,7 +263,6 @@ function OperaDream() {
 
     const history: Turn[] = [...historyRef.current, { role: "user", content: text }];
     historyRef.current = history;
-    setQuestion(text);
     let msgId = "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
     if (!isIncognito) {
       await DB.addMessage(conv.id, "user", text);
@@ -309,7 +327,6 @@ function OperaDream() {
     clearTimeout(stopTimerRef.current);
     const text = await resolveTranscript(liveTextRef.current.trim() || null);
     liveTextRef.current = "";
-    setLiveText("");
     setVoice("idle");
     if (text) ask(text).catch((e) => console.warn("Dream question failed", e));
   };
@@ -335,20 +352,18 @@ function OperaDream() {
     liveTextRef.current = "";
     audioUriRef.current = null;
     settledRef.current = false;
-    setLiveText("");
     setVoice("listening");
     const fail = (e: unknown) => {
       console.warn("Dream voice input failed:", e);
       settledRef.current = true;
       clearTimeout(vadTimerRef.current);
       clearTimeout(stopTimerRef.current);
-      setLiveText("");
       setVoice("idle");
     };
     try {
       STT.start(locale, {
-        onPartial: (text) => { if (text) { liveTextRef.current = text; setLiveText(text); } },
-        onFinal: (text) => { if (text) { liveTextRef.current = text; setLiveText(text); } },
+        onPartial: (text) => { if (text) liveTextRef.current = text; },
+        onFinal: (text) => { if (text) liveTextRef.current = text; },
         onSpeechStart: () => clearTimeout(vadTimerRef.current),
         //stop once the speaker stays quiet
         onSpeechEnd: () => {
@@ -372,6 +387,36 @@ function OperaDream() {
   };
 
   const busy = voice !== "idle" || !!generatingConvId;
+
+  //every touch restarts the countdown
+  useEffect(() => {
+    if (sleeping || busy || modelSelectorVisible) return;
+    const timer = setTimeout(() => setSleeping(true), SLEEP_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [sleeping, busy, modelSelectorVisible, lastTouch]);
+
+  //sleep drops the conversation back to the clock
+  useEffect(() => {
+    if (!sleeping) return;
+    TTS.stop();
+    setAnswer(null);
+    convRef.current = null;
+    historyRef.current = [];
+  }, [sleeping]);
+
+  useEffect(() => {
+    Animated.timing(actionsOpacity, { toValue: sleeping ? 0 : 1, duration: 300, useNativeDriver: true }).start();
+  }, [sleeping, actionsOpacity]);
+
+  //clock and butterflies dim while sleeping
+  const contentOpacity = actionsOpacity.interpolate({ inputRange: [0, 1], outputRange: [SLEEP_OPACITY, 1] });
+  //left and right sections grow while sleeping
+  const sleepScale = { transform: [{ scale: actionsOpacity.interpolate({ inputRange: [0, 1], outputRange: [SLEEP_SCALE, 1] }) }] };
+  const actionsStyle = [
+    styles.buttonRow,
+    landscape && [styles.floatingRow, { bottom: insets.bottom + Spacing.xxl, left: insets.left + Spacing.xxl }],
+    { opacity: actionsOpacity, pointerEvents: sleeping ? "none" : "auto" } as const,
+  ];
   const conversing = answer !== null || voice !== "idle";
   const display = answer ? deriveChatDisplay(answer.content, !!generatingConvId, null, modelCapabilities.includes("thinking") && selectedReflection !== "none") : null;
   const showMarkdown = !!display?.showMarkdown;
@@ -384,6 +429,24 @@ function OperaDream() {
   const answerView = voice === "transcribing" || display?.showThinkingRow ? <ThinkingIcon incognito={incognito} /> : markdown;
 
   const time = formatTime(now);
+
+  //sections drift every minute but only while sleeping
+  const shifts = useMemo(
+    () => (antiBurnIn && sleeping ? { left: randomShift(), right: randomShift() } : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [antiBurnIn, sleeping, now]
+  );
+  const sectionStyle = (side: "left" | "right") => [
+    StyleSheet.absoluteFill,
+    styles.center,
+    {
+      transform: [
+        ...sleepScale.transform,
+        { translateX: shifts?.[side].x ?? 0 },
+        { translateY: shifts?.[side].y ?? 0 },
+      ],
+    },
+  ];
 
   const micButton = (
     <Pressable
@@ -425,84 +488,83 @@ function OperaDream() {
     </Pressable>
   );
 
+  //landscape floats the row over the content
+  const actions = (withIncognito: boolean) => (
+    <Animated.View style={actionsStyle}>
+      {micButton}
+      {modelButton}
+      {withIncognito && incognitoButton}
+    </Animated.View>
+  );
+
   const idleLayout = (
     <>
       <View style={[styles.fill, landscape ? styles.row : styles.column]}>
-        <View style={[styles.clock, landscape && styles.fill]}>
-          <Text style={styles.time} numberOfLines={1} adjustsFontSizeToFit>{time}</Text>
-          <Text style={styles.date} numberOfLines={1}>{formatDate(now)}</Text>
+        <View style={styles.fill}>
+          <Animated.View style={sectionStyle("left")}>
+            <View style={styles.clockGroup}>
+              <Text style={styles.time} numberOfLines={1} adjustsFontSizeToFit>{time}</Text>
+              <Text style={styles.date} numberOfLines={1}>{formatDate(now)}</Text>
+            </View>
+          </Animated.View>
         </View>
         <View
-          style={[styles.fill, styles.center]}
+          style={styles.fill}
           onLayout={(e) => {
             const { width, height } = e.nativeEvent.layout;
             setButterflySize(Math.min(width, height));
           }}
         >
-          {butterflySize > 0 && (
-            <ButterflyCluster incognito={incognito} style={{ width: butterflySize, height: butterflySize }} />
-          )}
+          <Animated.View style={sectionStyle("right")}>
+            {butterflySize > 0 && (
+              <ButterflyCluster incognito={incognito} style={{ width: butterflySize, height: butterflySize }} />
+            )}
+          </Animated.View>
         </View>
       </View>
-      <View style={styles.buttonRow}>
-        {micButton}
-        {modelButton}
-        {incognitoButton}
-      </View>
+      {!landscape && actions(showIncognitoButton)}
     </>
   );
 
-  const questionText = (
-    <Text style={styles.question} numberOfLines={4}>
-      {voice === "idle" ? question : liveText}
-    </Text>
-  );
   const answerScroll = (
-    <ScrollView style={styles.fill} contentContainerStyle={styles.answerContent}>
+    <ScrollView style={styles.fill} contentContainerStyle={[styles.answerContent, landscape && styles.floatingClearance]}>
       {answerView}
     </ScrollView>
-  );
-  const conversationButtons = (
-    <View style={styles.buttonRow}>
-      {micButton}
-      {modelButton}
-    </View>
   );
 
   const conversationLayout = landscape ? (
     <View style={[styles.fill, styles.row]}>
-      <View style={[styles.fill, styles.spread]}>
-        <Text style={styles.smallTime}>{time}</Text>
-        <View style={styles.stack}>
-          {questionText}
-          {conversationButtons}
-        </View>
+      <View style={[styles.fill, styles.column]}>
+        {answerScroll}
       </View>
-      {answerScroll}
+      {/* right section reserved */}
+      <View style={styles.fill} />
     </View>
   ) : (
     <View style={[styles.fill, styles.column]}>
-      <Text style={styles.smallTime}>{time}</Text>
       {answerScroll}
-      <View style={styles.stack}>
-        {questionText}
-        {conversationButtons}
-      </View>
+      {actions(false)}
     </View>
   );
 
   return (
     <View
       style={styles.root}
+      //a sleep tap only wakes the screen
+      onTouchStart={() => {
+        setSleeping(false);
+        setLastTouch(Date.now());
+      }}
       onLayout={(e) => {
         const { width, height } = e.nativeEvent.layout;
         setLandscape(width > height);
       }}
     >
-      <View
+      <Animated.View
         style={[
           styles.content,
           {
+            opacity: contentOpacity,
             paddingTop: insets.top + Spacing.xxl,
             paddingBottom: insets.bottom + Spacing.xxl,
             paddingLeft: insets.left + Spacing.xxl,
@@ -511,7 +573,9 @@ function OperaDream() {
         ]}
       >
         {conversing ? conversationLayout : idleLayout}
-      </View>
+      </Animated.View>
+
+      {landscape && actions(!conversing && showIncognitoButton)}
 
       <ModelSelectorDrawer
         visible={modelSelectorVisible}
@@ -539,7 +603,8 @@ function OperaDream() {
           AIModule.preloadModel(model).catch(() => { });
         }}
         onReflectionChange={setSelectedReflection}
-        isLargeScreen={isLargeScreen}
+        //no trigger to anchor to, so always the bottom sheet
+        isLargeScreen={false}
       />
 
       <HeadlessWebView />
@@ -554,7 +619,7 @@ const rootStyles = StyleSheet.create({
 const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.screensaverBackground,
   },
   content: {
     flex: 1,
@@ -575,36 +640,25 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  //question and buttons sink to the bottom
-  spread: {
-    justifyContent: "space-between",
-  },
-  stack: {
-    gap: Spacing.lg2,
-  },
-  clock: {
+  clockGroup: {
     alignItems: "center",
     justifyContent: "center",
   },
   time: {
     fontFamily: Fonts.display,
     fontSize: FontSizes.displayClock,
+    //tight line box so the digits sit centered
+    lineHeight: FontSizes.displayClock,
+    includeFontPadding: false,
     color: Colors.textPrimary,
+    textAlign: "center",
   },
   date: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.xxxl,
+    includeFontPadding: false,
     color: Colors.textPrimary,
-  },
-  smallTime: {
-    fontFamily: Fonts.display,
-    fontSize: FontSizes.displayLg,
-    color: Colors.textPrimary,
-  },
-  question: {
-    fontFamily: Fonts.body,
-    fontSize: FontSizes.md,
-    color: Colors.textPrimary,
+    textAlign: "center",
   },
   answerContent: {
     paddingBottom: Spacing.xxl,
@@ -613,9 +667,18 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flexDirection: "row",
     gap: Spacing.lg,
   },
+  //half width, bottom left over the content
+  floatingRow: {
+    position: "absolute",
+    width: "50%",
+  },
+  //keeps text clear of the floating row
+  floatingClearance: {
+    paddingBottom: BUTTON_HEIGHT + Spacing.xxl,
+  },
   button: {
     flex: 1,
-    height: 44,
+    height: BUTTON_HEIGHT,
     borderRadius: Radius.xxl,
     borderWidth: 2,
     paddingHorizontal: Spacing.lg2,

@@ -24,6 +24,7 @@ import {
   Vibration,
   View
 } from "react-native";
+import Reanimated, { type SharedValue, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
@@ -257,36 +258,34 @@ function MentionBoxes({ text, spans, scrollY }: { text: string; spans: MentionSp
   );
 }
 
+const VOICE_BARS = [0, 1, 2, 3, 4, 5, 6];
+const VOICE_TICK_MS = 60;
+type VoiceLevel = { vol: number; at: number };
+
+function VoiceBar({ index, level }: { index: number; level: SharedValue<VoiceLevel> }) {
+  const styles = useThemedStyles(makeStyles);
+  const style = useAnimatedStyle(() => {
+    const { vol, at } = level.value;
+    const targetScale = 1 + vol * (2 + Math.sin(at / 100 + index)) + (Math.random() * vol * 1.5);
+    return { transform: [{ scaleY: withTiming(Math.max(1, Math.min(targetScale, 5)), { duration: VOICE_TICK_MS }) }] };
+  });
+  return <Reanimated.View style={[styles.voiceSquare, style]} />;
+}
+
 function VoiceIndicator() {
   const styles = useThemedStyles(makeStyles);
-  const anims = useMemo(() => Array.from({ length: 7 }).map(() => new Animated.Value(1)), []);
+  const level = useSharedValue<VoiceLevel>({ vol: 0, at: 0 });
   useEffect(() => {
-    let isMounted = true;
-    const animate = () => {
-      if (!isMounted) return;
-      const vol = Math.min(1, currentAudioVolume * 50);
-      const animations = anims.map((anim, i) => {
-        const targetScale = 1 + vol * (2 + Math.sin(Date.now() / 100 + i)) + (Math.random() * vol * 1.5);
-        return Animated.timing(anim, {
-          toValue: Math.max(1, Math.min(targetScale, 5)),
-          duration: 60,
-          useNativeDriver: Platform.OS !== "web",
-        });
-      });
-      Animated.parallel(animations).start(() => {
-        if (isMounted) requestAnimationFrame(animate);
-      });
-    };
-    animate();
-    return () => {
-      isMounted = false;
-      anims.forEach(a => a.stopAnimation());
-    };
-  }, [anims]);
+    //one ui write drives every bar
+    const timer = setInterval(() => {
+      level.value = { vol: Math.min(1, currentAudioVolume * 50), at: Date.now() };
+    }, VOICE_TICK_MS);
+    return () => clearInterval(timer);
+  }, [level]);
   return (
     <View style={styles.voiceIndicatorContainer}>
-      {anims.map((anim, i) => (
-        <Animated.View key={i} style={[styles.voiceSquare, { transform: [{ scaleY: anim }] }]} />
+      {VOICE_BARS.map(i => (
+        <VoiceBar key={i} index={i} level={level} />
       ))}
     </View>
   );

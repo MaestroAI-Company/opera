@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   AppState,
@@ -44,6 +44,7 @@ import SelectionLayer from './SelectionLayer';
 import TextLayer from './TextLayer';
 
 import { useResponsive } from '../../hooks/useResponsive';
+import { OverlayPresence } from '../../services/overlay/overlayPresence';
 import { AppContext, AppIcon, ScreenCapture } from '../../services/overlay/screenCapture';
 import { useScreenAccess } from '../../services/overlay/useScreenAccess';
 import { useScreenDetections } from '../../services/overlay/useScreenDetections';
@@ -176,6 +177,12 @@ function AssistantOverlay() {
   //close bumps session, skip its analysis
   const [closed, setClosed] = useState(false);
   const screenLive = screenAccess && !closed;
+  //app under overlay pauses work
+  useLayoutEffect(() => {
+    if (closed) return;
+    OverlayPresence.set(true);
+    return () => OverlayPresence.set(false);
+  }, [closed]);
   const { selection, select, clear: clearSelection, attachment } = useScreenSelection(session, screenLive);
   //selection works without it
   const detections = useScreenDetections(session, screenLive);
@@ -423,6 +430,8 @@ function AssistantOverlay() {
   //reopen via same activity instance
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener(AppEvents.overlayReopened, () => {
+      //before the resume reaches the app
+      OverlayPresence.set(true);
       closingRef.current = false;
       setClosed(false);
       resetOverlay();

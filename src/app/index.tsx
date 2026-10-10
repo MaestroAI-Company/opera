@@ -100,6 +100,7 @@ import {
 } from "../services/deeplinks/DeepLinkService";
 import { splitDocumentBlocks } from "../services/documents/DocumentService";
 import { AppEvents } from "../services/events";
+import { OverlayPresence } from "../services/overlay/overlayPresence";
 import { LocationService } from "../services/location/LocationService";
 import {
   takePendingCrash,
@@ -1019,7 +1020,8 @@ useEffect(() => {
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextAppState) => {
-      if (nextAppState === "active" && dbReady) {
+      //overlay resume is not app resume
+      if (nextAppState === "active" && dbReady && !OverlayPresence.isShown()) {
         loadConversations();
         if (
           activeConversationRef.current &&
@@ -1056,7 +1058,13 @@ useEffect(() => {
     if (!dbReady) return;
     //one reload per write burst
     let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+    let reloadAfterOverlay = false;
     const scheduleReload = () => {
+      //hidden list rerender stalls overlay
+      if (OverlayPresence.isShown()) {
+        reloadAfterOverlay = true;
+        return;
+      }
       if (reloadTimer) clearTimeout(reloadTimer);
       reloadTimer = setTimeout(loadConversations, 300);
     };
@@ -1064,6 +1072,14 @@ useEffect(() => {
     const conversationsSub = DeviceEventEmitter.addListener(
       AppEvents.conversationsChanged,
       scheduleReload,
+    );
+    const overlaySub = DeviceEventEmitter.addListener(
+      AppEvents.overlayVisibility,
+      (shown: boolean) => {
+        if (shown || !reloadAfterOverlay) return;
+        reloadAfterOverlay = false;
+        scheduleReload();
+      },
     );
     //sync ai service on change
     const settingsSub = DeviceEventEmitter.addListener(
@@ -1091,6 +1107,7 @@ useEffect(() => {
     return () => {
       if (reloadTimer) clearTimeout(reloadTimer);
       conversationsSub.remove();
+      overlaySub.remove();
       settingsSub.remove();
       modelSelectorSub.remove();
       codePreviewSub.remove();

@@ -11,6 +11,7 @@ import com.facebook.react.ReactActivity;
 import com.facebook.react.ReactActivityDelegate;
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint;
 import com.facebook.react.defaults.DefaultReactActivityDelegate;
+import com.facebook.react.modules.core.PermissionListener;
 import expo.modules.ReactActivityDelegateWrapper;
 public class OverlayActivity extends ReactActivity {
 
@@ -64,6 +65,13 @@ public class OverlayActivity extends ReactActivity {
     public void startActivityForResult(Intent intent, int requestCode, Bundle options) {
         launchedAt = SystemClock.uptimeMillis();
         super.startActivityForResult(intent, requestCode, options);
+    }
+
+    //permission dialog dont leave
+    @Override
+    public void requestPermissions(String[] permissions, int requestCode, PermissionListener listener) {
+        launchedAt = SystemClock.uptimeMillis();
+        super.requestPermissions(permissions, requestCode, listener);
     }
 
     //emit overlay leave event

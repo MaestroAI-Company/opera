@@ -9,6 +9,8 @@ export const AppEvents = {
   overlayReopened: 'OVERLAY_REOPENED',
   //user left the overlay via home
   overlayLeaving: 'OVERLAY_LEAVING',
+  //overlay shown or hidden
+  overlayVisibility: 'OVERLAY_VISIBILITY',
   //a screen text selection is being dragged
   textSelectionDrag: 'TEXT_SELECTION_DRAG',
   openModelSelector: 'OPEN_MODEL_SELECTOR',

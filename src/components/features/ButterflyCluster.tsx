@@ -12,6 +12,7 @@ import {
   Animated,
   AppState,
   AppStateStatus,
+  DeviceEventEmitter,
   Easing,
   Platform,
   StyleProp,
@@ -28,6 +29,8 @@ import Reanimated, {
   withTiming,
 } from "react-native-reanimated";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { AppEvents } from "../../services/events";
+import { OverlayPresence } from "../../services/overlay/overlayPresence";
 import { MAESTRO_BUTTERFLIES, useMaestroButterfly } from "./maestroButterfly";
 
 const MAX_SHIFT = 16;
@@ -183,13 +186,24 @@ function ButterflyCluster({
       sub = null;
     };
 
-    if (AppState.currentState === "active") {
+    //overlay resume keeps app backgrounded
+    const shouldListen = () => AppState.currentState === "active" && !OverlayPresence.isShown();
+
+    if (shouldListen()) {
       subscribe();
     }
 
     //pause sensor when app backgrounded
     const appStateSub = AppState.addEventListener("change", (nextState: AppStateStatus) => {
-      if (nextState === "active") {
+      if (nextState === "active" && shouldListen()) {
+        subscribe();
+      } else {
+        unsubscribe();
+      }
+    });
+    //each spring rerenders the hidden butterfly
+    const overlaySub = DeviceEventEmitter.addListener(AppEvents.overlayVisibility, () => {
+      if (shouldListen()) {
         subscribe();
       } else {
         unsubscribe();
@@ -200,6 +214,7 @@ function ButterflyCluster({
       isMounted = false;
       unsubscribe();
       appStateSub.remove();
+      overlaySub.remove();
     };
   }, [gyro, parallax]);
 

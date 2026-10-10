@@ -293,6 +293,8 @@ export const fr: Translations = {
   "settings.nav.general.subtitle": "Langue, thème",
   "settings.nav.overlay.title": "Assistant Overlay",
   "settings.nav.overlay.subtitle": "Voix, contexte de l'écran",
+  "settings.nav.screenSaver.title": "Écran de veille",
+  "settings.nav.screenSaver.subtitle": "Bientôt disponible",
   "settings.nav.service.title": "Service",
   "settings.nav.service.subtitle": "Service IA, serveur Ollama",
   "settings.nav.tools.title": "Outils",
@@ -308,6 +310,16 @@ export const fr: Translations = {
   "settings.nav.support.subtitle": "Signaler un problème, contacter le support",
   "settings.nav.info.title": "Informations",
   "settings.nav.info.subtitle": "Version de l'app, Github, Instagram, TikTok",
+  "settings.screenSaver.help":
+    "Choisis ce que ton appareil affiche pendant la charge ou en veille.",
+  "settings.screenSaver.open":
+    "Ouvrir les réglages de l'écran de veille",
+  "settings.screenSaver.antiBurnIn": "Anti burn-in",
+  "settings.screenSaver.antiBurnInHelp":
+    "Déplace l'horloge et les papillons de quelques pixels chaque minute pour protéger les écrans OLED.",
+  "settings.screenSaver.incognito": "Bouton mode incognito",
+  "settings.screenSaver.incognitoHelp":
+    "Affiche le bouton mode incognito sur l'écran de veille.",
 
   "settings.info.version": "Version",
   "settings.info.links": "Liens",

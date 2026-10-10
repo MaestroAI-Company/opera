@@ -98,6 +98,8 @@ export const LightColors = {
   //logo tiles stay white in both themes
   logoTile: "#FFFFFF",
   logoTileBorder: "#0000001A",
+  //screensaver stays pure black for oled
+  screensaverBackground: "#000000",
 } as const;
 
 //every palette carries the same keys, values stay free-form color strings
@@ -150,6 +152,7 @@ export const DarkColors: ThemeColors = {
   groupedBackground: "#141312",
   groupedBackgroundFade: "rgba(20,19,18,0.9)",
   groupedBackgroundClear: "rgba(20,19,18,0)",
+  screensaverBackground: "#000000",
 };
 
 //light stays the module default so non-react code keeps working

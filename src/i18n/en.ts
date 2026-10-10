@@ -286,6 +286,8 @@ export const en = {
   "settings.nav.general.subtitle": "Language, Theme",
   "settings.nav.overlay.title": "Assistant Overlay",
   "settings.nav.overlay.subtitle": "Voice, Screen context",
+  "settings.nav.screenSaver.title": "Screen Saver",
+  "settings.nav.screenSaver.subtitle": "Coming soon",
   "settings.nav.service.title": "Service",
   "settings.nav.service.subtitle": "AI Service, Ollama server",
   "settings.nav.tools.title": "Tools",
@@ -299,6 +301,15 @@ export const en = {
   "settings.nav.support.subtitle": "Send an issue, contact support",
   "settings.nav.info.title": "Informations",
   "settings.nav.info.subtitle": "Version App, Github, Instagram, TikTok",
+  "settings.screenSaver.help":
+    "Choose what your device shows while it charges or sits idle.",
+  "settings.screenSaver.open": "Open screen saver settings",
+  "settings.screenSaver.antiBurnIn": "Anti burn-in",
+  "settings.screenSaver.antiBurnInHelp":
+    "Shift the clock and butterflies a few pixels every minute to protect OLED screens.",
+  "settings.screenSaver.incognito": "Incognito mode button",
+  "settings.screenSaver.incognitoHelp":
+    "Show the incognito mode button on the screen saver.",
 
   "settings.info.version": "Version",
   "settings.info.links": "Links",

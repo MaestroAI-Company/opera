@@ -121,6 +121,13 @@ import {
   getCloudProviderDefinition,
 } from "../../services/cloud/registry";
 import { CloudSync } from "../../services/CloudSyncService";
+import {
+  HubDevice,
+  hubErrorCode,
+  HubStatus,
+  OperaHub,
+  PairedHub,
+} from "../../services/hub/OperaHubService";
 import { AppEvents } from "../../services/events";
 import { McpService } from "../../services/mcp/McpService";
 import { McpServerConfig } from "../../services/mcp/types";
@@ -144,6 +151,7 @@ import SliderToggle from "../ui/SliderToggle";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 import DrawerSheet from "./DrawerSheet";
+import HubPairingSheet from "./HubPairingSheet";
 import MaestroCard from "./MaestroCard";
 import { BUTTERFLY_OPTIONS, selectButterfly, useMaestroButterfly } from "./maestroButterfly";
 import VoiceEngineCard from "./VoiceEngineCard";
@@ -289,6 +297,7 @@ export type SubPage =
   | "widgets"
   | "profile"
   | "cloud"
+  | "operahub"
   | "mobileactions"
   | "mcpservers"
   | "mcpserver"
@@ -316,6 +325,7 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   tools: "main",
   profile: "main",
   cloud: "main",
+  operahub: "main",
   sociallinks: "main",
   widgets: "tools",
   mobileactions: "tools",
@@ -336,6 +346,11 @@ const sectionOf = (page: SubPage): SubPage => {
 
 //desktop always shows a page next to the nav
 const DESKTOP_ENTRY_PAGE: SubPage = "general";
+//hub device images by kind
+const HUB_DEVICE_ICONS: Record<string, ImageSourcePropType> = {
+  phone: require("../../../assets/icons/operaicon.png"),
+  desktop: require("../../../assets/icons/server.png"),
+};
 //settings rows stay readable on wide screens
 const DESKTOP_WINDOW_MAX_WIDTH = 960;
 
@@ -842,8 +857,32 @@ export default function SettingsDrawer({
   //measured width, the slide's push distance
   const [litertBodyWidth, setLitertBodyWidth] = useState(320);
 
+  const hubSupported = OperaHub.isSupported();
+  const [pairedHub, setPairedHub] = useState<PairedHub | null>(null);
+  const [hubState, setHubState] = useState<
+    "checking" | "online" | "offline" | "revoked"
+  >("checking");
+  const [hubStatus, setHubStatus] = useState<HubStatus | null>(null);
+  const [hubDevices, setHubDevices] = useState<HubDevice[] | null>(null);
+  const [hubPairingVisible, setHubPairingVisible] = useState(false);
+
+  const refreshHub = useCallback(async () => {
+    const hub = await OperaHub.getPairedHub();
+    setPairedHub(hub);
+    if (!hub) return;
+    setHubState("checking");
+    try {
+      setHubStatus(await OperaHub.status(hub));
+      setHubState("online");
+      setHubDevices(await OperaHub.devices(hub).catch(() => null));
+    } catch (e) {
+      setHubState(hubErrorCode(e) === "Unauthorized" ? "revoked" : "offline");
+    }
+  }, []);
+
   //open sheets keep the back press for themselves
   const sheetOpen =
+    hubPairingVisible ||
     profileEditVisible ||
     addModelSheetVisible ||
     ollamaAddVisible ||
@@ -2522,6 +2561,32 @@ export default function SettingsDrawer({
     );
   };
 
+  const handleUnpairHub = () => {
+    if (!pairedHub) return;
+    showAlert(
+      t("settings.hub.unpairTitle"),
+      t("settings.hub.unpairMessage", { name: pairedHub.name }),
+      [
+        {
+          text: t("settings.hub.unpair"),
+          style: "danger",
+          onPress: async () => {
+            setAlertModalVisible(false);
+            await OperaHub.unpair(pairedHub);
+            setPairedHub(null);
+            setHubStatus(null);
+            setHubDevices(null);
+          },
+        },
+        {
+          text: t("common.cancel"),
+          onPress: () => setAlertModalVisible(false),
+          style: "secondary",
+        },
+      ],
+    );
+  };
+
   const handleCreateSyncPin = () => {
     let currentInput = "";
     showAlert(
@@ -2990,7 +3055,7 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={navItemStyle("cloud", true)}
+          style={navItemStyle("cloud", !hubSupported)}
           onPress={() => setActiveSubPage("cloud")}
         >
           <View style={styles.menuIconWrap}>
@@ -3007,6 +3072,32 @@ export default function SettingsDrawer({
             </Text>
           </View>
         </Pressable>
+
+        {hubSupported && (
+          <Pressable
+            style={navItemStyle("operahub", true)}
+            onPress={() => {
+              setActiveSubPage("operahub");
+              refreshHub();
+            }}
+          >
+            <View style={styles.menuIconWrap}>
+              <Image
+                source={serverIcon}
+                style={styles.menuIcon}
+                tintColor={Colors.textOnPrimary}
+              />
+            </View>
+            <View style={styles.navTextContainer}>
+              <Text style={styles.navTitle}>
+                {t("settings.nav.hub.title")}
+              </Text>
+              <Text style={styles.navSubtitle}>
+                {t("settings.nav.hub.subtitle")}
+              </Text>
+            </View>
+          </Pressable>
+        )}
       </Group>
 
       <Group style={[styles.groupSpacing, styles.mainPageGroup]}>
@@ -3790,6 +3881,143 @@ export default function SettingsDrawer({
             </View>
           </View>
         )}
+      </View>
+    );
+  };
+
+  const renderOperaHubSubPage = () => {
+    if (!pairedHub) {
+      return (
+        <View style={styles.subPageContainer}>
+          {renderSubPageHeader(t("settings.nav.hub.title"))}
+
+          {/* pairing card */}
+          <View style={styles.contentCard}>
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <Text style={styles.settingLabel}>{t("settings.hub.title")}</Text>
+              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                {t("settings.hub.help")}
+              </Text>
+              <Group style={styles.highlightGroup}>
+                <ActionButton
+                  icon={cameraIcon}
+                  label={t("settings.hub.pair")}
+                  variant="highlight"
+                  onPress={() => setHubPairingVisible(true)}
+                />
+              </Group>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    const connection = {
+      checking: t("settings.hub.checking"),
+      offline: t("settings.hub.offline"),
+      revoked: t("settings.hub.offline"),
+      online: hubStatus?.direct
+        ? t("settings.hub.direct")
+        : t("settings.hub.relay"),
+    }[hubState];
+    const hubRows = [
+      {
+        label: t("settings.hub.name"),
+        value: hubStatus?.name ?? pairedHub.name,
+      },
+      { label: t("settings.hub.connection"), value: connection },
+      ...(hubStatus
+        ? [{ label: t("settings.hub.version"), value: hubStatus.version }]
+        : []),
+    ];
+
+    return (
+      <View style={styles.subPageContainer}>
+        {renderSubPageHeader(t("settings.nav.hub.title"))}
+
+        {/* hub card */}
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.hub.title")}
+            </Text>
+            <Group style={styles.infoGroup}>
+              {hubRows.map((row) => (
+                <ActionButton
+                  key={row.label}
+                  label={row.label}
+                  rightElement={
+                    <Text
+                      style={styles.infoValue}
+                      numberOfLines={1}
+                      ellipsizeMode="middle"
+                    >
+                      {row.value}
+                    </Text>
+                  }
+                />
+              ))}
+            </Group>
+            {hubState === "revoked" && (
+              <Text style={styles.helpText}>{t("settings.hub.revoked")}</Text>
+            )}
+          </View>
+        </View>
+
+        {/* connected devices card */}
+        {hubState === "online" && (
+          <View style={styles.contentCard}>
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <Text
+                style={[styles.settingLabel, { marginBottom: Spacing.md }]}
+              >
+                {t("settings.hub.devices")}
+              </Text>
+              {hubDevices ? (
+                <Group style={styles.infoGroup}>
+                  {hubDevices.map((device) => (
+                    <ActionButton
+                      key={device.id}
+                      icon={HUB_DEVICE_ICONS[device.kind] ?? operaIcon}
+                      label={device.name}
+                      rightElement={
+                        device.lastSeen ? (
+                          <Text style={styles.infoValue} numberOfLines={1}>
+                            {new Date(
+                              device.lastSeen * 1000,
+                            ).toLocaleDateString()}
+                          </Text>
+                        ) : undefined
+                      }
+                    />
+                  ))}
+                </Group>
+              ) : (
+                <Text style={styles.helpText}>
+                  {t("settings.hub.devicesEmpty")}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* actions section */}
+        <View style={styles.contentCard}>
+          <Group>
+            <ActionButton
+              icon={reconnectIcon}
+              label={t("settings.hub.check")}
+              disabled={hubState === "checking"}
+              style={hubState === "checking" && styles.highlightGroupDisabled}
+              onPress={refreshHub}
+            />
+            <ActionButton
+              icon={cancelIcon}
+              label={t("settings.hub.unpair")}
+              onPress={handleUnpairHub}
+            />
+          </Group>
+        </View>
       </View>
     );
   };
@@ -5228,6 +5456,8 @@ export default function SettingsDrawer({
         return renderProfileSubPage();
       case "cloud":
         return renderCloudSubPage();
+      case "operahub":
+        return renderOperaHubSubPage();
       case "general":
         return renderGeneralSubPage();
       case "maestro":
@@ -6230,6 +6460,19 @@ export default function SettingsDrawer({
 
   //storage switches only once the setup connects
   const CloudSetup = getCloudProviderDefinition(cloudSetupId)?.SetupComponent;
+  const hubPairingSheet = hubSupported && (
+    <HubPairingSheet
+      visible={hubPairingVisible}
+      onClose={() => setHubPairingVisible(false)}
+      onPaired={() => {
+        setHubPairingVisible(false);
+        refreshHub();
+      }}
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+    />
+  );
+
   const cloudSetupSheet = (
     <DrawerSheet
       visible={cloudSetupVisible}
@@ -6601,6 +6844,7 @@ export default function SettingsDrawer({
             {openaiModelsSheet}
             {mcpAddServerSheet}
             {cloudSetupSheet}
+            {hubPairingSheet}
             {localModelDetailSheet}
             {litertDownloadSheet}
             {profileEditSheet}
@@ -6646,6 +6890,7 @@ export default function SettingsDrawer({
       {openaiModelsSheet}
       {mcpAddServerSheet}
       {cloudSetupSheet}
+      {hubPairingSheet}
       {localModelDetailSheet}
       {litertDownloadSheet}
       {profileEditSheet}

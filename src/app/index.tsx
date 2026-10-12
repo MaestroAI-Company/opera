@@ -92,6 +92,7 @@ import {
 import { resolveQuickFlow } from "../services/ai/quickFlow";
 import { arrayBufferToBase64 } from "../services/ai/utils/base64";
 import { CloudSync } from "../services/CloudSyncService";
+import { HubSync } from "../services/hub/HubSync";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
 import {
   getInitialDeepLink,
@@ -963,6 +964,7 @@ useEffect(() => {
         CloudSync.init().catch((e) =>
           console.warn("Could not start cloud sync:", e),
         );
+        HubSync.init();
         await PluginRegistry.init();
         await PluginRegistry.loadAll();
         //mcp tools register as servers connect

@@ -5,6 +5,7 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
+import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableMap
 import kotlinx.coroutines.CoroutineScope
@@ -14,7 +15,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import uniffi.opera_hub_client.HubClient
 import uniffi.opera_hub_client.HubException
+import uniffi.opera_hub_client.McpGrant
 import uniffi.opera_hub_client.PairedHub
+import uniffi.opera_hub_client.SyncRecord
 
 //bridges the rust hub client to js
 class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
@@ -63,6 +66,102 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
             device.lastSeen?.let { putDouble("lastSeen", it.toDouble()) }
           })
         }
+      }
+    }
+
+  @ReactMethod
+  fun push(deviceKey: String, hub: ReadableMap, collection: String, records: ReadableArray, promise: Promise) =
+    launchPromise(promise) {
+      val list = (0 until records.size()).map { i ->
+        val record = records.getMap(i)!!
+        SyncRecord(
+          record.getString("id") ?: "",
+          record.getDouble("updatedAt").toULong(),
+          record.getBoolean("deleted"),
+          if (record.isNull("payload")) null else record.getString("payload"),
+        )
+      }
+      client(deviceKey).push(hubFromMap(hub), collection, list)
+      null
+    }
+
+  @ReactMethod
+  fun pull(deviceKey: String, hub: ReadableMap, collection: String, since: Double, promise: Promise) =
+    launchPromise(promise) {
+      val page = client(deviceKey).pull(hubFromMap(hub), collection, since.toULong())
+      Arguments.createMap().apply {
+        putArray("records", Arguments.createArray().apply {
+          for (record in page.records) {
+            pushMap(Arguments.createMap().apply {
+              putString("id", record.id)
+              //unix millis fit a js number
+              putDouble("updatedAt", record.updatedAt.toDouble())
+              putBoolean("deleted", record.deleted)
+              putString("payload", record.payload)
+            })
+          }
+        })
+        putDouble("cursor", page.cursor.toDouble())
+        putBoolean("more", page.more)
+      }
+    }
+
+  @ReactMethod
+  fun putGrant(deviceKey: String, hub: ReadableMap, grant: ReadableMap, promise: Promise) =
+    launchPromise(promise) {
+      client(deviceKey).putGrant(
+        hubFromMap(hub),
+        McpGrant(
+          grant.getString("serverId") ?: "",
+          grant.getString("tokenEndpoint") ?: "",
+          grant.getString("clientId") ?: "",
+          grant.getString("refreshToken") ?: "",
+          if (grant.isNull("accessToken")) null else grant.getString("accessToken"),
+          grant.getDouble("expiresAt").toULong(),
+        ),
+      )
+      null
+    }
+
+  @ReactMethod
+  fun accessToken(deviceKey: String, hub: ReadableMap, serverId: String, promise: Promise) =
+    launchPromise(promise) {
+      client(deviceKey).accessToken(hubFromMap(hub), serverId)?.let { token ->
+        Arguments.createMap().apply {
+          putString("accessToken", token.accessToken)
+          putDouble("expiresAt", token.expiresAt.toDouble())
+        }
+      }
+    }
+
+  @ReactMethod
+  fun dropGrant(deviceKey: String, hub: ReadableMap, serverId: String, promise: Promise) =
+    launchPromise(promise) {
+      client(deviceKey).dropGrant(hubFromMap(hub), serverId)
+      null
+    }
+
+  @ReactMethod
+  fun providers(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) {
+      Arguments.createArray().apply {
+        for (provider in client(deviceKey).providers(hubFromMap(hub))) {
+          pushMap(Arguments.createMap().apply {
+            putString("id", provider.id)
+            putString("name", provider.name)
+            putString("kind", provider.kind)
+          })
+        }
+      }
+    }
+
+  @ReactMethod
+  fun startProxy(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) {
+      val proxy = client(deviceKey).startProxy(hubFromMap(hub))
+      Arguments.createMap().apply {
+        putInt("port", proxy.port.toInt())
+        putString("token", proxy.token)
       }
     }
 

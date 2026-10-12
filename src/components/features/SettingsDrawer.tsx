@@ -128,6 +128,7 @@ import {
   OperaHub,
   PairedHub,
 } from "../../services/hub/OperaHubService";
+import { HubSync } from "../../services/hub/HubSync";
 import { AppEvents } from "../../services/events";
 import { McpService } from "../../services/mcp/McpService";
 import { McpServerConfig } from "../../services/mcp/types";
@@ -2574,6 +2575,7 @@ export default function SettingsDrawer({
           onPress: async () => {
             setAlertModalVisible(false);
             await OperaHub.unpair(pairedHub);
+            await HubSync.forgetHub();
             setPairedHub(null);
             setHubStatus(null);
             setHubDevices(null);
@@ -6468,6 +6470,7 @@ export default function SettingsDrawer({
       onPaired={() => {
         setHubPairingVisible(false);
         refreshHub();
+        HubSync.syncNow().catch((e) => console.warn("[HubSync] first sync failed:", e));
       }}
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}

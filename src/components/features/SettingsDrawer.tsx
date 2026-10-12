@@ -348,8 +348,9 @@ const sectionOf = (page: SubPage): SubPage => {
 const DESKTOP_ENTRY_PAGE: SubPage = "general";
 //hub device images by kind
 const HUB_DEVICE_ICONS: Record<string, ImageSourcePropType> = {
-  phone: require("../../../assets/icons/operaicon.png"),
-  desktop: require("../../../assets/icons/server.png"),
+  phone: require("../../../assets/icons/phone.png"),
+  desktop: require("../../../assets/icons/laptop.png"),
+  web: require("../../../assets/icons/website.png"),
 };
 //settings rows stay readable on wide screens
 const DESKTOP_WINDOW_MAX_WIDTH = 960;

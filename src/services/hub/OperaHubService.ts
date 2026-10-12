@@ -42,6 +42,7 @@ type NativeHub = {
   devices(deviceKey: string, hub: PairedHub): Promise<HubDevice[]>;
   push(deviceKey: string, hub: PairedHub, collection: string, records: SyncRecord[]): Promise<void>;
   pull(deviceKey: string, hub: PairedHub, collection: string, since: number): Promise<PullPage>;
+  watch(deviceKey: string, hub: PairedHub, since: number): Promise<number>;
   putGrant(deviceKey: string, hub: PairedHub, grant: McpGrant): Promise<void>;
   accessToken(deviceKey: string, hub: PairedHub, serverId: string): Promise<McpAccessToken | null>;
   dropGrant(deviceKey: string, hub: PairedHub, serverId: string): Promise<void>;
@@ -103,6 +104,11 @@ class OperaHubServiceImpl {
 
   async pull(hub: PairedHub, collection: string, since: number): Promise<PullPage> {
     return this.native().pull(await this.deviceKey(), hub, collection, since);
+  }
+
+  //hub cursor once something newer than since lands
+  async watch(hub: PairedHub, since: number): Promise<number> {
+    return this.native().watch(await this.deviceKey(), hub, since);
   }
 
   async putGrant(hub: PairedHub, grant: McpGrant): Promise<void> {

@@ -106,6 +106,11 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
       }
     }
 
+  //resolves once the hub has newer data
+  @ReactMethod
+  fun watch(deviceKey: String, hub: ReadableMap, since: Double, promise: Promise) =
+    launchPromise(promise) { client(deviceKey).watch(hubFromMap(hub), since.toULong()).toDouble() }
+
   @ReactMethod
   fun putGrant(deviceKey: String, hub: ReadableMap, grant: ReadableMap, promise: Promise) =
     launchPromise(promise) {

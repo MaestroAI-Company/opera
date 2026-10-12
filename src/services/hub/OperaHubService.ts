@@ -32,6 +32,7 @@ export type HubErrorCode =
   | 'PairingExpired'
   | 'Unauthorized'
   | 'Unreachable'
+  | 'Outdated'
   | 'Internal';
 
 type NativeHub = {
@@ -60,7 +61,14 @@ export const HUB_URL_SCHEME = 'opera-hub://';
 
 export function hubErrorCode(e: unknown): HubErrorCode {
   const code = (e as { code?: string })?.code;
-  const known: HubErrorCode[] = ['InvalidLink', 'PairingRejected', 'PairingExpired', 'Unauthorized', 'Unreachable'];
+  const known: HubErrorCode[] = [
+    'InvalidLink',
+    'PairingRejected',
+    'PairingExpired',
+    'Unauthorized',
+    'Unreachable',
+    'Outdated',
+  ];
   return known.includes(code as HubErrorCode) ? (code as HubErrorCode) : 'Internal';
 }
 

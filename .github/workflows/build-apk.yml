@@ -16,6 +16,8 @@ jobs:
     env:
       HAS_KEYSTORE: ${{ secrets.UPLOAD_KEYSTORE_BASE64 != '' }}
       HAS_PLAY_SA: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+      # opera-hub commit, tag or branch built into the apk
+      OPERA_HUB_REF: main
     steps:
       - uses: actions/checkout@v4
 
@@ -53,6 +55,29 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      # gradle compiles the opera hub client from its own repo
+      - uses: actions/checkout@v4
+        with:
+          repository: MaestroAI-Company/opera-hub
+          ref: ${{ env.OPERA_HUB_REF }}
+          path: opera-hub
+
+      # next to the app like locally, metro must not crawl its target dir
+      - name: Move opera-hub next to the app
+        run: mv opera-hub ../opera-hub
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ../opera-hub
 
       - name: Prebuild Android project
         run: npx expo prebuild --platform android

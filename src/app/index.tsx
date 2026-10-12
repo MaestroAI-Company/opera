@@ -964,7 +964,9 @@ useEffect(() => {
         CloudSync.init().catch((e) =>
           console.warn("Could not start cloud sync:", e),
         );
-        HubSync.init();
+        await HubSync.init().catch((e) =>
+          console.warn("Could not start hub sync:", e),
+        );
         await PluginRegistry.init();
         await PluginRegistry.loadAll();
         //mcp tools register as servers connect

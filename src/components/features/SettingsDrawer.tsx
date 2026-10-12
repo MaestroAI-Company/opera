@@ -93,7 +93,11 @@ import {
   getOllamaServers,
   getOllamaTuning,
   getOpenAIApiKeyById,
+  getHubName,
+  getHubServers,
   getOpenAIServers,
+  HUB_PROVIDER_ID,
+  patchHubServer,
   isProviderSupported,
   newOpenAIServerId,
   OllamaServer,
@@ -299,6 +303,8 @@ export type SubPage =
   | "profile"
   | "cloud"
   | "operahub"
+  | "hubprovider"
+  | "hubserver"
   | "mobileactions"
   | "mcpservers"
   | "mcpserver"
@@ -327,6 +333,8 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   profile: "main",
   cloud: "main",
   operahub: "main",
+  hubprovider: "service",
+  hubserver: "hubprovider",
   sociallinks: "main",
   widgets: "tools",
   mobileactions: "tools",
@@ -802,6 +810,9 @@ export default function SettingsDrawer({
   const [ollamaKeepAliveDraft, setOllamaKeepAliveDraft] = useState("");
   const [ollamaModels, setOllamaModels] = useState<string[]>([]);
   const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
+  const [hubDetailUrl, setHubDetailUrl] = useState<string | null>(null);
+  //hub server prefs live outside react state
+  const [, setHubPrefsTick] = useState(0);
   //ignore stale server answers
   const ollamaModelsRequest = useRef(0);
   const [openaiServers, setOpenAIServersState] = useState<OllamaServer[]>([]);
@@ -1911,7 +1922,7 @@ export default function SettingsDrawer({
     tuneOllamaServer(index, { keepAlive: isNaN(parsed) ? undefined : parsed });
   };
 
-  const loadOllamaModels = async (url: string) => {
+  const loadOllamaModels = async (url: string, service = "ollama") => {
     const target = url.trim();
     const request = ++ollamaModelsRequest.current;
     if (!target) {
@@ -1920,7 +1931,7 @@ export default function SettingsDrawer({
     }
     setOllamaModelsLoading(true);
     try {
-      const models = await AIModule.getModelsFor("ollama", target, true);
+      const models = await AIModule.getModelsFor(service, target, true);
       if (ollamaModelsRequest.current === request) setOllamaModels(models);
     } catch {
       if (ollamaModelsRequest.current === request) setOllamaModels([]);
@@ -1942,6 +1953,55 @@ export default function SettingsDrawer({
     setOllamaModels([]);
     loadOllamaModels(server?.url ?? "");
     setActiveSubPage("ollamaserver");
+  };
+
+  const openHubServer = (server: OllamaServer) => {
+    setHubDetailUrl(server.url);
+    setOllamaContextDraft(
+      server.contextLength != null ? String(server.contextLength) : "",
+    );
+    setOllamaKeepAliveDraft(
+      server.keepAlive != null ? String(server.keepAlive) : "",
+    );
+    setOllamaModels([]);
+    loadOllamaModels(server.url, HUB_PROVIDER_ID);
+    setActiveSubPage("hubserver");
+  };
+
+  //active server picks up new tuning
+  const patchHubServerPrefs = async (
+    url: string,
+    patch: Partial<OllamaServer>,
+  ) => {
+    await patchHubServer(url, patch);
+    setHubPrefsTick((tick) => tick + 1);
+    const server = getHubServers().find((s) => s.url === url);
+    if (server && url === ollamaUrl.trim()) {
+      AIModule.configure(
+        url,
+        serverContextLength(server),
+        serverKeepAlive(server),
+      );
+    }
+  };
+
+  const setHubServerContext = (url: string, v: string) => {
+    const next = v.replace(/[^0-9]/g, "");
+    setOllamaContextDraft(next);
+    const parsed = parseInt(next, 10);
+    patchHubServerPrefs(url, {
+      contextLength: isNaN(parsed) ? undefined : parsed,
+    });
+  };
+
+  //leading minus keeps -1 typable
+  const setHubServerKeepAlive = (url: string, v: string) => {
+    const next = (v.startsWith("-") ? "-" : "") + v.replace(/[^0-9]/g, "");
+    setOllamaKeepAliveDraft(next);
+    const parsed = parseInt(next, 10);
+    patchHubServerPrefs(url, {
+      keepAlive: isNaN(parsed) ? undefined : parsed,
+    });
   };
 
   const removeOllamaServer = (index: number) => {
@@ -4030,6 +4090,10 @@ export default function SettingsDrawer({
   };
 
   // service subpage content
+  //the hub row shows once a provider is detected
+  const showHubProvider =
+    isProviderSupported(HUB_PROVIDER_ID) && getHubServers().length > 0;
+
   const renderServiceSubPage = () => (
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.service.title"))}
@@ -4120,7 +4184,7 @@ export default function SettingsDrawer({
 
         <Pressable
           style={pressStyle(
-            [styles.toggleGroupRowItem, styles.navItemLast],
+            [styles.toggleGroupRowItem, !showHubProvider && styles.navItemLast],
             styles.toggleGroupCardPressed,
           )}
           onPress={() => setActiveSubPage("openai")}
@@ -4141,6 +4205,32 @@ export default function SettingsDrawer({
             />
           </View>
         </Pressable>
+
+        {showHubProvider && (
+          <Pressable
+            style={pressStyle(
+              [styles.toggleGroupRowItem, styles.navItemLast],
+              styles.toggleGroupCardPressed,
+            )}
+            onPress={() => setActiveSubPage("hubprovider")}
+          >
+            <View style={styles.toggleGroupRow}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.service.hub")}
+                </Text>
+                <Text style={styles.helpText}>
+                  {t("settings.service.hubHelp")}
+                </Text>
+              </View>
+              <View style={styles.toggleDivider} />
+              <Toggle
+                checked={enabledProviders.includes(HUB_PROVIDER_ID)}
+                onToggle={(v) => setProviderEnabled(HUB_PROVIDER_ID, v)}
+              />
+            </View>
+          </Pressable>
+        )}
       </Group>
 
       {/* local whisper transcription for web */}
@@ -4179,6 +4269,134 @@ export default function SettingsDrawer({
       )}
     </View>
   );
+
+  //servers the paired hub shares
+  const renderHubProviderSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader(t("settings.service.hub"))}
+
+      {/* hub servers card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>
+            {t("settings.hubProvider.title")}
+          </Text>
+          <Text style={styles.helpText}>
+            {t("settings.hubProvider.help", { name: getHubName() })}
+          </Text>
+          {renderCardGrid(
+            getHubServers().map((server) => ({
+              key: server.url,
+              title: server.name,
+              status: server.kind === "openai" ? "OpenAI" : "Ollama",
+              onPress: () => openHubServer(server),
+            })),
+          )}
+        </View>
+      </View>
+    </View>
+  );
+
+  //hub server page like the ollama one
+  const renderHubServerSubPage = () => {
+    const server = getHubServers().find((s) => s.url === hubDetailUrl);
+    if (!server) return renderHubProviderSubPage();
+    const url = server.url;
+
+    return (
+      <View style={styles.subPageContainer}>
+        {renderSubPageHeader(server.name)}
+
+        {/* tuning card for ollama only */}
+        {server.kind === "ollama" && (
+          <View style={styles.contentCard}>
+            <View style={styles.settingRowVertical}>
+              <Text style={styles.settingLabel}>
+                {t("settings.ollama.contextLength")}
+              </Text>
+              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                {t("settings.ollama.contextHelp")}
+              </Text>
+              <Group>
+                {advancedMode ? (
+                  <TextInputField
+                    icon={messageIcon}
+                    placeholder="8192"
+                    value={ollamaContextDraft}
+                    onChangeText={(v) => setHubServerContext(url, v)}
+                    keyboardType="numeric"
+                  />
+                ) : (
+                  <Slider
+                    icon={messageIcon}
+                    options={ollamaContextLengthOptions}
+                    selectedValue={String(serverContextLength(server))}
+                    onSelect={(v) => setHubServerContext(url, v)}
+                  />
+                )}
+              </Group>
+            </View>
+
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <Text style={styles.settingLabel}>
+                {t("settings.ollama.keepAlive")}
+              </Text>
+              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                {advancedMode
+                  ? t("settings.ollama.keepAliveHelpAdvanced")
+                  : t("settings.ollama.keepAliveHelp")}
+              </Text>
+              <Group>
+                {advancedMode ? (
+                  <TextInputField
+                    icon={timeIcon}
+                    placeholder="300"
+                    value={ollamaKeepAliveDraft}
+                    onChangeText={(v) => setHubServerKeepAlive(url, v)}
+                    keyboardType="numeric"
+                  />
+                ) : (
+                  <Slider
+                    icon={timeIcon}
+                    options={ollamaKeepAliveOptions}
+                    selectedValue={String(serverKeepAlive(server))}
+                    onSelect={(v) => setHubServerKeepAlive(url, v)}
+                  />
+                )}
+              </Group>
+            </View>
+          </View>
+        )}
+
+        <ModelToggleList
+          key={url}
+          models={ollamaModels}
+          loading={ollamaModelsLoading}
+          service={HUB_PROVIDER_ID}
+          url={url}
+          disabled={server.disabledModels}
+          capabilities={server.capabilities}
+          onChange={(next) => patchHubServerPrefs(url, { disabledModels: next })}
+          onCapabilitiesChange={(next) =>
+            patchHubServerPrefs(url, { capabilities: next })
+          }
+        />
+
+        {/* actions section */}
+        {!ollamaModelsLoading && ollamaModels.length === 0 && (
+          <View style={styles.contentCard}>
+            <Group>
+              <ActionButton
+                icon={reconnectIcon}
+                label={t("settings.ollama.reconnect")}
+                onPress={() => loadOllamaModels(url, HUB_PROVIDER_ID)}
+              />
+            </Group>
+          </View>
+        )}
+      </View>
+    );
+  };
 
   //beta provider info subpage
   const renderBetaSubPage = () => (
@@ -5465,6 +5683,10 @@ export default function SettingsDrawer({
         return renderCloudSubPage();
       case "operahub":
         return renderOperaHubSubPage();
+      case "hubprovider":
+        return renderHubProviderSubPage();
+      case "hubserver":
+        return renderHubServerSubPage();
       case "general":
         return renderGeneralSubPage();
       case "maestro":
@@ -6474,6 +6696,9 @@ export default function SettingsDrawer({
       onPaired={() => {
         setHubPairingVisible(false);
         refreshHub();
+        if (!enabledProviders.includes(HUB_PROVIDER_ID)) {
+          setProviderEnabled(HUB_PROVIDER_ID, true);
+        }
         HubSync.syncNow().catch((e) => console.warn("[HubSync] first sync failed:", e));
       }}
       isLargeScreen={isLargeScreen}

@@ -3,8 +3,11 @@ import {
   getOllamaServers,
   getOpenAIApiKeyById,
   getOpenAIServers,
+  HUB_PREFS_KEY,
   OllamaServer,
   serializeServers,
+  setHubProviders,
+  setHubServerPrefs,
   setOpenAIApiKey,
 } from '../ai/providers/sources';
 import { AppEvents } from '../events';
@@ -12,12 +15,16 @@ import { McpAuth } from '../mcp/McpAuth';
 import { getSecret, setSecret } from '../mcp/mcpStorage';
 import { McpServerConfig } from '../mcp/types';
 import { Settings } from '../settings/SettingsService';
-import { HUB_URL_SCHEME, OperaHub, PairedHub, SyncRecord } from './OperaHubService';
+import { HUB_URL_SCHEME, HubProvider, OperaHub, PairedHub, SyncRecord } from './OperaHubService';
 
 const COLLECTION = 'providers';
 //cursor and per entry fingerprints
 const STATE_KEY = 'opera_hub_sync_state';
 const CHANGE_DEBOUNCE_MS = 3000;
+//survives restarts while offline
+const PROVIDERS_KEY = 'hubProviders';
+
+type CachedProviders = { hubName: string; providers: HubProvider[] };
 
 type ProviderEntry =
   | { kind: 'ollama'; server: OllamaServer }
@@ -62,9 +69,16 @@ class HubSyncImpl {
   private applying = false;
   private initialized = false;
 
-  init(): void {
+  //cache loads before the model is picked
+  async init(): Promise<void> {
     if (this.initialized || !OperaHub.isSupported()) return;
     this.initialized = true;
+    const cached = await Settings.getLocal(PROVIDERS_KEY);
+    if (cached) {
+      const { hubName, providers } = JSON.parse(cached) as CachedProviders;
+      setHubProviders(providers, hubName);
+    }
+    setHubServerPrefs(JSON.parse((await Settings.getLocal(HUB_PREFS_KEY)) ?? '{}'));
     this.request(0);
     DeviceEventEmitter.addListener(AppEvents.settingsChanged, () => {
       if (!this.applying) this.request(CHANGE_DEBOUNCE_MS);
@@ -92,37 +106,40 @@ class HubSyncImpl {
 
   //drops hub providers after unpairing
   async forgetHub(): Promise<void> {
-    const ollama = getOllamaServers().filter((s) => !isHubUrl(s.url));
-    const openai = getOpenAIServers().filter((s) => !isHubUrl(s.url));
-    await Settings.setMany({ ollamaUrls: serializeServers(ollama), openaiUrls: serializeServers(openai) });
+    await this.storeProviders([], '');
     await setSecret(STATE_KEY, null);
   }
 
   private async run(): Promise<void> {
     const hub = await OperaHub.getPairedHub();
     if (!hub) return;
-    await this.addHubProviders(hub);
+    await this.dropInjectedServers();
+    await this.storeProviders(await OperaHub.providers(hub), hub.name);
     await this.syncProviders(hub);
   }
 
-  //hub machine providers become servers
-  private async addHubProviders(hub: PairedHub): Promise<void> {
-    const providers = await OperaHub.providers(hub);
+  private async storeProviders(providers: HubProvider[], hubName: string): Promise<void> {
+    const json = JSON.stringify({ hubName, providers } satisfies CachedProviders);
+    if (json === (await Settings.getLocal(PROVIDERS_KEY))) return;
+    setHubProviders(providers, hubName);
+    await Settings.setLocal(PROVIDERS_KEY, json);
+    //model pickers rebuild their sources
+    await this.write(async () => {
+      DeviceEventEmitter.emit(AppEvents.settingsChanged);
+    });
+  }
+
+  //an earlier build injected hub servers
+  private async dropInjectedServers(): Promise<void> {
     const ollama = getOllamaServers();
     const openai = getOpenAIServers();
-    let changed = false;
-    for (const provider of providers) {
-      const url = `${HUB_URL_SCHEME}${provider.id}`;
-      const list = provider.kind === 'ollama' ? ollama : openai;
-      if (list.some((s) => s.url === url)) continue;
-      list.push({ url, name: `${provider.name} · ${hub.name}`, id: `hub_${provider.id}` });
-      changed = true;
-    }
-    if (changed) {
-      await this.write(() =>
-        Settings.setMany({ ollamaUrls: serializeServers(ollama), openaiUrls: serializeServers(openai) }),
-      );
-    }
+    if (![...ollama, ...openai].some((s) => isHubUrl(s.url))) return;
+    await this.write(() =>
+      Settings.setMany({
+        ollamaUrls: serializeServers(ollama.filter((s) => !isHubUrl(s.url))),
+        openaiUrls: serializeServers(openai.filter((s) => !isHubUrl(s.url))),
+      }),
+    );
   }
 
   private async syncProviders(hub: PairedHub): Promise<void> {

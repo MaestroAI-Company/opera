@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { t } from '../../../i18n';
 import { AppSettings, Settings } from '../../settings/SettingsService';
+import { HUB_URL_SCHEME, type HubProvider } from '../../hub/OperaHubService';
 import { getSecret, setSecret } from '../../mcp/mcpStorage';
 
 //provider plus its server if any
@@ -11,7 +12,7 @@ export type ModelSource = {
   url: string;
 };
 
-export const PROVIDER_IDS = ['local', 'litert', 'ollama', 'openai', 'beta'] as const;
+export const PROVIDER_IDS = ['local', 'litert', 'ollama', 'openai', 'beta', 'operahub'] as const;
 
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
@@ -26,6 +27,8 @@ const PROVIDER_PLATFORMS: Record<ProviderId, readonly ProviderPlatform[]> = {
   ollama: ['android', 'ios', 'web', 'desktop'],
   openai: ['android', 'ios', 'web', 'desktop'],
   beta: ['android', 'ios', 'web', 'desktop'],
+  //only android ships the hub client
+  operahub: ['android'],
 };
 
 export function currentPlatform(): ProviderPlatform {
@@ -46,6 +49,49 @@ export const BETA_SERVER_URL = process.env.EXPO_PUBLIC_BETA_SERVER_URL ?? '';
 
 //any server speaking the openai protocol
 export const OPENAI_PROVIDER_ID = 'openai';
+
+//providers running on the paired opera hub
+export const HUB_PROVIDER_ID = 'operahub';
+
+//filled by hub sync never cloud synced
+let hubProviders: HubProvider[] = [];
+let hubName = '';
+//per hub server tuning on this device
+export const HUB_PREFS_KEY = 'hubServerPrefs';
+let hubServerPrefs: Record<string, Partial<OllamaServer>> = {};
+
+export function setHubServerPrefs(prefs: Record<string, Partial<OllamaServer>>): void {
+  hubServerPrefs = prefs;
+}
+
+export async function patchHubServer(url: string, patch: Partial<OllamaServer>): Promise<void> {
+  hubServerPrefs = { ...hubServerPrefs, [url]: { ...hubServerPrefs[url], ...patch } };
+  await Settings.setLocal(HUB_PREFS_KEY, JSON.stringify(hubServerPrefs));
+}
+
+export function setHubProviders(providers: HubProvider[], name: string): void {
+  hubProviders = providers;
+  hubName = name;
+}
+
+export function getHubName(): string {
+  return hubName;
+}
+
+export function getHubServers(): (OllamaServer & { kind: HubProvider['kind'] })[] {
+  //hub name avoids clashing with local ollama
+  return hubProviders.map((p) => ({
+    ...hubServerPrefs[`${HUB_URL_SCHEME}${p.id}`],
+    url: `${HUB_URL_SCHEME}${p.id}`,
+    name: hubName ? `${p.name} · ${hubName}` : p.name,
+    id: `hub_${p.id}`,
+    kind: p.kind,
+  }));
+}
+
+export function hubProviderKind(url: string): HubProvider['kind'] {
+  return getHubServers().find((s) => s.url === url.trim())?.kind ?? 'ollama';
+}
 
 //tuning fields apply to ollama only
 export type OllamaServer = {
@@ -140,7 +186,14 @@ export function serializeServers(servers: OllamaServer[]): string {
 }
 
 function findServer(service: string, url: string): OllamaServer | undefined {
-  const servers = service === 'ollama' ? getOllamaServers() : service === OPENAI_PROVIDER_ID ? getOpenAIServers() : [];
+  const servers =
+    service === 'ollama'
+      ? getOllamaServers()
+      : service === OPENAI_PROVIDER_ID
+        ? getOpenAIServers()
+        : service === HUB_PROVIDER_ID
+          ? getHubServers()
+          : [];
   return servers.find((s) => s.url === url.trim());
 }
 
@@ -155,7 +208,7 @@ export function getCapabilityOverride(service: string, url: string, model: strin
 //undefined falls back to global
 export function getOllamaTuning(url: string): { contextLength: number; keepAlive: number } {
   const settings = Settings.getCached();
-  const server = getOllamaServers().find((s) => s.url === url.trim());
+  const server = [...getOllamaServers(), ...getHubServers()].find((s) => s.url === url.trim());
   return {
     contextLength: server?.contextLength ?? settings.ollamaContextLength,
     keepAlive: server?.keepAlive ?? settings.ollamaKeepAlive,
@@ -233,6 +286,9 @@ export function buildSources(localAvailable: boolean): ModelSource[] {
   }
   if (isProviderSupported(OPENAI_PROVIDER_ID) && enabled.includes(OPENAI_PROVIDER_ID)) {
     sources.push(...serverSources(OPENAI_PROVIDER_ID, getOpenAIServers(), t('settings.service.cloudapi')));
+  }
+  if (isProviderSupported(HUB_PROVIDER_ID) && enabled.includes(HUB_PROVIDER_ID)) {
+    sources.push(...serverSources(HUB_PROVIDER_ID, getHubServers(), 'Opera Hub'));
   }
   return sources;
 }

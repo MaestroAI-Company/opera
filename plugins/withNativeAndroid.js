@@ -5,12 +5,13 @@ const { spawnSync } = require('child_process');
 
 const TEMPLATES_DIR = path.resolve(__dirname, '..', 'native', 'android');
 const HUB_REPO_DIR = path.resolve(process.env.OPERA_HUB_DIR ?? path.join(__dirname, '..', '..', 'opera-hub'));
-//needs the hub repo and cargo-ndk
+//pinned release or local source build
 const HAS_HUB_CLIENT = (() => {
+  if (fs.existsSync(path.resolve(__dirname, '..', 'opera-hub-client.json'))) return true;
   const hasRepo = fs.existsSync(path.join(HUB_REPO_DIR, 'Cargo.toml'));
   const hasCargoNdk = hasRepo && spawnSync('cargo', ['ndk', '--version'], { stdio: 'ignore' }).status === 0;
   if (!hasCargoNdk) {
-    console.warn(`opera hub disabled: needs the opera-hub repo at ${HUB_REPO_DIR}, rust and cargo-ndk`);
+    console.warn(`opera hub disabled: no pinned release and no buildable opera-hub repo at ${HUB_REPO_DIR}`);
   }
   return hasCargoNdk;
 })();
@@ -323,7 +324,6 @@ function withNativeAndroid(config) {
       '\n\ndef buildHubClient = tasks.register("buildHubClient", Exec) {\n' +
       '    workingDir rootProject.projectDir.parentFile\n' +
       '    commandLine "node", "scripts/build-hub-client.mjs"\n' +
-      `    environment "OPERA_HUB_DIR", ${JSON.stringify(HUB_REPO_DIR.replace(/\\/g, '/'))}\n` +
       '    //same ndk as the app\n' +
       '    environment "ANDROID_NDK_HOME", android.ndkDirectory.absolutePath\n' +
       '}\n' +

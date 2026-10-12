@@ -862,7 +862,7 @@ export default function SettingsDrawer({
   const hubSupported = OperaHub.isSupported();
   const [pairedHub, setPairedHub] = useState<PairedHub | null>(null);
   const [hubState, setHubState] = useState<
-    "checking" | "online" | "offline" | "revoked"
+    "checking" | "online" | "offline" | "revoked" | "outdated"
   >("checking");
   const [hubStatus, setHubStatus] = useState<HubStatus | null>(null);
   const [hubDevices, setHubDevices] = useState<HubDevice[] | null>(null);
@@ -878,7 +878,10 @@ export default function SettingsDrawer({
       setHubState("online");
       setHubDevices(await OperaHub.devices(hub).catch(() => null));
     } catch (e) {
-      setHubState(hubErrorCode(e) === "Unauthorized" ? "revoked" : "offline");
+      const code = hubErrorCode(e);
+      setHubState(
+        code === "Unauthorized" ? "revoked" : code === "Outdated" ? "outdated" : "offline",
+      );
     }
   }, []);
 
@@ -3919,6 +3922,7 @@ export default function SettingsDrawer({
       checking: t("settings.hub.checking"),
       offline: t("settings.hub.offline"),
       revoked: t("settings.hub.offline"),
+      outdated: t("settings.hub.outdated"),
       online: hubStatus?.direct
         ? t("settings.hub.direct")
         : t("settings.hub.relay"),

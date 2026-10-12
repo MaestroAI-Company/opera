@@ -1,6 +1,11 @@
 import { fetch as expoFetch } from 'expo/fetch';
+import { HUB_URL_SCHEME, OperaHub } from '../../hub/OperaHubService';
 
 export async function universalFetch(input: string | URL | Request, init?: any): Promise<Response> {
+  //hub providers use the local proxy
+  if (typeof input === 'string' && input.startsWith(HUB_URL_SCHEME)) {
+    input = await OperaHub.resolveUrl(input);
+  }
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
   
   if (isTauri) {

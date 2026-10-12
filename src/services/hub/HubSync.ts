@@ -1,9 +1,12 @@
 import { AppState, DeviceEventEmitter } from 'react-native';
+import { AIModule } from '../ai/AIModule';
 import {
   getOllamaServers,
+  getOllamaTuning,
   getOpenAIApiKeyById,
   getOpenAIServers,
   HUB_PREFS_KEY,
+  isProviderSupported,
   OllamaServer,
   serializeServers,
   setHubProviders,
@@ -15,6 +18,7 @@ import { AppEvents } from '../events';
 import { McpAuth } from '../mcp/McpAuth';
 import { getSecret, setSecret } from '../mcp/mcpStorage';
 import { McpServerConfig } from '../mcp/types';
+import { BASE_DEFAULTS } from '../settings/schema';
 import { AppSettings, Settings } from '../settings/SettingsService';
 import { pullRemoteChanges, pushLocalChanges, resetDataSync } from './hubData';
 import { HUB_URL_SCHEME, HubProvider, OperaHub, PairedHub, SyncRecord } from './OperaHubService';
@@ -25,16 +29,14 @@ const CHANGE_DEBOUNCE_MS = 3000;
 const WATCH_RETRY_MS = 10000;
 //survives restarts while offline
 const PROVIDERS_KEY = 'hubProviders';
-//same shared keys as cloud backup, the rest is per device
-const SHARED_SETTINGS = [
-  'language',
-  'theme',
-  'instruction',
-  'name',
-  'includeDateTime',
-  'useAppContext',
-  'hasSeenOnboarding',
-] as const satisfies readonly (keyof AppSettings)[];
+//server lists travel with their keys in providers
+const PROVIDER_LISTS: readonly string[] = ['ollamaUrls', 'openaiUrls', 'mcpServers'];
+//every other setting follows the user
+const SHARED_SETTINGS = (Object.keys(BASE_DEFAULTS) as (keyof AppSettings)[]).filter(
+  (key) => !PROVIDER_LISTS.includes(key),
+);
+//changes here retune the ai module
+const ACTIVE_MODEL_KEYS: readonly string[] = ['aiService', 'ollamaUrl', 'ollamaContextLength', 'ollamaKeepAlive'];
 
 type CachedProviders = { hubName: string; providers: HubProvider[] };
 
@@ -249,8 +251,21 @@ class HubSyncImpl {
         patch[record.id] = JSON.parse(record.payload);
       }
     }
-    if (Object.keys(patch).length > 0) {
-      await this.write(() => Settings.setMany(patch as Partial<AppSettings>));
+    //a provider this device lacks keeps the local model
+    if (typeof patch.aiService === 'string' && !isProviderSupported(patch.aiService)) {
+      delete patch.aiService;
+      delete patch.ollamaUrl;
+      delete patch.ollamaModel;
+    }
+    if (Object.keys(patch).length === 0) return;
+    await this.write(() => Settings.setMany(patch as Partial<AppSettings>));
+    if (ACTIVE_MODEL_KEYS.some((key) => key in patch)) {
+      const settings = Settings.getCached();
+      AIModule.setMode(settings.aiService);
+      if (settings.ollamaUrl) {
+        const tuning = getOllamaTuning(settings.ollamaUrl);
+        AIModule.configure(settings.ollamaUrl, tuning.contextLength, tuning.keepAlive);
+      }
     }
   }
 

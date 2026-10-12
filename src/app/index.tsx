@@ -1089,6 +1089,11 @@ useEffect(() => {
     const settingsSub = DeviceEventEmitter.addListener(
       AppEvents.settingsChanged,
       () => {
+        const cached = Settings.getCached();
+        //another device may switch the model
+        if (cached.ollamaModel) setSelectedModel(cached.ollamaModel);
+        setSpeakerEnabled(cached.speaker);
+        setAlwaysWhisper(cached.alwaysWhisper);
         setAiService(Settings.getCached().aiService);
         setOllamaUrl(Settings.getCached().ollamaUrl);
         setUserName(Settings.getCached().name);

@@ -4,7 +4,7 @@ import { OperaHub, PairedHub, SyncRecord } from './OperaHubService';
 
 const BLOB_REF = 'opera-blob:';
 //each push stays well under the hub frame limit
-const BATCH_BYTES = 6 * 1024 * 1024;
+const BATCH_BYTES = 1024 * 1024;
 const PUSH_MARK = 'push_mark';
 //blobs first so messages can resolve their images
 const PULL_ORDER = ['blobs', 'conversations', 'messages'] as const;

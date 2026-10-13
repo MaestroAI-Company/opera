@@ -29,6 +29,10 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
   override fun getName(): String = "OperaHubModule"
 
   @ReactMethod
+  fun deviceId(deviceKey: String, promise: Promise) =
+    launchPromise(promise) { client(deviceKey).deviceId() }
+
+  @ReactMethod
   fun pair(deviceKey: String, link: String, deviceName: String, kind: String, promise: Promise) =
     launchPromise(promise) { hubToMap(client(deviceKey).pair(link, deviceName, kind)) }
 

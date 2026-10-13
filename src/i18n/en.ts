@@ -326,6 +326,7 @@ export const en = {
   "settings.hub.hostStopped": "This computer's hub is stopped, your other devices no longer sync.",
   "settings.hub.helpDesktop": "Sync this computer with an Opera Hub, or make it the hub for your other devices.",
   "settings.hub.thisDevice": "This device",
+  "settings.hub.inactive": "Inactive",
   "hubUpdate.title": "Opera Hub update available",
   "hubUpdate.message": "Opera Hub {version} is ready to install on your hub, which runs {current}. It restarts in a few seconds and your devices reconnect on their own.",
   "hubUpdate.install": "Install now",

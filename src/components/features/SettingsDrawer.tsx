@@ -365,6 +365,8 @@ const sectionOf = (page: SubPage): SubPage => {
 
 //desktop always shows a page next to the nav
 const DESKTOP_ENTRY_PAGE: SubPage = "general";
+//a device unseen this long is flagged, never removed
+const HUB_INACTIVE_AFTER_S = 30 * 24 * 60 * 60;
 //hub device images by kind
 const HUB_DEVICE_ICONS: Record<string, ImageSourcePropType> = {
   phone: require("../../../assets/icons/phone.png"),
@@ -4308,9 +4310,12 @@ export default function SettingsDrawer({
                           </Text>
                         ) : device.lastSeen ? (
                           <Text style={styles.infoValue} numberOfLines={1}>
-                            {new Date(
-                              device.lastSeen * 1000,
-                            ).toLocaleDateString()}
+                            {Date.now() / 1000 - device.lastSeen >
+                            HUB_INACTIVE_AFTER_S
+                              ? t("settings.hub.inactive")
+                              : new Date(
+                                  device.lastSeen * 1000,
+                                ).toLocaleDateString()}
                           </Text>
                         ) : undefined
                       }

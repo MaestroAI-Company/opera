@@ -182,6 +182,32 @@ pub async fn hub_unpair(
 }
 
 #[tauri::command]
+pub async fn hub_rename_device(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    id: String,
+    name: String,
+) -> Result<(), HubError> {
+    let client = state.client(&device_key).await?;
+    client.rename_device(hub, id, name).await
+}
+
+#[tauri::command]
+pub async fn hub_remove_device(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    id: String,
+) -> Result<(), HubError> {
+    state
+        .client(&device_key)
+        .await?
+        .remove_device(hub, id)
+        .await
+}
+
+#[tauri::command]
 pub async fn hub_devices(
     state: State<'_, HubState>,
     device_key: String,

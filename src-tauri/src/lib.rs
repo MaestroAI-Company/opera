@@ -51,6 +51,10 @@ pub fn run() {
             #[cfg(desktop)]
             hub::hub_devices,
             #[cfg(desktop)]
+            hub::hub_rename_device,
+            #[cfg(desktop)]
+            hub::hub_remove_device,
+            #[cfg(desktop)]
             hub::hub_push,
             #[cfg(desktop)]
             hub::hub_pull,

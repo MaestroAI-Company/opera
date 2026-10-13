@@ -58,6 +58,8 @@ type NativeHub = {
   status(deviceKey: string, hub: PairedHub): Promise<HubStatus>;
   unpair(deviceKey: string, hub: PairedHub): Promise<void>;
   devices(deviceKey: string, hub: PairedHub): Promise<HubDevice[]>;
+  renameDevice(deviceKey: string, hub: PairedHub, id: string, name: string): Promise<void>;
+  removeDevice(deviceKey: string, hub: PairedHub, id: string): Promise<void>;
   push(deviceKey: string, hub: PairedHub, collection: string, records: SyncRecord[]): Promise<void>;
   pull(deviceKey: string, hub: PairedHub, collection: string, since: number): Promise<PullPage>;
   watch(deviceKey: string, hub: PairedHub, since: number): Promise<number>;
@@ -99,6 +101,8 @@ const tauriHub: NativeHub = {
   status: (deviceKey, hub) => invoke('hub_status', { deviceKey, hub }),
   unpair: (deviceKey, hub) => invoke('hub_unpair', { deviceKey, hub }),
   devices: (deviceKey, hub) => invoke('hub_devices', { deviceKey, hub }),
+  renameDevice: (deviceKey, hub, id, name) => invoke('hub_rename_device', { deviceKey, hub, id, name }),
+  removeDevice: (deviceKey, hub, id) => invoke('hub_remove_device', { deviceKey, hub, id }),
   push: (deviceKey, hub, collection, records) => invoke('hub_push', { deviceKey, hub, collection, records }),
   pull: (deviceKey, hub, collection, since) => invoke('hub_pull', { deviceKey, hub, collection, since }),
   watch: (deviceKey, hub, since) => invoke('hub_watch', { deviceKey, hub, since }),
@@ -132,6 +136,8 @@ type WebClient = {
   status(hub: PairedHub): Promise<HubStatus>;
   unpair(hub: PairedHub): Promise<void>;
   devices(hub: PairedHub): Promise<HubDevice[]>;
+  renameDevice(hub: PairedHub, id: string, name: string): Promise<void>;
+  removeDevice(hub: PairedHub, id: string): Promise<void>;
   push(hub: PairedHub, collection: string, records: SyncRecord[]): Promise<void>;
   pull(hub: PairedHub, collection: string, since: number): Promise<PullPage>;
   watch(hub: PairedHub, since: number): Promise<number>;
@@ -196,6 +202,8 @@ const webHub: NativeHub = {
   status: async (deviceKey, hub) => (await loadWebClient(deviceKey)).status(hub),
   unpair: async (deviceKey, hub) => (await loadWebClient(deviceKey)).unpair(hub),
   devices: async (deviceKey, hub) => (await loadWebClient(deviceKey)).devices(hub),
+  renameDevice: async (deviceKey, hub, id, name) => (await loadWebClient(deviceKey)).renameDevice(hub, id, name),
+  removeDevice: async (deviceKey, hub, id) => (await loadWebClient(deviceKey)).removeDevice(hub, id),
   push: async (deviceKey, hub, collection, records) =>
     (await loadWebClient(deviceKey)).push(hub, collection, records),
   pull: async (deviceKey, hub, collection, since) => (await loadWebClient(deviceKey)).pull(hub, collection, since),
@@ -363,6 +371,15 @@ class OperaHubServiceImpl {
 
   async devices(hub: PairedHub): Promise<HubDevice[]> {
     return this.native().devices(await this.deviceKey(), hub);
+  }
+
+  async renameDevice(hub: PairedHub, id: string, name: string): Promise<void> {
+    return this.native().renameDevice(await this.deviceKey(), hub, id, name);
+  }
+
+  //it loses access at once
+  async removeDevice(hub: PairedHub, id: string): Promise<void> {
+    return this.native().removeDevice(await this.deviceKey(), hub, id);
   }
 
   async push(hub: PairedHub, collection: string, records: SyncRecord[]): Promise<void> {

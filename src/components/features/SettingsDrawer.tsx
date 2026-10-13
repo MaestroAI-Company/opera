@@ -159,6 +159,7 @@ import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 import DrawerSheet from "./DrawerSheet";
 import HubPairingSheet from "./HubPairingSheet";
+import HubDeviceSheet from "./HubDeviceSheet";
 import HubQrSheet from "./HubQrSheet";
 import MaestroCard from "./MaestroCard";
 import { BUTTERFLY_OPTIONS, selectButterfly, useMaestroButterfly } from "./maestroButterfly";
@@ -892,6 +893,8 @@ export default function SettingsDrawer({
   const [hubDevices, setHubDevices] = useState<HubDevice[] | null>(null);
   const [hubPairingVisible, setHubPairingVisible] = useState(false);
   const [hubQrVisible, setHubQrVisible] = useState(false);
+  //the device whose sheet is open
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   //desktop only, the hub on this computer
   const [hostStatus, setHostStatus] = useState<HostStatus | null>(null);
   const [hostBusy, setHostBusy] = useState(false);
@@ -941,6 +944,7 @@ export default function SettingsDrawer({
   const sheetOpen =
     hubPairingVisible ||
     hubQrVisible ||
+    selectedDeviceId !== null ||
     profileEditVisible ||
     addModelSheetVisible ||
     ollamaAddVisible ||
@@ -4283,14 +4287,20 @@ export default function SettingsDrawer({
                 {t("settings.hub.devices")}
               </Text>
               {hubDevices ? (
+                //admins open each device, so the rows get an outline
                 <Group
-                  style={[styles.infoGroup, isAdmin && styles.groupSpacingTight]}
+                  style={isAdmin ? styles.groupSpacingTight : styles.infoGroup}
                 >
                   {hubDevices.map((device) => (
                     <ActionButton
                       key={device.id}
                       icon={HUB_DEVICE_ICONS[device.kind] ?? operaIcon}
                       label={device.name}
+                      onPress={
+                        isAdmin || device.id === thisDeviceId
+                          ? () => setSelectedDeviceId(device.id)
+                          : undefined
+                      }
                       rightElement={
                         device.id === thisDeviceId ? (
                           <Text style={styles.infoValue} numberOfLines={1}>
@@ -6993,6 +7003,24 @@ export default function SettingsDrawer({
         onPaired={handleHubPaired}
         link={hubPairLink}
         pairedHub={hubPairLink ? pairedHub : null}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
+      <HubDeviceSheet
+        device={hubDevices?.find((d) => d.id === selectedDeviceId) ?? null}
+        hub={pairedHub}
+        isSelf={selectedDeviceId === thisDeviceId}
+        canManage={
+          hubDevices
+            ?.find((d) => d.id === thisDeviceId)
+            ?.scopes.includes("admin") ?? Platform.OS !== "web"
+        }
+        onClose={() => setSelectedDeviceId(null)}
+        onChanged={refreshHub}
+        onUnpairSelf={() => {
+          setSelectedDeviceId(null);
+          handleUnpairHub();
+        }}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />

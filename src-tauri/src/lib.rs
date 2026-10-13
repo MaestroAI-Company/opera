@@ -2,6 +2,25 @@
 mod hub;
 mod webview_task;
 
+//webview data sits in the company folder like the hub
+#[cfg(windows)]
+fn webview_data_dir(app: &tauri::App) -> Option<std::path::PathBuf> {
+    use tauri::Manager;
+    let company = app.path().local_data_dir().ok()?.join("MaestroAI-Company");
+    let dir = company.join("Opera").join("data");
+    let old = app.path().app_local_data_dir().ok()?;
+    if !dir.exists() && old.exists() {
+        let moved =
+            std::fs::create_dir_all(dir.parent()?).and_then(|_| std::fs::rename(&old, &dir));
+        //an instance still open keeps the old folder
+        if let Err(e) = moved {
+            log::warn!("app data stays in {}: {e}", old.display());
+            return Some(old);
+        }
+    }
+    Some(dir)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -75,6 +94,22 @@ pub fn run() {
             hub::hub_computer_name,
         ])
         .setup(|app| {
+            //built here to choose where its data lives
+            let config = app
+                .config()
+                .app
+                .windows
+                .first()
+                .cloned()
+                .expect("main window config");
+            #[allow(unused_mut)]
+            let mut main = tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?;
+            #[cfg(windows)]
+            if let Some(dir) = webview_data_dir(app) {
+                main = main.data_directory(dir);
+            }
+            main.build()?;
+
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             {
                 use tauri::Manager;

@@ -12,6 +12,8 @@
   "app": {
     "windows": [
       {
+        "label": "main",
+        "create": false,
         "title": "Opera",
         "width": 800,
         "height": 600,
@@ -37,6 +39,14 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "publisher": "Maestro AI",
+    "copyright": "© Maestro AI",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "./windows/hooks.nsh"
+      }
+    },
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }

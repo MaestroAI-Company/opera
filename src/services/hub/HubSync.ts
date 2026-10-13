@@ -275,47 +275,62 @@ class HubSyncImpl {
     hub: PairedHub,
     collection: keyof typeof STATE_KEYS,
     local: Map<string, string>,
-    apply: (winners: SyncRecord[]) => Promise<void>,
+    //returns the ids it refused to apply
+    apply: (winners: SyncRecord[]) => Promise<string[] | void>,
   ): Promise<void> {
     const raw = await getSecret(STATE_KEYS[collection]);
     const state: FingerprintState = raw ? JSON.parse(raw) : { cursor: 0, entries: {} };
+
+    const pullAll = async () => {
+      const incoming: SyncRecord[] = [];
+      let more = true;
+      while (more) {
+        const page = await OperaHub.pull(hub, collection, state.cursor);
+        incoming.push(...page.records);
+        state.cursor = page.cursor;
+        more = page.more;
+      }
+      return incoming;
+    };
+    const settle = async (records: SyncRecord[]) => {
+      const refused = new Set((await apply(records)) ?? []);
+      for (const record of records) {
+        //a refused value stays local and unshared
+        const json = refused.has(record.id) ? local.get(record.id) : record.deleted ? null : record.payload;
+        state.entries[record.id] = { hash: json ? hash(json) : '', updatedAt: record.updatedAt };
+      }
+    };
+
+    //a new device takes what the others already share
+    const adopted = new Set<string>();
+    if (!raw) {
+      const remote = await pullAll();
+      if (remote.length > 0) await settle(remote);
+      for (const record of remote) adopted.add(record.id);
+    }
 
     const now = Date.now();
     const outgoing: SyncRecord[] = [];
     for (const [id, json] of local) {
       const fingerprint = hash(json);
-      if (state.entries[id]?.hash === fingerprint) continue;
+      if (adopted.has(id) || state.entries[id]?.hash === fingerprint) continue;
       outgoing.push({ id, updatedAt: now, deleted: false, payload: json });
       state.entries[id] = { hash: fingerprint, updatedAt: now };
     }
     for (const [id, known] of Object.entries(state.entries)) {
-      if (local.has(id) || known.hash === '') continue;
+      if (adopted.has(id) || local.has(id) || known.hash === '') continue;
       outgoing.push({ id, updatedAt: now, deleted: true, payload: null });
       state.entries[id] = { hash: '', updatedAt: now };
     }
     if (outgoing.length > 0) await OperaHub.push(hub, collection, outgoing);
 
-    const incoming: SyncRecord[] = [];
-    let more = true;
-    while (more) {
-      const page = await OperaHub.pull(hub, collection, state.cursor);
-      incoming.push(...page.records);
-      state.cursor = page.cursor;
-      more = page.more;
-    }
     //the hub already settled conflicts
-    const winners = incoming.filter((record) => {
+    const winners = (await pullAll()).filter((record) => {
       const known = state.entries[record.id];
       const fingerprint = record.deleted ? '' : hash(record.payload ?? '');
       return !known || (record.updatedAt >= known.updatedAt && known.hash !== fingerprint);
     });
-    if (winners.length > 0) await apply(winners);
-    for (const record of winners) {
-      state.entries[record.id] = {
-        hash: record.deleted ? '' : hash(record.payload ?? ''),
-        updatedAt: record.updatedAt,
-      };
-    }
+    if (winners.length > 0) await settle(winners);
     await setSecret(STATE_KEYS[collection], JSON.stringify(state));
   }
 
@@ -358,7 +373,7 @@ class HubSyncImpl {
     return new Map(SHARED_SETTINGS.map((key) => [key, JSON.stringify(settings[key])]));
   }
 
-  private async applySettings(records: SyncRecord[]): Promise<void> {
+  private async applySettings(records: SyncRecord[]): Promise<string[]> {
     const patch: Record<string, unknown> = {};
     for (const record of records) {
       if (record.payload && (SHARED_SETTINGS as readonly string[]).includes(record.id)) {
@@ -369,12 +384,14 @@ class HubSyncImpl {
     const url = typeof patch.ollamaUrl === 'string' ? patch.ollamaUrl.trim() : '';
     const knownUrl =
       !url || isHubUrl(url) || [...getOllamaServers(), ...getOpenAIServers()].some((s) => s.url === url);
+    const refused: string[] = [];
     if (!knownUrl || (typeof patch.aiService === 'string' && !isProviderSupported(patch.aiService))) {
-      delete patch.aiService;
-      delete patch.ollamaUrl;
-      delete patch.ollamaModel;
+      for (const key of ['aiService', 'ollamaUrl', 'ollamaModel']) {
+        if (key in patch) refused.push(key);
+        delete patch[key];
+      }
     }
-    if (Object.keys(patch).length === 0) return;
+    if (Object.keys(patch).length === 0) return refused;
     await this.write(() => Settings.setMany(patch as Partial<AppSettings>));
     DeviceEventEmitter.emit(AppEvents.settingsSynced);
     if (ACTIVE_MODEL_KEYS.some((key) => key in patch)) {
@@ -385,6 +402,7 @@ class HubSyncImpl {
         AIModule.configure(settings.ollamaUrl, tuning.contextLength, tuning.keepAlive);
       }
     }
+    return refused;
   }
 
   private async providerEntries(): Promise<Map<string, string>> {

@@ -143,7 +143,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Opera needs access to your camera to scan the Opera Hub pairing code.",
+          "cameraPermission": "Opera needs access to your camera to scan the Sampler pairing code.",
           "recordAudioAndroid": false
         }
       ],

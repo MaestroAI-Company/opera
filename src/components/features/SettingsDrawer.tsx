@@ -226,6 +226,7 @@ const supportIcon = require("../../../assets/icons/support.png");
 const informationIcon = require("../../../assets/icons/information.png");
 const githubIcon = require("../../../assets/icons/github.png");
 const operaIcon = require("../../../assets/icons/operaicon.png");
+const samplerIcon = require("../../../assets/icons/operaicon5.png");
 const instagramIcon = require("../../../assets/icons/instagram.png");
 const tiktokIcon = require("../../../assets/icons/tiktok.png");
 const micIcon = require("../../../assets/icons/microphone.png");
@@ -315,6 +316,7 @@ export type SubPage =
   | "profile"
   | "cloud"
   | "operahub"
+  | "hubsync"
   | "hubprovider"
   | "hubserver"
   | "hubmodels"
@@ -349,6 +351,7 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   operahub: "main",
   hubprovider: "service",
   hubserver: "hubprovider",
+  hubsync: "operahub",
   hubmodels: "operahub",
   hubmodel: "hubmodels",
   sociallinks: "main",
@@ -3121,6 +3124,7 @@ export default function SettingsDrawer({
       key: string;
       title: string;
       status: string;
+      icon?: ImageSourcePropType;
       error?: boolean;
       disabled?: boolean;
       onPress: () => void;
@@ -3160,6 +3164,13 @@ export default function SettingsDrawer({
               card.onPress();
             }}
           >
+            {card.icon && (
+              <Image
+                source={card.icon}
+                style={styles.localModelCardIcon}
+                tintColor={Colors.textPrimary}
+              />
+            )}
             <Text style={styles.localModelCardTitle} numberOfLines={2}>
               {card.title}
             </Text>
@@ -3249,7 +3260,26 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={navItemStyle("maestro")}
+          style={navItemStyle("cloud")}
+          onPress={() => setActiveSubPage("cloud")}
+        >
+          <View style={styles.menuIconWrap}>
+            <Image
+              source={cloudIcon}
+              style={styles.menuIcon}
+              tintColor={Colors.textOnPrimary}
+            />
+          </View>
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>{t("settings.nav.cloud.title")}</Text>
+            <Text style={styles.navSubtitle}>
+              {t("settings.nav.cloud.subtitle")}
+            </Text>
+          </View>
+        </Pressable>
+
+        <Pressable
+          style={navItemStyle("maestro", !hubSupported)}
           onPress={() => setActiveSubPage("maestro")}
         >
           <View style={styles.menuIconWrap}>
@@ -3271,25 +3301,6 @@ export default function SettingsDrawer({
           </View>
         </Pressable>
 
-        <Pressable
-          style={navItemStyle("cloud", !hubSupported)}
-          onPress={() => setActiveSubPage("cloud")}
-        >
-          <View style={styles.menuIconWrap}>
-            <Image
-              source={cloudIcon}
-              style={styles.menuIcon}
-              tintColor={Colors.textOnPrimary}
-            />
-          </View>
-          <View style={styles.navTextContainer}>
-            <Text style={styles.navTitle}>{t("settings.nav.cloud.title")}</Text>
-            <Text style={styles.navSubtitle}>
-              {t("settings.nav.cloud.subtitle")}
-            </Text>
-          </View>
-        </Pressable>
-
         {hubSupported && (
           <Pressable
             style={navItemStyle("operahub", true)}
@@ -3300,7 +3311,7 @@ export default function SettingsDrawer({
           >
             <View style={styles.menuIconWrap}>
               <Image
-                source={serverIcon}
+                source={samplerIcon}
                 style={styles.menuIcon}
                 tintColor={Colors.textOnPrimary}
               />
@@ -4102,43 +4113,12 @@ export default function SettingsDrawer({
     );
   };
 
-  //the hub this computer runs, once paired with it
-  const renderHubHostSection = () => {
-    if (!OperaHub.canHost() || !hostStatus || !pairedHub) return null;
-    if (pairedHub.id !== hostStatus.id) return null;
-    return (
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>
-            {t("settings.hub.thisComputer")}
-          </Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {hostError ??
-              (hostStatus.running
-                ? t("settings.hub.hostHelp")
-                : t("settings.hub.hostStopped"))}
-          </Text>
-          <Group>
-            {hostStatus.running ? (
-              <ActionButton
-                icon={cancelIcon}
-                label={t("settings.hub.stopHosting")}
-                disabled={hostBusy}
-                onPress={() => setHosting(false)}
-              />
-            ) : (
-              <ActionButton
-                icon={HUB_DEVICE_ICONS.desktop}
-                label={t("settings.hub.host")}
-                disabled={hostBusy}
-                onPress={() => setHosting(true)}
-              />
-            )}
-          </Group>
-        </View>
-      </View>
-    );
-  };
+  //this computer runs the hub it is paired with
+  const hostsPairedHub =
+    OperaHub.canHost() &&
+    !!hostStatus &&
+    !!pairedHub &&
+    pairedHub.id === hostStatus.id;
 
   //one toggle row of the hub page
   const renderHubToggle = (
@@ -4161,6 +4141,34 @@ export default function SettingsDrawer({
       </View>
     </View>
   );
+
+  //what this device syncs with the hub
+  const renderHubSyncSubPage = () => {
+    const syncRows = [
+      ["data", "settings.hub.syncData", "settings.hub.syncDataHelp"],
+      ["settings", "settings.hub.syncSettings", "settings.hub.syncSettingsHelp"],
+      ["providers", "settings.hub.syncProviders", "settings.hub.syncProvidersHelp"],
+      ["cloud", "settings.hub.syncCloud", "settings.hub.syncCloudHelp"],
+    ] as const;
+    return (
+      <View style={styles.subPageContainer}>
+        {renderSubPageHeader(t("settings.hub.syncTitle"))}
+        {syncPrefs && (
+          <View style={styles.contentCard}>
+            {syncRows.map(([key, label, help], index) =>
+              renderHubToggle(
+                t(label),
+                t(help),
+                syncPrefs[key],
+                (value) => setSyncPref(key, value),
+                index === syncRows.length - 1,
+              ),
+            )}
+          </View>
+        )}
+      </View>
+    );
+  };
 
   const renderOperaHubSubPage = () => {
     if (!pairedHub) {
@@ -4254,30 +4262,29 @@ export default function SettingsDrawer({
     const isAdmin = thisDevice
       ? thisDevice.scopes.includes("admin")
       : Platform.OS !== "web";
-    const syncRows = [
-      ["data", "settings.hub.syncData", "settings.hub.syncDataHelp"],
-      ["settings", "settings.hub.syncSettings", "settings.hub.syncSettingsHelp"],
-      ["providers", "settings.hub.syncProviders", "settings.hub.syncProvidersHelp"],
-      ["cloud", "settings.hub.syncCloud", "settings.hub.syncCloudHelp"],
-    ] as const;
-
     return (
       <View style={styles.subPageContainer}>
         {renderSubPageHeader(t("settings.nav.hub.title"))}
 
-        {/* what this device syncs */}
-        {syncPrefs && (
-          <View style={styles.contentCard}>
-            {syncRows.map(([key, label, help], index) =>
-              renderHubToggle(
-                t(label),
-                t(help),
-                syncPrefs[key],
-                (value) => setSyncPref(key, value),
-                index === syncRows.length - 1,
-              ),
-            )}
-          </View>
+        {/* sync and the models the hub runs, models for admins only */}
+        {(syncPrefs ||
+          (hubState === "online" && isAdmin && OperaHub.canManageModels())) && (
+          <Group style={styles.groupSpacing}>
+            {syncPrefs &&
+              renderToolsNavRow(
+                "hubsync",
+                t("settings.hub.syncTitle"),
+                t("settings.hub.syncNavHelp"),
+              )}
+            {hubState === "online" &&
+              isAdmin &&
+              OperaHub.canManageModels() &&
+              renderToolsNavRow(
+                "hubmodels",
+                t("hubModels.pageTitle"),
+                t("hubModels.navHelp"),
+              )}
+          </Group>
         )}
 
         {/* hub wide settings, admins only */}
@@ -4288,29 +4295,10 @@ export default function SettingsDrawer({
               t("settings.hub.lanDiscoveryHelp"),
               hubSettings.lanDiscovery,
               (value) => changeHubSettings({ lanDiscovery: value }),
-            )}
-            {renderHubToggle(
-              t("settings.hub.shareProviders"),
-              t("settings.hub.shareProvidersHelp"),
-              hubSettings.shareProviders,
-              (value) => changeHubSettings({ shareProviders: value }),
               true,
             )}
           </View>
         )}
-
-        {/* models the hub runs, admins only */}
-        {hubState === "online" && isAdmin && OperaHub.canManageModels() && (
-          <Group style={styles.groupSpacing}>
-            {renderToolsNavRow(
-              "hubmodels",
-              t("hubModels.pageTitle"),
-              t("hubModels.navHelp"),
-            )}
-          </Group>
-        )}
-
-        {renderHubHostSection()}
 
         {/* connected devices card */}
         {hubState === "online" && (
@@ -4323,38 +4311,28 @@ export default function SettingsDrawer({
               </Text>
               {hubDevices ? (
                 //admins open each device, so the rows get an outline
-                <Group
-                  style={isAdmin ? styles.groupSpacingTight : styles.infoGroup}
-                >
-                  {hubDevices.map((device) => (
-                    <ActionButton
-                      key={device.id}
-                      icon={HUB_DEVICE_ICONS[device.kind] ?? operaIcon}
-                      label={device.name}
-                      onPress={
-                        isAdmin || device.id === thisDeviceId
-                          ? () => setSelectedDeviceId(device.id)
-                          : undefined
-                      }
-                      rightElement={
-                        device.id === thisDeviceId ? (
-                          <Text style={styles.infoValue} numberOfLines={1}>
-                            {t("settings.hub.thisDevice")}
-                          </Text>
-                        ) : device.lastSeen ? (
-                          <Text style={styles.infoValue} numberOfLines={1}>
-                            {Date.now() / 1000 - device.lastSeen >
-                            HUB_INACTIVE_AFTER_S
+                <View style={isAdmin && { marginBottom: Spacing.md }}>
+                  {renderCardGrid(
+                    hubDevices.map((device) => ({
+                      key: device.id,
+                      icon: HUB_DEVICE_ICONS[device.kind] ?? operaIcon,
+                      title: device.name,
+                      status:
+                        device.id === thisDeviceId
+                          ? t("settings.hub.thisDevice")
+                          : device.lastSeen
+                            ? Date.now() / 1000 - device.lastSeen >
+                              HUB_INACTIVE_AFTER_S
                               ? t("settings.hub.inactive")
                               : new Date(
                                   device.lastSeen * 1000,
-                                ).toLocaleDateString()}
-                          </Text>
-                        ) : undefined
-                      }
-                    />
-                  ))}
-                </Group>
+                                ).toLocaleDateString()
+                            : "",
+                      disabled: !(isAdmin || device.id === thisDeviceId),
+                      onPress: () => setSelectedDeviceId(device.id),
+                    })),
+                  )}
+                </View>
               ) : (
                 <Text
                   style={[styles.helpText, isAdmin && { marginBottom: Spacing.md }]}
@@ -4378,9 +4356,6 @@ export default function SettingsDrawer({
         {/* hub info, then its actions */}
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {t("settings.hub.title")}
-            </Text>
             <Group style={[styles.infoGroup, styles.groupSpacingTight]}>
               {hubRows.map((row) => (
                 <ActionButton
@@ -4403,6 +4378,11 @@ export default function SettingsDrawer({
                 {t("settings.hub.revoked")}
               </Text>
             )}
+            {hostsPairedHub && !!hostError && (
+              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                {hostError}
+              </Text>
+            )}
             <Group>
               {hubStatus?.update && isAdmin && OperaHub.canUpdateHub() && (
                 <ActionButton
@@ -4418,6 +4398,22 @@ export default function SettingsDrawer({
                 style={hubState === "checking" && styles.highlightGroupDisabled}
                 onPress={refreshHub}
               />
+              {hostsPairedHub &&
+                (hostStatus?.running ? (
+                  <ActionButton
+                    icon={cancelIcon}
+                    label={t("settings.hub.stopHosting")}
+                    disabled={hostBusy}
+                    onPress={() => setHosting(false)}
+                  />
+                ) : (
+                  <ActionButton
+                    icon={HUB_DEVICE_ICONS.desktop}
+                    label={t("settings.hub.host")}
+                    disabled={hostBusy}
+                    onPress={() => setHosting(true)}
+                  />
+                ))}
               <ActionButton
                 icon={cancelIcon}
                 label={t("settings.hub.unpair")}
@@ -6024,6 +6020,8 @@ export default function SettingsDrawer({
         return renderCloudSubPage();
       case "operahub":
         return renderOperaHubSubPage();
+      case "hubsync":
+        return renderHubSyncSubPage();
       case "hubprovider":
         return renderHubProviderSubPage();
       case "hubserver":
@@ -6032,6 +6030,17 @@ export default function SettingsDrawer({
         return (
           <View style={styles.subPageContainer}>
             {renderSubPageHeader(t("hubModels.pageTitle"))}
+            {hubSettings && (
+              <View style={styles.contentCard}>
+                {renderHubToggle(
+                  t("settings.hub.shareProviders"),
+                  t("settings.hub.shareProvidersHelp"),
+                  hubSettings.shareProviders,
+                  (value) => changeHubSettings({ shareProviders: value }),
+                  true,
+                )}
+              </View>
+            )}
             <HubModelsSection
               onAddModel={() => setHubModelsSheetVisible(true)}
               onOpenModel={(file, name) => {
@@ -7679,6 +7688,11 @@ const makeStyles = (Colors: ThemeColors) =>
       minHeight: 76,
       justifyContent: "center",
       alignItems: "center",
+    },
+    localModelCardIcon: {
+      width: 32,
+      height: 32,
+      marginBottom: Spacing.md,
     },
     localModelCardWide: {
       minHeight: 70,

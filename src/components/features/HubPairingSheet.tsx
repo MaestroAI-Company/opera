@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   useWindowDimensions,
+  Vibration,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -69,6 +70,8 @@ export default function HubPairingSheet({
   //which row the last failure belongs to
   const [errorRow, setErrorRow] = useState<"scan" | "code">("code");
   const [typedLink, setTypedLink] = useState("");
+  //paired hub waiting for the user to confirm the link
+  const [found, setFound] = useState<PairedHub | null>(null);
   //scanner fires on every frame
   const lastScan = useRef<{ data: string; at: number } | null>(null);
 
@@ -79,6 +82,7 @@ export default function HubPairingSheet({
     if (visible) {
       setError(null);
       setTypedLink("");
+      setFound(null);
     }
   }
   useEffect(() => {
@@ -98,6 +102,17 @@ export default function HubPairingSheet({
     };
   }, [visible, link]);
 
+  const showFound = (hub: PairedHub) => {
+    Vibration.vibrate(40);
+    setFound(hub);
+  };
+
+  //the hub is already stored, so closing undoes the pairing
+  const handleClose = () => {
+    if (found) OperaHub.unpair(found).catch(() => {});
+    onClose();
+  };
+
   const handleScan = async ({ data }: { data: string }) => {
     const previous = lastScan.current;
     if (
@@ -109,7 +124,7 @@ export default function HubPairingSheet({
     setPairing(true);
     setError(null);
     try {
-      onPaired(await OperaHub.pair(data));
+      showFound(await OperaHub.pair(data));
     } catch (e) {
       setError(t(`hubPairing.error.${hubErrorCode(e)}`));
       setErrorRow("scan");
@@ -129,7 +144,7 @@ export default function HubPairingSheet({
     setPairing(true);
     setError(null);
     try {
-      onPaired(await pair(value.trim()));
+      showFound(await pair(value.trim()));
     } catch (e) {
       console.warn("[HubPairing] pairing failed:", e);
       setError(t(`hubPairing.error.${hubErrorCode(e)}`));
@@ -207,7 +222,45 @@ export default function HubPairingSheet({
       </View>
     );
 
+  const renderFound = (hub: PairedHub) => (
+    <>
+      <Text style={styles.settingLabel}>{t("hubPairing.found")}</Text>
+      <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+        {t("hubPairing.foundHelp")}
+      </Text>
+      <Group style={[styles.infoGroup, styles.groupSpacingTight]}>
+        <ActionButton
+          icon={serverIcon}
+          label={t("settings.hub.name")}
+          rightElement={
+            <Text style={styles.infoValue} numberOfLines={1}>
+              {hub.name}
+            </Text>
+          }
+        />
+        <ActionButton
+          icon={keyIcon}
+          label={t("hubPairing.hubId")}
+          rightElement={
+            <Text style={styles.infoValue} numberOfLines={1}>
+              {hub.id.slice(0, 8)}
+            </Text>
+          }
+        />
+      </Group>
+      <Group style={styles.highlightGroup}>
+        <ActionButton
+          icon={linkIcon}
+          label={t("hubPairing.link")}
+          variant="highlight"
+          onPress={() => onPaired(hub)}
+        />
+      </Group>
+    </>
+  );
+
   const renderContent = () => {
+    if (found) return renderFound(found);
     if (pairedHub) {
       return (
         <>
@@ -275,12 +328,12 @@ export default function HubPairingSheet({
   return (
     <DrawerSheet
       visible={visible}
-      onClose={onClose}
+      onClose={handleClose}
       mode="overlay"
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
       handleContainerStyle={styles.sheetHandleContainer}
-      avoidKeyboard={mode !== "confirm"}
+      avoidKeyboard={mode !== "confirm" && !found}
       sheetStyle={[
         styles.sheet,
         {
@@ -353,6 +406,14 @@ const makeStyles = (Colors: ThemeColors) =>
     //static rows on the white card
     infoGroup: {
       borderWidth: 0,
+    },
+    infoValue: {
+      flexShrink: 1,
+      maxWidth: "60%",
+      textAlign: "right",
+      color: Colors.textMuted,
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.label,
     },
     groupSpacingTight: {
       marginBottom: Spacing.lg2,

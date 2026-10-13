@@ -94,7 +94,7 @@ export function useHubModels(active = true): HubModelsSnapshot {
 
 //applies an action and shares the new status
 export async function runHubModels(action: (api: HubModels) => Promise<LlamaStatus>) {
-  if (!snapshot.api) throw new Error("No Opera Hub paired");
+  if (!snapshot.api) throw new Error("No Sampler paired");
   publish({ status: await action(snapshot.api) });
 }
 

@@ -19,6 +19,8 @@ import kotlinx.coroutines.launch
 import uniffi.opera_hub_client.HubClient
 import uniffi.opera_hub_client.HubException
 import uniffi.opera_hub_client.HubSettings
+import uniffi.opera_hub_client.LlamaStatus
+import uniffi.opera_hub_client.ModelFile
 import uniffi.opera_hub_client.McpGrant
 import uniffi.opera_hub_client.PairedHub
 import uniffi.opera_hub_client.SyncRecord
@@ -104,6 +106,59 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
         lock.release()
       }
     }
+
+  @ReactMethod
+  fun modelsCatalog(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) {
+      Arguments.createArray().apply {
+        for (model in client(deviceKey).modelsCatalog(hubFromMap(hub))) {
+          pushMap(Arguments.createMap().apply {
+            putString("repo", model.repo)
+            putString("file", model.file)
+            putString("name", model.name)
+            putString("description", model.description)
+            putDouble("size", model.size.toDouble())
+          })
+        }
+      }
+    }
+
+  @ReactMethod
+  fun modelsSearch(deviceKey: String, hub: ReadableMap, query: String, promise: Promise) =
+    launchPromise(promise) {
+      Arguments.createArray().apply {
+        for (repo in client(deviceKey).modelsSearch(hubFromMap(hub), query)) {
+          pushMap(Arguments.createMap().apply {
+            putString("repo", repo.repo)
+            putDouble("downloads", repo.downloads.toDouble())
+          })
+        }
+      }
+    }
+
+  @ReactMethod
+  fun modelsFiles(deviceKey: String, hub: ReadableMap, repo: String, promise: Promise) =
+    launchPromise(promise) {
+      Arguments.createArray().apply {
+        for (file in client(deviceKey).modelsFiles(hubFromMap(hub), repo)) pushMap(fileToMap(file))
+      }
+    }
+
+  @ReactMethod
+  fun modelsDownload(deviceKey: String, hub: ReadableMap, repo: String, file: String, promise: Promise) =
+    launchPromise(promise) { statusToMap(client(deviceKey).modelsDownload(hubFromMap(hub), repo, file)) }
+
+  @ReactMethod
+  fun modelsCancel(deviceKey: String, hub: ReadableMap, file: String, promise: Promise) =
+    launchPromise(promise) { statusToMap(client(deviceKey).modelsCancel(hubFromMap(hub), file)) }
+
+  @ReactMethod
+  fun modelsDelete(deviceKey: String, hub: ReadableMap, file: String, promise: Promise) =
+    launchPromise(promise) { statusToMap(client(deviceKey).modelsDelete(hubFromMap(hub), file)) }
+
+  @ReactMethod
+  fun modelsStatus(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) { statusToMap(client(deviceKey).modelsStatus(hubFromMap(hub))) }
 
   @ReactMethod
   fun qrSvg(text: String, dark: String, light: String, promise: Promise) =
@@ -277,6 +332,33 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
   //stable across reinstalls of this app, hashed by the client
   private fun machineId(): String? =
     Settings.Secure.getString(reactApplicationContext.contentResolver, Settings.Secure.ANDROID_ID)
+
+  private fun fileToMap(file: ModelFile): WritableMap =
+    Arguments.createMap().apply {
+      putString("file", file.file)
+      putDouble("size", file.size.toDouble())
+    }
+
+  private fun statusToMap(status: LlamaStatus): WritableMap =
+    Arguments.createMap().apply {
+      putString("state", status.state)
+      putString("backend", status.backend)
+      putString("message", status.message)
+      putArray("installed", Arguments.createArray().apply {
+        for (file in status.installed) pushMap(fileToMap(file))
+      })
+      putArray("downloads", Arguments.createArray().apply {
+        for (download in status.downloads) {
+          pushMap(Arguments.createMap().apply {
+            putString("repo", download.repo)
+            putString("file", download.file)
+            putDouble("received", download.received.toDouble())
+            putDouble("total", download.total.toDouble())
+            putString("error", download.error)
+          })
+        }
+      })
+    }
 
   private fun settingsToMap(settings: HubSettings): WritableMap =
     Arguments.createMap().apply {

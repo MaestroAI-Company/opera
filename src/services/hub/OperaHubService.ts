@@ -33,6 +33,18 @@ export type HostStatus = { running: boolean; installed: boolean; id: string | nu
 export type HubInvite = { code: string; link: string };
 export type HubSettings = { lanDiscovery: boolean; shareProviders: boolean };
 export type NearbyHub = { id: string; name: string; addrs: string[] };
+//llama.cpp models on the hub
+export type CatalogModel = { repo: string; file: string; name: string; description: string; size: number };
+export type ModelRepo = { repo: string; downloads: number };
+export type ModelFile = { file: string; size: number };
+export type ModelDownload = { repo: string; file: string; received: number; total: number; error?: string | null };
+export type LlamaStatus = {
+  state: 'idle' | 'installing' | 'running' | 'failed';
+  backend?: string | null;
+  message?: string | null;
+  installed: ModelFile[];
+  downloads: ModelDownload[];
+};
 export type HubErrorCode =
   | 'InvalidLink'
   | 'PairingRejected'
@@ -55,6 +67,14 @@ type NativeHub = {
   //browsers cannot use multicast
   nearbyHubs?(deviceKey: string, waitMs: number): Promise<NearbyHub[]>;
   updateHub?(deviceKey: string, hub: PairedHub): Promise<string>;
+  //admin only, browsers lack it
+  modelsCatalog?(deviceKey: string, hub: PairedHub): Promise<CatalogModel[]>;
+  modelsSearch?(deviceKey: string, hub: PairedHub, query: string): Promise<ModelRepo[]>;
+  modelsFiles?(deviceKey: string, hub: PairedHub, repo: string): Promise<ModelFile[]>;
+  modelsDownload?(deviceKey: string, hub: PairedHub, repo: string, file: string): Promise<LlamaStatus>;
+  modelsCancel?(deviceKey: string, hub: PairedHub, file: string): Promise<LlamaStatus>;
+  modelsDelete?(deviceKey: string, hub: PairedHub, file: string): Promise<LlamaStatus>;
+  modelsStatus?(deviceKey: string, hub: PairedHub): Promise<LlamaStatus>;
   status(deviceKey: string, hub: PairedHub): Promise<HubStatus>;
   unpair(deviceKey: string, hub: PairedHub): Promise<void>;
   devices(deviceKey: string, hub: PairedHub): Promise<HubDevice[]>;
@@ -68,6 +88,16 @@ type NativeHub = {
   dropGrant(deviceKey: string, hub: PairedHub, serverId: string): Promise<void>;
   providers(deviceKey: string, hub: PairedHub): Promise<HubProvider[]>;
   startProxy(deviceKey: string, hub: PairedHub): Promise<{ port: number; token: string }>;
+};
+
+export type HubModels = {
+  catalog(): Promise<CatalogModel[]>;
+  search(query: string): Promise<ModelRepo[]>;
+  files(repo: string): Promise<ModelFile[]>;
+  download(repo: string, file: string): Promise<LlamaStatus>;
+  cancel(file: string): Promise<LlamaStatus>;
+  remove(file: string): Promise<LlamaStatus>;
+  status(): Promise<LlamaStatus>;
 };
 
 type HubHost = {
@@ -98,6 +128,13 @@ const tauriHub: NativeHub = {
   setHubSettings: (deviceKey, hub, settings) => invoke('hub_set_settings', { deviceKey, hub, settings }),
   nearbyHubs: (deviceKey, waitMs) => invoke('hub_nearby', { deviceKey, waitMs }),
   updateHub: (deviceKey, hub) => invoke('hub_update', { deviceKey, hub }),
+  modelsCatalog: (deviceKey, hub) => invoke('hub_models_catalog', { deviceKey, hub }),
+  modelsSearch: (deviceKey, hub, query) => invoke('hub_models_search', { deviceKey, hub, query }),
+  modelsFiles: (deviceKey, hub, repo) => invoke('hub_models_files', { deviceKey, hub, repo }),
+  modelsDownload: (deviceKey, hub, repo, file) => invoke('hub_models_download', { deviceKey, hub, repo, file }),
+  modelsCancel: (deviceKey, hub, file) => invoke('hub_models_cancel', { deviceKey, hub, file }),
+  modelsDelete: (deviceKey, hub, file) => invoke('hub_models_delete', { deviceKey, hub, file }),
+  modelsStatus: (deviceKey, hub) => invoke('hub_models_status', { deviceKey, hub }),
   status: (deviceKey, hub) => invoke('hub_status', { deviceKey, hub }),
   unpair: (deviceKey, hub) => invoke('hub_unpair', { deviceKey, hub }),
   devices: (deviceKey, hub) => invoke('hub_devices', { deviceKey, hub }),
@@ -301,6 +338,27 @@ class OperaHubServiceImpl {
   async nearbyHubs(waitMs = NEARBY_WAIT_MS): Promise<NearbyHub[]> {
     const nearby = this.native().nearbyHubs;
     return nearby ? nearby(await this.deviceKey(), waitMs) : [];
+  }
+
+  canManageModels(): boolean {
+    return !!native?.modelsStatus;
+  }
+
+  //llama.cpp models on the hub, admins only
+  async models(): Promise<HubModels> {
+    const native = this.native();
+    const key = await this.deviceKey();
+    const hub = await this.getPairedHub();
+    if (!hub || !native.modelsStatus) throw Object.assign(new Error('No Opera Hub paired'), { code: 'Unauthorized' });
+    return {
+      catalog: () => native.modelsCatalog!(key, hub),
+      search: (query) => native.modelsSearch!(key, hub, query),
+      files: (repo) => native.modelsFiles!(key, hub, repo),
+      download: (repo, file) => native.modelsDownload!(key, hub, repo, file),
+      cancel: (file) => native.modelsCancel!(key, hub, file),
+      remove: (file) => native.modelsDelete!(key, hub, file),
+      status: () => native.modelsStatus!(key, hub),
+    };
   }
 
   //browsers lack the admin scope

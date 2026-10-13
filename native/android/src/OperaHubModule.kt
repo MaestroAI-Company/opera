@@ -1,5 +1,7 @@
 package __PACKAGE_NAME__
 
+import android.content.Context
+import android.net.wifi.WifiManager
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -15,6 +17,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import uniffi.opera_hub_client.HubClient
 import uniffi.opera_hub_client.HubException
+import uniffi.opera_hub_client.HubSettings
 import uniffi.opera_hub_client.McpGrant
 import uniffi.opera_hub_client.PairedHub
 import uniffi.opera_hub_client.SyncRecord
@@ -46,6 +49,59 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
         putBoolean("direct", status.direct)
       }
     }
+
+  @ReactMethod
+  fun pairWithCode(deviceKey: String, code: String, deviceName: String, kind: String, promise: Promise) =
+    launchPromise(promise) { hubToMap(client(deviceKey).pairWithCode(code, deviceName, kind)) }
+
+  @ReactMethod
+  fun invite(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) {
+      val invite = client(deviceKey).invite(hubFromMap(hub))
+      Arguments.createMap().apply {
+        putString("code", invite.code)
+        putString("link", invite.link)
+      }
+    }
+
+  @ReactMethod
+  fun hubSettings(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) { settingsToMap(client(deviceKey).hubSettings(hubFromMap(hub))) }
+
+  @ReactMethod
+  fun setHubSettings(deviceKey: String, hub: ReadableMap, settings: ReadableMap, promise: Promise) =
+    launchPromise(promise) {
+      val wanted = HubSettings(settings.getBoolean("lanDiscovery"), settings.getBoolean("shareProviders"))
+      settingsToMap(client(deviceKey).setHubSettings(hubFromMap(hub), wanted))
+    }
+
+  //android drops multicast without a lock
+  @ReactMethod
+  fun nearbyHubs(deviceKey: String, waitMs: Double, promise: Promise) =
+    launchPromise(promise) {
+      val wifi = reactApplicationContext.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+      val lock = wifi.createMulticastLock("opera-hub").apply {
+        setReferenceCounted(false)
+        acquire()
+      }
+      try {
+        Arguments.createArray().apply {
+          for (hub in client(deviceKey).nearbyHubs(waitMs.toLong().toULong())) {
+            pushMap(Arguments.createMap().apply {
+              putString("id", hub.id)
+              putString("name", hub.name)
+              putArray("addrs", Arguments.fromList(hub.addrs))
+            })
+          }
+        }
+      } finally {
+        lock.release()
+      }
+    }
+
+  @ReactMethod
+  fun qrSvg(text: String, dark: String, light: String, promise: Promise) =
+    launchPromise(promise) { uniffi.opera_hub_client.qrSvg(text, dark, light) }
 
   @ReactMethod
   fun unpair(deviceKey: String, hub: ReadableMap, promise: Promise) =
@@ -197,6 +253,12 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
       }
     }
   }
+
+  private fun settingsToMap(settings: HubSettings): WritableMap =
+    Arguments.createMap().apply {
+      putBoolean("lanDiscovery", settings.lanDiscovery)
+      putBoolean("shareProviders", settings.shareProviders)
+    }
 
   private fun hubToMap(hub: PairedHub): WritableMap =
     Arguments.createMap().apply {

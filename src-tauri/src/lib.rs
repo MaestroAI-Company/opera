@@ -56,7 +56,17 @@ pub fn run() {
             #[cfg(desktop)]
             hub::hub_host_pairing_link,
             #[cfg(desktop)]
-            hub::hub_host_pairing_qr,
+            hub::hub_pair_with_code,
+            #[cfg(desktop)]
+            hub::hub_invite,
+            #[cfg(desktop)]
+            hub::hub_qr_svg,
+            #[cfg(desktop)]
+            hub::hub_settings,
+            #[cfg(desktop)]
+            hub::hub_set_settings,
+            #[cfg(desktop)]
+            hub::hub_nearby,
             #[cfg(desktop)]
             hub::hub_computer_name,
         ])

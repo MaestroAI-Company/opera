@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use opera_hub::{config, hub};
 use opera_hub_client::{
-    HubClient, HubDevice, HubError, HubProvider, HubStatus, McpAccessToken, McpGrant, PairedHub,
-    ProxyInfo, PullPage, SyncRecord,
+    HubClient, HubDevice, HubError, HubInvite, HubProvider, HubSettings, HubStatus, McpAccessToken,
+    McpGrant, NearbyHub, PairedHub, ProxyInfo, PullPage, SyncRecord,
 };
 use serde::Serialize;
 use tauri::State;
@@ -79,6 +79,61 @@ pub async fn hub_pair(
         .await?
         .pair(link, device_name, kind)
         .await
+}
+
+#[tauri::command]
+pub async fn hub_pair_with_code(
+    state: State<'_, HubState>,
+    device_key: String,
+    code: String,
+    device_name: String,
+    kind: String,
+) -> Result<PairedHub, HubError> {
+    let client = state.client(&device_key).await?;
+    client.pair_with_code(code, device_name, kind).await
+}
+
+#[tauri::command]
+pub async fn hub_invite(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<HubInvite, HubError> {
+    state.client(&device_key).await?.invite(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_settings(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<HubSettings, HubError> {
+    state.client(&device_key).await?.hub_settings(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_set_settings(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    settings: HubSettings,
+) -> Result<HubSettings, HubError> {
+    let client = state.client(&device_key).await?;
+    client.set_hub_settings(hub, settings).await
+}
+
+#[tauri::command]
+pub async fn hub_nearby(
+    state: State<'_, HubState>,
+    device_key: String,
+    wait_ms: u64,
+) -> Result<Vec<NearbyHub>, HubError> {
+    state.client(&device_key).await?.nearby_hubs(wait_ms).await
+}
+
+#[tauri::command]
+pub fn hub_qr_svg(text: String, dark: String, light: String) -> Result<String, HubError> {
+    opera_hub_client::qr_svg(text, dark, light)
 }
 
 #[tauri::command]
@@ -265,28 +320,6 @@ pub async fn hub_host_pairing_link() -> Result<String, String> {
     Ok(hub::pairing_link(&data_dir)
         .map_err(host_error)?
         .to_string())
-}
-
-#[derive(Serialize)]
-pub struct PairingQr {
-    svg: String,
-    //for a device without a camera
-    link: String,
-}
-
-//one time code for a phone to scan
-#[tauri::command]
-pub async fn hub_host_pairing_qr(dark: String, light: String) -> Result<PairingQr, String> {
-    use qrcode::render::svg;
-    let link = hub_host_pairing_link().await?;
-    let code = qrcode::QrCode::new(link.as_bytes()).map_err(host_error)?;
-    let svg = code
-        .render::<svg::Color>()
-        .dark_color(svg::Color(&dark))
-        .light_color(svg::Color(&light))
-        .quiet_zone(false)
-        .build();
-    Ok(PairingQr { svg, link })
 }
 
 //the name other devices see

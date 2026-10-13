@@ -22,7 +22,7 @@ import { McpServerConfig } from '../mcp/types';
 import { BASE_DEFAULTS } from '../settings/schema';
 import { AppSettings, Settings } from '../settings/SettingsService';
 import { pullRemoteChanges, pushLocalChanges, queueCloudMerge, resetDataSync } from './hubData';
-import { HUB_URL_SCHEME, HubProvider, OperaHub, PairedHub, SyncRecord } from './OperaHubService';
+import { HUB_URL_SCHEME, hubErrorCode, HubProvider, OperaHub, PairedHub, SyncRecord } from './OperaHubService';
 
 //cursor and per entry fingerprints
 const STATE_KEYS = { providers: 'opera_hub_sync_state', settings: 'opera_hub_sync_state_settings' } as const;
@@ -43,6 +43,11 @@ const SHARED_SETTINGS = (Object.keys(BASE_DEFAULTS) as (keyof AppSettings)[]).fi
 const ACTIVE_MODEL_KEYS: readonly string[] = ['aiService', 'ollamaUrl', 'ollamaContextLength', 'ollamaKeepAlive'];
 
 type CachedProviders = { hubName: string; providers: HubProvider[] };
+
+//what this device shares through the hub
+export type HubSyncPrefs = { data: boolean; settings: boolean; providers: boolean; cloud: boolean };
+const SYNC_PREFS_KEY = 'hubSyncPrefs';
+const DEFAULT_PREFS: HubSyncPrefs = { data: true, settings: true, providers: true, cloud: true };
 
 type AccountState = { cursor: number; pushedAt: number };
 
@@ -89,6 +94,7 @@ class HubSyncImpl {
   private applying = false;
   private initialized = false;
   private watching = false;
+  private prefs: HubSyncPrefs = DEFAULT_PREFS;
 
   //cache loads before the model is picked
   async init(): Promise<void> {
@@ -96,6 +102,7 @@ class HubSyncImpl {
     this.initialized = true;
     //this computer may be the hub itself
     await OperaHub.resumeHosting();
+    await this.loadPrefs();
     const cached = await Settings.getLocal(PROVIDERS_KEY);
     if (cached) {
       const { hubName, providers } = JSON.parse(cached) as CachedProviders;
@@ -122,6 +129,20 @@ class HubSyncImpl {
       this.request(0);
       this.watch();
     });
+  }
+
+  async loadPrefs(): Promise<HubSyncPrefs> {
+    const raw = await Settings.getLocal(SYNC_PREFS_KEY);
+    this.prefs = { ...DEFAULT_PREFS, ...(raw ? JSON.parse(raw) : {}) };
+    return this.prefs;
+  }
+
+  async setPref(key: keyof HubSyncPrefs, enabled: boolean): Promise<HubSyncPrefs> {
+    this.prefs = { ...this.prefs, [key]: enabled };
+    await Settings.setLocal(SYNC_PREFS_KEY, JSON.stringify(this.prefs));
+    //changes made while off go up now
+    if (enabled) this.request(0);
+    return this.prefs;
   }
 
   request(delay: number): void {
@@ -161,7 +182,11 @@ class HubSyncImpl {
           const cursor = await OperaHub.watch(hub, since);
           if (since > 0 && cursor > since) this.request(0);
           since = Math.max(since, cursor);
-        } catch {
+        } catch (e) {
+          //offline networks may still reach a hub nearby
+          if (hubErrorCode(e) === 'Unreachable' && OperaHub.canDiscover()) {
+            await OperaHub.nearbyHubs().catch(() => []);
+          }
           await new Promise((resolve) => setTimeout(resolve, WATCH_RETRY_MS));
         }
       }
@@ -175,9 +200,17 @@ class HubSyncImpl {
     if (!hub) return;
     await this.dropInjectedServers();
     await this.storeProviders(await OperaHub.providers(hub), hub.name);
-    await this.syncFingerprinted(hub, 'providers', await this.providerEntries(), (r) => this.applyProviders(r));
-    await this.syncFingerprinted(hub, 'settings', this.settingEntries(), (r) => this.applySettings(r));
-    await this.syncCloudAccount(hub).catch((e) => console.warn('[HubSync] cloud account not shared:', e));
+    const prefs = this.prefs;
+    if (prefs.providers) {
+      await this.syncFingerprinted(hub, 'providers', await this.providerEntries(), (r) => this.applyProviders(r));
+    }
+    if (prefs.settings) {
+      await this.syncFingerprinted(hub, 'settings', this.settingEntries(), (r) => this.applySettings(r));
+    }
+    if (prefs.cloud) {
+      await this.syncCloudAccount(hub).catch((e) => console.warn('[HubSync] cloud account not shared:', e));
+    }
+    if (!prefs.data) return;
     await pushLocalChanges(hub);
     if (await this.write(() => pullRemoteChanges(hub))) {
       await this.write(async () => DB.notifySynced());

@@ -1,11 +1,29 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useEffect, useRef, useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import {
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import {
+  Fonts,
+  FontSizes,
+  Radius,
+  Spacing,
+  ThemeColors,
+} from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
-import { hubErrorCode, OperaHub, PairedHub } from "../../services/hub/OperaHubService";
+import {
+  hubErrorCode,
+  NearbyHub,
+  OperaHub,
+  PairedHub,
+} from "../../services/hub/OperaHubService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import TextInputField from "../ui/TextInputField";
@@ -13,6 +31,8 @@ import DrawerSheet from "./DrawerSheet";
 
 const cameraIcon = require("../../../assets/icons/camera.png");
 const linkIcon = require("../../../assets/icons/link.png");
+const keyIcon = require("../../../assets/icons/key.png");
+const serverIcon = require("../../../assets/icons/server.png");
 
 const DESKTOP_CARD_WIDTH = 380;
 //delay before rescanning a failed code
@@ -46,6 +66,8 @@ export default function HubPairingSheet({
   const insets = useSafeAreaInsets();
   const [pairing, setPairing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  //which row the last failure belongs to
+  const [errorRow, setErrorRow] = useState<"scan" | "code">("code");
   const [typedLink, setTypedLink] = useState("");
   //scanner fires on every frame
   const lastScan = useRef<{ data: string; at: number } | null>(null);
@@ -63,9 +85,26 @@ export default function HubPairingSheet({
     if (visible) lastScan.current = null;
   }, [visible]);
 
+  //hubs answering on this network
+  const [nearby, setNearby] = useState<NearbyHub[]>([]);
+  useEffect(() => {
+    if (!visible || link || !OperaHub.canDiscover()) return;
+    let cancelled = false;
+    OperaHub.nearbyHubs()
+      .then((found) => !cancelled && setNearby(found))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, link]);
+
   const handleScan = async ({ data }: { data: string }) => {
     const previous = lastScan.current;
-    if (pairing || (previous?.data === data && Date.now() - previous.at < RESCAN_DELAY_MS)) return;
+    if (
+      pairing ||
+      (previous?.data === data && Date.now() - previous.at < RESCAN_DELAY_MS)
+    )
+      return;
     lastScan.current = { data, at: Date.now() };
     setPairing(true);
     setError(null);
@@ -73,6 +112,7 @@ export default function HubPairingSheet({
       onPaired(await OperaHub.pair(data));
     } catch (e) {
       setError(t(`hubPairing.error.${hubErrorCode(e)}`));
+      setErrorRow("scan");
       //delay counts from the attempt end
       lastScan.current = { data, at: Date.now() };
     } finally {
@@ -80,25 +120,37 @@ export default function HubPairingSheet({
     }
   };
 
-  //links are typed or confirmed, never auto paired
-  const pairLink = async (value: string) => {
+  //codes and links are typed or confirmed, never auto paired
+  const pairTyped = async (
+    value: string,
+    pair: (value: string) => Promise<PairedHub>,
+  ) => {
     if (pairing || !value.trim()) return;
     setPairing(true);
     setError(null);
     try {
-      onPaired(await OperaHub.pair(value.trim()));
+      onPaired(await pair(value.trim()));
     } catch (e) {
       setError(t(`hubPairing.error.${hubErrorCode(e)}`));
+      setErrorRow("code");
     } finally {
       setPairing(false);
     }
   };
 
-  const help = pairing ? t("hubPairing.pairing") : (error ?? t("hubPairing.help"));
+  const status = (row: "scan" | "code", idle: string) =>
+    pairing
+      ? t("hubPairing.pairing")
+      : error && errorRow === row
+        ? error
+        : idle;
   //desktop and web have no camera to scan with
-  const mode = link ? "confirm" : Platform.OS === "web" ? "paste" : "scan";
+  const mode = link ? "confirm" : Platform.OS === "web" ? "code" : "scan";
 
-  const renderPairButton = (value: string) => (
+  const renderPairButton = (
+    value: string,
+    pair: (value: string) => Promise<PairedHub>,
+  ) => (
     <Group
       style={[
         styles.highlightGroup,
@@ -110,10 +162,49 @@ export default function HubPairingSheet({
         label={t("hubPairing.pair")}
         variant="highlight"
         disabled={pairing || !value.trim()}
-        onPress={() => pairLink(value)}
+        onPress={() => pairTyped(value, pair)}
       />
     </Group>
   );
+
+  const renderCodeRow = () => (
+    <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+      <Text style={styles.settingLabel}>{t("hubPairing.code")}</Text>
+      <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+        {status("code", t("hubPairing.codeHelp"))}
+      </Text>
+      <Group style={styles.groupSpacingTight}>
+        <TextInputField
+          icon={keyIcon}
+          placeholder="XXXX-XXXX"
+          value={typedLink}
+          onChangeText={setTypedLink}
+          onSubmitEditing={() =>
+            pairTyped(typedLink, (v) => OperaHub.pairWithCode(v))
+          }
+          autoCapitalize="characters"
+          autoCorrect={false}
+        />
+      </Group>
+      {renderPairButton(typedLink, (v) => OperaHub.pairWithCode(v))}
+    </View>
+  );
+
+  //found hubs still ask for their code
+  const renderNearbyRow = () =>
+    nearby.length > 0 && (
+      <View style={styles.settingRowVertical}>
+        <Text style={styles.settingLabel}>{t("hubPairing.nearby")}</Text>
+        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+          {t("hubPairing.nearbyHelp")}
+        </Text>
+        <Group style={styles.infoGroup}>
+          {nearby.map((hub) => (
+            <ActionButton key={hub.id} icon={serverIcon} label={hub.name} />
+          ))}
+        </Group>
+      </View>
+    );
 
   const renderContent = () => {
     if (pairedHub) {
@@ -131,59 +222,51 @@ export default function HubPairingSheet({
         <>
           <Text style={styles.settingLabel}>{t("hubPairing.confirm")}</Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {pairing ? t("hubPairing.pairing") : (error ?? t("hubPairing.confirmHelp"))}
+            {status("code", t("hubPairing.confirmHelp"))}
           </Text>
-          {renderPairButton(link ?? "")}
+          {renderPairButton(link ?? "", (v) => OperaHub.pair(v))}
         </>
       );
     }
-    if (mode === "paste") {
+    if (mode === "code") {
       return (
         <>
-          <Text style={styles.settingLabel}>{t("hubPairing.link")}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {pairing ? t("hubPairing.pairing") : (error ?? t("hubPairing.linkHelp"))}
-          </Text>
-          <Group style={styles.groupSpacingTight}>
-            <TextInputField
-              icon={linkIcon}
-              placeholder="opera://hub/pair?..."
-              value={typedLink}
-              onChangeText={setTypedLink}
-              onSubmitEditing={() => pairLink(typedLink)}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </Group>
-          {renderPairButton(typedLink)}
+          {renderNearbyRow()}
+          {renderCodeRow()}
         </>
       );
     }
     return (
       <>
-        <Text style={styles.settingLabel}>{t("hubPairing.scan")}</Text>
-        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-          {permission?.granted ? help : t("hubPairing.cameraHelp")}
-        </Text>
-        <Group>
-          {permission?.granted ? (
-            //unmount to release the camera
-            visible && (
-              <CameraView
-                style={styles.camera}
-                facing="back"
-                barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-                onBarcodeScanned={handleScan}
+        {renderNearbyRow()}
+        <View style={styles.settingRowVertical}>
+          <Text style={styles.settingLabel}>{t("hubPairing.scan")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {permission?.granted
+              ? status("scan", t("hubPairing.help"))
+              : t("hubPairing.cameraHelp")}
+          </Text>
+          <Group>
+            {permission?.granted ? (
+              //unmount to release the camera
+              visible && (
+                <CameraView
+                  style={styles.camera}
+                  facing="back"
+                  barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+                  onBarcodeScanned={handleScan}
+                />
+              )
+            ) : (
+              <ActionButton
+                icon={cameraIcon}
+                label={t("hubPairing.allowCamera")}
+                onPress={requestPermission}
               />
-            )
-          ) : (
-            <ActionButton
-              icon={cameraIcon}
-              label={t("hubPairing.allowCamera")}
-              onPress={requestPermission}
-            />
-          )}
-        </Group>
+            )}
+          </Group>
+        </View>
+        {renderCodeRow()}
       </>
     );
   };
@@ -196,7 +279,7 @@ export default function HubPairingSheet({
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
       handleContainerStyle={styles.sheetHandleContainer}
-      avoidKeyboard={mode === "paste"}
+      avoidKeyboard={mode !== "confirm"}
       sheetStyle={[
         styles.sheet,
         {
@@ -206,7 +289,10 @@ export default function HubPairingSheet({
       ]}
       desktopStyle={styles.desktopCard}
     >
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.contentCard}>{renderContent()}</View>
       </ScrollView>
     </DrawerSheet>
@@ -259,6 +345,13 @@ const makeStyles = (Colors: ThemeColors) =>
       marginTop: Spacing.xs,
       lineHeight: 20,
       paddingHorizontal: Spacing.md,
+    },
+    settingRowVertical: {
+      marginBottom: Spacing.xxl,
+    },
+    //static rows on the white card
+    infoGroup: {
+      borderWidth: 0,
     },
     groupSpacingTight: {
       marginBottom: Spacing.lg2,

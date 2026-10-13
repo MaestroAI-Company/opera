@@ -16,6 +16,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Fetch the opera hub web client
+        run: node scripts/build-hub-client.mjs web
+
       - name: Build web export
         env:
           EXPO_PUBLIC_GOOGLE_REDIRECT_URI: ${{ secrets.EXPO_PUBLIC_GOOGLE_REDIRECT_URI }}

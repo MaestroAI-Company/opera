@@ -4372,7 +4372,7 @@ checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
 name = "opera-hub"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "chacha20poly1305",
@@ -4400,7 +4400,7 @@ dependencies = [
 
 [[package]]
 name = "opera-hub-client"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "bytes",
@@ -4410,18 +4410,23 @@ dependencies = [
  "hyper",
  "hyper-util",
  "iroh",
+ "js-sys",
+ "n0-future",
  "opera-hub-proto",
  "serde",
+ "serde-wasm-bindgen",
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
  "tokio-util",
  "uniffi",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
 name = "opera-hub-proto"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "iroh",
@@ -5615,6 +5620,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-wasm-bindgen"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8302e169f0eddcc139c70f139d19d6467353af16f9fce27e8c30158036a1e16b"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "serde_bytes"
 version = "0.11.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6631,7 +6647,7 @@ dependencies = [
  "serde_with",
  "swift-rs",
  "thiserror 2.0.18",
- "toml 0.9.12+spec-1.1.0",
+ "toml 1.1.8+spec-1.1.0",
  "url",
  "urlpattern",
  "uuid",
@@ -7285,7 +7301,7 @@ dependencies = [
  "serde",
  "tempfile",
  "textwrap",
- "toml 0.9.12+spec-1.1.0",
+ "toml 1.1.8+spec-1.1.0",
  "uniffi_internal_macros",
  "uniffi_meta",
  "uniffi_pipeline",
@@ -7331,7 +7347,7 @@ dependencies = [
  "quote",
  "serde",
  "syn 2.0.119",
- "toml 0.9.12+spec-1.1.0",
+ "toml 1.1.8+spec-1.1.0",
  "uniffi_meta",
 ]
 

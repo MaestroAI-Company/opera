@@ -28,7 +28,7 @@ const PROVIDER_PLATFORMS: Record<ProviderId, readonly ProviderPlatform[]> = {
   openai: ['android', 'ios', 'web', 'desktop'],
   beta: ['android', 'ios', 'web', 'desktop'],
   //platforms that ship the hub client
-  operahub: ['android', 'desktop'],
+  operahub: ['android', 'desktop', 'web'],
 };
 
 export function currentPlatform(): ProviderPlatform {

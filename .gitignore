@@ -43,6 +43,9 @@ example
 /ios
 /android
 
+# opera hub web client, built or downloaded
+/public/opera-hub/
+
 # Tauri
 /src-tauri/target/
 /src-tauri/gen/

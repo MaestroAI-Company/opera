@@ -329,6 +329,7 @@ export const fr: Translations = {
   "settings.hub.hostStopped": "Le hub de cet ordinateur est arrêté, vos autres appareils ne se synchronisent plus.",
   "settings.hub.helpDesktop": "Synchronisez cet ordinateur avec un Opera Hub, ou faites-en le hub de vos autres appareils.",
   "settings.hub.thisDevice": "Cet appareil",
+  "settings.hub.inactive": "Inactif",
   "hubUpdate.title": "Mise à jour d'Opera Hub disponible",
   "hubUpdate.message": "Opera Hub {version} est prête à être installée sur votre hub, qui utilise la {current}. Il redémarre en quelques secondes et vos appareils se reconnectent tout seuls.",
   "hubUpdate.install": "Installer maintenant",

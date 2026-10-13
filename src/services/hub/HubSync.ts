@@ -80,6 +80,18 @@ function newServerId(): string {
   return `srv_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
+//devices that added the same server before pairing
+function oneServerPerUrl(servers: OllamaServer[]): OllamaServer[] {
+  const key = (server: OllamaServer) => server.url.trim().replace(/\/+$/, '').toLowerCase();
+  const kept = new Map<string, OllamaServer>();
+  for (const server of servers) {
+    const known = kept.get(key(server));
+    //the smallest id wins the same way everywhere
+    if (!known || server.id! < known.id!) kept.set(key(server), server);
+  }
+  return servers.filter((server) => kept.get(key(server)) === server);
+}
+
 function readMcpServers(): McpServerConfig[] {
   try {
     const parsed = JSON.parse(Settings.getCached().mcpServers || '[]');
@@ -393,11 +405,12 @@ class HubSyncImpl {
 
   //older entries had no stable id
   private async withIds(): Promise<Lists> {
-    const ollama = getOllamaServers();
+    const allOllama = getOllamaServers();
     const openai = getOpenAIServers();
-    const missing = [...ollama, ...openai].filter((s) => !s.id);
+    const missing = [...allOllama, ...openai].filter((s) => !s.id);
     for (const server of missing) server.id = newServerId();
-    if (missing.length > 0) {
+    const ollama = oneServerPerUrl(allOllama);
+    if (missing.length > 0 || ollama.length !== allOllama.length) {
       await this.write(() =>
         Settings.setMany({ ollamaUrls: serializeServers(ollama), openaiUrls: serializeServers(openai) }),
       );

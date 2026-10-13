@@ -28,7 +28,10 @@ export type McpAccessToken = { accessToken: string; expiresAt: number };
 export type HubProvider = { id: string; name: string; kind: 'ollama' | 'openai' };
 //a hub on this computer, desktop only
 export type HostStatus = { running: boolean; embedded: boolean; id: string | null };
-export type PairingQr = { svg: string; link: string };
+//a one time code and the link its qr shows
+export type HubInvite = { code: string; link: string };
+export type HubSettings = { lanDiscovery: boolean; shareProviders: boolean };
+export type NearbyHub = { id: string; name: string; addrs: string[] };
 export type HubErrorCode =
   | 'InvalidLink'
   | 'PairingRejected'
@@ -42,6 +45,14 @@ type NativeHub = {
   //missing on builds older than hub 0.5
   deviceId?(deviceKey: string): Promise<string>;
   pair(deviceKey: string, link: string, deviceName: string, kind: string): Promise<PairedHub>;
+  pairWithCode(deviceKey: string, code: string, deviceName: string, kind: string): Promise<PairedHub>;
+  invite(deviceKey: string, hub: PairedHub): Promise<HubInvite>;
+  qrSvg(text: string, dark: string, light: string): Promise<string>;
+  //admin only, browsers lack it
+  hubSettings?(deviceKey: string, hub: PairedHub): Promise<HubSettings>;
+  setHubSettings?(deviceKey: string, hub: PairedHub, settings: HubSettings): Promise<HubSettings>;
+  //browsers cannot use multicast
+  nearbyHubs?(deviceKey: string, waitMs: number): Promise<NearbyHub[]>;
   status(deviceKey: string, hub: PairedHub): Promise<HubStatus>;
   unpair(deviceKey: string, hub: PairedHub): Promise<void>;
   devices(deviceKey: string, hub: PairedHub): Promise<HubDevice[]>;
@@ -60,7 +71,6 @@ type HubHost = {
   start(): Promise<void>;
   stop(): Promise<void>;
   pairingLink(): Promise<string>;
-  pairingQr(dark: string, light: string): Promise<PairingQr>;
   computerName(): Promise<string>;
 };
 
@@ -76,6 +86,13 @@ async function invoke<T>(command: string, args?: Record<string, unknown>): Promi
 const tauriHub: NativeHub = {
   deviceId: (deviceKey) => invoke('hub_device_id', { deviceKey }),
   pair: (deviceKey, link, deviceName, kind) => invoke('hub_pair', { deviceKey, link, deviceName, kind }),
+  pairWithCode: (deviceKey, code, deviceName, kind) =>
+    invoke('hub_pair_with_code', { deviceKey, code, deviceName, kind }),
+  invite: (deviceKey, hub) => invoke('hub_invite', { deviceKey, hub }),
+  qrSvg: (text, dark, light) => invoke('hub_qr_svg', { text, dark, light }),
+  hubSettings: (deviceKey, hub) => invoke('hub_settings', { deviceKey, hub }),
+  setHubSettings: (deviceKey, hub, settings) => invoke('hub_set_settings', { deviceKey, hub, settings }),
+  nearbyHubs: (deviceKey, waitMs) => invoke('hub_nearby', { deviceKey, waitMs }),
   status: (deviceKey, hub) => invoke('hub_status', { deviceKey, hub }),
   unpair: (deviceKey, hub) => invoke('hub_unpair', { deviceKey, hub }),
   devices: (deviceKey, hub) => invoke('hub_devices', { deviceKey, hub }),
@@ -94,7 +111,6 @@ const tauriHost: HubHost = {
   start: () => invoke('hub_host_start'),
   stop: () => invoke('hub_host_stop'),
   pairingLink: () => invoke('hub_host_pairing_link'),
-  pairingQr: (dark, light) => invoke('hub_host_pairing_qr', { dark, light }),
   computerName: () => invoke('hub_computer_name'),
 };
 
@@ -108,6 +124,8 @@ type WebResponse = {
 type WebClient = {
   deviceId(): string;
   pair(link: string, deviceName: string, kind: string): Promise<PairedHub>;
+  pairWithCode(code: string, deviceName: string, kind: string): Promise<PairedHub>;
+  invite(hub: PairedHub): Promise<HubInvite>;
   status(hub: PairedHub): Promise<HubStatus>;
   unpair(hub: PairedHub): Promise<void>;
   devices(hub: PairedHub): Promise<HubDevice[]>;
@@ -131,6 +149,7 @@ type WebClient = {
 type WebModule = {
   default(options: { module_or_path: string }): Promise<unknown>;
   WebHubClient: new (secretKey: Uint8Array) => WebClient;
+  qrSvg(text: string, dark: string, light: string): string;
 };
 
 //public files, built or downloaded before the web bundle
@@ -144,16 +163,20 @@ const importAtRuntime = new Function('url', 'return import(url)') as (url: strin
 let webModule: Promise<WebModule> | null = null;
 let webClient: { key: string; client: WebClient } | null = null;
 
-async function loadWebClient(deviceKey: string): Promise<WebClient> {
-  if (webClient?.key === deviceKey) return webClient.client;
+async function loadWebModule(): Promise<WebModule> {
   webModule ??= importAtRuntime(WEB_MODULE_URL).then(async (mod) => {
     await mod.default({ module_or_path: WEB_WASM_URL });
     return mod;
   });
-  const mod = await webModule.catch((e) => {
+  return webModule.catch((e) => {
     webModule = null;
     throw Object.assign(new Error(`Opera Hub web client missing: ${e}`), { code: 'Internal' });
   });
+}
+
+async function loadWebClient(deviceKey: string): Promise<WebClient> {
+  if (webClient?.key === deviceKey) return webClient.client;
+  const mod = await loadWebModule();
   const bytes = Uint8Array.from(deviceKey.match(/../g) ?? [], (byte) => parseInt(byte, 16));
   webClient = { key: deviceKey, client: new mod.WebHubClient(bytes) };
   return webClient.client;
@@ -163,6 +186,10 @@ async function loadWebClient(deviceKey: string): Promise<WebClient> {
 const webHub: NativeHub = {
   deviceId: async (deviceKey) => (await loadWebClient(deviceKey)).deviceId(),
   pair: async (deviceKey, link, deviceName, kind) => (await loadWebClient(deviceKey)).pair(link, deviceName, kind),
+  pairWithCode: async (deviceKey, code, deviceName, kind) =>
+    (await loadWebClient(deviceKey)).pairWithCode(code, deviceName, kind),
+  invite: async (deviceKey, hub) => (await loadWebClient(deviceKey)).invite(hub),
+  qrSvg: async (text, dark, light) => (await loadWebModule()).qrSvg(text, dark, light),
   status: async (deviceKey, hub) => (await loadWebClient(deviceKey)).status(hub),
   unpair: async (deviceKey, hub) => (await loadWebClient(deviceKey)).unpair(hub),
   devices: async (deviceKey, hub) => (await loadWebClient(deviceKey)).devices(hub),
@@ -199,6 +226,8 @@ const host: HubHost | undefined = isTauri ? tauriHost : undefined;
 const DEVICE_KEY = 'opera_hub_device_key';
 const PAIRED_HUB_KEY = 'opera_hub_paired';
 const HOSTING_KEY = 'opera_hub_hosting';
+//every hub nearby answers within it
+const NEARBY_WAIT_MS = 2500;
 //a fresh hub publishes its address slowly
 const SELF_PAIR_ATTEMPTS = 5;
 const SELF_PAIR_DELAY_MS = 2000;
@@ -233,6 +262,46 @@ class OperaHubServiceImpl {
     const hub = await this.native().pair(await this.deviceKey(), link, name, kind);
     await setSecret(PAIRED_HUB_KEY, JSON.stringify(hub));
     return hub;
+  }
+
+  //what a hub or paired device shows, a code or a pairing link
+  async pairWithCode(input: string): Promise<PairedHub> {
+    const value = input.trim();
+    if (value.startsWith('opera://')) return this.pair(value);
+    const { name, kind } = await this.identity();
+    const hub = await this.native().pairWithCode(await this.deviceKey(), value, name, kind);
+    await setSecret(PAIRED_HUB_KEY, JSON.stringify(hub));
+    return hub;
+  }
+
+  //a code for another device, needs the admin scope
+  async invite(hub: PairedHub): Promise<HubInvite> {
+    return this.native().invite(await this.deviceKey(), hub);
+  }
+
+  async qrSvg(text: string, dark: string, light: string): Promise<string> {
+    return this.native().qrSvg(text, dark, light);
+  }
+
+  canDiscover(): boolean {
+    return !!native?.nearbyHubs;
+  }
+
+  //hubs announcing themselves on this network
+  async nearbyHubs(waitMs = NEARBY_WAIT_MS): Promise<NearbyHub[]> {
+    const nearby = this.native().nearbyHubs;
+    return nearby ? nearby(await this.deviceKey(), waitMs) : [];
+  }
+
+  async hubSettings(hub: PairedHub): Promise<HubSettings | null> {
+    const read = this.native().hubSettings;
+    return read ? read(await this.deviceKey(), hub) : null;
+  }
+
+  async setHubSettings(hub: PairedHub, settings: HubSettings): Promise<HubSettings> {
+    const write = this.native().setHubSettings;
+    if (!write) throw Object.assign(new Error('Hub settings need the app'), { code: 'Unauthorized' });
+    return write(await this.deviceKey(), hub, settings);
   }
 
   //null when the client predates it
@@ -279,10 +348,6 @@ class OperaHubServiceImpl {
     }
   }
 
-  //one time code for another device
-  async hostPairingQr(dark: string, light: string): Promise<PairingQr> {
-    return this.host().pairingQr(dark, light);
-  }
 
   async status(hub: PairedHub): Promise<HubStatus> {
     return this.native().status(await this.deviceKey(), hub);

@@ -2,10 +2,20 @@ import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useState } from "react";
 import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SvgXml } from "react-native-svg";
-import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import {
+  Fonts,
+  FontSizes,
+  Radius,
+  Spacing,
+  ThemeColors,
+} from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
-import { OperaHub, PairingQr } from "../../services/hub/OperaHubService";
+import {
+  HubInvite,
+  OperaHub,
+  PairedHub,
+} from "../../services/hub/OperaHubService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import DrawerSheet from "./DrawerSheet";
@@ -19,40 +29,51 @@ const COPIED_NOTICE_MS = 2000;
 type HubQrSheetProps = {
   visible: boolean;
   onClose: () => void;
+  hub: PairedHub | null;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
 };
 
-//one time code from the hub on this computer
+//one time code and qr from the hub
 export default function HubQrSheet({
   visible,
   onClose,
+  hub,
   isLargeScreen = false,
   isDesktop = false,
 }: HubQrSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const colors = useColors();
   const t = useT();
-  const [qr, setQr] = useState<PairingQr | null>(null);
+  const [invite, setInvite] = useState<HubInvite | null>(null);
+  const [svg, setSvg] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const refresh = useCallback(async () => {
+    if (!hub) return;
     try {
-      setQr(await OperaHub.hostPairingQr(colors.textPrimary, colors.surface));
+      const fresh = await OperaHub.invite(hub);
+      setSvg(
+        await OperaHub.qrSvg(fresh.link, colors.textPrimary, colors.surface),
+      );
+      setInvite(fresh);
       setFailed(false);
     } catch (e) {
       console.warn("[OperaHub] no pairing code:", e);
-      setQr(null);
+      setInvite(null);
       setFailed(true);
     }
-  }, [colors.textPrimary, colors.surface]);
+  }, [hub, colors.textPrimary, colors.surface]);
 
   //a closed sheet forgets its code
   const [prevVisible, setPrevVisible] = useState(visible);
   if (visible !== prevVisible) {
     setPrevVisible(visible);
-    if (!visible) setQr(null);
+    if (!visible) {
+      setInvite(null);
+      setSvg(null);
+    }
   }
   //each opening invalidates the previous code
   useEffect(() => {
@@ -61,8 +82,8 @@ export default function HubQrSheet({
   }, [visible, refresh]);
 
   const copy = async () => {
-    if (!qr) return;
-    await Clipboard.setStringAsync(qr.link);
+    if (!invite) return;
+    await Clipboard.setStringAsync(invite.code);
     setCopied(true);
     setTimeout(() => setCopied(false), COPIED_NOTICE_MS);
   };
@@ -75,30 +96,40 @@ export default function HubQrSheet({
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
       handleContainerStyle={styles.sheetHandleContainer}
-      sheetStyle={[styles.sheet, { paddingBottom: Platform.OS === "ios" ? 34 : 20 }]}
+      sheetStyle={[
+        styles.sheet,
+        { paddingBottom: Platform.OS === "ios" ? 34 : 20 },
+      ]}
       desktopStyle={styles.desktopCard}
     >
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.contentCard}>
           <Text style={styles.settingLabel}>{t("hubQr.title")}</Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {failed ? t("settings.hub.hostFailed") : t("hubQr.help")}
+            {failed ? t("hubQr.failed") : t("hubQr.help")}
           </Text>
-          {qr && (
+          {invite && svg && (
             <Group style={styles.groupSpacingTight}>
               <View style={styles.qr}>
-                <SvgXml xml={qr.svg} width="100%" height="100%" />
+                <SvgXml xml={svg} width="100%" height="100%" />
               </View>
+              <Text style={styles.code} selectable>
+                {invite.code}
+              </Text>
             </Group>
           )}
           <Group>
             <ActionButton
               icon={copyIcon}
               label={copied ? t("hubQr.copied") : t("hubQr.copy")}
-              disabled={!qr}
+              disabled={!invite}
               onPress={copy}
             />
-            <ActionButton icon={reloadIcon} label={t("hubQr.refresh")} onPress={refresh} />
+            <ActionButton
+              icon={reloadIcon}
+              label={t("hubQr.refresh")}
+              onPress={refresh}
+            />
           </Group>
         </View>
       </ScrollView>
@@ -160,5 +191,15 @@ const makeStyles = (Colors: ThemeColors) =>
       width: "100%",
       aspectRatio: 1,
       padding: Spacing.xl2,
+      paddingBottom: Spacing.md,
+    },
+    //typed on devices without a camera
+    code: {
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.xxxl,
+      color: Colors.textPrimary,
+      textAlign: "center",
+      letterSpacing: Spacing.xs,
+      paddingBottom: Spacing.xl2,
     },
   });

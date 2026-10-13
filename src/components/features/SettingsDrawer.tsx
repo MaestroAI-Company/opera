@@ -129,11 +129,12 @@ import {
   HostStatus,
   HubDevice,
   hubErrorCode,
+  HubSettings,
   HubStatus,
   OperaHub,
   PairedHub,
 } from "../../services/hub/OperaHubService";
-import { HubSync } from "../../services/hub/HubSync";
+import { HubSync, HubSyncPrefs } from "../../services/hub/HubSync";
 import { AppEvents } from "../../services/events";
 import { McpService } from "../../services/mcp/McpService";
 import { McpServerConfig } from "../../services/mcp/types";
@@ -896,6 +897,9 @@ export default function SettingsDrawer({
   const [hostBusy, setHostBusy] = useState(false);
   const [hostError, setHostError] = useState<string | null>(null);
   const [thisDeviceId, setThisDeviceId] = useState<string | null>(null);
+  const [syncPrefs, setSyncPrefs] = useState<HubSyncPrefs | null>(null);
+  //null without the admin scope
+  const [hubSettings, setHubSettings] = useState<HubSettings | null>(null);
 
   const refreshHub = useCallback(async () => {
     const hub = await OperaHub.getPairedHub();
@@ -904,6 +908,7 @@ export default function SettingsDrawer({
       setHostStatus(await OperaHub.hostStatus().catch(() => null));
     }
     if (!hub) return;
+    setSyncPrefs(await HubSync.loadPrefs());
     OperaHub.deviceId()
       .then(setThisDeviceId)
       .catch(() => setThisDeviceId(null));
@@ -912,6 +917,7 @@ export default function SettingsDrawer({
       setHubStatus(await OperaHub.status(hub));
       setHubState("online");
       setHubDevices(await OperaHub.devices(hub).catch(() => null));
+      setHubSettings(await OperaHub.hubSettings(hub).catch(() => null));
     } catch (e) {
       const code = hubErrorCode(e);
       setHubState(
@@ -2704,6 +2710,22 @@ export default function SettingsDrawer({
     }
   };
 
+  const setSyncPref = async (key: keyof HubSyncPrefs, enabled: boolean) => {
+    setSyncPrefs(await HubSync.setPref(key, enabled));
+  };
+
+  const changeHubSettings = async (patch: Partial<HubSettings>) => {
+    if (!pairedHub || !hubSettings) return;
+    const wanted = { ...hubSettings, ...patch };
+    setHubSettings(wanted);
+    try {
+      setHubSettings(await OperaHub.setHubSettings(pairedHub, wanted));
+    } catch (e) {
+      console.warn("[OperaHub] hub settings not saved:", e);
+      setHubSettings(hubSettings);
+    }
+  };
+
   const handleUnpairHub = () => {
     if (!pairedHub) return;
     showAlert(
@@ -4042,12 +4064,8 @@ export default function SettingsDrawer({
   const renderHubHostSection = () => {
     if (!OperaHub.canHost() || !hostStatus || !pairedHub) return null;
     if (pairedHub.id !== hostStatus.id) return null;
-    const byService = hostStatus.running && !hostStatus.embedded;
-    const help = byService
-      ? t("settings.hub.hostService")
-      : hostStatus.running
-        ? t("settings.hub.hostHelp")
-        : t("settings.hub.hostStopped");
+    //the service runs it, nothing to do here
+    if (hostStatus.running && !hostStatus.embedded) return null;
     return (
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -4055,14 +4073,18 @@ export default function SettingsDrawer({
             {t("settings.hub.thisComputer")}
           </Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {hostError ?? help}
+            {hostError ??
+              (hostStatus.running
+                ? t("settings.hub.hostHelp")
+                : t("settings.hub.hostStopped"))}
           </Text>
           <Group>
             {hostStatus.running ? (
               <ActionButton
-                icon={HUB_DEVICE_ICONS.phone}
-                label={t("settings.hub.pairDevice")}
-                onPress={() => setHubQrVisible(true)}
+                icon={cancelIcon}
+                label={t("settings.hub.stopHosting")}
+                disabled={hostBusy}
+                onPress={() => setHosting(false)}
               />
             ) : (
               <ActionButton
@@ -4072,19 +4094,33 @@ export default function SettingsDrawer({
                 onPress={() => setHosting(true)}
               />
             )}
-            {hostStatus.embedded && (
-              <ActionButton
-                icon={cancelIcon}
-                label={t("settings.hub.stopHosting")}
-                disabled={hostBusy}
-                onPress={() => setHosting(false)}
-              />
-            )}
           </Group>
         </View>
       </View>
     );
   };
+
+  //one toggle row of the hub page
+  const renderHubToggle = (
+    label: string,
+    help: string,
+    checked: boolean,
+    onToggle: (value: boolean) => void,
+    last = false,
+  ) => (
+    <View
+      key={label}
+      style={[styles.settingRowVertical, last && { marginBottom: 0 }]}
+    >
+      <View style={styles.toggleGroupRow}>
+        <View style={styles.toggleGroupContent}>
+          <Text style={styles.settingLabel}>{label}</Text>
+          <Text style={styles.helpText}>{help}</Text>
+        </View>
+        <Toggle checked={checked} onToggle={onToggle} />
+      </View>
+    </View>
+  );
 
   const renderOperaHubSubPage = () => {
     if (!pairedHub) {
@@ -4163,38 +4199,55 @@ export default function SettingsDrawer({
         : []),
     ];
 
+    const thisDevice = hubDevices?.find((device) => device.id === thisDeviceId);
+    //older clients cannot tell, browsers never manage
+    const isAdmin = thisDevice
+      ? thisDevice.scopes.includes("admin")
+      : Platform.OS !== "web";
+    const syncRows = [
+      ["data", "settings.hub.syncData", "settings.hub.syncDataHelp"],
+      ["settings", "settings.hub.syncSettings", "settings.hub.syncSettingsHelp"],
+      ["providers", "settings.hub.syncProviders", "settings.hub.syncProvidersHelp"],
+      ["cloud", "settings.hub.syncCloud", "settings.hub.syncCloudHelp"],
+    ] as const;
+
     return (
       <View style={styles.subPageContainer}>
         {renderSubPageHeader(t("settings.nav.hub.title"))}
 
-        {/* hub card */}
-        <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {t("settings.hub.title")}
-            </Text>
-            <Group style={styles.infoGroup}>
-              {hubRows.map((row) => (
-                <ActionButton
-                  key={row.label}
-                  label={row.label}
-                  rightElement={
-                    <Text
-                      style={styles.infoValue}
-                      numberOfLines={1}
-                      ellipsizeMode="middle"
-                    >
-                      {row.value}
-                    </Text>
-                  }
-                />
-              ))}
-            </Group>
-            {hubState === "revoked" && (
-              <Text style={styles.helpText}>{t("settings.hub.revoked")}</Text>
+        {/* what this device syncs */}
+        {syncPrefs && (
+          <View style={styles.contentCard}>
+            {syncRows.map(([key, label, help], index) =>
+              renderHubToggle(
+                t(label),
+                t(help),
+                syncPrefs[key],
+                (value) => setSyncPref(key, value),
+                index === syncRows.length - 1,
+              ),
             )}
           </View>
-        </View>
+        )}
+
+        {/* hub wide settings, admins only */}
+        {hubState === "online" && hubSettings && (
+          <View style={styles.contentCard}>
+            {renderHubToggle(
+              t("settings.hub.lanDiscovery"),
+              t("settings.hub.lanDiscoveryHelp"),
+              hubSettings.lanDiscovery,
+              (value) => changeHubSettings({ lanDiscovery: value }),
+            )}
+            {renderHubToggle(
+              t("settings.hub.shareProviders"),
+              t("settings.hub.shareProvidersHelp"),
+              hubSettings.shareProviders,
+              (value) => changeHubSettings({ shareProviders: value }),
+              true,
+            )}
+          </View>
+        )}
 
         {renderHubHostSection()}
 
@@ -4208,7 +4261,9 @@ export default function SettingsDrawer({
                 {t("settings.hub.devices")}
               </Text>
               {hubDevices ? (
-                <Group style={styles.infoGroup}>
+                <Group
+                  style={[styles.infoGroup, isAdmin && styles.groupSpacingTight]}
+                >
                   {hubDevices.map((device) => (
                     <ActionButton
                       key={device.id}
@@ -4231,30 +4286,68 @@ export default function SettingsDrawer({
                   ))}
                 </Group>
               ) : (
-                <Text style={styles.helpText}>
+                <Text
+                  style={[styles.helpText, isAdmin && { marginBottom: Spacing.md }]}
+                >
                   {t("settings.hub.devicesEmpty")}
                 </Text>
+              )}
+              {isAdmin && (
+                <Group>
+                  <ActionButton
+                    icon={addIcon}
+                    label={t("settings.hub.pairDevice")}
+                    onPress={() => setHubQrVisible(true)}
+                  />
+                </Group>
               )}
             </View>
           </View>
         )}
 
-        {/* actions section */}
+        {/* hub info, then its actions */}
         <View style={styles.contentCard}>
-          <Group>
-            <ActionButton
-              icon={reconnectIcon}
-              label={t("settings.hub.check")}
-              disabled={hubState === "checking"}
-              style={hubState === "checking" && styles.highlightGroupDisabled}
-              onPress={refreshHub}
-            />
-            <ActionButton
-              icon={cancelIcon}
-              label={t("settings.hub.unpair")}
-              onPress={handleUnpairHub}
-            />
-          </Group>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.hub.title")}
+            </Text>
+            <Group style={[styles.infoGroup, styles.groupSpacingTight]}>
+              {hubRows.map((row) => (
+                <ActionButton
+                  key={row.label}
+                  label={row.label}
+                  rightElement={
+                    <Text
+                      style={styles.infoValue}
+                      numberOfLines={1}
+                      ellipsizeMode="middle"
+                    >
+                      {row.value}
+                    </Text>
+                  }
+                />
+              ))}
+            </Group>
+            {hubState === "revoked" && (
+              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                {t("settings.hub.revoked")}
+              </Text>
+            )}
+            <Group>
+              <ActionButton
+                icon={reconnectIcon}
+                label={t("settings.hub.check")}
+                disabled={hubState === "checking"}
+                style={hubState === "checking" && styles.highlightGroupDisabled}
+                onPress={refreshHub}
+              />
+              <ActionButton
+                icon={cancelIcon}
+                label={t("settings.hub.unpair")}
+                onPress={handleUnpairHub}
+              />
+            </Group>
+          </View>
         </View>
       </View>
     );
@@ -6874,14 +6967,13 @@ export default function SettingsDrawer({
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />
-      {OperaHub.canHost() && (
-        <HubQrSheet
-          visible={hubQrVisible}
-          onClose={() => setHubQrVisible(false)}
-          isLargeScreen={isLargeScreen}
-          isDesktop={isDesktop}
-        />
-      )}
+      <HubQrSheet
+        visible={hubQrVisible}
+        onClose={() => setHubQrVisible(false)}
+        hub={pairedHub}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
     </>
   );
 

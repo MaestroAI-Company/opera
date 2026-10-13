@@ -404,10 +404,20 @@ async function readReadme(repoId: string): Promise<string | null> {
 
 const descriptions = new Map<string, string | null>();
 
+//repos outside the litert catalog name their upstream in tags
+async function readBaseModel(repoId: string): Promise<string | undefined> {
+  try {
+    const model: HFModel = await getJson(`${HF_API}/${repoId}`);
+    return baseModelFromTags(model.tags ?? []);
+  } catch {
+    return undefined;
+  }
+}
+
 //upstream card > litert card if gated
 export async function fetchModelDescription(repoId: string): Promise<string | null> {
   if (descriptions.has(repoId)) return descriptions.get(repoId)!;
-  const base = store.entries[repoId]?.baseModel;
+  const base = repoId in store.entries ? store.entries[repoId].baseModel : await readBaseModel(repoId);
   const description = (base ? await readReadme(base) : null) ?? await readReadme(repoId);
   descriptions.set(repoId, description);
   return description;

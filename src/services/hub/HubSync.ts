@@ -103,8 +103,6 @@ class HubSyncImpl {
   async init(): Promise<void> {
     if (this.initialized || !OperaHub.isSupported()) return;
     this.initialized = true;
-    //this computer may be the hub itself
-    await OperaHub.resumeHosting();
     await this.loadPrefs();
     const cached = await Settings.getLocal(PROVIDERS_KEY);
     if (cached) {

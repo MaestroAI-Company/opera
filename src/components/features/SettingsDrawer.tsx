@@ -4078,8 +4078,6 @@ export default function SettingsDrawer({
   const renderHubHostSection = () => {
     if (!OperaHub.canHost() || !hostStatus || !pairedHub) return null;
     if (pairedHub.id !== hostStatus.id) return null;
-    //the service runs it, nothing to do here
-    if (hostStatus.running && !hostStatus.embedded) return null;
     return (
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -4161,7 +4159,7 @@ export default function SettingsDrawer({
                     disabled={hostBusy}
                     onPress={() => setHubPairingVisible(true)}
                   />
-                  {hostStatus?.running && !hostStatus.embedded ? (
+                  {hostStatus?.running ? (
                     <ActionButton
                       icon={HUB_DEVICE_ICONS.desktop}
                       label={t("settings.hub.useThisComputer")}

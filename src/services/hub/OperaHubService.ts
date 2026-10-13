@@ -27,7 +27,8 @@ export type McpGrant = {
 export type McpAccessToken = { accessToken: string; expiresAt: number };
 export type HubProvider = { id: string; name: string; kind: 'ollama' | 'openai' };
 //a hub on this computer, desktop only
-export type HostStatus = { running: boolean; embedded: boolean; id: string | null };
+//installed means it starts with the session
+export type HostStatus = { running: boolean; installed: boolean; id: string | null };
 //a one time code and the link its qr shows
 export type HubInvite = { code: string; link: string };
 export type HubSettings = { lanDiscovery: boolean; shareProviders: boolean };
@@ -227,7 +228,6 @@ const host: HubHost | undefined = isTauri ? tauriHost : undefined;
 //per device so never cloud synced
 const DEVICE_KEY = 'opera_hub_device_key';
 const PAIRED_HUB_KEY = 'opera_hub_paired';
-const HOSTING_KEY = 'opera_hub_hosting';
 //every hub nearby answers within it
 const NEARBY_WAIT_MS = 2500;
 //a fresh hub publishes its address slowly
@@ -304,8 +304,8 @@ class OperaHubServiceImpl {
   async updateHub(hub: PairedHub, version: string): Promise<void> {
     if (host) {
       const local = await host.status().catch(() => null);
-      const byService = local?.id === hub.id && local.running && !local.embedded;
-      if (byService && (await invoke<boolean>('hub_install_update', { version }))) return;
+      const onThisComputer = local?.id === hub.id && local.running;
+      if (onThisComputer && (await invoke<boolean>('hub_install_update', { version }))) return;
     }
     const update = this.native().updateHub;
     if (!update) throw Object.assign(new Error('Hub updates need the app'), { code: 'Unauthorized' });
@@ -337,21 +337,10 @@ class OperaHubServiceImpl {
     return this.host().status();
   }
 
-  async isHosting(): Promise<boolean> {
-    return (await getSecret(HOSTING_KEY)) === 'true';
-  }
-
-  //runs while the app is open
+  //a background hub with its tray icon, closing the app leaves it running
   async setHosting(enabled: boolean): Promise<void> {
     if (enabled) await this.host().start();
     else await this.host().stop();
-    await setSecret(HOSTING_KEY, enabled ? 'true' : null);
-  }
-
-  //restarts the hub after an app restart
-  async resumeHosting(): Promise<void> {
-    if (!host || !(await this.isHosting())) return;
-    await host.start().catch((e) => console.warn('[OperaHub] hub did not start:', e));
   }
 
   //pairs with the hub running on this computer

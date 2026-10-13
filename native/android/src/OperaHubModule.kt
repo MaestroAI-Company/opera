@@ -116,6 +116,20 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
     }
 
   @ReactMethod
+  fun renameDevice(deviceKey: String, hub: ReadableMap, id: String, name: String, promise: Promise) =
+    launchPromise(promise) {
+      client(deviceKey).renameDevice(hubFromMap(hub), id, name)
+      null
+    }
+
+  @ReactMethod
+  fun removeDevice(deviceKey: String, hub: ReadableMap, id: String, promise: Promise) =
+    launchPromise(promise) {
+      client(deviceKey).removeDevice(hubFromMap(hub), id)
+      null
+    }
+
+  @ReactMethod
   fun devices(deviceKey: String, hub: ReadableMap, promise: Promise) =
     launchPromise(promise) {
       Arguments.createArray().apply {

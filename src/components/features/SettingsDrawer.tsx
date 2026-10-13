@@ -126,6 +126,7 @@ import {
 } from "../../services/cloud/registry";
 import { CloudSync } from "../../services/CloudSyncService";
 import {
+  HostStatus,
   HubDevice,
   hubErrorCode,
   HubStatus,
@@ -157,6 +158,7 @@ import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 import DrawerSheet from "./DrawerSheet";
 import HubPairingSheet from "./HubPairingSheet";
+import HubQrSheet from "./HubQrSheet";
 import MaestroCard from "./MaestroCard";
 import { BUTTERFLY_OPTIONS, selectButterfly, useMaestroButterfly } from "./maestroButterfly";
 import VoiceEngineCard from "./VoiceEngineCard";
@@ -279,6 +281,12 @@ type SettingsDrawerProps = {
   isLargeScreen?: boolean;
   isDesktop?: boolean;
   initialSubPage?: SubPage;
+  //an opera://hub/pair link to confirm
+  hubPairLink?: string | null;
+  onHubPairLinkHandled?: () => void;
+  //a cloud provider the user agreed to sign in to
+  cloudConnectRequest?: string | null;
+  onCloudConnectHandled?: () => void;
 };
 
 export type SubPage =
@@ -683,6 +691,10 @@ export default function SettingsDrawer({
   isLargeScreen = false,
   isDesktop = false,
   initialSubPage,
+  hubPairLink = null,
+  onHubPairLinkHandled,
+  cloudConnectRequest = null,
+  onCloudConnectHandled,
 }: SettingsDrawerProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -878,11 +890,23 @@ export default function SettingsDrawer({
   const [hubStatus, setHubStatus] = useState<HubStatus | null>(null);
   const [hubDevices, setHubDevices] = useState<HubDevice[] | null>(null);
   const [hubPairingVisible, setHubPairingVisible] = useState(false);
+  const [hubQrVisible, setHubQrVisible] = useState(false);
+  //desktop only, the hub on this computer
+  const [hostStatus, setHostStatus] = useState<HostStatus | null>(null);
+  const [hostBusy, setHostBusy] = useState(false);
+  const [hostError, setHostError] = useState<string | null>(null);
+  const [thisDeviceId, setThisDeviceId] = useState<string | null>(null);
 
   const refreshHub = useCallback(async () => {
     const hub = await OperaHub.getPairedHub();
     setPairedHub(hub);
+    if (OperaHub.canHost()) {
+      setHostStatus(await OperaHub.hostStatus().catch(() => null));
+    }
     if (!hub) return;
+    OperaHub.deviceId()
+      .then(setThisDeviceId)
+      .catch(() => setThisDeviceId(null));
     setHubState("checking");
     try {
       setHubStatus(await OperaHub.status(hub));
@@ -896,9 +920,21 @@ export default function SettingsDrawer({
     }
   }, []);
 
+  //a pairing link opens its confirmation
+  const [prevHubPairLink, setPrevHubPairLink] = useState(hubPairLink);
+  if (hubPairLink !== prevHubPairLink) {
+    setPrevHubPairLink(hubPairLink);
+    if (hubPairLink) setHubPairingVisible(true);
+  }
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the paired hub
+    if (visible && hubPairLink) refreshHub();
+  }, [visible, hubPairLink, refreshHub]);
+
   //open sheets keep the back press for themselves
   const sheetOpen =
     hubPairingVisible ||
+    hubQrVisible ||
     profileEditVisible ||
     addModelSheetVisible ||
     ollamaAddVisible ||
@@ -2626,6 +2662,48 @@ export default function SettingsDrawer({
     );
   };
 
+  const handleHubPaired = () => {
+    setHubPairingVisible(false);
+    onHubPairLinkHandled?.();
+    refreshHub();
+    if (!enabledProviders.includes(HUB_PROVIDER_ID)) {
+      setProviderEnabled(HUB_PROVIDER_ID, true);
+    }
+    HubSync.syncNow().catch((e) => console.warn("[HubSync] first sync failed:", e));
+  };
+
+  const pairWithThisComputer = async () => {
+    try {
+      await OperaHub.pairWithThisComputer();
+      handleHubPaired();
+    } catch (e) {
+      setHostError(t(`hubPairing.error.${hubErrorCode(e)}`));
+    }
+  };
+
+  const joinThisComputerHub = async () => {
+    setHostBusy(true);
+    setHostError(null);
+    await pairWithThisComputer();
+    setHostBusy(false);
+  };
+
+  const setHosting = async (enabled: boolean) => {
+    setHostBusy(true);
+    setHostError(null);
+    try {
+      await OperaHub.setHosting(enabled);
+      //this computer joins its own hub
+      if (enabled && !pairedHub) await pairWithThisComputer();
+    } catch (e) {
+      console.warn("[OperaHub] hosting failed:", e);
+      setHostError(t("settings.hub.hostFailed"));
+    } finally {
+      setHostBusy(false);
+      refreshHub();
+    }
+  };
+
   const handleUnpairHub = () => {
     if (!pairedHub) return;
     showAlert(
@@ -2783,6 +2861,15 @@ export default function SettingsDrawer({
       );
     }
   };
+
+  //starts the sign in the cloud offer asked for
+  useEffect(() => {
+    if (!visible || !cloudConnectRequest) return;
+    onCloudConnectHandled?.();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- runs the sign in the user accepted
+    handleSetCloudProvider(cloudConnectRequest);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per request
+  }, [visible, cloudConnectRequest]);
 
   const refreshLastSync = useCallback(async () => {
     const time = await CloudSync.getLastSyncTime();
@@ -3951,6 +4038,54 @@ export default function SettingsDrawer({
     );
   };
 
+  //the hub this computer runs, once paired with it
+  const renderHubHostSection = () => {
+    if (!OperaHub.canHost() || !hostStatus || !pairedHub) return null;
+    if (pairedHub.id !== hostStatus.id) return null;
+    const byService = hostStatus.running && !hostStatus.embedded;
+    const help = byService
+      ? t("settings.hub.hostService")
+      : hostStatus.running
+        ? t("settings.hub.hostHelp")
+        : t("settings.hub.hostStopped");
+    return (
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>
+            {t("settings.hub.thisComputer")}
+          </Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {hostError ?? help}
+          </Text>
+          <Group>
+            {hostStatus.running ? (
+              <ActionButton
+                icon={HUB_DEVICE_ICONS.phone}
+                label={t("settings.hub.pairDevice")}
+                onPress={() => setHubQrVisible(true)}
+              />
+            ) : (
+              <ActionButton
+                icon={HUB_DEVICE_ICONS.desktop}
+                label={t("settings.hub.host")}
+                disabled={hostBusy}
+                onPress={() => setHosting(true)}
+              />
+            )}
+            {hostStatus.embedded && (
+              <ActionButton
+                icon={cancelIcon}
+                label={t("settings.hub.stopHosting")}
+                disabled={hostBusy}
+                onPress={() => setHosting(false)}
+              />
+            )}
+          </Group>
+        </View>
+      </View>
+    );
+  };
+
   const renderOperaHubSubPage = () => {
     if (!pairedHub) {
       return (
@@ -3962,16 +4097,46 @@ export default function SettingsDrawer({
             <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
               <Text style={styles.settingLabel}>{t("settings.hub.title")}</Text>
               <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-                {t("settings.hub.help")}
+                {hostError ??
+                  (OperaHub.canHost()
+                    ? t("settings.hub.helpDesktop")
+                    : t("settings.hub.help"))}
               </Text>
-              <Group style={styles.highlightGroup}>
-                <ActionButton
-                  icon={cameraIcon}
-                  label={t("settings.hub.pair")}
-                  variant="highlight"
-                  onPress={() => setHubPairingVisible(true)}
-                />
-              </Group>
+              {OperaHub.canHost() ? (
+                //pair with a hub or become one
+                <Group>
+                  <ActionButton
+                    icon={linkIcon}
+                    label={t("settings.hub.pair")}
+                    disabled={hostBusy}
+                    onPress={() => setHubPairingVisible(true)}
+                  />
+                  {hostStatus?.running && !hostStatus.embedded ? (
+                    <ActionButton
+                      icon={HUB_DEVICE_ICONS.desktop}
+                      label={t("settings.hub.useThisComputer")}
+                      disabled={hostBusy}
+                      onPress={joinThisComputerHub}
+                    />
+                  ) : (
+                    <ActionButton
+                      icon={HUB_DEVICE_ICONS.desktop}
+                      label={t("settings.hub.host")}
+                      disabled={hostBusy}
+                      onPress={() => setHosting(true)}
+                    />
+                  )}
+                </Group>
+              ) : (
+                <Group style={styles.highlightGroup}>
+                  <ActionButton
+                    icon={Platform.OS === "web" ? linkIcon : cameraIcon}
+                    label={t("settings.hub.pair")}
+                    variant="highlight"
+                    onPress={() => setHubPairingVisible(true)}
+                  />
+                </Group>
+              )}
             </View>
           </View>
         </View>
@@ -4031,6 +4196,8 @@ export default function SettingsDrawer({
           </View>
         </View>
 
+        {renderHubHostSection()}
+
         {/* connected devices card */}
         {hubState === "online" && (
           <View style={styles.contentCard}>
@@ -4048,7 +4215,11 @@ export default function SettingsDrawer({
                       icon={HUB_DEVICE_ICONS[device.kind] ?? operaIcon}
                       label={device.name}
                       rightElement={
-                        device.lastSeen ? (
+                        device.id === thisDeviceId ? (
+                          <Text style={styles.infoValue} numberOfLines={1}>
+                            {t("settings.hub.thisDevice")}
+                          </Text>
+                        ) : device.lastSeen ? (
                           <Text style={styles.infoValue} numberOfLines={1}>
                             {new Date(
                               device.lastSeen * 1000,
@@ -6690,20 +6861,28 @@ export default function SettingsDrawer({
   //storage switches only once the setup connects
   const CloudSetup = getCloudProviderDefinition(cloudSetupId)?.SetupComponent;
   const hubPairingSheet = hubSupported && (
-    <HubPairingSheet
-      visible={hubPairingVisible}
-      onClose={() => setHubPairingVisible(false)}
-      onPaired={() => {
-        setHubPairingVisible(false);
-        refreshHub();
-        if (!enabledProviders.includes(HUB_PROVIDER_ID)) {
-          setProviderEnabled(HUB_PROVIDER_ID, true);
-        }
-        HubSync.syncNow().catch((e) => console.warn("[HubSync] first sync failed:", e));
-      }}
-      isLargeScreen={isLargeScreen}
-      isDesktop={isDesktop}
-    />
+    <>
+      <HubPairingSheet
+        visible={hubPairingVisible}
+        onClose={() => {
+          setHubPairingVisible(false);
+          onHubPairLinkHandled?.();
+        }}
+        onPaired={handleHubPaired}
+        link={hubPairLink}
+        pairedHub={hubPairLink ? pairedHub : null}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
+      {OperaHub.canHost() && (
+        <HubQrSheet
+          visible={hubQrVisible}
+          onClose={() => setHubQrVisible(false)}
+          isLargeScreen={isLargeScreen}
+          isDesktop={isDesktop}
+        />
+      )}
+    </>
   );
 
   const cloudSetupSheet = (

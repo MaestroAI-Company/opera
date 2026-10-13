@@ -1,5 +1,6 @@
 import { AppState, DeviceEventEmitter } from 'react-native';
 import { AIModule } from '../ai/AIModule';
+import { CloudSync, SharedCloudAccount } from '../CloudSyncService';
 import {
   getOllamaServers,
   getOllamaTuning,
@@ -20,11 +21,14 @@ import { getSecret, setSecret } from '../mcp/mcpStorage';
 import { McpServerConfig } from '../mcp/types';
 import { BASE_DEFAULTS } from '../settings/schema';
 import { AppSettings, Settings } from '../settings/SettingsService';
-import { pullRemoteChanges, pushLocalChanges, resetDataSync } from './hubData';
+import { pullRemoteChanges, pushLocalChanges, queueCloudMerge, resetDataSync } from './hubData';
 import { HUB_URL_SCHEME, HubProvider, OperaHub, PairedHub, SyncRecord } from './OperaHubService';
 
 //cursor and per entry fingerprints
 const STATE_KEYS = { providers: 'opera_hub_sync_state', settings: 'opera_hub_sync_state_settings' } as const;
+const ACCOUNT_STATE_KEY = 'opera_hub_sync_state_accounts';
+//the one cloud backup account
+const CLOUD_ACCOUNT_ID = 'cloud';
 const CHANGE_DEBOUNCE_MS = 3000;
 const WATCH_RETRY_MS = 10000;
 //survives restarts while offline
@@ -39,6 +43,8 @@ const SHARED_SETTINGS = (Object.keys(BASE_DEFAULTS) as (keyof AppSettings)[]).fi
 const ACTIVE_MODEL_KEYS: readonly string[] = ['aiService', 'ollamaUrl', 'ollamaContextLength', 'ollamaKeepAlive'];
 
 type CachedProviders = { hubName: string; providers: HubProvider[] };
+
+type AccountState = { cursor: number; pushedAt: number };
 
 type ProviderEntry =
   | { kind: 'ollama'; server: OllamaServer }
@@ -88,6 +94,8 @@ class HubSyncImpl {
   async init(): Promise<void> {
     if (this.initialized || !OperaHub.isSupported()) return;
     this.initialized = true;
+    //this computer may be the hub itself
+    await OperaHub.resumeHosting();
     const cached = await Settings.getLocal(PROVIDERS_KEY);
     if (cached) {
       const { hubName, providers } = JSON.parse(cached) as CachedProviders;
@@ -101,6 +109,14 @@ class HubSyncImpl {
     };
     DeviceEventEmitter.addListener(AppEvents.settingsChanged, onLocalChange);
     DeviceEventEmitter.addListener(AppEvents.conversationsChanged, onLocalChange);
+    DeviceEventEmitter.addListener(AppEvents.cloudAccountChanged, onLocalChange);
+    DeviceEventEmitter.addListener(AppEvents.cloudMerged, async (touched) => {
+      //a later pairing pushes everything anyway
+      if (!(await OperaHub.getPairedHub())) return;
+      queueCloudMerge(touched)
+        .then(() => this.request(CHANGE_DEBOUNCE_MS))
+        .catch((e) => console.warn('[HubSync] cloud merge not queued:', e));
+    });
     AppState.addEventListener('change', (state) => {
       if (state !== 'active') return;
       this.request(0);
@@ -128,6 +144,7 @@ class HubSyncImpl {
   async forgetHub(): Promise<void> {
     await this.storeProviders([], '');
     for (const key of Object.values(STATE_KEYS)) await setSecret(key, null);
+    await setSecret(ACCOUNT_STATE_KEY, null);
     await resetDataSync();
   }
 
@@ -160,6 +177,7 @@ class HubSyncImpl {
     await this.storeProviders(await OperaHub.providers(hub), hub.name);
     await this.syncFingerprinted(hub, 'providers', await this.providerEntries(), (r) => this.applyProviders(r));
     await this.syncFingerprinted(hub, 'settings', this.settingEntries(), (r) => this.applySettings(r));
+    await this.syncCloudAccount(hub).catch((e) => console.warn('[HubSync] cloud account not shared:', e));
     await pushLocalChanges(hub);
     if (await this.write(() => pullRemoteChanges(hub))) {
       await this.write(async () => DB.notifySynced());
@@ -237,6 +255,40 @@ class HubSyncImpl {
       };
     }
     await setSecret(STATE_KEYS[collection], JSON.stringify(state));
+  }
+
+  //newest linked account wins, by its link time
+  private async syncCloudAccount(hub: PairedHub): Promise<void> {
+    const raw = await getSecret(ACCOUNT_STATE_KEY);
+    const state: AccountState = raw ? JSON.parse(raw) : { cursor: 0, pushedAt: 0 };
+    const changedAt = await CloudSync.getAccountChangedAt();
+    if (changedAt > state.pushedAt) {
+      const account = await CloudSync.exportSharedAccount();
+      await OperaHub.push(hub, 'accounts', [
+        {
+          id: CLOUD_ACCOUNT_ID,
+          updatedAt: changedAt,
+          deleted: !account,
+          payload: account ? JSON.stringify(account) : null,
+        },
+      ]);
+      state.pushedAt = changedAt;
+    }
+
+    let more = true;
+    while (more) {
+      const page = await OperaHub.pull(hub, 'accounts', state.cursor);
+      for (const record of page.records) {
+        //an unlinked account never unlinks the others
+        if (record.id !== CLOUD_ACCOUNT_ID || record.deleted || !record.payload) continue;
+        if (record.updatedAt <= (await CloudSync.getAccountChangedAt())) continue;
+        await CloudSync.receiveSharedAccount(JSON.parse(record.payload) as SharedCloudAccount, record.updatedAt);
+        state.pushedAt = Math.max(state.pushedAt, record.updatedAt);
+      }
+      state.cursor = page.cursor;
+      more = page.more;
+    }
+    await setSecret(ACCOUNT_STATE_KEY, JSON.stringify(state));
   }
 
   private settingEntries(): Map<string, string> {

@@ -8,6 +8,8 @@ import { DB, Conversation, Message, SyncTombstone } from './db/DatabaseService';
 import { Settings, AppSettings } from './settings/SettingsService';
 import { CloudProvider, CloudUserInfo } from './cloud/CloudProvider';
 import { getCloudProviderDefinition } from './cloud/registry';
+import { GoogleDriveProvider } from './cloud/GoogleDriveProvider';
+import { adoptNextcloudConfig, loadNextcloudConfig, NextcloudConfig, NextcloudProvider } from './cloud/NextcloudProvider';
 import { AppEvents } from './events';
 import { OverlayPresence } from './overlay/overlayPresence';
 import * as SecureStore from 'expo-secure-store';
@@ -20,6 +22,9 @@ const LAST_SYNC_TIME_KEY = 'cloud_sync_last_time';
 const LAST_SYNC_SIZE_KEY = 'cloud_sync_last_size';
 const SYNC_PAUSED_KEY = 'cloud_sync_paused';
 const REMOTE_STATE_KEY = 'cloud_sync_remote_state';
+//when this device last linked or changed its account
+const ACCOUNT_CHANGED_AT_KEY = 'cloud_account_changed_at';
+const SHARED_OFFER_KEY = 'cloud_shared_offer';
 
 //a full migration flow (prompt, gating, local snapshot) lives in 78bd429
 const ENC_VERSION = 2;
@@ -36,6 +41,31 @@ const RETRY_MAX_DELAY_MS = 5 * 60 * 1000;
 const MAX_RETRY_ATTEMPTS = 5;
 
 type SyncOutcome = { success: boolean; error?: string; retryable?: boolean };
+
+//rows a cloud merge wrote or deleted
+export type CloudMergeTouched = { conversations: string[]; messages: string[] };
+
+//the account other hub devices reuse
+export type SharedCloudAccount = {
+  provider: string;
+  email: string | null;
+  pin: string | null;
+  //where the credentials work, null for every platform
+  platform: string | null;
+  credentials:
+    | { kind: 'google'; refreshToken: string }
+    | ({ kind: 'nextcloud' } & NextcloudConfig)
+    | null;
+};
+
+//an account this device must sign in to itself
+export type SharedCloudOffer = {
+  provider: string;
+  email: string | null;
+  pin: string | null;
+  //declined offers still fill the pin later
+  declined?: boolean;
+};
 
 //tag and hash of last upload
 type RemoteState = { tag: string; hash: string };
@@ -69,6 +99,8 @@ class CloudSyncServiceImpl {
   //pin check result, spares a second decrypt
   private verifiedDownload: { tag: string; backup: unknown } | null = null;
   private retryAttempt = 0;
+  //applying a shared account must not share it back
+  private adopting = false;
 
   private async setStorageItem(key: string, value: string | null) {
     if (Platform.OS === 'web') {
@@ -189,10 +221,133 @@ class CloudSyncServiceImpl {
       //another account, another remote file
       await this.setRemoteState(null);
       this.retryAttempt = 0;
+      await this.applyOfferedPin(providerName);
+      await this.markAccountChanged();
       await this.setPaused(false);
       return true;
     }
     return false;
+  }
+
+  //accounts linked before sharing existed still count
+  async getAccountChangedAt(): Promise<number> {
+    const stored = await this.getStorageItem(ACCOUNT_CHANGED_AT_KEY);
+    if (stored) return parseInt(stored, 10);
+    return this.provider ? 1 : 0;
+  }
+
+  private async markAccountChanged(): Promise<void> {
+    if (this.adopting) return;
+    await this.setStorageItem(ACCOUNT_CHANGED_AT_KEY, Date.now().toString());
+    DeviceEventEmitter.emit(AppEvents.cloudAccountChanged);
+  }
+
+  //null once this device unlinked its account
+  async exportSharedAccount(): Promise<SharedCloudAccount | null> {
+    const provider = this.provider;
+    if (!provider) return null;
+    const id = provider.getId();
+    const email = (await provider.getUserInfo())?.email ?? null;
+    let platform: string | null = null;
+    let credentials: SharedCloudAccount['credentials'] = null;
+    if (provider instanceof GoogleDriveProvider) {
+      const refreshToken = await provider.exportRefreshToken();
+      //google tokens belong to one platform client
+      if (refreshToken) {
+        platform = Platform.OS;
+        credentials = { kind: 'google', refreshToken };
+      }
+    } else if (provider instanceof NextcloudProvider) {
+      const config = await loadNextcloudConfig();
+      if (config) credentials = { kind: 'nextcloud', ...config };
+    }
+    return { provider: id, email, pin: this.pin, platform, credentials };
+  }
+
+  //another device linked this account
+  async receiveSharedAccount(account: SharedCloudAccount, changedAt: number): Promise<void> {
+    await this.setStorageItem(ACCOUNT_CHANGED_AT_KEY, changedAt.toString());
+    this.adopting = true;
+    try {
+      const current = this.provider;
+      if (current?.getId() === account.provider) {
+        const email = (await current.getUserInfo())?.email ?? null;
+        if (!account.email || email === account.email) {
+          //same account, only the pin can be new
+          if (account.pin && account.pin !== this.pin) await this.verifyAndSetPin(account.pin);
+          return;
+        }
+      }
+      if (!current && (await this.adoptSharedAccount(account))) return;
+    } finally {
+      this.adopting = false;
+    }
+    const offer: SharedCloudOffer = { provider: account.provider, email: account.email, pin: account.pin };
+    await this.setStorageItem(SHARED_OFFER_KEY, JSON.stringify(offer));
+    DeviceEventEmitter.emit(AppEvents.cloudAccountOffered);
+  }
+
+  //false when the credentials do not fit this device
+  private async adoptSharedAccount(account: SharedCloudAccount): Promise<boolean> {
+    const credentials = account.credentials;
+    if (!credentials || (account.platform && account.platform !== Platform.OS)) return false;
+    let provider: CloudProvider;
+    if (credentials.kind === 'google') {
+      const google = new GoogleDriveProvider();
+      if (!(await google.adoptRefreshToken(credentials.refreshToken))) return false;
+      provider = google;
+    } else {
+      const { kind: _kind, ...config } = credentials;
+      await adoptNextcloudConfig(config);
+      provider = new NextcloudProvider();
+      if (!(await provider.authenticate(false))) {
+        await provider.logout();
+        return false;
+      }
+    }
+    this.provider = provider;
+    await this.setStorageItem(CLOUD_PROVIDER_KEY, account.provider);
+    await this.loadPinFor(account.provider);
+    await this.setRemoteState(null);
+    this.retryAttempt = 0;
+    if (account.pin) await this.verifyAndSetPin(account.pin);
+    await this.setPaused(false);
+    DeviceEventEmitter.emit(AppEvents.syncCompleted);
+    return true;
+  }
+
+  async getSharedOffer(): Promise<SharedCloudOffer | null> {
+    const raw = await this.getStorageItem(SHARED_OFFER_KEY);
+    return raw ? (JSON.parse(raw) as SharedCloudOffer) : null;
+  }
+
+  async dismissSharedOffer(): Promise<void> {
+    await this.setStorageItem(SHARED_OFFER_KEY, null);
+  }
+
+  async declineSharedOffer(): Promise<void> {
+    const offer = await this.getSharedOffer();
+    if (offer) await this.setStorageItem(SHARED_OFFER_KEY, JSON.stringify({ ...offer, declined: true }));
+  }
+
+  //a linked account of the same provider would block the sign in
+  async prepareSharedOffer(offer: SharedCloudOffer): Promise<void> {
+    if (this.provider?.getId() === offer.provider) await this.disconnect();
+  }
+
+  //the shared pin unlocks the backup without typing it
+  private async applyOfferedPin(providerName: string): Promise<void> {
+    const offer = await this.getSharedOffer();
+    if (!offer || offer.provider !== providerName) return;
+    await this.dismissSharedOffer();
+    if (offer.pin && offer.pin !== this.pin) {
+      this.adopting = true;
+      try {
+        await this.verifyAndSetPin(offer.pin);
+      } finally {
+        this.adopting = false;
+      }
+    }
   }
 
   //unlinks the account for good
@@ -210,6 +365,7 @@ class CloudSyncServiceImpl {
     await this.setStorageItem(LAST_SYNC_TIME_KEY, null);
     await this.setStorageItem(LAST_SYNC_SIZE_KEY, null);
     await this.setPaused(false);
+    await this.markAccountChanged();
   }
 
   private async setPaused(paused: boolean): Promise<void> {
@@ -246,6 +402,7 @@ class CloudSyncServiceImpl {
     if (providerName) {
       await this.setStorageItem(this.pinKey(providerName), pin);
     }
+    await this.markAccountChanged();
   }
 
   hasPin(): boolean {
@@ -585,9 +742,12 @@ class CloudSyncServiceImpl {
         const backupToMerge = cloudBackup;
         this.isMerging = true;
         try {
-          await DB.runSilently(() => this.mergeCloudIntoLocal(backupToMerge));
+          const touched = await DB.runSilently(() => this.mergeCloudIntoLocal(backupToMerge));
           //one notification for the merge
           DeviceEventEmitter.emit(AppEvents.conversationsChanged);
+          if (touched.conversations.length > 0 || touched.messages.length > 0) {
+            DeviceEventEmitter.emit(AppEvents.cloudMerged, touched);
+          }
         } finally {
           this.isMerging = false;
         }
@@ -637,7 +797,8 @@ class CloudSyncServiceImpl {
     }
   }
 
-  private async mergeCloudIntoLocal(cloudBackup: BackupData): Promise<void> {
+  private async mergeCloudIntoLocal(cloudBackup: BackupData): Promise<CloudMergeTouched> {
+    const touched = { conversations: new Set<string>(), messages: new Set<string>() };
     //merge settings (last-write-wins, exclude device specific)
     const localSettingsUpdatedAt = await Settings.getSettingsUpdatedAt();
     const cloudSettingsUpdatedAt = cloudBackup.settingsUpdatedAt ?? 0;
@@ -690,6 +851,7 @@ class CloudSyncServiceImpl {
       const t = tombByKey.get('conversation:' + conv.id);
       if (t && t.deletedAt >= conv.updatedAt) {
         await DB.deleteConversation(conv.id, { recordTombstone: false });
+        touched.conversations.add(conv.id);
         localConvsMap.delete(conv.id);
         localMsgsByConv.delete(conv.id);
       }
@@ -698,6 +860,7 @@ class CloudSyncServiceImpl {
       const t = tombByKey.get('message:' + msg.id);
       if (t && t.deletedAt >= msg.createdAt) {
         await DB.deleteMessage(msg.id, { recordTombstone: false });
+        touched.messages.add(msg.id);
       }
     }
 
@@ -716,6 +879,7 @@ class CloudSyncServiceImpl {
           return !(mt && mt.deletedAt >= m.createdAt);
         });
         await DB.replaceConversationWithMessages(cloudConv, msgs);
+        touched.conversations.add(cloudConv.id);
         continue;
       }
 
@@ -754,12 +918,14 @@ class CloudSyncServiceImpl {
 
       if (changed) {
         await DB.replaceConversationWithMessages(mergedConv, finalMsgs);
+        touched.conversations.add(mergedConv.id);
       }
     }
 
     //persist merged tombstones (keep any newer recorded during deletes above)
     const freshTombstones = await DB.getTombstones();
     await DB.setTombstones(this.unionTombstones(mergedTombstones, freshTombstones));
+    return { conversations: [...touched.conversations], messages: [...touched.messages] };
   }
 
   private unionTombstones(a: SyncTombstone[], b: SyncTombstone[]): SyncTombstone[] {

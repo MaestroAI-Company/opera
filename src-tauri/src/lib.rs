@@ -1,3 +1,5 @@
+#[cfg(desktop)]
+mod hub;
 mod webview_task;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -6,7 +8,9 @@ pub fn run() {
 
     #[cfg(desktop)]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}));
+        builder = builder
+            .plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}))
+            .manage(hub::HubState::default());
     }
 
     builder = builder
@@ -15,7 +19,47 @@ pub fn run() {
         .plugin(tauri_plugin_oauth::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .invoke_handler(tauri::generate_handler![webview_task::webview_task])
+        .invoke_handler(tauri::generate_handler![
+            webview_task::webview_task,
+            #[cfg(desktop)]
+            hub::hub_device_id,
+            #[cfg(desktop)]
+            hub::hub_pair,
+            #[cfg(desktop)]
+            hub::hub_status,
+            #[cfg(desktop)]
+            hub::hub_unpair,
+            #[cfg(desktop)]
+            hub::hub_devices,
+            #[cfg(desktop)]
+            hub::hub_push,
+            #[cfg(desktop)]
+            hub::hub_pull,
+            #[cfg(desktop)]
+            hub::hub_watch,
+            #[cfg(desktop)]
+            hub::hub_put_grant,
+            #[cfg(desktop)]
+            hub::hub_access_token,
+            #[cfg(desktop)]
+            hub::hub_drop_grant,
+            #[cfg(desktop)]
+            hub::hub_providers,
+            #[cfg(desktop)]
+            hub::hub_start_proxy,
+            #[cfg(desktop)]
+            hub::hub_host_status,
+            #[cfg(desktop)]
+            hub::hub_host_start,
+            #[cfg(desktop)]
+            hub::hub_host_stop,
+            #[cfg(desktop)]
+            hub::hub_host_pairing_link,
+            #[cfg(desktop)]
+            hub::hub_host_pairing_qr,
+            #[cfg(desktop)]
+            hub::hub_computer_name,
+        ])
         .setup(|app| {
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             {
@@ -65,6 +109,19 @@ pub fn run() {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
                         .level(log::LevelFilter::Info)
+                        //the hub network logs every packet
+                        .filter(|meta| {
+                            const NOISY: [&str; 6] = [
+                                "iroh",
+                                "noq",
+                                "netwatch",
+                                "portmapper",
+                                "tracing::span",
+                                "hickory",
+                            ];
+                            meta.level() <= log::Level::Warn
+                                || !NOISY.iter().any(|t| meta.target().starts_with(t))
+                        })
                         .build(),
                 )?;
             }

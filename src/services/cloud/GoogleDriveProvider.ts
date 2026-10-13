@@ -274,6 +274,22 @@ export class GoogleDriveProvider implements CloudProvider {
     await this.setStorageItem(TOKEN_EXPIRY_KEY, null);
   }
 
+  //only app logins hold one, web logins expire
+  async exportRefreshToken(): Promise<string | null> {
+    await this.loadTokens();
+    return this.refreshToken;
+  }
+
+  //a login shared by another device of this platform
+  async adoptRefreshToken(refreshToken: string): Promise<boolean> {
+    this.accessToken = null;
+    this.tokenExpiry = null;
+    this.refreshToken = refreshToken;
+    if (await this.refreshAccessToken()) return true;
+    await this.logout();
+    return false;
+  }
+
   async persistRedirectTokens(accessToken: string, expiresIn: number): Promise<void> {
     await this.saveTokens(accessToken, undefined, expiresIn);
   }

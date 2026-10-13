@@ -91,7 +91,8 @@ import {
 } from "../services/ai/providers/sources";
 import { resolveQuickFlow } from "../services/ai/quickFlow";
 import { arrayBufferToBase64 } from "../services/ai/utils/base64";
-import { CloudSync } from "../services/CloudSyncService";
+import { CloudSync, SharedCloudOffer } from "../services/CloudSyncService";
+import { getCloudProviderDefinition } from "../services/cloud/registry";
 import { HubSync } from "../services/hub/HubSync";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
 import {
@@ -372,6 +373,11 @@ export default function Index() {
   const modelSelectorProgress = useAnimatedValue(0);
   const [settingsInitialSubPage, setSettingsInitialSubPage] =
     useState<SubPage>("main");
+  //a cloud another device uses, to sign in here
+  const [cloudOffer, setCloudOffer] = useState<SharedCloudOffer | null>(null);
+  const [cloudConnectRequest, setCloudConnectRequest] = useState<string | null>(null);
+  //a hub pairing link waiting for confirmation
+  const [hubPairLink, setHubPairLink] = useState<string | null>(null);
   const [dbReady, setDbReady] = useState(false);
   const [dbFailed, setDbFailed] = useState(false);
   const [showDataWarning, setShowDataWarning] = useState(false);
@@ -1112,6 +1118,17 @@ useEffect(() => {
       AppEvents.openCodePreview,
       setPreviewCode,
     );
+    const showCloudOffer = () => {
+      CloudSync.getSharedOffer().then((offer) => {
+        if (offer && !offer.declined) setCloudOffer(offer);
+      });
+    };
+    const cloudOfferSub = DeviceEventEmitter.addListener(
+      AppEvents.cloudAccountOffered,
+      showCloudOffer,
+    );
+    //an offer may land before this screen
+    showCloudOffer();
 
     return () => {
       if (reloadTimer) clearTimeout(reloadTimer);
@@ -1120,6 +1137,7 @@ useEffect(() => {
       settingsSub.remove();
       modelSelectorSub.remove();
       codePreviewSub.remove();
+      cloudOfferSub.remove();
     };
   }, [dbReady, loadConversations, openDrawerSafely]);
 
@@ -1245,6 +1263,13 @@ useEffect(() => {
       } else if (route.type === "settings") {
         openDrawerSafely(() => {
           setSettingsInitialSubPage("main");
+          setSettingsDrawerVisible(true);
+        });
+      } else if (route.type === "hub-pair") {
+        //the drawer asks before pairing
+        openDrawerSafely(() => {
+          setHubPairLink(route.link);
+          setSettingsInitialSubPage("operahub");
           setSettingsDrawerVisible(true);
         });
       }
@@ -2100,6 +2125,10 @@ useEffect(() => {
       isDesktop={isDesktop}
       visible={settingsDrawerVisible}
       initialSubPage={settingsInitialSubPage}
+      hubPairLink={hubPairLink}
+      onHubPairLinkHandled={() => setHubPairLink(null)}
+      cloudConnectRequest={cloudConnectRequest}
+      onCloudConnectHandled={() => setCloudConnectRequest(null)}
       onClose={closeSettings}
       onDataChanged={async () => {
         await loadConversations();
@@ -2488,6 +2517,55 @@ useEffect(() => {
         }
         onClose={() => setShareNotice(null)}
         buttons={shareNoticeButtons}
+      />
+
+      <NotificationModal
+        visible={!!cloudOffer}
+        title={t("cloudOffer.title")}
+        message={
+          cloudOffer
+            ? t(
+                CloudSync.getProviderName() === "none"
+                  ? "cloudOffer.message"
+                  : "cloudOffer.switchMessage",
+                {
+                  provider:
+                    getCloudProviderDefinition(cloudOffer.provider)?.label ??
+                    cloudOffer.provider,
+                  account: cloudOffer.email ? ` (${cloudOffer.email})` : "",
+                },
+              )
+            : undefined
+        }
+        onClose={() => setCloudOffer(null)}
+        buttons={[
+          {
+            text: t("cloudOffer.later"),
+            style: "secondary",
+            onPress: () => {
+              CloudSync.declineSharedOffer();
+              setCloudOffer(null);
+            },
+          },
+          {
+            text:
+              CloudSync.getProviderName() === "none"
+                ? t("cloudOffer.connect")
+                : t("cloudOffer.switch"),
+            style: "primary",
+            onPress: async () => {
+              const offer = cloudOffer;
+              setCloudOffer(null);
+              if (!offer) return;
+              await CloudSync.prepareSharedOffer(offer);
+              openDrawerSafely(() => {
+                setCloudConnectRequest(offer.provider);
+                setSettingsInitialSubPage("cloud");
+                setSettingsDrawerVisible(true);
+              });
+            },
+          },
+        ]}
       />
 
       <NotificationModal

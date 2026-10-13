@@ -69,6 +69,11 @@ async function saveNextcloudConfig(config: NextcloudConfig | null): Promise<void
   await setStorageItem(PASSWORD_KEY, config?.password || null);
 }
 
+//app passwords work on every platform
+export async function adoptNextcloudConfig(config: NextcloudConfig): Promise<void> {
+  await saveNextcloudConfig(config);
+}
+
 type LoginFlowPoll = { token: string; endpoint: string };
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));

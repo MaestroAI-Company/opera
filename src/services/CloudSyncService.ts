@@ -819,6 +819,7 @@ class CloudSyncServiceImpl {
         mergedSettings.mcpServers = cloudBackup.settings.mcpServers;
       }
       await Settings.applyCloudSettings(mergedSettings);
+      DeviceEventEmitter.emit(AppEvents.settingsSynced);
       mergedSettingsUpdatedAt = cloudSettingsUpdatedAt;
     }
     await Settings.setSettingsUpdatedAt(mergedSettingsUpdatedAt);

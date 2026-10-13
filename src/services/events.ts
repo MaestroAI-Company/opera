@@ -4,6 +4,8 @@ export const AppEvents = {
   conversationsChanged: 'CONVERSATIONS_CHANGED',
   //a user setting was written
   settingsChanged: 'SETTINGS_CHANGED',
+  //another device wrote settings through sync
+  settingsSynced: 'SETTINGS_SYNCED',
   syncCompleted: 'SYNC_COMPLETED',
   //cloud rows keep old dates, the hub must still get them
   cloudMerged: 'CLOUD_MERGED',

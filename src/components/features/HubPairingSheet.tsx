@@ -131,6 +131,7 @@ export default function HubPairingSheet({
     try {
       onPaired(await pair(value.trim()));
     } catch (e) {
+      console.warn("[HubPairing] pairing failed:", e);
       setError(t(`hubPairing.error.${hubErrorCode(e)}`));
       setErrorRow("code");
     } finally {

@@ -4,7 +4,7 @@ import { NativeModules, Platform } from 'react-native';
 import { getSecret, setSecret } from '../mcp/mcpStorage';
 
 export type PairedHub = { id: string; name: string; relays: string[] };
-export type HubStatus = { name: string; version: string; direct: boolean };
+export type HubStatus = { name: string; version: string; direct: boolean; update?: string | null };
 export type HubDevice = {
   id: string;
   name: string;
@@ -53,6 +53,7 @@ type NativeHub = {
   setHubSettings?(deviceKey: string, hub: PairedHub, settings: HubSettings): Promise<HubSettings>;
   //browsers cannot use multicast
   nearbyHubs?(deviceKey: string, waitMs: number): Promise<NearbyHub[]>;
+  updateHub?(deviceKey: string, hub: PairedHub): Promise<string>;
   status(deviceKey: string, hub: PairedHub): Promise<HubStatus>;
   unpair(deviceKey: string, hub: PairedHub): Promise<void>;
   devices(deviceKey: string, hub: PairedHub): Promise<HubDevice[]>;
@@ -93,6 +94,7 @@ const tauriHub: NativeHub = {
   hubSettings: (deviceKey, hub) => invoke('hub_settings', { deviceKey, hub }),
   setHubSettings: (deviceKey, hub, settings) => invoke('hub_set_settings', { deviceKey, hub, settings }),
   nearbyHubs: (deviceKey, waitMs) => invoke('hub_nearby', { deviceKey, waitMs }),
+  updateHub: (deviceKey, hub) => invoke('hub_update', { deviceKey, hub }),
   status: (deviceKey, hub) => invoke('hub_status', { deviceKey, hub }),
   unpair: (deviceKey, hub) => invoke('hub_unpair', { deviceKey, hub }),
   devices: (deviceKey, hub) => invoke('hub_devices', { deviceKey, hub }),
@@ -291,6 +293,23 @@ class OperaHubServiceImpl {
   async nearbyHubs(waitMs = NEARBY_WAIT_MS): Promise<NearbyHub[]> {
     const nearby = this.native().nearbyHubs;
     return nearby ? nearby(await this.deviceKey(), waitMs) : [];
+  }
+
+  //browsers lack the admin scope
+  canUpdateHub(): boolean {
+    return !!native?.updateHub;
+  }
+
+  //the hub on this computer opens its installer, others update themselves
+  async updateHub(hub: PairedHub, version: string): Promise<void> {
+    if (host) {
+      const local = await host.status().catch(() => null);
+      const byService = local?.id === hub.id && local.running && !local.embedded;
+      if (byService && (await invoke<boolean>('hub_install_update', { version }))) return;
+    }
+    const update = this.native().updateHub;
+    if (!update) throw Object.assign(new Error('Hub updates need the app'), { code: 'Unauthorized' });
+    await update(await this.deviceKey(), hub);
   }
 
   async hubSettings(hub: PairedHub): Promise<HubSettings | null> {

@@ -132,6 +132,31 @@ pub async fn hub_nearby(
 }
 
 #[tauri::command]
+pub async fn hub_update(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<String, HubError> {
+    state.client(&device_key).await?.update_hub(hub).await
+}
+
+//false where the hub swaps its own binaries
+#[tauri::command]
+pub async fn hub_install_update(version: String) -> Result<bool, String> {
+    if !cfg!(windows) {
+        return Ok(false);
+    }
+    let http = opera_hub::secrets::http_client().map_err(host_error)?;
+    let installer = opera_hub::update::download_installer(&http, &version)
+        .await
+        .map_err(host_error)?;
+    std::process::Command::new(installer)
+        .spawn()
+        .map_err(host_error)?;
+    Ok(true)
+}
+
+#[tauri::command]
 pub fn hub_qr_svg(text: String, dark: String, light: String) -> Result<String, HubError> {
     opera_hub_client::qr_svg(text, dark, light)
 }

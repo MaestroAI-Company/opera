@@ -47,8 +47,13 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
         putString("name", status.name)
         putString("version", status.version)
         putBoolean("direct", status.direct)
+        putString("update", status.update)
       }
     }
+
+  @ReactMethod
+  fun updateHub(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) { client(deviceKey).updateHub(hubFromMap(hub)) }
 
   @ReactMethod
   fun pairWithCode(deviceKey: String, code: String, deviceName: String, kind: String, promise: Promise) =

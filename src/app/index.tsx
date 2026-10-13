@@ -94,6 +94,7 @@ import { arrayBufferToBase64 } from "../services/ai/utils/base64";
 import { CloudSync, SharedCloudOffer } from "../services/CloudSyncService";
 import { getCloudProviderDefinition } from "../services/cloud/registry";
 import { HubSync } from "../services/hub/HubSync";
+import { OperaHub, PairedHub } from "../services/hub/OperaHubService";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
 import {
   getInitialDeepLink,
@@ -373,6 +374,13 @@ export default function Index() {
   const modelSelectorProgress = useAnimatedValue(0);
   const [settingsInitialSubPage, setSettingsInitialSubPage] =
     useState<SubPage>("main");
+  //a hub release waiting for the user
+  const [hubUpdate, setHubUpdate] = useState<{
+    hub: PairedHub;
+    version: string;
+    current: string;
+  } | null>(null);
+  const [hubUpdateError, setHubUpdateError] = useState<string | null>(null);
   //a cloud another device uses, to sign in here
   const [cloudOffer, setCloudOffer] = useState<SharedCloudOffer | null>(null);
   const [cloudConnectRequest, setCloudConnectRequest] = useState<string | null>(null);
@@ -1127,6 +1135,10 @@ useEffect(() => {
       AppEvents.cloudAccountOffered,
       showCloudOffer,
     );
+    const hubUpdateSub = DeviceEventEmitter.addListener(
+      AppEvents.hubUpdateAvailable,
+      setHubUpdate,
+    );
     //an offer may land before this screen
     showCloudOffer();
 
@@ -1138,6 +1150,7 @@ useEffect(() => {
       modelSelectorSub.remove();
       codePreviewSub.remove();
       cloudOfferSub.remove();
+      hubUpdateSub.remove();
     };
   }, [dbReady, loadConversations, openDrawerSafely]);
 
@@ -2517,6 +2530,60 @@ useEffect(() => {
         }
         onClose={() => setShareNotice(null)}
         buttons={shareNoticeButtons}
+      />
+
+      <NotificationModal
+        visible={!!hubUpdate}
+        title={t("hubUpdate.title")}
+        message={
+          hubUpdate
+            ? t("hubUpdate.message", {
+                version: hubUpdate.version,
+                current: hubUpdate.current,
+              })
+            : undefined
+        }
+        onClose={() => setHubUpdate(null)}
+        buttons={[
+          {
+            text: t("hubUpdate.later"),
+            style: "secondary",
+            onPress: () => {
+              if (hubUpdate) HubSync.declineUpdate(hubUpdate.version);
+              setHubUpdate(null);
+            },
+          },
+          {
+            text: t("hubUpdate.install"),
+            style: "primary",
+            onPress: () => {
+              const update = hubUpdate;
+              setHubUpdate(null);
+              if (!update) return;
+              OperaHub.updateHub(update.hub, update.version).catch((e: Error) =>
+                setHubUpdateError(e?.message ?? String(e)),
+              );
+            },
+          },
+        ]}
+      />
+
+      <NotificationModal
+        visible={!!hubUpdateError}
+        title={t("hubUpdate.title")}
+        message={
+          hubUpdateError
+            ? t("hubUpdate.failed", { error: hubUpdateError })
+            : undefined
+        }
+        onClose={() => setHubUpdateError(null)}
+        buttons={[
+          {
+            text: t("common.ok"),
+            style: "primary",
+            onPress: () => setHubUpdateError(null),
+          },
+        ]}
       />
 
       <NotificationModal

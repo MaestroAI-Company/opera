@@ -11,6 +11,8 @@ export const AppEvents = {
   cloudAccountChanged: 'CLOUD_ACCOUNT_CHANGED',
   //another device uses a cloud this one cannot reuse
   cloudAccountOffered: 'CLOUD_ACCOUNT_OFFERED',
+  //the paired hub can install a newer release
+  hubUpdateAvailable: 'HUB_UPDATE_AVAILABLE',
   syncPinInvalidated: 'SYNC_PIN_INVALIDATED',
   overlayReopened: 'OVERLAY_REOPENED',
   //user left the overlay via home

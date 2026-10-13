@@ -157,9 +157,8 @@ export function HubModelPage({ file, onDeleted }: { file: string; onDeleted: () 
   const [error, setError] = useState<string | null>(null);
 
   const name = hubModelName(file, catalog);
-  const size = status?.installed.find((m) => m.file === file)?.size;
-  //only catalog models remember their repo
-  const repo = catalog.find((m) => m.file === file)?.repo;
+  const model = status?.installed.find((m) => m.file === file);
+  const repo = model?.repo ?? catalog.find((m) => m.file === file)?.repo;
   const [description, setDescription] = useState<{ repo: string; text: string | null } | null>(null);
 
   useEffect(() => {
@@ -190,14 +189,14 @@ export function HubModelPage({ file, onDeleted }: { file: string; onDeleted: () 
       <View style={styles.contentCard}>
         <View style={styles.detailHeader}>
           <View style={styles.detailTile}>
-            <Image source={{ uri: hubModelAvatar(name) }} style={styles.tileImage} />
+            <Image source={{ uri: hubModelAvatar(name, repo) }} style={styles.tileImage} />
           </View>
           <View style={styles.detailInfo}>
             <Text style={styles.detailName}>{name}</Text>
             {!!hubModelPublisher(name) && (
               <Text style={styles.detailMeta}>{hubModelPublisher(name)!.publisher}</Text>
             )}
-            {size !== undefined && <Text style={styles.detailMeta}>{formatBytes(size)}</Text>}
+            {!!model && <Text style={styles.detailMeta}>{formatBytes(model.size)}</Text>}
             <Text style={styles.detailMeta}>{file}</Text>
           </View>
         </View>

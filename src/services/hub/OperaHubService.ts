@@ -34,15 +34,17 @@ export type HubInvite = { code: string; link: string };
 export type HubSettings = { lanDiscovery: boolean; shareProviders: boolean };
 export type NearbyHub = { id: string; name: string; addrs: string[] };
 //llama.cpp models on the hub
-export type CatalogModel = { repo: string; file: string; name: string; description: string; size: number };
+export type CatalogModel = { repo: string; file: string; name: string; size: number };
 export type ModelRepo = { repo: string; downloads: number };
 export type ModelFile = { file: string; size: number };
+//repo is unknown for files copied by hand
+export type InstalledModel = ModelFile & { repo?: string | null };
 export type ModelDownload = { repo: string; file: string; received: number; total: number; error?: string | null };
 export type LlamaStatus = {
   state: 'idle' | 'installing' | 'running' | 'failed';
   backend?: string | null;
   message?: string | null;
-  installed: ModelFile[];
+  installed: InstalledModel[];
   downloads: ModelDownload[];
 };
 export type HubErrorCode =

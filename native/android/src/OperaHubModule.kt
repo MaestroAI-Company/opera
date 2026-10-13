@@ -116,7 +116,6 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
             putString("repo", model.repo)
             putString("file", model.file)
             putString("name", model.name)
-            putString("description", model.description)
             putDouble("size", model.size.toDouble())
           })
         }
@@ -345,7 +344,13 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
       putString("backend", status.backend)
       putString("message", status.message)
       putArray("installed", Arguments.createArray().apply {
-        for (file in status.installed) pushMap(fileToMap(file))
+        for (model in status.installed) {
+          pushMap(Arguments.createMap().apply {
+            putString("file", model.file)
+            putDouble("size", model.size.toDouble())
+            putString("repo", model.repo)
+          })
+        }
       })
       putArray("downloads", Arguments.createArray().apply {
         for (download in status.downloads) {

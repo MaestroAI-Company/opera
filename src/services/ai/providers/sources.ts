@@ -279,7 +279,7 @@ export function buildSources(localAvailable: boolean): ModelSource[] {
     sources.push(...serverSources(OPENAI_PROVIDER_ID, getOpenAIServers(), t('settings.service.cloudapi')));
   }
   if (isProviderSupported(HUB_PROVIDER_ID) && enabled.includes(HUB_PROVIDER_ID)) {
-    sources.push(...serverSources(HUB_PROVIDER_ID, getHubServers(), 'Opera Hub'));
+    sources.push(...serverSources(HUB_PROVIDER_ID, getHubServers(), 'Sampler'));
   }
   return sources;
 }

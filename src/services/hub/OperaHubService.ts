@@ -218,7 +218,7 @@ async function loadWebModule(): Promise<WebModule> {
   });
   return webModule.catch((e) => {
     webModule = null;
-    throw Object.assign(new Error(`Opera Hub web client missing: ${e}`), { code: 'Internal' });
+    throw Object.assign(new Error(`Sampler web client missing: ${e}`), { code: 'Internal' });
   });
 }
 
@@ -351,7 +351,7 @@ class OperaHubServiceImpl {
     const native = this.native();
     const key = await this.deviceKey();
     const hub = await this.getPairedHub();
-    if (!hub || !native.modelsStatus) throw Object.assign(new Error('No Opera Hub paired'), { code: 'Unauthorized' });
+    if (!hub || !native.modelsStatus) throw Object.assign(new Error('No Sampler paired'), { code: 'Unauthorized' });
     return {
       catalog: () => native.modelsCatalog!(key, hub),
       search: (query) => native.modelsSearch!(key, hub, query),
@@ -479,7 +479,7 @@ class OperaHubServiceImpl {
   //browsers send provider requests through the tunnel
   async fetchThroughHub(url: string, init?: RequestInit): Promise<Response> {
     const hub = await this.getPairedHub();
-    if (!hub) throw Object.assign(new Error('No Opera Hub paired'), { code: 'Unauthorized' });
+    if (!hub) throw Object.assign(new Error('No Sampler paired'), { code: 'Unauthorized' });
     const client = await loadWebClient(await this.deviceKey());
     const [provider, ...rest] = url.slice(HUB_URL_SCHEME.length).split('/');
     const response = await client.forward(
@@ -507,7 +507,7 @@ class OperaHubServiceImpl {
   //maps hub urls to the local proxy
   async resolveUrl(url: string): Promise<string> {
     const hub = await this.getPairedHub();
-    if (!hub) throw Object.assign(new Error('No Opera Hub paired'), { code: 'Unauthorized' });
+    if (!hub) throw Object.assign(new Error('No Sampler paired'), { code: 'Unauthorized' });
     const { port, token } = await this.native().startProxy(await this.deviceKey(), hub);
     return `http://127.0.0.1:${port}/${token}/${url.slice(HUB_URL_SCHEME.length)}`;
   }
@@ -538,7 +538,7 @@ class OperaHubServiceImpl {
   }
 
   private native(): NativeHub {
-    if (!native) throw Object.assign(new Error('Opera Hub is not available'), { code: 'Internal' });
+    if (!native) throw Object.assign(new Error('Sampler is not available'), { code: 'Internal' });
     return native;
   }
 

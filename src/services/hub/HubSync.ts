@@ -365,8 +365,11 @@ class HubSyncImpl {
         patch[record.id] = JSON.parse(record.payload);
       }
     }
-    //a provider this device lacks keeps the local model
-    if (typeof patch.aiService === 'string' && !isProviderSupported(patch.aiService)) {
+    //a provider or server this device lacks keeps the local model
+    const url = typeof patch.ollamaUrl === 'string' ? patch.ollamaUrl.trim() : '';
+    const knownUrl =
+      !url || isHubUrl(url) || [...getOllamaServers(), ...getOpenAIServers()].some((s) => s.url === url);
+    if (!knownUrl || (typeof patch.aiService === 'string' && !isProviderSupported(patch.aiService))) {
       delete patch.aiService;
       delete patch.ollamaUrl;
       delete patch.ollamaModel;

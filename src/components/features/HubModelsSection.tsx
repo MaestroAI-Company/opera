@@ -1,128 +1,56 @@
-import { useCallback, useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Image, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import {
+  hubModelAvatar,
+  hubModelName,
+  hubModelPublisher,
+  runHubModels,
+  useHubModels,
+} from "../../hooks/useHubModels";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
-import { formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
-import {
-  CatalogModel,
-  HubModels,
-  LlamaStatus,
-  ModelFile,
-  ModelRepo,
-  OperaHub,
-} from "../../services/hub/OperaHubService";
+import { fetchModelDescription, formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 import { pressStyle } from "../ui/pressStyle";
-import TextInputField from "../ui/TextInputField";
 
-const searchIcon = require("../../../assets/icons/search.png");
-const serverIcon = require("../../../assets/icons/server.png");
-const downloadIcon = require("../../../assets/icons/download.png");
-
-//fast while something moves, idle otherwise
-const BUSY_POLL_MS = 1500;
-const IDLE_POLL_MS = 10000;
+const addIcon = require("../../../assets/icons/add.png");
+const binIcon = require("../../../assets/icons/bin.png");
 
 type Card = { key: string; title: string; status: string; error?: boolean; onPress: () => void };
-type Confirm = { title: string; message: string; action: string; danger?: boolean; run: () => Promise<unknown> };
 
-const stem = (file: string) => file.replace(/\.gguf$/, "");
+type HubModelsSectionProps = {
+  onAddModel: () => void;
+  onOpenModel: (file: string, name: string) => void;
+};
 
 //llama.cpp models the hub runs, admins only
-export default function HubModelsSection() {
+export default function HubModelsSection({ onAddModel, onOpenModel }: HubModelsSectionProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
-  const [models, setModels] = useState<HubModels | null>(null);
-  const [status, setStatus] = useState<LlamaStatus | null>(null);
-  const [catalog, setCatalog] = useState<CatalogModel[]>([]);
-  const [query, setQuery] = useState("");
-  const [repos, setRepos] = useState<ModelRepo[] | null>(null);
-  const [repo, setRepo] = useState<string | null>(null);
-  const [files, setFiles] = useState<ModelFile[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<Confirm | null>(null);
+  const { api, status, catalog, error } = useHubModels();
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [cancelFile, setCancelFile] = useState<string | null>(null);
   const [gridWidth, setGridWidth] = useState(0);
 
-  const fail = useCallback(
-    (e: unknown) => setError(t("hubModels.failed", { error: e instanceof Error ? e.message : String(e) })),
-    [t],
-  );
+  const message = (e: unknown) => t("hubModels.failed", { error: e instanceof Error ? e.message : String(e) });
 
-  useEffect(() => {
-    let cancelled = false;
-    OperaHub.models()
-      .then(async (api) => {
-        const [first, list] = await Promise.all([api.status(), api.catalog()]);
-        if (cancelled) return;
-        setModels(api);
-        setStatus(first);
-        setCatalog(list);
-      })
-      .catch((e) => !cancelled && fail(e));
-    return () => {
-      cancelled = true;
-    };
-  }, [fail]);
-
-  const busy = !!status && (status.state === "installing" || status.downloads.some((d) => !d.error));
-  useEffect(() => {
-    if (!models) return;
-    const timer = setInterval(
-      () => models.status().then(setStatus).catch(() => {}),
-      busy ? BUSY_POLL_MS : IDLE_POLL_MS,
-    );
-    return () => clearInterval(timer);
-  }, [models, busy]);
-
-  const act = async (run: () => Promise<LlamaStatus>) => {
-    setConfirm(null);
-    setError(null);
+  const cancel = async () => {
+    const file = cancelFile;
+    setCancelFile(null);
+    if (!file) return;
+    setActionError(null);
     try {
-      setStatus(await run());
+      await runHubModels((models) => models.cancel(file));
     } catch (e) {
-      fail(e);
+      setActionError(message(e));
     }
   };
 
-  const askDownload = (repoId: string, file: string, size: number, name = stem(file)) =>
-    setConfirm({
-      title: t("hubModels.downloadTitle", { name }),
-      message: t("hubModels.downloadMessage", { size: formatBytes(size) }),
-      action: t("hubModels.download"),
-      run: () => act(() => models!.download(repoId, file)),
-    });
-
-  const search = async () => {
-    if (!models || !query.trim()) return;
-    setError(null);
-    setRepo(null);
-    setFiles(null);
-    try {
-      setRepos(await models.search(query.trim()));
-    } catch (e) {
-      fail(e);
-    }
-  };
-
-  const openRepo = async (id: string) => {
-    if (!models) return;
-    setRepo(id);
-    setFiles(null);
-    try {
-      setFiles(await models.files(id));
-    } catch (e) {
-      fail(e);
-    }
-  };
-
-  const installed = new Set(status?.installed.map((m) => m.file));
-  const downloading = new Set(status?.downloads.map((d) => d.file));
-  const nameOf = (file: string) => catalog.find((m) => m.file === file)?.name ?? stem(file);
-
-  const ownCards: Card[] = [
+  const nameOf = (file: string) => hubModelName(file, catalog);
+  const cards: Card[] = [
     ...(status?.downloads ?? []).map((d) => ({
       key: `download-${d.file}`,
       title: nameOf(d.file),
@@ -130,80 +58,27 @@ export default function HubModelsSection() {
       status: d.error
         ? t("hubModels.downloadFailed")
         : t("hubModels.downloading", { percent: d.total ? Math.floor((d.received / d.total) * 100) : 0 }),
-      onPress: () =>
-        setConfirm({
-          title: t("hubModels.cancelTitle", { name: nameOf(d.file) }),
-          message: t("hubModels.cancelMessage"),
-          action: t("hubModels.cancel"),
-          danger: true,
-          run: () => act(() => models!.cancel(d.file)),
-        }),
+      onPress: () => setCancelFile(d.file),
     })),
     ...(status?.installed ?? []).map((m) => ({
       key: m.file,
       title: nameOf(m.file),
       status: formatBytes(m.size),
-      onPress: () =>
-        setConfirm({
-          title: t("hubModels.deleteTitle", { name: nameOf(m.file) }),
-          message: t("hubModels.deleteMessage"),
-          action: t("hubModels.delete"),
-          danger: true,
-          run: () => act(() => models!.remove(m.file)),
-        }),
+      onPress: () => onOpenModel(m.file, nameOf(m.file)),
     })),
   ];
-  const catalogCards: Card[] = catalog
-    .filter((m) => !installed.has(m.file) && !downloading.has(m.file))
-    .map((m) => ({
-      key: m.file,
-      title: m.name,
-      status: formatBytes(m.size),
-      onPress: () => askDownload(m.repo, m.file, m.size, m.name),
-    }));
 
-  const runtime = !status
-    ? t("hubModels.loading")
-    : status.state === "running"
-      ? t("hubModels.running", { backend: (status.backend ?? "cpu").toUpperCase() })
-      : status.state === "installing"
-        ? t("hubModels.installing")
-        : status.state === "failed"
-          ? t("hubModels.startFailed", { error: status.message ?? "" })
-          : t("hubModels.idle");
-
-  const renderGrid = (cards: Card[]) => (
-    <View
-      style={[styles.grid, { marginTop: Spacing.md }]}
-      onLayout={(e) => {
-        const width = e.nativeEvent.layout.width;
-        if (width > 0 && width !== gridWidth) setGridWidth(width);
-      }}
-    >
-      {cards.map((card, index) => {
-        //a lone last card takes the row
-        const lastOdd = cards.length % 2 !== 0 && index === cards.length - 1;
-        const width = lastOdd ? "100%" : gridWidth > 0 ? Math.floor((gridWidth - Spacing.md) / 2) - 1 : "47%";
-        return (
-          <Pressable
-            key={card.key}
-            style={pressStyle([styles.card, { width, flexGrow: 1 }, lastOdd && styles.cardWide], "surface")}
-            onPress={() => {
-              Vibration.vibrate(8);
-              card.onPress();
-            }}
-          >
-            <Text style={styles.cardTitle} numberOfLines={2}>
-              {card.title}
-            </Text>
-            <Text style={[styles.cardStatus, card.error && styles.cardError]} numberOfLines={1}>
-              {card.status}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
+  const runtime = error
+    ? message(error)
+    : !status
+      ? t("hubModels.loading")
+      : status.state === "running"
+        ? t("hubModels.running", { backend: (status.backend ?? "cpu").toUpperCase() })
+        : status.state === "installing"
+          ? t("hubModels.installing")
+          : status.state === "failed"
+            ? t("hubModels.startFailed", { error: status.message ?? "" })
+            : t("hubModels.idle");
 
   return (
     <>
@@ -211,98 +86,157 @@ export default function HubModelsSection() {
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={styles.settingLabel}>{t("hubModels.title")}</Text>
-          <Text style={styles.helpText}>{error ?? runtime}</Text>
-          {ownCards.length > 0 ? (
-            renderGrid(ownCards)
-          ) : (
-            <Text style={styles.helpText}>{t("hubModels.empty")}</Text>
-          )}
-        </View>
-      </View>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{actionError ?? runtime}</Text>
 
-      {/* recommended models */}
-      {catalogCards.length > 0 && (
-        <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={styles.settingLabel}>{t("hubModels.catalog")}</Text>
-            <Text style={styles.helpText}>{t("hubModels.catalogHelp")}</Text>
-            {renderGrid(catalogCards)}
-          </View>
-        </View>
-      )}
-
-      {/* hugging face search */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{t("hubModels.search")}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("hubModels.searchHelp")}</Text>
-          <Group style={repos ? styles.groupSpacingTight : undefined}>
-            <TextInputField
-              icon={searchIcon}
-              placeholder={t("hubModels.searchPlaceholder")}
-              value={query}
-              onChangeText={setQuery}
-              onSubmitEditing={search}
-              returnKeyType="search"
-              autoCapitalize="none"
-              autoCorrect={false}
+          <Group style={[styles.highlightGroup, !api && styles.highlightGroupDisabled]}>
+            <ActionButton
+              icon={addIcon}
+              label={t("settings.litert.addModel")}
+              variant="highlight"
+              disabled={!api}
+              onPress={onAddModel}
             />
           </Group>
-          {repos && !repo && (
-            <Group>
-              {repos.length === 0 ? (
-                <ActionButton label={t("hubModels.noResults")} />
-              ) : (
-                repos.map((r) => (
-                  <ActionButton
-                    key={r.repo}
-                    icon={serverIcon}
-                    label={r.repo}
-                    onPress={() => openRepo(r.repo)}
-                    rightElement={
-                      <Text style={styles.infoValue} numberOfLines={1}>
-                        {t("hubModels.downloads", { count: r.downloads.toLocaleString() })}
-                      </Text>
-                    }
-                  />
-                ))
-              )}
-            </Group>
-          )}
-          {repo && (
-            <Group>
-              <ActionButton icon={serverIcon} label={repo} onPress={() => setRepo(null)} />
-              {(files ?? []).map((f) => (
-                <ActionButton
-                  key={f.file}
-                  icon={downloadIcon}
-                  label={stem(f.file)}
-                  disabled={installed.has(f.file) || downloading.has(f.file)}
-                  onPress={() => askDownload(repo, f.file, f.size)}
-                  rightElement={
-                    <Text style={styles.infoValue} numberOfLines={1}>
-                      {formatBytes(f.size)}
+
+          {cards.length > 0 && (
+            <View
+              style={[styles.grid, { marginTop: Spacing.md }]}
+              onLayout={(e) => {
+                const width = e.nativeEvent.layout.width;
+                if (width > 0 && width !== gridWidth) setGridWidth(width);
+              }}
+            >
+              {cards.map((card, index) => {
+                //a lone last card takes the row
+                const lastOdd = cards.length % 2 !== 0 && index === cards.length - 1;
+                const width = lastOdd ? "100%" : gridWidth > 0 ? Math.floor((gridWidth - Spacing.md) / 2) - 1 : "47%";
+                return (
+                  <Pressable
+                    key={card.key}
+                    style={pressStyle([styles.card, { width, flexGrow: 1 }, lastOdd && styles.cardWide], "surface")}
+                    onPress={() => {
+                      Vibration.vibrate(8);
+                      card.onPress();
+                    }}
+                  >
+                    <Text style={styles.cardTitle} numberOfLines={2}>
+                      {card.title}
                     </Text>
-                  }
-                />
-              ))}
-            </Group>
+                    <Text style={[styles.cardStatus, card.error && styles.cardError]} numberOfLines={1}>
+                      {card.status}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           )}
         </View>
       </View>
 
       <NotificationModal
-        visible={!!confirm}
-        title={confirm?.title}
-        message={confirm?.message}
-        onClose={() => setConfirm(null)}
+        visible={!!cancelFile}
+        title={t("hubModels.cancelTitle", { name: cancelFile ? nameOf(cancelFile) : "" })}
+        message={t("hubModels.cancelMessage")}
+        onClose={() => setCancelFile(null)}
         buttons={[
-          { text: t("common.cancel"), style: "secondary", onPress: () => setConfirm(null) },
-          {
-            text: confirm?.action ?? "",
-            style: confirm?.danger ? "danger" : "primary",
-            onPress: () => confirm?.run(),
-          },
+          { text: t("common.cancel"), style: "secondary", onPress: () => setCancelFile(null) },
+          { text: t("hubModels.cancel"), style: "danger", onPress: cancel },
+        ]}
+      />
+    </>
+  );
+}
+
+//one installed model, opened from the grid
+export function HubModelPage({ file, onDeleted }: { file: string; onDeleted: () => void }) {
+  const styles = useThemedStyles(makeStyles);
+  const t = useT();
+  const { status, catalog } = useHubModels();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const name = hubModelName(file, catalog);
+  const size = status?.installed.find((m) => m.file === file)?.size;
+  //only catalog models remember their repo
+  const repo = catalog.find((m) => m.file === file)?.repo;
+  const [description, setDescription] = useState<{ repo: string; text: string | null } | null>(null);
+
+  useEffect(() => {
+    if (!repo) return;
+    let dropped = false;
+    fetchModelDescription(repo).then((text) => !dropped && setDescription({ repo, text }));
+    return () => {
+      dropped = true;
+    };
+  }, [repo]);
+
+  const remove = async () => {
+    setConfirmDelete(false);
+    setBusy(true);
+    setError(null);
+    try {
+      await runHubModels((models) => models.remove(file));
+      onDeleted();
+    } catch (e) {
+      setError(t("hubModels.failed", { error: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <View style={styles.contentCard}>
+        <View style={styles.detailHeader}>
+          <View style={styles.detailTile}>
+            <Image source={{ uri: hubModelAvatar(name) }} style={styles.tileImage} />
+          </View>
+          <View style={styles.detailInfo}>
+            <Text style={styles.detailName}>{name}</Text>
+            {!!hubModelPublisher(name) && (
+              <Text style={styles.detailMeta}>{hubModelPublisher(name)!.publisher}</Text>
+            )}
+            {size !== undefined && <Text style={styles.detailMeta}>{formatBytes(size)}</Text>}
+            <Text style={styles.detailMeta}>{file}</Text>
+          </View>
+        </View>
+
+        {!!repo && (
+          <>
+            <Text style={[styles.settingLabel, styles.detailSection]}>{t("settings.litert.description")}</Text>
+            <Text style={styles.helpText}>
+              {description?.repo !== repo
+                ? t("settings.litert.loading")
+                : (description.text ?? t("settings.litert.noDescription"))}
+            </Text>
+          </>
+        )}
+      </View>
+
+      {/* actions section */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          {!!error && <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{error}</Text>}
+          <Group>
+            <ActionButton
+              icon={binIcon}
+              label={t("settings.litert.deleteModel")}
+              disabled={busy}
+              onPress={() => setConfirmDelete(true)}
+            />
+          </Group>
+        </View>
+      </View>
+
+      <NotificationModal
+        visible={confirmDelete}
+        title={t("hubModels.deleteTitle", { name })}
+        message={t("hubModels.deleteMessage")}
+        onClose={() => setConfirmDelete(false)}
+        buttons={[
+          { text: t("common.cancel"), style: "secondary", onPress: () => setConfirmDelete(false) },
+          { text: t("hubModels.delete"), style: "danger", onPress: remove },
         ]}
       />
     </>
@@ -337,16 +271,12 @@ const makeStyles = (Colors: ThemeColors) =>
       lineHeight: 20,
       paddingHorizontal: Spacing.md,
     },
-    groupSpacingTight: {
-      marginBottom: Spacing.lg2,
+    highlightGroup: {
+      backgroundColor: Colors.primary,
+      borderColor: Colors.borderOnPrimary,
     },
-    infoValue: {
-      flexShrink: 1,
-      maxWidth: "60%",
-      textAlign: "right",
-      color: Colors.textMuted,
-      fontFamily: Fonts.mono,
-      fontSize: FontSizes.label,
+    highlightGroupDisabled: {
+      opacity: 0.5,
     },
     grid: {
       flexDirection: "row",
@@ -383,5 +313,40 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     cardError: {
       color: Colors.error,
+    },
+    detailHeader: {
+      flexDirection: "row",
+      gap: Spacing.lg2,
+    },
+    detailTile: {
+      width: 120,
+      height: 120,
+      backgroundColor: Colors.logoTile,
+      borderWidth: 2,
+      borderColor: Colors.logoTileBorder,
+      borderRadius: Radius.xxl,
+      overflow: "hidden",
+    },
+    tileImage: {
+      width: "100%",
+      height: "100%",
+    },
+    detailInfo: {
+      flex: 1,
+    },
+    detailName: {
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.lg,
+      color: Colors.textPrimary,
+      marginBottom: Spacing.xs,
+    },
+    detailMeta: {
+      fontFamily: Fonts.body,
+      fontSize: FontSizes.caption,
+      color: Colors.textSecondary,
+      lineHeight: 20,
+    },
+    detailSection: {
+      marginTop: Spacing.xxl,
     },
   });

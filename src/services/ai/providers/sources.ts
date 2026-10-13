@@ -141,17 +141,8 @@ function parseServers(raw: string): OllamaServer[] {
 }
 
 //legacy url only seeds ollama
-function isLegacyOllamaSeed(settings: AppSettings): boolean {
-  const active = settings.ollamaUrl.trim();
-  return settings.aiService === 'ollama' && active.length > 0 && active !== BETA_SERVER_URL;
-}
-
 export function getOllamaServers(): OllamaServer[] {
-  const settings = Settings.getCached();
-  const servers = parseServers(settings.ollamaUrls);
-  //legacy single-url setting seeds the list
-  if (servers.length === 0 && isLegacyOllamaSeed(settings)) return [{ url: settings.ollamaUrl.trim(), name: '' }];
-  return servers;
+  return parseServers(Settings.getCached().ollamaUrls);
 }
 
 export function getOpenAIServers(): OllamaServer[] {
@@ -296,12 +287,7 @@ export function buildSources(localAvailable: boolean): ModelSource[] {
 //one-off cleanup of the settings the beta used to share with ollama
 export function migrateModelSources(settings: AppSettings): AppSettings {
   const patch: Partial<AppSettings> = {};
-  //the legacy seed only lived in the active url, keep it before beta clears it
   const legacy = settings.ollamaUrl.trim();
-  const stored = settings.ollamaUrls.trim();
-  if ((!stored || stored === '[]') && isLegacyOllamaSeed(settings)) {
-    patch.ollamaUrls = serializeServers([{ url: legacy, name: '' }]);
-  }
   if (!BETA_SERVER_URL) return applyPatch(settings, patch);
   if (settings.aiService === 'ollama' && legacy === BETA_SERVER_URL) {
     patch.aiService = BETA_PROVIDER_ID;

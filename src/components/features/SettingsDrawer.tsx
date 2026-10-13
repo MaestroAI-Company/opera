@@ -160,7 +160,8 @@ import Toggle from "../ui/Toggle";
 import DrawerSheet from "./DrawerSheet";
 import HubPairingSheet from "./HubPairingSheet";
 import HubDeviceSheet from "./HubDeviceSheet";
-import HubModelsSection from "./HubModelsSection";
+import HubModelsSection, { HubModelPage } from "./HubModelsSection";
+import HubModelsSheet from "./HubModelsSheet";
 import HubQrSheet from "./HubQrSheet";
 import MaestroCard from "./MaestroCard";
 import { BUTTERFLY_OPTIONS, selectButterfly, useMaestroButterfly } from "./maestroButterfly";
@@ -317,6 +318,7 @@ export type SubPage =
   | "hubprovider"
   | "hubserver"
   | "hubmodels"
+  | "hubmodel"
   | "mobileactions"
   | "mcpservers"
   | "mcpserver"
@@ -348,6 +350,7 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   hubprovider: "service",
   hubserver: "hubprovider",
   hubmodels: "operahub",
+  hubmodel: "hubmodels",
   sociallinks: "main",
   widgets: "tools",
   mobileactions: "tools",
@@ -847,6 +850,11 @@ export default function SettingsDrawer({
   const [lastSyncSize, setLastSyncSize] = useState<number | null>(null);
 
   const [addModelSheetVisible, setAddModelSheetVisible] = useState(false);
+  const [hubModelsSheetVisible, setHubModelsSheetVisible] = useState(false);
+  const [selectedHubModel, setSelectedHubModel] = useState<{
+    file: string;
+    name: string;
+  } | null>(null);
   const [ollamaAddVisible, setOllamaAddVisible] = useState(false);
   const [openaiAddVisible, setOpenAIAddVisible] = useState(false);
   const [openaiModelsVisible, setOpenAIModelsVisible] = useState(false);
@@ -952,6 +960,7 @@ export default function SettingsDrawer({
     selectedDeviceId !== null ||
     profileEditVisible ||
     addModelSheetVisible ||
+    hubModelsSheetVisible ||
     ollamaAddVisible ||
     openaiAddVisible ||
     openaiModelsVisible ||
@@ -6013,7 +6022,25 @@ export default function SettingsDrawer({
         return (
           <View style={styles.subPageContainer}>
             {renderSubPageHeader(t("hubModels.pageTitle"))}
-            <HubModelsSection />
+            <HubModelsSection
+              onAddModel={() => setHubModelsSheetVisible(true)}
+              onOpenModel={(file, name) => {
+                setSelectedHubModel({ file, name });
+                setActiveSubPage("hubmodel");
+              }}
+            />
+          </View>
+        );
+      case "hubmodel":
+        return (
+          <View style={styles.subPageContainer}>
+            {renderSubPageHeader(selectedHubModel?.name ?? "")}
+            {selectedHubModel && (
+              <HubModelPage
+                file={selectedHubModel.file}
+                onDeleted={() => setActiveSubPage("hubmodels")}
+              />
+            )}
           </View>
         );
       case "general":
@@ -7047,6 +7074,12 @@ export default function SettingsDrawer({
           setSelectedDeviceId(null);
           handleUnpairHub();
         }}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
+      <HubModelsSheet
+        visible={hubModelsSheetVisible}
+        onClose={() => setHubModelsSheetVisible(false)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />

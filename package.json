@@ -92,6 +92,7 @@
   "scripts": {
     "postinstall": "patch-package",
     "start": "expo start",
+    "preandroid": "expo prebuild --platform android --no-install",
     "android": "expo run:android --app-id ai.maestro.opera.dev",
     "android:preview": "expo run:android --variant preview --app-id ai.maestro.opera.dev --no-bundler",
     "build:android": "expo prebuild --platform android && cd android && ./gradlew assembleRelease",

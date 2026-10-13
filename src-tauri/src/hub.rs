@@ -76,11 +76,13 @@ pub async fn hub_pair(
     device_name: String,
     kind: String,
 ) -> Result<PairedHub, HubError> {
-    state
-        .client(&device_key)
-        .await?
-        .pair(link, device_name, kind)
-        .await
+    let client = state.client(&device_key).await?;
+    client.pair(link, device_name, kind, machine_id()).await
+}
+
+//stable for this os install, hashed by the client
+fn machine_id() -> Option<String> {
+    machine_uid::get().ok()
 }
 
 #[tauri::command]
@@ -92,7 +94,9 @@ pub async fn hub_pair_with_code(
     kind: String,
 ) -> Result<PairedHub, HubError> {
     let client = state.client(&device_key).await?;
-    client.pair_with_code(code, device_name, kind).await
+    client
+        .pair_with_code(code, device_name, kind, machine_id())
+        .await
 }
 
 #[tauri::command]

@@ -2,6 +2,7 @@ package __PACKAGE_NAME__
 
 import android.content.Context
 import android.net.wifi.WifiManager
+import android.provider.Settings
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -37,7 +38,7 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
 
   @ReactMethod
   fun pair(deviceKey: String, link: String, deviceName: String, kind: String, promise: Promise) =
-    launchPromise(promise) { hubToMap(client(deviceKey).pair(link, deviceName, kind)) }
+    launchPromise(promise) { hubToMap(client(deviceKey).pair(link, deviceName, kind, machineId())) }
 
   @ReactMethod
   fun status(deviceKey: String, hub: ReadableMap, promise: Promise) =
@@ -57,7 +58,7 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
 
   @ReactMethod
   fun pairWithCode(deviceKey: String, code: String, deviceName: String, kind: String, promise: Promise) =
-    launchPromise(promise) { hubToMap(client(deviceKey).pairWithCode(code, deviceName, kind)) }
+    launchPromise(promise) { hubToMap(client(deviceKey).pairWithCode(code, deviceName, kind, machineId())) }
 
   @ReactMethod
   fun invite(deviceKey: String, hub: ReadableMap, promise: Promise) =
@@ -272,6 +273,10 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
       }
     }
   }
+
+  //stable across reinstalls of this app, hashed by the client
+  private fun machineId(): String? =
+    Settings.Secure.getString(reactApplicationContext.contentResolver, Settings.Secure.ANDROID_ID)
 
   private fun settingsToMap(settings: HubSettings): WritableMap =
     Arguments.createMap().apply {

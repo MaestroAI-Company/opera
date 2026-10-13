@@ -1,21 +1,23 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use opera_hub::{config, hub};
+use opera_hub::{config, hub, service};
 use opera_hub_client::{
     HubClient, HubDevice, HubError, HubInvite, HubProvider, HubSettings, HubStatus, McpAccessToken,
     McpGrant, NearbyHub, PairedHub, ProxyInfo, PullPage, SyncRecord,
 };
 use serde::Serialize;
 use tauri::State;
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::Mutex;
+
+//how long a fresh hub gets to take its lock
+const START_POLLS: u32 = 50;
+const START_POLL: std::time::Duration = std::time::Duration::from_millis(200);
 
 //one client per device key like android
 #[derive(Default)]
 pub struct HubState {
     clients: Mutex<HashMap<String, Arc<HubClient>>>,
-    //stops the hub this app hosts
-    host: Mutex<Option<oneshot::Sender<()>>>,
 }
 
 #[derive(Serialize)]
@@ -23,8 +25,8 @@ pub struct HubState {
 pub struct HostStatus {
     //a hub runs on this computer
     running: bool,
-    //this app runs it, not the service
-    embedded: bool,
+    //it starts with the session
+    installed: bool,
     //none until a hub ever ran here
     id: Option<String>,
 }
@@ -285,7 +287,7 @@ pub async fn hub_start_proxy(
 }
 
 #[tauri::command]
-pub async fn hub_host_status(state: State<'_, HubState>) -> Result<HostStatus, String> {
+pub async fn hub_host_status() -> Result<HostStatus, String> {
     let data_dir = config::default_data_dir().map_err(host_error)?;
     //reading must not create a key
     let id = if data_dir.join(config::SECRET_KEY_FILE).exists() {
@@ -294,48 +296,47 @@ pub async fn hub_host_status(state: State<'_, HubState>) -> Result<HostStatus, S
     } else {
         None
     };
+    let installed = tauri::async_runtime::spawn_blocking(service::status)
+        .await
+        .map_err(host_error)?
+        .map_err(host_error)?;
     Ok(HostStatus {
         running: hub::is_running(&data_dir),
-        embedded: state.host.lock().await.is_some(),
+        installed: installed != service::Status::NotInstalled,
         id,
     })
 }
 
-//shares the data dir of the standalone hub
+//the sidecar runs with the session, with or without the app
 #[tauri::command]
-pub async fn hub_host_start(state: State<'_, HubState>) -> Result<(), String> {
-    let mut host = state.host.lock().await;
+pub async fn hub_host_start() -> Result<(), String> {
     let data_dir = config::default_data_dir().map_err(host_error)?;
-    //the service already hosts it
-    if host.is_some() || hub::is_running(&data_dir) {
+    if hub::is_running(&data_dir) {
         return Ok(());
     }
-    let (stop, stopped) = oneshot::channel::<()>();
-    let (started, ready) = oneshot::channel();
-    tauri::async_runtime::spawn(async move {
-        let result = hub::run_notify(&data_dir, started, async {
-            let _ = stopped.await;
-        })
-        .await;
-        if let Err(e) = result {
-            log::error!("opera hub stopped: {e:#}");
-        }
-    });
-    //fails fast if the data dir is taken
-    ready
+    let exe = std::env::current_exe().map_err(host_error)?;
+    let launch = service::Launch::next_to(&exe, &data_dir).map_err(host_error)?;
+    tauri::async_runtime::spawn_blocking(move || service::install(&launch))
         .await
-        .map_err(|_| "the hub did not start".to_string())?
+        .map_err(host_error)?
         .map_err(host_error)?;
-    *host = Some(stop);
-    Ok(())
+    //pairing right after needs it listening
+    for _ in 0..START_POLLS {
+        if hub::is_running(&data_dir) {
+            return Ok(());
+        }
+        tokio::time::sleep(START_POLL).await;
+    }
+    Err("the hub did not start".into())
 }
 
+//stops it and its login start
 #[tauri::command]
-pub async fn hub_host_stop(state: State<'_, HubState>) -> Result<(), String> {
-    if let Some(stop) = state.host.lock().await.take() {
-        let _ = stop.send(());
-    }
-    Ok(())
+pub async fn hub_host_stop() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(service::uninstall)
+        .await
+        .map_err(host_error)?
+        .map_err(host_error)
 }
 
 //one time link for this app to pair itself

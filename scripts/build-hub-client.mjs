@@ -1,4 +1,4 @@
-//gradle runs it before each android build, npm before web
+//gradle runs it before each android build, npm before web and desktop
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -13,6 +13,14 @@ const libPath = join(mainDir, 'jniLibs', 'arm64-v8a', 'libopera_hub_client.so');
 const bindingsDir = join(mainDir, 'java', 'uniffi', 'opera_hub_client');
 //served as is next to the web bundle
 const webDir = join(root, 'public', 'opera-hub');
+//tauri sidecars carry the target triple
+const sidecarDir = join(root, 'src-tauri', 'binaries');
+const SIDECARS = {
+  'win32-x64': ['x86_64-pc-windows-msvc', 'opera-hubw-windows-x86_64.exe'],
+  'darwin-arm64': ['aarch64-apple-darwin', 'opera-hubw-macos-aarch64'],
+  'linux-x64': ['x86_64-unknown-linux-gnu', 'opera-hubw-linux-x86_64'],
+  'linux-arm64': ['aarch64-unknown-linux-gnu', 'opera-hubw-linux-aarch64'],
+};
 const RELEASES = 'https://github.com/MaestroAI-Company/opera-hub/releases/download';
 //ring needs clang for wasm
 const WINDOWS_CLANG = 'C:\\Program Files\\LLVM\\bin';
@@ -21,7 +29,17 @@ const target = process.argv[2] ?? 'android';
 const works = (command, args) => spawnSync(command, args, { stdio: 'ignore' }).status === 0;
 const hasHub = existsSync(join(hubDir, 'Cargo.toml'));
 
-if (target === 'web') {
+if (target === 'desktop') {
+  const sidecar = SIDECARS[`${process.platform}-${process.arch}`];
+  if (!sidecar) throw new Error(`no opera hub build for ${process.platform} ${process.arch}`);
+  const [triple, asset] = sidecar;
+  const dest = join(sidecarDir, `opera-hubw-${triple}${process.platform === 'win32' ? '.exe' : ''}`);
+  if (hasHub) {
+    buildSidecarFromSource(dest);
+  } else {
+    await downloadPinned([[asset, dest]]);
+  }
+} else if (target === 'web') {
   if (hasHub && works('wasm-bindgen', ['--version']) && hasClang()) {
     buildWebFromSource();
   } else {
@@ -69,6 +87,19 @@ function buildAndroidFromSource() {
   mkdirSync(dirname(libPath), { recursive: true });
   copyFileSync(join(hubDir, 'target', 'aarch64-linux-android', 'release', 'libopera_hub_client.so'), libPath);
   console.log(`opera hub client built from ${hubDir}`);
+}
+
+//its own target dir, a running hub locks target/release
+function buildSidecarFromSource(dest) {
+  const targetDir = join(hubDir, 'target', 'sidecar');
+  cargo(['build', '--release', '-p', 'opera-hub', '--bin', 'opera-hubw'], {
+    ...process.env,
+    CARGO_TARGET_DIR: targetDir,
+  });
+  const exe = process.platform === 'win32' ? 'opera-hubw.exe' : 'opera-hubw';
+  mkdirSync(dirname(dest), { recursive: true });
+  copyFileSync(join(targetDir, 'release', exe), dest);
+  console.log(`opera hub sidecar built from ${hubDir}`);
 }
 
 function buildWebFromSource() {

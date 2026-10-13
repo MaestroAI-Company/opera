@@ -1,4 +1,4 @@
-//pins the hub client release for android and web
+//pins the hub client release for android, web and desktop
 
 import { writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -9,6 +9,10 @@ const ASSETS = [
   'opera_hub_client.kt',
   'opera-hub-client-web.js',
   'opera-hub-client-web.wasm',
+  'opera-hubw-windows-x86_64.exe',
+  'opera-hubw-macos-aarch64',
+  'opera-hubw-linux-x86_64',
+  'opera-hubw-linux-aarch64',
 ];
 
 const version = process.argv[2];

@@ -100,7 +100,9 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "tauri": "tauri",
+    "predesktop": "node scripts/build-hub-client.mjs desktop",
     "desktop": "tauri dev",
+    "prebuild:desktop": "node scripts/build-hub-client.mjs desktop",
     "build:desktop": "tauri build"
   },
   "private": true

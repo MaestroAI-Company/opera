@@ -47,6 +47,8 @@ type CachedProviders = { hubName: string; providers: HubProvider[] };
 //what this device shares through the hub
 export type HubSyncPrefs = { data: boolean; settings: boolean; providers: boolean; cloud: boolean };
 const SYNC_PREFS_KEY = 'hubSyncPrefs';
+//a hub release the user put off
+const DECLINED_UPDATE_KEY = 'hubUpdateDeclined';
 const DEFAULT_PREFS: HubSyncPrefs = { data: true, settings: true, providers: true, cloud: true };
 
 type AccountState = { cursor: number; pushedAt: number };
@@ -95,6 +97,7 @@ class HubSyncImpl {
   private initialized = false;
   private watching = false;
   private prefs: HubSyncPrefs = DEFAULT_PREFS;
+  private offeredUpdate: string | null = null;
 
   //cache loads before the model is picked
   async init(): Promise<void> {
@@ -200,6 +203,7 @@ class HubSyncImpl {
     if (!hub) return;
     await this.dropInjectedServers();
     await this.storeProviders(await OperaHub.providers(hub), hub.name);
+    await this.offerUpdate(hub);
     const prefs = this.prefs;
     if (prefs.providers) {
       await this.syncFingerprinted(hub, 'providers', await this.providerEntries(), (r) => this.applyProviders(r));
@@ -215,6 +219,21 @@ class HubSyncImpl {
     if (await this.write(() => pullRemoteChanges(hub))) {
       await this.write(async () => DB.notifySynced());
     }
+  }
+
+  //once per version, admins only
+  private async offerUpdate(hub: PairedHub): Promise<void> {
+    if (!OperaHub.canUpdateHub()) return;
+    const status = await OperaHub.status(hub).catch(() => null);
+    const version = status?.update;
+    if (!status || !version || version === this.offeredUpdate) return;
+    if ((await Settings.getLocal(DECLINED_UPDATE_KEY)) === version) return;
+    this.offeredUpdate = version;
+    DeviceEventEmitter.emit(AppEvents.hubUpdateAvailable, { hub, version, current: status.version });
+  }
+
+  async declineUpdate(version: string): Promise<void> {
+    await Settings.setLocal(DECLINED_UPDATE_KEY, version);
   }
 
   private async storeProviders(providers: HubProvider[], hubName: string): Promise<void> {

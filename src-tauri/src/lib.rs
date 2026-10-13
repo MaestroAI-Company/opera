@@ -68,6 +68,10 @@ pub fn run() {
             #[cfg(desktop)]
             hub::hub_nearby,
             #[cfg(desktop)]
+            hub::hub_update,
+            #[cfg(desktop)]
+            hub::hub_install_update,
+            #[cfg(desktop)]
             hub::hub_computer_name,
         ])
         .setup(|app| {

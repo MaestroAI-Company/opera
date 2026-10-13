@@ -2710,6 +2710,20 @@ export default function SettingsDrawer({
     }
   };
 
+  const installHubUpdate = async (version: string) => {
+    if (!pairedHub) return;
+    try {
+      await OperaHub.updateHub(pairedHub, version);
+    } catch (e) {
+      showAlert(
+        t("hubUpdate.title"),
+        t("hubUpdate.failed", {
+          error: e instanceof Error ? e.message : String(e),
+        }),
+      );
+    }
+  };
+
   const setSyncPref = async (key: keyof HubSyncPrefs, enabled: boolean) => {
     setSyncPrefs(await HubSync.setPref(key, enabled));
   };
@@ -4197,6 +4211,16 @@ export default function SettingsDrawer({
       ...(hubStatus
         ? [{ label: t("settings.hub.version"), value: hubStatus.version }]
         : []),
+      ...(hubStatus?.update
+        ? [
+            {
+              label: t("settings.hub.update"),
+              value: t("settings.hub.updateAvailable", {
+                version: hubStatus.update,
+              }),
+            },
+          ]
+        : []),
     ];
 
     const thisDevice = hubDevices?.find((device) => device.id === thisDeviceId);
@@ -4334,6 +4358,13 @@ export default function SettingsDrawer({
               </Text>
             )}
             <Group>
+              {hubStatus?.update && isAdmin && OperaHub.canUpdateHub() && (
+                <ActionButton
+                  icon={downloadIcon}
+                  label={t("settings.hub.installUpdate")}
+                  onPress={() => installHubUpdate(hubStatus.update!)}
+                />
+              )}
               <ActionButton
                 icon={reconnectIcon}
                 label={t("settings.hub.check")}

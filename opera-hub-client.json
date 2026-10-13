@@ -1,7 +1,7 @@
 {
-  "version": "v0.3.0",
+  "version": "v0.4.0",
   "sha256": {
-    "opera-hub-client-arm64-v8a.so": "5bb6d4571e6e7cfafec66054e196554f7aed7047e357c8016e96e4d2148adf5b",
-    "opera_hub_client.kt": "a8461090530192ccfbe49d6e4ecbbfd2d28e4643a01330ddf75664d10a5bfe1f"
+    "opera-hub-client-arm64-v8a.so": "63c1fdeb169881da8f5cd35cb39fd0ece2d5be1836c3730123e050ec1c93446d",
+    "opera_hub_client.kt": "9595c18c632df1a0566ab7b071d989ef2556ea2271cec03e1d074799d09fbaa5"
   }
 }

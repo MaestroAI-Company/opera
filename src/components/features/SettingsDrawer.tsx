@@ -160,6 +160,7 @@ import Toggle from "../ui/Toggle";
 import DrawerSheet from "./DrawerSheet";
 import HubPairingSheet from "./HubPairingSheet";
 import HubDeviceSheet from "./HubDeviceSheet";
+import HubModelsSection from "./HubModelsSection";
 import HubQrSheet from "./HubQrSheet";
 import MaestroCard from "./MaestroCard";
 import { BUTTERFLY_OPTIONS, selectButterfly, useMaestroButterfly } from "./maestroButterfly";
@@ -315,6 +316,7 @@ export type SubPage =
   | "operahub"
   | "hubprovider"
   | "hubserver"
+  | "hubmodels"
   | "mobileactions"
   | "mcpservers"
   | "mcpserver"
@@ -345,6 +347,7 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   operahub: "main",
   hubprovider: "service",
   hubserver: "hubprovider",
+  hubmodels: "operahub",
   sociallinks: "main",
   widgets: "tools",
   mobileactions: "tools",
@@ -4277,6 +4280,17 @@ export default function SettingsDrawer({
           </View>
         )}
 
+        {/* models the hub runs, admins only */}
+        {hubState === "online" && isAdmin && OperaHub.canManageModels() && (
+          <Group style={styles.groupSpacing}>
+            {renderToolsNavRow(
+              "hubmodels",
+              t("hubModels.pageTitle"),
+              t("hubModels.navHelp"),
+            )}
+          </Group>
+        )}
+
         {renderHubHostSection()}
 
         {/* connected devices card */}
@@ -5995,6 +6009,13 @@ export default function SettingsDrawer({
         return renderHubProviderSubPage();
       case "hubserver":
         return renderHubServerSubPage();
+      case "hubmodels":
+        return (
+          <View style={styles.subPageContainer}>
+            {renderSubPageHeader(t("hubModels.pageTitle"))}
+            <HubModelsSection />
+          </View>
+        );
       case "general":
         return renderGeneralSubPage();
       case "maestro":

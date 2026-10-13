@@ -3,8 +3,9 @@ use std::sync::Arc;
 
 use opera_hub::{config, hub, service};
 use opera_hub_client::{
-    HubClient, HubDevice, HubError, HubInvite, HubProvider, HubSettings, HubStatus, McpAccessToken,
-    McpGrant, NearbyHub, PairedHub, ProxyInfo, PullPage, SyncRecord,
+    CatalogModel, HubClient, HubDevice, HubError, HubInvite, HubProvider, HubSettings, HubStatus,
+    LlamaStatus, McpAccessToken, McpGrant, ModelFile, ModelRepo, NearbyHub, PairedHub, ProxyInfo,
+    PullPage, SyncRecord,
 };
 use serde::Serialize;
 use tauri::State;
@@ -160,6 +161,82 @@ pub async fn hub_install_update(version: String) -> Result<bool, String> {
         .spawn()
         .map_err(host_error)?;
     Ok(true)
+}
+
+#[tauri::command]
+pub async fn hub_models_catalog(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<Vec<CatalogModel>, HubError> {
+    let client = state.client(&device_key).await?;
+    client.models_catalog(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_models_search(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    query: String,
+) -> Result<Vec<ModelRepo>, HubError> {
+    let client = state.client(&device_key).await?;
+    client.models_search(hub, query).await
+}
+
+#[tauri::command]
+pub async fn hub_models_files(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    repo: String,
+) -> Result<Vec<ModelFile>, HubError> {
+    let client = state.client(&device_key).await?;
+    client.models_files(hub, repo).await
+}
+
+#[tauri::command]
+pub async fn hub_models_download(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    repo: String,
+    file: String,
+) -> Result<LlamaStatus, HubError> {
+    let client = state.client(&device_key).await?;
+    client.models_download(hub, repo, file).await
+}
+
+#[tauri::command]
+pub async fn hub_models_cancel(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    file: String,
+) -> Result<LlamaStatus, HubError> {
+    let client = state.client(&device_key).await?;
+    client.models_cancel(hub, file).await
+}
+
+#[tauri::command]
+pub async fn hub_models_delete(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    file: String,
+) -> Result<LlamaStatus, HubError> {
+    let client = state.client(&device_key).await?;
+    client.models_delete(hub, file).await
+}
+
+#[tauri::command]
+pub async fn hub_models_status(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<LlamaStatus, HubError> {
+    let client = state.client(&device_key).await?;
+    client.models_status(hub).await
 }
 
 #[tauri::command]

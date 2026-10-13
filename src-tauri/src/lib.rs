@@ -85,6 +85,20 @@ pub fn run() {
             #[cfg(desktop)]
             hub::hub_qr_svg,
             #[cfg(desktop)]
+            hub::hub_models_catalog,
+            #[cfg(desktop)]
+            hub::hub_models_search,
+            #[cfg(desktop)]
+            hub::hub_models_files,
+            #[cfg(desktop)]
+            hub::hub_models_download,
+            #[cfg(desktop)]
+            hub::hub_models_cancel,
+            #[cfg(desktop)]
+            hub::hub_models_delete,
+            #[cfg(desktop)]
+            hub::hub_models_status,
+            #[cfg(desktop)]
             hub::hub_settings,
             #[cfg(desktop)]
             hub::hub_set_settings,

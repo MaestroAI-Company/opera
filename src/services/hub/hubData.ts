@@ -1,3 +1,4 @@
+import type { CloudMergeTouched } from '../CloudSyncService';
 import { BackupCryptoImpl } from '../crypto/backupCrypto';
 import { Conversation, DB, Message } from '../db/DatabaseService';
 import { OperaHub, PairedHub, SyncRecord } from './OperaHubService';
@@ -6,6 +7,8 @@ const BLOB_REF = 'opera-blob:';
 //each push stays well under the hub frame limit
 const BATCH_BYTES = 1024 * 1024;
 const PUSH_MARK = 'push_mark';
+//cloud merges older than the push mark
+const PENDING = 'pending';
 //blobs first so messages can resolve their images
 const PULL_ORDER = ['blobs', 'conversations', 'messages'] as const;
 
@@ -53,6 +56,65 @@ async function unpackImages(images: string[] | undefined): Promise<string[] | un
   return unpacked;
 }
 
+async function readPending(): Promise<CloudMergeTouched> {
+  const raw = await DB.getHubState(PENDING);
+  return raw ? JSON.parse(raw) : { conversations: [], messages: [] };
+}
+
+//queued until the next push
+export async function queueCloudMerge(touched: CloudMergeTouched): Promise<void> {
+  const pending = await readPending();
+  const merged: CloudMergeTouched = {
+    conversations: [...new Set([...pending.conversations, ...touched.conversations])],
+    messages: [...new Set([...pending.messages, ...touched.messages])],
+  };
+  await DB.setHubState(PENDING, JSON.stringify(merged));
+}
+
+//whole conversations, or tombstones once deleted
+async function pendingRecords(pending: CloudMergeTouched, blobs: Map<string, string>) {
+  const conversations: SyncRecord[] = [];
+  const messages: SyncRecord[] = [];
+  if (pending.conversations.length === 0 && pending.messages.length === 0) return { conversations, messages };
+  const tombstones = new Map((await DB.getTombstones()).map((t) => [`${t.kind}:${t.id}`, t]));
+  const existing = new Map((await DB.getConversations()).map((c) => [c.id, c]));
+  for (const id of pending.conversations) {
+    const conv = existing.get(id);
+    if (!conv) {
+      const tomb = tombstones.get(`conversation:${id}`);
+      if (tomb) conversations.push({ id, updatedAt: tomb.deletedAt, deleted: true, payload: null });
+      continue;
+    }
+    conversations.push({ id, updatedAt: conv.updatedAt, deleted: false, payload: JSON.stringify(conv) });
+    for (const message of await DB.getMessages(id)) messages.push(await messageRecord(message, blobs));
+  }
+  for (const id of pending.messages) {
+    const tomb = tombstones.get(`message:${id}`);
+    if (tomb) messages.push({ id, updatedAt: tomb.deletedAt, deleted: true, payload: null });
+  }
+  return { conversations, messages };
+}
+
+async function messageRecord(message: Message, blobs: Map<string, string>): Promise<SyncRecord> {
+  const payload: Message = { ...message, images: await packImages(message.images, blobs) };
+  return {
+    id: message.id,
+    updatedAt: message.updatedAt ?? message.createdAt,
+    deleted: false,
+    payload: JSON.stringify(payload),
+  };
+}
+
+//one record per id, the newest wins
+function dedupe(records: SyncRecord[]): SyncRecord[] {
+  const byId = new Map<string, SyncRecord>();
+  for (const record of records) {
+    const known = byId.get(record.id);
+    if (!known || record.updatedAt > known.updatedAt) byId.set(record.id, record);
+  }
+  return [...byId.values()];
+}
+
 export async function pushLocalChanges(hub: PairedHub): Promise<void> {
   const mark = Number((await DB.getHubState(PUSH_MARK)) ?? 0);
   //a write during the push lands in the next one
@@ -66,19 +128,16 @@ export async function pushLocalChanges(hub: PairedHub): Promise<void> {
   }));
   const blobs = new Map<string, string>();
   const messages: SyncRecord[] = [];
-  for (const message of await DB.getMessagesChangedSince(mark)) {
-    const payload: Message = { ...message, images: await packImages(message.images, blobs) };
-    messages.push({
-      id: message.id,
-      updatedAt: message.updatedAt ?? message.createdAt,
-      deleted: false,
-      payload: JSON.stringify(payload),
-    });
-  }
+  for (const message of await DB.getMessagesChangedSince(mark)) messages.push(await messageRecord(message, blobs));
   for (const tombstone of await DB.getTombstonesSince(mark)) {
     const target = tombstone.kind === 'conversation' ? conversations : messages;
     target.push({ id: tombstone.id, updatedAt: tombstone.deletedAt, deleted: true, payload: null });
   }
+
+  const pending = await readPending();
+  const fromCloud = await pendingRecords(pending, blobs);
+  conversations.push(...fromCloud.conversations);
+  messages.push(...fromCloud.messages);
 
   //content addressed so each image goes up once
   const fresh: SyncRecord[] = [];
@@ -87,9 +146,18 @@ export async function pushLocalChanges(hub: PairedHub): Promise<void> {
   }
   await pushBatched(hub, 'blobs', fresh);
   for (const blob of fresh) await DB.putHubBlob(blob.id, blob.payload!);
-  await pushBatched(hub, 'conversations', conversations);
-  await pushBatched(hub, 'messages', messages);
+  await pushBatched(hub, 'conversations', dedupe(conversations));
+  await pushBatched(hub, 'messages', dedupe(messages));
   await DB.setHubState(PUSH_MARK, String(startedAt));
+  //merges queued meanwhile stay for the next push
+  const left = await readPending();
+  await DB.setHubState(
+    PENDING,
+    JSON.stringify({
+      conversations: left.conversations.filter((id) => !pending.conversations.includes(id)),
+      messages: left.messages.filter((id) => !pending.messages.includes(id)),
+    }),
+  );
 }
 
 //true when anything was written locally
@@ -131,5 +199,6 @@ async function applyRecord(collection: DataCollection, record: SyncRecord): Prom
 //a new hub starts from scratch
 export async function resetDataSync(): Promise<void> {
   await DB.setHubState(PUSH_MARK, '0');
+  await DB.setHubState(PENDING, '');
   for (const collection of PULL_ORDER) await DB.setHubState(`cursor_${collection}`, '0');
 }

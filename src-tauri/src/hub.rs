@@ -1,0 +1,296 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use opera_hub::{config, hub};
+use opera_hub_client::{
+    HubClient, HubDevice, HubError, HubProvider, HubStatus, McpAccessToken, McpGrant, PairedHub,
+    ProxyInfo, PullPage, SyncRecord,
+};
+use serde::Serialize;
+use tauri::State;
+use tokio::sync::{oneshot, Mutex};
+
+//one client per device key like android
+#[derive(Default)]
+pub struct HubState {
+    clients: Mutex<HashMap<String, Arc<HubClient>>>,
+    //stops the hub this app hosts
+    host: Mutex<Option<oneshot::Sender<()>>>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostStatus {
+    //a hub runs on this computer
+    running: bool,
+    //this app runs it, not the service
+    embedded: bool,
+    //none until a hub ever ran here
+    id: Option<String>,
+}
+
+impl HubState {
+    async fn client(&self, device_key: &str) -> Result<Arc<HubClient>, HubError> {
+        let mut clients = self.clients.lock().await;
+        if let Some(client) = clients.get(device_key) {
+            return Ok(client.clone());
+        }
+        let client = HubClient::new(decode_hex(device_key)?)?;
+        clients.insert(device_key.to_string(), client.clone());
+        Ok(client)
+    }
+}
+
+fn decode_hex(text: &str) -> Result<Vec<u8>, HubError> {
+    let invalid = || HubError::Internal("invalid device key".into());
+    if text.len() % 2 != 0 {
+        return Err(invalid());
+    }
+    (0..text.len())
+        .step_by(2)
+        .map(|i| {
+            u8::from_str_radix(text.get(i..i + 2).ok_or_else(invalid)?, 16).map_err(|_| invalid())
+        })
+        .collect()
+}
+
+fn host_error(e: impl std::fmt::Display) -> String {
+    e.to_string()
+}
+
+#[tauri::command]
+pub async fn hub_device_id(
+    state: State<'_, HubState>,
+    device_key: String,
+) -> Result<String, HubError> {
+    Ok(state.client(&device_key).await?.device_id())
+}
+
+#[tauri::command]
+pub async fn hub_pair(
+    state: State<'_, HubState>,
+    device_key: String,
+    link: String,
+    device_name: String,
+    kind: String,
+) -> Result<PairedHub, HubError> {
+    state
+        .client(&device_key)
+        .await?
+        .pair(link, device_name, kind)
+        .await
+}
+
+#[tauri::command]
+pub async fn hub_status(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<HubStatus, HubError> {
+    state.client(&device_key).await?.status(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_unpair(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<(), HubError> {
+    state.client(&device_key).await?.unpair(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_devices(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<Vec<HubDevice>, HubError> {
+    state.client(&device_key).await?.devices(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_push(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    collection: String,
+    records: Vec<SyncRecord>,
+) -> Result<(), HubError> {
+    state
+        .client(&device_key)
+        .await?
+        .push(hub, collection, records)
+        .await
+}
+
+#[tauri::command]
+pub async fn hub_pull(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    collection: String,
+    since: u64,
+) -> Result<PullPage, HubError> {
+    state
+        .client(&device_key)
+        .await?
+        .pull(hub, collection, since)
+        .await
+}
+
+#[tauri::command]
+pub async fn hub_watch(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    since: u64,
+) -> Result<u64, HubError> {
+    state.client(&device_key).await?.watch(hub, since).await
+}
+
+#[tauri::command]
+pub async fn hub_put_grant(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    grant: McpGrant,
+) -> Result<(), HubError> {
+    state.client(&device_key).await?.put_grant(hub, grant).await
+}
+
+#[tauri::command]
+pub async fn hub_access_token(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    server_id: String,
+) -> Result<Option<McpAccessToken>, HubError> {
+    state
+        .client(&device_key)
+        .await?
+        .access_token(hub, server_id)
+        .await
+}
+
+#[tauri::command]
+pub async fn hub_drop_grant(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    server_id: String,
+) -> Result<(), HubError> {
+    state
+        .client(&device_key)
+        .await?
+        .drop_grant(hub, server_id)
+        .await
+}
+
+#[tauri::command]
+pub async fn hub_providers(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<Vec<HubProvider>, HubError> {
+    state.client(&device_key).await?.providers(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_start_proxy(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<ProxyInfo, HubError> {
+    state.client(&device_key).await?.start_proxy(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_host_status(state: State<'_, HubState>) -> Result<HostStatus, String> {
+    let data_dir = config::default_data_dir().map_err(host_error)?;
+    //reading must not create a key
+    let id = if data_dir.join(config::SECRET_KEY_FILE).exists() {
+        let key = config::load_or_create_key(&data_dir).map_err(host_error)?;
+        Some(key.public().to_string())
+    } else {
+        None
+    };
+    Ok(HostStatus {
+        running: hub::is_running(&data_dir),
+        embedded: state.host.lock().await.is_some(),
+        id,
+    })
+}
+
+//shares the data dir of the standalone hub
+#[tauri::command]
+pub async fn hub_host_start(state: State<'_, HubState>) -> Result<(), String> {
+    let mut host = state.host.lock().await;
+    let data_dir = config::default_data_dir().map_err(host_error)?;
+    //the service already hosts it
+    if host.is_some() || hub::is_running(&data_dir) {
+        return Ok(());
+    }
+    let (stop, stopped) = oneshot::channel::<()>();
+    let (started, ready) = oneshot::channel();
+    tauri::async_runtime::spawn(async move {
+        let result = hub::run_notify(&data_dir, started, async {
+            let _ = stopped.await;
+        })
+        .await;
+        if let Err(e) = result {
+            log::error!("opera hub stopped: {e:#}");
+        }
+    });
+    //fails fast if the data dir is taken
+    ready
+        .await
+        .map_err(|_| "the hub did not start".to_string())?
+        .map_err(host_error)?;
+    *host = Some(stop);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn hub_host_stop(state: State<'_, HubState>) -> Result<(), String> {
+    if let Some(stop) = state.host.lock().await.take() {
+        let _ = stop.send(());
+    }
+    Ok(())
+}
+
+//one time link for this app to pair itself
+#[tauri::command]
+pub async fn hub_host_pairing_link() -> Result<String, String> {
+    let data_dir = config::default_data_dir().map_err(host_error)?;
+    Ok(hub::pairing_link(&data_dir)
+        .map_err(host_error)?
+        .to_string())
+}
+
+#[derive(Serialize)]
+pub struct PairingQr {
+    svg: String,
+    //for a device without a camera
+    link: String,
+}
+
+//one time code for a phone to scan
+#[tauri::command]
+pub async fn hub_host_pairing_qr(dark: String, light: String) -> Result<PairingQr, String> {
+    use qrcode::render::svg;
+    let link = hub_host_pairing_link().await?;
+    let code = qrcode::QrCode::new(link.as_bytes()).map_err(host_error)?;
+    let svg = code
+        .render::<svg::Color>()
+        .dark_color(svg::Color(&dark))
+        .light_color(svg::Color(&light))
+        .quiet_zone(false)
+        .build();
+    Ok(PairingQr { svg, link })
+}
+
+//the name other devices see
+#[tauri::command]
+pub fn hub_computer_name() -> String {
+    config::Config::default().hub_name()
+}

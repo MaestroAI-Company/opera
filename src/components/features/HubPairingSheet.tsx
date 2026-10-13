@@ -1,15 +1,18 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useEffect, useRef, useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { hubErrorCode, OperaHub, PairedHub } from "../../services/hub/OperaHubService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
+import TextInputField from "../ui/TextInputField";
 import DrawerSheet from "./DrawerSheet";
 
 const cameraIcon = require("../../../assets/icons/camera.png");
+const linkIcon = require("../../../assets/icons/link.png");
 
 const DESKTOP_CARD_WIDTH = 380;
 //delay before rescanning a failed code
@@ -19,6 +22,10 @@ type HubPairingSheetProps = {
   visible: boolean;
   onClose: () => void;
   onPaired: (hub: PairedHub) => void;
+  //opened from an opera://hub/pair link
+  link?: string | null;
+  //a second hub would silently replace it
+  pairedHub?: PairedHub | null;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
 };
@@ -27,14 +34,19 @@ export default function HubPairingSheet({
   visible,
   onClose,
   onPaired,
+  link = null,
+  pairedHub = null,
   isLargeScreen = false,
   isDesktop = false,
 }: HubPairingSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const [permission, requestPermission] = useCameraPermissions();
+  const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [pairing, setPairing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [typedLink, setTypedLink] = useState("");
   //scanner fires on every frame
   const lastScan = useRef<{ data: string; at: number } | null>(null);
 
@@ -42,7 +54,10 @@ export default function HubPairingSheet({
   const [prevVisible, setPrevVisible] = useState(visible);
   if (visible !== prevVisible) {
     setPrevVisible(visible);
-    if (visible) setError(null);
+    if (visible) {
+      setError(null);
+      setTypedLink("");
+    }
   }
   useEffect(() => {
     if (visible) lastScan.current = null;
@@ -65,7 +80,113 @@ export default function HubPairingSheet({
     }
   };
 
+  //links are typed or confirmed, never auto paired
+  const pairLink = async (value: string) => {
+    if (pairing || !value.trim()) return;
+    setPairing(true);
+    setError(null);
+    try {
+      onPaired(await OperaHub.pair(value.trim()));
+    } catch (e) {
+      setError(t(`hubPairing.error.${hubErrorCode(e)}`));
+    } finally {
+      setPairing(false);
+    }
+  };
+
   const help = pairing ? t("hubPairing.pairing") : (error ?? t("hubPairing.help"));
+  //desktop and web have no camera to scan with
+  const mode = link ? "confirm" : Platform.OS === "web" ? "paste" : "scan";
+
+  const renderPairButton = (value: string) => (
+    <Group
+      style={[
+        styles.highlightGroup,
+        (pairing || !value.trim()) && styles.highlightGroupDisabled,
+      ]}
+    >
+      <ActionButton
+        icon={linkIcon}
+        label={t("hubPairing.pair")}
+        variant="highlight"
+        disabled={pairing || !value.trim()}
+        onPress={() => pairLink(value)}
+      />
+    </Group>
+  );
+
+  const renderContent = () => {
+    if (pairedHub) {
+      return (
+        <>
+          <Text style={styles.settingLabel}>{t("hubPairing.confirm")}</Text>
+          <Text style={styles.helpText}>
+            {t("hubPairing.alreadyPaired", { name: pairedHub.name })}
+          </Text>
+        </>
+      );
+    }
+    if (mode === "confirm") {
+      return (
+        <>
+          <Text style={styles.settingLabel}>{t("hubPairing.confirm")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {pairing ? t("hubPairing.pairing") : (error ?? t("hubPairing.confirmHelp"))}
+          </Text>
+          {renderPairButton(link ?? "")}
+        </>
+      );
+    }
+    if (mode === "paste") {
+      return (
+        <>
+          <Text style={styles.settingLabel}>{t("hubPairing.link")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {pairing ? t("hubPairing.pairing") : (error ?? t("hubPairing.linkHelp"))}
+          </Text>
+          <Group style={styles.groupSpacingTight}>
+            <TextInputField
+              icon={linkIcon}
+              placeholder="opera://hub/pair?..."
+              value={typedLink}
+              onChangeText={setTypedLink}
+              onSubmitEditing={() => pairLink(typedLink)}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </Group>
+          {renderPairButton(typedLink)}
+        </>
+      );
+    }
+    return (
+      <>
+        <Text style={styles.settingLabel}>{t("hubPairing.scan")}</Text>
+        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+          {permission?.granted ? help : t("hubPairing.cameraHelp")}
+        </Text>
+        <Group>
+          {permission?.granted ? (
+            //unmount to release the camera
+            visible && (
+              <CameraView
+                style={styles.camera}
+                facing="back"
+                barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+                onBarcodeScanned={handleScan}
+              />
+            )
+          ) : (
+            <ActionButton
+              icon={cameraIcon}
+              label={t("hubPairing.allowCamera")}
+              onPress={requestPermission}
+            />
+          )}
+        </Group>
+      </>
+    );
+  };
 
   return (
     <DrawerSheet
@@ -75,35 +196,18 @@ export default function HubPairingSheet({
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
       handleContainerStyle={styles.sheetHandleContainer}
-      sheetStyle={[styles.sheet, { paddingBottom: Platform.OS === "ios" ? 34 : 20 }]}
+      avoidKeyboard={mode === "paste"}
+      sheetStyle={[
+        styles.sheet,
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          maxHeight: windowHeight - insets.top - Spacing.xl2,
+        },
+      ]}
       desktopStyle={styles.desktopCard}
     >
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.contentCard}>
-          <Text style={styles.settingLabel}>{t("hubPairing.scan")}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {permission?.granted ? help : t("hubPairing.cameraHelp")}
-          </Text>
-          <Group>
-            {permission?.granted ? (
-              //unmount to release the camera
-              visible && (
-                <CameraView
-                  style={styles.camera}
-                  facing="back"
-                  barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-                  onBarcodeScanned={handleScan}
-                />
-              )
-            ) : (
-              <ActionButton
-                icon={cameraIcon}
-                label={t("hubPairing.allowCamera")}
-                onPress={requestPermission}
-              />
-            )}
-          </Group>
-        </View>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View style={styles.contentCard}>{renderContent()}</View>
       </ScrollView>
     </DrawerSheet>
   );
@@ -155,6 +259,16 @@ const makeStyles = (Colors: ThemeColors) =>
       marginTop: Spacing.xs,
       lineHeight: 20,
       paddingHorizontal: Spacing.md,
+    },
+    groupSpacingTight: {
+      marginBottom: Spacing.lg2,
+    },
+    highlightGroup: {
+      backgroundColor: Colors.primary,
+      borderColor: Colors.borderOnPrimary,
+    },
+    highlightGroupDisabled: {
+      opacity: 0.5,
     },
     camera: {
       width: "100%",

@@ -5,6 +5,12 @@ export const AppEvents = {
   //a user setting was written
   settingsChanged: 'SETTINGS_CHANGED',
   syncCompleted: 'SYNC_COMPLETED',
+  //cloud rows keep old dates, the hub must still get them
+  cloudMerged: 'CLOUD_MERGED',
+  //this device linked or changed its cloud account
+  cloudAccountChanged: 'CLOUD_ACCOUNT_CHANGED',
+  //another device uses a cloud this one cannot reuse
+  cloudAccountOffered: 'CLOUD_ACCOUNT_OFFERED',
   syncPinInvalidated: 'SYNC_PIN_INVALIDATED',
   overlayReopened: 'OVERLAY_REOPENED',
   //user left the overlay via home

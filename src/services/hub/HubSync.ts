@@ -376,6 +376,7 @@ class HubSyncImpl {
     }
     if (Object.keys(patch).length === 0) return;
     await this.write(() => Settings.setMany(patch as Partial<AppSettings>));
+    DeviceEventEmitter.emit(AppEvents.settingsSynced);
     if (ACTIVE_MODEL_KEYS.some((key) => key in patch)) {
       const settings = Settings.getCached();
       AIModule.setMode(settings.aiService);
@@ -463,6 +464,7 @@ class HubSyncImpl {
         mcpServers: JSON.stringify(mcp),
       }),
     );
+    DeviceEventEmitter.emit(AppEvents.settingsSynced);
     //mcp service reconnects what arrived
     DeviceEventEmitter.emit(AppEvents.syncCompleted);
   }

@@ -139,7 +139,7 @@ import { AppEvents } from "../../services/events";
 import { McpService } from "../../services/mcp/McpService";
 import { McpServerConfig } from "../../services/mcp/types";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
-import { Settings } from "../../services/settings/SettingsService";
+import { AppSettings, Settings } from "../../services/settings/SettingsService";
 import { WhisperSTT } from "../../services/speech/STTService";
 import { TTS_SPEEDS } from "../../services/speech/engines";
 import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
@@ -1412,43 +1412,52 @@ export default function SettingsDrawer({
   };
 
   useEffect(() => {
+    //mirrors stored settings into the page
+    const showSettings = (s: AppSettings) => {
+      setLanguageState(s.language || "en");
+      setThemeState(s.theme);
+      setAiServiceState(s.aiService);
+      setOllamaUrlState(s.ollamaUrl);
+      setOllamaServersState(getOllamaServers());
+      setOpenAIServersState(getOpenAIServers());
+      setEnabledProvidersState(getEnabledProviders());
+      setQuickFlowIdState(
+        s.quickFlowModel
+          ? quickFlowOptionId(
+              s.quickFlowService,
+              s.quickFlowUrl,
+              s.quickFlowModel,
+            )
+          : "",
+      );
+      setWhisperModelState(s.whisperModel);
+      setWhisperLanguageState(s.whisperLanguage);
+      setInstructionState(s.instruction);
+      setNameState(s.name || "");
+      setConfirmedName(s.name || "");
+      setAlwaysWhisperState(s.alwaysWhisper);
+      setAutoSpeakState(s.autoSpeak);
+      setShowTechnicalDetailsState(s.showTechnicalDetails);
+      setEditAiMessagesState(s.editAiMessages);
+      setShowDetectionBoxesState(s.showDetectionBoxes);
+      setAdvancedModeState(s.advancedMode);
+      setUseAppContextState(s.useAppContext);
+      setAutoStartMicState(s.autoStartMic);
+      setModelFailoverState(s.modelFailover);
+      setShareInstanceUrlState(s.shareInstanceUrl || "");
+      setLitertForceLoadState(s.litertForceLoad);
+      setLitertContextLengthState(String(s.litertContextLength));
+    };
+    //other devices change settings through sync
+    const sub = DeviceEventEmitter.addListener(AppEvents.settingsSynced, () =>
+      showSettings(Settings.getCached()),
+    );
+
     const loadSettings = async () => {
       try {
         await Settings.init();
         const s = await Settings.load();
-        setLanguageState(s.language || "en");
-        setThemeState(s.theme);
-        setAiServiceState(s.aiService);
-        setOllamaUrlState(s.ollamaUrl);
-        setOllamaServersState(getOllamaServers());
-        setOpenAIServersState(getOpenAIServers());
-        setEnabledProvidersState(getEnabledProviders());
-        setQuickFlowIdState(
-          s.quickFlowModel
-            ? quickFlowOptionId(
-                s.quickFlowService,
-                s.quickFlowUrl,
-                s.quickFlowModel,
-              )
-            : "",
-        );
-        setWhisperModelState(s.whisperModel);
-        setWhisperLanguageState(s.whisperLanguage);
-        setInstructionState(s.instruction);
-        setNameState(s.name || "");
-        setConfirmedName(s.name || "");
-        setAlwaysWhisperState(s.alwaysWhisper);
-        setAutoSpeakState(s.autoSpeak);
-        setShowTechnicalDetailsState(s.showTechnicalDetails);
-        setEditAiMessagesState(s.editAiMessages);
-        setShowDetectionBoxesState(s.showDetectionBoxes);
-        setAdvancedModeState(s.advancedMode);
-        setUseAppContextState(s.useAppContext);
-        setAutoStartMicState(s.autoStartMic);
-        setModelFailoverState(s.modelFailover);
-        setShareInstanceUrlState(s.shareInstanceUrl || "");
-        setLitertForceLoadState(s.litertForceLoad);
-        setLitertContextLengthState(String(s.litertContextLength));
+        showSettings(s);
         //installed read is synchronous while rendering
         await hydrateLiteRTCatalog();
         setInstalledLitertModels(getInstalledLiteRTModels());
@@ -1489,6 +1498,7 @@ export default function SettingsDrawer({
       }
     };
     loadSettings();
+    return () => sub.remove();
   }, []);
 
   //all reachable models, one row each

@@ -1,4 +1,4 @@
-//gradle runs it before each android build
+//gradle runs it before each android build, npm before web
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -11,21 +11,43 @@ const hubDir = resolve(process.env.OPERA_HUB_DIR ?? join(root, '..', 'opera-hub'
 const mainDir = join(root, 'android', 'app', 'src', 'main');
 const libPath = join(mainDir, 'jniLibs', 'arm64-v8a', 'libopera_hub_client.so');
 const bindingsDir = join(mainDir, 'java', 'uniffi', 'opera_hub_client');
+//served as is next to the web bundle
+const webDir = join(root, 'public', 'opera-hub');
 const RELEASES = 'https://github.com/MaestroAI-Company/opera-hub/releases/download';
+//ring needs clang for wasm
+const WINDOWS_CLANG = 'C:\\Program Files\\LLVM\\bin';
 
-const hasSource =
-  existsSync(join(hubDir, 'Cargo.toml')) &&
-  spawnSync('cargo', ['ndk', '--version'], { stdio: 'ignore' }).status === 0;
+const target = process.argv[2] ?? 'android';
+const works = (command, args) => spawnSync(command, args, { stdio: 'ignore' }).status === 0;
+const hasHub = existsSync(join(hubDir, 'Cargo.toml'));
 
-if (hasSource) {
-  buildFromSource();
+if (target === 'web') {
+  if (hasHub && works('wasm-bindgen', ['--version']) && hasClang()) {
+    buildWebFromSource();
+  } else {
+    await downloadPinned([
+      ['opera-hub-client-web.js', join(webDir, 'opera-hub-client-web.js')],
+      ['opera-hub-client-web.wasm', join(webDir, 'opera-hub-client-web.wasm')],
+    ]);
+  }
+} else if (hasHub && works('cargo', ['ndk', '--version'])) {
+  buildAndroidFromSource();
 } else {
-  await downloadPinned();
+  await downloadPinned([
+    ['opera-hub-client-arm64-v8a.so', libPath],
+    ['opera_hub_client.kt', join(bindingsDir, 'opera_hub_client.kt')],
+  ]);
 }
 
-function buildFromSource() {
-  const cargo = (args) => execFileSync('cargo', args, { cwd: hubDir, stdio: 'inherit' });
+function cargo(args, env = process.env) {
+  execFileSync('cargo', args, { cwd: hubDir, stdio: 'inherit', env });
+}
 
+function hasClang() {
+  return works('clang', ['--version']) || existsSync(join(WINDOWS_CLANG, 'clang.exe'));
+}
+
+function buildAndroidFromSource() {
   //arm64 only like the apk
   cargo(['ndk', '-t', 'arm64-v8a', 'build', '--release', '-p', 'opera-hub-client']);
 
@@ -49,12 +71,33 @@ function buildFromSource() {
   console.log(`opera hub client built from ${hubDir}`);
 }
 
-async function downloadPinned() {
+function buildWebFromSource() {
+  const env = { ...process.env };
+  if (!works('clang', ['--version'])) {
+    env.CC_wasm32_unknown_unknown = join(WINDOWS_CLANG, 'clang.exe');
+    env.AR_wasm32_unknown_unknown = join(WINDOWS_CLANG, 'llvm-ar.exe');
+  }
+  cargo(['build', '--release', '--target', 'wasm32-unknown-unknown', '-p', 'opera-hub-client'], env);
+
+  const out = join(hubDir, 'target', 'wasm-bindgen');
+  execFileSync(
+    'wasm-bindgen',
+    ['--target', 'web', '--out-dir', out, join(hubDir, 'target', 'wasm32-unknown-unknown', 'release', 'opera_hub_client.wasm')],
+    { stdio: 'inherit' },
+  );
+  mkdirSync(webDir, { recursive: true });
+  copyFileSync(join(out, 'opera_hub_client.js'), join(webDir, 'opera-hub-client-web.js'));
+  copyFileSync(join(out, 'opera_hub_client_bg.wasm'), join(webDir, 'opera-hub-client-web.wasm'));
+  console.log(`opera hub web client built from ${hubDir}`);
+}
+
+async function downloadPinned(assets) {
   const pin = JSON.parse(readFileSync(join(root, 'opera-hub-client.json'), 'utf8'));
-  const assets = [
-    ['opera-hub-client-arm64-v8a.so', libPath],
-    ['opera_hub_client.kt', join(bindingsDir, 'opera_hub_client.kt')],
-  ];
+  //older pins predate the web client
+  if (assets.some(([asset]) => !pin.sha256[asset])) {
+    console.warn(`opera hub client ${pin.version} has no ${target} build, skipping`);
+    return;
+  }
   for (const [asset, dest] of assets) {
     const expected = pin.sha256[asset];
     //cached while it matches the pin

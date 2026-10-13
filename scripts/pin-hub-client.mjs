@@ -1,10 +1,15 @@
-//pins the hub client release for android
+//pins the hub client release for android and web
 
 import { writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ASSETS = ['opera-hub-client-arm64-v8a.so', 'opera_hub_client.kt'];
+const ASSETS = [
+  'opera-hub-client-arm64-v8a.so',
+  'opera_hub_client.kt',
+  'opera-hub-client-web.js',
+  'opera-hub-client-web.wasm',
+];
 
 const version = process.argv[2];
 if (!/^v\d+\.\d+\.\d+$/.test(version ?? '')) {

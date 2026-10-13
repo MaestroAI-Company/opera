@@ -96,6 +96,7 @@
     "android:preview": "expo run:android --variant preview --app-id ai.maestro.opera.dev --no-bundler",
     "build:android": "expo prebuild --platform android && cd android && ./gradlew assembleRelease",
     "ios": "expo run:ios",
+    "preweb": "node scripts/build-hub-client.mjs web",
     "web": "expo start --web",
     "lint": "expo lint",
     "tauri": "tauri",

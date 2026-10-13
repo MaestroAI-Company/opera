@@ -65,6 +65,7 @@ type HubHost = {
 };
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+const isBrowser = Platform.OS === 'web' && !isTauri;
 
 async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   const core = await import('@tauri-apps/api/core');
@@ -97,9 +98,101 @@ const tauriHost: HubHost = {
   computerName: () => invoke('hub_computer_name'),
 };
 
+type WebResponse = {
+  status: number;
+  headers: [string, string][];
+  read(): Promise<Uint8Array | undefined>;
+  cancel(): void;
+};
+
+type WebClient = {
+  deviceId(): string;
+  pair(link: string, deviceName: string, kind: string): Promise<PairedHub>;
+  status(hub: PairedHub): Promise<HubStatus>;
+  unpair(hub: PairedHub): Promise<void>;
+  devices(hub: PairedHub): Promise<HubDevice[]>;
+  push(hub: PairedHub, collection: string, records: SyncRecord[]): Promise<void>;
+  pull(hub: PairedHub, collection: string, since: number): Promise<PullPage>;
+  watch(hub: PairedHub, since: number): Promise<number>;
+  putGrant(hub: PairedHub, grant: McpGrant): Promise<void>;
+  accessToken(hub: PairedHub, serverId: string): Promise<McpAccessToken | null>;
+  dropGrant(hub: PairedHub, serverId: string): Promise<void>;
+  providers(hub: PairedHub): Promise<HubProvider[]>;
+  forward(
+    hub: PairedHub,
+    provider: string,
+    method: string,
+    path: string,
+    headers: [string, string][],
+    body: Uint8Array,
+  ): Promise<WebResponse>;
+};
+
+type WebModule = {
+  default(options: { module_or_path: string }): Promise<unknown>;
+  WebHubClient: new (secretKey: Uint8Array) => WebClient;
+};
+
+//public files, built or downloaded before the web bundle
+const WEB_MODULE_URL = '/opera-hub/opera-hub-client-web.js';
+const WEB_WASM_URL = '/opera-hub/opera-hub-client-web.wasm';
+//statuses a response body is not allowed for
+const BODYLESS_STATUSES = [204, 205, 304];
+
+//metro must not bundle the generated module
+const importAtRuntime = new Function('url', 'return import(url)') as (url: string) => Promise<WebModule>;
+let webModule: Promise<WebModule> | null = null;
+let webClient: { key: string; client: WebClient } | null = null;
+
+async function loadWebClient(deviceKey: string): Promise<WebClient> {
+  if (webClient?.key === deviceKey) return webClient.client;
+  webModule ??= importAtRuntime(WEB_MODULE_URL).then(async (mod) => {
+    await mod.default({ module_or_path: WEB_WASM_URL });
+    return mod;
+  });
+  const mod = await webModule.catch((e) => {
+    webModule = null;
+    throw Object.assign(new Error(`Opera Hub web client missing: ${e}`), { code: 'Internal' });
+  });
+  const bytes = Uint8Array.from(deviceKey.match(/../g) ?? [], (byte) => parseInt(byte, 16));
+  webClient = { key: deviceKey, client: new mod.WebHubClient(bytes) };
+  return webClient.client;
+}
+
+//browsers run the same rust client in wasm, over relays
+const webHub: NativeHub = {
+  deviceId: async (deviceKey) => (await loadWebClient(deviceKey)).deviceId(),
+  pair: async (deviceKey, link, deviceName, kind) => (await loadWebClient(deviceKey)).pair(link, deviceName, kind),
+  status: async (deviceKey, hub) => (await loadWebClient(deviceKey)).status(hub),
+  unpair: async (deviceKey, hub) => (await loadWebClient(deviceKey)).unpair(hub),
+  devices: async (deviceKey, hub) => (await loadWebClient(deviceKey)).devices(hub),
+  push: async (deviceKey, hub, collection, records) =>
+    (await loadWebClient(deviceKey)).push(hub, collection, records),
+  pull: async (deviceKey, hub, collection, since) => (await loadWebClient(deviceKey)).pull(hub, collection, since),
+  watch: async (deviceKey, hub, since) => (await loadWebClient(deviceKey)).watch(hub, since),
+  putGrant: async (deviceKey, hub, grant) => (await loadWebClient(deviceKey)).putGrant(hub, grant),
+  accessToken: async (deviceKey, hub, serverId) => (await loadWebClient(deviceKey)).accessToken(hub, serverId),
+  dropGrant: async (deviceKey, hub, serverId) => (await loadWebClient(deviceKey)).dropGrant(hub, serverId),
+  providers: async (deviceKey, hub) => (await loadWebClient(deviceKey)).providers(hub),
+  startProxy: () => Promise.reject(Object.assign(new Error('No local proxy in a browser'), { code: 'Internal' })),
+};
+
+function headerPairs(headers: HeadersInit | undefined): [string, string][] {
+  if (!headers) return [];
+  if (headers instanceof Headers) return [...headers.entries()];
+  if (Array.isArray(headers)) return headers.map(([name, value]) => [name, value]);
+  return Object.entries(headers);
+}
+
+async function bodyBytes(body: BodyInit | null | undefined): Promise<Uint8Array> {
+  if (body == null) return new Uint8Array();
+  if (typeof body === 'string') return new TextEncoder().encode(body);
+  return new Uint8Array(await new Response(body).arrayBuffer());
+}
+
 //absent without the rust client
 const native: NativeHub | undefined =
-  Platform.OS === 'android' ? NativeModules.OperaHubModule : isTauri ? tauriHub : undefined;
+  Platform.OS === 'android' ? NativeModules.OperaHubModule : isTauri ? tauriHub : isBrowser ? webHub : undefined;
 const host: HubHost | undefined = isTauri ? tauriHost : undefined;
 
 //per device so never cloud synced
@@ -228,6 +321,39 @@ class OperaHubServiceImpl {
     return this.native().providers(await this.deviceKey(), hub);
   }
 
+  //true where requests cannot use the local proxy
+  needsTunnelFetch(): boolean {
+    return isBrowser;
+  }
+
+  //browsers send provider requests through the tunnel
+  async fetchThroughHub(url: string, init?: RequestInit): Promise<Response> {
+    const hub = await this.getPairedHub();
+    if (!hub) throw Object.assign(new Error('No Opera Hub paired'), { code: 'Unauthorized' });
+    const client = await loadWebClient(await this.deviceKey());
+    const [provider, ...rest] = url.slice(HUB_URL_SCHEME.length).split('/');
+    const response = await client.forward(
+      hub,
+      provider,
+      (init?.method ?? 'GET').toUpperCase(),
+      `/${rest.join('/')}`,
+      headerPairs(init?.headers),
+      await bodyBytes(init?.body),
+    );
+    init?.signal?.addEventListener('abort', () => response.cancel());
+    const body = BODYLESS_STATUSES.includes(response.status)
+      ? null
+      : new ReadableStream<Uint8Array>({
+          async pull(controller) {
+            const chunk = await response.read();
+            if (chunk) controller.enqueue(chunk);
+            else controller.close();
+          },
+          cancel: () => response.cancel(),
+        });
+    return new Response(body, { status: response.status, headers: response.headers });
+  }
+
   //maps hub urls to the local proxy
   async resolveUrl(url: string): Promise<string> {
     const hub = await this.getPairedHub();
@@ -252,6 +378,7 @@ class OperaHubServiceImpl {
 
   private async identity(): Promise<{ name: string; kind: string }> {
     if (host) return { name: await host.computerName(), kind: 'desktop' };
+    if (isBrowser) return { name: Device.osName ? `Opera Web (${Device.osName})` : 'Opera Web', kind: 'web' };
     return { name: Device.deviceName ?? Device.modelName ?? 'Android', kind: 'phone' };
   }
 

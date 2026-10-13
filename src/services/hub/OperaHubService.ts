@@ -160,12 +160,12 @@ const WEB_WASM_URL = '/opera-hub/opera-hub-client-web.wasm';
 //statuses a response body is not allowed for
 const BODYLESS_STATUSES = [204, 205, 304];
 
-//metro must not bundle the generated module
-const importAtRuntime = new Function('url', 'return import(url)') as (url: string) => Promise<WebModule>;
 let webModule: Promise<WebModule> | null = null;
 let webClient: { key: string; client: WebClient } | null = null;
 
 async function loadWebModule(): Promise<WebModule> {
+  //metro must not bundle it, hermes cannot even parse it
+  const importAtRuntime = new Function('url', 'return import(url)') as (url: string) => Promise<WebModule>;
   webModule ??= importAtRuntime(WEB_MODULE_URL).then(async (mod) => {
     await mod.default({ module_or_path: WEB_WASM_URL });
     return mod;

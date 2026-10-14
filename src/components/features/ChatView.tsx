@@ -49,7 +49,7 @@ const linkSourceIcon = require("../../../assets/icons/hyperlink.png");
 const arrowIcon = require("../../../assets/icons/return.png");
 const fileIcon = require("../../../assets/icons/file.png");
 const rightArrowIcon = require("../../../assets/icons/right.png");
-const pencilIcon = require("../../../assets/icons/pencil.png");
+const pencilIcon = require("../../../assets/icons/edit.png");
 
 //android 13+ shows its own clipboard confirmation
 const ANDROID_CLIPBOARD_UI_API = 33;

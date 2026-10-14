@@ -13,6 +13,7 @@ export const fr: Translations = {
   "common.pin": "Épingler",
   "common.unpin": "Désépingler",
   "common.copy": "Copier",
+  "common.download": "Télécharger",
   "common.expand": "Agrandir",
   "common.regenerate": "Régénérer",
   "common.listen": "Écouter",

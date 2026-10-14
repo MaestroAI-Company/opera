@@ -1,4 +1,5 @@
-import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { LinearGradient } from "expo-linear-gradient";
+import { createContext, forwardRef, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   Animated,
   BackHandler,
@@ -7,17 +8,25 @@ import {
   PanResponder,
   Platform,
   Pressable,
+  ScrollView,
+  ScrollViewProps,
   StyleProp,
   StyleSheet,
   View,
+  ViewProps,
   ViewStyle,
 } from "react-native";
+import {
+  KeyboardAwareScrollView,
+  KeyboardAwareScrollViewProps,
+  KeyboardAwareScrollViewRef,
+} from "react-native-keyboard-controller";
 import Reanimated, { useAnimatedStyle } from "react-native-reanimated";
 import { Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useKeyboardLift } from "../../hooks/useKeyboardLift";
 import { usePredictiveBack } from "../../hooks/usePredictiveBack";
-import { useThemedStyles } from "../../hooks/useTheme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import DrawerBackButton from "./DrawerBackButton";
 import { dragDrawer, gestureVelocity, releaseOpens, settleDrawer } from "./drawerAnimation";
 
@@ -25,6 +34,105 @@ import { dragDrawer, gestureVelocity, releaseOpens, settleDrawer } from "./drawe
 const CLOSED_SLIDE = 420;
 //closed sheet parks below so no edge peeks
 const CLOSED_MARGIN = 80;
+const FADE_STEPS = 8;
+//content pads by the same amount
+const FADE_EXTRA = Spacing.xxl;
+
+//smoothstep avoids a kink on short fades
+function fadeStops(clear: string): [string, string, ...string[]] {
+  const rgb = clear.match(/\d+/g)?.slice(0, 3).join(",") ?? "0,0,0";
+  const stops = Array.from({ length: FADE_STEPS }, (_, i) => {
+    const t = i / (FADE_STEPS - 1);
+    const alpha = 1 - t * t * (3 - 2 * t);
+    return `rgba(${rgb},${alpha.toFixed(3)})`;
+  });
+  return stops as [string, string, ...string[]];
+}
+
+//bled once a SheetBody covers the band
+type SheetInsets = { bottom: number; fade: number; bled: boolean };
+const SheetInsetsContext = createContext<SheetInsets>({ bottom: 0, fade: 0, bled: false });
+
+const fadeBottomStyle = StyleSheet.create({
+  fade: { position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 1 },
+});
+//basis auto keeps auto height sheets sized
+const scrollFill = { flexGrow: 1, flexShrink: 1 } as const;
+
+//sits beside the scroll, none for static sheets
+function SheetFade() {
+  const Colors = useColors();
+  const { bottom, fade } = useContext(SheetInsetsContext);
+  const colors = useMemo(
+    () => [...fadeStops(Colors.groupedBackgroundClear)].reverse() as [string, string, ...string[]],
+    [Colors.groupedBackgroundClear]
+  );
+  return <LinearGradient colors={colors} style={[fadeBottomStyle.fade, { height: bottom + fade }]} pointerEvents="none" />;
+}
+
+//wrapper clips top, android ignores radius
+function useSheetScroll(style: StyleProp<ViewStyle>, contentContainerStyle: StyleProp<ViewStyle>) {
+  const { bottom, fade, bled } = useContext(SheetInsetsContext);
+  const content = StyleSheet.flatten(contentContainerStyle) ?? {};
+  //margin so the clip matches the cards
+  const side = Number(content.paddingHorizontal ?? 0);
+  return {
+    wrapStyle: [style, scrollWrap, { marginHorizontal: side }, !bled && { marginBottom: -bottom }],
+    contentContainerStyle: [content, { paddingHorizontal: 0, paddingBottom: Number(content.paddingBottom ?? 0) + bottom + fade }],
+  };
+}
+
+//matches the cards inside a sheet
+const scrollWrap = {
+  flexGrow: 1,
+  flexShrink: 1,
+  borderTopLeftRadius: Radius.xxl + Spacing.md,
+  borderTopRightRadius: Radius.xxl + Spacing.md,
+  overflow: "hidden",
+} as const;
+
+//pages bleed into the band as one block
+export function SheetBody({ style, ...props }: ViewProps) {
+  const { bottom, fade } = useContext(SheetInsetsContext);
+  const inner = useMemo(() => ({ bottom, fade, bled: true }), [bottom, fade]);
+  return (
+    <>
+      <SheetInsetsContext.Provider value={inner}>
+        <View {...props} style={[style, { marginBottom: -bottom }]} />
+      </SheetInsetsContext.Provider>
+      <SheetFade />
+    </>
+  );
+}
+
+//drop-in ScrollView for a sheet body
+export const SheetScrollView = forwardRef<ScrollView, ScrollViewProps>(function SheetScrollView(props, ref) {
+  const { wrapStyle, contentContainerStyle } = useSheetScroll(props.style, props.contentContainerStyle);
+  const { bled } = useContext(SheetInsetsContext);
+  return (
+    <>
+      <View style={wrapStyle}>
+        <ScrollView {...props} ref={ref} style={scrollFill} contentContainerStyle={contentContainerStyle} />
+      </View>
+      {!bled && <SheetFade />}
+    </>
+  );
+});
+
+export const SheetKeyboardAwareScrollView = forwardRef<KeyboardAwareScrollViewRef, KeyboardAwareScrollViewProps>(
+  function SheetKeyboardAwareScrollView(props, ref) {
+    const { wrapStyle, contentContainerStyle } = useSheetScroll(props.style, props.contentContainerStyle);
+    const { bled } = useContext(SheetInsetsContext);
+    return (
+      <>
+        <View style={wrapStyle}>
+          <KeyboardAwareScrollView {...props} ref={ref} style={scrollFill} contentContainerStyle={contentContainerStyle} />
+        </View>
+        {!bled && <SheetFade />}
+      </>
+    );
+  }
+);
 
 //lets an outside gesture drag a sheet one to one
 const sheetTravels = new WeakMap<Animated.Value, number>();
@@ -74,6 +182,8 @@ export default function DrawerSheet({
 }: DrawerSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const isLift = mode === "lift";
+  const insetBottom = Number(StyleSheet.flatten(sheetStyle)?.paddingBottom ?? 0);
+  const insets = useMemo(() => ({ bottom: insetBottom, fade: FADE_EXTRA, bled: false }), [insetBottom]);
   const ownedProgress = useAnimatedValue(0);
   const progress = isLift ? ownedProgress : externalProgress ?? ownedProgress;
   const nativeDriver = !isLift;
@@ -238,7 +348,7 @@ export default function DrawerSheet({
           {...panResponder.panHandlers}
         >
           {handle}
-          {children}
+          <SheetInsetsContext.Provider value={insets}>{children}</SheetInsetsContext.Provider>
           {avoidKeyboard && <KeyboardSpacer />}
         </Animated.View>
       )}
@@ -301,7 +411,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     alignItems: "center",
   },
   handle: {
-    width: 36,
+    width: 48,
     height: 4,
     borderRadius: Radius.pill,
     backgroundColor: Colors.textMuted,

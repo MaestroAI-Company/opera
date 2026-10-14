@@ -101,8 +101,6 @@ const makeStyles = (Colors: ThemeColors) =>
     tile: {
       aspectRatio: 1,
       borderRadius: Radius.xl,
-      borderWidth: 2,
-      borderColor: Colors.border,
       backgroundColor: Colors.primary,
       overflow: "hidden",
       alignItems: "center",

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useKeyboardState } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
@@ -12,7 +12,7 @@ import Checkbox from "../ui/Checkbox";
 import Group from "../ui/Group";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
-import DrawerSheet from "./DrawerSheet";
+import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
@@ -67,7 +67,7 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
         ]}
         desktopStyle={styles.desktopCard}
       >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <SheetScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.contentCard}>
             <Text style={styles.title}>{crash ? t("bugReport.crashTitle") : t("bugReport.title")}</Text>
 
@@ -124,7 +124,7 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
               />
             </Group>
           </View>
-        </ScrollView>
+        </SheetScrollView>
       </DrawerSheet>
 
       <NotificationModal
@@ -147,16 +147,19 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     backgroundColor: Colors.groupedBackground,
     borderTopLeftRadius: Radius.huge2,
     borderTopRightRadius: Radius.huge2,
-    paddingTop: Spacing.lg2,
+    paddingTop: Spacing.xxl,
   },
   desktopCard: {
     width: DESKTOP_CARD_WIDTH,
   },
   sheetHandleContainer: {
+    //floats so top edge matches sides
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     alignItems: "center",
-    marginBottom: Spacing.xs2,
-    paddingVertical: Spacing.lg,
-    marginTop: -Spacing.lg,
+    paddingVertical: Spacing.md,
   },
   content: {
     paddingHorizontal: Spacing.lg2,

@@ -143,7 +143,11 @@ import Slider from "../ui/Slider";
 import SliderToggle from "../ui/SliderToggle";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
-import DrawerSheet from "./DrawerSheet";
+import DrawerSheet, {
+  SheetBody,
+  SheetKeyboardAwareScrollView,
+  SheetScrollView,
+} from "./DrawerSheet";
 import MaestroCard from "./MaestroCard";
 import { BUTTERFLY_OPTIONS, selectButterfly, useMaestroButterfly } from "./maestroButterfly";
 import VoiceEngineCard from "./VoiceEngineCard";
@@ -5652,7 +5656,7 @@ export default function SettingsDrawer({
   //catalog, search and model push like settings pages
   const renderLitertPage = (page: LitertPage, active: boolean) => (
     <>
-      <ScrollView
+      <SheetScrollView
         ref={active ? addModelScrollRef : undefined}
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
@@ -5682,7 +5686,7 @@ export default function SettingsDrawer({
                 )}
           </>
         )}
-      </ScrollView>
+      </SheetScrollView>
 
       {/* floats over the scroll like the settings back button */}
       {page !== "browse" && (
@@ -5719,7 +5723,7 @@ export default function SettingsDrawer({
       //fills the settings window, stacked pages cannot size it
       desktopStyle={[styles.addModelSheetDesktop, { height: "100%" }]}
     >
-      <View
+      <SheetBody
         style={styles.litertSheetBody}
         onLayout={(e) => {
           const width = e.nativeEvent.layout.width;
@@ -5734,7 +5738,7 @@ export default function SettingsDrawer({
           onBack={handleLitertBackPress}
           renderPage={renderLitertPage}
         />
-      </View>
+      </SheetBody>
     </DrawerSheet>
   );
 
@@ -5756,7 +5760,7 @@ export default function SettingsDrawer({
       ]}
       desktopStyle={styles.addModelSheetDesktop}
     >
-      <ScrollView
+      <SheetScrollView
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
@@ -5819,7 +5823,7 @@ export default function SettingsDrawer({
             </Group>
           </View>
         </View>
-      </ScrollView>
+      </SheetScrollView>
     </DrawerSheet>
   );
 
@@ -5836,7 +5840,7 @@ export default function SettingsDrawer({
 
     return (
       <>
-        <ScrollView
+        <SheetScrollView
           contentContainerStyle={styles.addModelSheetContent}
           keyboardShouldPersistTaps="handled"
           onScroll={
@@ -5929,7 +5933,7 @@ export default function SettingsDrawer({
               </>
             )
           )}
-        </ScrollView>
+        </SheetScrollView>
 
         {/* floats over the scroll like the settings back button */}
         {page !== "list" && (
@@ -5966,7 +5970,7 @@ export default function SettingsDrawer({
       ]}
       desktopStyle={[styles.addModelSheetDesktop, { height: "100%" }]}
     >
-      <View
+      <SheetBody
         style={styles.litertSheetBody}
         onLayout={(e) => {
           const width = e.nativeEvent.layout.width;
@@ -5981,7 +5985,7 @@ export default function SettingsDrawer({
           onBack={handleOpenAIModelsBack}
           renderPage={renderOpenAIModelsPage}
         />
-      </View>
+      </SheetBody>
     </DrawerSheet>
   );
 
@@ -6003,7 +6007,7 @@ export default function SettingsDrawer({
       ]}
       desktopStyle={styles.addModelSheetDesktop}
     >
-      <ScrollView
+      <SheetScrollView
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
@@ -6086,7 +6090,7 @@ export default function SettingsDrawer({
             </Group>
           </View>
         </View>
-      </ScrollView>
+      </SheetScrollView>
     </DrawerSheet>
   );
 
@@ -6108,7 +6112,7 @@ export default function SettingsDrawer({
       desktopStyle={styles.addModelSheetDesktop}
     >
       {/* too tall to ride the keyboard */}
-      <KeyboardAwareScrollView
+      <SheetKeyboardAwareScrollView
         bottomOffset={Spacing.xl2}
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
@@ -6224,7 +6228,7 @@ export default function SettingsDrawer({
             </Group>
           </View>
         </View>
-      </KeyboardAwareScrollView>
+      </SheetKeyboardAwareScrollView>
     </DrawerSheet>
   );
 
@@ -6248,7 +6252,7 @@ export default function SettingsDrawer({
       ]}
       desktopStyle={styles.addModelSheetDesktop}
     >
-      <ScrollView
+      <SheetScrollView
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
@@ -6262,7 +6266,7 @@ export default function SettingsDrawer({
             />
           )}
         </View>
-      </ScrollView>
+      </SheetScrollView>
     </DrawerSheet>
   );
 
@@ -6285,8 +6289,8 @@ export default function SettingsDrawer({
       desktopStyle={styles.addModelSheetDesktop}
     >
       {selectedLocalModel && (
-        <View style={styles.addModelSheetBody}>
-          <ScrollView
+        <SheetBody style={styles.addModelSheetBody}>
+          <SheetScrollView
             contentContainerStyle={styles.addModelSheetContent}
             keyboardShouldPersistTaps="handled"
           >
@@ -6380,8 +6384,8 @@ export default function SettingsDrawer({
                 />
               )}
             </View>
-          </ScrollView>
-        </View>
+          </SheetScrollView>
+        </SheetBody>
       )}
     </DrawerSheet>
   );
@@ -6405,8 +6409,8 @@ export default function SettingsDrawer({
       desktopStyle={styles.addModelSheetDesktop}
     >
       {!!downloadingLitert && (
-        <View style={styles.addModelSheetBody}>
-          <ScrollView contentContainerStyle={styles.addModelSheetContent}>
+        <SheetBody style={styles.addModelSheetBody}>
+          <SheetScrollView contentContainerStyle={styles.addModelSheetContent}>
             <View style={styles.contentCard}>
               <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
                 <Text
@@ -6461,8 +6465,8 @@ export default function SettingsDrawer({
                 </Group>
               </View>
             </View>
-          </ScrollView>
-        </View>
+          </SheetScrollView>
+        </SheetBody>
       )}
     </DrawerSheet>
   );
@@ -6488,7 +6492,7 @@ export default function SettingsDrawer({
       ]}
       desktopStyle={styles.addModelSheetDesktop}
     >
-      <ScrollView
+      <SheetScrollView
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
@@ -6508,7 +6512,7 @@ export default function SettingsDrawer({
             </Group>
           </View>
         </View>
-      </ScrollView>
+      </SheetScrollView>
     </DrawerSheet>
   );
 
@@ -6777,14 +6781,17 @@ const makeStyles = (Colors: ThemeColors) =>
       backgroundColor: Colors.groupedBackground,
       borderTopLeftRadius: Radius.huge2,
       borderTopRightRadius: Radius.huge2,
-      paddingTop: Spacing.lg2,
+      paddingTop: Spacing.xxl,
       overflow: "hidden",
     },
     sheetHandleContainer: {
+      //floats so top edge matches sides
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
       alignItems: "center",
-      marginBottom: Spacing.xs2,
-      paddingVertical: Spacing.lg,
-      marginTop: -Spacing.lg,
+      paddingVertical: Spacing.md,
     },
     addModelSheetDesktop: {
       width: 380,

@@ -41,6 +41,7 @@ import {
 import { findMentionSpans, listMentionables, MentionSpan } from "../../services/ai/mentions";
 import { Settings } from "../../services/settings/SettingsService";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
+import IconButton from "../ui/IconButton";
 import NotificationModal from "../ui/NotificationModal";
 import AttachmentSheet, { SelectedFile } from "./AttachmentSheet";
 import { pressStyle } from "../ui/pressStyle";
@@ -51,6 +52,7 @@ const addIcon = require("../../../assets/icons/add.png");
 const stopIcon = require("../../../assets/icons/stop.png");
 const fileIcon = require("../../../assets/icons/file.png");
 const pencilIcon = require("../../../assets/icons/pencil.png");
+const cancelIcon = require("../../../assets/icons/cancel2.png");
 
 const IMAGE_MAX_WIDTH = 1280;
 const IMAGE_COMPRESS_QUALITY = 0.7;
@@ -1341,21 +1343,22 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                     transform: [{ translateY: filesAnim.interpolate({ inputRange: [0, 1], outputRange: [drawerHeight, 0] }) }],
                   }}
                 >
-                  <View style={[styles.filesContainerTop, incognito && styles.filesContainerTopIncognito]}>
+                  <View style={[styles.filesContainerTop, incognito && styles.filesContainerTopIncognito, editing && !hasAttachments && styles.filesContainerTopEditOnly]}>
                     <View style={styles.fileChipsContainer}>
                       {editing && (
                         <View style={styles.editTrayRow}>
                           <Image source={pencilIcon} style={styles.filePreviewDocumentIconTop} tintColor={Colors.textMuted} />
-                          <Text style={styles.filesAddedText}>{t("chatbar.editingMessage")}</Text>
-                          <Pressable
+                          <Text style={styles.editTrayText} numberOfLines={1}>{t("chatbar.editingMessage")}</Text>
+                          <IconButton
+                            icon={cancelIcon}
+                            label={t("common.cancel")}
                             onPress={onEditCancel}
-                            style={pressStyle([styles.removeFileBtnTop, { position: "relative" as const, right: 0, marginLeft: "auto" as const }], "fadeLight")}
-                          >
-                            <Text style={styles.removeFileBtnTextTop}>✕</Text>
-                          </Pressable>
+                            size={18}
+                            tintColor={Colors.textMuted}
+                            containerSize={32}
+                          />
                         </View>
                       )}
-                      {editing && <View style={styles.editTrayDivider} />}
                       {appContextChip && (
                         <View style={styles.filePreviewContainerTop}>
                           <Image source={{ uri: appContextChip.icon }} style={styles.appContextChipIcon} resizeMode="contain" />
@@ -1809,16 +1812,21 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     fontSize: FontSizes.bodyMd,
     marginLeft: 4,
   },
+  filesContainerTopEditOnly: {
+    minHeight: 0,
+  },
   editTrayRow: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    //matches the chip row height
+    gap: Spacing.md,
+    paddingLeft: Spacing.md,
     minHeight: 32,
   },
-  editTrayDivider: {
-    width: '100%',
-    height: 2,
-    backgroundColor: Colors.border,
+  editTrayText: {
+    flex: 1,
+    fontFamily: Fonts.mono,
+    color: Colors.textMuted,
+    fontSize: FontSizes.bodyMd,
   },
 });

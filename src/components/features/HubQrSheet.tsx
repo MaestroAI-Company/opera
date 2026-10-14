@@ -20,8 +20,8 @@ import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import DrawerSheet from "./DrawerSheet";
 
-const copyIcon = require("../../../assets/icons/copy.png");
-const reloadIcon = require("../../../assets/icons/reload.png");
+const copyIcon = require("../../../assets/icons/copy2.png");
+const reloadIcon = require("../../../assets/icons/reconnect.png");
 
 const DESKTOP_CARD_WIDTH = 380;
 const COPIED_NOTICE_MS = 2000;

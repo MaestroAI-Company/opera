@@ -182,7 +182,7 @@ The palette is rooted in a warm cream foundation, a single red accent, and a ful
 - **Text ramp (#000000 → #888888):** Three neutral steps — primary (#000000), secondary (#444444) and muted (#888888) — plus white on colored surfaces. Full-black text on cream keeps maximum readability. Do not introduce intermediate greys outside these tokens.
 - **Incognito (#565A75):** A purple-gray identity that swaps out every red element when ephemeral mode is on. Base #565A75 acts like the red's role, with a dark surface #2A2A35 for the composer.
 - **Links:** Opera Red with an underline, in markdown and onboarding. There is no separate link blue.
-- **Code (#1E1E1E blocks / #D63384 inline):** Dark blocks with light-gray text; pink inline code.
+- **Code (host surface / #D63384 inline):** Code blocks share the background of their host (white widget card, drawer surface); pink inline code.
 
 ## Typography
 
@@ -225,7 +225,7 @@ The shape language is **sticker-like**: 2px outlines on nearly every interactive
 - **Input fields:** A borderless 44px row, mono 14px text, placeholder `text-muted`, optional 18×18 leading icon. The outline and 10px radius come from the `Group` around it (see Component Placement).
 - **Chat messages:** User messages are right-aligned red pills (10px radius, max-width 80%) with white Figtree text — purple #565A75 in incognito. Assistant messages are transparent and full-width, rendered as markdown with no bubble.
 - **Chat composer:** A 56px colored pill (red, or dark #2A2A35 incognito) with a glow shadow; white 16px text, 28×28 plus/mic/send icon buttons.
-- **Code blocks:** Dark #1E1E1E background, #D4D4D4 text, 6px radius, mono 13px, VS2015-style highlighting. Inline code is #F0F0F0 with pink #D63384 text.
+- **Code blocks:** Same background as the widget or drawer that holds them, 6px radius, mono 13px. Highlighting follows the surface: VS (light) on light, VS2015 on dark. The widget header has expand, download and copy icon buttons. Inline code is #F0F0F0 with pink #D63384 text.
 - **Drawers & modals:** Drawers and sheets sit on the grouped background with a drawer scrim (rgba(0,0,0,0.25)), modals are white windows on a modal scrim (rgba(0,0,0,0.4)); desktop sheet cards use the sticker shadow (see Drawers). Confirmation/info modals (`NotificationModal`) use a 15px window radius, with their buttons and text input kept at the 10px default.
 - **Snackbar:** A dark pill (`snackbar-bg`: #444444 in light, #3A3A3A in dark) floating above the composer, white mono text.
 - **Pressed state:** any element with a pressed or hover feedback lightens its main color, never darkens it. Red surfaces (buttons, checked checkbox, selected rows, banner, call-to-action) go to `primary-bright` (#FF4D4D), incognito surfaces go to `incognito-bright` (#70748E), and the chat composer and the Selector, Slider and model pills already do. An icon button on a red row lifts it with a white tint. Neutral surfaces keep their gray fill (`surface-pressed`), since white cannot get lighter. In code, use `pressStyle(base, "primary")` or `Colors.primaryBright`; never hardcode a darker red.
@@ -662,10 +662,11 @@ To add a settings subpage:
 - `mode="overlay"`: above everything on a scrim, slides up its own measured height, closes on pull down or flick, on Android back and on Escape.
 - `mode="lift"`: inside the layout, pushes the content above instead of covering it (attachment sheet under the chat bar). The parent screen handles back.
 - Large screen and desktop: a centered card (`Radius.window`, 2px outline, sticker shadow `-6px 6px 0px shadowInk`) with a close button top left. The card look lives only in DrawerSheet; consumers pass nothing but a width through `desktopStyle`, plus `height: "100%"` when the sheet holds a PageStack, since stacked pages cannot size it. `anchored` hangs the card under its trigger with no close button (model selector on tablet).
-- `avoidKeyboard` when it holds a TextInputField; it then needs a `maxHeight` in `sheetStyle`. A sheet too tall to ride the keyboard scrolls in a `KeyboardAwareScrollView` instead (MCP add server).
+- `avoidKeyboard` when it holds a TextInputField; it then needs a `maxHeight` in `sheetStyle`. A sheet too tall to ride the keyboard scrolls in a `SheetKeyboardAwareScrollView` instead (MCP add server).
 - `onBackPress` returns `true` when the sheet popped one of its own pages instead of closing.
-- Content: a `ScrollView` padded `Spacing.lg2` on the sides, then sections, rows and Groups like a page, without the Petrona header. The first row label acts as the title.
-- A sheet with several pages puts a `PageStack` in its body, a floating `DrawerBackButton kind="back"` on non-root pages, and pops pages in `onBackPress` (add model sheet).
+- Content: a `SheetScrollView` padded `Spacing.lg2` on the sides, then sections, rows and Groups like a page, without the Petrona header. The first row label acts as the title.
+- Edge scroll: on mobile the scroll runs to the bottom edge of the sheet under a `LinearGradient` fade (grouped background to clear, eased stops), same as the drawers. The top edge sits in a 20px band (`paddingTop: Spacing.xxl`) with the handle floating in it (`sheetHandleContainer` is absolute) and the scroll sits in a wrapping view clipped by a rounded top (`Radius.xxl + Spacing.md`, like the cards; android scrolls ignore the radius themselves), so `SheetScrollView` (or `SheetKeyboardAwareScrollView`) turns its content's side padding into margin. It reads the bottom band (`paddingBottom` of `sheetStyle`) plus `FADE_EXTRA` and moves them into its content padding, so rows sit clear of the fade at rest. Never a plain `ScrollView` as a sheet body. Desktop cards and `lift` mode keep their own padding.
+- A sheet with several pages puts a `PageStack` in a `SheetBody` (the block bleeds into the bottom band and owns the fade, each page's `SheetScrollView` then only pads and rounds its content), a floating `DrawerBackButton kind="back"` on non-root pages, and pops pages in `onBackPress` (add model sheet). A `SheetBody` also wraps a `SheetScrollView` that sits inside another view, so the scroll never reaches outside its parent's bounds.
 
 ```tsx
 <DrawerSheet
@@ -685,7 +686,7 @@ To add a settings subpage:
   ]}
   desktopStyle={styles.desktopCard}
 >
-  <ScrollView
+  <SheetScrollView
     contentContainerStyle={styles.content}
     keyboardShouldPersistTaps="handled"
   >
@@ -700,7 +701,7 @@ To add a settings subpage:
         />
       </Group>
     </View>
-  </ScrollView>
+  </SheetScrollView>
 </DrawerSheet>
 ```
 
@@ -713,13 +714,15 @@ sheet: {
   backgroundColor: Colors.groupedBackground,
   borderTopLeftRadius: Radius.huge2,
   borderTopRightRadius: Radius.huge2,
-  paddingTop: Spacing.lg2,
+  paddingTop: Spacing.xxl,
 },
 sheetHandleContainer: {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
   alignItems: "center",
-  marginBottom: Spacing.xs2,
-  paddingVertical: Spacing.lg,
-  marginTop: -Spacing.lg,
+  paddingVertical: Spacing.md,
 },
 desktopCard: {
   width: DESKTOP_CARD_WIDTH,

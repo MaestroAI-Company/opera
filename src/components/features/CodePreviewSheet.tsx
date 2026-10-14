@@ -1,6 +1,6 @@
 import * as Clipboard from "expo-clipboard";
 import { useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemedStyles } from "../../hooks/useTheme";
@@ -8,9 +8,11 @@ import { useT } from "../../i18n";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import { CodeContent, codeLanguageName } from "../ui/MarkdownText";
-import DrawerSheet from "./DrawerSheet";
+import { downloadCodeFile } from "../../services/codeDownload";
+import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 const copyIcon = require("../../../assets/icons/copy2.png");
+const downloadIcon = require("../../../assets/icons/download.png");
 
 const DESKTOP_CARD_WIDTH = 560;
 
@@ -52,6 +54,11 @@ export default function CodePreviewSheet({ code, onClose, isLargeScreen = false,
     setCopied(true);
   };
 
+  const handleDownload = () => {
+    if (!shown) return;
+    downloadCodeFile(shown.code, shown.language, shown.title).catch(() => {});
+  };
+
   return (
     <DrawerSheet
       visible={!!code}
@@ -64,7 +71,7 @@ export default function CodePreviewSheet({ code, onClose, isLargeScreen = false,
       sheetStyle={[styles.sheet, { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + bottomInset, maxHeight: windowHeight - insets.top - Spacing.xl2 }]}
       desktopStyle={styles.desktopCard}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <SheetScrollView contentContainerStyle={styles.content}>
         {shown && (
           <>
             <Group style={styles.infoGroup}>
@@ -86,11 +93,16 @@ export default function CodePreviewSheet({ code, onClose, isLargeScreen = false,
                   label={copied ? t("chat.copied") : t("common.copy")}
                   onPress={handleCopy}
                 />
+                <ActionButton
+                  icon={downloadIcon}
+                  label={t("common.download")}
+                  onPress={handleDownload}
+                />
               </Group>
             </View>
           </>
         )}
-      </ScrollView>
+      </SheetScrollView>
     </DrawerSheet>
   );
 }
@@ -104,16 +116,19 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     backgroundColor: Colors.groupedBackground,
     borderTopLeftRadius: Radius.huge2,
     borderTopRightRadius: Radius.huge2,
-    paddingTop: Spacing.lg2,
+    paddingTop: Spacing.xxl,
   },
   desktopCard: {
     width: DESKTOP_CARD_WIDTH,
   },
   sheetHandleContainer: {
+    //floats so top edge matches sides
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     alignItems: "center",
-    marginBottom: Spacing.xs2,
-    paddingVertical: Spacing.lg,
-    marginTop: -Spacing.lg,
+    paddingVertical: Spacing.md,
   },
   content: {
     paddingHorizontal: Spacing.lg2,

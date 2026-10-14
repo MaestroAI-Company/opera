@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { Image, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Image, Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
-import DrawerSheet from "./DrawerSheet";
+import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 const DESKTOP_CARD_WIDTH = 420;
 
@@ -82,7 +82,7 @@ export default function ImagePreviewSheet({ image, onClose, isLargeScreen = fals
       sheetStyle={[styles.sheet, { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + bottomInset, maxHeight: windowHeight - insets.top - Spacing.xl2 }]}
       desktopStyle={styles.desktopCard}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <SheetScrollView contentContainerStyle={styles.content}>
         {shown && (
           <Group style={styles.infoGroup}>
             <View style={styles.imageContainer}>
@@ -111,7 +111,7 @@ export default function ImagePreviewSheet({ image, onClose, isLargeScreen = fals
             ))}
           </Group>
         )}
-      </ScrollView>
+      </SheetScrollView>
     </DrawerSheet>
   );
 }
@@ -125,16 +125,19 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     backgroundColor: Colors.groupedBackground,
     borderTopLeftRadius: Radius.huge2,
     borderTopRightRadius: Radius.huge2,
-    paddingTop: Spacing.lg2,
+    paddingTop: Spacing.xxl,
   },
   desktopCard: {
     width: DESKTOP_CARD_WIDTH,
   },
   sheetHandleContainer: {
+    //floats so top edge matches sides
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     alignItems: "center",
-    marginBottom: Spacing.xs2,
-    paddingVertical: Spacing.lg,
-    marginTop: -Spacing.lg,
+    paddingVertical: Spacing.md,
   },
   content: {
     paddingHorizontal: Spacing.lg2,

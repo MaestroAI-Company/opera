@@ -12,6 +12,7 @@ export const en = {
   "common.pin": "Pin",
   "common.unpin": "Unpin",
   "common.copy": "Copy",
+  "common.download": "Download",
   "common.expand": "Expand",
   "common.regenerate": "Regenerate",
   "common.listen": "Listen",

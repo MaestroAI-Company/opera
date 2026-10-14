@@ -4171,6 +4171,13 @@ export default function SettingsDrawer({
   };
 
   const renderOperaHubSubPage = () => {
+    const hubIcon = (
+      <Image
+        source={HUB_DEVICE_ICONS.desktop}
+        style={styles.hubPageIcon}
+        tintColor={Colors.textPrimary}
+      />
+    );
     if (!pairedHub) {
       return (
         <View style={styles.subPageContainer}>
@@ -4190,7 +4197,7 @@ export default function SettingsDrawer({
                 //pair with a hub or become one
                 <Group>
                   <ActionButton
-                    icon={linkIcon}
+                    icon={addIcon}
                     label={t("settings.hub.pair")}
                     disabled={hostBusy}
                     onPress={() => setHubPairingVisible(true)}
@@ -4214,7 +4221,7 @@ export default function SettingsDrawer({
               ) : (
                 <Group style={styles.highlightGroup}>
                   <ActionButton
-                    icon={Platform.OS === "web" ? linkIcon : cameraIcon}
+                    icon={addIcon}
                     label={t("settings.hub.pair")}
                     variant="highlight"
                     onPress={() => setHubPairingVisible(true)}
@@ -4264,7 +4271,8 @@ export default function SettingsDrawer({
       : Platform.OS !== "web";
     return (
       <View style={styles.subPageContainer}>
-        {renderSubPageHeader(t("settings.nav.hub.title"))}
+        {renderSubPageHeader(hubStatus?.name ?? pairedHub.name)}
+        {hubIcon}
 
         {/* sync and the models the hub runs, models for admins only */}
         {(syncPrefs ||
@@ -7887,6 +7895,12 @@ const makeStyles = (Colors: ThemeColors) =>
     addModelSheetContent: {
       paddingHorizontal: Spacing.lg2,
       paddingBottom: Spacing.lg,
+    },
+    hubPageIcon: {
+      width: 120,
+      height: 120,
+      alignSelf: "center",
+      marginVertical: Spacing.xl2,
     },
     groupSpacing: {
       marginBottom: Spacing.xxl,

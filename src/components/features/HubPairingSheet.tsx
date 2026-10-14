@@ -1,6 +1,7 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useEffect, useRef, useState } from "react";
 import {
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -17,7 +18,7 @@ import {
   Spacing,
   ThemeColors,
 } from "../../../constants/theme";
-import { useThemedStyles } from "../../hooks/useTheme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import {
   hubErrorCode,
@@ -31,8 +32,10 @@ import TextInputField from "../ui/TextInputField";
 import DrawerSheet from "./DrawerSheet";
 
 const cameraIcon = require("../../../assets/icons/camera.png");
+const addIcon = require("../../../assets/icons/add.png");
 const linkIcon = require("../../../assets/icons/link.png");
 const keyIcon = require("../../../assets/icons/key.png");
+const laptopIcon = require("../../../assets/icons/laptop.png");
 const serverIcon = require("../../../assets/icons/server.png");
 
 const DESKTOP_CARD_WIDTH = 380;
@@ -61,6 +64,7 @@ export default function HubPairingSheet({
   isDesktop = false,
 }: HubPairingSheetProps) {
   const styles = useThemedStyles(makeStyles);
+  const Colors = useColors();
   const t = useT();
   const [permission, requestPermission] = useCameraPermissions();
   const { height: windowHeight } = useWindowDimensions();
@@ -174,7 +178,7 @@ export default function HubPairingSheet({
       ]}
     >
       <ActionButton
-        icon={linkIcon}
+        icon={addIcon}
         label={t("hubPairing.pair")}
         variant="highlight"
         disabled={pairing || !value.trim()}
@@ -224,34 +228,22 @@ export default function HubPairingSheet({
 
   const renderFound = (hub: PairedHub) => (
     <>
-      <Text style={styles.settingLabel}>{t("hubPairing.found")}</Text>
-      <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-        {t("hubPairing.foundHelp")}
+      <Text style={styles.foundTitle} numberOfLines={1}>
+        {hub.name}
       </Text>
-      <Group style={[styles.infoGroup, styles.groupSpacingTight]}>
-        <ActionButton
-          icon={serverIcon}
-          label={t("settings.hub.name")}
-          rightElement={
-            <Text style={styles.infoValue} numberOfLines={1}>
-              {hub.name}
-            </Text>
-          }
-        />
-        <ActionButton
-          icon={keyIcon}
-          label={t("hubPairing.hubId")}
-          rightElement={
-            <Text style={styles.infoValue} numberOfLines={1}>
-              {hub.id.slice(0, 8)}
-            </Text>
-          }
-        />
-      </Group>
+      <Image
+        source={laptopIcon}
+        style={styles.foundIcon}
+        tintColor={Colors.textPrimary}
+      />
+      <Text style={styles.foundText}>{t("hubPairing.found")}</Text>
+      <Text style={styles.foundId} numberOfLines={1}>
+        {hub.id.slice(0, 8)}
+      </Text>
       <Group style={styles.highlightGroup}>
         <ActionButton
           icon={linkIcon}
-          label={t("hubPairing.link")}
+          label={t("hubPairing.link", { name: hub.name })}
           variant="highlight"
           onPress={() => onPaired(hub)}
         />
@@ -407,13 +399,32 @@ const makeStyles = (Colors: ThemeColors) =>
     infoGroup: {
       borderWidth: 0,
     },
-    infoValue: {
-      flexShrink: 1,
-      maxWidth: "60%",
-      textAlign: "right",
+    foundTitle: {
+      fontSize: FontSizes.displayMd,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.display,
+      textAlign: "center",
+      paddingHorizontal: Spacing.md,
+    },
+    foundIcon: {
+      width: 120,
+      height: 120,
+      alignSelf: "center",
+      marginVertical: Spacing.xl2,
+    },
+    foundText: {
+      fontSize: FontSizes.body,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.mono,
+      paddingHorizontal: Spacing.md,
+    },
+    foundId: {
+      fontSize: FontSizes.body,
       color: Colors.textMuted,
       fontFamily: Fonts.mono,
-      fontSize: FontSizes.label,
+      marginTop: Spacing.sm,
+      marginBottom: Spacing.lg2,
+      paddingHorizontal: Spacing.md,
     },
     groupSpacingTight: {
       marginBottom: Spacing.lg2,

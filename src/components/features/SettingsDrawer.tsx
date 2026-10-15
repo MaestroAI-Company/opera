@@ -134,7 +134,8 @@ import {
   OperaHub,
   PairedHub,
 } from "../../services/hub/OperaHubService";
-import { HubSync, HubSyncPrefs } from "../../services/hub/HubSync";
+import { HubSync } from "../../services/hub/HubSync";
+import { SyncPrefs, SyncPrefsStore } from "../../services/SyncPrefs";
 import { AppEvents } from "../../services/events";
 import { McpService } from "../../services/mcp/McpService";
 import { McpServerConfig } from "../../services/mcp/types";
@@ -257,6 +258,8 @@ const reconnectIcon = require("../../../assets/icons/reconnect.png");
 const hyperlinkIcon = require("../../../assets/icons/hyperlink2.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
+//hub entry in the account list
+const HUB_SYNC_ID = "hub";
 
 //plugin help shows the first sentence only
 function shortDescription(text: string) {
@@ -289,9 +292,6 @@ type SettingsDrawerProps = {
   //an opera://hub/pair link to confirm
   hubPairLink?: string | null;
   onHubPairLinkHandled?: () => void;
-  //a cloud provider the user agreed to sign in to
-  cloudConnectRequest?: string | null;
-  onCloudConnectHandled?: () => void;
 };
 
 export type SubPage =
@@ -316,7 +316,6 @@ export type SubPage =
   | "profile"
   | "cloud"
   | "operahub"
-  | "hubsync"
   | "hubprovider"
   | "hubserver"
   | "hubmodels"
@@ -351,7 +350,6 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   operahub: "main",
   hubprovider: "service",
   hubserver: "hubprovider",
-  hubsync: "operahub",
   hubmodels: "operahub",
   hubmodel: "hubmodels",
   sociallinks: "main",
@@ -706,8 +704,6 @@ export default function SettingsDrawer({
   initialSubPage,
   hubPairLink = null,
   onHubPairLinkHandled,
-  cloudConnectRequest = null,
-  onCloudConnectHandled,
 }: SettingsDrawerProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -916,7 +912,11 @@ export default function SettingsDrawer({
   const [hostBusy, setHostBusy] = useState(false);
   const [hostError, setHostError] = useState<string | null>(null);
   const [thisDeviceId, setThisDeviceId] = useState<string | null>(null);
-  const [syncPrefs, setSyncPrefs] = useState<HubSyncPrefs | null>(null);
+  const [syncPrefs, setSyncPrefs] = useState<SyncPrefs | null>(null);
+  //another sync account was picked
+  const [hubSyncPaused, setHubSyncPaused] = useState(false);
+  //pairing started from the account list
+  const [hubPickedForSync, setHubPickedForSync] = useState(false);
   //null without the admin scope
   const [hubSettings, setHubSettings] = useState<HubSettings | null>(null);
 
@@ -927,7 +927,7 @@ export default function SettingsDrawer({
       setHostStatus(await OperaHub.hostStatus().catch(() => null));
     }
     if (!hub) return;
-    setSyncPrefs(await HubSync.loadPrefs());
+    setHubSyncPaused(await HubSync.isPaused());
     OperaHub.deviceId()
       .then(setThisDeviceId)
       .catch(() => setThisDeviceId(null));
@@ -1126,7 +1126,15 @@ export default function SettingsDrawer({
   const cloudStorageOptions = [
     { id: "none", label: t("settings.cloud.none") },
     ...CLOUD_PROVIDERS.map((def) => ({ id: def.id, label: def.label })),
+    ...(hubSupported
+      ? [{ id: HUB_SYNC_ID, label: t("settings.nav.hub.title") }]
+      : []),
   ];
+  //active cloud wins over the hub
+  const syncAccount =
+    cloudProvider === "none" && pairedHub && !hubSyncPaused
+      ? HUB_SYNC_ID
+      : cloudProvider;
 
   const ollamaKeepAliveOptions = [
     { id: "300", label: "5m" },
@@ -1482,6 +1490,11 @@ export default function SettingsDrawer({
       }
 
       try {
+        setSyncPrefs(await SyncPrefsStore.load());
+        if (OperaHub.isSupported()) {
+          setPairedHub(await OperaHub.getPairedHub());
+          setHubSyncPaused(await HubSync.isPaused());
+        }
         await CloudSync.init();
         setCloudProvider(CloudSync.getProviderName());
         setHasSyncPin(CloudSync.hasPin());
@@ -2633,6 +2646,7 @@ export default function SettingsDrawer({
     showCloudProgress(t("settings.cloud.progress.connecting"), providerName);
     const success = await CloudSync.setProvider(providerName);
     if (success) {
+      if (pairedHub) await pauseHubSync(true);
       await completeCloudConnect(providerName);
     } else {
       setCloudProvider("none");
@@ -2647,9 +2661,35 @@ export default function SettingsDrawer({
     }
   };
 
+  const pauseHubSync = async (paused: boolean) => {
+    await HubSync.setPaused(paused);
+    setHubSyncPaused(paused);
+  };
+
+  //cloud stays linked while paused
+  const selectHubSync = async () => {
+    if (CloudSync.getProviderName() !== "none") {
+      setCloudProvider("none");
+      await CloudSync.setProvider("none");
+      await completeCloudConnect("none");
+    }
+    await pauseHubSync(false);
+  };
+
   const handleSetCloudProvider = async (v: string) => {
+    if (v === HUB_SYNC_ID) {
+      if (pairedHub) {
+        await selectHubSync();
+      } else {
+        setHubPickedForSync(true);
+        setHubPairingVisible(true);
+      }
+      return;
+    }
+
     if (v === "none") {
       setCloudProvider("none");
+      if (pairedHub) await pauseHubSync(true);
       const success = await CloudSync.setProvider("none");
       if (success) {
         await completeCloudConnect("none");
@@ -2706,6 +2746,10 @@ export default function SettingsDrawer({
     if (!enabledProviders.includes(HUB_PROVIDER_ID)) {
       setProviderEnabled(HUB_PROVIDER_ID, true);
     }
+    if (hubPickedForSync) {
+      setHubPickedForSync(false);
+      selectHubSync();
+    }
     HubSync.syncNow().catch((e) => console.warn("[HubSync] first sync failed:", e));
   };
 
@@ -2755,8 +2799,12 @@ export default function SettingsDrawer({
     }
   };
 
-  const setSyncPref = async (key: keyof HubSyncPrefs, enabled: boolean) => {
-    setSyncPrefs(await HubSync.setPref(key, enabled));
+  const setSyncPref = async (key: keyof SyncPrefs, enabled: boolean) => {
+    setSyncPrefs(await SyncPrefsStore.set(key, enabled));
+    //changes made while off go up now
+    if (!enabled) return;
+    HubSync.request(0);
+    CloudSync.requestAutoSync(0);
   };
 
   const changeHubSettings = async (patch: Partial<HubSettings>) => {
@@ -2784,6 +2832,7 @@ export default function SettingsDrawer({
             setAlertModalVisible(false);
             await OperaHub.unpair(pairedHub);
             await HubSync.forgetHub();
+            setHubSyncPaused(false);
             setPairedHub(null);
             setHubStatus(null);
             setHubDevices(null);
@@ -2928,15 +2977,6 @@ export default function SettingsDrawer({
       );
     }
   };
-
-  //starts the sign in the cloud offer asked for
-  useEffect(() => {
-    if (!visible || !cloudConnectRequest) return;
-    onCloudConnectHandled?.();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- runs the sign in the user accepted
-    handleSetCloudProvider(cloudConnectRequest);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per request
-  }, [visible, cloudConnectRequest]);
 
   const refreshLastSync = useCallback(async () => {
     const time = await CloudSync.getLastSyncTime();
@@ -3984,23 +4024,49 @@ export default function SettingsDrawer({
               : []),
           ]
         : [];
+    const viaHub = syncAccount === HUB_SYNC_ID;
+    //providers only travel through the hub
+    const syncRows = [
+      {
+        key: "data",
+        label: t("settings.hub.syncData"),
+        help: t("settings.hub.syncDataHelp"),
+        hubOnly: false,
+      },
+      {
+        key: "settings",
+        label: t("settings.hub.syncSettings"),
+        help: viaHub
+          ? t("settings.hub.syncSettingsHelp")
+          : t("settings.hub.syncSettingsHelpCloud"),
+        hubOnly: false,
+      },
+      {
+        key: "providers",
+        label: t("settings.hub.syncProviders"),
+        help: viaHub
+          ? t("settings.hub.syncProvidersHelp")
+          : t("settings.hub.syncHubOnly"),
+        hubOnly: true,
+      },
+    ] as const;
 
     return (
       <View style={styles.subPageContainer}>
         {renderSubPageHeader(t("settings.nav.cloud.title"))}
 
-        {/* storage card */}
+        {/* sync account card */}
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {t("settings.cloud.storage")}
+              {t("settings.cloud.syncAccount")}
             </Text>
             <Group>
               <Selector
                 options={cloudStorageOptions}
-                selectedValue={cloudProvider}
+                selectedValue={syncAccount}
                 onSelect={handleSetCloudProvider}
-                title={t("settings.cloud.selectStorage")}
+                title={t("settings.cloud.selectSyncAccount")}
                 fullWidth
               />
             </Group>
@@ -4109,6 +4175,23 @@ export default function SettingsDrawer({
             </View>
           </View>
         )}
+
+        {/* sync choices card */}
+        {syncAccount !== "none" && syncPrefs && (
+          <View style={styles.contentCard}>
+            {syncRows.map((row, index) => {
+              const locked = row.hubOnly && !viaHub;
+              return renderHubToggle(
+                row.label,
+                row.help,
+                !locked && syncPrefs[row.key],
+                (value) => setSyncPref(row.key, value),
+                index === syncRows.length - 1,
+                locked,
+              );
+            })}
+          </View>
+        )}
       </View>
     );
   };
@@ -4127,6 +4210,7 @@ export default function SettingsDrawer({
     checked: boolean,
     onToggle: (value: boolean) => void,
     last = false,
+    disabled = false,
   ) => (
     <View
       key={label}
@@ -4137,38 +4221,10 @@ export default function SettingsDrawer({
           <Text style={styles.settingLabel}>{label}</Text>
           <Text style={styles.helpText}>{help}</Text>
         </View>
-        <Toggle checked={checked} onToggle={onToggle} />
+        <Toggle checked={checked} onToggle={onToggle} disabled={disabled} />
       </View>
     </View>
   );
-
-  //what this device syncs with the hub
-  const renderHubSyncSubPage = () => {
-    const syncRows = [
-      ["data", "settings.hub.syncData", "settings.hub.syncDataHelp"],
-      ["settings", "settings.hub.syncSettings", "settings.hub.syncSettingsHelp"],
-      ["providers", "settings.hub.syncProviders", "settings.hub.syncProvidersHelp"],
-      ["cloud", "settings.hub.syncCloud", "settings.hub.syncCloudHelp"],
-    ] as const;
-    return (
-      <View style={styles.subPageContainer}>
-        {renderSubPageHeader(t("settings.hub.syncTitle"))}
-        {syncPrefs && (
-          <View style={styles.contentCard}>
-            {syncRows.map(([key, label, help], index) =>
-              renderHubToggle(
-                t(label),
-                t(help),
-                syncPrefs[key],
-                (value) => setSyncPref(key, value),
-                index === syncRows.length - 1,
-              ),
-            )}
-          </View>
-        )}
-      </View>
-    );
-  };
 
   const renderOperaHubSubPage = () => {
     const hubIcon = (
@@ -4274,24 +4330,14 @@ export default function SettingsDrawer({
         {renderSubPageHeader(hubStatus?.name ?? pairedHub.name)}
         {hubIcon}
 
-        {/* sync and the models the hub runs, models for admins only */}
-        {(syncPrefs ||
-          (hubState === "online" && isAdmin && OperaHub.canManageModels())) && (
+        {/* hub models for admins only */}
+        {hubState === "online" && isAdmin && OperaHub.canManageModels() && (
           <Group style={styles.groupSpacing}>
-            {syncPrefs &&
-              renderToolsNavRow(
-                "hubsync",
-                t("settings.hub.syncTitle"),
-                t("settings.hub.syncNavHelp"),
-              )}
-            {hubState === "online" &&
-              isAdmin &&
-              OperaHub.canManageModels() &&
-              renderToolsNavRow(
-                "hubmodels",
-                t("hubModels.pageTitle"),
-                t("hubModels.navHelp"),
-              )}
+            {renderToolsNavRow(
+              "hubmodels",
+              t("hubModels.pageTitle"),
+              t("hubModels.navHelp"),
+            )}
           </Group>
         )}
 
@@ -6028,8 +6074,6 @@ export default function SettingsDrawer({
         return renderCloudSubPage();
       case "operahub":
         return renderOperaHubSubPage();
-      case "hubsync":
-        return renderHubSyncSubPage();
       case "hubprovider":
         return renderHubProviderSubPage();
       case "hubserver":
@@ -7078,6 +7122,7 @@ export default function SettingsDrawer({
         visible={hubPairingVisible}
         onClose={() => {
           setHubPairingVisible(false);
+          setHubPickedForSync(false);
           onHubPairLinkHandled?.();
         }}
         onPaired={handleHubPaired}

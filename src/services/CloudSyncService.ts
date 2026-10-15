@@ -6,10 +6,10 @@ import { gunzip, gzip } from './cloud/compress';
 import { BackupData } from './BackupService';
 import { DB, Conversation, Message, SyncTombstone } from './db/DatabaseService';
 import { Settings, AppSettings } from './settings/SettingsService';
+import { BASE_DEFAULTS } from './settings/schema';
+import { SyncPrefs, SyncPrefsStore } from './SyncPrefs';
 import { CloudProvider, CloudUserInfo } from './cloud/CloudProvider';
 import { getCloudProviderDefinition } from './cloud/registry';
-import { GoogleDriveProvider } from './cloud/GoogleDriveProvider';
-import { adoptNextcloudConfig, loadNextcloudConfig, NextcloudConfig, NextcloudProvider } from './cloud/NextcloudProvider';
 import { AppEvents } from './events';
 import { OverlayPresence } from './overlay/overlayPresence';
 import * as SecureStore from 'expo-secure-store';
@@ -22,9 +22,6 @@ const LAST_SYNC_TIME_KEY = 'cloud_sync_last_time';
 const LAST_SYNC_SIZE_KEY = 'cloud_sync_last_size';
 const SYNC_PAUSED_KEY = 'cloud_sync_paused';
 const REMOTE_STATE_KEY = 'cloud_sync_remote_state';
-//when this device last linked or changed its account
-const ACCOUNT_CHANGED_AT_KEY = 'cloud_account_changed_at';
-const SHARED_OFFER_KEY = 'cloud_shared_offer';
 
 //a full migration flow (prompt, gating, local snapshot) lives in 78bd429
 const ENC_VERSION = 2;
@@ -44,28 +41,6 @@ type SyncOutcome = { success: boolean; error?: string; retryable?: boolean };
 
 //rows a cloud merge wrote or deleted
 export type CloudMergeTouched = { conversations: string[]; messages: string[] };
-
-//the account other hub devices reuse
-export type SharedCloudAccount = {
-  provider: string;
-  email: string | null;
-  pin: string | null;
-  //where the credentials work, null for every platform
-  platform: string | null;
-  credentials:
-    | { kind: 'google'; refreshToken: string }
-    | ({ kind: 'nextcloud' } & NextcloudConfig)
-    | null;
-};
-
-//an account this device must sign in to itself
-export type SharedCloudOffer = {
-  provider: string;
-  email: string | null;
-  pin: string | null;
-  //declined offers still fill the pin later
-  declined?: boolean;
-};
 
 //tag and hash of last upload
 type RemoteState = { tag: string; hash: string };
@@ -99,8 +74,6 @@ class CloudSyncServiceImpl {
   //pin check result, spares a second decrypt
   private verifiedDownload: { tag: string; backup: unknown } | null = null;
   private retryAttempt = 0;
-  //applying a shared account must not share it back
-  private adopting = false;
 
   private async setStorageItem(key: string, value: string | null) {
     if (Platform.OS === 'web') {
@@ -130,6 +103,7 @@ class CloudSyncServiceImpl {
     if (this.initialized) return;
     this.initialized = true;
 
+    await SyncPrefsStore.load();
     this.remoteState = await this.loadRemoteState();
     this.paused = (await this.getStorageItem(SYNC_PAUSED_KEY)) === 'true';
 
@@ -221,133 +195,10 @@ class CloudSyncServiceImpl {
       //another account, another remote file
       await this.setRemoteState(null);
       this.retryAttempt = 0;
-      await this.applyOfferedPin(providerName);
-      await this.markAccountChanged();
       await this.setPaused(false);
       return true;
     }
     return false;
-  }
-
-  //accounts linked before sharing existed still count
-  async getAccountChangedAt(): Promise<number> {
-    const stored = await this.getStorageItem(ACCOUNT_CHANGED_AT_KEY);
-    if (stored) return parseInt(stored, 10);
-    return this.provider ? 1 : 0;
-  }
-
-  private async markAccountChanged(): Promise<void> {
-    if (this.adopting) return;
-    await this.setStorageItem(ACCOUNT_CHANGED_AT_KEY, Date.now().toString());
-    DeviceEventEmitter.emit(AppEvents.cloudAccountChanged);
-  }
-
-  //null once this device unlinked its account
-  async exportSharedAccount(): Promise<SharedCloudAccount | null> {
-    const provider = this.provider;
-    if (!provider) return null;
-    const id = provider.getId();
-    const email = (await provider.getUserInfo())?.email ?? null;
-    let platform: string | null = null;
-    let credentials: SharedCloudAccount['credentials'] = null;
-    if (provider instanceof GoogleDriveProvider) {
-      const refreshToken = await provider.exportRefreshToken();
-      //google tokens belong to one platform client
-      if (refreshToken) {
-        platform = Platform.OS;
-        credentials = { kind: 'google', refreshToken };
-      }
-    } else if (provider instanceof NextcloudProvider) {
-      const config = await loadNextcloudConfig();
-      if (config) credentials = { kind: 'nextcloud', ...config };
-    }
-    return { provider: id, email, pin: this.pin, platform, credentials };
-  }
-
-  //another device linked this account
-  async receiveSharedAccount(account: SharedCloudAccount, changedAt: number): Promise<void> {
-    await this.setStorageItem(ACCOUNT_CHANGED_AT_KEY, changedAt.toString());
-    this.adopting = true;
-    try {
-      const current = this.provider;
-      if (current?.getId() === account.provider) {
-        const email = (await current.getUserInfo())?.email ?? null;
-        if (!account.email || email === account.email) {
-          //same account, only the pin can be new
-          if (account.pin && account.pin !== this.pin) await this.verifyAndSetPin(account.pin);
-          return;
-        }
-      }
-      if (!current && (await this.adoptSharedAccount(account))) return;
-    } finally {
-      this.adopting = false;
-    }
-    const offer: SharedCloudOffer = { provider: account.provider, email: account.email, pin: account.pin };
-    await this.setStorageItem(SHARED_OFFER_KEY, JSON.stringify(offer));
-    DeviceEventEmitter.emit(AppEvents.cloudAccountOffered);
-  }
-
-  //false when the credentials do not fit this device
-  private async adoptSharedAccount(account: SharedCloudAccount): Promise<boolean> {
-    const credentials = account.credentials;
-    if (!credentials || (account.platform && account.platform !== Platform.OS)) return false;
-    let provider: CloudProvider;
-    if (credentials.kind === 'google') {
-      const google = new GoogleDriveProvider();
-      if (!(await google.adoptRefreshToken(credentials.refreshToken))) return false;
-      provider = google;
-    } else {
-      const { kind: _kind, ...config } = credentials;
-      await adoptNextcloudConfig(config);
-      provider = new NextcloudProvider();
-      if (!(await provider.authenticate(false))) {
-        await provider.logout();
-        return false;
-      }
-    }
-    this.provider = provider;
-    await this.setStorageItem(CLOUD_PROVIDER_KEY, account.provider);
-    await this.loadPinFor(account.provider);
-    await this.setRemoteState(null);
-    this.retryAttempt = 0;
-    if (account.pin) await this.verifyAndSetPin(account.pin);
-    await this.setPaused(false);
-    DeviceEventEmitter.emit(AppEvents.syncCompleted);
-    return true;
-  }
-
-  async getSharedOffer(): Promise<SharedCloudOffer | null> {
-    const raw = await this.getStorageItem(SHARED_OFFER_KEY);
-    return raw ? (JSON.parse(raw) as SharedCloudOffer) : null;
-  }
-
-  async dismissSharedOffer(): Promise<void> {
-    await this.setStorageItem(SHARED_OFFER_KEY, null);
-  }
-
-  async declineSharedOffer(): Promise<void> {
-    const offer = await this.getSharedOffer();
-    if (offer) await this.setStorageItem(SHARED_OFFER_KEY, JSON.stringify({ ...offer, declined: true }));
-  }
-
-  //a linked account of the same provider would block the sign in
-  async prepareSharedOffer(offer: SharedCloudOffer): Promise<void> {
-    if (this.provider?.getId() === offer.provider) await this.disconnect();
-  }
-
-  //the shared pin unlocks the backup without typing it
-  private async applyOfferedPin(providerName: string): Promise<void> {
-    const offer = await this.getSharedOffer();
-    if (!offer || offer.provider !== providerName) return;
-    await this.dismissSharedOffer();
-    if (offer.pin && offer.pin !== this.pin) {
-      this.adopting = true;
-      try {
-        await this.verifyAndSetPin(offer.pin);
-      } finally {
-        this.adopting = false;
-      }
-    }
   }
 
   //unlinks the account for good
@@ -365,7 +216,6 @@ class CloudSyncServiceImpl {
     await this.setStorageItem(LAST_SYNC_TIME_KEY, null);
     await this.setStorageItem(LAST_SYNC_SIZE_KEY, null);
     await this.setPaused(false);
-    await this.markAccountChanged();
   }
 
   private async setPaused(paused: boolean): Promise<void> {
@@ -402,7 +252,6 @@ class CloudSyncServiceImpl {
     if (providerName) {
       await this.setStorageItem(this.pinKey(providerName), pin);
     }
-    await this.markAccountChanged();
   }
 
   hasPin(): boolean {
@@ -695,13 +544,17 @@ class CloudSyncServiceImpl {
     //capture provider once for sync
     const provider = this.provider;
     const pin = this.pin;
+    const prefs = SyncPrefsStore.get();
+    if (!prefs.data && !prefs.settings) return { success: true };
+    //skipped parts keep the cloud copy
+    const partial = !prefs.data || !prefs.settings;
 
     try {
       //1. download unless unchanged since upload
       const knownState = this.remoteState;
       const verified = this.verifiedDownload;
       this.verifiedDownload = null;
-      const download = await provider.downloadFile(SYNC_FILE_NAME, knownState?.tag ?? verified?.tag ?? null);
+      const download = await provider.downloadFile(SYNC_FILE_NAME, partial ? null : (knownState?.tag ?? verified?.tag ?? null));
       if (download.status === 'error') {
         //blind upload would drop remote changes
         return { success: false, error: 'Could not reach the cloud.', retryable: true };
@@ -742,7 +595,7 @@ class CloudSyncServiceImpl {
         const backupToMerge = cloudBackup;
         this.isMerging = true;
         try {
-          const touched = await DB.runSilently(() => this.mergeCloudIntoLocal(backupToMerge));
+          const touched = await DB.runSilently(() => this.mergeCloudIntoLocal(backupToMerge, prefs));
           //one notification for the merge
           DeviceEventEmitter.emit(AppEvents.conversationsChanged);
           if (touched.conversations.length > 0 || touched.messages.length > 0) {
@@ -754,23 +607,21 @@ class CloudSyncServiceImpl {
       }
 
       //3. create merged backup from db
-      const updatedConversations = await DB.getConversations();
-      const updatedMessages = await DB.getAllMessagesAllConversations();
-      const tombstones = await DB.getTombstones();
-
       const newBackup: BackupData = {
         version: 2,
-        settings: Settings.getCached(),
-        settingsUpdatedAt: await Settings.getSettingsUpdatedAt(),
-        conversations: updatedConversations,
-        messages: updatedMessages,
-        tombstones,
+        //defaults keep local settings private
+        settings: prefs.settings ? Settings.getCached() : (cloudBackup?.settings ?? BASE_DEFAULTS),
+        settingsUpdatedAt: prefs.settings ? await Settings.getSettingsUpdatedAt() : (cloudBackup?.settingsUpdatedAt ?? 0),
+        conversations: prefs.data ? await DB.getConversations() : (cloudBackup?.conversations ?? []),
+        messages: prefs.data ? await DB.getAllMessagesAllConversations() : (cloudBackup?.messages ?? []),
+        tombstones: prefs.data ? await DB.getTombstones() : (cloudBackup?.tombstones ?? []),
       };
 
       //4. nothing moved, no transfer needed
       const { json, blobs } = await this.packBackup(newBackup);
       const hash = await BackupCryptoImpl.sha256B64(json);
-      if (download.status === 'unchanged' && knownState?.hash === hash) {
+      const sameFile = download.status === 'unchanged' || (download.status === 'ok' && !!download.tag && download.tag === knownState?.tag);
+      if (sameFile && knownState?.hash === hash) {
         await this.setStorageItem(LAST_SYNC_TIME_KEY, Date.now().toString());
         DeviceEventEmitter.emit(AppEvents.syncCompleted);
         return { success: true };
@@ -797,13 +648,13 @@ class CloudSyncServiceImpl {
     }
   }
 
-  private async mergeCloudIntoLocal(cloudBackup: BackupData): Promise<CloudMergeTouched> {
+  private async mergeCloudIntoLocal(cloudBackup: BackupData, prefs: SyncPrefs): Promise<CloudMergeTouched> {
     const touched = { conversations: new Set<string>(), messages: new Set<string>() };
     //merge settings (last-write-wins, exclude device specific)
     const localSettingsUpdatedAt = await Settings.getSettingsUpdatedAt();
     const cloudSettingsUpdatedAt = cloudBackup.settingsUpdatedAt ?? 0;
     let mergedSettingsUpdatedAt = localSettingsUpdatedAt;
-    if (cloudSettingsUpdatedAt >= localSettingsUpdatedAt) {
+    if (prefs.settings && cloudSettingsUpdatedAt >= localSettingsUpdatedAt) {
       const mergedSettings: Partial<AppSettings> = {
         language: cloudBackup.settings.language,
         theme: cloudBackup.settings.theme,
@@ -823,6 +674,7 @@ class CloudSyncServiceImpl {
       mergedSettingsUpdatedAt = cloudSettingsUpdatedAt;
     }
     await Settings.setSettingsUpdatedAt(mergedSettingsUpdatedAt);
+    if (!prefs.data) return { conversations: [], messages: [] };
 
     //load local state
     const localConversations = await DB.getConversations();

@@ -9,10 +9,6 @@ export const AppEvents = {
   syncCompleted: 'SYNC_COMPLETED',
   //cloud rows keep old dates, the hub must still get them
   cloudMerged: 'CLOUD_MERGED',
-  //this device linked or changed its cloud account
-  cloudAccountChanged: 'CLOUD_ACCOUNT_CHANGED',
-  //another device uses a cloud this one cannot reuse
-  cloudAccountOffered: 'CLOUD_ACCOUNT_OFFERED',
   //the paired hub can install a newer release
   hubUpdateAvailable: 'HUB_UPDATE_AVAILABLE',
   syncPinInvalidated: 'SYNC_PIN_INVALIDATED',

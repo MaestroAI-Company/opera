@@ -77,6 +77,7 @@ type NativeHub = {
   modelsCancel?(deviceKey: string, hub: PairedHub, file: string): Promise<LlamaStatus>;
   modelsDelete?(deviceKey: string, hub: PairedHub, file: string): Promise<LlamaStatus>;
   modelsStatus?(deviceKey: string, hub: PairedHub): Promise<LlamaStatus>;
+  mcpJson?(deviceKey: string, hub: PairedHub, request: string): Promise<string>;
   status(deviceKey: string, hub: PairedHub): Promise<HubStatus>;
   unpair(deviceKey: string, hub: PairedHub): Promise<void>;
   devices(deviceKey: string, hub: PairedHub): Promise<HubDevice[]>;
@@ -90,6 +91,67 @@ type NativeHub = {
   dropGrant(deviceKey: string, hub: PairedHub, serverId: string): Promise<void>;
   providers(deviceKey: string, hub: PairedHub): Promise<HubProvider[]>;
   startProxy(deviceKey: string, hub: PairedHub): Promise<{ port: number; token: string }>;
+};
+
+//mcp servers hosted on the hub, opera/mcp/1 shapes
+export type McpSource =
+  | { type: 'mcpb'; url: string; sha256: string }
+  | { type: 'npm'; package: string; version: string }
+  | { type: 'pypi'; package: string; version: string };
+export type McpField = {
+  key: string;
+  label: string;
+  description: string;
+  kind: 'text' | 'number' | 'boolean' | 'folder' | 'file';
+  required: boolean;
+  secret: boolean;
+  default?: string | null;
+};
+export type McpListing = {
+  id: string;
+  title: string;
+  description: string;
+  version: string;
+  publisher: string;
+  repository?: string | null;
+  license?: string | null;
+  source: McpSource;
+  fields: McpField[];
+  arguments: { flag?: string | null; value?: string | null; field?: string | null }[];
+  env: { name: string; value?: string | null; field?: string | null }[];
+  offline: boolean;
+  registry?: string | null;
+};
+export type McpServerState = 'installing' | 'starting' | 'running' | 'failed' | 'stopped';
+export type HostedMcpServer = {
+  id: string;
+  listing: McpListing;
+  enabled: boolean;
+  state: McpServerState;
+  message?: string | null;
+  values: Record<string, string>;
+  secrets_set: string[];
+  tools: string[];
+  update?: string | null;
+};
+export type McpStatus = { isolation: 'full' | 'partial'; servers: HostedMcpServer[] };
+export type McpFolders = { path: string; parent?: string | null; folders: string[] };
+
+export type HubMcp = {
+  catalog(): Promise<McpListing[]>;
+  search(query: string): Promise<McpListing[]>;
+  prepare(listing: McpListing): Promise<McpListing>;
+  install(listing: McpListing, values: Record<string, string>): Promise<string>;
+  configure(id: string, values: Record<string, string>): Promise<McpStatus>;
+  enable(id: string, on: boolean): Promise<McpStatus>;
+  restart(id: string): Promise<McpStatus>;
+  update(id: string): Promise<McpStatus>;
+  remove(id: string): Promise<McpStatus>;
+  status(): Promise<McpStatus>;
+  logs(id: string): Promise<string[]>;
+  folders(path?: string): Promise<McpFolders>;
+  registries(): Promise<string[]>;
+  setRegistries(urls: string[]): Promise<string[]>;
 };
 
 export type HubModels = {
@@ -137,6 +199,7 @@ const tauriHub: NativeHub = {
   modelsCancel: (deviceKey, hub, file) => invoke('hub_models_cancel', { deviceKey, hub, file }),
   modelsDelete: (deviceKey, hub, file) => invoke('hub_models_delete', { deviceKey, hub, file }),
   modelsStatus: (deviceKey, hub) => invoke('hub_models_status', { deviceKey, hub }),
+  mcpJson: (deviceKey, hub, request) => invoke('hub_mcp_json', { deviceKey, hub, request }),
   status: (deviceKey, hub) => invoke('hub_status', { deviceKey, hub }),
   unpair: (deviceKey, hub) => invoke('hub_unpair', { deviceKey, hub }),
   devices: (deviceKey, hub) => invoke('hub_devices', { deviceKey, hub }),
@@ -360,6 +423,42 @@ class OperaHubServiceImpl {
       cancel: (file) => native.modelsCancel!(key, hub, file),
       remove: (file) => native.modelsDelete!(key, hub, file),
       status: () => native.modelsStatus!(key, hub),
+    };
+  }
+
+  canManageMcp(): boolean {
+    return !!native?.mcpJson;
+  }
+
+  //mcp servers the hub runs, admins only
+  async mcp(): Promise<HubMcp> {
+    const native = this.native();
+    const key = await this.deviceKey();
+    const hub = await this.getPairedHub();
+    if (!hub || !native.mcpJson) throw Object.assign(new Error('No Sampler paired'), { code: 'Unauthorized' });
+    const send = async (request: Record<string, unknown>) => JSON.parse(await native.mcpJson!(key, hub, JSON.stringify(request)));
+    const status = async (request: Record<string, unknown>): Promise<McpStatus> => {
+      const { isolation, servers } = await send(request);
+      return { isolation, servers };
+    };
+    return {
+      catalog: async () => (await send({ type: 'catalog' })).listings,
+      search: async (query) => (await send({ type: 'search', query })).listings,
+      prepare: async (listing) => (await send({ type: 'prepare', listing })).listing,
+      install: async (listing, values) => (await send({ type: 'install', listing, values })).id,
+      configure: (id, values) => status({ type: 'configure', id, values }),
+      enable: (id, on) => status({ type: 'enable', id, on }),
+      restart: (id) => status({ type: 'restart', id }),
+      update: (id) => status({ type: 'update', id }),
+      remove: (id) => status({ type: 'remove', id }),
+      status: () => status({ type: 'status' }),
+      logs: async (id) => (await send({ type: 'logs', id })).lines,
+      folders: async (path) => {
+        const { path: current, parent, folders } = await send({ type: 'folders', path: path ?? null });
+        return { path: current, parent, folders };
+      },
+      registries: async () => (await send({ type: 'registries' })).urls,
+      setRegistries: async (urls) => (await send({ type: 'set_registries', urls })).urls,
     };
   }
 

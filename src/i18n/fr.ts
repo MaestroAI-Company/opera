@@ -37,6 +37,11 @@ export const fr: Translations = {
   "onboarding.intro.noAccount": "Sans compte obligatoire. Prêt à l'emploi.",
   "onboarding.intro.openSource": "Open source, transparent et indépendant.",
   "onboarding.welcome.cta": "Commencer",
+  "onboarding.restore.cta": "Connexion depuis une sauvegarde",
+  "onboarding.restore.fromCloud": "Depuis le cloud",
+  "onboarding.restore.fromFiles": "Depuis les fichiers",
+  "onboarding.restore.noCloudBackup":
+    "Aucune sauvegarde cloud n'a été trouvée sur ce compte.",
   "onboarding.name.placeholder": "Entre ton nom",
   "onboarding.profile.title": "Comment Maestro doit-il t'appeler ?",
   "onboarding.profile.subtitle":
@@ -303,7 +308,7 @@ export const fr: Translations = {
   "settings.info.website": "Site web",
 
   "settings.profile.personalize": "Personnaliser mon profil",
-  "settings.profile.exportCard": "Exporter ma carte de profil",
+  "settings.profile.exportCard": "Partager ma carte de profil",
   "settings.profile.name": "Nom",
   "settings.profile.instructions": "Écris tes instructions pour l'IA",
   "settings.profile.instructionsPlaceholder": "écrire",

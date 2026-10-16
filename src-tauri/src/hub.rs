@@ -229,6 +229,18 @@ pub async fn hub_models_delete(
     client.models_delete(hub, file).await
 }
 
+//opera/mcp/1 json both ways
+#[tauri::command]
+pub async fn hub_mcp_json(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    request: String,
+) -> Result<String, HubError> {
+    let client = state.client(&device_key).await?;
+    client.mcp_json(hub, request).await
+}
+
 #[tauri::command]
 pub async fn hub_models_status(
     state: State<'_, HubState>,

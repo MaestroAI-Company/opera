@@ -99,6 +99,8 @@ pub fn run() {
             #[cfg(desktop)]
             hub::hub_models_status,
             #[cfg(desktop)]
+            hub::hub_mcp_json,
+            #[cfg(desktop)]
             hub::hub_settings,
             #[cfg(desktop)]
             hub::hub_set_settings,

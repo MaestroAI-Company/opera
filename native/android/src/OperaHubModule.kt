@@ -159,6 +159,11 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
   fun modelsStatus(deviceKey: String, hub: ReadableMap, promise: Promise) =
     launchPromise(promise) { statusToMap(client(deviceKey).modelsStatus(hubFromMap(hub))) }
 
+  //opera/mcp/1 json both ways
+  @ReactMethod
+  fun mcpJson(deviceKey: String, hub: ReadableMap, request: String, promise: Promise) =
+    launchPromise(promise) { client(deviceKey).mcpJson(hubFromMap(hub), request) }
+
   @ReactMethod
   fun qrSvg(text: String, dark: String, light: String, promise: Promise) =
     launchPromise(promise) { uniffi.opera_hub_client.qrSvg(text, dark, light) }

@@ -163,6 +163,8 @@ import HubPairingSheet from "./HubPairingSheet";
 import HubDeviceSheet from "./HubDeviceSheet";
 import HubModelsSection, { HubModelPage } from "./HubModelsSection";
 import HubModelsSheet from "./HubModelsSheet";
+import HubMcpSection, { HubMcpServerPage } from "./HubMcpSection";
+import HubMcpSheet, { HubFolderSheet } from "./HubMcpSheet";
 import HubQrSheet from "./HubQrSheet";
 import MaestroCard from "./MaestroCard";
 import { BUTTERFLY_OPTIONS, selectButterfly, useMaestroButterfly } from "./maestroButterfly";
@@ -320,6 +322,8 @@ export type SubPage =
   | "hubserver"
   | "hubmodels"
   | "hubmodel"
+  | "hubmcp"
+  | "hubmcpserver"
   | "mobileactions"
   | "mcpservers"
   | "mcpserver"
@@ -352,6 +356,8 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   hubserver: "hubprovider",
   hubmodels: "operahub",
   hubmodel: "hubmodels",
+  hubmcp: "operahub",
+  hubmcpserver: "hubmcp",
   sociallinks: "main",
   widgets: "tools",
   mobileactions: "tools",
@@ -850,6 +856,16 @@ export default function SettingsDrawer({
 
   const [addModelSheetVisible, setAddModelSheetVisible] = useState(false);
   const [hubModelsSheetVisible, setHubModelsSheetVisible] = useState(false);
+  const [hubMcpSheetVisible, setHubMcpSheetVisible] = useState(false);
+  const [selectedHubMcp, setSelectedHubMcp] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  //folder field waiting for a pick
+  const [folderPick, setFolderPick] = useState<{
+    start?: string;
+    done: (path: string) => void;
+  } | null>(null);
   const [selectedHubModel, setSelectedHubModel] = useState<{
     file: string;
     name: string;
@@ -964,6 +980,8 @@ export default function SettingsDrawer({
     profileEditVisible ||
     addModelSheetVisible ||
     hubModelsSheetVisible ||
+    hubMcpSheetVisible ||
+    folderPick !== null ||
     ollamaAddVisible ||
     openaiAddVisible ||
     openaiModelsVisible ||
@@ -4226,6 +4244,14 @@ export default function SettingsDrawer({
     </View>
   );
 
+  //older clients cannot tell, browsers never manage
+  const isHubAdmin = () => {
+    const thisDevice = hubDevices?.find((device) => device.id === thisDeviceId);
+    return thisDevice
+      ? thisDevice.scopes.includes("admin")
+      : Platform.OS !== "web";
+  };
+
   const renderOperaHubSubPage = () => {
     const hubIcon = (
       <Image
@@ -4320,26 +4346,31 @@ export default function SettingsDrawer({
         : []),
     ];
 
-    const thisDevice = hubDevices?.find((device) => device.id === thisDeviceId);
-    //older clients cannot tell, browsers never manage
-    const isAdmin = thisDevice
-      ? thisDevice.scopes.includes("admin")
-      : Platform.OS !== "web";
+    const isAdmin = isHubAdmin();
     return (
       <View style={styles.subPageContainer}>
         {renderSubPageHeader(hubStatus?.name ?? pairedHub.name)}
         {hubIcon}
 
-        {/* hub models for admins only */}
-        {hubState === "online" && isAdmin && OperaHub.canManageModels() && (
-          <Group style={styles.groupSpacing}>
-            {renderToolsNavRow(
-              "hubmodels",
-              t("hubModels.pageTitle"),
-              t("hubModels.navHelp"),
-            )}
-          </Group>
-        )}
+        {/* hub models and mcp servers for admins only */}
+        {hubState === "online" &&
+          isAdmin &&
+          (OperaHub.canManageModels() || OperaHub.canManageMcp()) && (
+            <Group style={styles.groupSpacing}>
+              {OperaHub.canManageModels() &&
+                renderToolsNavRow(
+                  "hubmodels",
+                  t("hubModels.pageTitle"),
+                  t("hubModels.navHelp"),
+                )}
+              {OperaHub.canManageMcp() &&
+                renderToolsNavRow(
+                  "hubmcp",
+                  t("hubMcp.pageTitle"),
+                  t("hubMcp.navHelp"),
+                )}
+            </Group>
+          )}
 
         {/* hub wide settings, admins only */}
         {hubState === "online" && hubSettings && (
@@ -5744,9 +5775,9 @@ export default function SettingsDrawer({
             />
           </Group>
 
-          {mcpServers.length > 0 &&
-            renderCardGrid(
-              mcpServers.map((server) => ({
+          {(mcpServers.length > 0 || McpService.getHubServers().length > 0) &&
+            renderCardGrid([
+              ...mcpServers.map((server) => ({
                 key: server.id,
                 title: server.name,
                 status: mcpStatusLabel(server.id),
@@ -5756,7 +5787,23 @@ export default function SettingsDrawer({
                   setActiveSubPage("mcpserver");
                 },
               })),
-            )}
+              //hosted by the sampler, managed from its page
+              ...McpService.getHubServers().map((server) => ({
+                key: server.id,
+                icon: samplerIcon,
+                title: server.name,
+                status: mcpStatusLabel(server.id),
+                error: McpService.getStatus(server.id).state === "error",
+                disabled: !isHubAdmin() || !OperaHub.canManageMcp(),
+                onPress: () => {
+                  setSelectedHubMcp({
+                    id: server.id.replace(/^hub_mcp-/, ""),
+                    title: server.name,
+                  });
+                  setActiveSubPage("hubmcpserver");
+                },
+              })),
+            ])}
         </View>
       </View>
     </View>
@@ -6100,6 +6147,32 @@ export default function SettingsDrawer({
                 setActiveSubPage("hubmodel");
               }}
             />
+          </View>
+        );
+      case "hubmcp":
+        return (
+          <View style={styles.subPageContainer}>
+            {renderSubPageHeader(t("hubMcp.pageTitle"))}
+            <HubMcpSection
+              onAddServer={() => setHubMcpSheetVisible(true)}
+              onOpenServer={(id, title) => {
+                setSelectedHubMcp({ id, title });
+                setActiveSubPage("hubmcpserver");
+              }}
+            />
+          </View>
+        );
+      case "hubmcpserver":
+        return (
+          <View style={styles.subPageContainer}>
+            {renderSubPageHeader(selectedHubMcp?.title ?? "")}
+            {selectedHubMcp && (
+              <HubMcpServerPage
+                id={selectedHubMcp.id}
+                onRemoved={() => setActiveSubPage("hubmcp")}
+                onPickFolder={(start, done) => setFolderPick({ start, done })}
+              />
+            )}
           </View>
         );
       case "hubmodel":
@@ -7152,6 +7225,23 @@ export default function SettingsDrawer({
       <HubModelsSheet
         visible={hubModelsSheetVisible}
         onClose={() => setHubModelsSheetVisible(false)}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
+      <HubMcpSheet
+        visible={hubMcpSheetVisible}
+        onClose={() => setHubMcpSheetVisible(false)}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
+      <HubFolderSheet
+        visible={folderPick !== null}
+        start={folderPick?.start}
+        onPick={(path) => {
+          folderPick?.done(path);
+          setFolderPick(null);
+        }}
+        onClose={() => setFolderPick(null)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />

@@ -70,7 +70,8 @@ export async function patchHubServer(url: string, patch: Partial<OllamaServer>):
 }
 
 export function setHubProviders(providers: HubProvider[], name: string): void {
-  hubProviders = providers;
+  //hosted mcp servers are tools, not models
+  hubProviders = providers.filter((p) => p.kind !== 'mcp');
   hubName = name;
 }
 

@@ -4,7 +4,15 @@ import { NativeModules, Platform } from 'react-native';
 import { getSecret, setSecret } from '../mcp/mcpStorage';
 
 export type PairedHub = { id: string; name: string; relays: string[] };
-export type HubStatus = { name: string; version: string; direct: boolean; update?: string | null };
+//cpu is a share of the hub machine, memory in bytes
+export type HubStatus = {
+  name: string;
+  version: string;
+  direct: boolean;
+  update?: string | null;
+  cpu?: number | null;
+  memory?: number | null;
+};
 export type HubDevice = {
   id: string;
   name: string;
@@ -134,6 +142,7 @@ export type HostedMcpServer = {
   secrets_set: string[];
   tools: string[];
   update?: string | null;
+  usage?: { cpu: number; memory: number } | null;
 };
 export type McpStatus = { isolation: 'full' | 'partial'; servers: HostedMcpServer[] };
 export type McpFolders = { path: string; parent?: string | null; folders: string[] };

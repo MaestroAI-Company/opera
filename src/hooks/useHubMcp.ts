@@ -1,4 +1,5 @@
 import { useCallback, useSyncExternalStore } from "react";
+import { HubSync } from "../services/hub/HubSync";
 import { HubMcp, McpListing, McpStatus, OperaHub } from "../services/hub/OperaHubService";
 
 //fast while a server moves, idle otherwise
@@ -23,8 +24,21 @@ function busy(status: McpStatus | null): boolean {
   return !!status && status.servers.some((s) => s.state === "installing" || s.state === "starting");
 }
 
+//running servers become tools on this device at once
+function running(status: McpStatus | null): string {
+  return (status?.servers ?? [])
+    .filter((s) => s.state === "running")
+    .map((s) => s.id)
+    .sort()
+    .join(",");
+}
+
 function publish(patch: Partial<HubMcpSnapshot>) {
+  const before = running(snapshot.status);
   snapshot = { ...snapshot, ...patch };
+  if (snapshot.api && running(snapshot.status) !== before) {
+    HubSync.refreshProviders().catch(() => {});
+  }
   listeners.forEach((listener) => listener());
   schedule();
 }

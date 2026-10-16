@@ -1,6 +1,7 @@
 import { DeviceEventEmitter } from 'react-native';
 import { ToolManager } from '../ai/tools/ToolManager';
 import { AppEvents } from '../events';
+import { HUB_URL_SCHEME, HubProvider } from '../hub/OperaHubService';
 import { Settings } from '../settings/SettingsService';
 import { McpAuth } from './McpAuth';
 import { parseServerInput } from './config';
@@ -24,6 +25,8 @@ function labelFromUrl(url: string): string {
 
 class McpServiceImpl {
   private servers: McpServerConfig[] = [];
+  //hosted by the paired sampler, never stored or synced
+  private hubServers: McpServerConfig[] = [];
   private clients = new Map<string, McpClient>();
   private statuses = new Map<string, McpServerStatus>();
   private toolsByServer = new Map<string, McpTool[]>();
@@ -71,6 +74,32 @@ class McpServiceImpl {
 
   getServers(): McpServerConfig[] {
     return this.servers;
+  }
+
+  getHubServers(): McpServerConfig[] {
+    return this.hubServers;
+  }
+
+  private all(): McpServerConfig[] {
+    return [...this.servers, ...this.hubServers];
+  }
+
+  //running servers of the sampler, as plain mcp servers
+  async setHubServers(providers: HubProvider[]): Promise<void> {
+    const next: McpServerConfig[] = providers
+      .filter((p) => p.kind === 'mcp')
+      .map((p) => ({ id: `hub_${p.id}`, name: p.name, url: `${HUB_URL_SCHEME}${p.id}/`, headerName: '' }));
+    const before = new Set(this.hubServers.map((s) => s.id));
+    const present = new Set(next.map((s) => s.id));
+    this.hubServers = next;
+    for (const id of before) {
+      if (present.has(id)) continue;
+      this.clients.delete(id);
+      this.statuses.delete(id);
+      this.toolsByServer.delete(id);
+    }
+    this.publishTools();
+    await Promise.all(next.filter((s) => !before.has(s.id)).map((s) => this.connect(s.id)));
   }
 
   getStatus(id: string): McpServerStatus {
@@ -168,7 +197,7 @@ class McpServiceImpl {
     const token = await McpAuth.getAccessToken(id);
     if (token) return { Authorization: `Bearer ${token}` };
 
-    const server = this.servers.find((s) => s.id === id);
+    const server = this.all().find((s) => s.id === id);
     const value = await this.getHeaderValue(id);
     if (server?.headerName && value) return { [server.headerName]: value };
     return {};
@@ -182,7 +211,7 @@ class McpServiceImpl {
 
   //handshake and discover tools for one server
   async connect(id: string): Promise<void> {
-    const server = this.servers.find((s) => s.id === id);
+    const server = this.all().find((s) => s.id === id);
     if (!server?.url.trim()) return;
     //index and the overlay both boot the service
     if (this.statuses.get(id)?.state === 'connecting') return;
@@ -220,7 +249,7 @@ class McpServiceImpl {
   }
 
   async connectAll(): Promise<void> {
-    await Promise.all(this.servers.map((s) => this.connect(s.id)));
+    await Promise.all(this.all().map((s) => this.connect(s.id)));
   }
 
   //run the oauth flow then retry the handshake
@@ -245,7 +274,7 @@ class McpServiceImpl {
 
   //rebuild the whole mcp tool set and hand it to the tool manager
   private publishTools(): void {
-    const tools = this.servers.flatMap((s) => this.toolsByServer.get(s.id) ?? []);
+    const tools = this.all().flatMap((s) => this.toolsByServer.get(s.id) ?? []);
     ToolManager.setMcpTools(tools);
     DeviceEventEmitter.emit(AppEvents.mcpServersChanged);
   }

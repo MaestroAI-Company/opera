@@ -17,6 +17,7 @@ import {
 import { DB } from '../db/DatabaseService';
 import { AppEvents } from '../events';
 import { McpAuth } from '../mcp/McpAuth';
+import { McpService } from '../mcp/McpService';
 import { getSecret, setSecret } from '../mcp/mcpStorage';
 import { McpServerConfig } from '../mcp/types';
 import { BASE_DEFAULTS } from '../settings/schema';
@@ -115,6 +116,7 @@ class HubSyncImpl {
     if (cached) {
       const { hubName, providers } = JSON.parse(cached) as CachedProviders;
       setHubProviders(providers, hubName);
+      McpService.setHubServers(providers).catch((e) => console.warn('[HubSync] hub mcp servers not loaded:', e));
     }
     setHubServerPrefs(JSON.parse((await Settings.getLocal(HUB_PREFS_KEY)) ?? '{}'));
     this.request(0);
@@ -242,6 +244,7 @@ class HubSyncImpl {
     const json = JSON.stringify({ hubName, providers } satisfies CachedProviders);
     if (json === (await Settings.getLocal(PROVIDERS_KEY))) return;
     setHubProviders(providers, hubName);
+    await McpService.setHubServers(providers);
     await Settings.setLocal(PROVIDERS_KEY, json);
     //model pickers rebuild their sources
     await this.write(async () => {

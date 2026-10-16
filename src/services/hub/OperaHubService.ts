@@ -25,7 +25,8 @@ export type McpGrant = {
   expiresAt: number;
 };
 export type McpAccessToken = { accessToken: string; expiresAt: number };
-export type HubProvider = { id: string; name: string; kind: 'ollama' | 'openai' };
+//mcp ones are servers the hub hosts
+export type HubProvider = { id: string; name: string; kind: 'ollama' | 'openai' | 'mcp' };
 //a hub on this computer, desktop only
 //installed means it starts with the session
 export type HostStatus = { running: boolean; installed: boolean; id: string | null };

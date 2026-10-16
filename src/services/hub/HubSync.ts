@@ -190,6 +190,8 @@ class HubSyncImpl {
           const cursor = await OperaHub.watch(hub, since);
           if (since > 0 && cursor > since) this.request(0);
           since = Math.max(since, cursor);
+          //servers started elsewhere show up within a watch
+          await this.refreshProviders().catch(() => {});
         } catch (e) {
           //offline networks may still reach a hub nearby
           if (hubErrorCode(e) === 'Unreachable' && OperaHub.canDiscover()) {
@@ -238,6 +240,13 @@ class HubSyncImpl {
 
   async declineUpdate(version: string): Promise<void> {
     await Settings.setLocal(DECLINED_UPDATE_KEY, version);
+  }
+
+  //what the hub serves now, mcp servers included
+  async refreshProviders(): Promise<void> {
+    const hub = await OperaHub.getPairedHub();
+    if (!hub) return;
+    await this.storeProviders(await OperaHub.providers(hub), hub.name);
   }
 
   private async storeProviders(providers: HubProvider[], hubName: string): Promise<void> {

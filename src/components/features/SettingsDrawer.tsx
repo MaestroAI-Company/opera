@@ -380,6 +380,7 @@ const sectionOf = (page: SubPage): SubPage => {
 const DESKTOP_ENTRY_PAGE: SubPage = "general";
 //a device unseen this long is flagged, never removed
 const HUB_INACTIVE_AFTER_S = 30 * 24 * 60 * 60;
+const HUB_USAGE_POLL_MS = 5000;
 //hub device images by kind
 const HUB_DEVICE_ICONS: Record<string, ImageSourcePropType> = {
   phone: require("../../../assets/icons/phone.png"),
@@ -960,6 +961,17 @@ export default function SettingsDrawer({
       );
     }
   }, []);
+
+  //usage stays live while the sampler page shows
+  useEffect(() => {
+    if (activeSubPage !== "operahub" || !pairedHub || hubState !== "online") return;
+    const timer = setInterval(() => {
+      OperaHub.status(pairedHub)
+        .then(setHubStatus)
+        .catch(() => {});
+    }, HUB_USAGE_POLL_MS);
+    return () => clearInterval(timer);
+  }, [activeSubPage, pairedHub, hubState]);
 
   //a pairing link opens its confirmation
   const [prevHubPairLink, setPrevHubPairLink] = useState(hubPairLink);
@@ -1675,7 +1687,10 @@ export default function SettingsDrawer({
   const connectMcpServer = async (id: string) => {
     setMcpConnecting((prev) => ({ ...prev, [id]: true }));
     try {
-      const server = McpService.getServers().find((s) => s.id === id);
+      const server = [
+        ...McpService.getServers(),
+        ...McpService.getHubServers(),
+      ].find((s) => s.id === id);
       //check if server needs oauth
       if (McpService.getStatus(id).state === "needs_auth")
         await McpService.authorize(id);
@@ -4334,6 +4349,19 @@ export default function SettingsDrawer({
       ...(hubStatus
         ? [{ label: t("settings.hub.version"), value: hubStatus.version }]
         : []),
+      //the hub with llama.cpp and its mcp servers
+      ...(hubStatus?.memory != null
+        ? [
+            {
+              label: t("settings.hub.cpu"),
+              value: t("hubMcp.cpuValue", { value: Math.round(hubStatus.cpu ?? 0) }),
+            },
+            {
+              label: t("settings.hub.memory"),
+              value: formatBytes(hubStatus.memory),
+            },
+          ]
+        : []),
       ...(hubStatus?.update
         ? [
             {
@@ -5787,20 +5815,16 @@ export default function SettingsDrawer({
                   setActiveSubPage("mcpserver");
                 },
               })),
-              //hosted by the sampler, managed from its page
+              //hosted by the sampler
               ...McpService.getHubServers().map((server) => ({
                 key: server.id,
                 icon: samplerIcon,
                 title: server.name,
                 status: mcpStatusLabel(server.id),
                 error: McpService.getStatus(server.id).state === "error",
-                disabled: !isHubAdmin() || !OperaHub.canManageMcp(),
                 onPress: () => {
-                  setSelectedHubMcp({
-                    id: server.id.replace(/^hub_mcp-/, ""),
-                    title: server.name,
-                  });
-                  setActiveSubPage("hubmcpserver");
+                  setMcpDetailId(server.id);
+                  setActiveSubPage("mcpserver");
                 },
               })),
             ])}
@@ -5811,7 +5835,10 @@ export default function SettingsDrawer({
 
   //server detail page
   const renderMcpServerSubPage = () => {
-    const server = mcpServers.find((s) => s.id === mcpDetailId);
+    const hosted = McpService.getHubServers().find(
+      (s) => s.id === mcpDetailId,
+    );
+    const server = hosted ?? mcpServers.find((s) => s.id === mcpDetailId);
     if (!server) return renderMcpServersSubPage();
 
     const status = McpService.getStatus(server.id);
@@ -5832,14 +5859,16 @@ export default function SettingsDrawer({
           </View>
         ) : null}
 
-        {/* server settings link */}
-        <Group style={styles.groupSpacing}>
-          {renderToolsNavRow(
-            "mcpserversettings",
-            t("settings.server.settings"),
-            server.url,
-          )}
-        </Group>
+        {/* server settings link, the sampler owns hosted ones */}
+        {!hosted && (
+          <Group style={styles.groupSpacing}>
+            {renderToolsNavRow(
+              "mcpserversettings",
+              t("settings.server.settings"),
+              server.url,
+            )}
+          </Group>
+        )}
 
         {/* tools card */}
         {tools.length > 0 && (
@@ -5886,31 +5915,35 @@ export default function SettingsDrawer({
           </View>
         )}
 
-        {/* server actions card */}
-        <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Group>
-              {/* reconnect only while offline */}
-              {status.state !== "connected" && (
-                <ActionButton
-                  icon={reconnectIcon}
-                  label={
-                    busy
-                      ? t("settings.mcp.connecting")
-                      : t("settings.mcp.reconnect")
-                  }
-                  disabled={busy || !server.url.trim()}
-                  onPress={() => connectMcpServer(server.id)}
-                />
-              )}
-              <ActionButton
-                icon={binIcon}
-                label={t("settings.mcp.remove.action")}
-                onPress={() => removeMcpServer(server.id, server.name)}
-              />
-            </Group>
+        {/* server actions card, hosted ones only reconnect */}
+        {(!hosted || status.state !== "connected") && (
+          <View style={styles.contentCard}>
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <Group>
+                {/* reconnect only while offline */}
+                {status.state !== "connected" && (
+                  <ActionButton
+                    icon={reconnectIcon}
+                    label={
+                      busy
+                        ? t("settings.mcp.connecting")
+                        : t("settings.mcp.reconnect")
+                    }
+                    disabled={busy || !server.url.trim()}
+                    onPress={() => connectMcpServer(server.id)}
+                  />
+                )}
+                {!hosted && (
+                  <ActionButton
+                    icon={binIcon}
+                    label={t("settings.mcp.remove.action")}
+                    onPress={() => removeMcpServer(server.id, server.name)}
+                  />
+                )}
+              </Group>
+            </View>
           </View>
-        </View>
+        )}
       </View>
     );
   };

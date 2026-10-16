@@ -4,6 +4,7 @@ import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constan
 import { mcpAvatar, mcpSourceLabel, runHubMcp, useHubMcp } from "../../hooks/useHubMcp";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+import { formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
 import { HostedMcpServer, McpField } from "../../services/hub/OperaHubService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
@@ -31,9 +32,9 @@ export function useMcpStateLabel() {
   const t = useT();
   return (server: HostedMcpServer) => {
     if (server.state === "running") {
-      return server.update
-        ? t("hubMcp.state.update", { version: server.update })
-        : t("hubMcp.state.running", { count: server.tools.length });
+      if (server.update) return t("hubMcp.state.update", { version: server.update });
+      const running = t("hubMcp.state.running", { count: server.tools.length });
+      return server.usage ? `${running} · ${formatBytes(server.usage.memory)}` : running;
     }
     return t(`hubMcp.state.${server.state}`);
   };
@@ -239,6 +240,12 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
   const showLogs = () => act(async () => setLogs(await runHubMcp((api) => api.logs(id))));
 
   const accessRows = [
+    ...(server.usage
+      ? [
+          { label: t("hubMcp.cpu"), value: t("hubMcp.cpuValue", { value: Math.round(server.usage.cpu) }) },
+          { label: t("hubMcp.memory"), value: formatBytes(server.usage.memory) },
+        ]
+      : []),
     { label: t("hubMcp.isolation"), value: t(status?.isolation === "full" ? "hubMcp.isolationFull" : "hubMcp.isolationPartial") },
     { label: t("hubMcp.network"), value: t("hubMcp.networkOpen") },
     { label: t("hubMcp.folders"), value: folders.length > 0 ? folders.join(", ") : t("hubMcp.noFolders") },

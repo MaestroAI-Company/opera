@@ -51,6 +51,8 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
         putString("version", status.version)
         putBoolean("direct", status.direct)
         putString("update", status.update)
+        status.cpu?.let { putDouble("cpu", it.toDouble()) }
+        status.memory?.let { putDouble("memory", it.toDouble()) }
       }
     }
 

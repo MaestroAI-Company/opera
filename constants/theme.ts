@@ -6,7 +6,7 @@ export const LightColors = {
   primaryBright: "#FF4D4D",
 
   //canvas & surfaces
-  background: "#FDF8F1",
+  background: "#FEFBF6",
   surface: "#FFFFFF",
   surfaceMuted: "#F9F9F9",
   surfaceSubtle: "#F5F5F5",
@@ -51,8 +51,8 @@ export const LightColors = {
   overlayStrong: "rgba(0,0,0,0.3)",
   scrimModal: "rgba(0,0,0,0.4)",
   //same rgb as background
-  backgroundFade: "rgba(253,248,241,0.9)",
-  backgroundClear: "rgba(253,248,241,0)",
+  backgroundFade: "rgba(254,251,246,0.9)",
+  backgroundClear: "rgba(254,251,246,0)",
   groupedBackground: "#FAF9F6",
   groupedBackgroundFade: "rgba(250,249,246,0.9)",
   groupedBackgroundClear: "rgba(250,249,246,0)",

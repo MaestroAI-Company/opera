@@ -128,13 +128,11 @@ import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { Settings } from "../../services/settings/SettingsService";
 import { WhisperSTT } from "../../services/speech/STTService";
 import { TTS_SPEEDS } from "../../services/speech/engines";
-import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
 import ActionButton from "../ui/ActionButton";
 import Checkbox from "../ui/Checkbox";
 import DownloadProgress, { throttleProgress } from "../ui/DownloadProgress";
 import Group from "../ui/Group";
 import NotificationBanner from "../ui/NotificationBanner";
-import NotificationCard from "../ui/NotificationCard";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import ProgressBar from "../ui/ProgressBar";
 import IconSelector from "../ui/IconSelector";
@@ -290,10 +288,8 @@ export type SubPage =
   | "confidentiality"
   | "reports"
   | "tools"
-  | "widgets"
   | "profile"
   | "cloud"
-  | "mobileactions"
   | "mcpservers"
   | "mcpserver"
   | "mcpserversettings"
@@ -321,8 +317,6 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   profile: "main",
   cloud: "main",
   sociallinks: "main",
-  widgets: "tools",
-  mobileactions: "tools",
   mcpservers: "tools",
   mcpserver: "mcpservers",
   mcpserversettings: "mcpserver",
@@ -994,7 +988,6 @@ export default function SettingsDrawer({
   const mobileTools = allTools.filter((t) =>
     MOBILE_TOOL_NAMES.has(t.definition.function.name),
   );
-  const allWidgets: IWidget[] = WidgetManager.getAllWidgets();
 
   const [cloudProvider, setCloudProvider] = useState<string>("none");
   const [cloudUserInfo, setCloudUserInfo] = useState<CloudUserInfo | null>(
@@ -1462,8 +1455,6 @@ export default function SettingsDrawer({
   useEffect(() => {
     if (
       activeSubPage !== "tools" &&
-      activeSubPage !== "widgets" &&
-      activeSubPage !== "mobileactions" &&
       activeSubPage !== "mcpserver"
     )
       return;
@@ -1474,13 +1465,6 @@ export default function SettingsDrawer({
         "tool",
         name,
         tool.enabledByDefault ?? false,
-      );
-    }
-    for (const widget of WidgetManager.getAllWidgets()) {
-      states[`widget:${widget.id}`] = PluginRegistry.isEnabled(
-        "widget",
-        widget.id,
-        widget.enabledByDefault ?? false,
       );
     }
     setPluginStates(states);
@@ -2924,17 +2908,6 @@ export default function SettingsDrawer({
         )}
         <View style={styles.headerSpacer} />
       </View>
-
-      {notices.assistant && (
-        <NotificationCard
-          image={operaIcon}
-          tintColor={Colors.textPrimary}
-          title={t("settings.notice.assistant")}
-          onPress={notices.openAssistant}
-          onDismiss={notices.closeAssistant}
-          style={[styles.groupSpacing, styles.mainPageGroup]}
-        />
-      )}
 
       {!!notices.update && (
         <NotificationBanner
@@ -4784,7 +4757,7 @@ export default function SettingsDrawer({
     </View>
   );
 
-  // tools subpage content: assistant tools stay inline, widgets and mobile actions link out
+  // tools subpage content: assistant and mobile tools stay inline, mcp links out
   //whole row opens the subpage
   const renderToolsNavRow = (page: SubPage, title: string, help: string) => (
     <Pressable
@@ -4808,76 +4781,66 @@ export default function SettingsDrawer({
     </Pressable>
   );
 
+  //toggle rows shared by the assistant and mobile tool cards
+  const renderToolToggles = (list: ITool[]) =>
+    list.map((tool, index) => {
+      const name = tool.definition.function.name;
+      const key = `tool:${name}`;
+      const enabled = pluginStates[key] ?? tool.enabledByDefault ?? false;
+      return (
+        <View
+          key={name}
+          style={[
+            styles.settingRowVertical,
+            index === list.length - 1 && { marginBottom: 0 },
+          ]}
+        >
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
+              {tool.displayDescription ? (
+                <Text style={styles.helpText}>
+                  {shortDescription(tool.displayDescription)}
+                </Text>
+              ) : null}
+            </View>
+            <Toggle
+              checked={enabled}
+              onToggle={async (v) => {
+                setPluginStates((prev) => ({ ...prev, [key]: v }));
+                await PluginRegistry.setEnabled("tool", name, v);
+                if (v) await tool.requestPermission?.();
+              }}
+            />
+          </View>
+        </View>
+      );
+    });
+
   const renderToolsSubPage = () => (
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.tools.title"))}
 
-      {/* built-in tools card */}
-      <View style={styles.contentCard}>
-        {generalTools.map((tool, index) => {
-          const name = tool.definition.function.name;
-          const key = `tool:${name}`;
-          const enabled = pluginStates[key] ?? tool.enabledByDefault ?? false;
-          const isLast = index === generalTools.length - 1;
-          return (
-            <View
-              key={name}
-              style={[styles.settingRowVertical, isLast && { marginBottom: 0 }]}
-            >
-              <View style={styles.toggleGroupRow}>
-                <View style={styles.toggleGroupContent}>
-                  <Text style={styles.settingLabel}>
-                    {tool.displayName ?? name}
-                  </Text>
-                  {tool.displayDescription ? (
-                    <Text style={styles.helpText}>
-                      {shortDescription(tool.displayDescription)}
-                    </Text>
-                  ) : null}
-                </View>
-                <Toggle
-                  checked={enabled}
-                  onToggle={async (v) => {
-                    setPluginStates((prev) => ({ ...prev, [key]: v }));
-                    await PluginRegistry.setEnabled("tool", name, v);
-                    if (v) await tool.requestPermission?.();
-                  }}
-                />
-              </View>
-            </View>
-          );
-        })}
-      </View>
-
-      {/* extensions and integrations group */}
+      {/* mcp link on top */}
       <Group style={styles.groupSpacing}>
-        {renderToolsNavRow(
-          "widgets",
-          t("settings.tools.widgets.title"),
-          t("settings.tools.widgets.help", {
-            list: allWidgets.map((w) => w.name).join(", "),
-          }),
-        )}
-
         {renderToolsNavRow(
           "mcpservers",
           t("settings.tools.mcp.title"),
           t("settings.tools.mcp.help"),
         )}
-
-        {!isDesktop &&
-          renderToolsNavRow(
-            "mobileactions",
-            t("settings.tools.mobile.title"),
-            t("settings.tools.mobile.help", {
-              list: mobileTools
-                .map(
-                  (tool) => tool.displayName ?? tool.definition.function.name,
-                )
-                .join(", "),
-            }),
-          )}
       </Group>
+
+      {/* built-in tools card */}
+      <View style={styles.contentCard}>
+        {renderToolToggles(generalTools)}
+      </View>
+
+      {/* mobile actions card, phone only */}
+      {!isDesktop && (
+        <View style={styles.contentCard}>
+          {renderToolToggles(mobileTools)}
+        </View>
+      )}
     </View>
   );
 
@@ -5142,90 +5105,6 @@ export default function SettingsDrawer({
     );
   };
 
-  // widgets subpage content
-  const renderWidgetsSubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.tools.widgets.title"))}
-
-      <View style={styles.contentCard}>
-        {allWidgets.map((widget, index) => {
-          const key = `widget:${widget.id}`;
-          const enabled = pluginStates[key] ?? widget.enabledByDefault ?? false;
-          return (
-            <View
-              key={widget.id}
-              style={[
-                styles.settingRowVertical,
-                index === allWidgets.length - 1 && { marginBottom: 0 },
-              ]}
-            >
-              <View style={styles.toggleGroupRow}>
-                <View style={styles.toggleGroupContent}>
-                  <Text style={styles.settingLabel}>{widget.name}</Text>
-                  <Text style={styles.helpText}>
-                    {shortDescription(widget.description)}
-                  </Text>
-                </View>
-                <Toggle
-                  checked={enabled}
-                  onToggle={async (v) => {
-                    setPluginStates((prev) => ({ ...prev, [key]: v }));
-                    await PluginRegistry.setEnabled("widget", widget.id, v);
-                  }}
-                />
-              </View>
-            </View>
-          );
-        })}
-      </View>
-    </View>
-  );
-
-  // mobile actions subpage content
-  const renderMobileActionsSubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.tools.mobile.title"))}
-
-      <View style={styles.contentCard}>
-        {mobileTools.map((tool, index) => {
-          const name = tool.definition.function.name;
-          const key = `tool:${name}`;
-          const enabled = pluginStates[key] ?? tool.enabledByDefault ?? false;
-          return (
-            <View
-              key={name}
-              style={[
-                styles.settingRowVertical,
-                index === mobileTools.length - 1 && { marginBottom: 0 },
-              ]}
-            >
-              <View style={styles.toggleGroupRow}>
-                <View style={styles.toggleGroupContent}>
-                  <Text style={styles.settingLabel}>
-                    {tool.displayName ?? name}
-                  </Text>
-                  {tool.displayDescription ? (
-                    <Text style={styles.helpText}>
-                      {shortDescription(tool.displayDescription)}
-                    </Text>
-                  ) : null}
-                </View>
-                <Toggle
-                  checked={enabled}
-                  onToggle={async (v) => {
-                    setPluginStates((prev) => ({ ...prev, [key]: v }));
-                    await PluginRegistry.setEnabled("tool", name, v);
-                    if (v) await tool.requestPermission?.();
-                  }}
-                />
-              </View>
-            </View>
-          );
-        })}
-      </View>
-    </View>
-  );
-
   const getSubPageContent = (page: SubPage) => {
     switch (page) {
       case "profile":
@@ -5264,10 +5143,6 @@ export default function SettingsDrawer({
         return renderReportsSubPage();
       case "tools":
         return renderToolsSubPage();
-      case "widgets":
-        return renderWidgetsSubPage();
-      case "mobileactions":
-        return renderMobileActionsSubPage();
       case "mcpservers":
         return renderMcpServersSubPage();
       case "mcpserver":

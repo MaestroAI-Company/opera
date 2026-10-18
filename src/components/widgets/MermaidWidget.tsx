@@ -68,7 +68,6 @@ export const MermaidWidget: IWidget<MermaidWidgetData> = {
   name: 'Diagram',
   hasBorder: true,
   aiDefinesTitle: false,
-  enabledByDefault: true,
   description: 'Mermaid.js diagram (flowchart, sequence, mindmap). Use <br/> for line breaks inside nodes, never \\n.',
   schema: `{
     "mermaid": "graph TD;\\nA-->B;"

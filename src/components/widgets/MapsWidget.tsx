@@ -74,7 +74,6 @@ export const MapsWidget: IWidget<MapsWidgetData> = {
   name: 'Map',
   hasBorder: true,
   aiDefinesTitle: true,
-  enabledByDefault: true,
   description: 'Displays an interactive map. "label" or "location" is a description of the displayed location or route (e.g. "Paris, France" or "Trip to Tokyo"). If multiple points are provided, it automatically draws a route connecting them.',
   schema: `{
     "label": "Paris, France",

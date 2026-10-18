@@ -265,7 +265,6 @@ export const en = {
     "This is your floating assistant. You can Circle To Ask on your screen with any content. It's here to help you across your usage.",
 
   "settings.title": "Settings",
-  "settings.notice.assistant": "Add Opera as an assistant",
   "settings.notice.update": "Opera {version} is available",
 
   "settings.nav.profile.title": "Profile",
@@ -285,8 +284,8 @@ export const en = {
   "settings.nav.service.title": "Service",
   "settings.nav.service.subtitle": "AI Service, Ollama server",
   "settings.nav.tools.title": "Tools",
-  "settings.nav.tools.subtitle": "Assistant Tools, Widgets, Mobile actions",
-  "settings.nav.tools.subtitleDesktop": "Assistant Tools, Widgets",
+  "settings.nav.tools.subtitle": "Assistant Tools, Mobile actions",
+  "settings.nav.tools.subtitleDesktop": "Assistant Tools",
   "settings.nav.advanced.title": "Advanced",
   "settings.nav.advanced.subtitle": "Quick flow, Transcription, Sharing",
   "settings.nav.privacy.title": "Confidentiality",
@@ -305,7 +304,7 @@ export const en = {
   "settings.profile.personalize": "Personalize my profile",
   "settings.profile.exportCard": "Share my Profile Card",
   "settings.profile.name": "Name",
-  "settings.profile.instructions": "Write your instructions to AI",
+  "settings.profile.instructions": "Write instructions for Maestro",
   "settings.profile.instructionsPlaceholder": "write",
 
   "settings.general.language": "Language",
@@ -345,13 +344,13 @@ export const en = {
   "settings.sharing.instanceHelp":
     "They are stored on a PrivateBin instance. Leave this empty to use privatebin.net, or enter the address of another instance, including one you host yourself. The address is carried inside the links you create, so the people you share with reach the right server on their own.",
 
-  "settings.overlay.default": "Default assistant",
+  "settings.overlay.default": "Set Opera as assistant app",
   "settings.overlay.defaultHelp":
     "Get help from Opera anywhere on your device, from any app.",
   "settings.overlay.isDefault": "Opera is set as your default assistant.",
   "settings.overlay.isNotDefault":
     "Opera is not set as your default assistant.",
-  "settings.overlay.setDefault": "Set as default assistant",
+  "settings.overlay.setDefault": "Open settings",
   "settings.overlay.autoMic": "Auto-start microphone",
   "settings.overlay.autoMicHelp":
     "Automatically activate the microphone as soon as the assistant opens.",
@@ -585,15 +584,9 @@ export const en = {
     "Contact our support team for additional assistance and resources.",
   "settings.support.contact": "Contact support",
 
-  "settings.tools.widgets.title": "Widgets",
-  "settings.tools.widgets.help":
-    "Structured results the assistant can display: {list}.",
   "settings.tools.mcp.title": "MCP Servers",
   "settings.tools.mcp.help":
     "Connect Opera to external MCP servers so the assistant can use their tools.",
-  "settings.tools.mobile.title": "Mobile actions",
-  "settings.tools.mobile.help":
-    "Allow the assistant to integrate with installed apps: {list}.",
 
   "tools.consent.allow": "Allow",
   "tools.consent.decline": "Decline",

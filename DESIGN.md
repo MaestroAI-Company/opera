@@ -5,7 +5,7 @@ description: Warm editorial privacy-first design system for Opera, a local on-de
 colors:
   primary: "#FF1A1A"
   primary-bright: "#FF4D4D"
-  background: "#FDF8F1"
+  background: "#FEFBF6"
   surface: "#FFFFFF"
   surface-muted: "#F9F9F9"
   surface-subtle: "#F5F5F5"
@@ -177,7 +177,7 @@ The palette is rooted in a warm cream foundation, a single red accent, and a ful
 
 - **Primary — Opera Red (#FF1A1A):** The sole interaction color. Drives primary actions, the chat composer, user chat bubbles, CTAs, and text selection. It also marks the active state of controls (checked Toggle and Checkbox, selected pill, selected IconSelector tile, granted permission badge) and the icon badges of top-level navigation (settings home, conversations quick actions). Use it for the single most important action per screen; never for decoration.
 - **Primary bright (#FF4D4D):** The pressed color. Every pressed, hovered or lit red surface goes to this lighter red, never to a darker one. Incognito does the same with its own bright tone (#70748E).
-- **Background (#FDF8F1):** A warm cream canvas, softer than white, giving the editorial feel. Every screen sits on it.
+- **Background (#FEFBF6):** A warm cream canvas, softer than white, giving the editorial feel. Every screen sits on it.
 - **Surfaces (#FFFFFF + muted/subtle/pressed):** White cards and fields on the cream canvas; muted grays for pressed rows and subtle fills.
 - **Text ramp (#000000 → #888888):** Three neutral steps — primary (#000000), secondary (#444444) and muted (#888888) — plus white on colored surfaces. Full-black text on cream keeps maximum readability. Do not introduce intermediate greys outside these tokens.
 - **Incognito (#565A75):** A purple-gray identity that swaps out every red element when ephemeral mode is on. Base #565A75 acts like the red's role, with a dark surface #2A2A35 for the composer.

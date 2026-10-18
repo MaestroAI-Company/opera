@@ -268,7 +268,6 @@ export const fr: Translations = {
     "Voici ton Assistant Overlay. Tu peux entourer pour demander n'importe quel contenu à l'écran. Il est là pour t'aider tout au long de ton usage.",
 
   "settings.title": "Réglages",
-  "settings.notice.assistant": "Ajouter Opera comme assistant",
   "settings.notice.update": "Opera {version} est disponible",
 
   "settings.nav.profile.title": "Profil",
@@ -289,8 +288,8 @@ export const fr: Translations = {
   "settings.nav.service.subtitle": "Service IA, serveur Ollama",
   "settings.nav.tools.title": "Outils",
   "settings.nav.tools.subtitle":
-    "Outils de l'assistant, widgets, actions mobiles",
-  "settings.nav.tools.subtitleDesktop": "Outils de l'assistant, widgets",
+    "Outils de l'assistant, actions mobiles",
+  "settings.nav.tools.subtitleDesktop": "Outils de l'assistant",
   "settings.nav.advanced.title": "Avancé",
   "settings.nav.advanced.subtitle": "Flux rapide, transcription, partage",
   "settings.nav.privacy.title": "Confidentialité",
@@ -310,7 +309,7 @@ export const fr: Translations = {
   "settings.profile.personalize": "Personnaliser mon profil",
   "settings.profile.exportCard": "Partager ma carte de profil",
   "settings.profile.name": "Nom",
-  "settings.profile.instructions": "Écris tes instructions pour l'IA",
+  "settings.profile.instructions": "Écris tes instructions pour Maestro",
   "settings.profile.instructionsPlaceholder": "écrire",
 
   "settings.general.language": "Langue",
@@ -350,14 +349,14 @@ export const fr: Translations = {
   "settings.sharing.instanceHelp":
     "Elles sont stockées sur une instance PrivateBin. Laisse ce champ vide pour utiliser privatebin.net, ou saisis l'adresse d'une autre instance, y compris la tienne. L'adresse est portée par les liens que tu crées, de sorte que tes destinataires atteignent le bon serveur d'eux-mêmes.",
 
-  "settings.overlay.default": "Assistant par défaut",
+  "settings.overlay.default": "Définir Opera comme app d'assistance",
   "settings.overlay.defaultHelp":
     "Obtiens l'aide d'Opera partout sur ton appareil, depuis n'importe quelle app.",
   "settings.overlay.isDefault":
     "Opera est défini comme ton assistant par défaut.",
   "settings.overlay.isNotDefault":
     "Opera n'est pas défini comme ton assistant par défaut.",
-  "settings.overlay.setDefault": "Définir comme assistant par défaut",
+  "settings.overlay.setDefault": "Ouvrir les réglages",
   "settings.overlay.autoMic": "Démarrage automatique du micro",
   "settings.overlay.autoMicHelp":
     "Active automatiquement le microphone dès l'ouverture de l'assistant.",
@@ -604,15 +603,9 @@ export const fr: Translations = {
     "Contacte notre équipe de support pour obtenir de l'aide et des ressources supplémentaires.",
   "settings.support.contact": "Contacter le support",
 
-  "settings.tools.widgets.title": "Widgets",
-  "settings.tools.widgets.help":
-    "Résultats structurés que l'assistant peut afficher : {list}.",
   "settings.tools.mcp.title": "Serveurs MCP",
   "settings.tools.mcp.help":
     "Connecte Opera à des serveurs MCP externes pour que l'assistant puisse utiliser leurs outils.",
-  "settings.tools.mobile.title": "Actions mobiles",
-  "settings.tools.mobile.help":
-    "Autorise l'assistant à s'intégrer aux applications installées : {list}.",
 
   "tools.consent.allow": "Autoriser",
   "tools.consent.decline": "Refuser",

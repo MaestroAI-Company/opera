@@ -1,5 +1,4 @@
 import React from 'react';
-import { PluginRegistry } from '../plugins/PluginRegistry';
 
 export interface IWidget<T = any> {
   id: string;
@@ -9,7 +8,6 @@ export interface IWidget<T = any> {
   icon?: any; // asset path
   description: string; // system prompt description
   schema: string; // json schema definition
-  enabledByDefault?: boolean; // default enabled state in settings
   requires?: string[]; // tool names offered alongside on @mention
   component: React.ComponentType<{ data: T; title?: string; incognito?: boolean }>;
 }
@@ -34,11 +32,9 @@ class CentralWidgetManager {
     return Array.from(this.widgets.values());
   }
 
-  //get enabled widgets
+  //widgets are always on
   getEnabledWidgets(): IWidget[] {
-    return Array.from(this.widgets.values()).filter(w =>
-      PluginRegistry.isEnabled('widget', w.id, w.enabledByDefault ?? false)
-    );
+    return this.getAllWidgets();
   }
 
   getSystemPromptSegment(enabledWidgets: IWidget[] = this.getEnabledWidgets()): string {

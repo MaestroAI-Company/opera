@@ -36,6 +36,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import HeadlessWebView from "../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { Fonts, FontSizes, Radius, ThemeColors } from "../../constants/theme";
+import AssistantSheet from "../components/features/AssistantSheet";
 import BugReportSheet from "../components/features/BugReportSheet";
 import ButterflyCluster from "../components/features/ButterflyCluster";
 import ChatBar from "../components/features/ChatBar";
@@ -98,6 +99,10 @@ import {
   subscribeToDeepLinks,
   type DeepLinkRoute,
 } from "../services/deeplinks/DeepLinkService";
+import {
+  dismissAssistantPrompt,
+  shouldOfferAssistantRole,
+} from "../services/assistant/DefaultAssistant";
 import { splitDocumentBlocks } from "../services/documents/DocumentService";
 import { AppEvents } from "../services/events";
 import { OverlayPresence } from "../services/overlay/overlayPresence";
@@ -610,6 +615,20 @@ useEffect(() => {
   useEffect(() => {
     bugReportVisibleRef.current = bugReportVisible;
   }, [bugReportVisible]);
+
+  const [assistantSheetVisible, setAssistantSheetVisible] = useState(false);
+
+  //dbReady only comes after onboarding, flag set on open so it never returns
+  useEffect(() => {
+    if (!dbReady) return;
+    shouldOfferAssistantRole()
+      .then((offer) => {
+        if (!offer) return;
+        dismissAssistantPrompt().catch(() => {});
+        setAssistantSheetVisible(true);
+      })
+      .catch(() => {});
+  }, [dbReady]);
 
   //overlay inputs must not lift the chat
   const keyboardLift = useKeyboardLift(
@@ -2388,6 +2407,14 @@ useEffect(() => {
           setPendingCrash(null);
           setScreenshot(null);
         }}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        bottomInset={insets.bottom}
+      />
+
+      <AssistantSheet
+        visible={assistantSheetVisible}
+        onClose={() => setAssistantSheetVisible(false)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
         bottomInset={insets.bottom}

@@ -26,8 +26,16 @@ export type HubDevice = {
 //one person on the hub
 export type HubProfile = { id: string; name: string; role: 'admin' | 'member'; createdAt: number };
 //the key only lives in this device's secure store
-export type UnlockedProfile = { profile: HubProfile; key: string };
-type StoredProfile = { hubId: string; profile: HubProfile; key: string };
+export type UnlockedProfile = { profile: HubProfile; key: string; lock?: ProfileLock | null };
+//what reopens a profile key with its password
+export type ProfileLock = { salt: string; memoryKib: number; passes: number; wrapped: string };
+//cached lock for backups made while the hub is away
+type StoredProfile = { hubId: string; profile: HubProfile; key: string; lock?: ProfileLock };
+//a cloud backup of a profile, sealed with its backup key
+export type ProfileBackup = {
+  header: { hubId: string; profile: HubProfile; lock: ProfileLock };
+  backupKey: string;
+};
 //a device typed a link code, the user compares the digits
 export type LinkJoining = { device: string; digits: string };
 export type LinkProgress = { digits: string | null; profile: UnlockedProfile | null; denied: boolean };
@@ -102,6 +110,9 @@ type NativeHub = {
   createProfile(deviceKey: string, hub: PairedHub, name: string, password: string): Promise<UnlockedProfile>;
   unlockProfile(deviceKey: string, hub: PairedHub, profileId: string, password: string): Promise<UnlockedProfile>;
   changePassword(deviceKey: string, hub: PairedHub, current: string, next: string): Promise<void>;
+  lockedKey(deviceKey: string, hub: PairedHub): Promise<ProfileLock>;
+  openLockedKey(lock: ProfileLock, password: string): Promise<string>;
+  profileBackupKey(key: string): Promise<string>;
   linkStart(deviceKey: string, hub: PairedHub): Promise<HubInvite>;
   linkWatch(deviceKey: string, hub: PairedHub): Promise<LinkJoining | null>;
   linkApprove(deviceKey: string, hub: PairedHub): Promise<void>;
@@ -235,6 +246,9 @@ const tauriHub: NativeHub = {
   unlockProfile: (deviceKey, hub, profileId, password) =>
     invoke('hub_unlock_profile', { deviceKey, hub, profileId, password }),
   changePassword: (deviceKey, hub, current, next) => invoke('hub_change_password', { deviceKey, hub, current, next }),
+  lockedKey: (deviceKey, hub) => invoke('hub_locked_key', { deviceKey, hub }),
+  openLockedKey: (lock, password) => invoke('hub_open_locked_key', { lock, password }),
+  profileBackupKey: (key) => invoke('hub_profile_backup_key', { key }),
   linkStart: (deviceKey, hub) => invoke('hub_link_start', { deviceKey, hub }),
   linkWatch: (deviceKey, hub) => invoke('hub_link_watch', { deviceKey, hub }),
   linkApprove: (deviceKey, hub) => invoke('hub_link_approve', { deviceKey, hub }),
@@ -279,6 +293,7 @@ type WebClient = {
   createProfile(hub: PairedHub, name: string, password: string): Promise<UnlockedProfile>;
   unlockProfile(hub: PairedHub, profileId: string, password: string): Promise<UnlockedProfile>;
   changePassword(hub: PairedHub, current: string, next: string): Promise<void>;
+  lockedKey(hub: PairedHub): Promise<ProfileLock>;
   linkStart(hub: PairedHub): Promise<HubInvite>;
   linkWatch(hub: PairedHub): Promise<LinkJoining | null>;
   linkApprove(hub: PairedHub): Promise<void>;
@@ -300,6 +315,8 @@ type WebModule = {
   default(options: { module_or_path: string }): Promise<unknown>;
   WebHubClient: new (secretKey: Uint8Array) => WebClient;
   qrSvg(text: string, dark: string, light: string): string;
+  openLockedKey(lock: ProfileLock, password: string): string;
+  profileBackupKey(key: string): string;
 };
 
 //public files, built or downloaded before the web bundle
@@ -358,6 +375,9 @@ const webHub: NativeHub = {
     (await loadWebClient(deviceKey)).unlockProfile(hub, profileId, password),
   changePassword: async (deviceKey, hub, current, next) =>
     (await loadWebClient(deviceKey)).changePassword(hub, current, next),
+  lockedKey: async (deviceKey, hub) => (await loadWebClient(deviceKey)).lockedKey(hub),
+  openLockedKey: async (lock, password) => (await loadWebModule()).openLockedKey(lock, password),
+  profileBackupKey: async (key) => (await loadWebModule()).profileBackupKey(key),
   linkStart: async (deviceKey, hub) => (await loadWebClient(deviceKey)).linkStart(hub),
   linkWatch: async (deviceKey, hub) => (await loadWebClient(deviceKey)).linkWatch(hub),
   linkApprove: async (deviceKey, hub) => (await loadWebClient(deviceKey)).linkApprove(hub),
@@ -444,6 +464,31 @@ class OperaHubServiceImpl {
   async changePassword(hub: PairedHub, current: string, next: string): Promise<void> {
     await this.ensureProfile();
     return this.native().changePassword(await this.deviceKey(), hub, current, next);
+  }
+
+  //null without a profile or any known lock
+  async profileBackup(): Promise<ProfileBackup | null> {
+    const stored = await this.storedProfile();
+    const hub = await this.getPairedHub();
+    if (!stored || !hub) return null;
+    //the hub copy follows password changes
+    const lock = await this.native()
+      .lockedKey(await this.deviceKey(), hub)
+      .catch(() => stored.lock);
+    if (!lock) return null;
+    if (JSON.stringify(lock) !== JSON.stringify(stored.lock)) {
+      await setSecret(PROFILE_KEY, JSON.stringify({ ...stored, lock }));
+    }
+    return {
+      header: { hubId: stored.hubId, profile: stored.profile, lock },
+      backupKey: await this.native().profileBackupKey(stored.key),
+    };
+  }
+
+  //a cloud restore has only the password
+  async openBackupKey(lock: ProfileLock, password: string): Promise<string> {
+    const key = await this.native().openLockedKey(lock, password);
+    return this.native().profileBackupKey(key);
   }
 
   //a code for another device of this profile
@@ -756,7 +801,12 @@ class OperaHubServiceImpl {
   }
 
   private async keepProfile(hub: PairedHub, unlocked: UnlockedProfile): Promise<HubProfile> {
-    const stored: StoredProfile = { hubId: hub.id, profile: unlocked.profile, key: unlocked.key };
+    const stored: StoredProfile = {
+      hubId: hub.id,
+      profile: unlocked.profile,
+      key: unlocked.key,
+      lock: unlocked.lock ?? undefined,
+    };
     await setSecret(PROFILE_KEY, JSON.stringify(stored));
     //the client already holds it after unlocking
     this.profileLoaded = true;

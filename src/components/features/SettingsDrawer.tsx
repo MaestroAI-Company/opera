@@ -945,6 +945,10 @@ export default function SettingsDrawer({
   const [hubSyncPaused, setHubSyncPaused] = useState(false);
   //pairing started from the account list
   const [hubPickedForSync, setHubPickedForSync] = useState(false);
+  //sampler syncs while the cloud keeps a daily backup
+  const [cloudBackupMode, setCloudBackupMode] = useState(false);
+  //backup turned on, its cloud not picked yet
+  const [cloudBackupPicking, setCloudBackupPicking] = useState(false);
   //null without the admin scope
   const [hubSettings, setHubSettings] = useState<HubSettings | null>(null);
 
@@ -1173,11 +1177,13 @@ export default function SettingsDrawer({
       ? [{ id: HUB_SYNC_ID, label: t("settings.nav.hub.title") }]
       : []),
   ];
-  //active cloud wins over the hub
+  //active cloud wins over the hub, a backup cloud does not
   const syncAccount =
-    cloudProvider === "none" && pairedHub && !hubSyncPaused
+    (cloudProvider === "none" || cloudBackupMode) && pairedHub && !hubSyncPaused
       ? HUB_SYNC_ID
-      : cloudProvider;
+      : cloudBackupMode
+        ? "none"
+        : cloudProvider;
 
   const ollamaKeepAliveOptions = [
     { id: "300", label: "5m" },
@@ -1540,6 +1546,7 @@ export default function SettingsDrawer({
         }
         await CloudSync.init();
         setCloudProvider(CloudSync.getProviderName());
+        setCloudBackupMode(CloudSync.isBackupMode());
         setHasSyncPin(CloudSync.hasPin());
         if (CloudSync.getProviderName() !== "none") {
           const ui = await CloudSync.getUserInfo();
@@ -2692,7 +2699,7 @@ export default function SettingsDrawer({
     showCloudProgress(t("settings.cloud.progress.connecting"), providerName);
     const success = await CloudSync.setProvider(providerName);
     if (success) {
-      if (pairedHub) await pauseHubSync(true);
+      if (pairedHub && !CloudSync.isBackupMode()) await pauseHubSync(true);
       await completeCloudConnect(providerName);
     } else {
       setCloudProvider("none");
@@ -2714,7 +2721,7 @@ export default function SettingsDrawer({
 
   //cloud stays linked while paused
   const selectHubSync = async () => {
-    if (CloudSync.getProviderName() !== "none") {
+    if (CloudSync.getProviderName() !== "none" && !CloudSync.isBackupMode()) {
       setCloudProvider("none");
       await CloudSync.setProvider("none");
       await completeCloudConnect("none");
@@ -2723,6 +2730,11 @@ export default function SettingsDrawer({
   };
 
   const handleSetCloudProvider = async (v: string) => {
+    //a cloud sync account replaces the backup
+    if (v !== HUB_SYNC_ID && CloudSync.isBackupMode()) {
+      await CloudSync.setBackupMode(false);
+      setCloudBackupMode(false);
+    }
     if (v === HUB_SYNC_ID) {
       if (pairedHub) {
         await selectHubSync();
@@ -2753,6 +2765,33 @@ export default function SettingsDrawer({
       return;
     }
 
+    await connectProvider(v);
+  };
+
+  const setCloudBackup = async (on: boolean) => {
+    if (on) {
+      setCloudBackupPicking(true);
+      return;
+    }
+    setCloudBackupPicking(false);
+    setCloudProvider("none");
+    await CloudSync.setProvider("none");
+    await CloudSync.setBackupMode(false);
+    setCloudBackupMode(false);
+    await completeCloudConnect("none");
+  };
+
+  const pickBackupCloud = async (v: string) => {
+    const def = getCloudProviderDefinition(v);
+    if (!def) return;
+    await CloudSync.setBackupMode(true);
+    setCloudBackupMode(true);
+    setCloudBackupPicking(false);
+    if (def.SetupComponent && !(await CloudSync.isProviderConfigured(v))) {
+      setCloudSetupId(v);
+      setCloudSetupVisible(true);
+      return;
+    }
     await connectProvider(v);
   };
 
@@ -4071,7 +4110,7 @@ export default function SettingsDrawer({
       hasSyncPin && lastSyncTime
         ? [
             {
-              label: t("cloudSync.lastSynced"),
+              label: cloudBackupMode ? t("cloudSync.lastBackup") : t("cloudSync.lastSynced"),
               value: new Date(lastSyncTime).toLocaleString(),
             },
             ...(lastSyncSize != null
@@ -4111,6 +4150,115 @@ export default function SettingsDrawer({
       },
     ] as const;
 
+    //the linked cloud, for sync or backup
+    const accountCard = cloudDef && cloudUserInfo && (
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={styles.cloudAccount}>
+            {cloudUserInfo.picture ? (
+              <Image
+                source={{ uri: cloudUserInfo.picture }}
+                style={styles.cloudAvatar}
+              />
+            ) : (
+              <View style={styles.cloudAvatar}>
+                <Image
+                  source={profilIcon}
+                  style={styles.cloudAvatarIcon}
+                  tintColor={Colors.textMuted}
+                />
+              </View>
+            )}
+            {!!cloudUserInfo.name && (
+              <Text style={styles.cloudName} numberOfLines={1}>
+                {cloudUserInfo.name}
+              </Text>
+            )}
+            <Text style={styles.cloudEmail} numberOfLines={1}>
+              {cloudUserInfo.email}
+            </Text>
+          </View>
+
+          {cloudRows.length > 0 && (
+            <Group style={[styles.infoGroup, styles.groupSpacingTight]}>
+              {cloudRows.map((row) => (
+                <ActionButton
+                  key={row.label}
+                  label={row.label}
+                  rightElement={
+                    <Text
+                      style={styles.infoValue}
+                      numberOfLines={1}
+                      ellipsizeMode="middle"
+                    >
+                      {row.value}
+                    </Text>
+                  }
+                />
+              ))}
+            </Group>
+          )}
+
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {!hasSyncPin
+              ? t("cloudSync.setupIncomplete")
+              : cloudBackupMode
+                ? t("cloudSync.backupReady")
+                : t("cloudSync.ready")}
+          </Text>
+
+          {!hasSyncPin && (
+            <Group
+              style={[
+                styles.highlightGroup,
+                styles.groupSpacingTight,
+                isSyncing && styles.highlightGroupDisabled,
+              ]}
+            >
+              <ActionButton
+                icon={hasCloudBackup ? cloudDownloadIcon : cloudUploadIcon}
+                label={
+                  hasCloudBackup
+                    ? t("cloudSync.enterPin")
+                    : t("cloudSync.createPin")
+                }
+                variant="highlight"
+                disabled={isSyncing}
+                onPress={
+                  hasCloudBackup ? handleUnlockSyncPin : handleCreateSyncPin
+                }
+              />
+            </Group>
+          )}
+
+          <Group>
+            {hasSyncPin && (
+              <ActionButton
+                icon={reconnectIcon}
+                label={
+                  isSyncing
+                    ? cloudBackupMode
+                      ? t("cloudSync.backingUp")
+                      : t("cloudSync.syncing")
+                    : cloudBackupMode
+                      ? t("cloudSync.backupNow")
+                      : t("cloudSync.syncNow")
+                }
+                disabled={isSyncing}
+                style={isSyncing && styles.highlightGroupDisabled}
+                onPress={handleSyncNow}
+              />
+            )}
+            <ActionButton
+              icon={cancelIcon}
+              label={t("cloudSync.disconnect")}
+              onPress={handleDisconnectCloud}
+            />
+          </Group>
+        </View>
+      </View>
+    );
+
     return (
       <View style={styles.subPageContainer}>
         {renderSubPageHeader(t("settings.nav.cloud.title"))}
@@ -4133,108 +4281,7 @@ export default function SettingsDrawer({
           </View>
         </View>
 
-        {/* account card */}
-        {cloudDef && cloudUserInfo && (
-          <View style={styles.contentCard}>
-            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <View style={styles.cloudAccount}>
-                {cloudUserInfo.picture ? (
-                  <Image
-                    source={{ uri: cloudUserInfo.picture }}
-                    style={styles.cloudAvatar}
-                  />
-                ) : (
-                  <View style={styles.cloudAvatar}>
-                    <Image
-                      source={profilIcon}
-                      style={styles.cloudAvatarIcon}
-                      tintColor={Colors.textMuted}
-                    />
-                  </View>
-                )}
-                {!!cloudUserInfo.name && (
-                  <Text style={styles.cloudName} numberOfLines={1}>
-                    {cloudUserInfo.name}
-                  </Text>
-                )}
-                <Text style={styles.cloudEmail} numberOfLines={1}>
-                  {cloudUserInfo.email}
-                </Text>
-              </View>
-
-              {cloudRows.length > 0 && (
-                <Group style={[styles.infoGroup, styles.groupSpacingTight]}>
-                  {cloudRows.map((row) => (
-                    <ActionButton
-                      key={row.label}
-                      label={row.label}
-                      rightElement={
-                        <Text
-                          style={styles.infoValue}
-                          numberOfLines={1}
-                          ellipsizeMode="middle"
-                        >
-                          {row.value}
-                        </Text>
-                      }
-                    />
-                  ))}
-                </Group>
-              )}
-
-              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-                {hasSyncPin
-                  ? t("cloudSync.ready")
-                  : t("cloudSync.setupIncomplete")}
-              </Text>
-
-              {!hasSyncPin && (
-                <Group
-                  style={[
-                    styles.highlightGroup,
-                    styles.groupSpacingTight,
-                    isSyncing && styles.highlightGroupDisabled,
-                  ]}
-                >
-                  <ActionButton
-                    icon={hasCloudBackup ? cloudDownloadIcon : cloudUploadIcon}
-                    label={
-                      hasCloudBackup
-                        ? t("cloudSync.enterPin")
-                        : t("cloudSync.createPin")
-                    }
-                    variant="highlight"
-                    disabled={isSyncing}
-                    onPress={
-                      hasCloudBackup ? handleUnlockSyncPin : handleCreateSyncPin
-                    }
-                  />
-                </Group>
-              )}
-
-              <Group>
-                {hasSyncPin && (
-                  <ActionButton
-                    icon={reconnectIcon}
-                    label={
-                      isSyncing
-                        ? t("cloudSync.syncing")
-                        : t("cloudSync.syncNow")
-                    }
-                    disabled={isSyncing}
-                    style={isSyncing && styles.highlightGroupDisabled}
-                    onPress={handleSyncNow}
-                  />
-                )}
-                <ActionButton
-                  icon={cancelIcon}
-                  label={t("cloudSync.disconnect")}
-                  onPress={handleDisconnectCloud}
-                />
-              </Group>
-            </View>
-          </View>
-        )}
+        {!cloudBackupMode && accountCard}
 
         {/* sync choices card */}
         {syncAccount !== "none" && syncPrefs && (
@@ -4252,6 +4299,38 @@ export default function SettingsDrawer({
             })}
           </View>
         )}
+
+        {/* daily profile backup while sampler syncs */}
+        {syncAccount === HUB_SYNC_ID && (
+          <View style={styles.contentCard}>
+            {renderHubToggle(
+              t("settings.cloud.backup"),
+              hubProfile ? t("settings.cloud.backupHelp") : t("settings.cloud.backupNeedsProfile"),
+              cloudBackupMode && cloudProvider !== "none",
+              setCloudBackup,
+              !cloudBackupPicking,
+              !hubProfile,
+            )}
+            {cloudBackupPicking && (
+              <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+                <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+                  {t("settings.cloud.backupAccount")}
+                </Text>
+                <Group>
+                  {CLOUD_PROVIDERS.map((def) => (
+                    <ActionButton
+                      key={def.id}
+                      icon={cloudIcon}
+                      label={def.label}
+                      onPress={() => pickBackupCloud(def.id)}
+                    />
+                  ))}
+                </Group>
+              </View>
+            )}
+          </View>
+        )}
+        {cloudBackupMode && accountCard}
       </View>
     );
   };

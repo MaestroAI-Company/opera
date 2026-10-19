@@ -23,6 +23,10 @@ import uniffi.opera_hub_client.HubSettings
 import uniffi.opera_hub_client.LlamaStatus
 import uniffi.opera_hub_client.ModelFile
 import uniffi.opera_hub_client.PairedHub
+import uniffi.opera_hub_client.ProfileLock
+//aliased so the bridge methods keep their js names
+import uniffi.opera_hub_client.openLockedKey as reopenLockedKey
+import uniffi.opera_hub_client.profileBackupKey as deriveBackupKey
 import uniffi.opera_hub_client.UnlockedProfile
 import uniffi.opera_hub_client.SyncRecord
 
@@ -293,6 +297,37 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
     }
 
   @ReactMethod
+  fun lockedKey(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) {
+      val lock = client(deviceKey).lockedKey(hubFromMap(hub))
+      Arguments.createMap().apply {
+        putString("salt", lock.salt)
+        putDouble("memoryKib", lock.memoryKib.toDouble())
+        putDouble("passes", lock.passes.toDouble())
+        putString("wrapped", lock.wrapped)
+      }
+    }
+
+  //a cloud restore reopens the key without a hub
+  @ReactMethod
+  fun openLockedKey(lock: ReadableMap, password: String, promise: Promise) =
+    launchPromise(promise) {
+      reopenLockedKey(
+        ProfileLock(
+          lock.getString("salt") ?: "",
+          lock.getDouble("memoryKib").toUInt(),
+          lock.getDouble("passes").toUInt(),
+          lock.getString("wrapped") ?: "",
+        ),
+        password,
+      )
+    }
+
+  @ReactMethod
+  fun profileBackupKey(key: String, promise: Promise) =
+    launchPromise(promise) { deriveBackupKey(key) }
+
+  @ReactMethod
   fun linkStart(deviceKey: String, hub: ReadableMap, promise: Promise) =
     launchPromise(promise) {
       val invite = client(deviceKey).linkStart(hubFromMap(hub))
@@ -443,6 +478,14 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
     Arguments.createMap().apply {
       putMap("profile", profileToMap(unlocked.profile))
       putString("key", unlocked.key)
+      unlocked.lock?.let { lock ->
+        putMap("lock", Arguments.createMap().apply {
+          putString("salt", lock.salt)
+          putDouble("memoryKib", lock.memoryKib.toDouble())
+          putDouble("passes", lock.passes.toDouble())
+          putString("wrapped", lock.wrapped)
+        })
+      }
     }
 
   private fun settingsToMap(settings: HubSettings): WritableMap =

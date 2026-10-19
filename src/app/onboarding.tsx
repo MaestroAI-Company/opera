@@ -527,6 +527,50 @@ export default function OnboardingPage() {
     );
   };
 
+  //a profile backup opens with the profile password
+  const promptProfilePassword = (providerName: string, profileName: string) => {
+    let currentInput = "";
+    const cancel = async () => {
+      setAlertVisible(false);
+      await CloudSync.disconnect();
+    };
+    showAlert(
+      t("onboarding.restore.profileTitle", { name: profileName }),
+      t("onboarding.restore.profileMessage"),
+      [
+        { text: t("common.cancel"), onPress: cancel, style: "secondary" },
+        {
+          text: t("hubProfile.unlock"),
+          style: "primary",
+          onPress: async () => {
+            showCloudProgress(t("settings.cloud.progress.unlocking"), providerName);
+            if (await CloudSync.unlockProfileBackup(currentInput)) {
+              await syncAndFinish(providerName);
+              return;
+            }
+            showAlert(t("common.error"), t("hubProfile.wrongPassword"), [
+              {
+                text: t("settings.pin.tryAgain"),
+                onPress: () => promptProfilePassword(providerName, profileName),
+                style: "primary",
+              },
+              { text: t("common.cancel"), onPress: cancel, style: "secondary" },
+            ]);
+          },
+        },
+      ],
+      {
+        showInput: true,
+        inputPlaceholder: t("hubProfile.passwordPlaceholder"),
+        inputSecureTextEntry: true,
+        onInputChange: (text: string) => {
+          currentInput = text;
+          setAlertConfig((prev) => ({ ...prev, inputValue: text }));
+        },
+      },
+    );
+  };
+
   const connectCloudProvider = async (providerName: string) => {
     closeSaveSheet();
     await CloudSync.init();
@@ -553,6 +597,11 @@ export default function OnboardingPage() {
         getCloudProviderDefinition(providerName)?.label ?? t("settings.cloud.storage"),
         t("onboarding.restore.noCloudBackup"),
       );
+      return;
+    }
+    const profile = await CloudSync.cloudBackupProfile();
+    if (profile) {
+      promptProfilePassword(providerName, profile.name);
       return;
     }
     promptCloudPin(providerName);

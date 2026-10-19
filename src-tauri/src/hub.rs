@@ -5,7 +5,7 @@ use opera_hub::{config, hub, service};
 use opera_hub_client::{
     CatalogModel, HubClient, HubDevice, HubError, HubInvite, HubProfile, HubProvider, HubSettings,
     HubStatus, LinkJoining, LinkProgress, LlamaStatus, ModelFile, ModelRepo, NearbyHub, PairedHub,
-    ProxyInfo, PullPage, SyncRecord, UnlockedProfile,
+    ProfileLock, ProxyInfo, PullPage, SyncRecord, UnlockedProfile,
 };
 use serde::Serialize;
 use tauri::State;
@@ -420,6 +420,28 @@ pub async fn hub_change_password(
         .await?
         .change_password(hub, current, next)
         .await
+}
+
+#[tauri::command]
+pub async fn hub_locked_key(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<ProfileLock, HubError> {
+    state.client(&device_key).await?.locked_key(hub).await
+}
+
+//argon2 stays off the async runtime
+#[tauri::command]
+pub async fn hub_open_locked_key(lock: ProfileLock, password: String) -> Result<String, HubError> {
+    tokio::task::spawn_blocking(move || opera_hub_client::open_locked_key(lock, password))
+        .await
+        .map_err(|e| HubError::Internal(e.to_string()))?
+}
+
+#[tauri::command]
+pub fn hub_profile_backup_key(key: String) -> Result<String, HubError> {
+    opera_hub_client::profile_backup_key(key)
 }
 
 #[tauri::command]

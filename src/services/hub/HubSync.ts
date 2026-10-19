@@ -181,6 +181,10 @@ class HubSyncImpl {
   async joinedProfile(): Promise<void> {
     for (const key of Object.values(STATE_KEYS)) await setSecret(key, null);
     await resetDataSync();
+    //an older build paused it for the cloud
+    await this.setPaused(false);
+    //the cloud backup moves to the profile key
+    await CloudSync.refreshSecret();
     this.request(0);
     this.watch();
   }
@@ -220,8 +224,8 @@ class HubSyncImpl {
     await this.dropInjectedServers();
     await this.storeProviders(await OperaHub.providers(hub), hub.name);
     await this.offerUpdate(hub);
-    //one sync account at a time
-    if (this.paused || CloudSync.getProviderName() !== 'none') return;
+    //a cloud sync account replaces sampler, a backup does not
+    if (this.paused || (CloudSync.getProviderName() !== 'none' && !CloudSync.isBackupMode())) return;
     const prefs = SyncPrefsStore.get();
     if (prefs.providers) {
       await this.syncFingerprinted(hub, 'providers', await this.providerEntries(), (r) => this.applyProviders(r));

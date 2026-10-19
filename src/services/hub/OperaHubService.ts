@@ -21,18 +21,18 @@ export type HubDevice = {
   pairedAt: number;
   pairedBy: string | null;
   lastSeen?: number;
+  profile?: string | null;
 };
+//one person on the hub
+export type HubProfile = { id: string; name: string; role: 'admin' | 'member'; createdAt: number };
+//the key only lives in this device's secure store
+export type UnlockedProfile = { profile: HubProfile; key: string };
+type StoredProfile = { hubId: string; profile: HubProfile; key: string };
+//a device typed a link code, the user compares the digits
+export type LinkJoining = { device: string; digits: string };
+export type LinkProgress = { digits: string | null; profile: UnlockedProfile | null; denied: boolean };
 export type SyncRecord = { id: string; updatedAt: number; deleted: boolean; payload: string | null };
 export type PullPage = { records: SyncRecord[]; cursor: number; more: boolean };
-export type McpGrant = {
-  serverId: string;
-  tokenEndpoint: string;
-  clientId: string;
-  refreshToken: string;
-  accessToken: string | null;
-  expiresAt: number;
-};
-export type McpAccessToken = { accessToken: string; expiresAt: number };
 //mcp ones are servers the hub hosts
 export type HubProvider = { id: string; name: string; kind: 'ollama' | 'openai' | 'mcp' };
 //a hub on this computer, desktop only
@@ -63,6 +63,7 @@ export type HubErrorCode =
   | 'Unauthorized'
   | 'Unreachable'
   | 'Outdated'
+  | 'Locked'
   | 'Internal';
 
 type NativeHub = {
@@ -95,9 +96,18 @@ type NativeHub = {
   push(deviceKey: string, hub: PairedHub, collection: string, records: SyncRecord[]): Promise<void>;
   pull(deviceKey: string, hub: PairedHub, collection: string, since: number): Promise<PullPage>;
   watch(deviceKey: string, hub: PairedHub, since: number): Promise<number>;
-  putGrant(deviceKey: string, hub: PairedHub, grant: McpGrant): Promise<void>;
-  accessToken(deviceKey: string, hub: PairedHub, serverId: string): Promise<McpAccessToken | null>;
-  dropGrant(deviceKey: string, hub: PairedHub, serverId: string): Promise<void>;
+  setProfile(deviceKey: string, profileId: string, key: string): Promise<void>;
+  clearProfile(deviceKey: string): Promise<void>;
+  profiles(deviceKey: string, hub: PairedHub): Promise<HubProfile[]>;
+  createProfile(deviceKey: string, hub: PairedHub, name: string, password: string): Promise<UnlockedProfile>;
+  unlockProfile(deviceKey: string, hub: PairedHub, profileId: string, password: string): Promise<UnlockedProfile>;
+  changePassword(deviceKey: string, hub: PairedHub, current: string, next: string): Promise<void>;
+  linkStart(deviceKey: string, hub: PairedHub): Promise<HubInvite>;
+  linkWatch(deviceKey: string, hub: PairedHub): Promise<LinkJoining | null>;
+  linkApprove(deviceKey: string, hub: PairedHub): Promise<void>;
+  linkDeny(deviceKey: string, hub: PairedHub): Promise<void>;
+  linkJoin(deviceKey: string, hub: PairedHub): Promise<void>;
+  linkFetch(deviceKey: string, hub: PairedHub): Promise<LinkProgress>;
   providers(deviceKey: string, hub: PairedHub): Promise<HubProvider[]>;
   startProxy(deviceKey: string, hub: PairedHub): Promise<{ port: number; token: string }>;
 };
@@ -218,9 +228,19 @@ const tauriHub: NativeHub = {
   push: (deviceKey, hub, collection, records) => invoke('hub_push', { deviceKey, hub, collection, records }),
   pull: (deviceKey, hub, collection, since) => invoke('hub_pull', { deviceKey, hub, collection, since }),
   watch: (deviceKey, hub, since) => invoke('hub_watch', { deviceKey, hub, since }),
-  putGrant: (deviceKey, hub, grant) => invoke('hub_put_grant', { deviceKey, hub, grant }),
-  accessToken: (deviceKey, hub, serverId) => invoke('hub_access_token', { deviceKey, hub, serverId }),
-  dropGrant: (deviceKey, hub, serverId) => invoke('hub_drop_grant', { deviceKey, hub, serverId }),
+  setProfile: (deviceKey, profileId, key) => invoke('hub_set_profile', { deviceKey, profileId, key }),
+  clearProfile: (deviceKey) => invoke('hub_clear_profile', { deviceKey }),
+  profiles: (deviceKey, hub) => invoke('hub_profiles', { deviceKey, hub }),
+  createProfile: (deviceKey, hub, name, password) => invoke('hub_create_profile', { deviceKey, hub, name, password }),
+  unlockProfile: (deviceKey, hub, profileId, password) =>
+    invoke('hub_unlock_profile', { deviceKey, hub, profileId, password }),
+  changePassword: (deviceKey, hub, current, next) => invoke('hub_change_password', { deviceKey, hub, current, next }),
+  linkStart: (deviceKey, hub) => invoke('hub_link_start', { deviceKey, hub }),
+  linkWatch: (deviceKey, hub) => invoke('hub_link_watch', { deviceKey, hub }),
+  linkApprove: (deviceKey, hub) => invoke('hub_link_approve', { deviceKey, hub }),
+  linkDeny: (deviceKey, hub) => invoke('hub_link_deny', { deviceKey, hub }),
+  linkJoin: (deviceKey, hub) => invoke('hub_link_join', { deviceKey, hub }),
+  linkFetch: (deviceKey, hub) => invoke('hub_link_fetch', { deviceKey, hub }),
   providers: (deviceKey, hub) => invoke('hub_providers', { deviceKey, hub }),
   startProxy: (deviceKey, hub) => invoke('hub_start_proxy', { deviceKey, hub }),
 };
@@ -253,9 +273,18 @@ type WebClient = {
   push(hub: PairedHub, collection: string, records: SyncRecord[]): Promise<void>;
   pull(hub: PairedHub, collection: string, since: number): Promise<PullPage>;
   watch(hub: PairedHub, since: number): Promise<number>;
-  putGrant(hub: PairedHub, grant: McpGrant): Promise<void>;
-  accessToken(hub: PairedHub, serverId: string): Promise<McpAccessToken | null>;
-  dropGrant(hub: PairedHub, serverId: string): Promise<void>;
+  setProfile(profileId: string, key: string): void;
+  clearProfile(): void;
+  profiles(hub: PairedHub): Promise<HubProfile[]>;
+  createProfile(hub: PairedHub, name: string, password: string): Promise<UnlockedProfile>;
+  unlockProfile(hub: PairedHub, profileId: string, password: string): Promise<UnlockedProfile>;
+  changePassword(hub: PairedHub, current: string, next: string): Promise<void>;
+  linkStart(hub: PairedHub): Promise<HubInvite>;
+  linkWatch(hub: PairedHub): Promise<LinkJoining | null>;
+  linkApprove(hub: PairedHub): Promise<void>;
+  linkDeny(hub: PairedHub): Promise<void>;
+  linkJoin(hub: PairedHub): Promise<void>;
+  linkFetch(hub: PairedHub): Promise<LinkProgress>;
   providers(hub: PairedHub): Promise<HubProvider[]>;
   forward(
     hub: PairedHub,
@@ -320,9 +349,21 @@ const webHub: NativeHub = {
     (await loadWebClient(deviceKey)).push(hub, collection, records),
   pull: async (deviceKey, hub, collection, since) => (await loadWebClient(deviceKey)).pull(hub, collection, since),
   watch: async (deviceKey, hub, since) => (await loadWebClient(deviceKey)).watch(hub, since),
-  putGrant: async (deviceKey, hub, grant) => (await loadWebClient(deviceKey)).putGrant(hub, grant),
-  accessToken: async (deviceKey, hub, serverId) => (await loadWebClient(deviceKey)).accessToken(hub, serverId),
-  dropGrant: async (deviceKey, hub, serverId) => (await loadWebClient(deviceKey)).dropGrant(hub, serverId),
+  setProfile: async (deviceKey, profileId, key) => (await loadWebClient(deviceKey)).setProfile(profileId, key),
+  clearProfile: async (deviceKey) => (await loadWebClient(deviceKey)).clearProfile(),
+  profiles: async (deviceKey, hub) => (await loadWebClient(deviceKey)).profiles(hub),
+  createProfile: async (deviceKey, hub, name, password) =>
+    (await loadWebClient(deviceKey)).createProfile(hub, name, password),
+  unlockProfile: async (deviceKey, hub, profileId, password) =>
+    (await loadWebClient(deviceKey)).unlockProfile(hub, profileId, password),
+  changePassword: async (deviceKey, hub, current, next) =>
+    (await loadWebClient(deviceKey)).changePassword(hub, current, next),
+  linkStart: async (deviceKey, hub) => (await loadWebClient(deviceKey)).linkStart(hub),
+  linkWatch: async (deviceKey, hub) => (await loadWebClient(deviceKey)).linkWatch(hub),
+  linkApprove: async (deviceKey, hub) => (await loadWebClient(deviceKey)).linkApprove(hub),
+  linkDeny: async (deviceKey, hub) => (await loadWebClient(deviceKey)).linkDeny(hub),
+  linkJoin: async (deviceKey, hub) => (await loadWebClient(deviceKey)).linkJoin(hub),
+  linkFetch: async (deviceKey, hub) => (await loadWebClient(deviceKey)).linkFetch(hub),
   providers: async (deviceKey, hub) => (await loadWebClient(deviceKey)).providers(hub),
   startProxy: () => Promise.reject(Object.assign(new Error('No local proxy in a browser'), { code: 'Internal' })),
 };
@@ -348,6 +389,8 @@ const host: HubHost | undefined = isTauri ? tauriHost : undefined;
 //per device so never cloud synced
 const DEVICE_KEY = 'opera_hub_device_key';
 const PAIRED_HUB_KEY = 'opera_hub_paired';
+//never synced, it unlocks this device's sealed data
+const PROFILE_KEY = 'opera_hub_profile';
 //every hub nearby answers within it
 const NEARBY_WAIT_MS = 2500;
 //a fresh hub publishes its address slowly
@@ -365,13 +408,78 @@ export function hubErrorCode(e: unknown): HubErrorCode {
     'Unauthorized',
     'Unreachable',
     'Outdated',
+    'Locked',
   ];
   return known.includes(code as HubErrorCode) ? (code as HubErrorCode) : 'Internal';
 }
 
 class OperaHubServiceImpl {
+  //the native client forgets it on reload
+  private profileLoaded = false;
+
   isSupported(): boolean {
     return !!native;
+  }
+
+  //the profile this device unlocked on its hub
+  async getProfile(): Promise<HubProfile | null> {
+    const stored = await this.storedProfile();
+    return stored?.profile ?? null;
+  }
+
+  async profiles(hub: PairedHub): Promise<HubProfile[]> {
+    return this.native().profiles(await this.deviceKey(), hub);
+  }
+
+  async createProfile(hub: PairedHub, name: string, password: string): Promise<HubProfile> {
+    const unlocked = await this.native().createProfile(await this.deviceKey(), hub, name, password);
+    return this.keepProfile(hub, unlocked);
+  }
+
+  async unlockProfile(hub: PairedHub, profileId: string, password: string): Promise<HubProfile> {
+    const unlocked = await this.native().unlockProfile(await this.deviceKey(), hub, profileId, password);
+    return this.keepProfile(hub, unlocked);
+  }
+
+  async changePassword(hub: PairedHub, current: string, next: string): Promise<void> {
+    await this.ensureProfile();
+    return this.native().changePassword(await this.deviceKey(), hub, current, next);
+  }
+
+  //a code for another device of this profile
+  async linkStart(hub: PairedHub): Promise<HubInvite> {
+    await this.ensureProfile();
+    return this.native().linkStart(await this.deviceKey(), hub);
+  }
+
+  async linkWatch(hub: PairedHub): Promise<LinkJoining | null> {
+    return this.native().linkWatch(await this.deviceKey(), hub);
+  }
+
+  async linkApprove(hub: PairedHub): Promise<void> {
+    await this.ensureProfile();
+    return this.native().linkApprove(await this.deviceKey(), hub);
+  }
+
+  async linkDeny(hub: PairedHub): Promise<void> {
+    return this.native().linkDeny(await this.deviceKey(), hub);
+  }
+
+  //false when the code came from an admin, not a device
+  async linkJoin(hub: PairedHub): Promise<boolean> {
+    try {
+      await this.native().linkJoin(await this.deviceKey(), hub);
+      return true;
+    } catch (e) {
+      if (hubErrorCode(e) === 'Internal') return false;
+      throw e;
+    }
+  }
+
+  async linkFetch(hub: PairedHub): Promise<{ digits: string | null; profile: HubProfile | null; denied: boolean }> {
+    const progress = await this.native().linkFetch(await this.deviceKey(), hub);
+    const profile = progress.profile ? await this.keepProfile(hub, progress.profile) : null;
+    return { digits: progress.digits, profile, denied: progress.denied };
   }
 
   async getPairedHub(): Promise<PairedHub | null> {
@@ -380,6 +488,8 @@ class OperaHubServiceImpl {
   }
 
   async pair(link: string): Promise<PairedHub> {
+    //a new pairing starts without a profile
+    await this.forgetProfile();
     const { name, kind } = await this.identity();
     const hub = await this.native().pair(await this.deviceKey(), link, name, kind);
     await setSecret(PAIRED_HUB_KEY, JSON.stringify(hub));
@@ -390,6 +500,7 @@ class OperaHubServiceImpl {
   async pairWithCode(input: string): Promise<PairedHub> {
     const value = input.trim();
     if (value.startsWith('opera://')) return this.pair(value);
+    await this.forgetProfile();
     const { name, kind } = await this.identity();
     const hub = await this.native().pairWithCode(await this.deviceKey(), value, name, kind);
     await setSecret(PAIRED_HUB_KEY, JSON.stringify(hub));
@@ -552,28 +663,18 @@ class OperaHubServiceImpl {
   }
 
   async push(hub: PairedHub, collection: string, records: SyncRecord[]): Promise<void> {
+    await this.ensureProfile();
     return this.native().push(await this.deviceKey(), hub, collection, records);
   }
 
   async pull(hub: PairedHub, collection: string, since: number): Promise<PullPage> {
+    await this.ensureProfile();
     return this.native().pull(await this.deviceKey(), hub, collection, since);
   }
 
   //hub cursor once something newer than since lands
   async watch(hub: PairedHub, since: number): Promise<number> {
     return this.native().watch(await this.deviceKey(), hub, since);
-  }
-
-  async putGrant(hub: PairedHub, grant: McpGrant): Promise<void> {
-    return this.native().putGrant(await this.deviceKey(), hub, grant);
-  }
-
-  async accessToken(hub: PairedHub, serverId: string): Promise<McpAccessToken | null> {
-    return this.native().accessToken(await this.deviceKey(), hub, serverId);
-  }
-
-  async dropGrant(hub: PairedHub, serverId: string): Promise<void> {
-    return this.native().dropGrant(await this.deviceKey(), hub, serverId);
   }
 
   async providers(hub: PairedHub): Promise<HubProvider[]> {
@@ -628,11 +729,47 @@ class OperaHubServiceImpl {
     } catch (e) {
       console.warn('[OperaHub] hub not told about unpairing:', e);
     }
-    await setSecret(PAIRED_HUB_KEY, null);
+    await this.forget();
   }
 
   async forget(): Promise<void> {
     await setSecret(PAIRED_HUB_KEY, null);
+    await this.forgetProfile();
+  }
+
+  //the key stays only as long as the pairing
+  private async forgetProfile(): Promise<void> {
+    await setSecret(PROFILE_KEY, null);
+    this.profileLoaded = false;
+    await this.native()
+      .clearProfile(await this.deviceKey())
+      .catch(() => {});
+  }
+
+  private async storedProfile(): Promise<StoredProfile | null> {
+    const raw = await getSecret(PROFILE_KEY);
+    const hub = await this.getPairedHub();
+    if (!raw || !hub) return null;
+    const stored = JSON.parse(raw) as StoredProfile;
+    //a profile of another hub unlocks nothing here
+    return stored.hubId === hub.id ? stored : null;
+  }
+
+  private async keepProfile(hub: PairedHub, unlocked: UnlockedProfile): Promise<HubProfile> {
+    const stored: StoredProfile = { hubId: hub.id, profile: unlocked.profile, key: unlocked.key };
+    await setSecret(PROFILE_KEY, JSON.stringify(stored));
+    //the client already holds it after unlocking
+    this.profileLoaded = true;
+    return unlocked.profile;
+  }
+
+  //sealing needs the key in the native client
+  private async ensureProfile(): Promise<void> {
+    if (this.profileLoaded) return;
+    const stored = await this.storedProfile();
+    if (!stored) return;
+    await this.native().setProfile(await this.deviceKey(), stored.profile.id, stored.key);
+    this.profileLoaded = true;
   }
 
   private async identity(): Promise<{ name: string; kind: string }> {

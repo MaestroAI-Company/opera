@@ -129,6 +129,7 @@ import {
   HostStatus,
   HubDevice,
   hubErrorCode,
+  HubProfile,
   HubSettings,
   HubStatus,
   OperaHub,
@@ -164,6 +165,7 @@ import DrawerSheet, {
   SheetScrollView,
 } from "./DrawerSheet";
 import HubPairingSheet from "./HubPairingSheet";
+import HubProfileSheet from "./HubProfileSheet";
 import HubDeviceSheet from "./HubDeviceSheet";
 import HubModelsSection, { HubModelPage } from "./HubModelsSection";
 import HubModelsSheet from "./HubModelsSheet";
@@ -926,6 +928,11 @@ export default function SettingsDrawer({
   const [hubDevices, setHubDevices] = useState<HubDevice[] | null>(null);
   const [hubPairingVisible, setHubPairingVisible] = useState(false);
   const [hubQrVisible, setHubQrVisible] = useState(false);
+  //link adds one of my devices, invite anyone
+  const [hubQrMode, setHubQrMode] = useState<"invite" | "link">("invite");
+  //null until this device unlocks a profile
+  const [hubProfile, setHubProfile] = useState<HubProfile | null>(null);
+  const [hubProfileSheet, setHubProfileSheet] = useState<"pick" | "password" | null>(null);
   //the device whose sheet is open
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   //desktop only, the hub on this computer
@@ -944,6 +951,7 @@ export default function SettingsDrawer({
   const refreshHub = useCallback(async () => {
     const hub = await OperaHub.getPairedHub();
     setPairedHub(hub);
+    setHubProfile(await OperaHub.getProfile());
     if (OperaHub.canHost()) {
       setHostStatus(await OperaHub.hostStatus().catch(() => null));
     }
@@ -992,6 +1000,7 @@ export default function SettingsDrawer({
   const sheetOpen =
     hubPairingVisible ||
     hubQrVisible ||
+    hubProfileSheet !== null ||
     selectedDeviceId !== null ||
     profileEditVisible ||
     addModelSheetVisible ||
@@ -2776,9 +2785,17 @@ export default function SettingsDrawer({
     );
   };
 
+  //a paired device still needs its profile
   const handleHubPaired = () => {
     setHubPairingVisible(false);
     onHubPairLinkHandled?.();
+    refreshHub();
+    setHubProfileSheet("pick");
+  };
+
+  const handleHubProfileDone = (profile: HubProfile) => {
+    setHubProfileSheet(null);
+    setHubProfile(profile);
     refreshHub();
     if (!enabledProviders.includes(HUB_PROVIDER_ID)) {
       setProviderEnabled(HUB_PROVIDER_ID, true);
@@ -2787,7 +2804,12 @@ export default function SettingsDrawer({
       setHubPickedForSync(false);
       selectHubSync();
     }
-    HubSync.syncNow().catch((e) => console.warn("[HubSync] first sync failed:", e));
+    HubSync.joinedProfile().catch((e) => console.warn("[HubSync] first sync failed:", e));
+  };
+
+  const openHubQr = (mode: "invite" | "link") => {
+    setHubQrMode(mode);
+    setHubQrVisible(true);
   };
 
   const pairWithThisComputer = async () => {
@@ -2871,6 +2893,7 @@ export default function SettingsDrawer({
             await HubSync.forgetHub();
             setHubSyncPaused(false);
             setPairedHub(null);
+            setHubProfile(null);
             setHubStatus(null);
             setHubDevices(null);
           },
@@ -4263,13 +4286,8 @@ export default function SettingsDrawer({
     </View>
   );
 
-  //older clients cannot tell, browsers never manage
-  const isHubAdmin = () => {
-    const thisDevice = hubDevices?.find((device) => device.id === thisDeviceId);
-    return thisDevice
-      ? thisDevice.scopes.includes("admin")
-      : Platform.OS !== "web";
-  };
+  //the profile role decides, browsers never manage
+  const isHubAdmin = () => hubProfile?.role === "admin" && Platform.OS !== "web";
 
   const renderOperaHubSubPage = () => {
     const hubIcon = (
@@ -4384,12 +4402,33 @@ export default function SettingsDrawer({
         {renderSubPageHeader(hubStatus?.name ?? pairedHub.name)}
         {hubIcon}
 
-        {/* hub models and mcp servers for admins only */}
+        {/* a paired device picks its profile first */}
+        {hubState === "online" && !hubProfile && (
+          <View style={styles.contentCard}>
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <Text style={styles.settingLabel}>{t("settings.hub.noProfile")}</Text>
+              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                {t("settings.hub.noProfileHelp")}
+              </Text>
+              <Group style={styles.highlightGroup}>
+                <ActionButton
+                  icon={hyperlinkIcon}
+                  label={t("settings.hub.chooseProfile")}
+                  variant="highlight"
+                  onPress={() => setHubProfileSheet("pick")}
+                />
+              </Group>
+            </View>
+          </View>
+        )}
+
+        {/* hub models for admins, own mcp servers for members */}
         {hubState === "online" &&
-          isAdmin &&
-          (OperaHub.canManageModels() || OperaHub.canManageMcp()) && (
+          !!hubProfile &&
+          ((isAdmin && OperaHub.canManageModels()) || OperaHub.canManageMcp()) && (
             <Group style={styles.groupSpacing}>
-              {OperaHub.canManageModels() &&
+              {isAdmin &&
+                OperaHub.canManageModels() &&
                 renderToolsNavRow(
                   "hubmodels",
                   t("hubModels.pageTitle"),
@@ -4403,6 +4442,47 @@ export default function SettingsDrawer({
                 )}
             </Group>
           )}
+
+        {/* the profile sealing this device's data */}
+        {hubProfile && (
+          <View style={styles.contentCard}>
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <Text style={styles.settingLabel}>{t("settings.hub.profile")}</Text>
+              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                {t("settings.hub.profileHelp")}
+              </Text>
+              <Group style={[styles.infoGroup, styles.groupSpacingTight]}>
+                {[
+                  { label: t("settings.hub.name"), value: hubProfile.name },
+                  {
+                    label: t("settings.hub.role"),
+                    value:
+                      hubProfile.role === "admin"
+                        ? t("settings.hub.roleAdmin")
+                        : t("settings.hub.roleMember"),
+                  },
+                ].map((row) => (
+                  <ActionButton
+                    key={row.label}
+                    label={row.label}
+                    rightElement={
+                      <Text style={styles.infoValue} numberOfLines={1}>
+                        {row.value}
+                      </Text>
+                    }
+                  />
+                ))}
+              </Group>
+              <Group>
+                <ActionButton
+                  icon={keyIcon}
+                  label={t("settings.hub.changePassword")}
+                  onPress={() => setHubProfileSheet("password")}
+                />
+              </Group>
+            </View>
+          </View>
+        )}
 
         {/* hub wide settings, admins only */}
         {hubState === "online" && hubSettings && (
@@ -4428,7 +4508,7 @@ export default function SettingsDrawer({
               </Text>
               {hubDevices ? (
                 //admins open each device, so the rows get an outline
-                <View style={isAdmin && { marginBottom: Spacing.md }}>
+                <View style={!!hubProfile && { marginBottom: Spacing.md }}>
                   {renderCardGrid(
                     hubDevices.map((device) => ({
                       key: device.id,
@@ -4452,18 +4532,25 @@ export default function SettingsDrawer({
                 </View>
               ) : (
                 <Text
-                  style={[styles.helpText, isAdmin && { marginBottom: Spacing.md }]}
+                  style={[styles.helpText, !!hubProfile && { marginBottom: Spacing.md }]}
                 >
                   {t("settings.hub.devicesEmpty")}
                 </Text>
               )}
-              {isAdmin && (
+              {hubProfile && (
                 <Group>
                   <ActionButton
                     icon={addIcon}
-                    label={t("settings.hub.pairDevice")}
-                    onPress={() => setHubQrVisible(true)}
+                    label={t("settings.hub.addMyDevice")}
+                    onPress={() => openHubQr("link")}
                   />
+                  {isAdmin && (
+                    <ActionButton
+                      icon={hyperlinkIcon}
+                      label={t("settings.hub.pairDevice")}
+                      onPress={() => openHubQr("invite")}
+                    />
+                  )}
                 </Group>
               )}
             </View>
@@ -7245,11 +7332,7 @@ export default function SettingsDrawer({
         device={hubDevices?.find((d) => d.id === selectedDeviceId) ?? null}
         hub={pairedHub}
         isSelf={selectedDeviceId === thisDeviceId}
-        canManage={
-          hubDevices
-            ?.find((d) => d.id === thisDeviceId)
-            ?.scopes.includes("admin") ?? Platform.OS !== "web"
-        }
+        canManage={isHubAdmin()}
         onClose={() => setSelectedDeviceId(null)}
         onChanged={refreshHub}
         onUnpairSelf={() => {
@@ -7284,8 +7367,23 @@ export default function SettingsDrawer({
       />
       <HubQrSheet
         visible={hubQrVisible}
-        onClose={() => setHubQrVisible(false)}
+        onClose={() => {
+          setHubQrVisible(false);
+          //an approved device shows up in the list
+          refreshHub();
+        }}
         hub={pairedHub}
+        mode={hubQrMode}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
+      <HubProfileSheet
+        visible={hubProfileSheet !== null}
+        hub={pairedHub}
+        changePassword={hubProfileSheet === "password"}
+        defaultName={confirmedName}
+        onClose={() => setHubProfileSheet(null)}
+        onDone={handleHubProfileDone}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />

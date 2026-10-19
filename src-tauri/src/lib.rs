@@ -61,11 +61,29 @@ pub fn run() {
             #[cfg(desktop)]
             hub::hub_watch,
             #[cfg(desktop)]
-            hub::hub_put_grant,
+            hub::hub_set_profile,
             #[cfg(desktop)]
-            hub::hub_access_token,
+            hub::hub_clear_profile,
             #[cfg(desktop)]
-            hub::hub_drop_grant,
+            hub::hub_profiles,
+            #[cfg(desktop)]
+            hub::hub_create_profile,
+            #[cfg(desktop)]
+            hub::hub_unlock_profile,
+            #[cfg(desktop)]
+            hub::hub_change_password,
+            #[cfg(desktop)]
+            hub::hub_link_start,
+            #[cfg(desktop)]
+            hub::hub_link_watch,
+            #[cfg(desktop)]
+            hub::hub_link_approve,
+            #[cfg(desktop)]
+            hub::hub_link_deny,
+            #[cfg(desktop)]
+            hub::hub_link_join,
+            #[cfg(desktop)]
+            hub::hub_link_fetch,
             #[cfg(desktop)]
             hub::hub_providers,
             #[cfg(desktop)]

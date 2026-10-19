@@ -1,7 +1,6 @@
 import * as AuthSession from 'expo-auth-session';
 import { Platform } from 'react-native';
 import { universalFetch } from '../ai/utils/universalFetch';
-import { OperaHub } from '../hub/OperaHubService';
 import { getSecret, setSecret } from './mcpStorage';
 
 const CLIENT_NAME = 'Opera';
@@ -221,33 +220,7 @@ class McpAuthService {
     await setSecret(`${serverId}_expiry`, String(expiresAt));
     if (doc.refresh_token) await setSecret(`${serverId}_refresh`, doc.refresh_token);
     await setSecret(`${serverId}_meta`, JSON.stringify(meta));
-    if (doc.refresh_token) await this.handOverToHub(serverId, meta, body.client_id, doc, expiresAt);
     return true;
-  }
-
-  //only the hub refreshes rotating tokens
-  private async handOverToHub(
-    serverId: string,
-    meta: AuthServerMeta,
-    clientId: string,
-    doc: { access_token: string; refresh_token: string },
-    expiresAt: number,
-  ): Promise<void> {
-    const hub = await OperaHub.getPairedHub();
-    if (!hub) return;
-    try {
-      await OperaHub.putGrant(hub, {
-        serverId,
-        tokenEndpoint: meta.tokenEndpoint,
-        clientId,
-        refreshToken: doc.refresh_token,
-        accessToken: doc.access_token,
-        expiresAt,
-      });
-      await setSecret(`${serverId}_refresh`, null);
-    } catch (e) {
-      console.warn('[McpAuth] hub kept no grant, refreshing locally:', e);
-    }
   }
 
   //full authorization code + pkce flow, routed per platform
@@ -388,21 +361,8 @@ class McpAuthService {
     //renew slightly early so a slow request does not race the expiry
     if (token && Date.now() < expiry - 60_000) return token;
 
+    //each device refreshes its own tokens
     const refresh = await getSecret(`${serverId}_refresh`);
-    const hub = await OperaHub.getPairedHub();
-    if (!refresh && hub) {
-      try {
-        const fresh = await OperaHub.accessToken(hub, serverId);
-        if (!fresh) return null;
-        await setSecret(`${serverId}_access`, fresh.accessToken);
-        await setSecret(`${serverId}_expiry`, String(fresh.expiresAt));
-        return fresh.accessToken;
-      } catch (e) {
-        console.warn('[McpAuth] hub token unavailable:', e);
-        return token;
-      }
-    }
-
     const rawMeta = await getSecret(`${serverId}_meta`);
     const clientId = await getSecret(`${serverId}_client`);
     if (!refresh || !rawMeta || !clientId) return token;
@@ -430,8 +390,6 @@ class McpAuthService {
     for (const suffix of ['access', 'refresh', 'expiry', 'client', 'meta', 'header']) {
       await setSecret(`${serverId}_${suffix}`, null);
     }
-    const hub = await OperaHub.getPairedHub();
-    if (hub) await OperaHub.dropGrant(hub, serverId).catch(() => {});
   }
 }
 

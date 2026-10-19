@@ -177,6 +177,14 @@ class HubSyncImpl {
     await this.setPaused(false);
   }
 
+  //a profile on a fresh hub gets everything again
+  async joinedProfile(): Promise<void> {
+    for (const key of Object.values(STATE_KEYS)) await setSecret(key, null);
+    await resetDataSync();
+    this.request(0);
+    this.watch();
+  }
+
   //the hub answers as soon as another device writes
   private async watch(): Promise<void> {
     if (this.watching) return;
@@ -185,7 +193,8 @@ class HubSyncImpl {
     try {
       while (AppState.currentState === 'active') {
         const hub = await OperaHub.getPairedHub();
-        if (!hub) break;
+        //an unbound device reaches no data
+        if (!hub || !(await OperaHub.getProfile())) break;
         try {
           const cursor = await OperaHub.watch(hub, since);
           if (since > 0 && cursor > since) this.request(0);
@@ -207,7 +216,7 @@ class HubSyncImpl {
 
   private async run(): Promise<void> {
     const hub = await OperaHub.getPairedHub();
-    if (!hub) return;
+    if (!hub || !(await OperaHub.getProfile())) return;
     await this.dropInjectedServers();
     await this.storeProviders(await OperaHub.providers(hub), hub.name);
     await this.offerUpdate(hub);

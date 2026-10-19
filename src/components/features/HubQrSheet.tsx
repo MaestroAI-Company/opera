@@ -1,6 +1,6 @@
 import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, StyleSheet, Text, View } from "react-native";
 import { SvgXml } from "react-native-svg";
 import {
   Fonts,
@@ -19,7 +19,7 @@ import {
 } from "../../services/hub/OperaHubService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
-import DrawerSheet from "./DrawerSheet";
+import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 const copyIcon = require("../../../assets/icons/copy2.png");
 const reloadIcon = require("../../../assets/icons/reconnect.png");
@@ -152,7 +152,7 @@ export default function HubQrSheet({
       ]}
       desktopStyle={styles.desktopCard}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <SheetScrollView contentContainerStyle={styles.content}>
         {joining ? (
           //the user compares the digits on both screens
           <View style={styles.contentCard}>
@@ -225,7 +225,7 @@ export default function HubQrSheet({
             </Group>
           </View>
         )}
-      </ScrollView>
+      </SheetScrollView>
     </DrawerSheet>
   );
 }
@@ -241,16 +241,20 @@ const makeStyles = (Colors: ThemeColors) =>
       backgroundColor: Colors.groupedBackground,
       borderTopLeftRadius: Radius.huge2,
       borderTopRightRadius: Radius.huge2,
-      paddingTop: Spacing.lg2,
+      paddingTop: Spacing.xxl,
+      overflow: "hidden",
     },
     desktopCard: {
       width: DESKTOP_CARD_WIDTH,
     },
     sheetHandleContainer: {
+      //floats so top edge matches sides
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
       alignItems: "center",
-      marginBottom: Spacing.xs2,
-      paddingVertical: Spacing.lg,
-      marginTop: -Spacing.lg,
+      paddingVertical: Spacing.md,
     },
     content: {
       paddingHorizontal: Spacing.lg2,

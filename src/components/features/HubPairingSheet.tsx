@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   Image,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -29,7 +28,7 @@ import {
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import TextInputField from "../ui/TextInputField";
-import DrawerSheet from "./DrawerSheet";
+import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 const cameraIcon = require("../../../assets/icons/camera.png");
 const addIcon = require("../../../assets/icons/add.png");
@@ -335,12 +334,12 @@ export default function HubPairingSheet({
       ]}
       desktopStyle={styles.desktopCard}
     >
-      <ScrollView
+      <SheetScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.contentCard}>{renderContent()}</View>
-      </ScrollView>
+      </SheetScrollView>
     </DrawerSheet>
   );
 }
@@ -356,16 +355,20 @@ const makeStyles = (Colors: ThemeColors) =>
       backgroundColor: Colors.groupedBackground,
       borderTopLeftRadius: Radius.huge2,
       borderTopRightRadius: Radius.huge2,
-      paddingTop: Spacing.lg2,
+      paddingTop: Spacing.xxl,
+      overflow: "hidden",
     },
     desktopCard: {
       width: DESKTOP_CARD_WIDTH,
     },
     sheetHandleContainer: {
+      //floats so top edge matches sides
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
       alignItems: "center",
-      marginBottom: Spacing.xs2,
-      paddingVertical: Spacing.lg,
-      marginTop: -Spacing.lg,
+      paddingVertical: Spacing.md,
     },
     content: {
       paddingHorizontal: Spacing.lg2,

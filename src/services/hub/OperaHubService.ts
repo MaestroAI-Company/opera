@@ -119,6 +119,8 @@ type NativeHub = {
   linkDeny(deviceKey: string, hub: PairedHub): Promise<void>;
   linkJoin(deviceKey: string, hub: PairedHub): Promise<void>;
   linkFetch(deviceKey: string, hub: PairedHub): Promise<LinkProgress>;
+  lease(deviceKey: string, hub: PairedHub, name: string): Promise<boolean>;
+  release(deviceKey: string, hub: PairedHub, name: string): Promise<void>;
   providers(deviceKey: string, hub: PairedHub): Promise<HubProvider[]>;
   startProxy(deviceKey: string, hub: PairedHub): Promise<{ port: number; token: string }>;
 };
@@ -255,6 +257,8 @@ const tauriHub: NativeHub = {
   linkDeny: (deviceKey, hub) => invoke('hub_link_deny', { deviceKey, hub }),
   linkJoin: (deviceKey, hub) => invoke('hub_link_join', { deviceKey, hub }),
   linkFetch: (deviceKey, hub) => invoke('hub_link_fetch', { deviceKey, hub }),
+  lease: (deviceKey, hub, name) => invoke('hub_lease', { deviceKey, hub, name }),
+  release: (deviceKey, hub, name) => invoke('hub_release', { deviceKey, hub, name }),
   providers: (deviceKey, hub) => invoke('hub_providers', { deviceKey, hub }),
   startProxy: (deviceKey, hub) => invoke('hub_start_proxy', { deviceKey, hub }),
 };
@@ -300,6 +304,8 @@ type WebClient = {
   linkDeny(hub: PairedHub): Promise<void>;
   linkJoin(hub: PairedHub): Promise<void>;
   linkFetch(hub: PairedHub): Promise<LinkProgress>;
+  lease(hub: PairedHub, name: string): Promise<boolean>;
+  release(hub: PairedHub, name: string): Promise<void>;
   providers(hub: PairedHub): Promise<HubProvider[]>;
   forward(
     hub: PairedHub,
@@ -384,6 +390,8 @@ const webHub: NativeHub = {
   linkDeny: async (deviceKey, hub) => (await loadWebClient(deviceKey)).linkDeny(hub),
   linkJoin: async (deviceKey, hub) => (await loadWebClient(deviceKey)).linkJoin(hub),
   linkFetch: async (deviceKey, hub) => (await loadWebClient(deviceKey)).linkFetch(hub),
+  lease: async (deviceKey, hub, name) => (await loadWebClient(deviceKey)).lease(hub, name),
+  release: async (deviceKey, hub, name) => (await loadWebClient(deviceKey)).release(hub, name),
   providers: async (deviceKey, hub) => (await loadWebClient(deviceKey)).providers(hub),
   startProxy: () => Promise.reject(Object.assign(new Error('No local proxy in a browser'), { code: 'Internal' })),
 };
@@ -720,6 +728,15 @@ class OperaHubServiceImpl {
   //hub cursor once something newer than since lands
   async watch(hub: PairedHub, since: number): Promise<number> {
     return this.native().watch(await this.deviceKey(), hub, since);
+  }
+
+  //false while another device of the profile holds it
+  async lease(hub: PairedHub, name: string): Promise<boolean> {
+    return this.native().lease(await this.deviceKey(), hub, name);
+  }
+
+  async release(hub: PairedHub, name: string): Promise<void> {
+    return this.native().release(await this.deviceKey(), hub, name);
   }
 
   async providers(hub: PairedHub): Promise<HubProvider[]> {

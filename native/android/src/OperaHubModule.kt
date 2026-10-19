@@ -381,6 +381,18 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
       }
     }
 
+  //one device of the profile refreshes a token at a time
+  @ReactMethod
+  fun lease(deviceKey: String, hub: ReadableMap, name: String, promise: Promise) =
+    launchPromise(promise) { client(deviceKey).lease(hubFromMap(hub), name) }
+
+  @ReactMethod
+  fun release(deviceKey: String, hub: ReadableMap, name: String, promise: Promise) =
+    launchPromise(promise) {
+      client(deviceKey).release(hubFromMap(hub), name)
+      null
+    }
+
   @ReactMethod
   fun providers(deviceKey: String, hub: ReadableMap, promise: Promise) =
     launchPromise(promise) {

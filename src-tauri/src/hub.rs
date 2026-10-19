@@ -499,6 +499,26 @@ pub async fn hub_link_fetch(
 }
 
 #[tauri::command]
+pub async fn hub_lease(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    name: String,
+) -> Result<bool, HubError> {
+    state.client(&device_key).await?.lease(hub, name).await
+}
+
+#[tauri::command]
+pub async fn hub_release(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    name: String,
+) -> Result<(), HubError> {
+    state.client(&device_key).await?.release(hub, name).await
+}
+
+#[tauri::command]
 pub async fn hub_providers(
     state: State<'_, HubState>,
     device_key: String,

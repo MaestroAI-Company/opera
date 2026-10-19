@@ -457,6 +457,7 @@ export const fr: Translations = {
   "hubMcp.state.stopped": "Désactivé",
   "hubMcp.required": "Obligatoire.",
   "hubMcp.secretSet": "Défini. Laissez vide pour le garder, ou saisissez une nouvelle valeur.",
+  "hubMcp.secretOnHub": "Gardé et utilisé sur l'ordinateur du Sampler, la personne qui l'héberge peut le lire.",
   "hubMcp.chooseFolder": "Choisir un dossier",
   "hubMcp.isolation": "Isolation",
   "hubMcp.isolationFull": "Complète",

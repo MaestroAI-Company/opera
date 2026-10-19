@@ -57,7 +57,14 @@ export function McpFieldRows({ fields, drafts, secretsSet = [], onChange, onPick
       {fields.map((field, index) => {
         const last = index === fields.length - 1;
         const value = drafts[field.key] ?? "";
-        const help = [field.description, field.required ? t("hubMcp.required") : ""].filter(Boolean).join(" ");
+        //the hub machine reads secrets to run the server
+        const help = [
+          field.description,
+          field.required ? t("hubMcp.required") : "",
+          field.secret ? t("hubMcp.secretOnHub") : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
         if (field.kind === "boolean") {
           return (
             <View key={field.key} style={[styles.settingRowVertical, last && { marginBottom: 0 }]}>
@@ -78,7 +85,7 @@ export function McpFieldRows({ fields, drafts, secretsSet = [], onChange, onPick
           <View key={field.key} style={[styles.settingRowVertical, last && { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>{field.label}</Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {field.secret && secretsSet.includes(field.key) ? t("hubMcp.secretSet") : help}
+              {field.secret && secretsSet.includes(field.key) ? `${t("hubMcp.secretSet")} ${t("hubMcp.secretOnHub")}` : help}
             </Text>
             <Group>
               {field.kind === "folder" || field.kind === "file" ? (

@@ -142,7 +142,8 @@ export async function pushLocalChanges(hub: PairedHub): Promise<void> {
   //content addressed so each image goes up once
   const fresh: SyncRecord[] = [];
   for (const [id, uri] of blobs) {
-    if (!(await DB.getHubBlob(id))) fresh.push({ id, updatedAt: 1, deleted: false, payload: uri });
+    //a full push owes the new hub every image
+    if (mark === 0 || !(await DB.getHubBlob(id))) fresh.push({ id, updatedAt: 1, deleted: false, payload: uri });
   }
   await pushBatched(hub, 'blobs', fresh);
   for (const blob of fresh) await DB.putHubBlob(blob.id, blob.payload!);

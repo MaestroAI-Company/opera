@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use opera_hub::{config, hub, service};
 use opera_hub_client::{
-    CatalogModel, HubClient, HubDevice, HubError, HubInvite, HubProvider, HubSettings, HubStatus,
-    LlamaStatus, McpAccessToken, McpGrant, ModelFile, ModelRepo, NearbyHub, PairedHub, ProxyInfo,
-    PullPage, SyncRecord,
+    CatalogModel, HubClient, HubDevice, HubError, HubInvite, HubProfile, HubProvider, HubSettings,
+    HubStatus, LinkJoining, LinkProgress, LlamaStatus, ModelFile, ModelRepo, NearbyHub, PairedHub,
+    ProxyInfo, PullPage, SyncRecord, UnlockedProfile,
 };
 use serde::Serialize;
 use tauri::State;
@@ -350,41 +350,130 @@ pub async fn hub_watch(
 }
 
 #[tauri::command]
-pub async fn hub_put_grant(
+pub async fn hub_set_profile(
     state: State<'_, HubState>,
     device_key: String,
-    hub: PairedHub,
-    grant: McpGrant,
+    profile_id: String,
+    key: String,
 ) -> Result<(), HubError> {
-    state.client(&device_key).await?.put_grant(hub, grant).await
+    state.client(&device_key).await?.set_profile(profile_id, key)
 }
 
 #[tauri::command]
-pub async fn hub_access_token(
+pub async fn hub_clear_profile(
+    state: State<'_, HubState>,
+    device_key: String,
+) -> Result<(), HubError> {
+    state.client(&device_key).await?.clear_profile();
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn hub_profiles(
     state: State<'_, HubState>,
     device_key: String,
     hub: PairedHub,
-    server_id: String,
-) -> Result<Option<McpAccessToken>, HubError> {
+) -> Result<Vec<HubProfile>, HubError> {
+    state.client(&device_key).await?.profiles(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_create_profile(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    name: String,
+    password: String,
+) -> Result<UnlockedProfile, HubError> {
     state
         .client(&device_key)
         .await?
-        .access_token(hub, server_id)
+        .create_profile(hub, name, password)
         .await
 }
 
 #[tauri::command]
-pub async fn hub_drop_grant(
+pub async fn hub_unlock_profile(
     state: State<'_, HubState>,
     device_key: String,
     hub: PairedHub,
-    server_id: String,
+    profile_id: String,
+    password: String,
+) -> Result<UnlockedProfile, HubError> {
+    state
+        .client(&device_key)
+        .await?
+        .unlock_profile(hub, profile_id, password)
+        .await
+}
+
+#[tauri::command]
+pub async fn hub_change_password(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    current: String,
+    next: String,
 ) -> Result<(), HubError> {
     state
         .client(&device_key)
         .await?
-        .drop_grant(hub, server_id)
+        .change_password(hub, current, next)
         .await
+}
+
+#[tauri::command]
+pub async fn hub_link_start(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<HubInvite, HubError> {
+    state.client(&device_key).await?.link_start(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_link_watch(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<Option<LinkJoining>, HubError> {
+    state.client(&device_key).await?.link_watch(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_link_approve(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<(), HubError> {
+    state.client(&device_key).await?.link_approve(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_link_deny(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<(), HubError> {
+    state.client(&device_key).await?.link_deny(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_link_join(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<(), HubError> {
+    state.client(&device_key).await?.link_join(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_link_fetch(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<LinkProgress, HubError> {
+    state.client(&device_key).await?.link_fetch(hub).await
 }
 
 #[tauri::command]

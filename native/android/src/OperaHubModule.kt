@@ -18,11 +18,12 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import uniffi.opera_hub_client.HubClient
 import uniffi.opera_hub_client.HubException
+import uniffi.opera_hub_client.HubProfile
 import uniffi.opera_hub_client.HubSettings
 import uniffi.opera_hub_client.LlamaStatus
 import uniffi.opera_hub_client.ModelFile
-import uniffi.opera_hub_client.McpGrant
 import uniffi.opera_hub_client.PairedHub
+import uniffi.opera_hub_client.UnlockedProfile
 import uniffi.opera_hub_client.SyncRecord
 
 //bridges the rust hub client to js
@@ -205,6 +206,7 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
             putDouble("pairedAt", device.pairedAt.toDouble())
             putString("pairedBy", device.pairedBy)
             device.lastSeen?.let { putDouble("lastSeen", it.toDouble()) }
+            putString("profile", device.profile)
           })
         }
       }
@@ -252,39 +254,96 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
   fun watch(deviceKey: String, hub: ReadableMap, since: Double, promise: Promise) =
     launchPromise(promise) { client(deviceKey).watch(hubFromMap(hub), since.toULong()).toDouble() }
 
+  //the key comes from the secure store
   @ReactMethod
-  fun putGrant(deviceKey: String, hub: ReadableMap, grant: ReadableMap, promise: Promise) =
+  fun setProfile(deviceKey: String, profileId: String, key: String, promise: Promise) =
     launchPromise(promise) {
-      client(deviceKey).putGrant(
-        hubFromMap(hub),
-        McpGrant(
-          grant.getString("serverId") ?: "",
-          grant.getString("tokenEndpoint") ?: "",
-          grant.getString("clientId") ?: "",
-          grant.getString("refreshToken") ?: "",
-          if (grant.isNull("accessToken")) null else grant.getString("accessToken"),
-          grant.getDouble("expiresAt").toULong(),
-        ),
-      )
+      client(deviceKey).setProfile(profileId, key)
       null
     }
 
   @ReactMethod
-  fun accessToken(deviceKey: String, hub: ReadableMap, serverId: String, promise: Promise) =
+  fun clearProfile(deviceKey: String, promise: Promise) =
     launchPromise(promise) {
-      client(deviceKey).accessToken(hubFromMap(hub), serverId)?.let { token ->
+      client(deviceKey).clearProfile()
+      null
+    }
+
+  @ReactMethod
+  fun profiles(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) {
+      Arguments.createArray().apply {
+        for (profile in client(deviceKey).profiles(hubFromMap(hub))) pushMap(profileToMap(profile))
+      }
+    }
+
+  @ReactMethod
+  fun createProfile(deviceKey: String, hub: ReadableMap, name: String, password: String, promise: Promise) =
+    launchPromise(promise) { unlockedToMap(client(deviceKey).createProfile(hubFromMap(hub), name, password)) }
+
+  @ReactMethod
+  fun unlockProfile(deviceKey: String, hub: ReadableMap, profileId: String, password: String, promise: Promise) =
+    launchPromise(promise) { unlockedToMap(client(deviceKey).unlockProfile(hubFromMap(hub), profileId, password)) }
+
+  @ReactMethod
+  fun changePassword(deviceKey: String, hub: ReadableMap, current: String, next: String, promise: Promise) =
+    launchPromise(promise) {
+      client(deviceKey).changePassword(hubFromMap(hub), current, next)
+      null
+    }
+
+  @ReactMethod
+  fun linkStart(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) {
+      val invite = client(deviceKey).linkStart(hubFromMap(hub))
+      Arguments.createMap().apply {
+        putString("code", invite.code)
+        putString("link", invite.link)
+      }
+    }
+
+  //null until a device typed the code
+  @ReactMethod
+  fun linkWatch(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) {
+      client(deviceKey).linkWatch(hubFromMap(hub))?.let { joining ->
         Arguments.createMap().apply {
-          putString("accessToken", token.accessToken)
-          putDouble("expiresAt", token.expiresAt.toDouble())
+          putString("device", joining.device)
+          putString("digits", joining.digits)
         }
       }
     }
 
   @ReactMethod
-  fun dropGrant(deviceKey: String, hub: ReadableMap, serverId: String, promise: Promise) =
+  fun linkApprove(deviceKey: String, hub: ReadableMap, promise: Promise) =
     launchPromise(promise) {
-      client(deviceKey).dropGrant(hubFromMap(hub), serverId)
+      client(deviceKey).linkApprove(hubFromMap(hub))
       null
+    }
+
+  @ReactMethod
+  fun linkDeny(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) {
+      client(deviceKey).linkDeny(hubFromMap(hub))
+      null
+    }
+
+  @ReactMethod
+  fun linkJoin(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) {
+      client(deviceKey).linkJoin(hubFromMap(hub))
+      null
+    }
+
+  @ReactMethod
+  fun linkFetch(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) {
+      val progress = client(deviceKey).linkFetch(hubFromMap(hub))
+      Arguments.createMap().apply {
+        putString("digits", progress.digits)
+        progress.profile?.let { putMap("profile", unlockedToMap(it)) } ?: putNull("profile")
+        putBoolean("denied", progress.denied)
+      }
     }
 
   @ReactMethod
@@ -370,6 +429,20 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
           })
         }
       })
+    }
+
+  private fun profileToMap(profile: HubProfile): WritableMap =
+    Arguments.createMap().apply {
+      putString("id", profile.id)
+      putString("name", profile.name)
+      putString("role", profile.role)
+      putDouble("createdAt", profile.createdAt.toDouble())
+    }
+
+  private fun unlockedToMap(unlocked: UnlockedProfile): WritableMap =
+    Arguments.createMap().apply {
+      putMap("profile", profileToMap(unlocked.profile))
+      putString("key", unlocked.key)
     }
 
   private fun settingsToMap(settings: HubSettings): WritableMap =

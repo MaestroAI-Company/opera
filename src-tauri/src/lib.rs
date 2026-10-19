@@ -91,6 +91,10 @@ pub fn run() {
             #[cfg(desktop)]
             hub::hub_link_fetch,
             #[cfg(desktop)]
+            hub::hub_lease,
+            #[cfg(desktop)]
+            hub::hub_release,
+            #[cfg(desktop)]
             hub::hub_providers,
             #[cfg(desktop)]
             hub::hub_start_proxy,

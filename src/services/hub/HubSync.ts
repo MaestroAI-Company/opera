@@ -51,7 +51,7 @@ const DECLINED_UPDATE_KEY = 'hubUpdateDeclined';
 type ProviderEntry =
   | { kind: 'ollama'; server: OllamaServer }
   | { kind: 'openai'; server: OllamaServer; apiKey: string }
-  | { kind: 'mcp'; server: McpServerConfig; headerValue: string };
+  | { kind: 'mcp'; server: McpServerConfig; headerValue: string; oauth?: Record<string, string | null> };
 
 type FingerprintState = {
   cursor: number;
@@ -403,6 +403,7 @@ class HubSyncImpl {
         kind: 'mcp',
         server,
         headerValue: (await getSecret(`${server.id}_header`)) ?? '',
+        oauth: await McpAuth.exportSession(server.id),
       });
     }
     return new Map([...entries].map(([id, entry]) => [id, JSON.stringify(entry)]));
@@ -455,6 +456,7 @@ class HubSyncImpl {
       } else {
         upsert(mcp, entry.server);
         await setSecret(`${record.id}_header`, entry.headerValue || null);
+        if (entry.oauth) await McpAuth.importSession(record.id, entry.oauth);
       }
     }
 

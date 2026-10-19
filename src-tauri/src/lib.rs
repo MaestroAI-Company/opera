@@ -73,6 +73,12 @@ pub fn run() {
             #[cfg(desktop)]
             hub::hub_change_password,
             #[cfg(desktop)]
+            hub::hub_locked_key,
+            #[cfg(desktop)]
+            hub::hub_open_locked_key,
+            #[cfg(desktop)]
+            hub::hub_profile_backup_key,
+            #[cfg(desktop)]
             hub::hub_link_start,
             #[cfg(desktop)]
             hub::hub_link_watch,

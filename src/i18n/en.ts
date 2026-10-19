@@ -454,6 +454,7 @@ export const en = {
   "hubMcp.state.stopped": "Turned off",
   "hubMcp.required": "Required.",
   "hubMcp.secretSet": "Set. Leave empty to keep it, or type a new value.",
+  "hubMcp.secretOnHub": "Stored and used on the Sampler computer, whoever runs it can read it.",
   "hubMcp.chooseFolder": "Choose a folder",
   "hubMcp.isolation": "Isolation",
   "hubMcp.isolationFull": "Full",

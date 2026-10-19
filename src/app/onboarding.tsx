@@ -19,20 +19,23 @@ import {
   Text,
   Vibration,
   View,
+  useWindowDimensions,
   type ImageSourcePropType,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { KeyboardAvoidingView, useKeyboardState } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../constants/theme";
 import ButterflyCluster from "../components/features/ButterflyCluster";
+import DrawerSheet, { SheetScrollView } from "../components/features/DrawerSheet";
 import VoiceEngineCard from "../components/features/VoiceEngineCard";
 import { BUTTERFLY_OPTIONS, selectButterfly, useMaestroButterfly } from "../components/features/maestroButterfly";
 import ActionButton from "../components/ui/ActionButton";
 import Group from "../components/ui/Group";
 import IconSelector from "../components/ui/IconSelector";
+import NotificationModal, { type ModalButton } from "../components/ui/NotificationModal";
 import Slider from "../components/ui/Slider";
 import TextInputField from "../components/ui/TextInputField";
 import LottieView from "lottie-react-native";
@@ -41,6 +44,9 @@ import { useResponsive } from "../hooks/useResponsive";
 import { useVoicePackInstalled } from "../hooks/useVoicePackInstalled";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
 import { useT } from "../i18n";
+import { BackupService } from "../services/BackupService";
+import { CloudSync } from "../services/CloudSyncService";
+import { CLOUD_PROVIDERS, getCloudProviderDefinition } from "../services/cloud/registry";
 import { LocationService } from "../services/location/LocationService";
 import { Settings } from "../services/settings/SettingsService";
 import { TTS_SPEEDS, supportedEngineIds } from "../services/speech/engines";
@@ -57,10 +63,13 @@ const cameraIcon = require("../../assets/icons/camera.png");
 const photoIcon = require("../../assets/icons/photo.png");
 const locationIcon = require("../../assets/icons/location.png");
 const timeIcon = require("../../assets/icons/time.png");
+const cloudIcon = require("../../assets/icons/cloud.png");
+const fileIcon = require("../../assets/icons/file.png");
 
 const isWeb = Platform.OS === "web";
 
 const BACK_BUTTON_SIZE = 56;
+const DESKTOP_CARD_WIDTH = 380;
 
 type IntroPhase = "logo" | "phrases";
 
@@ -312,7 +321,9 @@ export default function OnboardingPage() {
   const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { isLargeScreen } = useResponsive();
+  const { isLargeScreen, isDesktop } = useResponsive();
+  const { height: windowHeight } = useWindowDimensions();
+  const isKeyboardOpen = useKeyboardState((state) => state.isVisible);
 
   const [step, setStep] = useState(0);
   //no neural engine on this platform, nothing to pick
@@ -331,6 +342,211 @@ export default function OnboardingPage() {
   const startupPlayer = useAudioPlayer(startupSound);
   const busy = useRef(false);
   const showBack = step > 0;
+
+  const [saveSheetVisible, setSaveSheetVisible] = useState(false);
+  const [saveSheetStep, setSaveSheetStep] = useState<"root" | "cloud" | "setup">("root");
+  const [cloudSetupId, setCloudSetupId] = useState("");
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{
+    title?: string;
+    message?: string;
+    messageAlign?: "left" | "center";
+    loading?: boolean;
+    showInput?: boolean;
+    inputValue?: string;
+    onInputChange?: (text: string) => void;
+    inputPlaceholder?: string;
+    inputSecureTextEntry?: boolean;
+    inputKeyboardType?: "default" | "numeric" | "email-address" | "phone-pad";
+    buttons?: ModalButton[];
+  }>({});
+
+  const showAlert = useCallback(
+    (
+      title: string,
+      message: string,
+      buttons?: ModalButton[],
+      extra?: Partial<typeof alertConfig>,
+    ) => {
+      setAlertConfig({
+        title,
+        message,
+        buttons,
+        messageAlign: "left",
+        loading: false,
+        showInput: false,
+        ...extra,
+      });
+      setAlertVisible(true);
+    },
+    [],
+  );
+
+  //same modal stays open between cloud steps
+  const showCloudProgress = (
+    message: string,
+    providerName = CloudSync.getProviderName(),
+  ) => {
+    showAlert(
+      getCloudProviderDefinition(providerName)?.label ?? t("settings.cloud.storage"),
+      message,
+      undefined,
+      { loading: true, messageAlign: "center" },
+    );
+  };
+
+  const closeSaveSheet = useCallback(() => {
+    setSaveSheetVisible(false);
+    setSaveSheetStep("root");
+  }, []);
+
+  const handleSaveSheetBack = useCallback(() => {
+    if (saveSheetStep === "setup") {
+      setSaveSheetStep("cloud");
+      return true;
+    }
+    if (saveSheetStep === "cloud") {
+      setSaveSheetStep("root");
+      return true;
+    }
+    return false;
+  }, [saveSheetStep]);
+
+  const completeRestore = async () => {
+    await Settings.set("hasSeenOnboarding", true);
+    setAlertVisible(false);
+    closeSaveSheet();
+    router.replace("/");
+  };
+
+  const handleRestoreFromFile = async () => {
+    try {
+      const result = await BackupService.importData();
+      if (result.success) {
+        await completeRestore();
+      }
+    } catch (e) {
+      const message =
+        e instanceof Error && e.message
+          ? e.message
+          : t("settings.data.importFailed");
+      showAlert(t("common.error"), message);
+    }
+  };
+
+  const syncAndFinish = async (providerName: string) => {
+    showCloudProgress(t("cloudSync.syncing"), providerName);
+    //cloud settings must win over fresh install defaults
+    await Settings.setSettingsUpdatedAt(0);
+    const result = await CloudSync.sync();
+    if (result.success) {
+      await completeRestore();
+    } else {
+      showAlert(
+        t("settings.cloud.syncError"),
+        result.error || t("settings.cloud.unknownError"),
+      );
+    }
+  };
+
+  const promptCloudPin = (providerName: string) => {
+    let currentInput = "";
+    showAlert(
+      t("settings.pin.unlock.title"),
+      t("settings.pin.unlock.message"),
+      [
+        {
+          text: t("common.cancel"),
+          onPress: async () => {
+            setAlertVisible(false);
+            await CloudSync.disconnect();
+          },
+          style: "secondary",
+        },
+        {
+          text: t("settings.pin.unlock.confirm"),
+          style: "primary",
+          onPress: async () => {
+            showCloudProgress(t("settings.cloud.progress.unlocking"), providerName);
+            const ok = await CloudSync.verifyAndSetPin(currentInput);
+            if (ok) {
+              await syncAndFinish(providerName);
+            } else {
+              showAlert(t("common.error"), t("settings.pin.incorrect"), [
+                {
+                  text: t("settings.pin.tryAgain"),
+                  onPress: () => promptCloudPin(providerName),
+                  style: "primary",
+                },
+                {
+                  text: t("common.cancel"),
+                  onPress: async () => {
+                    setAlertVisible(false);
+                    await CloudSync.disconnect();
+                  },
+                  style: "secondary",
+                },
+              ]);
+            }
+          },
+        },
+      ],
+      {
+        showInput: true,
+        inputPlaceholder: t("settings.pin.placeholder"),
+        inputSecureTextEntry: true,
+        inputKeyboardType: "numeric",
+        onInputChange: (text: string) => {
+          currentInput = text;
+          setAlertConfig((prev) => ({ ...prev, inputValue: text }));
+        },
+      },
+    );
+  };
+
+  const connectCloudProvider = async (providerName: string) => {
+    closeSaveSheet();
+    await CloudSync.init();
+    showCloudProgress(t("settings.cloud.progress.connecting"), providerName);
+    const success = await CloudSync.setProvider(providerName);
+    if (!success) {
+      showAlert(
+        t("settings.cloud.connectionError"),
+        t("settings.cloud.connectFailed", {
+          provider: getCloudProviderDefinition(providerName)?.label ?? providerName,
+        }),
+      );
+      return;
+    }
+    if (CloudSync.hasPin()) {
+      await syncAndFinish(providerName);
+      return;
+    }
+    showCloudProgress(t("settings.cloud.progress.checking"), providerName);
+    const hasBackup = await CloudSync.hasCloudBackup();
+    if (!hasBackup) {
+      await CloudSync.disconnect();
+      showAlert(
+        getCloudProviderDefinition(providerName)?.label ?? t("settings.cloud.storage"),
+        t("onboarding.restore.noCloudBackup"),
+      );
+      return;
+    }
+    promptCloudPin(providerName);
+  };
+
+  const handleSelectCloudProvider = async (providerName: string) => {
+    const def = getCloudProviderDefinition(providerName);
+    if (!def) return;
+    if (def.SetupComponent && !(await CloudSync.isProviderConfigured(providerName))) {
+      setCloudSetupId(providerName);
+      setSaveSheetStep("setup");
+      return;
+    }
+    await connectCloudProvider(providerName);
+  };
+
+  const CloudSetup = getCloudProviderDefinition(cloudSetupId)?.SetupComponent;
 
   const goTo = useCallback((next: number) => {
     if (busy.current) return;
@@ -599,6 +815,24 @@ export default function OnboardingPage() {
             )}
           </Animated.View>
 
+          {step === 0 && (
+            <Animated.View
+              pointerEvents={launchCtaReady ? "auto" : "none"}
+              style={[styles.restoreWrap, { opacity: Animated.multiply(launchCtaOpacity, contentOpacity) }]}
+            >
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  setSaveSheetStep("root");
+                  setSaveSheetVisible(true);
+                }}
+                style={({ pressed }) => [styles.restoreButton, pressed && styles.restoreButtonPressed]}
+              >
+                <Text style={styles.restoreText}>{t("onboarding.restore.cta")}</Text>
+              </Pressable>
+            </Animated.View>
+          )}
+
           <View style={styles.footer}>
             {step === 0 && (
               <Animated.View style={[styles.credit, { opacity: creditOpacity }]}>
@@ -637,6 +871,87 @@ export default function OnboardingPage() {
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      <DrawerSheet
+        visible={saveSheetVisible}
+        onClose={closeSaveSheet}
+        onBackPress={handleSaveSheetBack}
+        mode="overlay"
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        handleContainerStyle={styles.sheetHandleContainer}
+        avoidKeyboard
+        sheetStyle={[
+          styles.sheet,
+          {
+            paddingBottom: (Platform.OS === "ios" ? 20 : 10) + (isKeyboardOpen ? 0 : insets.bottom),
+            maxHeight: windowHeight - insets.top - Spacing.xl2,
+          },
+        ]}
+        desktopStyle={styles.desktopCard}
+      >
+        <SheetScrollView contentContainerStyle={styles.sheetContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.contentCard}>
+            {saveSheetStep === "root" && (
+              <>
+                <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+                  {t("onboarding.restore.cta")}
+                </Text>
+                <Group>
+                  <ActionButton
+                    icon={cloudIcon}
+                    label={t("onboarding.restore.fromCloud")}
+                    onPress={() => setSaveSheetStep("cloud")}
+                  />
+                  <ActionButton
+                    icon={fileIcon}
+                    label={t("onboarding.restore.fromFiles")}
+                    onPress={handleRestoreFromFile}
+                  />
+                </Group>
+              </>
+            )}
+            {saveSheetStep === "cloud" && (
+              <>
+                <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+                  {t("settings.cloud.selectStorage")}
+                </Text>
+                <Group>
+                  {CLOUD_PROVIDERS.map((def) => (
+                    <ActionButton
+                      key={def.id}
+                      icon={cloudIcon}
+                      label={def.label}
+                      onPress={() => handleSelectCloudProvider(def.id)}
+                    />
+                  ))}
+                </Group>
+              </>
+            )}
+            {saveSheetStep === "setup" && CloudSetup && (
+              <CloudSetup onDone={() => connectCloudProvider(cloudSetupId)} />
+            )}
+          </View>
+        </SheetScrollView>
+      </DrawerSheet>
+
+      <NotificationModal
+        visible={alertVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        messageAlign={alertConfig.messageAlign}
+        loading={alertConfig.loading}
+        showInput={alertConfig.showInput}
+        inputValue={alertConfig.inputValue}
+        onInputChange={alertConfig.onInputChange}
+        inputPlaceholder={alertConfig.inputPlaceholder}
+        inputSecureTextEntry={alertConfig.inputSecureTextEntry}
+        inputKeyboardType={alertConfig.inputKeyboardType}
+        buttons={alertConfig.buttons}
+        onClose={() => {
+          if (!alertConfig.loading) setAlertVisible(false);
+        }}
+      />
     </View>
   );
 }
@@ -671,6 +986,48 @@ const makeStyles = (Colors: ThemeColors) =>
     footer: {
       flexDirection: "row",
       alignItems: "center",
+    },
+    restoreWrap: {
+      alignItems: "center",
+      marginBottom: Spacing.md,
+    },
+    restoreButton: {
+      paddingVertical: Spacing.xs,
+      paddingHorizontal: Spacing.md,
+    },
+    restoreButtonPressed: {
+      opacity: 0.6,
+    },
+    restoreText: {
+      fontFamily: Fonts.body,
+      fontSize: FontSizes.bodyMd,
+      color: Colors.textMuted,
+      textDecorationLine: "underline",
+    },
+    sheet: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: Colors.groupedBackground,
+      borderTopLeftRadius: Radius.huge2,
+      borderTopRightRadius: Radius.huge2,
+      paddingTop: Spacing.xxl,
+    },
+    desktopCard: {
+      width: DESKTOP_CARD_WIDTH,
+    },
+    sheetHandleContainer: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      alignItems: "center",
+      paddingVertical: Spacing.md,
+    },
+    sheetContent: {
+      paddingHorizontal: Spacing.lg2,
+      paddingBottom: Spacing.lg,
     },
     //sits in the hidden cta slot
     credit: {

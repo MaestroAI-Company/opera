@@ -12,6 +12,7 @@ export const en = {
   "common.pin": "Pin",
   "common.unpin": "Unpin",
   "common.copy": "Copy",
+  "common.download": "Download",
   "common.expand": "Expand",
   "common.regenerate": "Regenerate",
   "common.listen": "Listen",
@@ -35,6 +36,11 @@ export const en = {
   "onboarding.intro.noAccount": "No account required. Ready to go.",
   "onboarding.intro.openSource": "Open source, transparent, and independent.",
   "onboarding.welcome.cta": "Get started",
+  "onboarding.restore.cta": "Connection from a save",
+  "onboarding.restore.fromCloud": "From cloud",
+  "onboarding.restore.fromFiles": "From files",
+  "onboarding.restore.noCloudBackup":
+    "No cloud backup was found on this account.",
   "onboarding.name.placeholder": "Enter your name",
   "onboarding.profile.title": "What should Maestro call you?",
   "onboarding.profile.subtitle":
@@ -490,7 +496,7 @@ export const en = {
   "settings.info.website": "Website",
 
   "settings.profile.personalize": "Personalize my profile",
-  "settings.profile.exportCard": "Export my Profile Card",
+  "settings.profile.exportCard": "Share my Profile Card",
   "settings.profile.name": "Name",
   "settings.profile.instructions": "Write your instructions to AI",
   "settings.profile.instructionsPlaceholder": "write",
@@ -547,6 +553,7 @@ export const en = {
     "Send the foreground app and on-screen text to the assistant when using the overlay",
 
   "settings.cloud.storage": "Cloud storage",
+  "settings.cloud.selectStorage": "Select Cloud Storage",
   "settings.cloud.none": "None",
   "settings.cloud.syncAccount": "Sync account",
   "settings.cloud.selectSyncAccount": "Select a sync account",

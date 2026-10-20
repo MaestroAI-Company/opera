@@ -378,6 +378,35 @@ pub async fn hub_profiles(
 }
 
 #[tauri::command]
+pub async fn hub_remove_profile(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    id: String,
+) -> Result<(), HubError> {
+    state
+        .client(&device_key)
+        .await?
+        .remove_profile(hub, id)
+        .await
+}
+
+#[tauri::command]
+pub async fn hub_set_profile_role(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    id: String,
+    role: String,
+) -> Result<(), HubError> {
+    state
+        .client(&device_key)
+        .await?
+        .set_profile_role(hub, id, role)
+        .await
+}
+
+#[tauri::command]
 pub async fn hub_create_profile(
     state: State<'_, HubState>,
     device_key: String,

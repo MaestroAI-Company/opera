@@ -64,11 +64,13 @@ import {
   ModelSelectorDrawer,
   ModelSelectorTrigger,
 } from "../components/features/ModelSelector";
+import SamplerScreen from "../components/features/SamplerScreen";
 import SettingsDrawer, { SubPage } from "../components/features/SettingsDrawer";
 import TopBar from "../components/features/TopBar";
 import ActionButton from "../components/ui/ActionButton";
 import Group from "../components/ui/Group";
 import NotificationModal from "../components/ui/NotificationModal";
+import SliderToggle from "../components/ui/SliderToggle";
 import { pressStyle } from "../components/ui/pressStyle";
 import { isWidgetTouchActive } from "../components/widgets/WidgetTouchArea";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
@@ -131,6 +133,8 @@ import { STT, WhisperSTT } from "../services/speech/STTService";
 const texture2 = require("../../assets/images/texture2.png");
 const settingsIcon = require("../../assets/icons/settings.png");
 const addIcon = require("../../assets/icons/add.png");
+const chatIcon = require("../../assets/icons/chat.png");
+const samplerIcon = require("../../assets/icons/operaicon5.png");
 
 function shareConsentMessage(): string {
   const host = resolvePasteHost()
@@ -369,6 +373,24 @@ export default function Index() {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
   const [modelSelectorVisible, setModelSelectorVisible] = useState(false);
+  //desktops that can host get the sampler admin screen
+  const [samplerMode, setSamplerMode] = useState(false);
+  const showSamplerSwitch = isDesktop && OperaHub.canHost();
+  const inSampler = samplerMode && showSamplerSwitch;
+  const samplerSwitchOptions = useMemo(
+    () => [
+      { id: "chat", label: t("sampler.switch.chat"), icon: chatIcon },
+      { id: "sampler", label: t("sampler.switch.sampler"), icon: samplerIcon },
+    ],
+    [t],
+  );
+  const samplerSwitch = showSamplerSwitch ? (
+    <SliderToggle
+      selectedValue={inSampler ? "sampler" : "chat"}
+      onSelect={(value) => setSamplerMode(value === "sampler")}
+      options={samplerSwitchOptions}
+    />
+  ) : undefined;
   //shared with the panResponder below so the swipe-up gesture can drag it live
   const modelSelectorProgress = useAnimatedValue(0);
   const [settingsInitialSubPage, setSettingsInitialSubPage] =
@@ -2165,7 +2187,11 @@ useEffect(() => {
         {...(isLargeScreen ? {} : panResponder.panHandlers)}
       >
         <View
-          style={{ flex: 1, flexDirection: isLargeScreen ? "row" : "column" }}
+          style={[
+            { flex: 1, flexDirection: isLargeScreen ? "row" : "column" },
+            //hidden, not unmounted, so a running answer keeps going
+            inSampler && { display: "none" },
+          ]}
           pointerEvents="box-none"
         >
           {/* only the desktop panels take part in layout, the overlay ones live outside the
@@ -2279,6 +2305,7 @@ useEffect(() => {
                 }}
                 onNewPress={startNewConversation}
                 isDesktop={isDesktop}
+                middleElement={samplerSwitch}
                 centerElement={
                   <ModelSelectorTrigger
                     viewRef={modelTriggerRef}
@@ -2408,6 +2435,22 @@ useEffect(() => {
             </View>
           </View>
         </View>
+
+        {inSampler && (
+          <SamplerScreen
+            isLargeScreen={isLargeScreen}
+            isDesktop={isDesktop}
+            topBar={
+              <TopBar
+                onMenuPress={() => {}}
+                onNewPress={() => {}}
+                isDesktop={isDesktop}
+                middleElement={samplerSwitch}
+                middleOnly
+              />
+            }
+          />
+        )}
       </Reanimated.View>
 
       {isDesktop ? null : conversationsDrawer}

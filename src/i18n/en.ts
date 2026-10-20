@@ -195,6 +195,8 @@ export const en = {
   "dream.model": "Model",
   "dream.incognito": "Incognito mode",
   "dream.noModel": "Choose a model with the button below, then ask your question again.",
+  "dream.whisperRequired":
+    "Install a Whisper model in Opera's settings to talk to Maestro here. Without it, voice and \"Maestro\" won't work.",
 
   "chat.noModel":
     "Please select a model from the top menu before sending a message.",

@@ -189,11 +189,12 @@ function withNativeAndroid(config) {
       const drawableDir = path.join(projectRoot, 'app', 'src', 'main', 'res', 'drawable-nodpi');
       fs.mkdirSync(drawableDir, { recursive: true });
       fs.copyFileSync(path.join(TEMPLATES_DIR, 'res/drawable-nodpi/dream_preview.png'), path.join(drawableDir, 'dream_preview.png'));
-      //models stay out of metro
+      //same models the web serves
+      const wakeWordSrc = path.resolve(__dirname, '..', 'public', 'wakeword');
       const wakeWordDir = path.join(projectRoot, 'app', 'src', 'main', 'assets', 'wakeword');
       fs.mkdirSync(wakeWordDir, { recursive: true });
-      for (const file of fs.readdirSync(path.join(TEMPLATES_DIR, 'assets/wakeword'))) {
-        fs.copyFileSync(path.join(TEMPLATES_DIR, 'assets/wakeword', file), path.join(wakeWordDir, file));
+      for (const file of fs.readdirSync(wakeWordSrc)) {
+        fs.copyFileSync(path.join(wakeWordSrc, file), path.join(wakeWordDir, file));
       }
 
       // copy themes

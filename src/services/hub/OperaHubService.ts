@@ -107,6 +107,9 @@ type NativeHub = {
   setProfile(deviceKey: string, profileId: string, key: string): Promise<void>;
   clearProfile(deviceKey: string): Promise<void>;
   profiles(deviceKey: string, hub: PairedHub): Promise<HubProfile[]>;
+  //admin only, desktop for now
+  removeProfile?(deviceKey: string, hub: PairedHub, id: string): Promise<void>;
+  setProfileRole?(deviceKey: string, hub: PairedHub, id: string, role: HubProfile['role']): Promise<void>;
   createProfile(deviceKey: string, hub: PairedHub, name: string, password: string): Promise<UnlockedProfile>;
   unlockProfile(deviceKey: string, hub: PairedHub, profileId: string, password: string): Promise<UnlockedProfile>;
   changePassword(deviceKey: string, hub: PairedHub, current: string, next: string): Promise<void>;
@@ -169,6 +172,17 @@ export type HostedMcpServer = {
 };
 export type McpStatus = { isolation: 'full' | 'partial'; servers: HostedMcpServer[] };
 export type McpFolders = { path: string; parent?: string | null; folders: string[] };
+//any profile's server, no values, admins only
+export type McpServerSummary = {
+  id: string;
+  //null for servers from before profiles
+  owner?: string | null;
+  title: string;
+  repository?: string | null;
+  state: McpServerState;
+  tools: number;
+  usage?: { cpu: number; memory: number } | null;
+};
 
 export type HubMcp = {
   catalog(): Promise<McpListing[]>;
@@ -185,6 +199,7 @@ export type HubMcp = {
   folders(path?: string): Promise<McpFolders>;
   registries(): Promise<string[]>;
   setRegistries(urls: string[]): Promise<string[]>;
+  overview(): Promise<McpServerSummary[]>;
 };
 
 export type HubModels = {
@@ -244,6 +259,8 @@ const tauriHub: NativeHub = {
   setProfile: (deviceKey, profileId, key) => invoke('hub_set_profile', { deviceKey, profileId, key }),
   clearProfile: (deviceKey) => invoke('hub_clear_profile', { deviceKey }),
   profiles: (deviceKey, hub) => invoke('hub_profiles', { deviceKey, hub }),
+  removeProfile: (deviceKey, hub, id) => invoke('hub_remove_profile', { deviceKey, hub, id }),
+  setProfileRole: (deviceKey, hub, id, role) => invoke('hub_set_profile_role', { deviceKey, hub, id, role }),
   createProfile: (deviceKey, hub, name, password) => invoke('hub_create_profile', { deviceKey, hub, name, password }),
   unlockProfile: (deviceKey, hub, profileId, password) =>
     invoke('hub_unlock_profile', { deviceKey, hub, profileId, password }),
@@ -459,6 +476,24 @@ class OperaHubServiceImpl {
     return this.native().profiles(await this.deviceKey(), hub);
   }
 
+  canManageProfiles(): boolean {
+    return !!native?.removeProfile;
+  }
+
+  //its data, devices and mcp servers go too
+  async removeProfile(hub: PairedHub, id: string): Promise<void> {
+    const remove = this.native().removeProfile;
+    if (!remove) throw Object.assign(new Error('Profiles are managed from the desktop app'), { code: 'Unauthorized' });
+    return remove(await this.deviceKey(), hub, id);
+  }
+
+  //the hub keeps at least one admin
+  async setProfileRole(hub: PairedHub, id: string, role: HubProfile['role']): Promise<void> {
+    const set = this.native().setProfileRole;
+    if (!set) throw Object.assign(new Error('Profiles are managed from the desktop app'), { code: 'Unauthorized' });
+    return set(await this.deviceKey(), hub, id, role);
+  }
+
   async createProfile(hub: PairedHub, name: string, password: string): Promise<HubProfile> {
     const unlocked = await this.native().createProfile(await this.deviceKey(), hub, name, password);
     return this.keepProfile(hub, unlocked);
@@ -633,6 +668,7 @@ class OperaHubServiceImpl {
       },
       registries: async () => (await send({ type: 'registries' })).urls,
       setRegistries: async (urls) => (await send({ type: 'set_registries', urls })).urls,
+      overview: async () => (await send({ type: 'overview' })).servers,
     };
   }
 

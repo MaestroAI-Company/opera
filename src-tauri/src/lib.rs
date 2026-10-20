@@ -67,6 +67,10 @@ pub fn run() {
             #[cfg(desktop)]
             hub::hub_profiles,
             #[cfg(desktop)]
+            hub::hub_remove_profile,
+            #[cfg(desktop)]
+            hub::hub_set_profile_role,
+            #[cfg(desktop)]
             hub::hub_create_profile,
             #[cfg(desktop)]
             hub::hub_unlock_profile,

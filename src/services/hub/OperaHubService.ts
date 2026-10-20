@@ -12,6 +12,10 @@ export type HubStatus = {
   update?: string | null;
   cpu?: number | null;
   memory?: number | null;
+  //llama.cpp options an admin set, shown to everyone
+  ctxSize?: number | null;
+  keepAlive?: number | null;
+  parallel?: number | null;
 };
 export type HubDevice = {
   id: string;
@@ -48,7 +52,16 @@ export type HubProvider = { id: string; name: string; kind: 'ollama' | 'openai' 
 export type HostStatus = { running: boolean; installed: boolean; id: string | null };
 //a one time code and the link its qr shows
 export type HubInvite = { code: string; link: string };
-export type HubSettings = { lanDiscovery: boolean; shareProviders: boolean; mcpServers: boolean; models: boolean };
+export type HubSettings = {
+  lanDiscovery: boolean;
+  shareProviders: boolean;
+  mcpServers: boolean;
+  models: boolean;
+  //llama.cpp options, 0 keeps its default
+  ctxSize: number;
+  keepAlive: number;
+  parallel: number;
+};
 export type NearbyHub = { id: string; name: string; addrs: string[] };
 //llama.cpp models on the hub
 export type CatalogModel = { repo: string; file: string; name: string; size: number };

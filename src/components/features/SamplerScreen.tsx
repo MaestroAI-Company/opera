@@ -26,8 +26,6 @@ import Toggle from "../ui/Toggle";
 import { pressStyle } from "../ui/pressStyle";
 import DrawerBackButton from "./DrawerBackButton";
 import HubDeviceSheet from "./HubDeviceSheet";
-import HubMcpSection, { HubMcpServerPage } from "./HubMcpSection";
-import HubMcpSheet, { HubFolderSheet } from "./HubMcpSheet";
 import HubModelsSection, { HubModelPage } from "./HubModelsSection";
 import HubModelsSheet from "./HubModelsSheet";
 import HubProfileSheet from "./HubProfileSheet";
@@ -67,7 +65,7 @@ const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 const CONTENT_TOP = (isTauri ? 32 : 0) + 60 + Spacing.xl2;
 
 type Page = "home" | "profiles" | "models" | "mcp" | "preferences";
-type Detail = { kind: "model"; file: string; name: string } | { kind: "mcp"; id: string; title: string };
+type Detail = { file: string; name: string };
 type HubState = "checking" | "online" | "offline" | "revoked" | "outdated";
 type Tile = { key: string; title: string; status: string; icon?: ImageSourcePropType; error?: boolean; onPress?: () => void };
 type Modal = { title: string; message?: string; buttons: ModalButton[]; loading?: boolean };
@@ -106,18 +104,17 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
   const [hostError, setHostError] = useState<string | null>(null);
   const [thisDeviceId, setThisDeviceId] = useState<string | null>(null);
   const [overview, setOverview] = useState<McpServerSummary[] | null>(null);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
   const [registries, setRegistries] = useState<string[] | null>(null);
   const [registryDraft, setRegistryDraft] = useState("");
   const [registryError, setRegistryError] = useState<string | null>(null);
   const [pageWidth, setPageWidth] = useState(0);
-  //one tile row per page
-  const [tileRowWidth, setTileRowWidth] = useState(0);
+  //measured width of each tile row
+  const [tileRowWidths, setTileRowWidths] = useState<Record<string, number>>({});
   const [profileSheet, setProfileSheet] = useState<"pick" | "password" | null>(null);
   const [qrMode, setQrMode] = useState<"invite" | "link" | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [modelsSheetVisible, setModelsSheetVisible] = useState(false);
-  const [mcpSheetVisible, setMcpSheetVisible] = useState(false);
-  const [folderPick, setFolderPick] = useState<{ start?: string; done: (path: string) => void } | null>(null);
   const [modal, setModal] = useState<Modal | null>(null);
 
   const refresh = useCallback(async () => {
@@ -172,24 +169,29 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
   const firstCheck = hubState === "checking" && !status;
   const hostsHub = !!hostStatus?.id && pairedHub?.id === hostStatus.id;
   const showModels = isAdmin && OperaHub.canManageModels();
-  const showMcp = OperaHub.canManageMcp();
+  //every profile's servers, nothing to install here
+  const showMcp = isAdmin && OperaHub.canManageMcp();
 
-  //every profile's servers, read only
+  //read only, on home and on its page
   useEffect(() => {
-    if (page !== "mcp" || !isAdmin || !online) return;
+    if ((page !== "home" && page !== "mcp") || !showMcp || !online) return;
     let live = true;
     const load = () =>
       OperaHub.mcp()
         .then((api) => api.overview())
-        .then((servers) => live && setOverview(servers))
-        .catch(() => live && setOverview(null));
+        .then((servers) => {
+          if (!live) return;
+          setOverview(servers);
+          setOverviewError(null);
+        })
+        .catch((e) => live && setOverviewError(message(e)));
     load();
     const timer = setInterval(load, OVERVIEW_POLL_MS);
     return () => {
       live = false;
       clearInterval(timer);
     };
-  }, [page, isAdmin, online]);
+  }, [page, showMcp, online]);
 
   useEffect(() => {
     if (page !== "preferences" || !isAdmin || !online) return;
@@ -391,9 +393,9 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
       ],
     });
 
+  //a device paired without a profile yet has none
   const ownerName = (id?: string | null) =>
-    //servers from before profiles belong to admins
-    id ? (profiles?.find((p) => p.id === id)?.name ?? t("sampler.noProfile")) : t("settings.hub.roleAdmin");
+    profiles?.find((p) => p.id === id)?.name ?? t("sampler.noProfile");
 
   const openPage = (next: Page) => {
     setPage(next);
@@ -401,81 +403,104 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
   };
 
   //tiles share the row, never narrower than the minimum
-  const renderTiles = (tiles: Tile[]) => (
-    <View
-      style={styles.tiles}
-      onLayout={(e) => {
-        const width = e.nativeEvent.layout.width;
-        if (width > 0 && width !== tileRowWidth) setTileRowWidth(width);
-      }}
-    >
-      {tiles.map((tile) => {
-        const columns = Math.max(2, Math.floor((tileRowWidth + Spacing.md) / (TILE_MIN_WIDTH + Spacing.md)));
-        const width = tileRowWidth > 0 ? Math.floor((tileRowWidth - Spacing.md * (columns - 1)) / columns) - 1 : "47%";
-        const body = (
-          <>
-            {tile.icon && <Image source={tile.icon} style={styles.tileIcon} tintColor={Colors.textPrimary} />}
-            <Text style={styles.tileTitle} numberOfLines={2}>
-              {tile.title}
-            </Text>
-            <Text style={[styles.tileStatus, tile.error && { color: Colors.error }]} numberOfLines={1}>
-              {tile.status}
-            </Text>
-          </>
-        );
-        return tile.onPress ? (
-          <Pressable
-            key={tile.key}
-            style={pressStyle([styles.tile, { width }], "surface")}
-            onPress={() => {
-              Vibration.vibrate(8);
-              tile.onPress!();
-            }}
-          >
-            {body}
-          </Pressable>
-        ) : (
-          <View key={tile.key} style={[styles.tile, { width }]}>
-            {body}
-          </View>
-        );
-      })}
-    </View>
-  );
+  const renderTiles = (row: string, tiles: Tile[]) => {
+    const rowWidth = tileRowWidths[row] ?? 0;
+    const columns = Math.max(2, Math.floor((rowWidth + Spacing.md) / (TILE_MIN_WIDTH + Spacing.md)));
+    const width = rowWidth > 0 ? Math.floor((rowWidth - Spacing.md * (columns - 1)) / columns) - 1 : "47%";
+    return (
+      <View
+        style={styles.tiles}
+        onLayout={(e) => {
+          const measured = e.nativeEvent.layout.width;
+          if (measured > 0 && measured !== rowWidth) setTileRowWidths((widths) => ({ ...widths, [row]: measured }));
+        }}
+      >
+        {tiles.map((tile) => {
+          const body = (
+            <>
+              {tile.icon && <Image source={tile.icon} style={styles.tileIcon} tintColor={Colors.textPrimary} />}
+              <Text style={styles.tileTitle} numberOfLines={2}>
+                {tile.title}
+              </Text>
+              <Text style={[styles.tileStatus, tile.error && { color: Colors.error }]} numberOfLines={1}>
+                {tile.status}
+              </Text>
+            </>
+          );
+          return tile.onPress ? (
+            <Pressable
+              key={tile.key}
+              style={pressStyle([styles.tile, { width }], "surface")}
+              onPress={() => {
+                Vibration.vibrate(8);
+                tile.onPress!();
+              }}
+            >
+              {body}
+            </Pressable>
+          ) : (
+            <View key={tile.key} style={[styles.tile, { width }]}>
+              {body}
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
 
-  const renderToggleRow = (
-    label: string,
-    help: string,
-    checked: boolean,
-    onToggle: (value: boolean) => void,
-    disabled = false,
-  ) => (
+  const renderToggleRow = (label: string, help: string, checked: boolean, onToggle: (value: boolean) => void) => (
     <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
       <View style={styles.toggleGroupRow}>
         <View style={styles.toggleGroupContent}>
           <Text style={styles.settingLabel}>{label}</Text>
           <Text style={styles.helpText}>{help}</Text>
         </View>
-        <Toggle checked={checked} onToggle={onToggle} disabled={disabled} />
+        <Toggle checked={checked} onToggle={onToggle} />
       </View>
     </View>
   );
 
-  const hostingCard = hostsHub && (
+  //stopped from preferences, started again from any page
+  const hubStopped = hostsHub && !hostStatus?.running;
+  const stoppedCard = (
     <View style={styles.contentCard}>
-      {renderToggleRow(
-        t("sampler.hosting"),
-        hostError ?? t("sampler.hostingHelp"),
-        !!hostStatus?.running,
-        setHosting,
-        hostBusy,
-      )}
+      <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+        <Text style={styles.settingLabel}>{t("sampler.stopped")}</Text>
+        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{hostError ?? t("sampler.stoppedHelp")}</Text>
+        <Group style={[styles.highlightGroup, hostBusy && styles.highlightGroupDisabled]}>
+          <ActionButton
+            icon={samplerIcon}
+            label={t("sampler.start")}
+            variant="highlight"
+            disabled={hostBusy}
+            onPress={() => setHosting(true)}
+          />
+        </Group>
+      </View>
     </View>
   );
 
+  const confirmStop = () =>
+    setModal({
+      title: t("sampler.stopTitle"),
+      message: t("sampler.stopMessage"),
+      buttons: [
+        { text: t("common.cancel"), style: "secondary", onPress: closeModal },
+        {
+          text: t("sampler.stop"),
+          style: "danger",
+          onPress: async () => {
+            setModal((shown) => shown && { ...shown, loading: true });
+            await setHosting(false);
+            closeModal();
+          },
+        },
+      ],
+    });
+
   //hub off or out of reach
   const renderUnreachable = () => {
-    if (hostsHub && !hostStatus?.running) return hostingCard;
+    if (hubStopped) return stoppedCard;
     const connection = {
       checking: t("settings.hub.checking"),
       offline: t("settings.hub.offline"),
@@ -505,18 +530,13 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
     );
   };
 
-  //members only see their own card
-  const profileCards = isAdmin ? (profiles ?? []) : (profiles ?? []).filter((p) => p.id === profile?.id);
-
   const profilesCard = (
     <View style={styles.contentCard}>
       <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
         <Text style={styles.settingLabel}>{t("sampler.profiles")}</Text>
-        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-          {isAdmin ? t("sampler.profilesHelp") : t("sampler.profilesHelpMember")}
-        </Text>
+        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("sampler.profilesHelp")}</Text>
         <View style={styles.profileTiles}>
-          {profileCards.map((p) => (
+          {(profiles ?? []).map((p) => (
             <Pressable key={p.id} style={pressStyle(styles.profileTile, "fadeLight")} onPress={() => openProfile(p)}>
               <ProfileCard name={p.name} createdAt={p.createdAt * 1000} compact />
             </Pressable>
@@ -548,7 +568,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
       <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
         <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.hub.devices")}</Text>
         {devices ? (
-          renderTiles(deviceTiles)
+          renderTiles("devices", deviceTiles)
         ) : (
           <Text style={styles.helpText}>{t("settings.hub.devicesEmpty")}</Text>
         )}
@@ -574,28 +594,65 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
       onAddModel={() => setModelsSheetVisible(true)}
       onOpenModel={(file, name) => {
         setPage("models");
-        setDetail({ kind: "model", file, name });
+        setDetail({ file, name });
       }}
     />
   );
 
-  const mcpSection = (highlight: boolean) => (
-    <HubMcpSection
-      highlight={highlight}
-      onAddServer={() => setMcpSheetVisible(true)}
-      onOpenServer={(id, title) => {
-        setPage("mcp");
-        setDetail({ kind: "mcp", id, title });
-      }}
-    />
-  );
+  //servers of each profile, read only
+  const renderMcpServers = () => {
+    //servers from before profiles belong to admins
+    const ownerOf = (server: McpServerSummary) => server.owner ?? profiles?.find((p) => p.role === "admin")?.id;
+    const owners = profiles ?? [];
+    return (
+      <View style={styles.contentCard}>
+        <View style={styles.settingRowVertical}>
+          <Text style={styles.settingLabel}>{t("hubMcp.title")}</Text>
+          <Text style={styles.helpText}>
+            {overviewError ? t("hubMcp.failed", { error: overviewError }) : t("sampler.mcpAllHelp")}
+          </Text>
+        </View>
+        {owners.map((owner, index) => {
+          const servers = (overview ?? []).filter((s) => ownerOf(s) === owner.id);
+          return (
+            <View
+              key={owner.id}
+              style={[styles.settingRowVertical, index === owners.length - 1 && { marginBottom: 0 }]}
+            >
+              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{owner.name}</Text>
+              {servers.length > 0 ? (
+                renderTiles(
+                  `mcp-${owner.id}`,
+                  servers.map((server) => ({
+                    key: server.id,
+                    title: server.title,
+                    error: server.state === "failed",
+                    status: [
+                      server.state === "running"
+                        ? t("hubMcp.state.running", { count: server.tools })
+                        : t(`hubMcp.state.${server.state}`),
+                      server.usage ? formatBytes(server.usage.memory) : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · "),
+                  })),
+                )
+              ) : (
+                <Text style={styles.helpText}>{overview ? t("sampler.mcpNone") : t("hubMcp.loading")}</Text>
+              )}
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
 
   const renderHome = () => {
     const cards = [
       <View key="profiles">{profilesCard}</View>,
       <View key="devices">{renderDevicesCard(false)}</View>,
       ...(showModels ? [<View key="models">{modelsSection(false)}</View>] : []),
-      ...(showMcp ? [<View key="mcp">{mcpSection(false)}</View>] : []),
+      ...(showMcp ? [<View key="mcp">{renderMcpServers()}</View>] : []),
     ];
     if (pageWidth < TWO_COLUMNS_FROM) return cards;
     //two columns that fill independently
@@ -636,39 +693,6 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
     </>
   );
 
-  const renderMcp = () => (
-    <>
-      {mcpSection(true)}
-      {isAdmin && (
-        <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={styles.settingLabel}>{t("sampler.mcpAll")}</Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {overview?.length === 0 ? t("sampler.mcpAllEmpty") : t("sampler.mcpAllHelp")}
-            </Text>
-            {!!overview?.length &&
-              renderTiles(
-                overview.map((server) => ({
-                  key: server.id,
-                  title: server.title,
-                  error: server.state === "failed",
-                  status: [
-                    ownerName(server.owner),
-                    server.state === "running"
-                      ? t("hubMcp.state.running", { count: server.tools })
-                      : t(`hubMcp.state.${server.state}`),
-                    server.usage ? formatBytes(server.usage.memory) : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · "),
-                })),
-              )}
-          </View>
-        </View>
-      )}
-    </>
-  );
-
   const renderPreferences = () => {
     const connection = {
       checking: t("settings.hub.checking"),
@@ -693,7 +717,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
     ];
     return (
       <>
-        {hostingCard}
+        {hubStopped && stoppedCard}
 
         {online && settings && (
           <View style={styles.contentCard}>
@@ -775,6 +799,14 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
                   refresh();
                 }}
               />
+              {hostsHub && !hubStopped && (
+                <ActionButton
+                  icon={cancelIcon}
+                  label={t("sampler.stop")}
+                  disabled={hostBusy}
+                  onPress={confirmStop}
+                />
+              )}
               <ActionButton icon={cancelIcon} label={t("settings.hub.unpair")} onPress={unpair} />
             </Group>
           </View>
@@ -790,19 +822,11 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
           <DrawerBackButton kind="back" onPress={() => setDetail(null)} />
         </View>
         <Text style={styles.title} numberOfLines={1}>
-          {shown.kind === "model" ? shown.name : shown.title}
+          {shown.name}
         </Text>
         <View style={styles.headerSpacer} />
       </View>
-      {shown.kind === "model" ? (
-        <HubModelPage file={shown.file} onDeleted={() => setDetail(null)} />
-      ) : (
-        <HubMcpServerPage
-          id={shown.id}
-          onRemoved={() => setDetail(null)}
-          onPickFolder={(start, done) => setFolderPick({ start, done })}
-        />
-      )}
+      <HubModelPage file={shown.file} onDeleted={() => setDetail(null)} />
     </>
   );
 
@@ -836,7 +860,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
       case "models":
         return renderModels();
       case "mcp":
-        return renderMcp();
+        return renderMcpServers();
       default:
         return renderHome();
     }
@@ -959,23 +983,6 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
       <HubModelsSheet
         visible={modelsSheetVisible}
         onClose={() => setModelsSheetVisible(false)}
-        isLargeScreen={isLargeScreen}
-        isDesktop={isDesktop}
-      />
-      <HubMcpSheet
-        visible={mcpSheetVisible}
-        onClose={() => setMcpSheetVisible(false)}
-        isLargeScreen={isLargeScreen}
-        isDesktop={isDesktop}
-      />
-      <HubFolderSheet
-        visible={folderPick !== null}
-        start={folderPick?.start}
-        onPick={(path) => {
-          folderPick?.done(path);
-          setFolderPick(null);
-        }}
-        onClose={() => setFolderPick(null)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />

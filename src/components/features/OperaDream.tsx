@@ -4,6 +4,7 @@ import {
   Animated,
   DeviceEventEmitter,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -34,11 +35,12 @@ import { AppEvents } from "../../services/events";
 import { McpService } from "../../services/mcp/McpService";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { AppSettings, Settings } from "../../services/settings/SettingsService";
-import { STT } from "../../services/speech/STTService";
+import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { TTS } from "../../services/speech/TTSService";
 import { onWakeWord, startWakeWord, stopWakeWord } from "../../services/speech/WakeWord";
 import "../../services/widgets/registerWidgets";
 import { deriveChatDisplay, renderMarkdown } from "../ui/MarkdownText";
+import NotificationModal from "../ui/NotificationModal";
 import { pressStyle } from "../ui/pressStyle";
 import ThinkingIcon from "../ui/ThinkingIcon";
 import ButterflyCluster from "./ButterflyCluster";
@@ -50,7 +52,8 @@ const stopIcon = require("../../../assets/icons/stop.png");
 //same silence window as the chat bar
 const VAD_SILENCE_MS = 1500;
 //recognizer may never send its end event
-const STOP_TIMEOUT_MS = 3000;
+//web whisper only starts after stop
+const STOP_TIMEOUT_MS = Platform.OS === "web" ? 30000 : 3000;
 //inactivity before the sleep phase
 const SLEEP_DELAY_MS = 15000;
 const SLEEP_OPACITY = 0.65;
@@ -60,8 +63,11 @@ const BUTTON_HEIGHT = 44;
 const BURN_IN_SHIFT = 15;
 
 //the router layout never mounts here
-initTheme();
-initI18n();
+//static web render has no window
+if (typeof window !== "undefined") {
+  initTheme();
+  initI18n();
+}
 
 type Turn = { role: "user" | "assistant"; content: string };
 type VoiceState = "idle" | "listening" | "transcribing";
@@ -139,6 +145,7 @@ function OperaDream() {
   const [antiBurnIn, setAntiBurnIn] = useState(true);
   const [wakeWord, setWakeWord] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [whisperMissing, setWhisperMissing] = useState(false);
 
   const [answer, setAnswer] = useState<{ msgId: string; content: string } | null>(null);
   const [generatingConvId, setGeneratingConvId] = useState<string | null>(null);
@@ -309,7 +316,8 @@ function OperaDream() {
     const model = selectedModelRef.current;
     if (!uri || !model) return localText;
     try {
-      const wavBuffer = await new File(uri).arrayBuffer();
+      //web recordings are blob urls
+      const wavBuffer = Platform.OS === "web" ? await (await fetch(uri)).arrayBuffer() : await new File(uri).arrayBuffer();
       let transcription = "";
       await AIModule.sendMessage(
         model,
@@ -357,6 +365,14 @@ function OperaDream() {
     let locale = Settings.getCached().whisperLanguage || "en-US";
     if (locale === "auto" || locale.length > 5) locale = "en-US";
     const canTranscribeRemotely = !Settings.getCached().alwaysWhisper && capabilitiesRef.current.includes("audio") && !!selectedModelRef.current;
+    //web needs whisper or audio model
+    if (Platform.OS === "web" && !canTranscribeRemotely) {
+      const whisperModel = Settings.getCached().whisperModel || "base";
+      if (whisperModel === "none" || !(await WhisperSTT.isModelInstalled(whisperModel))) {
+        setWhisperMissing(true);
+        return;
+      }
+    }
     liveTextRef.current = "";
     audioUriRef.current = null;
     settledRef.current = false;
@@ -398,10 +414,10 @@ function OperaDream() {
 
   //only while the mic is free
   useEffect(() => {
-    if (!wakeWord || busy || speaking) return;
+    if (!wakeWord || busy || speaking || whisperMissing) return;
     startWakeWord();
     return () => { stopWakeWord(); };
-  }, [wakeWord, busy, speaking]);
+  }, [wakeWord, busy, speaking, whisperMissing]);
 
   //detection acts like a mic tap
   const startListeningRef = useRef(startListening);
@@ -630,6 +646,14 @@ function OperaDream() {
         onReflectionChange={setSelectedReflection}
         //no trigger to anchor to, so always the bottom sheet
         isLargeScreen={false}
+      />
+
+      <NotificationModal
+        visible={whisperMissing}
+        title={t("whisper.notInstalled.title")}
+        message={t("dream.whisperRequired")}
+        buttons={[{ text: "OK", onPress: () => setWhisperMissing(false), style: "primary" }]}
+        onClose={() => setWhisperMissing(false)}
       />
 
       <HeadlessWebView />

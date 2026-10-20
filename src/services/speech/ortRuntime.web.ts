@@ -4,7 +4,7 @@ import type { Ort } from './ortRuntime';
 export type { Ort };
 
 //metro cannot bundle its dynamic imports
-const ORT_BASE = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/';
+export const ORT_BASE = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/';
 
 const hasWebGpu = () => typeof navigator !== 'undefined' && 'gpu' in navigator;
 

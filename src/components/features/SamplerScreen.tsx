@@ -1,5 +1,5 @@
 import { ReactNode, useCallback, useEffect, useState } from "react";
-import { Image, ImageSourcePropType, Platform, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from "react-native";
+import { Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from "react-native";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
@@ -75,12 +75,14 @@ type SamplerScreenProps = {
   topBar: ReactNode;
   isLargeScreen: boolean;
   isDesktop: boolean;
+  //after each reload, pairing or role may have changed
+  onHubChanged?: () => void;
 };
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-//admin page of the sampler, desktop only
-export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: SamplerScreenProps) {
+//admin page of the sampler, desktop app and admin browsers
+export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubChanged }: SamplerScreenProps) {
   const styles = useThemedStyles(makeStyles);
   const Colors = useColors();
   const t = useT();
@@ -142,8 +144,11 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
     } catch (e) {
       const code = hubErrorCode(e);
       setHubState(code === "Unauthorized" ? "revoked" : code === "Outdated" ? "outdated" : "offline");
+    } finally {
+      //the switch follows pairing and role
+      onHubChanged?.();
     }
-  }, []);
+  }, [onHubChanged]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the paired hub
@@ -163,22 +168,21 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
 
   //the role may have changed since the profile was unlocked
   const role = profiles?.find((p) => p.id === profile?.id)?.role ?? profile?.role;
-  const isAdmin = role === "admin" && Platform.OS !== "web";
+  const isAdmin = role === "admin";
   const online = hubState === "online";
   //nothing until the hub first answers
   const firstCheck = hubState === "checking" && !status;
   const hostsHub = !!hostStatus?.id && pairedHub?.id === hostStatus.id;
   const showModels = isAdmin && OperaHub.canManageModels();
   //every profile's servers, nothing to install here
-  const showMcp = isAdmin && OperaHub.canManageMcp();
+  const showMcp = isAdmin && OperaHub.canSeeMcpServers();
 
   //read only, on home and on its page
   useEffect(() => {
-    if ((page !== "home" && page !== "mcp") || !showMcp || !online) return;
+    if ((page !== "home" && page !== "mcp") || !showMcp || !online || !pairedHub) return;
     let live = true;
     const load = () =>
-      OperaHub.mcp()
-        .then((api) => api.overview())
+      OperaHub.mcpOverview(pairedHub)
         .then((servers) => {
           if (!live) return;
           setOverview(servers);
@@ -191,7 +195,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
       live = false;
       clearInterval(timer);
     };
-  }, [page, showMcp, online]);
+  }, [page, showMcp, online, pairedHub]);
 
   useEffect(() => {
     if (page !== "preferences" || !isAdmin || !online) return;
@@ -631,7 +635,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
                       server.state === "running"
                         ? t("hubMcp.state.running", { count: server.tools })
                         : t(`hubMcp.state.${server.state}`),
-                      server.usage ? formatBytes(server.usage.memory) : null,
+                      server.memory != null ? formatBytes(server.memory) : null,
                     ]
                       .filter(Boolean)
                       .join(" · "),
@@ -870,6 +874,8 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
   const renderWelcome = () => {
     const needsProfile = !!pairedHub;
     if (needsProfile && firstCheck) return null;
+    //a browser cannot host, it leaves the screen once unpaired
+    if (!needsProfile && !OperaHub.canHost()) return null;
     if (needsProfile && !online) {
       return <View style={styles.welcomeCard}>{renderUnreachable()}</View>;
     }

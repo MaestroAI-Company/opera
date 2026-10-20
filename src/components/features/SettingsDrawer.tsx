@@ -968,6 +968,9 @@ export default function SettingsDrawer({
     try {
       setHubStatus(await OperaHub.status(hub));
       setHubState("online");
+      //a role changed by an admin shows at once
+      const liveProfile = await OperaHub.refreshProfile(hub).catch(() => null);
+      if (liveProfile) setHubProfile(liveProfile);
       setHubDevices(await OperaHub.devices(hub).catch(() => null));
       setHubSettings(await OperaHub.hubSettings(hub).catch(() => null));
     } catch (e) {
@@ -4365,8 +4368,8 @@ export default function SettingsDrawer({
     </View>
   );
 
-  //the profile role decides, browsers never manage
-  const isHubAdmin = () => hubProfile?.role === "admin" && Platform.OS !== "web";
+  //the profile role decides, the hub checks it again
+  const isHubAdmin = () => hubProfile?.role === "admin";
 
   const renderOperaHubSubPage = () => {
     const hubIcon = (

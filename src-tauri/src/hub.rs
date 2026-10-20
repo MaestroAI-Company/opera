@@ -4,8 +4,8 @@ use std::sync::Arc;
 use opera_hub::{config, hub, service};
 use opera_hub_client::{
     CatalogModel, HubClient, HubDevice, HubError, HubInvite, HubProfile, HubProvider, HubSettings,
-    HubStatus, LinkJoining, LinkProgress, LlamaStatus, ModelFile, ModelRepo, NearbyHub, PairedHub,
-    ProfileLock, ProxyInfo, PullPage, SyncRecord, UnlockedProfile,
+    HubStatus, LinkJoining, LinkProgress, LlamaStatus, McpServerSummary, ModelFile, ModelRepo,
+    NearbyHub, PairedHub, ProfileLock, ProxyInfo, PullPage, SyncRecord, UnlockedProfile,
 };
 use serde::Serialize;
 use tauri::State;
@@ -404,6 +404,15 @@ pub async fn hub_set_profile_role(
         .await?
         .set_profile_role(hub, id, role)
         .await
+}
+
+#[tauri::command]
+pub async fn hub_mcp_overview(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<Vec<McpServerSummary>, HubError> {
+    state.client(&device_key).await?.mcp_overview(hub).await
 }
 
 #[tauri::command]

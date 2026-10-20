@@ -117,12 +117,10 @@ export function McpFieldRows({ fields, drafts, secretsSet = [], onChange, onPick
 type HubMcpSectionProps = {
   onAddServer: () => void;
   onOpenServer: (id: string, title: string) => void;
-  //off where another action is the main one
-  highlight?: boolean;
 };
 
 //mcp servers the sampler runs, admins only
-export default function HubMcpSection({ onAddServer, onOpenServer, highlight = true }: HubMcpSectionProps) {
+export default function HubMcpSection({ onAddServer, onOpenServer }: HubMcpSectionProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const stateLabel = useMcpStateLabel();
@@ -142,11 +140,11 @@ export default function HubMcpSection({ onAddServer, onOpenServer, highlight = t
         <Text style={styles.settingLabel}>{t("hubMcp.title")}</Text>
         <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{help}</Text>
 
-        <Group style={[highlight && styles.highlightGroup, !api && styles.highlightGroupDisabled]}>
+        <Group style={[styles.highlightGroup, !api && styles.highlightGroupDisabled]}>
           <ActionButton
             icon={addIcon}
             label={t("hubMcp.add")}
-            variant={highlight ? "highlight" : "default"}
+            variant="highlight"
             disabled={!api}
             onPress={onAddServer}
           />

@@ -8,7 +8,7 @@ type NativeWakeWord = {
 const Native: NativeWakeWord | undefined =
   Platform.OS === 'android' ? NativeModules.WakeWordModule : undefined;
 
-//v2c eval threshold
+//v3b starting threshold
 const THRESHOLD = 0.5;
 
 //false without the mic permission

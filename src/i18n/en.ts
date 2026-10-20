@@ -151,6 +151,8 @@ export const en = {
   "codePreview.language": "Language",
   "codePreview.lines": "Lines",
   "codePreview.characters": "Characters",
+  "codeDownload.title": "File downloaded",
+  "codeDownload.message": "{name} has been saved.",
   "imagePreview.name": "Name",
   "imagePreview.format": "Format",
   "imagePreview.dimensions": "Dimensions",

@@ -153,6 +153,8 @@ export const fr: Translations = {
   "codePreview.language": "Langage",
   "codePreview.lines": "Lignes",
   "codePreview.characters": "Caractères",
+  "codeDownload.title": "Fichier téléchargé",
+  "codeDownload.message": "{name} a été enregistré.",
   "imagePreview.name": "Nom",
   "imagePreview.format": "Format",
   "imagePreview.dimensions": "Dimensions",

@@ -40,7 +40,7 @@ import PageStack from "./PageStack";
 const searchIcon = require("../../../assets/icons/search.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 
-const DESKTOP_CARD_WIDTH = 380;
+const DESKTOP_CARD_WIDTH = 560;
 const OTHER_FAMILY = "other";
 
 type Page = "browse" | "search" | "model";

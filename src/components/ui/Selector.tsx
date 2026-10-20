@@ -5,6 +5,7 @@ import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constan
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { pressStyle } from "./pressStyle";
+import { lockTextSelection } from "./lockTextSelection";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const arrowDownIcon = require("../../../assets/icons/down_arrow.png");
@@ -132,6 +133,7 @@ export default function Selector({
       onStartShouldSetPanResponder: () => true,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
+        lockTextSelection(true);
         armedRef.current = false;
         startYRef.current = pillY.value;
         previewIndexRef.current = selectedIndexRef.current;
@@ -175,6 +177,7 @@ export default function Selector({
         pillHeight.value = withTiming(layouts[anchor]!.height, { duration: 100 });
       },
       onPanResponderRelease: () => {
+        lockTextSelection(false);
         clearLongPressTimer();
         if (armedRef.current) {
           const idx = previewIndexRef.current ?? selectedIndexRef.current;
@@ -195,6 +198,7 @@ export default function Selector({
         }
       },
       onPanResponderTerminate: () => {
+        lockTextSelection(false);
         clearLongPressTimer();
         if (armedRef.current) {
           const layout = rowLayoutsRef.current[selectedIndexRef.current];

@@ -125,6 +125,8 @@ export type ModelSelectorTriggerProps = {
   style?: StyleProp<ViewStyle>;
   //desktop drops panel under button
   viewRef?: React.Ref<View>;
+  //actionbutton look without sticker shadow
+  flat?: boolean;
 };
 
 //button trigger in topbar
@@ -133,6 +135,7 @@ export function ModelSelectorTrigger({
   onPress,
   style,
   viewRef,
+  flat = false,
 }: ModelSelectorTriggerProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
@@ -145,12 +148,12 @@ export function ModelSelectorTrigger({
   return (
     <View style={[styles.container, style]} ref={viewRef} collapsable={false}>
       <View style={styles.shadowLayer}>
-        <View style={styles.shadowBlock} />
+        {!flat && <View style={styles.shadowBlock} />}
         <Pressable
           onPress={onPress}
-          style={pressStyle(styles.trigger, "surface")}
+          style={pressStyle([styles.trigger, flat && styles.triggerFlat], "surface")}
         >
-          <Image source={botIcon} style={styles.icon} />
+          {!flat && <Image source={botIcon} style={styles.icon} />}
           <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
             {selectedModel ? displayName(selectedModel) : t("modelSelector.placeholder")}
           </Text>
@@ -1063,6 +1066,11 @@ const makeStyles = (Colors: ThemeColors) =>
       overflow: "hidden",
       position: "relative",
       zIndex: 1,
+    },
+    triggerFlat: {
+      height: 36,
+      borderRadius: Radius.md,
+      maxWidth: 130,
     },
     icon: {
       width: 18,

@@ -118,6 +118,11 @@ import { PluginRegistry } from "../services/plugins/PluginRegistry";
 import { NEW_CHAT_ACTION_ID } from "../services/quickActions/QuickActionsService";
 import { Settings } from "../services/settings/SettingsService";
 import {
+  openSettingsWindow,
+  settingsInWindow,
+  watchSettingsWindow,
+} from "../services/settingsWindow";
+import {
   clearShareFromUrl,
   fetchSharedConversation,
   resolvePasteHost,
@@ -1164,6 +1169,45 @@ useEffect(() => {
     sendLift.set(-1);
   }, [sendLift]);
 
+  //desktop shells open settings in their own os window instead of the drawer
+  const settingsWindowOpenRef = useRef(false);
+  useEffect(() => {
+    if (!settingsInWindow || !settingsDrawerVisible) return;
+    settingsWindowOpenRef.current = true;
+    openSettingsWindow(settingsInitialSubPage, hubPairLink).catch((e) =>
+      console.warn("Could not open the settings window:", e),
+    );
+    /* eslint-disable react-hooks/set-state-in-effect -- the window replaces the drawer */
+    setSettingsDrawerVisible(false);
+    setSettingsInitialSubPage("main");
+    setHubPairLink(null);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [settingsDrawerVisible, settingsInitialSubPage, hubPairLink]);
+
+  useEffect(() => {
+    if (!settingsInWindow) return;
+    let cancelled = false;
+    let stop: (() => void) | undefined;
+    watchSettingsWindow(
+      () => settingsWindowOpenRef.current,
+      () => {
+        settingsWindowOpenRef.current = false;
+        closeSettings();
+      },
+      () => {
+        loadConversations();
+        startNewConversation();
+      },
+    ).then((unlisten) => {
+      if (cancelled) unlisten();
+      else stop = unlisten;
+    });
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
+  }, [closeSettings, loadConversations, startNewConversation]);
+
   //stable ref keeps drawer rows memoized
   const closeConversationsDrawer = useCallback(
     () => setDrawerVisible(false),
@@ -2102,9 +2146,22 @@ useEffect(() => {
             },
           ];
 
+  const modelTrigger = (
+    <ModelSelectorTrigger
+      viewRef={modelTriggerRef}
+      selectedModel={selectedModel}
+      flat={isDesktop}
+      onPress={() => {
+        if (!isDesktop && (drawerVisible || settingsDrawerVisible)) return;
+        openDrawerSafely(() => setModelSelectorVisible((prev) => !prev));
+      }}
+    />
+  );
+
   const conversationsDrawer = (
     <ConversationsDrawer
       isDesktop={isDesktop}
+      onSettingsPress={() => openDrawerSafely(() => (settingsDrawerVisible ? closeSettings() : setSettingsDrawerVisible(true)))}
       visible={drawerVisible}
       onClose={closeConversationsDrawer}
       conversations={conversations}
@@ -2117,7 +2174,7 @@ useEffect(() => {
     />
   );
 
-  const settingsDrawer = (
+  const settingsDrawer = settingsInWindow ? null : (
     <SettingsDrawer
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
@@ -2279,23 +2336,9 @@ useEffect(() => {
                 }}
                 onNewPress={startNewConversation}
                 isDesktop={isDesktop}
-                centerElement={
-                  <ModelSelectorTrigger
-                    viewRef={modelTriggerRef}
-                    selectedModel={selectedModel}
-                    onPress={() => {
-                      if (
-                        !isDesktop &&
-                        (drawerVisible || settingsDrawerVisible)
-                      )
-                        return;
-                      openDrawerSafely(() =>
-                        setModelSelectorVisible((prev) => !prev),
-                      );
-                    }}
-                  />
-                }
+                centerElement={isDesktop ? undefined : modelTrigger}
                 rightElement={
+                  isDesktop ? undefined :
                   <View style={styles.settingsShadowLayer}>
                     <View style={styles.settingsShadowBlock} />
                     <Pressable
@@ -2403,6 +2446,7 @@ useEffect(() => {
                     });
                   }}
                   onAttachmentSheetVisibilityChange={setAttachmentSheetVisible}
+                  leadingElement={isDesktop ? modelTrigger : undefined}
                 />
               )}
             </View>

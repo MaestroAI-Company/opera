@@ -5,6 +5,7 @@ import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme"
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { pressStyle } from "./pressStyle";
+import { lockTextSelection } from "./lockTextSelection";
 
 //load theme icons
 const autoIcon = require("../../../assets/icons/auto.png");
@@ -111,6 +112,7 @@ export default function SliderToggle({
       onStartShouldSetPanResponder: () => true,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
+        lockTextSelection(true);
         armedRef.current = false;
         startXRef.current = pillX.value;
         previewIndexRef.current = selectedIndexRef.current;
@@ -145,6 +147,7 @@ export default function SliderToggle({
         pillX.value = anchor * slot + rubberBand(d, slot);
       },
       onPanResponderRelease: () => {
+        lockTextSelection(false);
         clearLongPressTimer();
         if (armedRef.current) {
           const bw = buttonWidthRef.current;
@@ -161,6 +164,7 @@ export default function SliderToggle({
         }
       },
       onPanResponderTerminate: () => {
+        lockTextSelection(false);
         clearLongPressTimer();
         if (armedRef.current) {
           const bw = buttonWidthRef.current;

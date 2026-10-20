@@ -12,7 +12,9 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import SiteHead from "../components/SiteHead";
 import SplashScreenComponent from "../components/ui/SplashScreen";
+import SettingsWindow from "../components/features/SettingsWindow";
 import TauriTitleBar from "../components/features/TauriTitleBar";
+import CodeDownloadHost from "../components/features/CodeDownloadHost";
 import ToolConsentHost from "../components/features/ToolConsentHost";
 import VoicePackHost from "../components/features/VoicePackHost";
 import { IconLabelProvider } from "../components/ui/IconLabel";
@@ -51,6 +53,8 @@ installLogger();
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const isLinux = isTauri && navigator.userAgent.includes("Linux") && !navigator.userAgent.includes("Android");
+//the settings os window loads the app with this flag
+const isSettingsWindow = isTauri && new URLSearchParams(window.location.search).get("window") === "settings";
 
 const screenLayout = ({ children }: { children: ReactNode }) => (
   <>
@@ -61,7 +65,7 @@ const screenLayout = ({ children }: { children: ReactNode }) => (
 
 export default function RootLayout() {
   const isDark = useIsDark();
-  const [showLottie, setShowLottie] = useState(Platform.OS !== "web" || isTauri);
+  const [showLottie, setShowLottie] = useState(Platform.OS !== "web" || (isTauri && !isSettingsWindow));
   const [fontsLoaded, fontError] = useFonts({
     Petrona: require("../../assets/fonts/Petrona-Medium.ttf"),
     Figtree: require("../../assets/fonts/Figtree-Regular.ttf"),
@@ -123,9 +127,16 @@ export default function RootLayout() {
       <KeyboardProvider>
         <IconLabelProvider>
           <TauriTitleBar />
-          <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
-          <ToolConsentHost />
-          <VoicePackHost />
+          {isSettingsWindow ? (
+            <SettingsWindow />
+          ) : (
+            <>
+              <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
+              <ToolConsentHost />
+              <VoicePackHost />
+              <CodeDownloadHost />
+            </>
+          )}
           <StatusBar style={isDark ? "light" : "dark"} />
         </IconLabelProvider>
       </KeyboardProvider>

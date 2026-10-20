@@ -11,7 +11,7 @@ import Group from "../ui/Group";
 import { describeToolCall } from "../ui/MarkdownText";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
-const DESKTOP_CARD_WIDTH = 420;
+const DESKTOP_CARD_WIDTH = 620;
 
 const REFLECTION_KEYS = {
   none: "reflection.none",

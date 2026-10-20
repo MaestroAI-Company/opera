@@ -20,6 +20,7 @@ import PageStack from "./PageStack";
 import { pressStyle } from "../ui/pressStyle";
 
 const searchIcon = require("../../../assets/icons/search.png");
+const settingsIcon = require("../../../assets/icons/settings.png");
 const newIcon = require("../../../assets/icons/add.png");
 const deleteIcon = require("../../../assets/icons/delete.png");
 const shareIcon = require("../../../assets/icons/share.png");
@@ -52,6 +53,7 @@ type ConversationsDrawerProps = {
   onTogglePinConversation?: (id: string, pinned: boolean) => void;
   onShareConversation?: (conv: Conversation) => void;
   isDesktop?: boolean;
+  onSettingsPress?: () => void;
 };
 
 //format group title based on date
@@ -89,6 +91,7 @@ export default function ConversationsDrawer({
   onTogglePinConversation,
   onShareConversation,
   isDesktop = false,
+  onSettingsPress,
 }: ConversationsDrawerProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -437,17 +440,21 @@ export default function ConversationsDrawer({
         //desktop title level with the top bar buttons
         contentContainerStyle={{ paddingTop: isDesktop ? Spacing.lg : 60, paddingBottom: 40 }}
       >
-        <View style={styles.header}>
-          <View style={styles.headerSpacer} />
-          <Text style={styles.title} numberOfLines={1}>{t("conversations.title")}</Text>
-          <View style={styles.headerSpacer} />
-        </View>
+        {/* docked desktop panel has no title */}
+        {!isDesktop && (
+          <View style={styles.header}>
+            <View style={styles.headerSpacer} />
+            <Text style={styles.title} numberOfLines={1}>{t("conversations.title")}</Text>
+            <View style={styles.headerSpacer} />
+          </View>
+        )}
 
         <Group style={styles.quickActionsSpacing}>
           <ActionButton
             icon={newIcon}
             iconBadge
             label={t("conversations.new")}
+            style={isDesktop && styles.desktopButton}
             onPress={() => {
               onNewConversation();
               if (!isDesktop) onClose();
@@ -457,6 +464,7 @@ export default function ConversationsDrawer({
             icon={searchIcon}
             iconBadge
             label={t("conversations.search.action")}
+            style={isDesktop && styles.desktopButton}
             onPress={enterSearch}
           />
         </Group>
@@ -555,6 +563,9 @@ export default function ConversationsDrawer({
         <View style={[styles.dockedPanel, { width: dockedWidth }]}>
           <View style={styles.dockedContent}>
             {pages}
+            <Group style={[styles.quickActionsSpacing, styles.dockedFooter]}>
+              <ActionButton icon={settingsIcon} iconBadge label={t("home.settings")} style={styles.desktopButton} onPress={() => onSettingsPress?.()} />
+            </Group>
           </View>
         </View>
         <View
@@ -619,7 +630,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     overflow: "hidden",
   },
   largeScreenContainer: {
-    backgroundColor: Colors.groupedBackground,
+    backgroundColor: Colors.surface,
     zIndex: 10,
     overflow: "hidden",
   },
@@ -636,6 +647,13 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     bottom: 0,
     right: 0,
     width: 8,
+  },
+  //desktop buttons round their own hover fill
+  desktopButton: {
+    borderRadius: Radius.pill,
+  },
+  dockedFooter: {
+    marginBottom: Spacing.lg2,
   },
   dockedContent: {
     //clears the tauri title bar

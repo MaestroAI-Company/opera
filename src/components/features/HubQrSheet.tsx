@@ -26,7 +26,7 @@ const reloadIcon = require("../../../assets/icons/reconnect.png");
 const cancelIcon = require("../../../assets/icons/cancel.png");
 const keyIcon = require("../../../assets/icons/key.png");
 
-const DESKTOP_CARD_WIDTH = 380;
+const DESKTOP_CARD_WIDTH = 560;
 const COPIED_NOTICE_MS = 2000;
 
 type HubQrSheetProps = {

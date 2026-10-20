@@ -17,7 +17,7 @@ import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
 
-const DESKTOP_CARD_WIDTH = 380;
+const DESKTOP_CARD_WIDTH = 560;
 
 type BugReportSheetProps = {
   visible: boolean;

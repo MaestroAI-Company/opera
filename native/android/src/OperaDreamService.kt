@@ -30,6 +30,7 @@ class OperaDreamService : DreamService() {
   }
 
   override fun onDreamingStopped() {
+    WakeWordModule.stopListening()
     val host = reactHost
     //an activity may own the host
     if (host != null && host.currentReactContext?.currentActivity == null) host.onHostPause()

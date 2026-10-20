@@ -309,6 +309,9 @@ export const en = {
   "settings.screenSaver.incognito": "Incognito mode button",
   "settings.screenSaver.incognitoHelp":
     "Show the incognito mode button on the screen saver.",
+  "settings.screenSaver.wakeWord": "Say \"Maestro\"",
+  "settings.screenSaver.wakeWordHelp":
+    "Ask Maestro hands free on the screen saver. Listening happens on this device.",
 
   "settings.info.version": "Version",
   "settings.info.links": "Links",

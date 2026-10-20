@@ -127,7 +127,7 @@ import { McpServerConfig } from "../../services/mcp/types";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { openScreenSaverSettings } from "../../services/screensaver/ScreenSaver";
 import { Settings } from "../../services/settings/SettingsService";
-import { WhisperSTT } from "../../services/speech/STTService";
+import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { TTS_SPEEDS } from "../../services/speech/engines";
 import ActionButton from "../ui/ActionButton";
 import Checkbox from "../ui/Checkbox";
@@ -952,6 +952,7 @@ export default function SettingsDrawer({
   const [autoSpeak, setAutoSpeakState] = useState(true);
   const [dreamIncognitoButton, setDreamIncognitoButtonState] = useState(true);
   const [dreamAntiBurnIn, setDreamAntiBurnInState] = useState(true);
+  const [dreamWakeWord, setDreamWakeWordState] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(false);
   const [editAiMessages, setEditAiMessagesState] = useState(false);
   const [showDetectionBoxes, setShowDetectionBoxesState] = useState(false);
@@ -1328,6 +1329,7 @@ export default function SettingsDrawer({
         setAutoSpeakState(s.autoSpeak);
         setDreamIncognitoButtonState(s.dreamIncognitoButton);
         setDreamAntiBurnInState(s.dreamAntiBurnIn);
+        setDreamWakeWordState(s.dreamWakeWord);
         setShowTechnicalDetailsState(s.showTechnicalDetails);
         setEditAiMessagesState(s.editAiMessages);
         setShowDetectionBoxesState(s.showDetectionBoxes);
@@ -2375,6 +2377,16 @@ export default function SettingsDrawer({
     Settings.set("dreamAntiBurnIn", v);
   };
 
+  const setDreamWakeWord = async (v: boolean) => {
+    setDreamWakeWordState(v);
+    //dream cannot show the mic prompt
+    if (v && !(await STT.requestPermissions())) {
+      setDreamWakeWordState(false);
+      return;
+    }
+    Settings.set("dreamWakeWord", v);
+  };
+
   const setShowTechnicalDetails = (v: boolean) => {
     setShowTechnicalDetailsState(v);
     Settings.set("showTechnicalDetails", v);
@@ -3391,6 +3403,20 @@ export default function SettingsDrawer({
               <Toggle
                 checked={dreamIncognitoButton}
                 onToggle={setDreamIncognitoButton}
+              />
+            </View>
+            <View style={[styles.toggleGroupRow, { marginTop: Spacing.lg }]}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.screenSaver.wakeWord")}
+                </Text>
+                <Text style={styles.helpText}>
+                  {t("settings.screenSaver.wakeWordHelp")}
+                </Text>
+              </View>
+              <Toggle
+                checked={dreamWakeWord}
+                onToggle={setDreamWakeWord}
               />
             </View>
           </View>

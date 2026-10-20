@@ -315,6 +315,9 @@ export const fr: Translations = {
   "settings.screenSaver.incognito": "Bouton mode incognito",
   "settings.screenSaver.incognitoHelp":
     "Affiche le bouton mode incognito sur l'écran de veille.",
+  "settings.screenSaver.wakeWord": "Dire « Maestro »",
+  "settings.screenSaver.wakeWordHelp":
+    "Parle à Maestro sans les mains sur l'écran de veille. L'écoute reste sur l'appareil.",
 
   "settings.info.version": "Version",
   "settings.info.links": "Liens",

@@ -36,6 +36,7 @@ import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { AppSettings, Settings } from "../../services/settings/SettingsService";
 import { STT } from "../../services/speech/STTService";
 import { TTS } from "../../services/speech/TTSService";
+import { onWakeWord, startWakeWord, stopWakeWord } from "../../services/speech/WakeWord";
 import "../../services/widgets/registerWidgets";
 import { deriveChatDisplay, renderMarkdown } from "../ui/MarkdownText";
 import { pressStyle } from "../ui/pressStyle";
@@ -136,6 +137,8 @@ function OperaDream() {
   const [incognito, setIncognito] = useState(false);
   const [showIncognitoButton, setShowIncognitoButton] = useState(true);
   const [antiBurnIn, setAntiBurnIn] = useState(true);
+  const [wakeWord, setWakeWord] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
 
   const [answer, setAnswer] = useState<{ msgId: string; content: string } | null>(null);
   const [generatingConvId, setGeneratingConvId] = useState<string | null>(null);
@@ -171,6 +174,7 @@ function OperaDream() {
     setOllamaUrl(s.ollamaUrl);
     setShowIncognitoButton(s.dreamIncognitoButton);
     setAntiBurnIn(s.dreamAntiBurnIn);
+    setWakeWord(s.dreamWakeWord);
     const tuning = getOllamaTuning(s.ollamaUrl);
     AIModule.configure(s.ollamaUrl, tuning.contextLength, tuning.keepAlive);
     AIModule.setMode(s.aiService);
@@ -215,6 +219,8 @@ function OperaDream() {
       setAnswer((prev) => (prev && prev.msgId === run.msgId ? { msgId: prev.msgId, content: run.content } : prev));
     });
   }, []);
+
+  useEffect(() => TTS.subscribe(() => setSpeaking(TTS.isSpeaking())), []);
 
   //voice leaves the mic free on exit
   useEffect(() => {
@@ -341,6 +347,8 @@ function OperaDream() {
   const startListening = async () => {
     //the mic would hear the previous reply
     TTS.stop();
+    //stt needs the mic to itself
+    await stopWakeWord();
     const granted = await STT.requestPermissions();
     if (!granted) {
       setAnswer({ msgId: "", content: t("chatbar.micPermission.message") });
@@ -387,6 +395,23 @@ function OperaDream() {
   };
 
   const busy = voice !== "idle" || !!generatingConvId;
+
+  //only while the mic is free
+  useEffect(() => {
+    if (!wakeWord || busy || speaking) return;
+    startWakeWord();
+    return () => { stopWakeWord(); };
+  }, [wakeWord, busy, speaking]);
+
+  //detection acts like a mic tap
+  const startListeningRef = useRef(startListening);
+  useEffect(() => { startListeningRef.current = startListening; });
+  useEffect(() => onWakeWord(() => {
+    Vibration.vibrate(10);
+    setSleeping(false);
+    setLastTouch(Date.now());
+    startListeningRef.current();
+  }), []);
 
   //every touch restarts the countdown
   useEffect(() => {

@@ -189,6 +189,12 @@ function withNativeAndroid(config) {
       const drawableDir = path.join(projectRoot, 'app', 'src', 'main', 'res', 'drawable-nodpi');
       fs.mkdirSync(drawableDir, { recursive: true });
       fs.copyFileSync(path.join(TEMPLATES_DIR, 'res/drawable-nodpi/dream_preview.png'), path.join(drawableDir, 'dream_preview.png'));
+      //models stay out of metro
+      const wakeWordDir = path.join(projectRoot, 'app', 'src', 'main', 'assets', 'wakeword');
+      fs.mkdirSync(wakeWordDir, { recursive: true });
+      for (const file of fs.readdirSync(path.join(TEMPLATES_DIR, 'assets/wakeword'))) {
+        fs.copyFileSync(path.join(TEMPLATES_DIR, 'assets/wakeword', file), path.join(wakeWordDir, file));
+      }
 
       // copy themes
       const themesPath = path.join(valuesDir, 'themes.xml');
@@ -211,6 +217,8 @@ function withNativeAndroid(config) {
       copyTemplate('src/AssistantModule.kt', path.join(javaDir, 'AssistantModule.kt'), packageName);
       copyTemplate('src/PredictiveBackModule.kt', path.join(javaDir, 'PredictiveBackModule.kt'), packageName);
       copyTemplate('src/OperaDreamService.kt', path.join(javaDir, 'OperaDreamService.kt'), packageName);
+      copyTemplate('src/WakeWordModule.kt', path.join(javaDir, 'WakeWordModule.kt'), packageName);
+      copyTemplate('src/WakeWordDetector.kt', path.join(javaDir, 'WakeWordDetector.kt'), packageName);
 
       // AICore (ML Kit GenAI) modules
       copyTemplate('src/AICorePackage.kt', path.join(javaDir, 'AICorePackage.kt'), packageName);
@@ -311,6 +319,8 @@ function withNativeAndroid(config) {
       //bundled models for ocr and qr
       'com.google.mlkit:text-recognition:16.0.1',
       'com.google.mlkit:barcode-scanning:17.3.0',
+      //same version as the js runtime
+      `com.microsoft.onnxruntime:onnxruntime-android:${require('onnxruntime-react-native/package.json').version}`,
     ];
     const missing = mlkit.filter(dep => !contents.includes(dep.split(':').slice(0, 2).join(':')));
     if (missing.length) {
@@ -346,6 +356,11 @@ function withNativeAndroid(config) {
     const jvmargs = config.modResults.find((p) => p.key === 'org.gradle.jvmargs');
     if (jvmargs) jvmargs.value = value;
     else config.modResults.push({ type: 'property', key: 'org.gradle.jvmargs', value });
+    //both onnx runtimes ship this lib
+    const pickFirsts = 'android.packagingOptions.pickFirsts';
+    if (!config.modResults.some((p) => p.key === pickFirsts)) {
+      config.modResults.push({ type: 'property', key: pickFirsts, value: '**/libonnxruntime.so' });
+    }
     return config;
   });
 

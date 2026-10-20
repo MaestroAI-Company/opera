@@ -58,6 +58,9 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
         putString("update", status.update)
         status.cpu?.let { putDouble("cpu", it.toDouble()) }
         status.memory?.let { putDouble("memory", it.toDouble()) }
+        status.ctxSize?.let { putDouble("ctxSize", it.toDouble()) }
+        status.keepAlive?.let { putDouble("keepAlive", it.toDouble()) }
+        status.parallel?.let { putDouble("parallel", it.toDouble()) }
       }
     }
 
@@ -86,7 +89,15 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
   @ReactMethod
   fun setHubSettings(deviceKey: String, hub: ReadableMap, settings: ReadableMap, promise: Promise) =
     launchPromise(promise) {
-      val wanted = HubSettings(settings.getBoolean("lanDiscovery"), settings.getBoolean("shareProviders"))
+      val wanted = HubSettings(
+        settings.getBoolean("lanDiscovery"),
+        settings.getBoolean("shareProviders"),
+        settings.getBoolean("mcpServers"),
+        settings.getBoolean("models"),
+        settings.getInt("ctxSize").toUInt(),
+        settings.getInt("keepAlive").toUInt(),
+        settings.getInt("parallel").toUInt(),
+      )
       settingsToMap(client(deviceKey).setHubSettings(hubFromMap(hub), wanted))
     }
 
@@ -504,6 +515,11 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
     Arguments.createMap().apply {
       putBoolean("lanDiscovery", settings.lanDiscovery)
       putBoolean("shareProviders", settings.shareProviders)
+      putBoolean("mcpServers", settings.mcpServers)
+      putBoolean("models", settings.models)
+      putDouble("ctxSize", settings.ctxSize.toDouble())
+      putDouble("keepAlive", settings.keepAlive.toDouble())
+      putDouble("parallel", settings.parallel.toDouble())
     }
 
   private fun hubToMap(hub: PairedHub): WritableMap =

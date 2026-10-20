@@ -24,10 +24,12 @@ type Card = { key: string; title: string; status: string; error?: boolean; onPre
 type HubModelsSectionProps = {
   onAddModel: () => void;
   onOpenModel: (file: string, name: string) => void;
+  //off where another action is the main one
+  highlight?: boolean;
 };
 
 //llama.cpp models the hub runs, admins only
-export default function HubModelsSection({ onAddModel, onOpenModel }: HubModelsSectionProps) {
+export default function HubModelsSection({ onAddModel, onOpenModel, highlight = true }: HubModelsSectionProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const { api, status, catalog, error } = useHubModels();
@@ -88,11 +90,11 @@ export default function HubModelsSection({ onAddModel, onOpenModel }: HubModelsS
           <Text style={styles.settingLabel}>{t("hubModels.title")}</Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{actionError ?? runtime}</Text>
 
-          <Group style={[styles.highlightGroup, !api && styles.highlightGroupDisabled]}>
+          <Group style={[highlight && styles.highlightGroup, !api && styles.highlightGroupDisabled]}>
             <ActionButton
               icon={addIcon}
               label={t("settings.litert.addModel")}
-              variant="highlight"
+              variant={highlight ? "highlight" : "default"}
               disabled={!api}
               onPress={onAddModel}
             />

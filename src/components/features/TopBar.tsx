@@ -13,10 +13,22 @@ type TopBarProps = {
   onNewPress: () => void;
   centerElement?: ReactNode;
   rightElement?: ReactNode;
+  //centered in the bar, between both sides
+  middleElement?: ReactNode;
+  //only the middle element, for the sampler screen
+  middleOnly?: boolean;
   isDesktop?: boolean;
 };
 
-export default function TopBar({ onMenuPress, onNewPress, centerElement, rightElement, isDesktop = false }: TopBarProps) {
+export default function TopBar({
+  onMenuPress,
+  onNewPress,
+  centerElement,
+  rightElement,
+  middleElement,
+  middleOnly = false,
+  isDesktop = false,
+}: TopBarProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   //native desktop has no new button
@@ -28,7 +40,7 @@ export default function TopBar({ onMenuPress, onNewPress, centerElement, rightEl
   return (
     <View style={styles.topBar}>
       <View style={styles.leftSection}>
-        {isDesktop ? (
+        {middleOnly ? null : isDesktop ? (
           <>
             <Pill>{menuButton}</Pill>
             {newButton && <Pill style={styles.newGap}>{newButton}</Pill>}
@@ -42,9 +54,13 @@ export default function TopBar({ onMenuPress, onNewPress, centerElement, rightEl
         )}
       </View>
 
+      {middleElement && <Pill style={styles.middle}>{middleElement}</Pill>}
+
       <View style={styles.rightSection}>
-        {centerElement && <View style={isDesktop ? styles.centerDesktop : styles.centerMobile}>{centerElement}</View>}
-        {rightElement}
+        {!middleOnly && centerElement && (
+          <View style={isDesktop ? styles.centerDesktop : styles.centerMobile}>{centerElement}</View>
+        )}
+        {!middleOnly && rightElement}
       </View>
     </View>
   );
@@ -90,6 +106,11 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   newGap: {
     marginLeft: Spacing.xl2,
+  },
+  //fits the chat and sampler switch
+  middle: {
+    width: 220,
+    marginHorizontal: Spacing.xl2,
   },
   rightSection: {
     flex: 1,

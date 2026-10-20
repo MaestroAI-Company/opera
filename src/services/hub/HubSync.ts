@@ -110,15 +110,7 @@ class HubSyncImpl {
   async init(): Promise<void> {
     if (this.initialized || !OperaHub.isSupported()) return;
     this.initialized = true;
-    await SyncPrefsStore.load();
-    await this.isPaused();
-    const cached = await Settings.getLocal(PROVIDERS_KEY);
-    if (cached) {
-      const { hubName, providers } = JSON.parse(cached) as CachedProviders;
-      setHubProviders(providers, hubName);
-      McpService.setHubServers(providers).catch((e) => console.warn('[HubSync] hub mcp servers not loaded:', e));
-    }
-    setHubServerPrefs(JSON.parse((await Settings.getLocal(HUB_PREFS_KEY)) ?? '{}'));
+    await this.readCached();
     this.request(0);
     this.watch();
     const onLocalChange = () => {
@@ -138,6 +130,19 @@ class HubSyncImpl {
       this.request(0);
       this.watch();
     });
+  }
+
+  //what init loads, also for a window that only reads and changes hub settings
+  async readCached(): Promise<void> {
+    await SyncPrefsStore.load();
+    await this.isPaused();
+    const cached = await Settings.getLocal(PROVIDERS_KEY);
+    if (cached) {
+      const { hubName, providers } = JSON.parse(cached) as CachedProviders;
+      setHubProviders(providers, hubName);
+      McpService.setHubServers(providers).catch((e) => console.warn('[HubSync] hub mcp servers not loaded:', e));
+    }
+    setHubServerPrefs(JSON.parse((await Settings.getLocal(HUB_PREFS_KEY)) ?? '{}'));
   }
 
   async isPaused(): Promise<boolean> {

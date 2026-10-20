@@ -296,6 +296,8 @@ type SettingsDrawerProps = {
   onDataChanged?: () => void;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
+  //fills its own os window instead of floating over the app
+  windowed?: boolean;
   initialSubPage?: SubPage;
   //an opera://hub/pair link to confirm
   hubPairLink?: string | null;
@@ -714,6 +716,7 @@ export default function SettingsDrawer({
   onDataChanged,
   isLargeScreen = false,
   isDesktop = false,
+  windowed = false,
   initialSubPage,
   hubPairLink = null,
   onHubPairLinkHandled,
@@ -3338,6 +3341,59 @@ export default function SettingsDrawer({
       ],
       styles.navItemPressed,
     );
+
+  //windowed nav lists the settings sections
+  const renderSidebar = () => {
+    const groups = [
+      [
+        { page: "profile", icon: profilIcon, label: name || t("settings.nav.profile.title") },
+        { page: "cloud", icon: cloudIcon, label: t("settings.nav.cloud.title") },
+        { page: "maestro", icon: operaIcon, label: t("settings.nav.maestro.title") },
+        { page: "operahub", icon: samplerIcon, label: t("settings.nav.hub.title"), show: hubSupported },
+      ],
+      [
+        { page: "general", icon: generalIcon, label: t("settings.nav.general.title") },
+        { page: "service", icon: linkIcon, label: t("settings.nav.service.title") },
+        { page: "tools", icon: toolIcon, label: t("settings.nav.tools.title") },
+        { page: "advanced", icon: advancedIcon, label: t("settings.nav.advanced.title"), show: advancedMode },
+      ],
+      [
+        { page: "confidentiality", icon: confidentialityIcon, label: t("settings.nav.privacy.title") },
+        { page: "reports", icon: reportsIcon, label: t("settings.nav.support.title") },
+        { page: "sociallinks", icon: informationIcon, label: t("settings.nav.info.title") },
+      ],
+    ];
+
+    return (
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: Spacing.lg, paddingBottom: 40 }}
+      >
+        {groups.map((items, index) => (
+          <Group key={index} style={styles.sidebarActions}>
+            {items
+              .filter((item) => item.show !== false)
+              .map((item) => (
+                <ActionButton
+                  key={item.page}
+                  icon={item.icon}
+                  iconBadge
+                  label={item.label}
+                  style={[
+                    styles.sidebarButton,
+                    desktopSection === item.page && styles.navItemPressed,
+                  ]}
+                  onPress={() => {
+                    setActiveSubPage(item.page as SubPage);
+                    if (item.page === "operahub") refreshHub();
+                  }}
+                />
+              ))}
+          </Group>
+        ))}
+      </ScrollView>
+    );
+  };
 
   //main navigation page content
   const renderMainPage = () => (
@@ -7760,32 +7816,44 @@ export default function SettingsDrawer({
 
     return (
       <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
-        <Animated.View style={[styles.overlay, { opacity: largeScreenAnim }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        </Animated.View>
+        {!windowed && (
+          <Animated.View style={[styles.overlay, { opacity: largeScreenAnim }]}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+          </Animated.View>
+        )}
 
-        <View style={styles.desktopWindowWrapper} pointerEvents="box-none">
+        <View
+          style={[styles.desktopWindowWrapper, windowed && styles.windowedWrapper]}
+          pointerEvents="box-none"
+        >
           <Animated.View
             style={[
               styles.desktopWindow,
+              windowed && styles.windowedWindow,
               {
                 opacity: largeScreenAnim,
                 transform: [{ translateY: windowTranslateY }],
               },
             ]}
           >
-            <View style={styles.desktopNav}>
+            <View style={[styles.desktopNav, windowed && styles.windowedColumn]}>
+              {windowed ? (
+                renderSidebar()
+              ) : (
               <View style={styles.innerContainer}>
-                <View
-                  style={[styles.fixedBackWrapper, { top: Spacing.xxl2 }]}
-                  pointerEvents="box-none"
-                >
-                  <DrawerBackButton
-                    kind="close"
-                    onPress={onClose}
-                    scrolled={navScrolled}
-                  />
-                </View>
+                {/* the os window already has its own close button */}
+                {!windowed && (
+                  <View
+                    style={[styles.fixedBackWrapper, { top: Spacing.xxl2 }]}
+                    pointerEvents="box-none"
+                  >
+                    <DrawerBackButton
+                      kind="close"
+                      onPress={onClose}
+                      scrolled={navScrolled}
+                    />
+                  </View>
+                )}
                 <ScrollView
                   onScroll={(e) =>
                     setNavScrolled(e.nativeEvent.contentOffset.y > 10)
@@ -7800,10 +7868,11 @@ export default function SettingsDrawer({
                   {renderMainPage()}
                 </ScrollView>
               </View>
+              )}
             </View>
 
             <View
-              style={styles.desktopPage}
+              style={[styles.desktopPage, windowed && styles.windowedColumn]}
               onLayout={(e) => setDesktopPageWidth(e.nativeEvent.layout.width)}
             >
               <View style={styles.innerContainer}>
@@ -7938,7 +8007,29 @@ const makeStyles = (Colors: ThemeColors) =>
       borderColor: Colors.border,
       overflow: "hidden",
     },
+    //the os window frames it, the title bar strip stays inside each column
+    windowedWrapper: {
+      padding: 0,
+      paddingTop: 0,
+    },
+    windowedWindow: {
+      maxWidth: "100%",
+      borderRadius: 0,
+      borderWidth: 0,
+    },
+    windowedColumn: {
+      paddingTop: 32,
+    },
+    sidebarButton: {
+      borderRadius: Radius.pill,
+    },
+    sidebarActions: {
+      marginBottom: Spacing.xxl,
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
+    },
     desktopNav: {
+      backgroundColor: Colors.surface,
       width: 320,
       paddingHorizontal: Spacing.lg2,
       borderRightWidth: 2,
@@ -8031,7 +8122,7 @@ const makeStyles = (Colors: ThemeColors) =>
       paddingVertical: Spacing.md,
     },
     addModelSheetDesktop: {
-      width: 380,
+      width: 560,
     },
     localModelsGrid: {
       flexDirection: "row",

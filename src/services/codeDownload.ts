@@ -1,6 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
-import { Platform } from "react-native";
+import { DeviceEventEmitter, Platform } from "react-native";
+import { AppEvents } from "./events";
 
 //fence language to file extension
 const EXTENSIONS: Record<string, string> = {
@@ -31,6 +32,7 @@ export async function downloadCodeFile(code: string, language?: string, title?: 
     link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
+    DeviceEventEmitter.emit(AppEvents.codeDownloaded, filename);
     return true;
   }
 
@@ -40,12 +42,14 @@ export async function downloadCodeFile(code: string, language?: string, title?: 
     //generic mime keeps android from appending .txt
     const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(permissions.directoryUri, filename, "application/octet-stream");
     await FileSystem.writeAsStringAsync(fileUri, code, { encoding: FileSystem.EncodingType.UTF8 });
+    DeviceEventEmitter.emit(AppEvents.codeDownloaded, filename);
     return true;
   }
 
   const fileUri = `${FileSystem.documentDirectory}${filename}`;
   await FileSystem.writeAsStringAsync(fileUri, code, { encoding: FileSystem.EncodingType.UTF8 });
   //sandbox hides the file from users
+  //share sheet already confirms, no event here
   if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(fileUri, { dialogTitle: filename });
   return true;
 }

@@ -37,7 +37,7 @@ const keyIcon = require("../../../assets/icons/key.png");
 const newIcon = require("../../../assets/icons/hyperlink2.png");
 const penIcon = require("../../../assets/icons/pencil.png");
 
-const DESKTOP_CARD_WIDTH = 380;
+const DESKTOP_CARD_WIDTH = 560;
 //shorter passwords fall to a guessing hub
 export const MIN_PASSWORD_LENGTH = 8;
 

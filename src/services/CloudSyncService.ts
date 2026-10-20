@@ -122,31 +122,14 @@ class CloudSyncServiceImpl {
     return await SecureStore.getItemAsync(key);
   }
 
-  async init(): Promise<void> {
+  //passive skips every background sync trigger, for a second window
+  async init(options?: { passive?: boolean }): Promise<void> {
     //init once or listeners register twice
     if (this.initialized) return;
     this.initialized = true;
 
-    await SyncPrefsStore.load();
-    this.remoteState = await this.loadRemoteState();
-    this.paused = (await this.getStorageItem(SYNC_PAUSED_KEY)) === 'true';
-
-    const providerName = await this.getStorageItem(CLOUD_PROVIDER_KEY);
-    this.lastBackupAt = Number((await this.getStorageItem(LAST_SYNC_TIME_KEY)) ?? 0);
-    this.backupMode = (await this.getStorageItem(BACKUP_MODE_KEY)) === 'true';
-    await this.refreshSecret();
-
-    if (providerName && providerName !== 'none') {
-      await this.migrateSharedPin(providerName);
-      await this.loadPinFor(providerName);
-      const def = getCloudProviderDefinition(providerName);
-      if (def) {
-        const provider = def.create();
-        if (await provider.authenticate(false)) { //silent auth
-          this.provider = provider;
-        }
-      }
-    }
+    await this.loadState();
+    if (options?.passive) return;
 
     //trigger initial sync on startup
     if (this.provider && this.hasPin()) {
@@ -168,6 +151,36 @@ class CloudSyncServiceImpl {
     };
     DeviceEventEmitter.addListener(AppEvents.conversationsChanged, onDataChanged);
     DeviceEventEmitter.addListener(AppEvents.settingsChanged, onDataChanged);
+  }
+
+  //reads everything init and a second window's changes depend on
+  private async loadState(): Promise<void> {
+    await SyncPrefsStore.load();
+    this.remoteState = await this.loadRemoteState();
+    this.paused = (await this.getStorageItem(SYNC_PAUSED_KEY)) === 'true';
+
+    const providerName = await this.getStorageItem(CLOUD_PROVIDER_KEY);
+    this.lastBackupAt = Number((await this.getStorageItem(LAST_SYNC_TIME_KEY)) ?? 0);
+    this.backupMode = (await this.getStorageItem(BACKUP_MODE_KEY)) === 'true';
+    await this.refreshSecret();
+
+    if (providerName && providerName !== 'none') {
+      await this.migrateSharedPin(providerName);
+      await this.loadPinFor(providerName);
+      const def = getCloudProviderDefinition(providerName);
+      if (def) {
+        const provider = def.create();
+        //silent auth
+        this.provider = (await provider.authenticate(false)) ? provider : null;
+      }
+    } else {
+      this.provider = null;
+    }
+  }
+
+  //another window may have changed the account, the pin or the pause
+  async reload(): Promise<void> {
+    if (this.initialized) await this.loadState();
   }
 
   requestAutoSync(delay = 5000) {

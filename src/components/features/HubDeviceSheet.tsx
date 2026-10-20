@@ -15,7 +15,7 @@ const pencilIcon = require("../../../assets/icons/pencil.png");
 const binIcon = require("../../../assets/icons/bin.png");
 const cancelIcon = require("../../../assets/icons/cancel.png");
 
-const DESKTOP_CARD_WIDTH = 380;
+const DESKTOP_CARD_WIDTH = 560;
 const KINDS = ["phone", "desktop", "web"] as const;
 
 type HubDeviceSheetProps = {

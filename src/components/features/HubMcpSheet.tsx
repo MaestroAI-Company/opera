@@ -40,7 +40,7 @@ const linkIcon = require("../../../assets/icons/link.png");
 const errorIcon = require("../../../assets/icons/error.png");
 const validIcon = require("../../../assets/icons/valid.png");
 
-const DESKTOP_CARD_WIDTH = 380;
+const DESKTOP_CARD_WIDTH = 560;
 
 type Page = "browse" | "search" | "server" | "configure" | "folders" | "manual";
 type SourceType = McpSource["type"];

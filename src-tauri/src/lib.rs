@@ -1,10 +1,12 @@
 #[cfg(desktop)]
 mod hub;
+#[cfg(desktop)]
+mod settings_window;
 mod webview_task;
 
 //webview data sits in the company folder like the hub
 #[cfg(windows)]
-fn webview_data_dir(app: &tauri::App) -> Option<std::path::PathBuf> {
+fn webview_data_dir(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
     use tauri::Manager;
     let company = app.path().local_data_dir().ok()?.join("MaestroAI-Company");
     let dir = company.join("Opera").join("data");
@@ -40,6 +42,8 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![
             webview_task::webview_task,
+            #[cfg(desktop)]
+            settings_window::open_settings_window,
             #[cfg(desktop)]
             hub::hub_device_id,
             #[cfg(desktop)]
@@ -153,10 +157,25 @@ pub fn run() {
             #[allow(unused_mut)]
             let mut main = tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?;
             #[cfg(windows)]
-            if let Some(dir) = webview_data_dir(app) {
+            if let Some(dir) = webview_data_dir(app.handle()) {
                 main = main.data_directory(dir);
             }
-            main.build()?;
+            #[allow(unused_variables)]
+            let main_window = main.build()?;
+
+            //settings window never outlives the main one
+            #[cfg(desktop)]
+            {
+                use tauri::Manager;
+                let handle = app.handle().clone();
+                main_window.on_window_event(move |event| {
+                    if matches!(event, tauri::WindowEvent::Destroyed) {
+                        if let Some(settings) = handle.get_webview_window("settings") {
+                            let _ = settings.close();
+                        }
+                    }
+                });
+            }
 
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             {

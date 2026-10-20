@@ -37,7 +37,7 @@ const keyIcon = require("../../../assets/icons/key.png");
 const laptopIcon = require("../../../assets/icons/laptop.png");
 const serverIcon = require("../../../assets/icons/server.png");
 
-const DESKTOP_CARD_WIDTH = 380;
+const DESKTOP_CARD_WIDTH = 560;
 //delay before rescanning a failed code
 const RESCAN_DELAY_MS = 3000;
 

@@ -14,6 +14,9 @@ function detectShell() {
   return { isTauri: true, isMac: isMacOS, isLinux: isLinuxOS };
 }
 
+//the settings window has a fixed size range
+const isSettingsWindow = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('window') === 'settings';
+
 export default function TauriTitleBar() {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -84,22 +87,24 @@ export default function TauriTitleBar() {
               </Svg>
             )}
           </Pressable>
-          <Pressable 
-            style={({ pressed, hovered }: any) => [styles.button, hovered && styles.buttonHovered, pressed && styles.buttonPressed]} 
-            onPress={handleMaximize}>
-            {({ pressed, hovered }: any) => (
-              <Svg width="12" height="12" viewBox="0 0 10 10">
-                {isMaximized ? (
-                  <>
-                    <Rect x="2.5" y="1.5" width="6" height="6" stroke={Colors.textSecondary} strokeWidth="1" fill="none" />
-                    <Path d="M 1.5 3.5 V 8.5 H 6.5" stroke={Colors.textSecondary} strokeWidth="1" fill="none" />
-                  </>
-                ) : (
-                  <Rect x="1.5" y="1.5" width="7" height="7" stroke={Colors.textSecondary} strokeWidth="1" fill="none" />
-                )}
-              </Svg>
-            )}
-          </Pressable>
+          {!isSettingsWindow && (
+            <Pressable 
+              style={({ pressed, hovered }: any) => [styles.button, hovered && styles.buttonHovered, pressed && styles.buttonPressed]} 
+              onPress={handleMaximize}>
+              {({ pressed, hovered }: any) => (
+                <Svg width="12" height="12" viewBox="0 0 10 10">
+                  {isMaximized ? (
+                    <>
+                      <Rect x="2.5" y="1.5" width="6" height="6" stroke={Colors.textSecondary} strokeWidth="1" fill="none" />
+                      <Path d="M 1.5 3.5 V 8.5 H 6.5" stroke={Colors.textSecondary} strokeWidth="1" fill="none" />
+                    </>
+                  ) : (
+                    <Rect x="1.5" y="1.5" width="7" height="7" stroke={Colors.textSecondary} strokeWidth="1" fill="none" />
+                  )}
+                </Svg>
+              )}
+            </Pressable>
+          )}
           <Pressable 
             style={({ pressed, hovered }: any) => [styles.button, hovered && styles.closeButtonHovered, pressed && styles.closeButtonPressed]} 
             onPress={handleClose}>

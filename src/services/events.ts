@@ -23,6 +23,8 @@ export const AppEvents = {
   openBugReport: 'OPEN_BUG_REPORT',
   //a chat code block was tapped
   openCodePreview: 'OPEN_CODE_PREVIEW',
+  //a code file was saved, payload is its name
+  codeDownloaded: 'CODE_DOWNLOADED',
   //mcp server state changed
   mcpServersChanged: 'MCP_SERVERS_CHANGED',
 } as const;

@@ -1,13 +1,13 @@
 {
-  "version": "v0.9.0",
+  "version": "v0.10.0",
   "sha256": {
-    "opera-hub-client-arm64-v8a.so": "9877e6640de46a3c3c80679aa400e444576ad438835b6568424e6657e4d11f1d",
-    "opera_hub_client.kt": "cd3b2944f32f5cf464a70e7e0b74927e7f2911d17cd26a9559da642bf78b4d3a",
-    "opera-hub-client-web.js": "c03cb3f8a9ec93539546dd72c58433d6ac628b83ff79266e7dfa30d51a3f28d8",
-    "opera-hub-client-web.wasm": "3e092540be1255e64e1c03ebb5a6c94537a5ff246e6047a63a0bfb4f13b8f504",
-    "opera-hubw-windows-x86_64.exe": "b62a4fb9895639187729b8c38a9abf5cf7a4f518ec4ca8ab2ef29d35328f3243",
-    "opera-hubw-macos-aarch64": "5ad52353179ff0e83fc1f510b1cb449163af961196c97b7d390f61510e00e497",
-    "opera-hubw-linux-x86_64": "7e52a4a7a55cb933e101643135d9834450adbf559588674923a2bd58833ee812",
-    "opera-hubw-linux-aarch64": "bb4272b5002fea73a86b8b733a2ca26cd898f17b993c7b58fe652183f132fa53"
+    "opera-hub-client-arm64-v8a.so": "511876586fe8c6436b48824a9f4bfb91ecfd4c6e438d5712fbc372ca238b0b8b",
+    "opera_hub_client.kt": "e2b49f3583922648dd3454d0c75ff19cbd8e294044d8e5ea405ae4ac0702e81a",
+    "opera-hub-client-web.js": "480228009d2adad109265a34566ebdd1f9f053e5a5016d30eda0fee5ac97fbbd",
+    "opera-hub-client-web.wasm": "c3ff3f4feba52351cd7de3e87e63056c2dfb3b015aa06972cefae53d8547f85f",
+    "opera-hubw-windows-x86_64.exe": "5d7f2461801de33d3f961d6b2b7b999a10b3cfc940bf2e3cabeb7d3274a60bb9",
+    "opera-hubw-macos-aarch64": "cf708c0077200b2a0f2b03dfd6a89964d334e19d5f79a1813bbb32b412134ce9",
+    "opera-hubw-linux-x86_64": "eaaf9be5f352081e6fdefc83eb002a44ddecad96ccb90dbff46ef5f2c5496d2c",
+    "opera-hubw-linux-aarch64": "eef8834c876e94a162fb03ac4d1e0a2c724b68fcc0a9fb8cc5a535c35feb43d5"
   }
 }

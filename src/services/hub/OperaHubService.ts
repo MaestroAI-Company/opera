@@ -48,7 +48,7 @@ export type HubProvider = { id: string; name: string; kind: 'ollama' | 'openai' 
 export type HostStatus = { running: boolean; installed: boolean; id: string | null };
 //a one time code and the link its qr shows
 export type HubInvite = { code: string; link: string };
-export type HubSettings = { lanDiscovery: boolean; shareProviders: boolean };
+export type HubSettings = { lanDiscovery: boolean; shareProviders: boolean; mcpServers: boolean; models: boolean };
 export type NearbyHub = { id: string; name: string; addrs: string[] };
 //llama.cpp models on the hub
 export type CatalogModel = { repo: string; file: string; name: string; size: number };
@@ -63,6 +63,9 @@ export type LlamaStatus = {
   message?: string | null;
   installed: InstalledModel[];
   downloads: ModelDownload[];
+  //llama-server with its model processes
+  cpu?: number | null;
+  memory?: number | null;
 };
 export type HubErrorCode =
   | 'InvalidLink'
@@ -98,6 +101,7 @@ type NativeHub = {
   mcpJson?(deviceKey: string, hub: PairedHub, request: string): Promise<string>;
   //admin only, every profile's servers
   mcpOverview?(deviceKey: string, hub: PairedHub): Promise<McpServerSummary[]>;
+  mcpManage?(deviceKey: string, hub: PairedHub, id: string, action: McpAction): Promise<McpServerSummary[]>;
   status(deviceKey: string, hub: PairedHub): Promise<HubStatus>;
   unpair(deviceKey: string, hub: PairedHub): Promise<void>;
   devices(deviceKey: string, hub: PairedHub): Promise<HubDevice[]>;
@@ -174,6 +178,7 @@ export type HostedMcpServer = {
 };
 export type McpStatus = { isolation: 'full' | 'partial'; servers: HostedMcpServer[] };
 export type McpFolders = { path: string; parent?: string | null; folders: string[] };
+export type McpAction = 'start' | 'stop' | 'restart' | 'remove';
 //any profile's server, no values, admins only
 export type McpServerSummary = {
   id: string;
@@ -181,6 +186,7 @@ export type McpServerSummary = {
   owner?: string | null;
   title: string;
   repository?: string | null;
+  enabled: boolean;
   state: McpServerState;
   tools: number;
   cpu?: number | null;
@@ -251,6 +257,7 @@ const tauriHub: NativeHub = {
   modelsStatus: (deviceKey, hub) => invoke('hub_models_status', { deviceKey, hub }),
   mcpJson: (deviceKey, hub, request) => invoke('hub_mcp_json', { deviceKey, hub, request }),
   mcpOverview: (deviceKey, hub) => invoke('hub_mcp_overview', { deviceKey, hub }),
+  mcpManage: (deviceKey, hub, id, action) => invoke('hub_mcp_manage', { deviceKey, hub, id, action }),
   status: (deviceKey, hub) => invoke('hub_status', { deviceKey, hub }),
   unpair: (deviceKey, hub) => invoke('hub_unpair', { deviceKey, hub }),
   devices: (deviceKey, hub) => invoke('hub_devices', { deviceKey, hub }),
@@ -314,6 +321,7 @@ type WebClient = {
   removeProfile(hub: PairedHub, id: string): Promise<void>;
   setProfileRole(hub: PairedHub, id: string, role: string): Promise<void>;
   mcpOverview(hub: PairedHub): Promise<McpServerSummary[]>;
+  mcpManage(hub: PairedHub, id: string, action: McpAction): Promise<McpServerSummary[]>;
   modelsCatalog(hub: PairedHub): Promise<CatalogModel[]>;
   modelsSearch(hub: PairedHub, query: string): Promise<ModelRepo[]>;
   modelsFiles(hub: PairedHub, repo: string): Promise<ModelFile[]>;
@@ -408,6 +416,7 @@ const webHub: NativeHub = {
   removeProfile: async (deviceKey, hub, id) => (await loadWebClient(deviceKey)).removeProfile(hub, id),
   setProfileRole: async (deviceKey, hub, id, role) => (await loadWebClient(deviceKey)).setProfileRole(hub, id, role),
   mcpOverview: async (deviceKey, hub) => (await loadWebClient(deviceKey)).mcpOverview(hub),
+  mcpManage: async (deviceKey, hub, id, action) => (await loadWebClient(deviceKey)).mcpManage(hub, id, action),
   modelsCatalog: async (deviceKey, hub) => (await loadWebClient(deviceKey)).modelsCatalog(hub),
   modelsSearch: async (deviceKey, hub, query) => (await loadWebClient(deviceKey)).modelsSearch(hub, query),
   modelsFiles: async (deviceKey, hub, repo) => (await loadWebClient(deviceKey)).modelsFiles(hub, repo),
@@ -544,6 +553,13 @@ class OperaHubServiceImpl {
   }
 
   //every profile's mcp servers, admins only
+  //any profile's server, its settings stay private
+  async mcpManage(hub: PairedHub, id: string, action: McpAction): Promise<McpServerSummary[]> {
+    const manage = this.native().mcpManage;
+    if (!manage) throw Object.assign(new Error('Needs the app'), { code: 'Unauthorized' });
+    return manage(await this.deviceKey(), hub, id, action);
+  }
+
   async mcpOverview(hub: PairedHub): Promise<McpServerSummary[]> {
     const overview = this.native().mcpOverview;
     if (!overview) throw Object.assign(new Error('Needs the app'), { code: 'Unauthorized' });
@@ -767,6 +783,13 @@ class OperaHubServiceImpl {
 
   async hostStatus(): Promise<HostStatus> {
     return this.host().status();
+  }
+
+  //the desktop app turns on the hub it hosts, never off
+  async startHostedHub(): Promise<void> {
+    if (!host) return;
+    const [hub, local] = await Promise.all([this.getPairedHub(), host.status()]);
+    if (hub && local.id === hub.id && !local.running) await host.start();
   }
 
   //a background hub with its tray icon, closing the app leaves it running

@@ -86,7 +86,12 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
   @ReactMethod
   fun setHubSettings(deviceKey: String, hub: ReadableMap, settings: ReadableMap, promise: Promise) =
     launchPromise(promise) {
-      val wanted = HubSettings(settings.getBoolean("lanDiscovery"), settings.getBoolean("shareProviders"))
+      val wanted = HubSettings(
+        settings.getBoolean("lanDiscovery"),
+        settings.getBoolean("shareProviders"),
+        settings.getBoolean("mcpServers"),
+        settings.getBoolean("models"),
+      )
       settingsToMap(client(deviceKey).setHubSettings(hubFromMap(hub), wanted))
     }
 
@@ -504,6 +509,8 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
     Arguments.createMap().apply {
       putBoolean("lanDiscovery", settings.lanDiscovery)
       putBoolean("shareProviders", settings.shareProviders)
+      putBoolean("mcpServers", settings.mcpServers)
+      putBoolean("models", settings.models)
     }
 
   private fun hubToMap(hub: PairedHub): WritableMap =

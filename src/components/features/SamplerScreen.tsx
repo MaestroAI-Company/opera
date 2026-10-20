@@ -1,6 +1,7 @@
 import { ReactNode, useCallback, useEffect, useState } from "react";
 import { Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from "react-native";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import { useHubModels } from "../../hooks/useHubModels";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
@@ -12,6 +13,7 @@ import {
   HubProfile,
   HubSettings,
   HubStatus,
+  McpAction,
   McpServerSummary,
   OperaHub,
   PairedHub,
@@ -21,6 +23,7 @@ import { Settings } from "../../services/settings/SettingsService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import NotificationModal, { type ModalButton } from "../ui/NotificationModal";
+import ProgressBar from "../ui/ProgressBar";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 import { pressStyle } from "../ui/pressStyle";
@@ -174,6 +177,8 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
   const firstCheck = hubState === "checking" && !status;
   const hostsHub = !!hostStatus?.id && pairedHub?.id === hostStatus.id;
   const showModels = isAdmin && OperaHub.canManageModels();
+  //llama.cpp usage on the models page
+  const { status: modelsStatus } = useHubModels(online && showModels && page === "models");
   //every profile's servers, nothing to install here
   const showMcp = isAdmin && OperaHub.canSeeMcpServers();
 
@@ -464,25 +469,8 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     </View>
   );
 
-  //stopped from preferences, started again from any page
+  //stopped from preferences, started again from its page
   const hubStopped = hostsHub && !hostStatus?.running;
-  const stoppedCard = (
-    <View style={styles.contentCard}>
-      <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-        <Text style={styles.settingLabel}>{t("sampler.stopped")}</Text>
-        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{hostError ?? t("sampler.stoppedHelp")}</Text>
-        <Group style={[styles.highlightGroup, hostBusy && styles.highlightGroupDisabled]}>
-          <ActionButton
-            icon={samplerIcon}
-            label={t("sampler.start")}
-            variant="highlight"
-            disabled={hostBusy}
-            onPress={() => setHosting(true)}
-          />
-        </Group>
-      </View>
-    </View>
-  );
 
   const confirmStop = () =>
     setModal({
@@ -502,9 +490,8 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
       ],
     });
 
-  //hub off or out of reach
-  const renderUnreachable = () => {
-    if (hubStopped) return stoppedCard;
+  //hub off or out of reach, a page of its own
+  const renderStopped = () => {
     const connection = {
       checking: t("settings.hub.checking"),
       offline: t("settings.hub.offline"),
@@ -513,10 +500,22 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
       online: "",
     }[hubState];
     return (
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{pairedHub?.name}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{connection}</Text>
+      <View style={styles.welcome}>
+        <Text style={styles.welcomeText}>{hubStopped ? t("sampler.stopped") : pairedHub?.name}</Text>
+        <Text style={styles.welcomeHelp}>{hostError ?? (hubStopped ? t("sampler.stoppedHelp") : connection)}</Text>
+        <View style={styles.welcomeAction}>
+          {/* only this computer can start it */}
+          {hubStopped && (
+            <Group style={[styles.highlightGroup, styles.groupSpacingTight, hostBusy && styles.highlightGroupDisabled]}>
+              <ActionButton
+                icon={samplerIcon}
+                label={t("sampler.start")}
+                variant="highlight"
+                disabled={hostBusy}
+                onPress={() => setHosting(true)}
+              />
+            </Group>
+          )}
           <Group>
             <ActionButton
               icon={reconnectIcon}
@@ -603,7 +602,68 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     />
   );
 
-  //servers of each profile, read only
+  const serverStatus = (server: McpServerSummary) =>
+    [
+      server.state === "running"
+        ? t("hubMcp.state.running", { count: server.tools })
+        : t(`hubMcp.state.${server.state}`),
+      server.memory != null ? formatBytes(server.memory) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+  //every server together
+  const renderMcpUsage = (servers: McpServerSummary[]) => {
+    const running = servers.filter((server) => server.state === "running");
+    return renderUsage(
+      t("sampler.mcpUsage"),
+      t("sampler.mcpUsageHelp"),
+      running.reduce((sum, server) => sum + (server.cpu ?? 0), 0),
+      running.reduce((sum, server) => sum + (server.memory ?? 0), 0),
+      [{ label: t("sampler.mcpRunning"), value: `${running.length} / ${servers.length}` }],
+    );
+  };
+
+  const runMcp = async (id: string, action: McpAction) => {
+    closeModal();
+    if (!pairedHub) return;
+    try {
+      setOverview(await OperaHub.mcpManage(pairedHub, id, action));
+    } catch (e) {
+      showError(e);
+    }
+  };
+
+  const confirmRemoveServer = (server: McpServerSummary, owner: string) =>
+    setModal({
+      title: t("sampler.mcpRemoveTitle", { name: server.title }),
+      message: t("sampler.mcpRemoveMessage", { owner }),
+      buttons: [
+        { text: t("common.cancel"), style: "secondary", onPress: closeModal },
+        { text: t("common.remove"), style: "danger", onPress: () => runMcp(server.id, "remove") },
+      ],
+    });
+
+  //an admin runs anyone's server, its settings stay private
+  const openServer = (server: McpServerSummary, owner: string) =>
+    setModal({
+      title: server.title,
+      message: `${owner} · ${serverStatus(server)}`,
+      buttons: [
+        { text: t("common.cancel"), style: "secondary", onPress: closeModal },
+        {
+          text: server.enabled ? t("sampler.mcpStop") : t("sampler.mcpStart"),
+          style: "secondary",
+          onPress: () => runMcp(server.id, server.enabled ? "stop" : "start"),
+        },
+        ...(server.enabled
+          ? [{ text: t("sampler.mcpRestart"), style: "secondary" as const, onPress: () => runMcp(server.id, "restart") }]
+          : []),
+        { text: t("common.remove"), style: "danger", onPress: () => confirmRemoveServer(server, owner) },
+      ],
+    });
+
+  //servers of each profile
   const renderMcpServers = () => {
     //servers from before profiles belong to admins
     const ownerOf = (server: McpServerSummary) => server.owner ?? profiles?.find((p) => p.role === "admin")?.id;
@@ -631,14 +691,8 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
                     key: server.id,
                     title: server.title,
                     error: server.state === "failed",
-                    status: [
-                      server.state === "running"
-                        ? t("hubMcp.state.running", { count: server.tools })
-                        : t(`hubMcp.state.${server.state}`),
-                      server.memory != null ? formatBytes(server.memory) : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · "),
+                    status: serverStatus(server),
+                    onPress: () => openServer(server, owner.name),
                   })),
                 )
               ) : (
@@ -651,12 +705,60 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     );
   };
 
+  //older hubs lack these settings, both stay on
+  const modelsOn = settings?.models !== false;
+  const mcpOn = settings?.mcpServers !== false;
+
+  //live processor and memory of the hub or one feature
+  const renderUsage = (
+    title: string,
+    help: string,
+    cpu: number | null | undefined,
+    memory: number | null | undefined,
+    extra: { label: string; value: string }[] = [],
+  ) => (
+    <View style={styles.contentCard}>
+      <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+        <Text style={styles.settingLabel}>{title}</Text>
+        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{help}</Text>
+        <Group>
+          <ProgressBar progress={(cpu ?? 0) / 100} />
+          {[
+            { label: t("settings.hub.cpu"), value: t("hubMcp.cpuValue", { value: Math.round(cpu ?? 0) }) },
+            { label: t("settings.hub.memory"), value: formatBytes(memory ?? 0) },
+            ...extra,
+          ].map((row) => (
+            <ActionButton
+              key={row.label}
+              label={row.label}
+              rightElement={
+                <Text style={styles.infoValue} numberOfLines={1}>
+                  {row.value}
+                </Text>
+              }
+            />
+          ))}
+        </Group>
+      </View>
+    </View>
+  );
+
+  const performanceCard =
+    status?.memory != null && renderUsage(t("sampler.performance"), t("sampler.performanceHelp"), status.cpu, status.memory);
+
+  //turns a whole feature off for every profile
+  const renderFeatureToggle = (label: string, help: string, on: boolean, key: "models" | "mcpServers") =>
+    settings && (
+      <View style={styles.contentCard}>{renderToggleRow(label, help, on, (value) => changeSettings({ [key]: value }))}</View>
+    );
+
   const renderHome = () => {
     const cards = [
       <View key="profiles">{profilesCard}</View>,
       <View key="devices">{renderDevicesCard(false)}</View>,
-      ...(showModels ? [<View key="models">{modelsSection(false)}</View>] : []),
-      ...(showMcp ? [<View key="mcp">{renderMcpServers()}</View>] : []),
+      ...(performanceCard ? [<View key="performance">{performanceCard}</View>] : []),
+      ...(showModels && modelsOn ? [<View key="models">{modelsSection(false)}</View>] : []),
+      ...(showMcp && mcpOn ? [<View key="mcp">{renderMcpServers()}</View>] : []),
     ];
     if (pageWidth < TWO_COLUMNS_FROM) return cards;
     //two columns that fill independently
@@ -683,7 +785,8 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
 
   const renderModels = () => (
     <>
-      {settings && (
+      {renderFeatureToggle(t("sampler.feature.models"), t("sampler.feature.modelsHelp"), modelsOn, "models")}
+      {modelsOn && settings && (
         <View style={styles.contentCard}>
           {renderToggleRow(
             t("settings.hub.shareProviders"),
@@ -693,7 +796,23 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
           )}
         </View>
       )}
-      {modelsSection(true)}
+      {modelsOn &&
+        modelsStatus &&
+        renderUsage(
+          t("sampler.modelsUsage"),
+          modelsStatus.state === "running" ? t("sampler.modelsUsageHelp") : t("sampler.modelsUsageIdle"),
+          modelsStatus.cpu,
+          modelsStatus.memory,
+        )}
+      {modelsOn && modelsSection(true)}
+    </>
+  );
+
+  const renderMcp = () => (
+    <>
+      {renderFeatureToggle(t("sampler.feature.mcp"), t("sampler.feature.mcpHelp"), mcpOn, "mcpServers")}
+      {mcpOn && overview && renderMcpUsage(overview)}
+      {mcpOn && renderMcpServers()}
     </>
   );
 
@@ -721,8 +840,6 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     ];
     return (
       <>
-        {hubStopped && stoppedCard}
-
         {online && settings && (
           <View style={styles.contentCard}>
             {renderToggleRow(
@@ -854,30 +971,29 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
   const shownPage = navItems.some((item) => item.page === page) ? page : "home";
 
   const renderPage = () => {
-    if (firstCheck) return null;
-    if (detail && online) return renderDetail(detail);
-    if (shownPage === "preferences") return renderPreferences();
-    if (!online) return renderUnreachable();
+    if (detail) return renderDetail(detail);
     switch (shownPage) {
       case "profiles":
         return renderProfiles();
       case "models":
         return renderModels();
       case "mcp":
-        return renderMcpServers();
+        return renderMcp();
+      case "preferences":
+        return renderPreferences();
       default:
         return renderHome();
     }
   };
 
-  //not hosting yet, or no profile on this hub
+  //not hosting yet, hub off, or no profile on this hub
   const renderWelcome = () => {
     const needsProfile = !!pairedHub;
     if (needsProfile && firstCheck) return null;
     //a browser cannot host, it leaves the screen once unpaired
     if (!needsProfile && !OperaHub.canHost()) return null;
     if (needsProfile && !online) {
-      return <View style={styles.welcomeCard}>{renderUnreachable()}</View>;
+      return renderStopped();
     }
     return (
       <View style={styles.welcome}>
@@ -899,7 +1015,8 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     );
   };
 
-  const ready = !!pairedHub && !!profile;
+  //the nav and pages need the hub up and a profile
+  const ready = !!pairedHub && !!profile && online;
 
   return (
     <View style={styles.root}>
@@ -1050,14 +1167,6 @@ const makeStyles = (Colors: ThemeColors) =>
       flex: 1,
       justifyContent: "center",
       alignItems: "center",
-      paddingHorizontal: Spacing.xxl2,
-    },
-    welcomeCard: {
-      flex: 1,
-      justifyContent: "center",
-      width: "100%",
-      maxWidth: 480,
-      alignSelf: "center",
       paddingHorizontal: Spacing.xxl2,
     },
     //same as the chat home greeting

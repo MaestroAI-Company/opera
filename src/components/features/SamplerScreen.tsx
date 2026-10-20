@@ -70,7 +70,7 @@ type Page = "home" | "profiles" | "models" | "mcp" | "preferences";
 type Detail = { kind: "model"; file: string; name: string } | { kind: "mcp"; id: string; title: string };
 type HubState = "checking" | "online" | "offline" | "revoked" | "outdated";
 type Tile = { key: string; title: string; status: string; icon?: ImageSourcePropType; error?: boolean; onPress?: () => void };
-type Modal = { title: string; message?: string; buttons: ModalButton[] };
+type Modal = { title: string; message?: string; buttons: ModalButton[]; loading?: boolean };
 
 type SamplerScreenProps = {
   //the chat and sampler switch
@@ -294,9 +294,11 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
           text: t("settings.hub.unpair"),
           style: "danger",
           onPress: async () => {
-            closeModal();
+            //an unreachable hub takes a few seconds
+            setModal((shown) => shown && { ...shown, loading: true });
             await OperaHub.unpair(pairedHub);
             await HubSync.forgetHub();
+            closeModal();
             setPage("home");
             setDetail(null);
             setProfile(null);
@@ -496,6 +498,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
                 refresh();
               }}
             />
+            <ActionButton icon={cancelIcon} label={t("settings.hub.unpair")} onPress={unpair} />
           </Group>
         </View>
       </View>
@@ -981,6 +984,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop }: Samp
         title={modal?.title}
         message={modal?.message}
         buttons={modal?.buttons}
+        loading={modal?.loading}
         onClose={closeModal}
       />
     </View>

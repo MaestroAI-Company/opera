@@ -441,6 +441,8 @@ const NEARBY_WAIT_MS = 2500;
 //a fresh hub publishes its address slowly
 const SELF_PAIR_ATTEMPTS = 5;
 const SELF_PAIR_DELAY_MS = 2000;
+//an unreachable hub takes the whole connect timeout
+const UNPAIR_WAIT_MS = 3000;
 //providers reached through the hub tunnel
 export const HUB_URL_SCHEME = 'opera-hub://';
 
@@ -822,11 +824,12 @@ class OperaHubServiceImpl {
 
   //forgets locally even if unreachable
   async unpair(hub: PairedHub): Promise<void> {
-    try {
-      await this.native().unpair(await this.deviceKey(), hub);
-    } catch (e) {
-      console.warn('[OperaHub] hub not told about unpairing:', e);
-    }
+    const key = await this.deviceKey();
+    const told = this.native()
+      .unpair(key, hub)
+      .catch((e) => console.warn('[OperaHub] hub not told about unpairing:', e));
+    //the hub may still hear it later, the device does not wait
+    await Promise.race([told, new Promise((resolve) => setTimeout(resolve, UNPAIR_WAIT_MS))]);
     await this.forget();
   }
 

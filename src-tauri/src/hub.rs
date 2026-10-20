@@ -4,8 +4,8 @@ use std::sync::Arc;
 use opera_hub::{config, hub, service};
 use opera_hub_client::{
     CatalogModel, HubClient, HubDevice, HubError, HubInvite, HubProfile, HubProvider, HubSettings,
-    HubStatus, LinkJoining, LinkProgress, LlamaStatus, ModelFile, ModelRepo, NearbyHub, PairedHub,
-    ProfileLock, ProxyInfo, PullPage, SyncRecord, UnlockedProfile,
+    HubStatus, LinkJoining, LinkProgress, LlamaStatus, McpServerSummary, ModelFile, ModelRepo,
+    NearbyHub, PairedHub, ProfileLock, ProxyInfo, PullPage, SyncRecord, UnlockedProfile,
 };
 use serde::Serialize;
 use tauri::State;
@@ -375,6 +375,59 @@ pub async fn hub_profiles(
     hub: PairedHub,
 ) -> Result<Vec<HubProfile>, HubError> {
     state.client(&device_key).await?.profiles(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_remove_profile(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    id: String,
+) -> Result<(), HubError> {
+    state
+        .client(&device_key)
+        .await?
+        .remove_profile(hub, id)
+        .await
+}
+
+#[tauri::command]
+pub async fn hub_set_profile_role(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    id: String,
+    role: String,
+) -> Result<(), HubError> {
+    state
+        .client(&device_key)
+        .await?
+        .set_profile_role(hub, id, role)
+        .await
+}
+
+#[tauri::command]
+pub async fn hub_mcp_overview(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<Vec<McpServerSummary>, HubError> {
+    state.client(&device_key).await?.mcp_overview(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_mcp_manage(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    id: String,
+    action: String,
+) -> Result<Vec<McpServerSummary>, HubError> {
+    state
+        .client(&device_key)
+        .await?
+        .mcp_manage(hub, id, action)
+        .await
 }
 
 #[tauri::command]

@@ -2,7 +2,7 @@ import type { InferenceSession } from 'onnxruntime-react-native';
 import type { Ort } from './ortRuntime';
 import { ORT_BASE } from './ortRuntime.web';
 
-//v2c eval threshold
+//v3b starting threshold
 const THRESHOLD = 0.5;
 const SAMPLE_RATE = 16000;
 const MODELS = '/wakeword/';

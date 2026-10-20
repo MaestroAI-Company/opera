@@ -172,6 +172,13 @@ import HubModelsSheet from "./HubModelsSheet";
 import HubMcpSection, { HubMcpServerPage } from "./HubMcpSection";
 import HubMcpSheet, { HubFolderSheet } from "./HubMcpSheet";
 import HubQrSheet from "./HubQrSheet";
+import {
+  CTX_SIZE_OPTIONS,
+  KEEP_ALIVE_OPTIONS,
+  LLAMA_SERVER_URL,
+  PARALLEL_OPTIONS,
+  optionLabel,
+} from "../../services/hub/modelOptions";
 import MaestroCard from "./MaestroCard";
 import { BUTTERFLY_OPTIONS, selectButterfly, useMaestroButterfly } from "./maestroButterfly";
 import VoiceEngineCard from "./VoiceEngineCard";
@@ -2099,6 +2106,8 @@ export default function SettingsDrawer({
 
   const openHubServer = (server: OllamaServer) => {
     setHubDetailUrl(server.url);
+    //the llama.cpp options ride the hub status
+    if (server.url === LLAMA_SERVER_URL) refreshHub();
     setOllamaContextDraft(
       server.contextLength != null ? String(server.contextLength) : "",
     );
@@ -4916,6 +4925,44 @@ export default function SettingsDrawer({
     return (
       <View style={styles.subPageContainer}>
         {renderSubPageHeader(server.name)}
+
+        {/* llama.cpp options, set in the sampler screen */}
+        {url === LLAMA_SERVER_URL && hubStatus?.ctxSize != null && (
+          <View style={styles.contentCard}>
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <Text style={styles.settingLabel}>{t("sampler.model.title")}</Text>
+              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                {t("sampler.model.readOnly")}
+              </Text>
+              <Group style={styles.infoGroup}>
+                {[
+                  {
+                    label: t("sampler.model.ctx"),
+                    value: optionLabel(CTX_SIZE_OPTIONS, hubStatus.ctxSize),
+                  },
+                  {
+                    label: t("sampler.model.keepAlive"),
+                    value: optionLabel(KEEP_ALIVE_OPTIONS, hubStatus.keepAlive ?? 0),
+                  },
+                  {
+                    label: t("sampler.model.parallel"),
+                    value: optionLabel(PARALLEL_OPTIONS, hubStatus.parallel ?? 0),
+                  },
+                ].map((row) => (
+                  <ActionButton
+                    key={row.label}
+                    label={row.label}
+                    rightElement={
+                      <Text style={styles.infoValue} numberOfLines={1}>
+                        {row.value}
+                      </Text>
+                    }
+                  />
+                ))}
+              </Group>
+            </View>
+          </View>
+        )}
 
         {/* tuning card for ollama only */}
         {server.kind === "ollama" && (

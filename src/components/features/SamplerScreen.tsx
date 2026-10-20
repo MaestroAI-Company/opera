@@ -19,11 +19,13 @@ import {
   PairedHub,
   hubErrorCode,
 } from "../../services/hub/OperaHubService";
+import { CTX_SIZE_OPTIONS, KEEP_ALIVE_OPTIONS, PARALLEL_OPTIONS } from "../../services/hub/modelOptions";
 import { Settings } from "../../services/settings/SettingsService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import NotificationModal, { type ModalButton } from "../ui/NotificationModal";
 import ProgressBar from "../ui/ProgressBar";
+import Slider from "../ui/Slider";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 import { pressStyle } from "../ui/pressStyle";
@@ -48,6 +50,9 @@ const cancelIcon = require("../../../assets/icons/cancel.png");
 const binIcon = require("../../../assets/icons/bin.png");
 const serverIcon = require("../../../assets/icons/server.png");
 const operaIcon = require("../../../assets/icons/operaicon.png");
+const messageIcon = require("../../../assets/icons/message.png");
+const timeIcon = require("../../../assets/icons/time.png");
+const tilesIcon = require("../../../assets/icons/tiles.png");
 
 const HUB_DEVICE_ICONS: Record<string, ImageSourcePropType> = {
   phone: require("../../../assets/icons/phone.png"),
@@ -783,6 +788,60 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     </>
   );
 
+  //llama.cpp options for every device, a change restarts it
+  const renderModelOptions = () => {
+    if (!settings) return null;
+    const rows = [
+      {
+        key: "ctxSize" as const,
+        icon: messageIcon,
+        label: t("sampler.model.ctx"),
+        help: t("sampler.model.ctxHelp"),
+        options: CTX_SIZE_OPTIONS,
+      },
+      {
+        key: "keepAlive" as const,
+        icon: timeIcon,
+        label: t("sampler.model.keepAlive"),
+        help: t("sampler.model.keepAliveHelp"),
+        options: KEEP_ALIVE_OPTIONS,
+      },
+      {
+        key: "parallel" as const,
+        icon: tilesIcon,
+        label: t("sampler.model.parallel"),
+        help: t("sampler.model.parallelHelp"),
+        options: PARALLEL_OPTIONS,
+      },
+    ];
+    return (
+      <View style={styles.contentCard}>
+        <View style={styles.settingRowVertical}>
+          <Text style={styles.settingLabel}>{t("sampler.model.title")}</Text>
+          <Text style={styles.helpText}>{t("sampler.model.help")}</Text>
+        </View>
+        {rows.map((row, index) => (
+          <View
+            key={row.key}
+            style={[styles.settingRowVertical, index === rows.length - 1 && { marginBottom: 0 }]}
+          >
+            <Text style={styles.settingLabel}>{row.label}</Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{row.help}</Text>
+            <Group>
+              <Slider
+                icon={row.icon}
+                options={row.options}
+                //older hubs lack these, llama.cpp keeps its defaults
+                selectedValue={String(settings[row.key] ?? 0)}
+                onSelect={(value) => changeSettings({ [row.key]: Number(value) })}
+              />
+            </Group>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   const renderModels = () => (
     <>
       {renderFeatureToggle(t("sampler.feature.models"), t("sampler.feature.modelsHelp"), modelsOn, "models")}
@@ -796,6 +855,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
           )}
         </View>
       )}
+      {modelsOn && renderModelOptions()}
       {modelsOn &&
         modelsStatus &&
         renderUsage(

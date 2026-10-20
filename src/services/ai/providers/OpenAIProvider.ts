@@ -34,6 +34,44 @@ function imageUrl(b64: string): string {
   return `data:${mime};base64,${b64}`;
 }
 
+const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+//first 12 bytes of a base64 payload
+function headerBytes(b64: string): string {
+  let value = 0;
+  let bits = 0;
+  let out = '';
+  for (const ch of b64.slice(0, 16)) {
+    value = ((value << 6) | BASE64_ALPHABET.indexOf(ch)) & 0xffff;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out += String.fromCharCode((value >> bits) & 0xff);
+    }
+  }
+  return out;
+}
+
+//sniff kind from base64 header
+function mediaPart(b64: string): any {
+  const head = headerBytes(b64);
+  if (head.startsWith('RIFF') && head.slice(8, 12) === 'WAVE') {
+    return { type: 'input_audio', input_audio: { data: b64, format: 'wav' } };
+  }
+  //id3 tag or mpeg frame sync
+  if (head.startsWith('ID3') || (head.charCodeAt(0) === 0xff && (head.charCodeAt(1) & 0xe0) === 0xe0)) {
+    return { type: 'input_audio', input_audio: { data: b64, format: 'mp3' } };
+  }
+  if (head.slice(4, 8) === 'ftyp') {
+    const mime = head.slice(8, 10) === 'qt' ? 'video/quicktime' : 'video/mp4';
+    return { type: 'video_url', video_url: { url: `data:${mime};base64,${b64}` } };
+  }
+  if (head.slice(0, 4) === String.fromCharCode(0x1a, 0x45, 0xdf, 0xa3)) {
+    return { type: 'video_url', video_url: { url: `data:video/webm;base64,${b64}` } };
+  }
+  return { type: 'image_url', image_url: { url: imageUrl(b64) } };
+}
+
 //results pair to calls by id
 function toOpenAIMessages(messages: ChatMessage[], nativeTools: boolean): any[] {
   const out: any[] = [];
@@ -72,7 +110,7 @@ function toOpenAIMessages(messages: ChatMessage[], nativeTools: boolean): any[] 
       role: m.role,
       content: [
         { type: 'text', text: m.content },
-        ...m.images.map((b64) => ({ type: 'image_url', image_url: { url: imageUrl(b64) } })),
+        ...m.images.map(mediaPart),
       ],
     });
   });

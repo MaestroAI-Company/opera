@@ -499,51 +499,46 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
       style={StyleSheet.absoluteFill}
       onLayout={e => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
     >
-      {showBox && (
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Animated.View style={[styles.dim, { top: 0, left: 0, right: 0 }, topDim]} />
-          <Animated.View style={[styles.dim, { left: 0, right: 0, bottom: 0 }, bottomDim]} />
-          <Animated.View style={[styles.dim, { left: 0 }, leftDim]} />
-          <Animated.View style={[styles.dim, { right: 0 }, rightDim]} />
-        </View>
-      )}
+      {/* hidden keeps animated styles alive */}
+      <View style={[StyleSheet.absoluteFill, !showBox && styles.hidden]} pointerEvents="none">
+        <Animated.View style={[styles.dim, { top: 0, left: 0, right: 0 }, topDim]} />
+        <Animated.View style={[styles.dim, { left: 0, right: 0, bottom: 0 }, bottomDim]} />
+        <Animated.View style={[styles.dim, { left: 0 }, leftDim]} />
+        <Animated.View style={[styles.dim, { right: 0 }, rightDim]} />
+      </View>
 
-      {showBox && (
-        <Animated.View style={[styles.group, groupStyle]} pointerEvents="none">
-          <View style={styles.box} pointerEvents="none" />
-          {CORNERS.map(corner => (
-            <Animated.View
-              key={corner}
-              style={[styles.handleHit, cornerStyles[corner]]}
-              pointerEvents="none"
-            >
-              <Svg width={HANDLE_HIT} height={HANDLE_HIT}>
-                <Path
-                  d={anglePath(corner)}
-                  stroke={Colors.selectionOutline}
-                  strokeWidth={HANDLE_STROKE}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                />
-              </Svg>
-            </Animated.View>
-          ))}
-        </Animated.View>
-      )}
+      <Animated.View style={[styles.group, groupStyle, !showBox && styles.hidden]} pointerEvents="none">
+        <View style={styles.box} pointerEvents="none" />
+        {CORNERS.map(corner => (
+          <Animated.View
+            key={corner}
+            style={[styles.handleHit, cornerStyles[corner]]}
+            pointerEvents="none"
+          >
+            <Svg width={HANDLE_HIT} height={HANDLE_HIT}>
+              <Path
+                d={anglePath(corner)}
+                stroke={Colors.selectionOutline}
+                strokeWidth={HANDLE_STROKE}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            </Svg>
+          </Animated.View>
+        ))}
+      </Animated.View>
 
-      {drawing && (
-        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-          <AnimatedPath
-            animatedProps={strokePathProps}
-            stroke={Colors.selectionOutline}
-            strokeWidth={STROKE_WIDTH}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-          />
-        </Svg>
-      )}
+      <Svg style={[StyleSheet.absoluteFill, !drawing && styles.hidden]} pointerEvents="none">
+        <AnimatedPath
+          animatedProps={strokePathProps}
+          stroke={Colors.selectionOutline}
+          strokeWidth={STROKE_WIDTH}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </Svg>
 
       {showDetections && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -574,6 +569,9 @@ const styles = StyleSheet.create({
   },
   group: {
     position: 'absolute',
+  },
+  hidden: {
+    display: 'none',
   },
   box: {
     position: 'absolute',

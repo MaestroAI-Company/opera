@@ -17,7 +17,6 @@ export const HtmlWidget: IWidget<HtmlWidgetData> = {
   name: 'Web Page',
   hasBorder: true,
   aiDefinesTitle: true,
-  enabledByDefault: true,
   description: 'Displays a web page (URL) or raw HTML. For raw HTML, use font-family: "Figtree", system-ui; text: #333; accent: #FF1A1A; background: #F9F9F9; border-radius: 12px.',
   schema: `{
     "html": "<html>...</html>",

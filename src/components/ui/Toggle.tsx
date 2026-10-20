@@ -94,7 +94,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   track: {
     width: 40,
     height: 24,
-    borderRadius: Radius.xl2,
+    borderRadius: Radius.pill,
     padding: 2,
     justifyContent: "center",
     borderWidth: 2,

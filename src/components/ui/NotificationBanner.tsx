@@ -39,7 +39,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   bannerPressed: {
-    backgroundColor: Colors.primaryPressed,
+    backgroundColor: Colors.primaryBright,
   },
   icon: {
     width: 18,

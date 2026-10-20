@@ -1,15 +1,14 @@
 import { useEffect, useState } from "react";
-import { Image, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Image, Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
-import DrawerSheet from "./DrawerSheet";
+import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 const DESKTOP_CARD_WIDTH = 420;
-const DESKTOP_MARGIN = 24;
 
 export type PreviewImage = { uri: string };
 
@@ -50,7 +49,7 @@ function formatBytes(bytes: number): string {
 export default function ImagePreviewSheet({ image, onClose, isLargeScreen = false, isDesktop = false, bottomInset = 0 }: ImagePreviewSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   //last image stays during close animation
   const [shown, setShown] = useState<PreviewImage | null>(image);
@@ -71,13 +70,6 @@ export default function ImagePreviewSheet({ image, onClose, isLargeScreen = fals
     info?.bytes != null ? { label: t("imagePreview.size"), value: formatBytes(info.bytes) } : null,
   ].filter((r): r is { label: string; value: string } => r !== null);
 
-  const centeredStyle = {
-    position: "absolute" as const,
-    left: Math.max(DESKTOP_MARGIN, (windowWidth - DESKTOP_CARD_WIDTH) / 2),
-    top: Math.max(DESKTOP_MARGIN, windowHeight * 0.08),
-    maxHeight: windowHeight * 0.84,
-  };
-
   return (
     <DrawerSheet
       visible={!!image}
@@ -88,9 +80,9 @@ export default function ImagePreviewSheet({ image, onClose, isLargeScreen = fals
       handleContainerStyle={styles.sheetHandleContainer}
       //sheet may grow up to just under the status bar
       sheetStyle={[styles.sheet, { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + bottomInset, maxHeight: windowHeight - insets.top - Spacing.xl2 }]}
-      desktopStyle={[styles.desktopCard, centeredStyle]}
+      desktopStyle={styles.desktopCard}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <SheetScrollView contentContainerStyle={styles.content}>
         {shown && (
           <Group style={styles.infoGroup}>
             <View style={styles.imageContainer}>
@@ -98,9 +90,10 @@ export default function ImagePreviewSheet({ image, onClose, isLargeScreen = fals
                 source={{ uri: shown.uri }}
                 resizeMode="contain"
                 onLoad={(e) => {
-                  const { width, height } = e.nativeEvent.source;
-                  if (width > 0 && height > 0) {
-                    setMeasured({ uri: shown.uri, width, height });
+                  //web passes the dom event without source, getSize covers it
+                  const source = e.nativeEvent.source;
+                  if (source && source.width > 0 && source.height > 0) {
+                    setMeasured({ uri: shown.uri, width: source.width, height: source.height });
                   }
                 }}
                 style={[
@@ -118,7 +111,7 @@ export default function ImagePreviewSheet({ image, onClose, isLargeScreen = fals
             ))}
           </Group>
         )}
-      </ScrollView>
+      </SheetScrollView>
     </DrawerSheet>
   );
 }
@@ -132,23 +125,19 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     backgroundColor: Colors.groupedBackground,
     borderTopLeftRadius: Radius.huge2,
     borderTopRightRadius: Radius.huge2,
-    paddingTop: 12,
+    paddingTop: Spacing.xxl,
   },
   desktopCard: {
-    backgroundColor: Colors.groupedBackground,
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
-    elevation: 5,
     width: DESKTOP_CARD_WIDTH,
-    overflow: "hidden",
   },
   sheetHandleContainer: {
+    //floats so top edge matches sides
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     alignItems: "center",
-    marginBottom: Spacing.xs2,
-    paddingVertical: 10,
-    marginTop: -10,
+    paddingVertical: Spacing.md,
   },
   content: {
     paddingHorizontal: Spacing.lg2,

@@ -13,7 +13,7 @@ export default function SiteHead() {
       <title>{SITE_TITLE}</title>
       <meta name="description" content={SITE_DESCRIPTION} />
       <meta name="application-name" content={SITE_NAME} />
-      <meta name="theme-color" content="#FDF8F1" />
+      <meta name="theme-color" content="#FEFBF6" />
       <meta property="og:type" content="website" />
       <meta property="og:site_name" content={SITE_NAME} />
       <meta property="og:title" content={SITE_TITLE} />

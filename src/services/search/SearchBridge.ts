@@ -1,4 +1,5 @@
-import { WebViewRunner } from '../webview/WebViewRunner';
+import { WebViewRunner, WebViewTask } from '../webview/WebViewRunner';
+import { isTauri } from '../platform';
 
 //search result with extracted content
 export interface SearchResult {
@@ -120,11 +121,24 @@ const EXTRACT_CONTENT_JS = `
 })(); true;
 `;
 
+//desktop uses a hidden tauri window
+async function runTask<T>(task: WebViewTask & { source: { uri: string } }): Promise<T> {
+  if (!isTauri) return WebViewRunner.run<T>(task);
+  const { invoke } = await import('@tauri-apps/api/core');
+  const raw = await invoke<string>('webview_task', {
+    url: task.source.uri,
+    script: task.injectedJavaScript ?? '',
+    userAgent: task.userAgent ?? null,
+    timeoutMs: task.timeoutMs ?? 20000,
+  });
+  return JSON.parse(raw);
+}
+
 //web browsing via shared headless webview
 class SearchBridgeService {
   //start a search
   async search(query: string): Promise<SearchResult[]> {
-    const payload = await WebViewRunner.run<{ results?: SearchResult[] }>({
+    const payload = await runTask<{ results?: SearchResult[] }>({
       source: { uri: `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}` },
       injectedJavaScript: EXTRACT_RESULTS_JS,
       timeoutMs: 15000,
@@ -134,13 +148,15 @@ class SearchBridgeService {
 
   //fetch specific pages
   async fetchPages(urls: string[]): Promise<FetchResult[]> {
-    const payloads = await WebViewRunner.runAll<{ content: string; title?: string; favicon?: string }>(
-      urls.map(url => ({
-        source: { uri: url },
-        injectedJavaScript: EXTRACT_CONTENT_JS,
-        userAgent: GOOGLEBOT_UA,
-        timeoutMs: 25000,
-      }))
+    const payloads = await Promise.all(
+      urls.map(url =>
+        runTask<{ content: string; title?: string; favicon?: string }>({
+          source: { uri: url },
+          injectedJavaScript: EXTRACT_CONTENT_JS,
+          userAgent: GOOGLEBOT_UA,
+          timeoutMs: 25000,
+        }).catch(() => null)
+      )
     );
     return payloads.flatMap((payload, i) =>
       payload ? [{ url: urls[i], content: payload.content, title: payload.title, favicon: payload.favicon }] : []

@@ -3,13 +3,14 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { DeviceEventEmitter, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import AutoHeightWebView from "react-native-autoheight-webview";
 import CodeHighlighter from "react-native-code-highlighter";
-import { vs2015 } from "react-syntax-highlighter/dist/esm/styles/hljs";
+import { vs, vs2015 } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
-import { getColors, getThemedStyles, useColors, useThemedStyles } from "../../hooks/useTheme";
+import { getColors, getThemedStyles, useColors, useIsDark, useThemedStyles } from "../../hooks/useTheme";
 import { t } from "../../i18n";
 import type { ToolCall } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { AppEvents } from "../../services/events";
+import { downloadCodeFile } from "../../services/codeDownload";
 import { WidgetManager } from "../../services/widgets/WidgetManager";
 import WidgetWrapper from "../widgets/WidgetWrapper";
 import IconButton from "./IconButton";
@@ -17,6 +18,7 @@ import { ensureKatexStylesheet, getKatexCss, KATEX_STYLESHEET_NAME } from "./kat
 
 const copyIcon = require("../../../assets/icons/copy.png");
 const fullIcon = require("../../../assets/icons/full.png");
+const downloadIcon = require("../../../assets/icons/download2.png");
 
 const makeS = (Colors: ThemeColors) => StyleSheet.create({
   base: { fontSize: FontSizes.xl, lineHeight: 28, color: Colors.textPrimary, fontFamily: Fonts.body },
@@ -48,7 +50,7 @@ const makeS = (Colors: ThemeColors) => StyleSheet.create({
   },
   codeTitle: {
     fontFamily: Fonts.mono,
-    fontSize: FontSizes.title,
+    fontSize: FontSizes.lg,
     color: Colors.textPrimary,
     flex: 1,
     marginRight: Spacing.sm,
@@ -67,7 +69,7 @@ const makeS = (Colors: ThemeColors) => StyleSheet.create({
   },
   h1: { fontSize: FontSizes.displaySm, fontWeight: "bold", marginTop: 8, marginBottom: 4, color: Colors.textPrimary },
   h2: { fontSize: FontSizes.xl, fontWeight: "bold", marginTop: 7, marginBottom: 3, color: Colors.textPrimary },
-  h3: { fontSize: FontSizes.title, fontWeight: "bold", marginTop: 6, marginBottom: 3, color: Colors.textPrimary },
+  h3: { fontSize: FontSizes.lg, fontWeight: "bold", marginTop: 6, marginBottom: 3, color: Colors.textPrimary },
   h4: { fontSize: FontSizes.lg, fontWeight: "bold", marginTop: 5, marginBottom: 3, color: Colors.textPrimary },
   paragraph: { marginVertical: 2 },
   spacing: { height: 8 },
@@ -583,20 +585,23 @@ export function codeLanguageName(language?: string): string | null {
   return LANG_DISPLAY_NAMES[rawLang] ?? (rawLang.length <= 4 ? rawLang.toUpperCase() : rawLang.charAt(0).toUpperCase() + rawLang.slice(1));
 }
 
-//dark highlighted code surface
-export function CodeContent({ code, language, incognito, maxHeight, radius }: { code: string; language?: string; incognito?: boolean; maxHeight?: number; radius?: number }) {
+//highlighted code on the host surface
+export function CodeContent({ code, language, incognito, maxHeight, radius, background, dark }: { code: string; language?: string; incognito?: boolean; maxHeight?: number; radius?: number; background?: string; dark?: boolean }) {
   const Colors = useColors();
+  const themeDark = useIsDark();
   const s = useThemedStyles(makeS);
   const lang = language ? LANG_ALIASES[language] ?? language : undefined;
   const textStyle = { fontFamily: Fonts.mono, fontSize: FontSizes.code, lineHeight: 18 } as const;
   const codeBorderColor = incognito ? Colors.incognito : Colors.responseBorder;
+  //light text only reads on a dark surface
+  const onDark = dark ?? themeDark;
 
   return (
-    <View style={[s.codeContent, { maxHeight, borderColor: codeBorderColor, backgroundColor: Colors.codeBlockBg, borderRadius: radius ?? s.codeContent.borderRadius }]}>
+    <View style={[s.codeContent, { maxHeight, borderColor: codeBorderColor, backgroundColor: background ?? Colors.surface, borderRadius: radius ?? s.codeContent.borderRadius }]}>
       {lang ? (
         <CodeHighlighter
           language={lang}
-          hljsStyle={vs2015}
+          hljsStyle={onDark ? vs2015 : vs}
           textStyle={textStyle}
           scrollViewProps={{
             nestedScrollEnabled: true,
@@ -614,7 +619,7 @@ export function CodeContent({ code, language, incognito, maxHeight, radius }: { 
           nestedScrollEnabled={true}
           contentContainerStyle={{ padding: Spacing.md }}
         >
-          <Text style={[textStyle, { color: Colors.codeBlockText }]} selectable={true}>
+          <Text style={[textStyle, { color: onDark ? Colors.codeBlockText : Colors.textPrimary }]} selectable={true}>
             {code}
           </Text>
         </ScrollView>
@@ -641,12 +646,18 @@ const CodeBlock = React.memo(function CodeBlock({
   incognito?: boolean;
 }) {
   const Colors = useColors();
+  const themeDark = useIsDark();
   const s = useThemedStyles(makeS);
 
   //copy code to clipboard
   const handleCopy = useCallback(() => {
     Clipboard.setStringAsync(code);
   }, [code]);
+
+  //save code as a file
+  const handleDownload = useCallback(() => {
+    downloadCodeFile(code, language, title).catch(() => {});
+  }, [code, language, title]);
 
   //full view opens at app root
   const handleOpen = useCallback(() => {
@@ -675,6 +686,15 @@ const CodeBlock = React.memo(function CodeBlock({
             tintColor={dark ? Colors.responseTextMuted : Colors.textSecondary}
           />
           <IconButton
+            icon={downloadIcon}
+            label={t("common.download")}
+            onPress={handleDownload}
+            containerSize={28}
+            size={16}
+            pressedColor={Colors.surfacePressed}
+            tintColor={dark ? Colors.responseTextMuted : Colors.textSecondary}
+          />
+          <IconButton
             icon={copyIcon}
             label={t("common.copy")}
             onPress={handleCopy}
@@ -685,7 +705,7 @@ const CodeBlock = React.memo(function CodeBlock({
           />
         </View>
       </View>
-      <CodeContent code={code} language={language} incognito={incognito} maxHeight={CODE_BLOCK_MAX_HEIGHT} />
+      <CodeContent code={code} language={language} incognito={incognito} maxHeight={CODE_BLOCK_MAX_HEIGHT} background={cardBg} dark={dark || themeDark} />
     </Pressable>
   );
 });

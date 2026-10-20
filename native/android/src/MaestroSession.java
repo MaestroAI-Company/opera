@@ -17,6 +17,8 @@ public class MaestroSession extends VoiceInteractionSession {
     private static final String TAG = "MaestroSession";
 
     private boolean activityStarted = false;
+    //overlay already visible, invocation ignored
+    private boolean ignored = false;
     private final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
     private final Runnable startOverlayRunnable = new Runnable() {
         @Override
@@ -31,6 +33,7 @@ public class MaestroSession extends VoiceInteractionSession {
 
     @Override
     public void onHandleScreenshot(Bitmap screenshot) {
+        if (ignored) return;
         if (screenshot != null) {
             try {
                 Log.i(TAG, "onHandleScreenshot: got " + screenshot.getWidth() + "x" + screenshot.getHeight()
@@ -56,6 +59,7 @@ public class MaestroSession extends VoiceInteractionSession {
     @Override
     public void onHandleAssist(Bundle data, AssistStructure structure, android.app.assist.AssistContent content) {
         super.onHandleAssist(data, structure, content);
+        if (ignored) return;
         if (structure != null && structure.getActivityComponent() != null) {
             String pkg = structure.getActivityComponent().getPackageName();
             Log.d(TAG, "onHandleAssist: current package = " + pkg);
@@ -132,6 +136,13 @@ public class MaestroSession extends VoiceInteractionSession {
     @Override
     public void onShow(Bundle args, int showFlags) {
         super.onShow(args, showFlags);
+        //keep the overlay and its capture
+        ignored = OverlayActivity.isShown();
+        if (ignored) {
+            Log.d(TAG, "overlay already shown, ignoring invocation");
+            hide();
+            return;
+        }
         activityStarted = false;
         //clear stale screenshot from previous session
         ScreenshotHolder.clear();
@@ -158,7 +169,8 @@ public class MaestroSession extends VoiceInteractionSession {
         handler.removeCallbacks(startOverlayRunnable);
 
         Intent intent = new Intent(getContext(), OverlayActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        //system slide hid the overlay entry
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
         boolean started = false;
         try {
             startAssistantActivity(intent);

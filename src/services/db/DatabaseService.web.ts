@@ -23,6 +23,13 @@ export type MessageMetrics = {
   error?: string;
 };
 
+//web page consulted during generation
+export type MessageSource = {
+  url: string;
+  title?: string;
+  favicon?: string;
+};
+
 export type Message = {
   id: string;
   conversationId: string;
@@ -31,8 +38,9 @@ export type Message = {
   createdAt: number;
   images?: string[];
   metrics?: MessageMetrics;
+  sources?: MessageSource[];
   //app context at send time
-  screenContext?: { appPackage: string | null; hasScreenText: boolean; icon?: string | null; label?: string | null };
+  screenContext?: { appPackage: string | null; hasScreenText: boolean; icon?: string | null; label?: string | null; text?: string | null };
 };
 
 export type SyncTombstone = {
@@ -342,6 +350,14 @@ class DatabaseService {
   async updateMessageMetrics(id: string, metrics: MessageMetrics): Promise<void> {
     this.messages = this.messages.map(m => 
       m.id === id ? { ...m, metrics } : m
+    );
+    this.saveMessages();
+  }
+
+  //store sources consulted for a message
+  async updateMessageSources(id: string, sources: Message['sources']): Promise<void> {
+    this.messages = this.messages.map(m =>
+      m.id === id ? { ...m, sources: sources && sources.length > 0 ? sources : undefined } : m
     );
     this.saveMessages();
   }

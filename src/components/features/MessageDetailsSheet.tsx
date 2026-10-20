@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemedStyles } from "../../hooks/useTheme";
@@ -9,10 +9,9 @@ import { MessageMetrics } from "../../services/db/DatabaseService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import { describeToolCall } from "../ui/MarkdownText";
-import DrawerSheet from "./DrawerSheet";
+import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 const DESKTOP_CARD_WIDTH = 420;
-const DESKTOP_MARGIN = 24;
 
 const REFLECTION_KEYS = {
   none: "reflection.none",
@@ -34,7 +33,7 @@ type MessageDetailsSheetProps = {
 export default function MessageDetailsSheet({ details, onClose, isLargeScreen = false, isDesktop = false, bottomInset = 0 }: MessageDetailsSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   //last details stay during close animation
   const [shown, setShown] = useState<PreviewDetails | null>(details);
@@ -56,13 +55,6 @@ export default function MessageDetailsSheet({ details, onClose, isLargeScreen = 
   //rows are truncated so errors get their own block
   const error = metrics?.error ?? "";
 
-  const centeredStyle = {
-    position: "absolute" as const,
-    left: Math.max(DESKTOP_MARGIN, (windowWidth - DESKTOP_CARD_WIDTH) / 2),
-    top: Math.max(DESKTOP_MARGIN, windowHeight * 0.08),
-    maxHeight: windowHeight * 0.84,
-  };
-
   return (
     <DrawerSheet
       visible={!!details}
@@ -73,9 +65,9 @@ export default function MessageDetailsSheet({ details, onClose, isLargeScreen = 
       handleContainerStyle={styles.sheetHandleContainer}
       //sheet may grow up to just under the status bar
       sheetStyle={[styles.sheet, { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + bottomInset, maxHeight: windowHeight - insets.top - Spacing.xl2 }]}
-      desktopStyle={[styles.desktopCard, centeredStyle]}
+      desktopStyle={styles.desktopCard}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <SheetScrollView contentContainerStyle={styles.content}>
         {shown && (
           <>
             {rows.length > 0 && (
@@ -120,7 +112,7 @@ export default function MessageDetailsSheet({ details, onClose, isLargeScreen = 
             )}
           </>
         )}
-      </ScrollView>
+      </SheetScrollView>
     </DrawerSheet>
   );
 }
@@ -134,23 +126,19 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     backgroundColor: Colors.groupedBackground,
     borderTopLeftRadius: Radius.huge2,
     borderTopRightRadius: Radius.huge2,
-    paddingTop: 12,
+    paddingTop: Spacing.xxl,
   },
   desktopCard: {
-    backgroundColor: Colors.groupedBackground,
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
-    elevation: 5,
     width: DESKTOP_CARD_WIDTH,
-    overflow: "hidden",
   },
   sheetHandleContainer: {
+    //floats so top edge matches sides
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     alignItems: "center",
-    marginBottom: Spacing.xs2,
-    paddingVertical: 10,
-    marginTop: -10,
+    paddingVertical: Spacing.md,
   },
   content: {
     paddingHorizontal: Spacing.lg2,

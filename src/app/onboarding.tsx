@@ -1,3 +1,4 @@
+import { useAudioPlayer } from "expo-audio";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as MediaLibrary from "expo-media-library/legacy";
@@ -16,50 +17,59 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  Vibration,
   View,
+  useWindowDimensions,
   type ImageSourcePropType,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { KeyboardAvoidingView, useKeyboardState } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../constants/theme";
-import ProfileCard from "../components/features/ProfileCard";
+import ButterflyCluster from "../components/features/ButterflyCluster";
+import DrawerSheet, { SheetScrollView } from "../components/features/DrawerSheet";
+import VoiceEngineCard from "../components/features/VoiceEngineCard";
+import { BUTTERFLY_OPTIONS, selectButterfly, useMaestroButterfly } from "../components/features/maestroButterfly";
+import ActionButton from "../components/ui/ActionButton";
 import Group from "../components/ui/Group";
+import IconSelector from "../components/ui/IconSelector";
+import NotificationModal, { type ModalButton } from "../components/ui/NotificationModal";
+import Slider from "../components/ui/Slider";
 import TextInputField from "../components/ui/TextInputField";
 import LottieView from "lottie-react-native";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
 import { useResponsive } from "../hooks/useResponsive";
+import { useVoicePackInstalled } from "../hooks/useVoicePackInstalled";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
 import { useT } from "../i18n";
-import { CalendarService } from "../services/calendar/CalendarService";
-import { ContactsService } from "../services/contacts/ContactsService";
+import { BackupService } from "../services/BackupService";
+import { CloudSync } from "../services/CloudSyncService";
+import { CLOUD_PROVIDERS, getCloudProviderDefinition } from "../services/cloud/registry";
 import { LocationService } from "../services/location/LocationService";
 import { Settings } from "../services/settings/SettingsService";
+import { TTS_SPEEDS, supportedEngineIds } from "../services/speech/engines";
 import { STT } from "../services/speech/STTService";
 import { pressStyle } from "../components/ui/pressStyle";
 
 const texture2 = require("../../assets/images/texture2.png");
 const wordmarkAnimation = require("../../assets/animations/wordmark.json");
-const homeButterfly = require("../../assets/images/butterfly5.png");
+const startupSound = require("../../assets/sounds/startup.m4a");
 const arrowIcon = require("../../assets/icons/arrow.png");
 const pencilIcon = require("../../assets/icons/pencil.png");
-const serverIcon = require("../../assets/icons/server.png");
-const confidentialityIcon = require("../../assets/icons/confidentiality.png");
-const githubIcon = require("../../assets/icons/github.png");
 const micIcon = require("../../assets/icons/microphone.png");
 const cameraIcon = require("../../assets/icons/camera.png");
 const photoIcon = require("../../assets/icons/photo.png");
-const contactIcon = require("../../assets/icons/profil.png");
-const calendarIcon = require("../../assets/icons/calendar.png");
 const locationIcon = require("../../assets/icons/location.png");
+const timeIcon = require("../../assets/icons/time.png");
+const cloudIcon = require("../../assets/icons/cloud.png");
+const fileIcon = require("../../assets/icons/file.png");
 
 const isWeb = Platform.OS === "web";
 
-//intro welcome profile permissions ready
-const LAST_STEP = 4;
 const BACK_BUTTON_SIZE = 56;
+const DESKTOP_CARD_WIDTH = 380;
 
 type IntroPhase = "logo" | "phrases";
 
@@ -76,7 +86,53 @@ const tintWordmark = (hex: string) => {
   return source;
 };
 
-const PHRASE_HOLD = 3500;
+//logo ends at 4s with the sound's first part
+const LOGO_HOLD_EXTRA_FRAMES = 13;
+
+//pushes each bar's sweep out later
+const holdWordmark = (source: any) => {
+  for (const layer of source.layers) {
+    layer.op += LOGO_HOLD_EXTRA_FRAMES;
+    for (const mask of layer.masksProperties) for (const key of mask.pt.k.slice(2)) key.t += LOGO_HOLD_EXTRA_FRAMES;
+  }
+  source.op += LOGO_HOLD_EXTRA_FRAMES;
+  return source;
+};
+
+//android can't set amplitude, so ticks spaced further apart read as weaker
+const buildRumble = (fadeMs: number) => {
+  //short close ticks blur into one soft buzz
+  const baseTick = 6;
+  //share of time spent buzzing, kept low to barely feel it
+  const peakDuty = 0.2;
+  //extra duty and tick length that hit hard at the start
+  const startBoost = 0.6;
+  const boostDecay = 800;
+  //sparser ticks would just be stray taps
+  const maxGap = 800;
+  //no delay before the first tick
+  const pattern = [0];
+  let t = 0;
+  while (t < fadeMs) {
+    const boost = Math.exp(-t / boostDecay);
+    //longer ticks hit harder than shorter ones
+    const tick = Math.round(baseTick + 14 * boost);
+    //boost fades fast then the base thins out linearly to nothing
+    const duty = peakDuty * (1 - t / fadeMs) + startBoost * boost;
+    const gap = Math.round(tick * (1 / duty - 1));
+    if (gap > maxGap) break;
+    pattern.push(tick, gap);
+    t += tick + gap;
+  }
+  return pattern;
+};
+//starts with the sound and fades out around eight seconds
+const INTRO_RUMBLE = buildRumble(8400);
+
+const PHRASE_HOLD = 2000;
+//blur is android 12+ and web only
+const INTRO_BLUR = 8;
+const TITLES_DURATION = 6000;
 const INTRO_PHRASES = [
   "personal",
   "choice",
@@ -90,13 +146,7 @@ const INTRO_PHRASES = [
   "openSource",
 ] as const;
 
-const PROMISES = [
-  { id: "local", icon: serverIcon },
-  { id: "account", icon: confidentialityIcon },
-  { id: "open", icon: githubIcon },
-] as const;
-
-type PermissionId = "microphone" | "camera" | "photos" | "contacts" | "calendar" | "location";
+type PermissionId = "microphone" | "camera" | "photos" | "location";
 type PermissionStatus = "granted" | "denied";
 type PermissionDef = {
   id: PermissionId;
@@ -106,7 +156,6 @@ type PermissionDef = {
 
 const requestLocation = async () => {
   const granted = await LocationService.requestPermission();
-  //warm cache for location context
   if (granted) LocationService.refresh().catch(() => {});
   return granted;
 };
@@ -131,9 +180,8 @@ const PERMISSIONS: PermissionDef[] = isWeb
   : [
       { id: "microphone", icon: micIcon, request: () => STT.requestPermissions() },
       { id: "camera", icon: cameraIcon, request: async () => (await ImagePicker.requestCameraPermissionsAsync()).granted },
-      { id: "photos", icon: photoIcon, request: async () => (await MediaLibrary.requestPermissionsAsync()).granted },
-      { id: "contacts", icon: contactIcon, request: () => ContactsService.requestPermission() },
-      { id: "calendar", icon: calendarIcon, request: () => CalendarService.requestPermission() },
+      //android uses the system photo picker
+      ...(Platform.OS === "android" ? [] : [{ id: "photos" as const, icon: photoIcon, request: async () => (await MediaLibrary.requestPermissionsAsync()).granted }]),
       { id: "location", icon: locationIcon, request: requestLocation },
     ];
 
@@ -155,97 +203,113 @@ function Reveal({ delay = 0, style, children }: { delay?: number; style?: StyleP
   return <Animated.View style={[style, { opacity: progress, transform: [{ translateY }] }]}>{children}</Animated.View>;
 }
 
-//slow hover keeps the mascot alive
-function FloatingButterfly({ source, style }: { source: ImageSourcePropType; style: StyleProp<any> }) {
-  const float = useAnimatedValue(0);
-
-  useEffect(() => {
-    const drift = (toValue: number) =>
-      Animated.timing(float, { toValue, duration: 2400, easing: Easing.inOut(Easing.sin), useNativeDriver: true });
-    const loop = Animated.loop(Animated.sequence([drift(1), drift(0)]));
-    loop.start();
-    return () => loop.stop();
-  }, [float]);
-
-  const translateY = float.interpolate({ inputRange: [0, 1], outputRange: [0, -8] });
-  return <Animated.Image source={source} resizeMode="contain" style={[style, { transform: [{ translateY }] }]} />;
-}
-
 
 type PhraseCyclerProps = {
   phrases: string[];
   style: StyleProp<TextStyle>;
-  onFirstShown: () => void;
 };
 
 //fades each phrase in then out
-function PhraseCycler({ phrases, style, onFirstShown }: PhraseCyclerProps) {
+function PhraseCycler({ phrases, style }: PhraseCyclerProps) {
+  const styles = useThemedStyles(makeStyles);
   const [index, setIndex] = useState(0);
   const cycle = useAnimatedValue(0);
-  const shown = useRef(false);
 
+  //native driver can't animate filter
   useEffect(() => {
     cycle.setValue(0);
-    Animated.timing(cycle, { toValue: 1, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(({ finished }) => {
+    Animated.timing(cycle, { toValue: 1, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start(({ finished }) => {
       if (!finished) return;
-      if (!shown.current) {
-        shown.current = true;
-        onFirstShown();
-      }
       Animated.timing(cycle, {
         toValue: 2,
         duration: 400,
         delay: PHRASE_HOLD,
         easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }).start(({ finished: done }) => done && setIndex((i) => (i + 1) % phrases.length));
     });
     return () => cycle.stopAnimation();
-  }, [index, cycle, phrases.length, onFirstShown]);
+  }, [index, cycle, phrases.length]);
 
   //rises in then keeps rising out
   const animatedStyle = useMemo(
     () => ({
       opacity: cycle.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 0] }),
       transform: [{ translateY: cycle.interpolate({ inputRange: [0, 1, 2], outputRange: [10, 0, -10] }) }],
+      filter: cycle.interpolate({
+        inputRange: [0, 1, 2],
+        outputRange: [`blur(${INTRO_BLUR}px)`, "blur(0px)", "blur(0px)"],
+      }),
     }),
     [cycle],
   );
 
-  return <Animated.Text style={[style, animatedStyle]}>{phrases[index]}</Animated.Text>;
+  return (
+    <Animated.View style={[styles.blurRoom, animatedStyle]}>
+      <Text style={style}>{phrases[index]}</Text>
+    </Animated.View>
+  );
 }
 
 type IntroStageProps = {
   phase: IntroPhase;
   onLogoGone: () => void;
-  onReady: () => void;
 };
 
 //logo sweep then the phrases
-function IntroStage({ phase, onLogoGone, onReady }: IntroStageProps) {
+function IntroStage({ phase, onLogoGone }: IntroStageProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const { isLargeScreen } = useResponsive();
   const phrases = useMemo(() => INTRO_PHRASES.map((id) => t(`onboarding.intro.${id}`)), [t]);
-  const wordmark = useMemo(() => tintWordmark(Colors.textPrimary), [Colors.textPrimary]);
+  const wordmark = useMemo(
+    () => holdWordmark(tintWordmark(Colors.primary)),
+    [Colors.primary],
+  );
+  const logoMotion = useAnimatedValue(0);
+
+  //arrive, hold, leave timed to the lottie sweeps
+  useEffect(() => {
+    if (phase !== "logo") return;
+    const motion = Animated.sequence([
+      Animated.timing(logoMotion, { toValue: 1, duration: 1200, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
+      Animated.timing(logoMotion, { toValue: 2, duration: 1500, easing: Easing.linear, useNativeDriver: false }),
+      Animated.timing(logoMotion, { toValue: 3, duration: 1000, easing: Easing.in(Easing.cubic), useNativeDriver: false }),
+    ]);
+    motion.start();
+    return () => motion.stop();
+  }, [phase, logoMotion]);
+
+  const logoStyle = useMemo(
+    () => ({
+      transform: [{ translateX: logoMotion.interpolate({ inputRange: [0, 1, 2, 3], outputRange: [-48, 0, 0, 72] }) }],
+      filter: logoMotion.interpolate({
+        inputRange: [0, 1, 2, 3],
+        outputRange: [`blur(${INTRO_BLUR}px)`, "blur(0px)", "blur(0px)", `blur(${INTRO_BLUR}px)`],
+      }),
+    }),
+    [logoMotion],
+  );
 
   return (
     <View style={styles.stage}>
       {phase === "logo" && (
-        <LottieView
-          source={wordmark}
-          autoPlay
-          loop={false}
-          style={isLargeScreen ? WORDMARK_LARGE : WORDMARK}
-          resizeMode="contain"
-          onAnimationFinish={(isCancelled) => {
-            if (!isCancelled) onLogoGone();
-          }}
-        />
+        <Animated.View style={[styles.blurRoom, logoStyle]}>
+          <LottieView
+            source={wordmark}
+            autoPlay
+            loop={false}
+            style={isLargeScreen ? WORDMARK_LARGE : WORDMARK}
+            resizeMode="contain"
+            onAnimationFinish={(isCancelled) => {
+              if (!isCancelled) onLogoGone();
+            }}
+          />
+        </Animated.View>
       )}
       {phase === "phrases" && (
-        <PhraseCycler phrases={phrases} style={[styles.phrase, isLargeScreen && styles.phraseLarge]} onFirstShown={onReady} />
+        <PhraseCycler phrases={phrases} style={[styles.phrase, isLargeScreen && styles.phraseLarge]} />
       )}
     </View>
   );
@@ -257,20 +321,232 @@ export default function OnboardingPage() {
   const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { isLargeScreen } = useResponsive();
+  const { isLargeScreen, isDesktop } = useResponsive();
+  const { height: windowHeight } = useWindowDimensions();
+  const isKeyboardOpen = useKeyboardState((state) => state.isVisible);
 
   const [step, setStep] = useState(0);
+  //no neural engine on this platform, nothing to pick
+  const [hasVoiceEngines] = useState(() => supportedEngineIds().length > 0);
   const [name, setName] = useState(() => Settings.getCached().name);
-  //only feeds the card's look, so it doesn't redesign on every keystroke
-  const [confirmedName, setConfirmedName] = useState(name);
+  const [ttsSpeed, setTtsSpeedState] = useState(() => Settings.getCached().ttsSpeed);
+  const voicePackInstalled = useVoicePackInstalled();
+  const maestroButterfly = useMaestroButterfly();
   const [statuses, setStatuses] = useState<Partial<Record<PermissionId, PermissionStatus>>>({});
   const contentOpacity = useAnimatedValue(1);
   const backButtonProgress = useAnimatedValue(0);
   const launchCtaOpacity = useAnimatedValue(0);
   const [launchCtaReady, setLaunchCtaReady] = useState(false);
   const [introPhase, setIntroPhase] = useState<IntroPhase>("logo");
+  const creditOpacity = useAnimatedValue(0);
+  const startupPlayer = useAudioPlayer(startupSound);
   const busy = useRef(false);
   const showBack = step > 0;
+
+  const [saveSheetVisible, setSaveSheetVisible] = useState(false);
+  const [saveSheetStep, setSaveSheetStep] = useState<"root" | "cloud" | "setup">("root");
+  const [cloudSetupId, setCloudSetupId] = useState("");
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{
+    title?: string;
+    message?: string;
+    messageAlign?: "left" | "center";
+    loading?: boolean;
+    showInput?: boolean;
+    inputValue?: string;
+    onInputChange?: (text: string) => void;
+    inputPlaceholder?: string;
+    inputSecureTextEntry?: boolean;
+    inputKeyboardType?: "default" | "numeric" | "email-address" | "phone-pad";
+    buttons?: ModalButton[];
+  }>({});
+
+  const showAlert = useCallback(
+    (
+      title: string,
+      message: string,
+      buttons?: ModalButton[],
+      extra?: Partial<typeof alertConfig>,
+    ) => {
+      setAlertConfig({
+        title,
+        message,
+        buttons,
+        messageAlign: "left",
+        loading: false,
+        showInput: false,
+        ...extra,
+      });
+      setAlertVisible(true);
+    },
+    [],
+  );
+
+  //same modal stays open between cloud steps
+  const showCloudProgress = (
+    message: string,
+    providerName = CloudSync.getProviderName(),
+  ) => {
+    showAlert(
+      getCloudProviderDefinition(providerName)?.label ?? t("settings.cloud.storage"),
+      message,
+      undefined,
+      { loading: true, messageAlign: "center" },
+    );
+  };
+
+  const closeSaveSheet = useCallback(() => {
+    setSaveSheetVisible(false);
+    setSaveSheetStep("root");
+  }, []);
+
+  const handleSaveSheetBack = useCallback(() => {
+    if (saveSheetStep === "setup") {
+      setSaveSheetStep("cloud");
+      return true;
+    }
+    if (saveSheetStep === "cloud") {
+      setSaveSheetStep("root");
+      return true;
+    }
+    return false;
+  }, [saveSheetStep]);
+
+  const completeRestore = async () => {
+    await Settings.set("hasSeenOnboarding", true);
+    setAlertVisible(false);
+    closeSaveSheet();
+    router.replace("/");
+  };
+
+  const handleRestoreFromFile = async () => {
+    try {
+      const result = await BackupService.importData();
+      if (result.success) {
+        await completeRestore();
+      }
+    } catch (e) {
+      const message =
+        e instanceof Error && e.message
+          ? e.message
+          : t("settings.data.importFailed");
+      showAlert(t("common.error"), message);
+    }
+  };
+
+  const syncAndFinish = async (providerName: string) => {
+    showCloudProgress(t("cloudSync.syncing"), providerName);
+    //cloud settings must win over fresh install defaults
+    await Settings.setSettingsUpdatedAt(0);
+    const result = await CloudSync.sync();
+    if (result.success) {
+      await completeRestore();
+    } else {
+      showAlert(
+        t("settings.cloud.syncError"),
+        result.error || t("settings.cloud.unknownError"),
+      );
+    }
+  };
+
+  const promptCloudPin = (providerName: string) => {
+    let currentInput = "";
+    showAlert(
+      t("settings.pin.unlock.title"),
+      t("settings.pin.unlock.message"),
+      [
+        {
+          text: t("common.cancel"),
+          onPress: async () => {
+            setAlertVisible(false);
+            await CloudSync.disconnect();
+          },
+          style: "secondary",
+        },
+        {
+          text: t("settings.pin.unlock.confirm"),
+          style: "primary",
+          onPress: async () => {
+            showCloudProgress(t("settings.cloud.progress.unlocking"), providerName);
+            const ok = await CloudSync.verifyAndSetPin(currentInput);
+            if (ok) {
+              await syncAndFinish(providerName);
+            } else {
+              showAlert(t("common.error"), t("settings.pin.incorrect"), [
+                {
+                  text: t("settings.pin.tryAgain"),
+                  onPress: () => promptCloudPin(providerName),
+                  style: "primary",
+                },
+                {
+                  text: t("common.cancel"),
+                  onPress: async () => {
+                    setAlertVisible(false);
+                    await CloudSync.disconnect();
+                  },
+                  style: "secondary",
+                },
+              ]);
+            }
+          },
+        },
+      ],
+      {
+        showInput: true,
+        inputPlaceholder: t("settings.pin.placeholder"),
+        inputSecureTextEntry: true,
+        inputKeyboardType: "numeric",
+        onInputChange: (text: string) => {
+          currentInput = text;
+          setAlertConfig((prev) => ({ ...prev, inputValue: text }));
+        },
+      },
+    );
+  };
+
+  const connectCloudProvider = async (providerName: string) => {
+    closeSaveSheet();
+    await CloudSync.init();
+    showCloudProgress(t("settings.cloud.progress.connecting"), providerName);
+    const success = await CloudSync.setProvider(providerName);
+    if (!success) {
+      showAlert(
+        t("settings.cloud.connectionError"),
+        t("settings.cloud.connectFailed", {
+          provider: getCloudProviderDefinition(providerName)?.label ?? providerName,
+        }),
+      );
+      return;
+    }
+    if (CloudSync.hasPin()) {
+      await syncAndFinish(providerName);
+      return;
+    }
+    showCloudProgress(t("settings.cloud.progress.checking"), providerName);
+    const hasBackup = await CloudSync.hasCloudBackup();
+    if (!hasBackup) {
+      await CloudSync.disconnect();
+      showAlert(
+        getCloudProviderDefinition(providerName)?.label ?? t("settings.cloud.storage"),
+        t("onboarding.restore.noCloudBackup"),
+      );
+      return;
+    }
+    promptCloudPin(providerName);
+  };
+
+  const handleSelectCloudProvider = async (providerName: string) => {
+    const def = getCloudProviderDefinition(providerName);
+    if (!def) return;
+    if (def.SetupComponent && !(await CloudSync.isProviderConfigured(providerName))) {
+      setCloudSetupId(providerName);
+      setSaveSheetStep("setup");
+      return;
+    }
+    await connectCloudProvider(providerName);
+  };
+
+  const CloudSetup = getCloudProviderDefinition(cloudSetupId)?.SetupComponent;
 
   const goTo = useCallback((next: number) => {
     if (busy.current) return;
@@ -289,6 +565,15 @@ export default function OnboardingPage() {
     contentOpacity.setValue(1);
     busy.current = false;
   }, [step, contentOpacity]);
+
+  //sound and rumble ride the logo animation
+  useEffect(() => {
+    startupPlayer.play();
+    //ios plays every buzz at a fixed length
+    if (Platform.OS !== "android") return;
+    Vibration.vibrate(INTRO_RUMBLE);
+    return () => Vibration.cancel();
+  }, [startupPlayer]);
 
   //hardware back walks steps backward
   useEffect(() => {
@@ -310,18 +595,27 @@ export default function OnboardingPage() {
     }).start();
   }, [showBack, backButtonProgress]);
 
-  //cta trails the first phrase
-  const revealCta = useCallback(() => {
-    setLaunchCtaReady(true);
+  //cta waits for the titles to play
+  const onLogoGone = useCallback(() => {
+    setIntroPhase("phrases");
     Animated.timing(launchCtaOpacity, {
       toValue: 1,
       duration: 500,
+      delay: TITLES_DURATION,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => setLaunchCtaReady(true));
+  }, [launchCtaOpacity]);
+
+  //credit lives only with the logo
+  useEffect(() => {
+    Animated.timing(creditOpacity, {
+      toValue: introPhase === "logo" ? 1 : 0,
+      duration: 400,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [launchCtaOpacity]);
-
-  const onLogoGone = useCallback(() => setIntroPhase("phrases"), []);
+  }, [introPhase, creditOpacity]);
 
   const requestPermission = async (perm: PermissionDef) => {
     if (statuses[perm.id]) return;
@@ -336,36 +630,21 @@ export default function OnboardingPage() {
     router.replace("/");
   };
 
-  const isLast = step === LAST_STEP;
-  const ctaLabel = step === 0 ? t("onboarding.welcome.cta") : isLast ? t("onboarding.ready.cta") : t("onboarding.next");
   const trimmedName = name.trim();
 
-  const renderIntro = () => <IntroStage phase={introPhase} onLogoGone={onLogoGone} onReady={revealCta} />;
+  const renderIntro = () => <IntroStage phase={introPhase} onLogoGone={onLogoGone} />;
 
-  const renderWelcome = () => (
-    <>
-      <Reveal>
-        <Text style={[styles.heroTitle, isLargeScreen && styles.heroTitleLarge]}>{t("onboarding.welcome.title")}</Text>
-      </Reveal>
-      <Reveal delay={120}>
-        <Text style={styles.lead}>{t("onboarding.welcome.subtitle")}</Text>
-      </Reveal>
-      <Reveal delay={240}>
-        <Group>
-          {PROMISES.map((promise) => (
-            <View key={promise.id} style={styles.row}>
-              <View style={styles.iconBadge}>
-                <Image source={promise.icon} style={styles.badgeIcon} tintColor={Colors.textOnPrimary} />
-              </View>
-              <View style={styles.rowText}>
-                <Text style={styles.rowTitle}>{t(`onboarding.welcome.${promise.id}.title`)}</Text>
-                <Text style={styles.rowDescription}>{t(`onboarding.welcome.${promise.id}.description`)}</Text>
-              </View>
-            </View>
-          ))}
-        </Group>
-      </Reveal>
-    </>
+  //same pill as the settings permissions page
+  const renderPermissionBadge = (status?: PermissionStatus) => (
+    <View style={[styles.permissionBadge, status === "granted" && styles.permissionBadgeAllowed]}>
+      <Text style={[styles.permissionBadgeText, status === "granted" && styles.permissionBadgeTextAllowed]}>
+        {status === "granted"
+          ? t("permissions.allowed")
+          : status === "denied"
+            ? t("permissions.denied")
+            : t("permissions.allow")}
+      </Text>
+    </View>
   );
 
   const renderProfile = () => (
@@ -374,30 +653,56 @@ export default function OnboardingPage() {
         <Text style={styles.title}>{t("onboarding.profile.title")}</Text>
       </Reveal>
       <Reveal delay={100}>
-        <Text style={styles.lead}>{t("onboarding.profile.subtitle")}</Text>
+        <View style={styles.contentCard}>
+          <Text style={styles.settingLabel}>{t("settings.profile.name")}</Text>
+          <Text style={styles.helpText}>{t("onboarding.profile.subtitle")}</Text>
+          <Group>
+            <TextInputField
+              icon={pencilIcon}
+              value={name}
+              onChangeText={setName}
+              placeholder={t("onboarding.name.placeholder")}
+              returnKeyType="next"
+              onSubmitEditing={() => goTo(step + 1)}
+              autoCapitalize="words"
+              autoCorrect={false}
+            />
+          </Group>
+        </View>
+      </Reveal>
+    </>
+  );
+
+  const renderVoice = () => (
+    <>
+      <Reveal>
+        <Text style={styles.title}>{t("onboarding.voice.title")}</Text>
+      </Reveal>
+      <Reveal delay={100}>
+        <ButterflyCluster parallax={false} intro={false} style={styles.voiceButterfly} />
       </Reveal>
       <Reveal delay={200}>
-        <Group>
-          <TextInputField
-            icon={pencilIcon}
-            value={name}
-            onChangeText={setName}
-            placeholder={t("onboarding.name.placeholder")}
-            returnKeyType="next"
-            onSubmitEditing={() => {
-              setConfirmedName(name);
-              goTo(step + 1);
-            }}
-            autoCapitalize="words"
-            autoCorrect={false}
-          />
-        </Group>
-      </Reveal>
-      <Reveal delay={300}>
-        <Text style={styles.sectionLabel}>{t("onboarding.profile.card")}</Text>
-        <Group>
-          <ProfileCard name={confirmedName} />
-        </Group>
+        <VoiceEngineCard />
+        {voicePackInstalled && (
+          <View style={styles.contentCard}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.maestro.voice")}</Text>
+            <IconSelector options={BUTTERFLY_OPTIONS} selectedValue={maestroButterfly} onSelect={selectButterfly} />
+            <Text style={[styles.settingLabel, { marginTop: Spacing.xxl, marginBottom: Spacing.md }]}>
+              {t("settings.tts.speed")}
+            </Text>
+            <Group>
+              <Slider
+                icon={timeIcon}
+                options={TTS_SPEEDS.map((id) => ({ id, label: `${id}×` }))}
+                selectedValue={ttsSpeed}
+                onSelect={(v) => {
+                  setTtsSpeedState(v);
+                  Settings.set("ttsSpeed", v);
+                }}
+              />
+            </Group>
+          </View>
+        )}
       </Reveal>
     </>
   );
@@ -408,71 +713,43 @@ export default function OnboardingPage() {
         <Text style={styles.title}>{t("onboarding.permissions.title")}</Text>
       </Reveal>
       <Reveal delay={100}>
-        <Text style={styles.lead}>
-          {isWeb ? (
-            t("onboarding.permissions.subtitleWeb")
-          ) : (
-            <>
-              {t("onboarding.permissions.subtitle")}{" "}
-              <Text style={styles.link} onPress={() => Linking.openSettings()}>
-                {t("onboarding.permissions.settingsLink")}
-              </Text>
-            </>
-          )}
-        </Text>
-      </Reveal>
-      <Reveal delay={200}>
-        <Group>
-          {PERMISSIONS.map((perm) => {
-            const status = statuses[perm.id];
-            return (
-              <Pressable
-                key={perm.id}
-                onPress={() => requestPermission(perm)}
-                disabled={!!status}
-                style={pressStyle(styles.row, !status && styles.rowPressed)}
-              >
-                <View style={styles.iconBadge}>
-                  <Image source={perm.icon} style={styles.badgeIcon} tintColor={Colors.textOnPrimary} />
-                </View>
-                <View style={styles.rowText}>
-                  <Text style={styles.rowTitle}>{t(`permissions.${perm.id}.label`)}</Text>
-                  <Text style={styles.rowDescription}>{t(`permissions.${perm.id}.description`)}</Text>
-                </View>
-                <View
-                  style={[
-                    styles.chip,
-                    status === "granted" && styles.chipGranted,
-                    status === "denied" && styles.chipDenied,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      status === "granted" && styles.chipTextGranted,
-                      status === "denied" && styles.chipTextDenied,
-                    ]}
-                  >
-                    {status === "granted"
-                      ? t("permissions.allowed")
-                      : status === "denied"
-                        ? t("permissions.denied")
-                        : t("permissions.allow")}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </Group>
+        <View style={styles.contentCard}>
+          <Text style={styles.settingLabel}>{t("permissions.title")}</Text>
+          <Text style={styles.helpText}>
+            {isWeb ? (
+              t("onboarding.permissions.subtitleWeb")
+            ) : (
+              <>
+                {t("onboarding.permissions.subtitle")}{" "}
+                <Text style={styles.link} onPress={() => Linking.openSettings()}>
+                  {t("onboarding.permissions.settingsLink")}
+                </Text>
+              </>
+            )}
+          </Text>
+          <Group>
+            {PERMISSIONS.map((perm) => {
+              const status = statuses[perm.id];
+              return (
+                <ActionButton
+                  key={perm.id}
+                  icon={perm.icon}
+                  label={t(`permissions.${perm.id}.label`)}
+                  onPress={() => requestPermission(perm)}
+                  disabled={!!status}
+                  rightElement={renderPermissionBadge(status)}
+                />
+              );
+            })}
+          </Group>
+        </View>
       </Reveal>
     </>
   );
 
   const renderReady = () => (
     <View style={styles.readyContent}>
-      <Reveal>
-        <FloatingButterfly source={homeButterfly} style={styles.readyButterfly} />
-      </Reveal>
+      <ButterflyCluster style={styles.readyButterfly} />
       <Reveal delay={120}>
         <Text style={[styles.title, styles.centered]}>
           {trimmedName ? t("onboarding.ready.titleNamed", { name: trimmedName }) : t("onboarding.ready.title")}
@@ -484,7 +761,10 @@ export default function OnboardingPage() {
     </View>
   );
 
-  const steps = [renderIntro, renderWelcome, renderProfile, renderPermissions, renderReady];
+  const steps = [renderIntro, renderProfile, ...(hasVoiceEngines ? [renderVoice] : []), renderPermissions, renderReady];
+
+  const isLast = step === steps.length - 1;
+  const ctaLabel = step === 0 ? t("onboarding.welcome.cta") : isLast ? t("onboarding.ready.cta") : t("onboarding.next");
 
   return (
     <View style={styles.container}>
@@ -520,17 +800,45 @@ export default function OnboardingPage() {
           <View style={styles.header} />
 
           <Animated.View style={[styles.flex, { opacity: contentOpacity }]}>
-            <ScrollView
-              key={step}
-              contentContainerStyle={[styles.scrollContent, (step === 1 || step === 2) && styles.scrollContentTop]}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              {steps[step]()}
-            </ScrollView>
+            {step === 0 ? (
+              //scrollview would clip the logo's slide
+              <View style={styles.scrollContent}>{steps[0]()}</View>
+            ) : (
+              <ScrollView
+                key={step}
+                contentContainerStyle={[styles.scrollContent, step > 0 && !isLast && styles.scrollContentTop]}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                {steps[step]()}
+              </ScrollView>
+            )}
           </Animated.View>
 
+          {step === 0 && (
+            <Animated.View
+              pointerEvents={launchCtaReady ? "auto" : "none"}
+              style={[styles.restoreWrap, { opacity: Animated.multiply(launchCtaOpacity, contentOpacity) }]}
+            >
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  setSaveSheetStep("root");
+                  setSaveSheetVisible(true);
+                }}
+                style={({ pressed }) => [styles.restoreButton, pressed && styles.restoreButtonPressed]}
+              >
+                <Text style={styles.restoreText}>{t("onboarding.restore.cta")}</Text>
+              </Pressable>
+            </Animated.View>
+          )}
+
           <View style={styles.footer}>
+            {step === 0 && (
+              <Animated.View style={[styles.credit, { opacity: creditOpacity }]}>
+                <Text style={styles.creditText}>by Maestroai.Company</Text>
+              </Animated.View>
+            )}
             <Animated.View
               pointerEvents={showBack ? "auto" : "none"}
               style={[
@@ -554,7 +862,7 @@ export default function OnboardingPage() {
             <Animated.View pointerEvents={launchCtaReady ? "auto" : "none"} style={[styles.ctaWrap, { opacity: launchCtaOpacity }]}>
               <Pressable
                 onPress={isLast ? finish : () => goTo(step + 1)}
-                style={pressStyle([styles.cta, isLast && styles.ctaGlow], styles.ctaPressed)}
+                style={pressStyle(styles.cta, styles.ctaPressed)}
               >
                 <Text style={styles.ctaText}>{ctaLabel}</Text>
                 <Image source={arrowIcon} style={styles.ctaIcon} tintColor={Colors.textOnPrimary} />
@@ -563,6 +871,87 @@ export default function OnboardingPage() {
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      <DrawerSheet
+        visible={saveSheetVisible}
+        onClose={closeSaveSheet}
+        onBackPress={handleSaveSheetBack}
+        mode="overlay"
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        handleContainerStyle={styles.sheetHandleContainer}
+        avoidKeyboard
+        sheetStyle={[
+          styles.sheet,
+          {
+            paddingBottom: (Platform.OS === "ios" ? 20 : 10) + (isKeyboardOpen ? 0 : insets.bottom),
+            maxHeight: windowHeight - insets.top - Spacing.xl2,
+          },
+        ]}
+        desktopStyle={styles.desktopCard}
+      >
+        <SheetScrollView contentContainerStyle={styles.sheetContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.contentCard}>
+            {saveSheetStep === "root" && (
+              <>
+                <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+                  {t("onboarding.restore.cta")}
+                </Text>
+                <Group>
+                  <ActionButton
+                    icon={cloudIcon}
+                    label={t("onboarding.restore.fromCloud")}
+                    onPress={() => setSaveSheetStep("cloud")}
+                  />
+                  <ActionButton
+                    icon={fileIcon}
+                    label={t("onboarding.restore.fromFiles")}
+                    onPress={handleRestoreFromFile}
+                  />
+                </Group>
+              </>
+            )}
+            {saveSheetStep === "cloud" && (
+              <>
+                <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+                  {t("settings.cloud.selectStorage")}
+                </Text>
+                <Group>
+                  {CLOUD_PROVIDERS.map((def) => (
+                    <ActionButton
+                      key={def.id}
+                      icon={cloudIcon}
+                      label={def.label}
+                      onPress={() => handleSelectCloudProvider(def.id)}
+                    />
+                  ))}
+                </Group>
+              </>
+            )}
+            {saveSheetStep === "setup" && CloudSetup && (
+              <CloudSetup onDone={() => connectCloudProvider(cloudSetupId)} />
+            )}
+          </View>
+        </SheetScrollView>
+      </DrawerSheet>
+
+      <NotificationModal
+        visible={alertVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        messageAlign={alertConfig.messageAlign}
+        loading={alertConfig.loading}
+        showInput={alertConfig.showInput}
+        inputValue={alertConfig.inputValue}
+        onInputChange={alertConfig.onInputChange}
+        inputPlaceholder={alertConfig.inputPlaceholder}
+        inputSecureTextEntry={alertConfig.inputSecureTextEntry}
+        inputKeyboardType={alertConfig.inputKeyboardType}
+        buttons={alertConfig.buttons}
+        onClose={() => {
+          if (!alertConfig.loading) setAlertVisible(false);
+        }}
+      />
     </View>
   );
 }
@@ -598,6 +987,64 @@ const makeStyles = (Colors: ThemeColors) =>
       flexDirection: "row",
       alignItems: "center",
     },
+    restoreWrap: {
+      alignItems: "center",
+      marginBottom: Spacing.md,
+    },
+    restoreButton: {
+      paddingVertical: Spacing.xs,
+      paddingHorizontal: Spacing.md,
+    },
+    restoreButtonPressed: {
+      opacity: 0.6,
+    },
+    restoreText: {
+      fontFamily: Fonts.body,
+      fontSize: FontSizes.bodyMd,
+      color: Colors.textMuted,
+      textDecorationLine: "underline",
+    },
+    sheet: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: Colors.groupedBackground,
+      borderTopLeftRadius: Radius.huge2,
+      borderTopRightRadius: Radius.huge2,
+      paddingTop: Spacing.xxl,
+    },
+    desktopCard: {
+      width: DESKTOP_CARD_WIDTH,
+    },
+    sheetHandleContainer: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      alignItems: "center",
+      paddingVertical: Spacing.md,
+    },
+    sheetContent: {
+      paddingHorizontal: Spacing.lg2,
+      paddingBottom: Spacing.lg,
+    },
+    //sits in the hidden cta slot
+    credit: {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      alignItems: "center",
+      justifyContent: "center",
+      pointerEvents: "none",
+    },
+    creditText: {
+      fontFamily: Fonts.body,
+      fontSize: FontSizes.caption,
+      color: Colors.textMuted,
+    },
     //clips the button as its animated width reveals it
     backButtonWrap: {
       height: BACK_BUTTON_SIZE,
@@ -628,13 +1075,18 @@ const makeStyles = (Colors: ThemeColors) =>
       paddingVertical: Spacing.xxl2,
       gap: Spacing.xxl,
     },
-    //welcome and profile read top down, not centered
+    //middle steps read top down, not centered
     scrollContentTop: {
       justifyContent: "flex-start",
       paddingTop: Spacing.xl,
     },
     stage: {
       alignItems: "center",
+    },
+    //filter clips to bounds, pad so the blur fits
+    blurRoom: {
+      padding: Spacing.xxxl,
+      margin: -Spacing.xxxl,
     },
     phrase: {
       maxWidth: 320,
@@ -648,16 +1100,6 @@ const makeStyles = (Colors: ThemeColors) =>
       maxWidth: 480,
       fontSize: FontSizes.displayLg,
       lineHeight: 44,
-    },
-    heroTitle: {
-      fontFamily: Fonts.display,
-      fontSize: FontSizes.displayLg,
-      lineHeight: 42,
-      color: Colors.textPrimary,
-    },
-    heroTitleLarge: {
-      fontSize: FontSizes.displayHero,
-      lineHeight: 54,
     },
     title: {
       fontFamily: Fonts.display,
@@ -678,76 +1120,52 @@ const makeStyles = (Colors: ThemeColors) =>
     centered: {
       textAlign: "center",
     },
-    sectionLabel: {
+    //same card, label and help text as the settings pages
+    contentCard: {
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.xxl + Spacing.md,
+      padding: Spacing.md,
+    },
+    settingLabel: {
       fontFamily: Fonts.mono,
-      fontSize: FontSizes.label,
-      color: Colors.textMuted,
-      marginBottom: Spacing.md,
-    },
-    row: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingVertical: Spacing.lg2,
-      paddingHorizontal: Spacing.lg2,
-      gap: Spacing.lg2,
-    },
-    rowPressed: {
-      backgroundColor: Colors.surfacePressed,
-    },
-    iconBadge: {
-      width: 36,
-      height: 36,
-      borderRadius: Radius.xxl,
-      backgroundColor: Colors.primary,
-      borderWidth: 2,
-      borderColor: Colors.borderOnPrimary,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    badgeIcon: {
-      width: 18,
-      height: 18,
-    },
-    rowText: {
-      flex: 1,
-      gap: Spacing.xs2,
-    },
-    rowTitle: {
-      fontFamily: Fonts.mono,
-      fontSize: FontSizes.bodyMd,
+      fontSize: FontSizes.body,
       color: Colors.textPrimary,
+      paddingTop: Spacing.xs,
+      paddingHorizontal: Spacing.md,
     },
-    rowDescription: {
+    helpText: {
       fontFamily: Fonts.body,
-      fontSize: FontSizes.caption,
-      lineHeight: 18,
+      fontSize: FontSizes.bodyMd,
+      lineHeight: 20,
       color: Colors.textMuted,
+      marginTop: Spacing.xs,
+      marginBottom: Spacing.md,
+      paddingHorizontal: Spacing.md,
     },
-    chip: {
-      paddingVertical: Spacing.xs,
+    permissionBadge: {
+      paddingVertical: 3,
       paddingHorizontal: Spacing.md,
       borderRadius: Radius.md,
       borderWidth: 2,
       borderColor: Colors.border,
       backgroundColor: Colors.surface,
     },
-    chipGranted: {
+    permissionBadgeAllowed: {
       backgroundColor: Colors.primary,
       borderColor: Colors.primaryBright,
     },
-    chipDenied: {
-      backgroundColor: Colors.surfaceSubtle,
-    },
-    chipText: {
+    permissionBadgeText: {
       fontFamily: Fonts.mono,
-      fontSize: FontSizes.label,
+      fontSize: FontSizes.labelSm,
       color: Colors.textSecondary,
     },
-    chipTextGranted: {
+    permissionBadgeTextAllowed: {
       color: Colors.textOnPrimary,
     },
-    chipTextDenied: {
-      color: Colors.textMuted,
+    voiceButterfly: {
+      width: 200,
+      height: 200,
+      alignSelf: "center",
     },
     readyContent: {
       alignItems: "center",
@@ -771,12 +1189,8 @@ const makeStyles = (Colors: ThemeColors) =>
       borderColor: Colors.borderOnPrimary,
       backgroundColor: Colors.primary,
     },
-    //echoes the chat composer glow
-    ctaGlow: {
-      boxShadow: `2px 6px 22px ${Colors.primary}`,
-    },
     ctaPressed: {
-      backgroundColor: Colors.primaryPressed,
+      backgroundColor: Colors.primaryBright,
     },
     ctaText: {
       fontFamily: Fonts.mono,

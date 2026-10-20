@@ -8,8 +8,7 @@ import * as MediaLibrary from "expo-media-library/legacy";
 import * as Sharing from "expo-sharing";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
 import {
-  Dispatch,
-  SetStateAction,
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -31,14 +30,20 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StyleProp,
   StyleSheet,
   Text,
   useWindowDimensions,
   Vibration,
   View,
+  ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { captureRef, releaseCapture } from "react-native-view-shot";
+import {
+  MODEL_CAPABILITY_KEYS,
+  type ModelCapabilityId,
+} from "../../../constants/modelCapabilities";
 import {
   Fonts,
   FontSizes,
@@ -93,6 +98,7 @@ import {
   newOpenAIServerId,
   OllamaServer,
   OPENAI_PROVIDER_ID,
+  openAIServerNames,
   serializeServers,
   serializeProviders,
   setOpenAIApiKey,
@@ -122,21 +128,28 @@ import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { openScreenSaverSettings } from "../../services/screensaver/ScreenSaver";
 import { Settings } from "../../services/settings/SettingsService";
 import { WhisperSTT } from "../../services/speech/STTService";
-import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
+import { TTS_SPEEDS } from "../../services/speech/engines";
 import ActionButton from "../ui/ActionButton";
 import Checkbox from "../ui/Checkbox";
-import DownloadProgress from "../ui/DownloadProgress";
+import DownloadProgress, { throttleProgress } from "../ui/DownloadProgress";
 import Group from "../ui/Group";
 import NotificationBanner from "../ui/NotificationBanner";
-import NotificationCard from "../ui/NotificationCard";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import ProgressBar from "../ui/ProgressBar";
+import IconSelector from "../ui/IconSelector";
 import Selector, { SelectorOption } from "../ui/Selector";
 import Slider from "../ui/Slider";
 import SliderToggle from "../ui/SliderToggle";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
-import DrawerSheet from "./DrawerSheet";
+import DrawerSheet, {
+  SheetBody,
+  SheetKeyboardAwareScrollView,
+  SheetScrollView,
+} from "./DrawerSheet";
+import MaestroCard from "./MaestroCard";
+import { BUTTERFLY_OPTIONS, selectButterfly, useMaestroButterfly } from "./maestroButterfly";
+import VoiceEngineCard from "./VoiceEngineCard";
 import ProfileCard from "./ProfileCard";
 
 import {
@@ -145,6 +158,7 @@ import {
 } from "react-native-keyboard-controller";
 import { useResponsive } from "../../hooks/useResponsive";
 import { useSettingsNotices } from "../../hooks/useSettingsNotices";
+import { useVoicePackInstalled } from "../../hooks/useVoicePackInstalled";
 
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useBugReport } from "../../hooks/useBugReport";
@@ -159,7 +173,6 @@ import {
   settingsProgress,
   settleDrawer,
   settleLayoutDrawer,
-  settlePage,
 } from "./drawerAnimation";
 import DrawerBackButton from "./DrawerBackButton";
 import PageStack from "./PageStack";
@@ -169,13 +182,15 @@ const addIcon = require("../../../assets/icons/add.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 const deleteIcon = require("../../../assets/icons/delete.png");
 const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
+const keyIcon = require("../../../assets/icons/key.png");
 
-const LITERT_CAPABILITY_KEYS = {
-  vision: "settings.litert.capVision",
-  audio: "settings.litert.capAudio",
-  thinking: "settings.litert.capThinking",
-} as const;
-const searchIcon = require("../../../assets/icons/search.png");
+//tools and video stay hidden here
+const LITERT_CAPABILITY_IDS: readonly ModelCapabilityId[] = [
+  "vision",
+  "audio",
+  "thinking",
+];
+const searchIcon =require("../../../assets/icons/search.png");
 const profilIcon = require("../../../assets/icons/profil.png");
 const cloudIcon = require("../../../assets/icons/cloud.png");
 const cloudUploadIcon = require("../../../assets/icons/cloudupload.png");
@@ -183,10 +198,12 @@ const cloudDownloadIcon = require("../../../assets/icons/clouddownload.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
 const rightArrowIcon = require("../../../assets/icons/right.png");
 const cancelIcon = require("../../../assets/icons/cancel.png");
+const activateIcon = require("../../../assets/icons/activate.png");
 const generalIcon = require("../../../assets/icons/general.png");
 const advancedIcon = require("../../../assets/icons/settings.png");
 const serverIcon = require("../../../assets/icons/server.png");
 const toolIcon = require("../../../assets/icons/tool.png");
+const tool2Icon = require("../../../assets/icons/tool2.png");
 const confidentialityIcon = require("../../../assets/icons/confidentiality.png");
 const reportsIcon = require("../../../assets/icons/bug.png");
 const supportIcon = require("../../../assets/icons/support.png");
@@ -197,15 +214,18 @@ const instagramIcon = require("../../../assets/icons/instagram.png");
 const tiktokIcon = require("../../../assets/icons/tiktok.png");
 const micIcon = require("../../../assets/icons/microphone.png");
 const cameraIcon = require("../../../assets/icons/camera.png");
+const videocamIcon = require("../../../assets/icons/videocam.png");
 const visionIcon = require("../../../assets/icons/vision.png");
 const microIcon = require("../../../assets/icons/micro.png");
 const brainIcon = require("../../../assets/icons/brain.png");
-//same icons as the model drawer
-const LITERT_CAPABILITY_ICONS = {
+//icon set differs from the sheet
+const MODEL_CAPABILITY_ICONS = {
+  tools: tool2Icon,
   vision: visionIcon,
-  audio: microIcon,
   thinking: brainIcon,
-};
+  audio: microIcon,
+  video: videocamIcon,
+} as const satisfies Record<ModelCapabilityId, ImageSourcePropType>;
 const photoIcon = require("../../../assets/icons/photo.png");
 const locationIcon = require("../../../assets/icons/location.png");
 const calendarIcon = require("../../../assets/icons/calendar.png");
@@ -214,28 +234,12 @@ const exportIcon = require("../../../assets/icons/export.png");
 const messageIcon = require("../../../assets/icons/message.png");
 const timeIcon = require("../../../assets/icons/time.png");
 const errorIcon = require("../../../assets/icons/error.png");
-const ollamaErrorImage = require("../../../assets/images/ImageCard/OllamaError.png");
+const errorImage = require("../../../assets/images/ImageCard/error.png");
 const infoIcon = require("../../../assets/icons/info.png");
 const reconnectIcon = require("../../../assets/icons/reconnect.png");
 const hyperlinkIcon = require("../../../assets/icons/hyperlink2.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
-
-//downloads tick per chunk, repaint on whole percents or twice a second
-function throttleProgress<T extends { progress: number }>(
-  set: Dispatch<SetStateAction<T | null>>,
-) {
-  let lastPercent = -1;
-  let lastTime = 0;
-  return (value: T) => {
-    const percent = Math.floor(value.progress * 100);
-    const now = Date.now();
-    if (percent === lastPercent && now - lastTime < 500) return;
-    lastPercent = percent;
-    lastTime = now;
-    set(value);
-  };
-}
 
 //plugin help shows the first sentence only
 function shortDescription(text: string) {
@@ -267,16 +271,18 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
 };
 
-type SubPage =
+export type SubPage =
   | "main"
   | "general"
   | "advanced"
+  | "maestro"
+  | "maestropreferences"
   | "assistantoverlay"
   | "screensaver"
   | "service"
   | "beta"
-  | "local"
   | "litert"
+  | "litertmodel"
   | "ollama"
   | "ollamaserver"
   | "openai"
@@ -284,10 +290,8 @@ type SubPage =
   | "confidentiality"
   | "reports"
   | "tools"
-  | "widgets"
   | "profile"
   | "cloud"
-  | "mobileactions"
   | "mcpservers"
   | "mcpserver"
   | "mcpserversettings"
@@ -298,12 +302,14 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   main: "main",
   general: "main",
   advanced: "main",
-  assistantoverlay: "main",
+  maestro: "main",
+  maestropreferences: "maestro",
+  assistantoverlay: "general",
   screensaver: "general",
   service: "main",
   beta: "service",
-  local: "service",
   litert: "service",
+  litertmodel: "litert",
   ollama: "service",
   ollamaserver: "ollama",
   openai: "service",
@@ -314,8 +320,6 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   profile: "main",
   cloud: "main",
   sociallinks: "main",
-  widgets: "tools",
-  mobileactions: "tools",
   mcpservers: "tools",
   mcpserver: "mcpservers",
   mcpserversettings: "mcpserver",
@@ -323,6 +327,330 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
 
 const subPageParent = (page: SubPage) =>
   page === "main" ? null : SUB_PAGE_PARENT[page];
+
+//nav entry a subpage lives under
+const sectionOf = (page: SubPage): SubPage => {
+  let p = page;
+  while (SUB_PAGE_PARENT[p] !== "main") p = SUB_PAGE_PARENT[p];
+  return p;
+};
+
+//desktop always shows a page next to the nav
+const DESKTOP_ENTRY_PAGE: SubPage = "general";
+//settings rows stay readable on wide screens
+const DESKTOP_WINDOW_MAX_WIDTH = 960;
+
+type LitertPage = "browse" | "search" | "model";
+type CloudModelsPage = "list" | "model";
+
+const MODEL_PAGE_SIZE = 50;
+//cloud page previews before the full sheet
+const MODEL_PREVIEW_SIZE = 10;
+const NO_DISABLED_MODELS: string[] = [];
+const NO_CAPABILITY_OVERRIDES: Record<string, string[]> = {};
+const MODEL_CAPABILITY_ROWS = [
+  "tools",
+  "vision",
+  "thinking",
+  "audio",
+  "video",
+] as const satisfies readonly ModelCapabilityId[];
+
+//override wins over server caps
+const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
+  model,
+  service,
+  url,
+  onCapabilitiesChange,
+  style,
+  labelStyle,
+  checkboxes = false,
+}: {
+  model: string;
+  service: string;
+  url: string;
+  onCapabilitiesChange: (model: string, capabilities: string[]) => void;
+  style?: StyleProp<ViewStyle>;
+  labelStyle?: StyleProp<ViewStyle>;
+  checkboxes?: boolean;
+}) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
+  const t = useT();
+  const [capabilities, setCapabilities] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    AIModule.getModelCapabilitiesFor(service, url, model)
+      .catch(() => [] as string[])
+      .then((caps) => {
+        if (!cancelled) setCapabilities(caps);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [service, url, model]);
+
+  const toggleCapability = (id: string, on: boolean) => {
+    const current = capabilities ?? [];
+    const next = MODEL_CAPABILITY_ROWS.filter((c) =>
+      c === id ? on : current.includes(c),
+    );
+    setCapabilities(next);
+    onCapabilitiesChange(model, next);
+  };
+
+  if (!capabilities) return null;
+  return (
+    <View style={style}>
+      {MODEL_CAPABILITY_ROWS.map((c) => (
+        <View key={c} style={styles.toggleGroupRow}>
+          <View style={[styles.litertCapability, labelStyle]}>
+            <Image
+              source={MODEL_CAPABILITY_ICONS[c]}
+              style={styles.litertCapabilityIcon}
+              tintColor={Colors.textSecondary}
+            />
+            <Text style={styles.litertDetailMeta}>
+              {t(MODEL_CAPABILITY_KEYS[c])}
+            </Text>
+          </View>
+          {checkboxes ? (
+            <Checkbox
+              checked={capabilities.includes(c)}
+              onToggle={(v) => toggleCapability(c, v)}
+            />
+          ) : (
+            <Toggle
+              checked={capabilities.includes(c)}
+              onToggle={(v) => toggleCapability(c, v)}
+            />
+          )}
+        </View>
+      ))}
+    </View>
+  );
+});
+
+const ModelToggleRow = memo(function ModelToggleRow({
+  model,
+  enabled,
+  last,
+  expanded,
+  service,
+  url,
+  onToggle,
+  onExpand,
+  onCapabilitiesChange,
+}: {
+  model: string;
+  enabled: boolean;
+  last: boolean;
+  expanded: boolean;
+  service: string;
+  url: string;
+  onToggle: (model: string, enabled: boolean) => void;
+  onExpand: (model: string) => void;
+  onCapabilitiesChange: (model: string, capabilities: string[]) => void;
+}) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
+
+  return (
+    <View style={!last && { marginBottom: Spacing.lg }}>
+      <View style={styles.toggleGroupRow}>
+        <Pressable
+          style={pressStyle(styles.modelToggleName, "fadeLight")}
+          onPress={() => onExpand(model)}
+        >
+          <Text style={[styles.settingLabel, styles.modelToggleLabel]} numberOfLines={1}>
+            {model}
+          </Text>
+          <Image
+            source={rightArrowIcon}
+            style={[styles.litertCapabilityIcon, expanded && styles.modelToggleArrowOpen]}
+            tintColor={Colors.textMuted}
+          />
+        </Pressable>
+        <Checkbox checked={enabled} onToggle={(v) => onToggle(model, v)} />
+      </View>
+      {expanded && (
+        <ModelCapabilityToggles
+          model={model}
+          service={service}
+          url={url}
+          onCapabilitiesChange={onCapabilitiesChange}
+          style={styles.modelCapabilities}
+        />
+      )}
+    </View>
+  );
+});
+
+//local search avoids drawer redraws
+const ModelToggleList = memo(function ModelToggleList({
+  models,
+  loading,
+  service,
+  url,
+  disabled = NO_DISABLED_MODELS,
+  capabilities = NO_CAPABILITY_OVERRIDES,
+  onChange,
+  onCapabilitiesChange,
+  onShowAll,
+  onOpenModel,
+  showAll = false,
+  autoFocusSearch = false,
+  onSearchFocus,
+}: {
+  models: string[];
+  loading: boolean;
+  service: string;
+  url: string;
+  disabled?: string[];
+  capabilities?: Record<string, string[]>;
+  onChange: (next: string[]) => void;
+  //only the inline expand edits capabilities
+  onCapabilitiesChange?: (next: Record<string, string[]>) => void;
+  //show more opens the full list instead of paging
+  onShowAll?: () => void;
+  //rows open a model page instead of expanding
+  onOpenModel?: (model: string) => void;
+  showAll?: boolean;
+  autoFocusSearch?: boolean;
+  onSearchFocus?: () => void;
+}) {
+  const styles = useThemedStyles(makeStyles);
+  const t = useT();
+  const pageSize = showAll
+    ? Infinity
+    : onShowAll
+      ? MODEL_PREVIEW_SIZE
+      : MODEL_PAGE_SIZE;
+  const [search, setSearch] = useState("");
+  const [limit, setLimit] = useState(pageSize);
+
+  const disabledSet = useMemo(() => new Set(disabled), [disabled]);
+  const shown = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return query
+      ? models.filter((m) => m.toLowerCase().includes(query))
+      : models;
+  }, [models, search]);
+  const enabledCount = models.filter((m) => !disabledSet.has(m)).length;
+
+  //stable handler keeps memo rows still
+  const latest = useRef({ disabled, onChange, capabilities, onCapabilitiesChange });
+  useEffect(() => {
+    latest.current = { disabled, onChange, capabilities, onCapabilitiesChange };
+  });
+  const toggleModel = useCallback((model: string, enabled: boolean) => {
+    const { disabled: current, onChange: save } = latest.current;
+    save(enabled ? current.filter((m) => m !== model) : [...current, model]);
+  }, []);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const toggleExpanded = useCallback((model: string) => {
+    setExpanded((current) => (current === model ? null : model));
+  }, []);
+  const setModelCapabilities = useCallback((model: string, caps: string[]) => {
+    const { capabilities: current, onCapabilitiesChange: save } = latest.current;
+    save?.({ ...current, [model]: caps });
+  }, []);
+
+  //bulk buttons act on the filtered rows
+  const setShown = (enabled: boolean) => {
+    const shownSet = new Set(shown);
+    onChange(
+      enabled
+        ? disabled.filter((m) => !shownSet.has(m))
+        : [...new Set([...disabled, ...shown])],
+    );
+  };
+
+  const visible = shown.slice(0, limit);
+
+  return (
+    <View style={styles.contentCard}>
+      <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+        <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+          {models.length > 0
+            ? t("settings.ollama.modelsCount", {
+                count: `${enabledCount}/${models.length}`,
+              })
+            : t("settings.ollama.models")}
+        </Text>
+        {models.length === 0 ? (
+          <Text style={styles.helpText}>
+            {loading
+              ? t("settings.ollama.modelsLoading")
+              : t("settings.ollama.noModels")}
+          </Text>
+        ) : (
+          <>
+            <Group style={styles.groupSpacingTight}>
+              <TextInputField
+                icon={searchIcon}
+                placeholder={t("settings.ollama.searchModels")}
+                value={search}
+                onChangeText={(v) => {
+                  setSearch(v);
+                  setLimit(pageSize);
+                }}
+                autoFocus={autoFocusSearch}
+                onFocus={onSearchFocus}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </Group>
+            <Group style={{ marginBottom: Spacing.xxl }}>
+              <ActionButton
+                icon={activateIcon}
+                label={t("settings.ollama.enableAll")}
+                disabled={shown.every((m) => !disabledSet.has(m))}
+                onPress={() => setShown(true)}
+              />
+              <ActionButton
+                icon={cancelIcon}
+                label={t("settings.ollama.disableAll")}
+                disabled={shown.every((m) => disabledSet.has(m))}
+                onPress={() => setShown(false)}
+              />
+            </Group>
+            {shown.length === 0 ? (
+              <Text style={styles.helpText}>{t("settings.ollama.noMatch")}</Text>
+            ) : (
+              visible.map((model, index) => (
+                <ModelToggleRow
+                  key={model}
+                  model={model}
+                  enabled={!disabledSet.has(model)}
+                  last={index === visible.length - 1}
+                  expanded={expanded === model}
+                  service={service}
+                  url={url}
+                  onToggle={toggleModel}
+                  onExpand={onOpenModel ?? toggleExpanded}
+                  onCapabilitiesChange={setModelCapabilities}
+                />
+              ))
+            )}
+            {shown.length > limit && (
+              <Group style={{ marginTop: Spacing.xxl }}>
+                <ActionButton
+                  icon={addIcon}
+                  label={t("settings.ollama.showMore", {
+                    count: shown.length - limit,
+                  })}
+                  onPress={onShowAll ?? (() => setLimit((l) => l + pageSize))}
+                />
+              </Group>
+            )}
+          </>
+        )}
+      </View>
+    </View>
+  );
+});
 
 export default function SettingsDrawer({
   visible,
@@ -440,7 +768,6 @@ export default function SettingsDrawer({
   const [selectedLocalModelId, setSelectedLocalModelId] = useState<
     string | null
   >(null);
-  const [localGridWidth, setLocalGridWidth] = useState(0);
   const [cardGridWidth, setCardGridWidth] = useState(0);
   const selectedLocalModel =
     localSheet?.models.find((m) => m.id === selectedLocalModelId) ?? null;
@@ -476,17 +803,39 @@ export default function SettingsDrawer({
   const [addModelSheetVisible, setAddModelSheetVisible] = useState(false);
   const [ollamaAddVisible, setOllamaAddVisible] = useState(false);
   const [openaiAddVisible, setOpenAIAddVisible] = useState(false);
+  const [openaiModelsVisible, setOpenAIModelsVisible] = useState(false);
+  const [openaiModelsPage, setOpenAIModelsPage] =
+    useState<CloudModelsPage>("list");
+  const [openaiModelDetail, setOpenAIModelDetail] = useState<string | null>(
+    null,
+  );
+  const [openaiModelsScrolled, setOpenAIModelsScrolled] = useState(false);
+  const [openaiModelsWidth, setOpenAIModelsWidth] = useState(320);
+  //model page search hands focus to the list
+  const [openaiModelsSearchHandoff, setOpenAIModelsSearchHandoff] =
+    useState(false);
   const [mcpAddVisible, setMcpAddVisible] = useState(false);
+  const [profileEditVisible, setProfileEditVisible] = useState(false);
   const [litertDownloadVisible, setLitertDownloadVisible] = useState(false);
   //id outlives the close so the sheet keeps its content
   const [cloudSetupVisible, setCloudSetupVisible] = useState(false);
   const [cloudSetupId, setCloudSetupId] = useState("");
   const [addModelScrolled, setAddModelScrolled] = useState(false);
+  const [litertPage, setLitertPage] = useState<LitertPage>("browse");
+  //model steps back to the list it came from
+  const [litertModelFrom, setLitertModelFrom] = useState<"browse" | "search">(
+    "browse",
+  );
   const [litertDetail, setLitertDetail] = useState<{
     repoId: string;
     entry: CatalogEntry | null;
     loading: boolean;
     //undefined while the card loads
+    description?: string | null;
+  } | null>(null);
+  //installed model shown on its own subpage
+  const [installedModel, setInstalledModel] = useState<{
+    id: string;
     description?: string | null;
   } | null>(null);
   const addModelScrollRef = useRef<ScrollView>(null);
@@ -496,17 +845,19 @@ export default function SettingsDrawer({
 
   //open sheets keep the back press for themselves
   const sheetOpen =
+    profileEditVisible ||
     addModelSheetVisible ||
     ollamaAddVisible ||
     openaiAddVisible ||
+    openaiModelsVisible ||
     mcpAddVisible ||
     litertDownloadVisible ||
     cloudSetupVisible ||
     selectedLocalModel !== null;
 
   const [hfModelInput, setHfModelInput] = useState("");
-  //true as soon as the search field is focused, no typing needed
-  const [litertSearchActive, setLitertSearchActive] = useState(false);
+  //entry fields hand their focus to the search page
+  const [litertSearchHandoff, setLitertSearchHandoff] = useState(false);
   const [litertForceLoad, setLitertForceLoadState] = useState(false);
   const [litertContextLength, setLitertContextLengthState] = useState("8192");
   const [installedLitertModels, setInstalledLitertModels] = useState<
@@ -524,6 +875,9 @@ export default function SettingsDrawer({
   >([]);
   const [litertBrowserLoading, setLitertBrowserLoading] = useState(false);
   const [litertBrowserFailed, setLitertBrowserFailed] = useState(false);
+  //kept apart so the catalog never shows a search state
+  const [litertSearchLoading, setLitertSearchLoading] = useState(false);
+  const [litertSearchFailed, setLitertSearchFailed] = useState(false);
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   //sheet may grow up to just under the status bar
@@ -561,6 +915,9 @@ export default function SettingsDrawer({
   };
   //empty id means chores follow the main model
   const [quickFlowId, setQuickFlowIdState] = useState("");
+  const maestroButterfly = useMaestroButterfly();
+  const [ttsSpeed, setTtsSpeedState] = useState(() => Settings.getCached().ttsSpeed);
+  const voicePackInstalled = useVoicePackInstalled();
   const [quickFlowOptions, setQuickFlowOptions] = useState<SelectorOption[]>(
     [],
   );
@@ -596,6 +953,7 @@ export default function SettingsDrawer({
   const [dreamIncognitoButton, setDreamIncognitoButtonState] = useState(true);
   const [dreamAntiBurnIn, setDreamAntiBurnInState] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(false);
+  const [editAiMessages, setEditAiMessagesState] = useState(false);
   const [showDetectionBoxes, setShowDetectionBoxesState] = useState(false);
   const [advancedMode, setAdvancedModeState] = useState(false);
   const [useAppContext, setUseAppContextState] = useState(true);
@@ -635,7 +993,6 @@ export default function SettingsDrawer({
   const mobileTools = allTools.filter((t) =>
     MOBILE_TOOL_NAMES.has(t.definition.function.name),
   );
-  const allWidgets: IWidget[] = WidgetManager.getAllWidgets();
 
   const [cloudProvider, setCloudProvider] = useState<string>("none");
   const [cloudUserInfo, setCloudUserInfo] = useState<CloudUserInfo | null>(
@@ -972,6 +1329,7 @@ export default function SettingsDrawer({
         setDreamIncognitoButtonState(s.dreamIncognitoButton);
         setDreamAntiBurnInState(s.dreamAntiBurnIn);
         setShowTechnicalDetailsState(s.showTechnicalDetails);
+        setEditAiMessagesState(s.editAiMessages);
         setShowDetectionBoxesState(s.showDetectionBoxes);
         setAdvancedModeState(s.advancedMode);
         setUseAppContextState(s.useAppContext);
@@ -1057,7 +1415,7 @@ export default function SettingsDrawer({
 
   //built-in facts, read on page open
   useEffect(() => {
-    if (activeSubPage !== "local") return;
+    if (activeSubPage !== "litert" || !localAvailable) return;
     let cancelled = false;
     AIModule.getLocalModelSheet()
       .then((sheet) => {
@@ -1067,7 +1425,7 @@ export default function SettingsDrawer({
     return () => {
       cancelled = true;
     };
-  }, [activeSubPage]);
+  }, [activeSubPage, localAvailable]);
 
   //browsers need a user gesture
   const handleDownloadLocal = async (modelId: string) => {
@@ -1104,8 +1462,6 @@ export default function SettingsDrawer({
   useEffect(() => {
     if (
       activeSubPage !== "tools" &&
-      activeSubPage !== "widgets" &&
-      activeSubPage !== "mobileactions" &&
       activeSubPage !== "mcpserver"
     )
       return;
@@ -1116,13 +1472,6 @@ export default function SettingsDrawer({
         "tool",
         name,
         tool.enabledByDefault ?? false,
-      );
-    }
-    for (const widget of WidgetManager.getAllWidgets()) {
-      states[`widget:${widget.id}`] = PluginRegistry.isEnabled(
-        "widget",
-        widget.id,
-        widget.enabledByDefault ?? false,
       );
     }
     setPluginStates(states);
@@ -1300,7 +1649,7 @@ export default function SettingsDrawer({
           t("settings.ollama.unreachableTitle"),
           t("settings.ollama.unreachableInfo"),
           undefined,
-          { image: ollamaErrorImage, messageAlign: "left" },
+          { image: errorImage, messageAlign: "left" },
         );
         return;
       }
@@ -1341,7 +1690,7 @@ export default function SettingsDrawer({
       if (!(await new OpenAIProvider(url, openaiKeyDraft).isAvailable())) {
         showAlert(
           t("settings.ollama.unreachableTitle"),
-          t("settings.openai.unreachableInfo"),
+          t("settings.cloudapi.unreachableInfo"),
           undefined,
           { messageAlign: "left" },
         );
@@ -1430,6 +1779,10 @@ export default function SettingsDrawer({
       .replace(/\/+$/, "") ||
     t("settings.ollama.newServer");
 
+  const openAIServerLabel = (index: number): string =>
+    openAIServerNames(openaiServers)[index] ||
+    ollamaServerLabel(openaiServers[index]);
+
   //undefined falls back to global
   const serverContextLength = (server: OllamaServer) =>
     server.contextLength && server.contextLength > 0
@@ -1450,10 +1803,11 @@ export default function SettingsDrawer({
       : t("settings.ollama.connected");
   };
 
-  //keep active server in the list
+  //move url only while ollama active
   const saveOllamaServers = (servers: OllamaServer[]) => {
     setOllamaServersState(servers);
     Settings.set("ollamaUrls", serializeServers(servers));
+    if (aiService !== "ollama") return;
     const filled = servers.filter((s) => s.url.trim().length > 0);
     const active =
       filled.find((s) => s.url.trim() === ollamaUrl.trim()) ?? filled[0];
@@ -1517,7 +1871,7 @@ export default function SettingsDrawer({
     }
     setOllamaModelsLoading(true);
     try {
-      const models = await AIModule.getModelsFor("ollama", target);
+      const models = await AIModule.getModelsFor("ollama", target, true);
       if (ollamaModelsRequest.current === request) setOllamaModels(models);
     } catch {
       if (ollamaModelsRequest.current === request) setOllamaModels([]);
@@ -1614,7 +1968,11 @@ export default function SettingsDrawer({
     }
     setOpenAIModelsLoading(true);
     try {
-      const models = await AIModule.getModelsFor(OPENAI_PROVIDER_ID, target);
+      const models = await AIModule.getModelsFor(
+        OPENAI_PROVIDER_ID,
+        target,
+        true,
+      );
       if (openaiModelsRequest.current === request) setOpenAIModels(models);
     } catch {
       if (openaiModelsRequest.current === request) setOpenAIModels([]);
@@ -1674,7 +2032,7 @@ export default function SettingsDrawer({
     const server = openaiServers[index];
     showAlert(
       t("settings.ollama.remove.title"),
-      t("settings.ollama.remove.message", { name: ollamaServerLabel(server) }),
+      t("settings.ollama.remove.message", { name: openAIServerLabel(index) }),
       [
         {
           text: t("common.cancel"),
@@ -1779,6 +2137,8 @@ export default function SettingsDrawer({
               console.warn("Could not delete the model:", e);
             }
             refreshLitertModels();
+            setInstalledModel(null);
+            setActiveSubPage("litert");
           },
         },
         {
@@ -1791,9 +2151,10 @@ export default function SettingsDrawer({
   };
 
   const openAddModelSheet = async () => {
+    setLitertPage("browse");
     setLitertDetail(null);
     setHfModelInput("");
-    setLitertSearchActive(false);
+    setLitertSearchHandoff(false);
     setLitertSearchResults([]);
     setAddModelSheetVisible(true);
     //cache paints, hub refreshes behind
@@ -1814,27 +2175,51 @@ export default function SettingsDrawer({
   //queries hit the hub, not families
   const runLitertSearch = useCallback(
     async (query: string, signal: AbortSignal) => {
-      setLitertBrowserFailed(false);
-      setLitertBrowserLoading(true);
+      setLitertSearchFailed(false);
+      setLitertSearchLoading(true);
       try {
         const results = await searchModels(query, signal);
         if (!signal.aborted) setLitertSearchResults(results);
       } catch (e) {
         console.warn("Could not search the hugging face models:", e);
-        if (!signal.aborted) setLitertBrowserFailed(true);
+        if (!signal.aborted) setLitertSearchFailed(true);
       } finally {
-        if (!signal.aborted) setLitertBrowserLoading(false);
+        if (!signal.aborted) setLitertSearchLoading(false);
       }
     },
     [],
   );
 
+  //each page opens at the top
+  const showLitertPage = (page: LitertPage) => {
+    setAddModelScrolled(false);
+    setLitertPage(page);
+  };
+
+  //a model found by search steps back to its results
+  const openLitertSearch = () => {
+    if (litertPage !== "model" || litertModelFrom !== "search") {
+      setHfModelInput("");
+      setLitertSearchResults([]);
+      setLitertSearchLoading(false);
+      setLitertSearchFailed(false);
+    }
+    setLitertSearchHandoff(true);
+    showLitertPage("search");
+  };
+
   //sizes resolve on open, not on listing
   const openLitertDetail = async (repoId: string) => {
-    setHfModelInput("");
-    setLitertSearchActive(false);
+    //keyboard slides away with the push
+    Keyboard.dismiss();
+    if (litertPage === "model") {
+      //similar model swaps in place
+      addModelScrollRef.current?.scrollTo({ y: 0, animated: false });
+    } else {
+      setLitertModelFrom(litertPage);
+    }
+    showLitertPage("model");
     setLitertDetail({ repoId, entry: null, loading: true });
-    addModelScrollRef.current?.scrollTo({ y: 0, animated: false });
     fetchModelDescription(repoId).then((description) =>
       setLitertDetail((prev) =>
         prev?.repoId === repoId ? { ...prev, description } : prev,
@@ -1846,24 +2231,41 @@ export default function SettingsDrawer({
     );
   };
 
+  const openInstalledLitert = (repoId: string) => {
+    setInstalledModel({ id: repoId });
+    setActiveSubPage("litertmodel");
+    fetchModelDescription(repoId).then((description) =>
+      setInstalledModel((prev) =>
+        prev?.id === repoId ? { ...prev, description } : prev,
+      ),
+    );
+  };
+
   const litertFamilyName = (family: ModelFamily) =>
     family.id === OTHER_FAMILY_ID
       ? t("settings.litert.familyOther")
       : family.label;
 
-  const setProviderEnabled = (id: string, enabled: boolean) => {
-    const next = enabled
-      ? [...enabledProviders.filter((p) => p !== id), id]
-      : enabledProviders.filter((p) => p !== id);
+  const setProviderEnabled = (ids: string | string[], enabled: boolean) => {
+    const list = typeof ids === "string" ? [ids] : ids;
+    const rest = enabledProviders.filter((p) => !list.includes(p));
+    const next = enabled ? [...rest, ...list] : rest;
     setEnabledProvidersState(next);
     Settings.set("enabledProviders", serializeProviders(next));
     //the active service has to stay on an enabled provider
-    if (!enabled && aiService === id && next.length > 0) {
+    if (!enabled && list.includes(aiService) && next.length > 0) {
       setAiService(next[0]);
     } else if (enabled && !enabledProviders.includes(aiService)) {
-      setAiService(id);
+      setAiService(list[0]);
     }
   };
+
+  //built-in models live under on-device
+  const litertSupported = isProviderSupported("litert");
+  const onDeviceProviders = [
+    ...(litertSupported ? ["litert"] : []),
+    ...(localAvailable ? ["local"] : []),
+  ];
 
   //dead downloads resume from disk
   useEffect(() => {
@@ -1976,6 +2378,11 @@ export default function SettingsDrawer({
   const setShowTechnicalDetails = (v: boolean) => {
     setShowTechnicalDetailsState(v);
     Settings.set("showTechnicalDetails", v);
+  };
+
+  const setEditAiMessages = (v: boolean) => {
+    setEditAiMessagesState(v);
+    Settings.set("editAiMessages", v);
   };
 
   const setShowDetectionBoxes = (v: boolean) => {
@@ -2389,6 +2796,13 @@ export default function SettingsDrawer({
   };
 
   const largeScreenAnim = useAnimatedValue(visible ? 1 : 0);
+  //closed overlay leaves the tree, a live page layer would still catch clicks on the web
+  const [desktopMounted, setDesktopMounted] = useState(visible);
+  if (visible && !desktopMounted) setDesktopMounted(true);
+  const [navScrolled, setNavScrolled] = useState(false);
+  const [desktopPageWidth, setDesktopPageWidth] = useState(0);
+  const desktopPage = activeSubPage === "main" ? DESKTOP_ENTRY_PAGE : activeSubPage;
+  const desktopSection = sectionOf(desktopPage);
 
   useEffect(() => {
     if (visible) {
@@ -2402,7 +2816,11 @@ export default function SettingsDrawer({
       //reset once the close settles
       const reset = () => setActiveSubPage("main");
       if (isDesktop) {
-        settleLayoutDrawer(largeScreenAnim, false, reset);
+        settleLayoutDrawer(largeScreenAnim, false, () => {
+          reset();
+          setDesktopMounted(false);
+          setNavScrolled(false);
+        });
       } else {
         settleDrawer(progress, false, undefined, undefined, reset);
       }
@@ -2483,27 +2901,30 @@ export default function SettingsDrawer({
     </View>
   );
 
+  //desktop nav keeps the open section highlighted
+  const navItemStyle = (page: SubPage, last = false) =>
+    pressStyle(
+      [
+        styles.navItem,
+        last && styles.navItemLast,
+        isDesktop && desktopSection === page && styles.navItemPressed,
+      ],
+      styles.navItemPressed,
+    );
+
   //main navigation page content
   const renderMainPage = () => (
     <View style={styles.menuContainer}>
+      {/* desktop keeps the row for its close button */}
       <View style={styles.header}>
         <View style={styles.headerSpacer} />
-        <Text style={styles.title} numberOfLines={1}>
-          {t("settings.title")}
-        </Text>
+        {!isDesktop && (
+          <Text style={styles.title} numberOfLines={1}>
+            {t("settings.title")}
+          </Text>
+        )}
         <View style={styles.headerSpacer} />
       </View>
-
-      {notices.assistant && (
-        <NotificationCard
-          image={operaIcon}
-          tintColor={Colors.textPrimary}
-          title={t("settings.notice.assistant")}
-          onPress={notices.openAssistant}
-          onDismiss={notices.closeAssistant}
-          style={[styles.groupSpacing, styles.mainPageGroup]}
-        />
-      )}
 
       {!!notices.update && (
         <NotificationBanner
@@ -2519,7 +2940,7 @@ export default function SettingsDrawer({
       {/* profile section */}
       <Group style={[styles.groupSpacing, styles.mainPageGroup]}>
         <Pressable
-          style={pressStyle(styles.navItem, styles.navItemPressed)}
+          style={navItemStyle("profile")}
           onPress={() => setActiveSubPage("profile")}
         >
           <View style={styles.menuIconWrap}>
@@ -2540,10 +2961,30 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={pressStyle(
-            [styles.navItem, styles.navItemLast],
-            styles.navItemPressed,
-          )}
+          style={navItemStyle("maestro")}
+          onPress={() => setActiveSubPage("maestro")}
+        >
+          <View style={styles.menuIconWrap}>
+            <Image
+              source={operaIcon}
+              style={styles.menuIcon}
+              tintColor={Colors.textOnPrimary}
+            />
+          </View>
+          <View style={styles.navTextContainer}>
+            <Text style={styles.navTitle}>
+              {t("settings.nav.maestro.title")}
+            </Text>
+            <Text style={styles.navSubtitle}>
+              {isDesktop
+                ? t("settings.nav.maestro.subtitleDesktop")
+                : t("settings.nav.maestro.subtitle")}
+            </Text>
+          </View>
+        </Pressable>
+
+        <Pressable
+          style={navItemStyle("cloud", true)}
           onPress={() => setActiveSubPage("cloud")}
         >
           <View style={styles.menuIconWrap}>
@@ -2564,7 +3005,7 @@ export default function SettingsDrawer({
 
       <Group style={[styles.groupSpacing, styles.mainPageGroup]}>
         <Pressable
-          style={pressStyle(styles.navItem, styles.navItemPressed)}
+          style={navItemStyle("general")}
           onPress={() => setActiveSubPage("general")}
         >
           <View style={styles.menuIconWrap}>
@@ -2584,31 +3025,8 @@ export default function SettingsDrawer({
           </View>
         </Pressable>
 
-        {!isDesktop && (
-          <Pressable
-            style={pressStyle(styles.navItem, styles.navItemPressed)}
-            onPress={() => setActiveSubPage("assistantoverlay")}
-          >
-            <View style={styles.menuIconWrap}>
-              <Image
-                source={micIcon}
-                style={styles.menuIcon}
-                tintColor={Colors.textOnPrimary}
-              />
-            </View>
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>
-                {t("settings.nav.overlay.title")}
-              </Text>
-              <Text style={styles.navSubtitle}>
-                {t("settings.nav.overlay.subtitle")}
-              </Text>
-            </View>
-          </Pressable>
-        )}
-
         <Pressable
-          style={pressStyle(styles.navItem, styles.navItemPressed)}
+          style={navItemStyle("service")}
           onPress={() => setActiveSubPage("service")}
         >
           <View style={styles.menuIconWrap}>
@@ -2629,10 +3047,7 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={pressStyle(
-            [styles.navItem, !advancedMode && styles.navItemLast],
-            styles.navItemPressed,
-          )}
+          style={navItemStyle("tools", !advancedMode)}
           onPress={() => setActiveSubPage("tools")}
         >
           <View style={styles.menuIconWrap}>
@@ -2654,10 +3069,7 @@ export default function SettingsDrawer({
 
         {advancedMode && (
           <Pressable
-            style={pressStyle(
-              [styles.navItem, styles.navItemLast],
-              styles.navItemPressed,
-            )}
+            style={navItemStyle("advanced", true)}
             onPress={() => setActiveSubPage("advanced")}
           >
             <View style={styles.menuIconWrap}>
@@ -2681,7 +3093,7 @@ export default function SettingsDrawer({
 
       <Group style={[styles.groupSpacing, styles.mainPageGroup]}>
         <Pressable
-          style={pressStyle(styles.navItem, styles.navItemPressed)}
+          style={navItemStyle("confidentiality")}
           onPress={() => setActiveSubPage("confidentiality")}
         >
           <View style={styles.menuIconWrap}>
@@ -2702,7 +3114,7 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={pressStyle(styles.navItem, styles.navItemPressed)}
+          style={navItemStyle("reports")}
           onPress={() => setActiveSubPage("reports")}
         >
           <View style={styles.menuIconWrap}>
@@ -2723,10 +3135,7 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={pressStyle(
-            [styles.navItem, styles.navItemLast],
-            styles.navItemPressed,
-          )}
+          style={navItemStyle("sociallinks", true)}
           onPress={() => setActiveSubPage("sociallinks")}
         >
           <View style={styles.menuIconWrap}>
@@ -2839,44 +3248,21 @@ export default function SettingsDrawer({
       </View>
 
       <View style={styles.contentCard}>
-        <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-            {t("settings.profile.name")}
-          </Text>
-          <Group>
-            <TextInputField
-              icon={penPlaceholderIcon}
-              placeholder={t("onboarding.name.placeholder")}
-              value={name}
-              onChangeText={setName}
-              onSubmitEditing={() => setConfirmedName(name)}
-            />
-          </Group>
-        </View>
-
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-            {t("settings.profile.instructions")}
-          </Text>
-          <Group>
-            <TextInputField
-              icon={penPlaceholderIcon}
-              placeholder={t("settings.profile.instructionsPlaceholder")}
-              value={instruction}
-              onChangeText={setInstruction}
-            />
-          </Group>
-        </View>
-      </View>
-
-      <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Group>
             <ActionButton
-              icon={exportIcon}
-              label="Export my Profile Card"
-              onPress={exportProfileCard}
+              icon={penPlaceholderIcon}
+              label={t("settings.profile.personalize")}
+              onPress={() => setProfileEditVisible(true)}
             />
+            {/* export ends in the mobile share sheet */}
+            {!isDesktop && (
+              <ActionButton
+                icon={exportIcon}
+                label={t("settings.profile.exportCard")}
+                onPress={exportProfileCard}
+              />
+            )}
           </Group>
         </View>
       </View>
@@ -2888,7 +3274,7 @@ export default function SettingsDrawer({
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.general.title"))}
 
-      {/* language, appearance, audio and modes card */}
+      {/* language, appearance and modes card */}
       <View style={styles.contentCard}>
         <View style={styles.settingRowVertical}>
           <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
@@ -2914,20 +3300,6 @@ export default function SettingsDrawer({
           </Group>
         </View>
 
-        <View style={styles.settingRowVertical}>
-          <View style={styles.toggleGroupRow}>
-            <View style={styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>
-                {t("settings.general.autoRead")}
-              </Text>
-              <Text style={styles.helpText}>
-                {t("settings.general.autoReadHelp")}
-              </Text>
-            </View>
-            <Toggle checked={autoSpeak} onToggle={setAutoSpeak} />
-          </View>
-        </View>
-
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>
@@ -2942,6 +3314,15 @@ export default function SettingsDrawer({
           </View>
         </View>
       </View>
+
+      <Group style={styles.groupSpacing}>
+        {!isDesktop &&
+          renderToolsNavRow(
+            "assistantoverlay",
+            t("settings.nav.overlay.title"),
+            t("settings.nav.overlay.subtitle"),
+          )}
+      </Group>
 
       {/* screen saver link */}
       <Group style={styles.groupSpacing}>
@@ -3022,26 +3403,8 @@ export default function SettingsDrawer({
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.advanced.title"))}
 
-      {/* flow, audio and technical card */}
+      {/* audio and technical card */}
       <View style={styles.contentCard}>
-        <View style={styles.settingRowVertical}>
-          <Text style={styles.settingLabel}>
-            {t("settings.quickFlow.label")}
-          </Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.quickFlow.help")}
-          </Text>
-          <Group>
-            <Selector
-              options={quickFlowOptions}
-              selectedValue={quickFlowId}
-              onSelect={handleSelectQuickFlow}
-              title={t("settings.quickFlow.select")}
-              fullWidth
-            />
-          </Group>
-        </View>
-
         <View style={styles.settingRowVertical}>
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>
@@ -3071,6 +3434,23 @@ export default function SettingsDrawer({
             <Toggle
               checked={showTechnicalDetails}
               onToggle={setShowTechnicalDetails}
+            />
+          </View>
+        </View>
+
+        <View style={styles.settingRowVertical}>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.general.editAiMessages")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.general.editAiMessagesHelp")}
+              </Text>
+            </View>
+            <Toggle
+              checked={editAiMessages}
+              onToggle={setEditAiMessages}
             />
           </View>
         </View>
@@ -3131,6 +3511,121 @@ export default function SettingsDrawer({
               keyboardType="url"
             />
           </Group>
+        </View>
+      </View>
+
+      {/* quick flow card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>
+            {t("settings.quickFlow.label")}
+          </Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.quickFlow.help")}
+          </Text>
+          <Group>
+            <Selector
+              options={quickFlowOptions}
+              selectedValue={quickFlowId}
+              onSelect={handleSelectQuickFlow}
+              title={t("settings.quickFlow.select")}
+              fullWidth
+            />
+          </Group>
+        </View>
+      </View>
+    </View>
+  );
+
+  // maestro subpage
+  const renderMaestroSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader(t("settings.nav.maestro.title"))}
+
+      <View style={{ paddingVertical: Spacing.xxl2, marginBottom: Spacing.xxl2 }}>
+        <MaestroCard />
+      </View>
+
+      {/* butterfly selector card */}
+      {voicePackInstalled && (
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.maestro.voice")}
+            </Text>
+            <IconSelector
+              options={BUTTERFLY_OPTIONS}
+              selectedValue={maestroButterfly}
+              onSelect={selectButterfly}
+            />
+            <Text style={[styles.settingLabel, { marginTop: Spacing.xxl, marginBottom: Spacing.md }]}>
+              {t("settings.tts.speed")}
+            </Text>
+            <Group>
+              <Slider
+                icon={timeIcon}
+                options={TTS_SPEEDS.map((id) => ({ id, label: `${id}×` }))}
+                selectedValue={ttsSpeed}
+                onSelect={(v) => {
+                  setTtsSpeedState(v);
+                  Settings.set("ttsSpeed", v);
+                }}
+              />
+            </Group>
+          </View>
+        </View>
+      )}
+
+      {/* voice engine card */}
+      <VoiceEngineCard />
+
+      {/* navigation to maestro subpages */}
+      <Group style={styles.groupSpacing}>
+        {renderToolsNavRow(
+          "maestropreferences",
+          t("settings.nav.maestroPreferences.title"),
+          t("settings.nav.maestroPreferences.subtitle"),
+        )}
+      </Group>
+    </View>
+  );
+
+  //maestro preferences subpage
+  const renderMaestroPreferencesSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader(t("settings.nav.maestroPreferences.title"))}
+
+      {/* instructions card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+            {t("settings.profile.instructions")}
+          </Text>
+          <Group>
+            <TextInputField
+              icon={penPlaceholderIcon}
+              placeholder={t("settings.profile.instructionsPlaceholder")}
+              value={instruction}
+              onChangeText={setInstruction}
+            />
+          </Group>
+        </View>
+      </View>
+
+      {/* auto read card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.general.autoRead")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.general.autoReadHelp")}
+              </Text>
+            </View>
+            <Toggle checked={autoSpeak} onToggle={setAutoSpeak} />
+          </View>
         </View>
       </View>
     </View>
@@ -3264,56 +3759,56 @@ export default function SettingsDrawer({
         {cloudDef && cloudUserInfo && (
           <View style={styles.contentCard}>
             <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <Text style={styles.settingLabel}>{cloudDef.label}</Text>
+              <View style={styles.cloudAccount}>
+                {cloudUserInfo.picture ? (
+                  <Image
+                    source={{ uri: cloudUserInfo.picture }}
+                    style={styles.cloudAvatar}
+                  />
+                ) : (
+                  <View style={styles.cloudAvatar}>
+                    <Image
+                      source={profilIcon}
+                      style={styles.cloudAvatarIcon}
+                      tintColor={Colors.textMuted}
+                    />
+                  </View>
+                )}
+                {!!cloudUserInfo.name && (
+                  <Text style={styles.cloudName} numberOfLines={1}>
+                    {cloudUserInfo.name}
+                  </Text>
+                )}
+                <Text style={styles.cloudEmail} numberOfLines={1}>
+                  {cloudUserInfo.email}
+                </Text>
+              </View>
+
+              {cloudRows.length > 0 && (
+                <Group style={[styles.infoGroup, styles.groupSpacingTight]}>
+                  {cloudRows.map((row) => (
+                    <ActionButton
+                      key={row.label}
+                      label={row.label}
+                      rightElement={
+                        <Text
+                          style={styles.infoValue}
+                          numberOfLines={1}
+                          ellipsizeMode="middle"
+                        >
+                          {row.value}
+                        </Text>
+                      }
+                    />
+                  ))}
+                </Group>
+              )}
+
               <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
                 {hasSyncPin
                   ? t("cloudSync.ready")
                   : t("cloudSync.setupIncomplete")}
               </Text>
-
-              <Group style={styles.groupSpacingTight}>
-                <View style={styles.navItem}>
-                  {cloudUserInfo.picture ? (
-                    <Image
-                      source={{ uri: cloudUserInfo.picture }}
-                      style={styles.cloudAvatar}
-                    />
-                  ) : (
-                    <View style={styles.cloudAvatar}>
-                      <Image
-                        source={profilIcon}
-                        style={styles.menuIcon}
-                        tintColor={Colors.textMuted}
-                      />
-                    </View>
-                  )}
-                  <View style={styles.navTextContainer}>
-                    {!!cloudUserInfo.name && (
-                      <Text style={styles.navTitle} numberOfLines={1}>
-                        {cloudUserInfo.name}
-                      </Text>
-                    )}
-                    <Text style={styles.navSubtitle} numberOfLines={1}>
-                      {cloudUserInfo.email}
-                    </Text>
-                  </View>
-                </View>
-                {cloudRows.map((row) => (
-                  <ActionButton
-                    key={row.label}
-                    label={row.label}
-                    rightElement={
-                      <Text
-                        style={styles.infoValue}
-                        numberOfLines={1}
-                        ellipsizeMode="middle"
-                      >
-                        {row.value}
-                      </Text>
-                    }
-                  />
-                ))}
-              </Group>
 
               {!hasSyncPin && (
                 <Group
@@ -3331,6 +3826,7 @@ export default function SettingsDrawer({
                         : t("cloudSync.createPin")
                     }
                     variant="highlight"
+                    disabled={isSyncing}
                     onPress={
                       hasCloudBackup ? handleUnlockSyncPin : handleCreateSyncPin
                     }
@@ -3398,34 +3894,7 @@ export default function SettingsDrawer({
           </Pressable>
         )}
 
-        <Pressable
-          style={pressStyle(
-            styles.toggleGroupRowItem,
-            styles.toggleGroupCardPressed,
-          )}
-          onPress={() => setActiveSubPage("local")}
-        >
-          <View style={styles.toggleGroupRow}>
-            <View style={styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>
-                {t("settings.service.local")}
-              </Text>
-              <Text style={styles.helpText}>
-                {t("settings.service.localHelp")}
-              </Text>
-            </View>
-            <View style={styles.toggleDivider} />
-            <Toggle
-              checked={localAvailable && enabledProviders.includes("local")}
-              disabled={!localAvailable}
-              onToggle={(v) => {
-                if (localAvailable) setProviderEnabled("local", v);
-              }}
-            />
-          </View>
-        </Pressable>
-
-        {isProviderSupported("litert") && (
+        {onDeviceProviders.length > 0 && (
           <Pressable
             style={pressStyle(
               styles.toggleGroupRowItem,
@@ -3439,13 +3908,19 @@ export default function SettingsDrawer({
                   {t("settings.service.litert")}
                 </Text>
                 <Text style={styles.helpText}>
-                  {t("settings.service.litertHelp")}
+                  {t(
+                    litertSupported
+                      ? "settings.service.litertHelp"
+                      : "settings.service.localHelp",
+                  )}
                 </Text>
               </View>
               <View style={styles.toggleDivider} />
               <Toggle
-                checked={enabledProviders.includes("litert")}
-                onToggle={(v) => setProviderEnabled("litert", v)}
+                checked={onDeviceProviders.some((id) =>
+                  enabledProviders.includes(id),
+                )}
+                onToggle={(v) => setProviderEnabled(onDeviceProviders, v)}
               />
             </View>
           </Pressable>
@@ -3485,10 +3960,10 @@ export default function SettingsDrawer({
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>
               <Text style={styles.settingLabel}>
-                {t("settings.service.openai")}
+                {t("settings.service.cloudapi")}
               </Text>
               <Text style={styles.helpText}>
-                {t("settings.service.openaiHelp")}
+                {t("settings.service.cloudapiHelp")}
               </Text>
             </View>
             <View style={styles.toggleDivider} />
@@ -3559,128 +4034,6 @@ export default function SettingsDrawer({
     </View>
   );
 
-  //built-in provider, model ships with device
-  const renderLocalSubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.local.title"))}
-
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{t("settings.local.title")}</Text>
-          <Text style={[styles.helpText, { marginBottom: 0 }]}>
-            {t("settings.local.help")}
-          </Text>
-        </View>
-      </View>
-
-      {localSheet && (
-        <View style={styles.contentCard}>
-          <View
-            style={
-              localSheet.models.length > 0
-                ? styles.settingRowVertical
-                : [styles.settingRowVertical, { marginBottom: 0 }]
-            }
-          >
-            <Text style={styles.settingLabel}>
-              {t("settings.local.sheetTitle")}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.local.sheetHelp")}
-            </Text>
-            <Group>
-              {(
-                [
-                  ["family", localSheet.family],
-                  ["runtime", localSheet.runtime],
-                  ["browser", localSheet.browser],
-                ] as const
-              )
-                .filter(([, value]) => !!value)
-                .map(([key, value]) => (
-                  <ActionButton
-                    key={key}
-                    label={t(`settings.local.sheet.${key}`)}
-                    rightElement={
-                      <Text style={styles.litertRowMeta}>{value}</Text>
-                    }
-                  />
-                ))}
-            </Group>
-          </View>
-
-          {localSheet.models.length > 0 && (
-            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-                {t("settings.local.modelsTitle")}
-              </Text>
-              {/* measure available grid width for columns */}
-              <View
-                style={styles.localModelsGrid}
-                onLayout={(e) => {
-                  const w = e.nativeEvent.layout.width;
-                  if (w > 0 && w !== localGridWidth) setLocalGridWidth(w);
-                }}
-              >
-                {localSheet.models.map((model, i) => {
-                  const isOdd = localSheet.models.length % 2 !== 0;
-                  //expand lone odd model to full row
-                  const isLastOdd = isOdd && i === localSheet.models.length - 1;
-                  //prevent wrapping subpixel overflow
-                  const cardWidth = isLastOdd
-                    ? "100%"
-                    : localGridWidth > 0
-                      ? Math.floor((localGridWidth - Spacing.md) / 2) - 1
-                      : "47%";
-
-                  return (
-                    <Pressable
-                      key={model.id}
-                      style={pressStyle(
-                        [
-                          styles.localModelCard,
-                          { width: cardWidth, flexGrow: isLastOdd ? 1 : 1 },
-                          isLastOdd && styles.localModelCardWide,
-                        ],
-                        "surface",
-                      )}
-                      onPress={() => {
-                        Vibration.vibrate(8);
-                        setSelectedLocalModelId(model.id);
-                      }}
-                    >
-                      <Text
-                        style={styles.localModelCardTitle}
-                        numberOfLines={2}
-                      >
-                        {model.label}
-                      </Text>
-                      {!!model.status && (
-                        <Text
-                          style={styles.localModelCardStatus}
-                          numberOfLines={1}
-                        >
-                          {t(`settings.local.status.${model.status}`)}
-                        </Text>
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </View>
-              {!!localDownload && (
-                <DownloadProgress
-                  title={t("settings.local.downloading")}
-                  progress={localDownload.progress}
-                  sizeStr={localDownload.sizeStr}
-                />
-              )}
-            </View>
-          )}
-        </View>
-      )}
-    </View>
-  );
-
   //on-device provider, models the browser installed
   const renderLitertSubPage = () => (
     <View style={styles.subPageContainer}>
@@ -3692,26 +4045,41 @@ export default function SettingsDrawer({
             {t("settings.litert.modelTitle")}
           </Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.litert.help")}
+            {t(
+              litertSupported ? "settings.litert.help" : "settings.local.help",
+            )}
           </Text>
 
-          <Group
-            style={[
-              styles.highlightGroup,
-              !!downloadingLitert && styles.highlightGroupDisabled,
-            ]}
-          >
-            <ActionButton
-              icon={addIcon}
-              label={t("settings.litert.addModel")}
-              variant="highlight"
-              disabled={!!downloadingLitert}
-              onPress={openAddModelSheet}
-            />
-          </Group>
+          {/* web has the built-in model only */}
+          {litertSupported && (
+            <Group
+              style={[
+                styles.highlightGroup,
+                !!downloadingLitert && styles.highlightGroupDisabled,
+              ]}
+            >
+              <ActionButton
+                icon={addIcon}
+                label={t("settings.litert.addModel")}
+                variant="highlight"
+                disabled={!!downloadingLitert}
+                onPress={openAddModelSheet}
+              />
+            </Group>
+          )}
 
-          {(installedLitertModels.length > 0 || !!downloadingLitert) &&
+          {(!!localSheet?.models.length ||
+            installedLitertModels.length > 0 ||
+            !!downloadingLitert) &&
             renderCardGrid([
+              ...(localSheet?.models ?? []).map((model) => ({
+                key: model.id,
+                title: model.label,
+                status: model.status
+                  ? t(`settings.local.status.${model.status}`)
+                  : "",
+                onPress: () => setSelectedLocalModelId(model.id),
+              })),
               ...(downloadingLitert
                 ? [
                     {
@@ -3731,32 +4099,117 @@ export default function SettingsDrawer({
                 title: model.label,
                 status: model.sizeStr,
                 disabled: !!downloadingLitert,
-                onPress: () => handleDeleteLitert(model),
+                onPress: () => openInstalledLitert(model.id),
               })),
             ])}
         </View>
       </View>
 
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>
-            {t("settings.litert.contextTitle")}
-          </Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.litert.contextHelp")}
-          </Text>
-          <Group>
-            <Slider
-              icon={messageIcon}
-              options={litertContextLengthOptions}
-              selectedValue={litertContextLength}
-              onSelect={setLitertContextLength}
-            />
-          </Group>
+      {litertSupported && (
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={styles.settingLabel}>
+              {t("settings.litert.contextTitle")}
+            </Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {t("settings.litert.contextHelp")}
+            </Text>
+            <Group>
+              <Slider
+                icon={messageIcon}
+                options={litertContextLengthOptions}
+                selectedValue={litertContextLength}
+                onSelect={setLitertContextLength}
+              />
+            </Group>
+          </View>
         </View>
-      </View>
+      )}
     </View>
   );
+
+  //installed on-device model subpage
+  const renderLitertModelSubPage = () => {
+    const entry = installedModel ? getCatalogEntry(installedModel.id) : null;
+    if (!installedModel || !entry) return renderLitertSubPage();
+
+    const publisher = familyPublisher(entry.family);
+    const capabilities = entry.capabilities
+      .filter((c): c is ModelCapabilityId =>
+        LITERT_CAPABILITY_IDS.includes(c as ModelCapabilityId),
+      )
+      .map((c) => ({
+        id: c,
+        label: t(MODEL_CAPABILITY_KEYS[c]),
+        icon: MODEL_CAPABILITY_ICONS[c],
+      }));
+    const { description } = installedModel;
+
+    return (
+      <View style={styles.subPageContainer}>
+        {renderSubPageHeader(entry.label)}
+
+        <View style={styles.contentCard}>
+          <View style={styles.litertDetailHeader}>
+            <View style={styles.litertDetailTile}>
+              <Image
+                source={{ uri: modelAvatarUrl(entry, entry.repoId) }}
+                style={styles.litertTileImage}
+              />
+            </View>
+            <View style={styles.litertDetailInfo}>
+              <Text style={styles.litertDetailName}>{entry.label}</Text>
+              {!!publisher && (
+                <Text style={styles.litertDetailMeta}>{publisher}</Text>
+              )}
+              <Text style={styles.litertDetailMeta}>
+                {formatBytes(entry.sizeBytes)}
+              </Text>
+              {capabilities.map((capability) => (
+                <View key={capability.id} style={styles.litertCapability}>
+                  <Image
+                    source={capability.icon}
+                    style={styles.litertCapabilityIcon}
+                    tintColor={Colors.textSecondary}
+                  />
+                  <Text style={styles.litertDetailMeta}>
+                    {capability.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <Text style={[styles.settingLabel, styles.litertDetailSection]}>
+            {t("settings.litert.description")}
+          </Text>
+          <Text style={styles.helpText}>
+            {description === undefined
+              ? t("settings.litert.loading")
+              : (description ?? t("settings.litert.noDescription"))}
+          </Text>
+        </View>
+
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Group>
+              <ActionButton
+                icon={binIcon}
+                label={t("settings.litert.deleteModel")}
+                onPress={() =>
+                  handleDeleteLitert({
+                    id: entry.repoId,
+                    label: entry.label,
+                    sizeStr: formatBytes(entry.sizeBytes),
+                  })
+                }
+              />
+            </Group>
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   //ollama server list subpage
   const renderOllamaSubPage = () => (
@@ -3863,7 +4316,7 @@ export default function SettingsDrawer({
                     t("settings.ollama.unreachableTitle"),
                     t("settings.ollama.unreachableInfo"),
                     undefined,
-                    { image: ollamaErrorImage, messageAlign: "left" },
+                    { image: errorImage, messageAlign: "left" },
                   )
                 }
               />
@@ -3897,7 +4350,7 @@ export default function SettingsDrawer({
             </Group>
           </View>
 
-          <View style={styles.settingRowVertical}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>
               {t("settings.ollama.keepAlive")}
             </Text>
@@ -3925,24 +4378,23 @@ export default function SettingsDrawer({
               )}
             </Group>
           </View>
-
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {ollamaModels.length > 0
-                ? t("settings.ollama.modelsCount", {
-                    count: ollamaModels.length,
-                  })
-                : t("settings.ollama.models")}
-            </Text>
-            <Text style={styles.helpText}>
-              {ollamaModels.length > 0
-                ? ollamaModels.join(", ")
-                : ollamaModelsLoading
-                  ? t("settings.ollama.modelsLoading")
-                  : t("settings.ollama.noModels")}
-            </Text>
-          </View>
         </View>
+
+        <ModelToggleList
+          key={url}
+          models={ollamaModels}
+          loading={ollamaModelsLoading}
+          service="ollama"
+          url={url}
+          disabled={server.disabledModels}
+          capabilities={server.capabilities}
+          onChange={(next) =>
+            patchOllamaServer(index, { disabledModels: next })
+          }
+          onCapabilitiesChange={(next) =>
+            patchOllamaServer(index, { capabilities: next })
+          }
+        />
 
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -3974,14 +4426,14 @@ export default function SettingsDrawer({
   //openai server list subpage
   const renderOpenAISubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.service.openai"))}
+      {renderSubPageHeader(t("settings.service.cloudapi"))}
 
       {/* openai servers card */}
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{t("settings.openai.title")}</Text>
+          <Text style={styles.settingLabel}>{t("settings.cloudapi.title")}</Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.openai.help")}
+            {t("settings.cloudapi.help")}
           </Text>
 
           <Group style={styles.highlightGroup}>
@@ -3997,7 +4449,7 @@ export default function SettingsDrawer({
             renderCardGrid(
               openaiServers.map((server, index) => ({
                 key: String(index),
-                title: ollamaServerLabel(server),
+                title: openAIServerLabel(index),
                 status: ollamaStatusLabel(server),
                 error: serverErrors[server.url.trim()] === true,
                 onPress: () => openOpenAIServer(index),
@@ -4025,6 +4477,28 @@ export default function SettingsDrawer({
     </View>
   );
 
+  //each page opens at the top
+  const showOpenAIModelsPage = (page: CloudModelsPage, model?: string) => {
+    if (model) setOpenAIModelDetail(model);
+    setOpenAIModelsScrolled(false);
+    setOpenAIModelsPage(page);
+  };
+
+  const openOpenAIModels = (page: CloudModelsPage, model?: string) => {
+    showOpenAIModelsPage(page, model);
+    setOpenAIModelsVisible(true);
+  };
+
+  //android back steps up to the list before the sheet closes
+  const handleOpenAIModelsBack = () => {
+    if (openaiModelsPage === "list") return false;
+    //keyboard slides away with the pop
+    Keyboard.dismiss();
+    setOpenAIModelsSearchHandoff(false);
+    showOpenAIModelsPage("list");
+    return true;
+  };
+
   //openai server detail page
   const renderOpenAIServerSubPage = () => {
     const index = openaiDetailIndex ?? -1;
@@ -4036,7 +4510,7 @@ export default function SettingsDrawer({
 
     return (
       <View style={styles.subPageContainer}>
-        {renderSubPageHeader(ollamaServerLabel(server))}
+        {renderSubPageHeader(openAIServerLabel(index))}
 
         <View style={styles.contentCard}>
           <View style={styles.settingRowVertical}>
@@ -4074,7 +4548,7 @@ export default function SettingsDrawer({
                 onRightIconPress={() =>
                   showAlert(
                     t("settings.ollama.unreachableTitle"),
-                    t("settings.openai.unreachableInfo"),
+                    t("settings.cloudapi.unreachableInfo"),
                     undefined,
                     { messageAlign: "left" },
                   )
@@ -4083,17 +4557,17 @@ export default function SettingsDrawer({
             </Group>
           </View>
 
-          <View style={styles.settingRowVertical}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>
-              {t("settings.openai.apiKey")}
+              {t("settings.cloudapi.apiKey")}
             </Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.openai.apiKeyHelp")}
+              {t("settings.cloudapi.apiKeyHelp")}
             </Text>
             <Group>
               <TextInputField
-                icon={penPlaceholderIcon}
-                placeholder={t("settings.openai.apiKeyPlaceholder")}
+                icon={keyIcon}
+                placeholder={t("settings.cloudapi.apiKeyPlaceholder")}
                 autoCapitalize="none"
                 autoCorrect={false}
                 secureTextEntry
@@ -4103,24 +4577,21 @@ export default function SettingsDrawer({
               />
             </Group>
           </View>
-
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {openaiModels.length > 0
-                ? t("settings.ollama.modelsCount", {
-                    count: openaiModels.length,
-                  })
-                : t("settings.ollama.models")}
-            </Text>
-            <Text style={styles.helpText}>
-              {openaiModels.length > 0
-                ? openaiModels.join(", ")
-                : openaiModelsLoading
-                  ? t("settings.ollama.modelsLoading")
-                  : t("settings.ollama.noModels")}
-            </Text>
-          </View>
         </View>
+
+        <ModelToggleList
+          key={url}
+          models={openaiModels}
+          loading={openaiModelsLoading}
+          service={OPENAI_PROVIDER_ID}
+          url={url}
+          disabled={server.disabledModels}
+          onChange={(next) =>
+            patchOpenAIServer(index, { disabledModels: next })
+          }
+          onShowAll={() => openOpenAIModels("list")}
+          onOpenModel={(model) => openOpenAIModels("model", model)}
+        />
 
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -4231,7 +4702,7 @@ export default function SettingsDrawer({
                   : undefined
               }
             />
-            {Platform.OS !== "web" && (
+            {Platform.OS !== "web" && Platform.OS !== "android" && (
               <ActionButton
                 icon={photoIcon}
                 label={t("permissions.photos.label")}
@@ -4376,7 +4847,7 @@ export default function SettingsDrawer({
     </View>
   );
 
-  // tools subpage content: assistant tools stay inline, widgets and mobile actions link out
+  // tools subpage content: assistant and mobile tools stay inline, mcp links out
   //whole row opens the subpage
   const renderToolsNavRow = (page: SubPage, title: string, help: string) => (
     <Pressable
@@ -4400,76 +4871,66 @@ export default function SettingsDrawer({
     </Pressable>
   );
 
+  //toggle rows shared by the assistant and mobile tool cards
+  const renderToolToggles = (list: ITool[]) =>
+    list.map((tool, index) => {
+      const name = tool.definition.function.name;
+      const key = `tool:${name}`;
+      const enabled = pluginStates[key] ?? tool.enabledByDefault ?? false;
+      return (
+        <View
+          key={name}
+          style={[
+            styles.settingRowVertical,
+            index === list.length - 1 && { marginBottom: 0 },
+          ]}
+        >
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
+              {tool.displayDescription ? (
+                <Text style={styles.helpText}>
+                  {shortDescription(tool.displayDescription)}
+                </Text>
+              ) : null}
+            </View>
+            <Toggle
+              checked={enabled}
+              onToggle={async (v) => {
+                setPluginStates((prev) => ({ ...prev, [key]: v }));
+                await PluginRegistry.setEnabled("tool", name, v);
+                if (v) await tool.requestPermission?.();
+              }}
+            />
+          </View>
+        </View>
+      );
+    });
+
   const renderToolsSubPage = () => (
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.tools.title"))}
 
-      {/* built-in tools card */}
-      <View style={styles.contentCard}>
-        {generalTools.map((tool, index) => {
-          const name = tool.definition.function.name;
-          const key = `tool:${name}`;
-          const enabled = pluginStates[key] ?? tool.enabledByDefault ?? false;
-          const isLast = index === generalTools.length - 1;
-          return (
-            <View
-              key={name}
-              style={[styles.settingRowVertical, isLast && { marginBottom: 0 }]}
-            >
-              <View style={styles.toggleGroupRow}>
-                <View style={styles.toggleGroupContent}>
-                  <Text style={styles.settingLabel}>
-                    {tool.displayName ?? name}
-                  </Text>
-                  {tool.displayDescription ? (
-                    <Text style={styles.helpText}>
-                      {shortDescription(tool.displayDescription)}
-                    </Text>
-                  ) : null}
-                </View>
-                <Toggle
-                  checked={enabled}
-                  onToggle={async (v) => {
-                    setPluginStates((prev) => ({ ...prev, [key]: v }));
-                    await PluginRegistry.setEnabled("tool", name, v);
-                    if (v) await tool.requestPermission?.();
-                  }}
-                />
-              </View>
-            </View>
-          );
-        })}
-      </View>
-
-      {/* extensions and integrations group */}
+      {/* mcp link on top */}
       <Group style={styles.groupSpacing}>
-        {renderToolsNavRow(
-          "widgets",
-          t("settings.tools.widgets.title"),
-          t("settings.tools.widgets.help", {
-            list: allWidgets.map((w) => w.name).join(", "),
-          }),
-        )}
-
         {renderToolsNavRow(
           "mcpservers",
           t("settings.tools.mcp.title"),
           t("settings.tools.mcp.help"),
         )}
-
-        {!isDesktop &&
-          renderToolsNavRow(
-            "mobileactions",
-            t("settings.tools.mobile.title"),
-            t("settings.tools.mobile.help", {
-              list: mobileTools
-                .map(
-                  (tool) => tool.displayName ?? tool.definition.function.name,
-                )
-                .join(", "),
-            }),
-          )}
       </Group>
+
+      {/* built-in tools card */}
+      <View style={styles.contentCard}>
+        {renderToolToggles(generalTools)}
+      </View>
+
+      {/* mobile actions card, phone only */}
+      {!isDesktop && (
+        <View style={styles.contentCard}>
+          {renderToolToggles(mobileTools)}
+        </View>
+      )}
     </View>
   );
 
@@ -4527,29 +4988,24 @@ export default function SettingsDrawer({
       <View style={styles.subPageContainer}>
         {renderSubPageHeader(server.name)}
 
-        {/* server settings card */}
-        <View style={styles.contentCard}>
-          {status.error ? (
-            <View style={styles.settingRowVertical}>
+        {status.error ? (
+          <View style={styles.contentCard}>
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
               <Text style={[styles.helpText, { color: Colors.error }]}>
                 {status.error}
               </Text>
             </View>
-          ) : null}
-
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {server.name}
-            </Text>
-            <Group>
-              <ActionButton
-                icon={arrowIcon}
-                label={t("settings.server.settings")}
-                onPress={() => setActiveSubPage("mcpserversettings")}
-              />
-            </Group>
           </View>
-        </View>
+        ) : null}
+
+        {/* server settings link */}
+        <Group style={styles.groupSpacing}>
+          {renderToolsNavRow(
+            "mcpserversettings",
+            t("settings.server.settings"),
+            server.url,
+          )}
+        </Group>
 
         {/* tools card */}
         {tools.length > 0 && (
@@ -4664,6 +5120,9 @@ export default function SettingsDrawer({
           </View>
 
           <View style={styles.settingRowVertical}>
+            <Text style={styles.settingLabel}>
+              {t("settings.mcp.headerLabel")}
+            </Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
               {t("settings.mcp.headerHelp")}
             </Text>
@@ -4705,6 +5164,9 @@ export default function SettingsDrawer({
           </View>
 
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={styles.settingLabel}>
+              {t("settings.mcp.clientIdLabel")}
+            </Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
               {t("settings.mcp.clientIdHelp")}
             </Text>
@@ -4733,90 +5195,6 @@ export default function SettingsDrawer({
     );
   };
 
-  // widgets subpage content
-  const renderWidgetsSubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.tools.widgets.title"))}
-
-      <View style={styles.contentCard}>
-        {allWidgets.map((widget, index) => {
-          const key = `widget:${widget.id}`;
-          const enabled = pluginStates[key] ?? widget.enabledByDefault ?? false;
-          return (
-            <View
-              key={widget.id}
-              style={[
-                styles.settingRowVertical,
-                index === allWidgets.length - 1 && { marginBottom: 0 },
-              ]}
-            >
-              <View style={styles.toggleGroupRow}>
-                <View style={styles.toggleGroupContent}>
-                  <Text style={styles.settingLabel}>{widget.name}</Text>
-                  <Text style={styles.helpText}>
-                    {shortDescription(widget.description)}
-                  </Text>
-                </View>
-                <Toggle
-                  checked={enabled}
-                  onToggle={async (v) => {
-                    setPluginStates((prev) => ({ ...prev, [key]: v }));
-                    await PluginRegistry.setEnabled("widget", widget.id, v);
-                  }}
-                />
-              </View>
-            </View>
-          );
-        })}
-      </View>
-    </View>
-  );
-
-  // mobile actions subpage content
-  const renderMobileActionsSubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.tools.mobile.title"))}
-
-      <View style={styles.contentCard}>
-        {mobileTools.map((tool, index) => {
-          const name = tool.definition.function.name;
-          const key = `tool:${name}`;
-          const enabled = pluginStates[key] ?? tool.enabledByDefault ?? false;
-          return (
-            <View
-              key={name}
-              style={[
-                styles.settingRowVertical,
-                index === mobileTools.length - 1 && { marginBottom: 0 },
-              ]}
-            >
-              <View style={styles.toggleGroupRow}>
-                <View style={styles.toggleGroupContent}>
-                  <Text style={styles.settingLabel}>
-                    {tool.displayName ?? name}
-                  </Text>
-                  {tool.displayDescription ? (
-                    <Text style={styles.helpText}>
-                      {shortDescription(tool.displayDescription)}
-                    </Text>
-                  ) : null}
-                </View>
-                <Toggle
-                  checked={enabled}
-                  onToggle={async (v) => {
-                    setPluginStates((prev) => ({ ...prev, [key]: v }));
-                    await PluginRegistry.setEnabled("tool", name, v);
-                    if (v) await tool.requestPermission?.();
-                  }}
-                />
-              </View>
-            </View>
-          );
-        })}
-      </View>
-    </View>
-  );
-
   const getSubPageContent = (page: SubPage) => {
     switch (page) {
       case "profile":
@@ -4825,6 +5203,10 @@ export default function SettingsDrawer({
         return renderCloudSubPage();
       case "general":
         return renderGeneralSubPage();
+      case "maestro":
+        return renderMaestroSubPage();
+      case "maestropreferences":
+        return renderMaestroPreferencesSubPage();
       case "assistantoverlay":
         return renderAssistantOverlaySubPage();
       case "screensaver":
@@ -4833,10 +5215,10 @@ export default function SettingsDrawer({
         return renderServiceSubPage();
       case "beta":
         return renderBetaSubPage();
-      case "local":
-        return renderLocalSubPage();
       case "litert":
         return renderLitertSubPage();
+      case "litertmodel":
+        return renderLitertModelSubPage();
       case "ollama":
         return renderOllamaSubPage();
       case "ollamaserver":
@@ -4853,10 +5235,6 @@ export default function SettingsDrawer({
         return renderReportsSubPage();
       case "tools":
         return renderToolsSubPage();
-      case "widgets":
-        return renderWidgetsSubPage();
-      case "mobileactions":
-        return renderMobileActionsSubPage();
       case "mcpservers":
         return renderMcpServersSubPage();
       case "mcpserver":
@@ -4871,10 +5249,28 @@ export default function SettingsDrawer({
     }
   };
 
+  const renderScrollPage = (page: SubPage, active: boolean) => (
+    //focused field scrolls just above the keyboard
+    <KeyboardAwareScrollView
+      ref={active ? scrollRef : undefined}
+      bottomOffset={Spacing.xl2}
+      onScroll={active ? handleScroll : undefined}
+      scrollEventThrottle={16}
+      contentContainerStyle={{
+        paddingTop: isDesktop ? Spacing.xxl2 : 60,
+        paddingBottom: 40,
+        flexGrow: 1,
+      }}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={{ flex: 1 }}>{getSubPageContent(page)}</View>
+    </KeyboardAwareScrollView>
+  );
+
   const innerContent = (
     <View style={styles.innerContainer}>
       <View
-        style={[styles.fixedBackWrapper, { top: isDesktop ? 0 : 60 }]}
+        style={[styles.fixedBackWrapper, { top: 60 }]}
         pointerEvents="box-none"
       >
         <DrawerBackButton
@@ -4889,41 +5285,22 @@ export default function SettingsDrawer({
         page={activeSubPage}
         visible={visible}
         //push travels the whole panel, padding included
-        width={isDesktop ? 320 : drawerWidth}
+        width={drawerWidth}
         parentOf={subPageParent}
         gestureEnabled={!sheetOpen}
         onBack={handleBack}
-        renderPage={(page, active) => (
-          //focused field scrolls just above the keyboard
-          <KeyboardAwareScrollView
-            ref={active ? scrollRef : undefined}
-            bottomOffset={Spacing.xl2}
-            onScroll={active ? handleScroll : undefined}
-            scrollEventThrottle={16}
-            contentContainerStyle={{
-              paddingTop: isDesktop ? 0 : 60,
-              paddingBottom: 40,
-              flexGrow: 1,
-            }}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={{ flex: 1 }}>{getSubPageContent(page)}</View>
-          </KeyboardAwareScrollView>
-        )}
+        renderPage={renderScrollPage}
       />
 
-      {/* floating drawers keep their titles visible */}
-      {!isDesktop && (
-        <LinearGradient
-          colors={[
-            Colors.groupedBackground,
-            Colors.groupedBackgroundFade,
-            Colors.groupedBackgroundClear,
-          ]}
-          style={styles.gradientTop}
-          pointerEvents="none"
-        />
-      )}
+      <LinearGradient
+        colors={[
+          Colors.groupedBackground,
+          Colors.groupedBackgroundFade,
+          Colors.groupedBackgroundClear,
+        ]}
+        style={styles.gradientTop}
+        pointerEvents="none"
+      />
       <LinearGradient
         colors={[
           Colors.groupedBackgroundClear,
@@ -4999,60 +5376,23 @@ export default function SettingsDrawer({
     </>
   );
 
-  //focus opens the search view, the hub query still waits for enough chars
-  const isLitertSearching = litertSearchActive;
+  //the hub query waits for enough chars
   const isLitertQuerying = hfModelInput.trim().length >= MIN_SEARCH_LENGTH;
-  const isLitertDetail = !isLitertSearching && litertDetail !== null;
 
-  //android back/gesture steps out of detail then search before the sheet closes
+  const litertPageParent = (page: LitertPage) =>
+    page === "model" ? litertModelFrom : page === "search" ? "browse" : null;
+
+  //android back steps up the pages before the sheet closes
   const handleLitertBackPress = () => {
-    if (isLitertDetail) {
-      setLitertDetail(null);
-      return true;
-    }
-    if (isLitertSearching) {
-      setHfModelInput("");
-      setLitertSearchActive(false);
-      return true;
-    }
-    return false;
+    const parent = litertPageParent(litertPage);
+    if (parent === null) return false;
+    //keyboard slides away with the pop
+    Keyboard.dismiss();
+    //a page reached by back never grabs focus
+    setLitertSearchHandoff(false);
+    showLitertPage(parent);
+    return true;
   };
-
-  //slides the browse/detail body like a settings page push
-  //a fresh value each time avoids a flash at rest before it offsets
-  const [litertShown, setLitertShown] = useState(isLitertDetail);
-  const [litertTransition, setLitertTransition] = useState<{
-    shift: number;
-    progress: Animated.Value;
-  } | null>(null);
-  if (isLitertDetail !== litertShown) {
-    setLitertShown(isLitertDetail);
-    //opening fresh on the list skips the push
-    if (addModelSheetVisible) {
-      setLitertTransition({
-        shift: isLitertDetail ? litertBodyWidth : -litertBodyWidth,
-        progress: new Animated.Value(0),
-      });
-    }
-  }
-  useEffect(() => {
-    if (!litertTransition) return;
-    settlePage(litertTransition.progress, 1, () =>
-      setLitertTransition((cur) => (cur === litertTransition ? null : cur)),
-    );
-  }, [litertTransition]);
-  const litertBodyTranslate = useMemo(() => {
-    if (!litertTransition) return 0;
-    return litertTransition.progress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [litertTransition.shift, 0],
-    });
-  }, [litertTransition]);
-  //shared by the two mutually exclusive slide layers below
-  const litertBodySlideStyle = useMemo(
-    () => ({ transform: [{ translateX: litertBodyTranslate }] }),
-    [litertBodyTranslate],
-  );
 
   const renderLitertCard = (repoId: string) => {
     const entry = getCatalogEntry(repoId);
@@ -5113,14 +5453,13 @@ export default function SettingsDrawer({
     const canDownload = !!resolved && !installed && !downloadingLitert;
     const publisher = familyPublisher(entry?.family ?? "");
     const capabilities = (resolved?.capabilities ?? [])
-      .filter(
-        (c): c is keyof typeof LITERT_CAPABILITY_KEYS =>
-          c in LITERT_CAPABILITY_KEYS,
+      .filter((c): c is ModelCapabilityId =>
+        LITERT_CAPABILITY_IDS.includes(c as ModelCapabilityId),
       )
       .map((c) => ({
         id: c,
-        label: t(LITERT_CAPABILITY_KEYS[c]),
-        icon: LITERT_CAPABILITY_ICONS[c],
+        label: t(MODEL_CAPABILITY_KEYS[c]),
+        icon: MODEL_CAPABILITY_ICONS[c],
       }));
     //both carousels share one card
     const sections = [
@@ -5230,31 +5569,102 @@ export default function SettingsDrawer({
   ) : litertBrowserFailed ? (
     <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
   ) : (
-    <>
-      {!isLitertSearching ? (
-        <View style={styles.litertFamilies}>
-          {litertFamilies.map((family) => (
-            <View key={family.id}>
-              <Text style={[styles.settingLabel, styles.litertFamilyTitle]}>
-                {litertFamilyName(family)}
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.litertCarousel}
-              >
-                {family.repoIds.map(renderLitertCard)}
-              </ScrollView>
-            </View>
-          ))}
+    <View style={styles.litertFamilies}>
+      {litertFamilies.map((family) => (
+        <View key={family.id}>
+          <Text style={[styles.settingLabel, styles.litertFamilyTitle]}>
+            {litertFamilyName(family)}
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.litertCarousel}
+          >
+            {family.repoIds.map(renderLitertCard)}
+          </ScrollView>
         </View>
-      ) : (
-        litertSearchResults.length > 0 && (
-          <Group>{litertSearchResults.map(renderLitertSearchResult)}</Group>
-        )
-      )}
-      {isLitertQuerying && litertSearchResults.length === 0 && (
-        <Text style={styles.helpText}>{t("settings.litert.noResults")}</Text>
+      ))}
+    </View>
+  );
+
+  //nothing until a query goes out
+  const litertSearchList = litertSearchLoading ? (
+    <Text style={styles.helpText}>{t("settings.litert.loading")}</Text>
+  ) : litertSearchFailed ? (
+    <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
+  ) : litertSearchResults.length > 0 ? (
+    <Group>{litertSearchResults.map(renderLitertSearchResult)}</Group>
+  ) : (
+    isLitertQuerying && (
+      <Text style={styles.helpText}>{t("settings.litert.noResults")}</Text>
+    )
+  );
+
+  const renderLitertSearchField = (page: LitertPage) => (
+    <Group>
+      <TextInputField
+        icon={searchIcon}
+        placeholder={t("settings.litert.addModelPlaceholder")}
+        //other pages only lead to the search page
+        value={page === "search" ? hfModelInput : ""}
+        onChangeText={setHfModelInput}
+        onFocus={
+          page === "search"
+            ? () => setLitertSearchHandoff(false)
+            : openLitertSearch
+        }
+        autoFocus={page === "search" && litertSearchHandoff}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+    </Group>
+  );
+
+  //catalog, search and model push like settings pages
+  const renderLitertPage = (page: LitertPage, active: boolean) => (
+    <>
+      <SheetScrollView
+        ref={active ? addModelScrollRef : undefined}
+        contentContainerStyle={styles.addModelSheetContent}
+        keyboardShouldPersistTaps="handled"
+        onScroll={
+          active
+            ? (e) => setAddModelScrolled(e.nativeEvent.contentOffset.y > 4)
+            : undefined
+        }
+        scrollEventThrottle={16}
+      >
+        {page === "browse" ? (
+          <View style={styles.contentCard}>
+            <View style={styles.settingRowVertical}>
+              {renderLitertSearchField(page)}
+            </View>
+            {litertList}
+          </View>
+        ) : (
+          <>
+            <View style={[styles.contentCard, styles.litertSearchWithBack]}>
+              {renderLitertSearchField(page)}
+            </View>
+            {page === "model"
+              ? renderLitertDetail()
+              : litertSearchList && (
+                  <View style={styles.contentCard}>{litertSearchList}</View>
+                )}
+          </>
+        )}
+      </SheetScrollView>
+
+      {/* floats over the scroll like the settings back button */}
+      {page !== "browse" && (
+        <View style={styles.litertBackWrapper} pointerEvents="box-none">
+          <DrawerBackButton
+            kind="back"
+            onPress={handleLitertBackPress}
+            scrolled={addModelScrolled}
+            pulseKey={page === "model" ? litertDetail?.repoId : page}
+          />
+        </View>
       )}
     </>
   );
@@ -5262,12 +5672,7 @@ export default function SettingsDrawer({
   const addModelSheet = (
     <DrawerSheet
       visible={addModelSheetVisible}
-      onClose={() => {
-        setAddModelSheetVisible(false);
-        setLitertDetail(null);
-        setAddModelScrolled(false);
-        setLitertSearchActive(false);
-      }}
+      onClose={() => setAddModelSheetVisible(false)}
       onBackPress={handleLitertBackPress}
       mode="overlay"
       isLargeScreen={isLargeScreen}
@@ -5278,110 +5683,29 @@ export default function SettingsDrawer({
         styles.addModelSheet,
         {
           paddingBottom: Platform.OS === "ios" ? 34 : 20,
-          maxHeight: sheetMaxHeight,
+          //stacked pages cannot size the sheet
+          height: sheetMaxHeight,
         },
       ]}
-      desktopStyle={styles.addModelSheetDesktop}
+      //fills the settings window, stacked pages cannot size it
+      desktopStyle={[styles.addModelSheetDesktop, { height: "100%" }]}
     >
-      <View
-        style={styles.addModelSheetBody}
+      <SheetBody
+        style={styles.litertSheetBody}
         onLayout={(e) => {
           const width = e.nativeEvent.layout.width;
           setLitertBodyWidth((prev) => (prev !== width ? width : prev));
         }}
       >
-        <ScrollView
-          ref={addModelScrollRef}
-          contentContainerStyle={styles.addModelSheetContent}
-          keyboardShouldPersistTaps="handled"
-          onScroll={(e) =>
-            setAddModelScrolled(e.nativeEvent.contentOffset.y > 4)
-          }
-          scrollEventThrottle={16}
-        >
-          {/* same slot keeps the field focused */}
-          <View style={!isLitertDetail && styles.contentCard}>
-            <View
-              style={
-                isLitertDetail
-                  ? [styles.contentCard, styles.litertSearchWithBack]
-                  : styles.settingRowVertical
-              }
-            >
-              <View style={styles.litertSearchBarRow}>
-                {isLitertSearching && (
-                  <Pressable
-                    onPress={() => {
-                      setHfModelInput("");
-                      setLitertSearchActive(false);
-                    }}
-                    hitSlop={12}
-                    style={pressStyle(styles.litertSearchBackButton, "fade")}
-                  >
-                    <Image
-                      source={arrowIcon}
-                      style={styles.backIcon}
-                      tintColor={Colors.textPrimary}
-                    />
-                  </Pressable>
-                )}
-                <View style={styles.litertSearchBarGroup}>
-                  <Group>
-                    <TextInputField
-                      icon={searchIcon}
-                      placeholder={t("settings.litert.addModelPlaceholder")}
-                      value={hfModelInput}
-                      onChangeText={setHfModelInput}
-                      onFocus={() => setLitertSearchActive(true)}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </Group>
-                </View>
-              </View>
-            </View>
-            {!isLitertDetail && (
-              <Animated.View style={litertBodySlideStyle}>
-                {litertList}
-              </Animated.View>
-            )}
-          </View>
-
-          {isLitertDetail && (
-            <Animated.View style={litertBodySlideStyle}>
-              {renderLitertDetail()}
-            </Animated.View>
-          )}
-        </ScrollView>
-
-        {/* floats over the scroll like the settings back button */}
-        {isLitertDetail && (
-          <View style={styles.litertBackWrapper} pointerEvents="box-none">
-            {addModelScrolled && (
-              <View style={styles.fixedBackShadow} pointerEvents="none" />
-            )}
-            <Pressable
-              onPress={() => setLitertDetail(null)}
-              hitSlop={12}
-              style={pressStyle(
-                [
-                  styles.fixedBackButton,
-                  addModelScrolled
-                    ? styles.fixedBackButtonScrolled
-                    : styles.fixedBackButtonUnscrolled,
-                ],
-                addModelScrolled ? "surface" : "fade",
-              )}
-            >
-              <Image
-                source={arrowIcon}
-                style={styles.backIcon}
-                tintColor={Colors.textPrimary}
-              />
-            </Pressable>
-          </View>
-        )}
-      </View>
+        <PageStack
+          page={litertPage}
+          visible={addModelSheetVisible}
+          width={litertBodyWidth}
+          parentOf={litertPageParent}
+          onBack={handleLitertBackPress}
+          renderPage={renderLitertPage}
+        />
+      </SheetBody>
     </DrawerSheet>
   );
 
@@ -5403,7 +5727,7 @@ export default function SettingsDrawer({
       ]}
       desktopStyle={styles.addModelSheetDesktop}
     >
-      <ScrollView
+      <SheetScrollView
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
@@ -5466,7 +5790,169 @@ export default function SettingsDrawer({
             </Group>
           </View>
         </View>
-      </ScrollView>
+      </SheetScrollView>
+    </DrawerSheet>
+  );
+
+  const openaiModelsServer =
+    openaiDetailIndex !== null ? openaiServers[openaiDetailIndex] : undefined;
+
+  const renderOpenAIModelsPage = (page: CloudModelsPage, active: boolean) => {
+    const server = openaiModelsServer;
+    const index = openaiDetailIndex;
+    if (!server || index === null) return null;
+    const url = server.url.trim();
+    const disabled = server.disabledModels ?? NO_DISABLED_MODELS;
+    const model = openaiModelDetail;
+
+    return (
+      <>
+        <SheetScrollView
+          contentContainerStyle={styles.addModelSheetContent}
+          keyboardShouldPersistTaps="handled"
+          onScroll={
+            active
+              ? (e) =>
+                  setOpenAIModelsScrolled(e.nativeEvent.contentOffset.y > 4)
+              : undefined
+          }
+          scrollEventThrottle={16}
+        >
+          {page === "list" ? (
+            <ModelToggleList
+              key={url}
+              models={openaiModels}
+              loading={openaiModelsLoading}
+              service={OPENAI_PROVIDER_ID}
+              url={url}
+              disabled={server.disabledModels}
+              onChange={(next) =>
+                patchOpenAIServer(index, { disabledModels: next })
+              }
+              onOpenModel={(m) => {
+                Keyboard.dismiss();
+                showOpenAIModelsPage("model", m);
+              }}
+              showAll
+              autoFocusSearch={openaiModelsSearchHandoff}
+              onSearchFocus={() => setOpenAIModelsSearchHandoff(false)}
+            />
+          ) : (
+            model && (
+              <>
+                <View style={[styles.contentCard, styles.litertSearchWithBack]}>
+                  <Group>
+                    <TextInputField
+                      icon={searchIcon}
+                      placeholder={t("settings.ollama.searchModels")}
+                      //only leads to the list search
+                      value=""
+                      onFocus={() => {
+                        setOpenAIModelsSearchHandoff(true);
+                        showOpenAIModelsPage("list");
+                      }}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </Group>
+                </View>
+                <View style={styles.contentCard}>
+                  <View style={styles.toggleGroupRow}>
+                    <View
+                      style={[styles.toggleGroupContent, styles.cloudModelText]}
+                    >
+                      <Text style={styles.litertDetailName}>{model}</Text>
+                      <Text style={styles.litertDetailMeta}>
+                        {openAIServerLabel(index)}
+                      </Text>
+                    </View>
+                    <Toggle
+                      checked={!disabled.includes(model)}
+                      onToggle={(on) =>
+                        patchOpenAIServer(index, {
+                          disabledModels: on
+                            ? disabled.filter((m) => m !== model)
+                            : [...disabled, model],
+                        })
+                      }
+                    />
+                  </View>
+                  <Text
+                    style={[styles.settingLabel, styles.litertDetailSection]}
+                  >
+                    {t("settings.ollama.capabilities")}
+                  </Text>
+                  <ModelCapabilityToggles
+                    key={model}
+                    model={model}
+                    service={OPENAI_PROVIDER_ID}
+                    url={url}
+                    onCapabilitiesChange={(m, caps) =>
+                      patchOpenAIServer(index, {
+                        capabilities: { ...server.capabilities, [m]: caps },
+                      })
+                    }
+                    style={styles.cloudModelCapabilities}
+                    labelStyle={styles.cloudModelCapabilityLabel}
+                    checkboxes
+                  />
+                </View>
+              </>
+            )
+          )}
+        </SheetScrollView>
+
+        {/* floats over the scroll like the settings back button */}
+        {page !== "list" && (
+          <View style={styles.litertBackWrapper} pointerEvents="box-none">
+            <DrawerBackButton
+              kind="back"
+              onPress={handleOpenAIModelsBack}
+              scrolled={openaiModelsScrolled}
+              pulseKey={model ?? page}
+            />
+          </View>
+        )}
+      </>
+    );
+  };
+
+  const openaiModelsSheet = (
+    <DrawerSheet
+      visible={openaiModelsVisible && !!openaiModelsServer}
+      onClose={() => setOpenAIModelsVisible(false)}
+      onBackPress={handleOpenAIModelsBack}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      avoidKeyboard
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          //stacked pages cannot size the sheet
+          height: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={[styles.addModelSheetDesktop, { height: "100%" }]}
+    >
+      <SheetBody
+        style={styles.litertSheetBody}
+        onLayout={(e) => {
+          const width = e.nativeEvent.layout.width;
+          setOpenAIModelsWidth((prev) => (prev !== width ? width : prev));
+        }}
+      >
+        <PageStack
+          page={openaiModelsPage}
+          visible={openaiModelsVisible}
+          width={openaiModelsWidth}
+          parentOf={(page) => (page === "model" ? "list" : null)}
+          onBack={handleOpenAIModelsBack}
+          renderPage={renderOpenAIModelsPage}
+        />
+      </SheetBody>
     </DrawerSheet>
   );
 
@@ -5488,7 +5974,7 @@ export default function SettingsDrawer({
       ]}
       desktopStyle={styles.addModelSheetDesktop}
     >
-      <ScrollView
+      <SheetScrollView
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
@@ -5531,15 +6017,15 @@ export default function SettingsDrawer({
 
           <View style={styles.settingRowVertical}>
             <Text style={styles.settingLabel}>
-              {t("settings.openai.apiKey")}
+              {t("settings.cloudapi.apiKey")}
             </Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.openai.apiKeyHelp")}
+              {t("settings.cloudapi.apiKeyHelp")}
             </Text>
             <Group>
               <TextInputField
-                icon={penPlaceholderIcon}
-                placeholder={t("settings.openai.apiKeyPlaceholder")}
+                icon={keyIcon}
+                placeholder={t("settings.cloudapi.apiKeyPlaceholder")}
                 autoCapitalize="none"
                 autoCorrect={false}
                 secureTextEntry
@@ -5571,7 +6057,7 @@ export default function SettingsDrawer({
             </Group>
           </View>
         </View>
-      </ScrollView>
+      </SheetScrollView>
     </DrawerSheet>
   );
 
@@ -5593,7 +6079,7 @@ export default function SettingsDrawer({
       desktopStyle={styles.addModelSheetDesktop}
     >
       {/* too tall to ride the keyboard */}
-      <KeyboardAwareScrollView
+      <SheetKeyboardAwareScrollView
         bottomOffset={Spacing.xl2}
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
@@ -5636,6 +6122,9 @@ export default function SettingsDrawer({
           </View>
 
           <View style={styles.settingRowVertical}>
+            <Text style={styles.settingLabel}>
+              {t("settings.mcp.headerLabel")}
+            </Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
               {t("settings.mcp.headerHelp")}
             </Text>
@@ -5664,6 +6153,9 @@ export default function SettingsDrawer({
           </View>
 
           <View style={styles.settingRowVertical}>
+            <Text style={styles.settingLabel}>
+              {t("settings.mcp.clientIdLabel")}
+            </Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
               {t("settings.mcp.clientIdHelp")}
             </Text>
@@ -5703,7 +6195,7 @@ export default function SettingsDrawer({
             </Group>
           </View>
         </View>
-      </KeyboardAwareScrollView>
+      </SheetKeyboardAwareScrollView>
     </DrawerSheet>
   );
 
@@ -5727,7 +6219,7 @@ export default function SettingsDrawer({
       ]}
       desktopStyle={styles.addModelSheetDesktop}
     >
-      <ScrollView
+      <SheetScrollView
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
@@ -5741,7 +6233,7 @@ export default function SettingsDrawer({
             />
           )}
         </View>
-      </ScrollView>
+      </SheetScrollView>
     </DrawerSheet>
   );
 
@@ -5764,91 +6256,92 @@ export default function SettingsDrawer({
       desktopStyle={styles.addModelSheetDesktop}
     >
       {selectedLocalModel && (
-        <View style={styles.addModelSheetBody}>
-          <ScrollView
+        <SheetBody style={styles.addModelSheetBody}>
+          <SheetScrollView
             contentContainerStyle={styles.addModelSheetContent}
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.contentCard}>
-              <View
-                style={[
-                  styles.settingRowVertical,
-                  { marginBottom: Spacing.md },
-                ]}
-              >
-                <Text style={styles.settingLabel}>
-                  {selectedLocalModel.label}
-                </Text>
-                {selectedLocalModel.status && (
-                  <Text style={[styles.helpText, { marginBottom: 0 }]}>
-                    {t(`settings.local.status.${selectedLocalModel.status}`)}
-                  </Text>
-                )}
-              </View>
+              <Group style={styles.infoGroup}>
+                <ActionButton
+                  label={selectedLocalModel.label}
+                  rightElement={
+                    selectedLocalModel.status && (
+                      <Text
+                        style={styles.localModelFactValue}
+                        numberOfLines={1}
+                      >
+                        {t(`settings.local.status.${selectedLocalModel.status}`)}
+                      </Text>
+                    )
+                  }
+                />
+                {(
+                  [
+                    ["family", localSheet?.family],
+                    ["runtime", localSheet?.runtime],
+                    ["browser", localSheet?.browser],
+                    ["version", selectedLocalModel.version],
+                    [
+                      "context",
+                      selectedLocalModel.contextTokens !== undefined
+                        ? t("settings.local.sheet.tokens", {
+                            count:
+                              selectedLocalModel.contextTokens.toLocaleString(),
+                          })
+                        : undefined,
+                    ],
+                    [
+                      "thinking",
+                      selectedLocalModel.thinking !== undefined
+                        ? t(
+                            selectedLocalModel.thinking
+                              ? "settings.local.sheet.yes"
+                              : "settings.local.sheet.no",
+                          )
+                        : undefined,
+                    ],
+                  ] as const
+                )
+                  .filter(([, value]) => !!value)
+                  .map(([key, value]) => (
+                    <ActionButton
+                      key={key}
+                      label={t(`settings.local.sheet.${key}`)}
+                      rightElement={
+                        <Text
+                          style={styles.localModelFactValue}
+                          numberOfLines={1}
+                          ellipsizeMode="middle"
+                        >
+                          {value}
+                        </Text>
+                      }
+                    />
+                  ))}
+              </Group>
 
-              <Group>
-                {selectedLocalModel.status && (
-                  <ActionButton
-                    label={t("settings.local.sheet.status")}
-                    rightElement={
-                      <Text style={styles.litertRowMeta}>
-                        {t(
-                          `settings.local.status.${selectedLocalModel.status}`,
-                        )}
-                      </Text>
-                    }
-                  />
-                )}
-                {!!selectedLocalModel.version && (
-                  <ActionButton
-                    label={t("settings.local.sheet.version")}
-                    rightElement={
-                      <Text style={styles.litertRowMeta}>
-                        {selectedLocalModel.version}
-                      </Text>
-                    }
-                  />
-                )}
-                {selectedLocalModel.contextTokens !== undefined && (
-                  <ActionButton
-                    label={t("settings.local.sheet.context")}
-                    rightElement={
-                      <Text style={styles.litertRowMeta}>
-                        {t("settings.local.sheet.tokens", {
-                          count:
-                            selectedLocalModel.contextTokens.toLocaleString(),
-                        })}
-                      </Text>
-                    }
-                  />
-                )}
-                {selectedLocalModel.thinking !== undefined && (
-                  <ActionButton
-                    label={t("settings.local.sheet.thinking")}
-                    rightElement={
-                      <Text style={styles.litertRowMeta}>
-                        {t(
-                          selectedLocalModel.thinking
-                            ? "settings.local.sheet.yes"
-                            : "settings.local.sheet.no",
-                        )}
-                      </Text>
-                    }
-                  />
-                )}
-                {localSheet?.canDownload &&
-                  (selectedLocalModel.status === "downloadable" ||
-                    selectedLocalModel.status === "downloading") && (
+              {localSheet?.canDownload &&
+                (selectedLocalModel.status === "downloadable" ||
+                  selectedLocalModel.status === "downloading") && (
+                  <Group
+                    style={[
+                      styles.highlightGroup,
+                      styles.litertDetailDownload,
+                      !!localDownload && styles.highlightGroupDisabled,
+                    ]}
+                  >
                     <ActionButton
                       icon={downloadIcon}
                       label={t("settings.local.download")}
+                      variant="highlight"
                       disabled={!!localDownload}
                       onPress={() => {
                         handleDownloadLocal(selectedLocalModel.id);
                       }}
                     />
-                  )}
-              </Group>
+                  </Group>
+                )}
 
               {!!localDownload && (
                 <DownloadProgress
@@ -5858,8 +6351,8 @@ export default function SettingsDrawer({
                 />
               )}
             </View>
-          </ScrollView>
-        </View>
+          </SheetScrollView>
+        </SheetBody>
       )}
     </DrawerSheet>
   );
@@ -5883,111 +6376,209 @@ export default function SettingsDrawer({
       desktopStyle={styles.addModelSheetDesktop}
     >
       {!!downloadingLitert && (
-        <View style={styles.addModelSheetBody}>
-          <ScrollView contentContainerStyle={styles.addModelSheetContent}>
+        <SheetBody style={styles.addModelSheetBody}>
+          <SheetScrollView contentContainerStyle={styles.addModelSheetContent}>
             <View style={styles.contentCard}>
-              <View
-                style={[
-                  styles.settingRowVertical,
-                  { marginBottom: Spacing.md },
-                ]}
-              >
-                <Text style={styles.settingLabel}>
+              <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+                <Text
+                  style={[styles.settingLabel, { marginBottom: Spacing.md }]}
+                >
                   {t("settings.litert.downloadingModel", {
                     name: getLiteRTModelLabel(downloadingLitert),
                   })}
                 </Text>
+
+                <Group style={styles.groupSpacingTight}>
+                  <ProgressBar
+                    progress={litertDownloadProgress?.progress ?? 0}
+                    icon={downloadIcon}
+                  />
+                  <ActionButton
+                    label={t("settings.litert.downloaded")}
+                    rightElement={
+                      <Text style={styles.litertRowMeta}>
+                        {litertDownloadProgress?.sizeStr ??
+                          t("download.starting")}
+                      </Text>
+                    }
+                  />
+                  <ActionButton
+                    label={t("settings.litert.speed")}
+                    rightElement={
+                      <Text style={styles.litertRowMeta}>
+                        {litertDownloadProgress?.speedStr ??
+                          t("download.starting")}
+                      </Text>
+                    }
+                  />
+                  <ActionButton
+                    label={t("settings.litert.timeLeft")}
+                    rightElement={
+                      <Text style={styles.litertRowMeta}>
+                        {litertDownloadProgress?.etaSeconds
+                          ? `${Math.round(litertDownloadProgress.etaSeconds)}s`
+                          : t("download.starting")}
+                      </Text>
+                    }
+                  />
+                </Group>
+
+                <Group>
+                  <ActionButton
+                    icon={cancelIcon}
+                    label={t("settings.litert.cancelDownload")}
+                    onPress={handleCancelLitert}
+                  />
+                </Group>
               </View>
-
-              <Group>
-                <ProgressBar
-                  progress={litertDownloadProgress?.progress ?? 0}
-                  icon={downloadIcon}
-                />
-                <ActionButton
-                  label={t("settings.litert.downloaded")}
-                  rightElement={
-                    <Text style={styles.litertRowMeta}>
-                      {litertDownloadProgress?.sizeStr ??
-                        t("download.starting")}
-                    </Text>
-                  }
-                />
-                <ActionButton
-                  label={t("settings.litert.speed")}
-                  rightElement={
-                    <Text style={styles.litertRowMeta}>
-                      {litertDownloadProgress?.speedStr ??
-                        t("download.starting")}
-                    </Text>
-                  }
-                />
-                <ActionButton
-                  label={t("settings.litert.timeLeft")}
-                  rightElement={
-                    <Text style={styles.litertRowMeta}>
-                      {litertDownloadProgress?.etaSeconds
-                        ? `${Math.round(litertDownloadProgress.etaSeconds)}s`
-                        : t("download.starting")}
-                    </Text>
-                  }
-                />
-              </Group>
-
-              <Group style={styles.litertCancelRow}>
-                <ActionButton
-                  icon={cancelIcon}
-                  label={t("settings.litert.cancelDownload")}
-                  onPress={handleCancelLitert}
-                />
-              </Group>
             </View>
-          </ScrollView>
-        </View>
+          </SheetScrollView>
+        </SheetBody>
       )}
     </DrawerSheet>
   );
 
+  const profileEditSheet = (
+    <DrawerSheet
+      visible={profileEditVisible}
+      onClose={() => {
+        setConfirmedName(name);
+        setProfileEditVisible(false);
+      }}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      avoidKeyboard
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.addModelSheetDesktop}
+    >
+      <SheetScrollView
+        contentContainerStyle={styles.addModelSheetContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.profile.name")}
+            </Text>
+            <Group>
+              <TextInputField
+                icon={penPlaceholderIcon}
+                placeholder={t("onboarding.name.placeholder")}
+                value={name}
+                onChangeText={setName}
+                onSubmitEditing={() => setConfirmedName(name)}
+              />
+            </Group>
+          </View>
+        </View>
+      </SheetScrollView>
+    </DrawerSheet>
+  );
+
   if (isDesktop) {
-    const largeScreenWidth = largeScreenAnim.interpolate({
+    if (!desktopMounted) return null;
+    const windowTranslateY = largeScreenAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: [0, 320],
-    });
-    const largeScreenMargin = largeScreenAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 16],
-    });
-    const largeScreenOpacity = largeScreenAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 1],
+      outputRange: [-10, 0],
     });
 
     return (
-      <Animated.View
-        style={[
-          styles.largeScreenContainer,
-          styles.floatingContainer,
-          {
-            width: largeScreenWidth,
-            opacity: largeScreenOpacity,
-            marginLeft: largeScreenMargin,
-            marginRight: largeScreenMargin,
-            overflow: "hidden",
-          },
-        ]}
-      >
-        <View style={{ width: 320, flex: 1 }}>
-          <View style={styles.floatingContent}>{innerContent}</View>
+      <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
+        <Animated.View style={[styles.overlay, { opacity: largeScreenAnim }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        </Animated.View>
+
+        <View style={styles.desktopWindowWrapper} pointerEvents="box-none">
+          <Animated.View
+            style={[
+              styles.desktopWindow,
+              {
+                opacity: largeScreenAnim,
+                transform: [{ translateY: windowTranslateY }],
+              },
+            ]}
+          >
+            <View style={styles.desktopNav}>
+              <View style={styles.innerContainer}>
+                <View
+                  style={[styles.fixedBackWrapper, { top: Spacing.xxl2 }]}
+                  pointerEvents="box-none"
+                >
+                  <DrawerBackButton
+                    kind="close"
+                    onPress={onClose}
+                    scrolled={navScrolled}
+                  />
+                </View>
+                <ScrollView
+                  onScroll={(e) =>
+                    setNavScrolled(e.nativeEvent.contentOffset.y > 10)
+                  }
+                  scrollEventThrottle={16}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{
+                    paddingTop: Spacing.xxl2,
+                    paddingBottom: 40,
+                  }}
+                >
+                  {renderMainPage()}
+                </ScrollView>
+              </View>
+            </View>
+
+            <View
+              style={styles.desktopPage}
+              onLayout={(e) => setDesktopPageWidth(e.nativeEvent.layout.width)}
+            >
+              <View style={styles.innerContainer}>
+                {SUB_PAGE_PARENT[desktopPage] !== "main" && (
+                  <View
+                    style={[styles.fixedBackWrapper, { top: Spacing.xxl2 }]}
+                    pointerEvents="box-none"
+                  >
+                    <DrawerBackButton
+                      kind="back"
+                      onPress={handleBack}
+                      scrolled={isScrolled}
+                      pulseKey={desktopPage}
+                    />
+                  </View>
+                )}
+                {/* switching section swaps pages, only nested pages push */}
+                <PageStack
+                  key={desktopSection}
+                  page={desktopPage}
+                  visible={visible}
+                  width={desktopPageWidth || DESKTOP_WINDOW_MAX_WIDTH}
+                  parentOf={subPageParent}
+                  gestureEnabled={!sheetOpen}
+                  onBack={handleBack}
+                  renderPage={renderScrollPage}
+                />
+              </View>
+            </View>
+
+            {addModelSheet}
+            {ollamaAddServerSheet}
+            {openaiAddServerSheet}
+            {openaiModelsSheet}
+            {mcpAddServerSheet}
+            {cloudSetupSheet}
+            {localModelDetailSheet}
+            {litertDownloadSheet}
+            {profileEditSheet}
+          </Animated.View>
         </View>
         {notificationModal}
-        {addModelSheet}
-        {ollamaAddServerSheet}
-        {openaiAddServerSheet}
-        {mcpAddServerSheet}
-        {cloudSetupSheet}
-        {localModelDetailSheet}
-        {litertDownloadSheet}
-      </Animated.View>
+      </View>
     );
   }
 
@@ -6023,10 +6614,12 @@ export default function SettingsDrawer({
       {addModelSheet}
       {ollamaAddServerSheet}
       {openaiAddServerSheet}
+      {openaiModelsSheet}
       {mcpAddServerSheet}
       {cloudSetupSheet}
       {localModelDetailSheet}
       {litertDownloadSheet}
+      {profileEditSheet}
     </View>
   );
 
@@ -6053,29 +6646,38 @@ const makeStyles = (Colors: ThemeColors) =>
       paddingHorizontal: Spacing.lg2,
       overflow: "hidden",
     },
-    largeScreenContainer: {
-      width: 320,
-      backgroundColor: Colors.groupedBackground,
-      zIndex: 10,
+    desktopWindowWrapper: {
+      ...StyleSheet.absoluteFill,
+      padding: Spacing.xxl2,
+      //clears the tauri title bar
+      paddingTop:
+        Spacing.xxl2 +
+        (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+          ? 32
+          : 0),
     },
-    floatingContainer: {
-      margin: 16,
-      marginTop:
-        typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
-          ? 40
-          : 8,
-      marginBottom: 16,
-      borderRadius: Radius.xxl,
+    desktopWindow: {
+      flex: 1,
+      width: "100%",
+      maxWidth: DESKTOP_WINDOW_MAX_WIDTH,
+      alignSelf: "center",
+      flexDirection: "row",
+      backgroundColor: Colors.groupedBackground,
+      borderRadius: Radius.window,
       borderWidth: 2,
       borderColor: Colors.border,
-      boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
-      elevation: 5,
       overflow: "hidden",
     },
-    floatingContent: {
-      flex: 1,
-      paddingTop: 24,
+    desktopNav: {
+      width: 320,
       paddingHorizontal: Spacing.lg2,
+      borderRightWidth: 2,
+      borderRightColor: Colors.border,
+    },
+    desktopPage: {
+      flex: 1,
+      paddingHorizontal: Spacing.lg2,
+      overflow: "hidden",
     },
     innerContainer: {
       flex: 1,
@@ -6088,31 +6690,6 @@ const makeStyles = (Colors: ThemeColors) =>
       elevation: 10,
       width: 40,
       height: 40,
-    },
-    fixedBackShadow: {
-      position: "absolute",
-      top: 4,
-      left: -4,
-      width: 40,
-      height: 40,
-      backgroundColor: Colors.shadowInk,
-      borderRadius: Radius.xxl,
-    },
-    fixedBackButton: {
-      width: 40,
-      height: 40,
-      justifyContent: "center",
-      alignItems: "center",
-      position: "relative",
-      zIndex: 1,
-    },
-    fixedBackButtonScrolled: {
-      backgroundColor: Colors.surface,
-      borderRadius: Radius.xxl,
-    },
-    fixedBackButtonUnscrolled: {
-      backgroundColor: "transparent",
-      borderRadius: Radius.xxl,
     },
     header: {
       flexDirection: "row",
@@ -6143,11 +6720,6 @@ const makeStyles = (Colors: ThemeColors) =>
       padding: Spacing.md,
       marginBottom: Spacing.xxl2,
     },
-    backIcon: {
-      width: 18,
-      height: 18,
-      transform: [{ rotate: "-180deg" }],
-    },
     gradientTop: {
       position: "absolute",
       top: 0,
@@ -6176,25 +6748,20 @@ const makeStyles = (Colors: ThemeColors) =>
       backgroundColor: Colors.groupedBackground,
       borderTopLeftRadius: Radius.huge2,
       borderTopRightRadius: Radius.huge2,
-      paddingTop: 12,
+      paddingTop: Spacing.xxl,
       overflow: "hidden",
     },
     sheetHandleContainer: {
+      //floats so top edge matches sides
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
       alignItems: "center",
-      marginBottom: Spacing.xs2,
-      paddingVertical: 10,
-      marginTop: -10,
+      paddingVertical: Spacing.md,
     },
     addModelSheetDesktop: {
-      backgroundColor: Colors.groupedBackground,
-      borderRadius: Radius.xxl,
-      borderWidth: 2,
-      borderColor: Colors.border,
-      boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
-      elevation: 5,
       width: 380,
-      overflow: "hidden",
-      paddingVertical: 16,
     },
     localModelsGrid: {
       flexDirection: "row",
@@ -6229,8 +6796,17 @@ const makeStyles = (Colors: ThemeColors) =>
       color: Colors.textSecondary,
       textAlign: "center",
     },
-    litertCancelRow: {
-      marginTop: Spacing.md,
+    //rows like the chat details sheet
+    infoGroup: {
+      borderWidth: 0,
+    },
+    localModelFactValue: {
+      flexShrink: 1,
+      maxWidth: "60%",
+      textAlign: "right",
+      color: Colors.textMuted,
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.label,
     },
     litertDetailHeader: {
       flexDirection: "row",
@@ -6254,7 +6830,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     litertDetailName: {
       fontFamily: Fonts.mono,
-      fontSize: FontSizes.title,
+      fontSize: FontSizes.lg,
       color: Colors.textPrimary,
       marginBottom: Spacing.xs,
     },
@@ -6273,11 +6849,40 @@ const makeStyles = (Colors: ThemeColors) =>
       width: 14,
       height: 14,
     },
+    modelToggleName: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      marginRight: Spacing.lg2,
+    },
+    modelToggleLabel: {
+      flexShrink: 1,
+    },
+    modelToggleArrowOpen: {
+      transform: [{ rotate: "90deg" }],
+    },
+    modelCapabilities: {
+      gap: Spacing.md,
+      marginTop: Spacing.lg,
+      paddingLeft: Spacing.xxl,
+    },
     litertDetailDownload: {
       marginTop: Spacing.lg2,
     },
     litertDetailSection: {
       marginTop: Spacing.xxl,
+    },
+    //texts inset like settingLabel, controls stay on the edge
+    cloudModelText: {
+      paddingTop: Spacing.xs,
+      paddingHorizontal: Spacing.md,
+    },
+    cloudModelCapabilityLabel: {
+      paddingHorizontal: Spacing.md,
+    },
+    cloudModelCapabilities: {
+      gap: Spacing.md,
+      marginTop: Spacing.md,
     },
     litertFamilies: {
       gap: Spacing.xxl,
@@ -6349,6 +6954,9 @@ const makeStyles = (Colors: ThemeColors) =>
       flexShrink: 1,
       position: "relative",
     },
+    litertSheetBody: {
+      flex: 1,
+    },
     litertBackWrapper: {
       position: "absolute",
       top: Spacing.md + 4,
@@ -6360,21 +6968,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     litertSearchWithBack: {
       marginLeft: 40 + Spacing.md,
-    },
-    litertSearchBarRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: Spacing.md,
-    },
-    litertSearchBarGroup: {
-      flex: 1,
-    },
-    litertSearchBackButton: {
-      width: 44,
-      height: 44,
-      justifyContent: "center",
-      alignItems: "center",
-      borderRadius: Radius.xxl,
     },
     addModelSheetContent: {
       paddingHorizontal: Spacing.lg2,
@@ -6431,21 +7024,46 @@ const makeStyles = (Colors: ThemeColors) =>
       fontFamily: Fonts.mono,
       fontSize: FontSizes.label,
     },
+    cloudAccount: {
+      alignItems: "center",
+      paddingVertical: Spacing.xl2,
+      paddingHorizontal: Spacing.md,
+      marginBottom: Spacing.lg2,
+    },
     cloudAvatar: {
-      width: 36,
-      height: 36,
-      borderRadius: Radius.pill,
+      width: 80,
+      height: 80,
+      //stays a circle at this size
+      borderRadius: Radius.pill * 2,
       borderWidth: 2,
       borderColor: Colors.border,
       backgroundColor: Colors.surfaceSubtle,
       alignItems: "center",
       justifyContent: "center",
+      marginBottom: Spacing.lg2,
+    },
+    cloudAvatarIcon: {
+      width: 32,
+      height: 32,
+    },
+    cloudName: {
+      fontSize: FontSizes.lg,
+      fontFamily: Fonts.mono,
+      color: Colors.textPrimary,
+      textAlign: "center",
+      marginBottom: Spacing.xs2,
+    },
+    cloudEmail: {
+      fontSize: FontSizes.bodyMd,
+      fontFamily: Fonts.body,
+      color: Colors.textMuted,
+      textAlign: "center",
     },
     navTitle: {
       fontSize: FontSizes.lg,
       fontFamily: Fonts.mono,
       color: Colors.textPrimary,
-      marginBottom: 2,
+      marginBottom: Spacing.xs2,
     },
     navSubtitle: {
       fontSize: FontSizes.bodyMd,
@@ -6454,7 +7072,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     permissionBadge: {
       paddingVertical: 3,
-      paddingHorizontal: 8,
+      paddingHorizontal: Spacing.md,
       borderRadius: Radius.md,
       borderWidth: 2,
       borderColor: Colors.border,
@@ -6462,7 +7080,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     permissionBadgeAllowed: {
       backgroundColor: Colors.primary,
-      borderColor: Colors.primaryBright,
+      borderColor: Colors.borderOnPrimary,
     },
     permissionBadgeText: {
       fontFamily: Fonts.mono,
@@ -6519,16 +7137,17 @@ const makeStyles = (Colors: ThemeColors) =>
       fontSize: FontSizes.bodyMd,
       color: Colors.textMuted,
       fontFamily: Fonts.body,
-      marginTop: 4,
+      marginTop: Spacing.xs,
       lineHeight: 20,
       paddingHorizontal: Spacing.md,
     },
     assistantStatusText: {
       fontSize: FontSizes.bodyMd,
       fontFamily: Fonts.body,
-      marginTop: 6,
-      marginBottom: 12,
+      marginTop: Spacing.sm,
+      marginBottom: Spacing.md,
       lineHeight: 20,
+      paddingHorizontal: Spacing.md,
     },
     assistantStatusOn: {
       color: Colors.primary,

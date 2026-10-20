@@ -44,7 +44,7 @@ export type Message = {
   metrics?: MessageMetrics;
   sources?: MessageSource[];
   //app context at send time
-  screenContext?: { appPackage: string | null; hasScreenText: boolean; icon?: string | null; label?: string | null };
+  screenContext?: { appPackage: string | null; hasScreenText: boolean; icon?: string | null; label?: string | null; text?: string | null };
 };
 
 export type SyncTombstone = {

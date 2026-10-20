@@ -160,7 +160,7 @@ export default function NotificationModal({
                           btn.disabled && styles.buttonDisabled,
                         ],
                         !btn.disabled && (isPrimary || isDanger
-                          ? { backgroundColor: Colors.primaryPressed, borderColor: Colors.primaryPressed }
+                          ? { backgroundColor: Colors.primaryBright, borderColor: Colors.primaryBright }
                           : "surface")
                       )}
                       onPress={() => !btn.disabled && btn.onPress()}
@@ -197,8 +197,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.window,
-    borderWidth: 2,
-    borderColor: Colors.border,
     padding: 24,
     width: "100%",
     maxWidth: 400,

@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: Fonts.body,
-    fontSize: FontSizes.xs,
+    fontSize: FontSizes.labelSm,
     color: Colors.textPrimary,
   },
 });

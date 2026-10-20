@@ -21,12 +21,17 @@ export type AppSettings = {
   instruction: string;
   speaker: boolean;
   autoSpeak: boolean;
+  maestroButterfly: string;
+  ttsEngine: string;
+  ttsVoices: string;
+  ttsSpeed: string;
   alwaysWhisper: boolean;
   autoStartMic: boolean;
   hasSeenOnboarding: boolean;
   name: string;
   includeDateTime: boolean;
   showTechnicalDetails: boolean;
+  editAiMessages: boolean;
   showDetectionBoxes: boolean;
   advancedMode: boolean;
   dataWarningDismissed: boolean;
@@ -70,12 +75,21 @@ export const BASE_DEFAULTS: AppSettings = {
   instruction: '',
   speaker: true,
   autoSpeak: true,
+  //empty means the first butterfly
+  maestroButterfly: '',
+  //supertonic until the user picks system
+  ttsEngine: 'supertonic',
+  //engine id to voice json
+  ttsVoices: '{}',
+  //string keeps fractional rates
+  ttsSpeed: '1',
   alwaysWhisper: false,
   autoStartMic: true,
   hasSeenOnboarding: false,
   name: '',
   includeDateTime: true,
   showTechnicalDetails: false,
+  editAiMessages: false,
   showDetectionBoxes: false,
   advancedMode: false,
   dataWarningDismissed: false,
@@ -101,6 +115,7 @@ const BOOLEAN_KEYS = [
   'hasSeenOnboarding',
   'includeDateTime',
   'showTechnicalDetails',
+  'editAiMessages',
   'showDetectionBoxes',
   'advancedMode',
   'dataWarningDismissed',

@@ -55,6 +55,10 @@ export type OllamaServer = {
   keepAlive?: number;
   //names the stored openai api key
   id?: string;
+  //disabled ones hidden from pickers
+  disabledModels?: string[];
+  //user set caps win over detection
+  capabilities?: Record<string, string[]>;
 };
 
 //legacy entries are plain url strings
@@ -69,30 +73,43 @@ function readServer(entry: unknown): OllamaServer | null {
   if (typeof raw.contextLength === 'number') server.contextLength = raw.contextLength;
   if (typeof raw.keepAlive === 'number') server.keepAlive = raw.keepAlive;
   if (typeof raw.id === 'string' && raw.id.length > 0) server.id = raw.id;
+  if (Array.isArray(raw.disabledModels)) {
+    const disabled = raw.disabledModels.filter((m): m is string => typeof m === 'string');
+    if (disabled.length > 0) server.disabledModels = disabled;
+  }
+  if (raw.capabilities && typeof raw.capabilities === 'object') {
+    const caps = Object.entries(raw.capabilities as Record<string, unknown>)
+      .filter((e): e is [string, string[]] => Array.isArray(e[1]) && e[1].every((c) => typeof c === 'string'));
+    if (caps.length > 0) server.capabilities = Object.fromEntries(caps);
+  }
   return server;
 }
 
 //stored as a json array
-export function getOllamaServers(): OllamaServer[] {
-  const settings = Settings.getCached();
-  let servers: OllamaServer[] = [];
+function parseServers(raw: string): OllamaServer[] {
   try {
-    const parsed = JSON.parse(settings.ollamaUrls || '[]');
-    if (Array.isArray(parsed)) servers = parsed.map(readServer).filter((s): s is OllamaServer => s !== null);
-  } catch {}
-  //legacy single-url setting seeds the list, never the beta server
-  const active = settings.ollamaUrl.trim();
-  if (servers.length === 0 && active.length > 0 && active !== BETA_SERVER_URL) servers = [{ url: active, name: '' }];
-  return servers;
-}
-
-//stored as a json array too
-export function getOpenAIServers(): OllamaServer[] {
-  try {
-    const parsed = JSON.parse(Settings.getCached().openaiUrls || '[]');
+    const parsed = JSON.parse(raw || '[]');
     if (Array.isArray(parsed)) return parsed.map(readServer).filter((s): s is OllamaServer => s !== null);
   } catch {}
   return [];
+}
+
+//legacy url only seeds ollama
+function isLegacyOllamaSeed(settings: AppSettings): boolean {
+  const active = settings.ollamaUrl.trim();
+  return settings.aiService === 'ollama' && active.length > 0 && active !== BETA_SERVER_URL;
+}
+
+export function getOllamaServers(): OllamaServer[] {
+  const settings = Settings.getCached();
+  const servers = parseServers(settings.ollamaUrls);
+  //legacy single-url setting seeds the list
+  if (servers.length === 0 && isLegacyOllamaSeed(settings)) return [{ url: settings.ollamaUrl.trim(), name: '' }];
+  return servers;
+}
+
+export function getOpenAIServers(): OllamaServer[] {
+  return parseServers(Settings.getCached().openaiUrls);
 }
 
 export function newOpenAIServerId(): string {
@@ -120,6 +137,19 @@ export function serializeServers(servers: OllamaServer[]): string {
     .map((s) => ({ ...s, url: s.url.trim(), name: s.name.trim() }))
     .filter((s) => s.url.length > 0 || s.name.length > 0);
   return JSON.stringify(kept);
+}
+
+function findServer(service: string, url: string): OllamaServer | undefined {
+  const servers = service === 'ollama' ? getOllamaServers() : service === OPENAI_PROVIDER_ID ? getOpenAIServers() : [];
+  return servers.find((s) => s.url === url.trim());
+}
+
+export function getDisabledModels(service: string, url: string): string[] {
+  return findServer(service, url)?.disabledModels ?? [];
+}
+
+export function getCapabilityOverride(service: string, url: string, model: string): string[] | undefined {
+  return findServer(service, url)?.capabilities?.[model];
 }
 
 //undefined falls back to global
@@ -150,14 +180,36 @@ function serverLabel(url: string): string {
   return url.replace(/^https?:\/\//, '').replace(/\/+$/, '');
 }
 
+//domain name like api.mistral.ai gives Mistral
+function apiNameFromUrl(url: string): string | null {
+  const parts = serverLabel(url.trim()).split(/[/:]/)[0].toLowerCase().split('.');
+  //skip ips and bare hosts like localhost
+  if (parts.length < 2 || parts.every((p) => /^\d+$/.test(p))) return null;
+  const domain = parts[parts.length - 2];
+  return domain ? domain.charAt(0).toUpperCase() + domain.slice(1) : null;
+}
+
+//user name, else service name numbered on repeats
+export function openAIServerNames(servers: OllamaServer[]): (string | null)[] {
+  const seen: Record<string, number> = {};
+  return servers.map((server) => {
+    if (server.name) return server.name;
+    const known = apiNameFromUrl(server.url);
+    if (!known) return null;
+    seen[known] = (seen[known] ?? 0) + 1;
+    return seen[known] > 1 ? `${known} #${seen[known]}` : known;
+  });
+}
+
 //one tab per configured server
 function serverSources(service: string, servers: OllamaServer[], fallback: string): ModelSource[] {
   const kept = servers.filter((s) => s.url.length > 0);
-  return kept.map((server) => ({
+  const names = service === OPENAI_PROVIDER_ID ? openAIServerNames(kept) : kept.map((s) => s.name || null);
+  return kept.map((server, i) => ({
     key: `${service}:${server.url}`,
     service,
     //name wins over host then provider
-    label: server.name || (kept.length > 1 ? serverLabel(server.url) : fallback),
+    label: names[i] || (kept.length > 1 ? serverLabel(server.url) : fallback),
     url: server.url,
   }));
 }
@@ -180,7 +232,7 @@ export function buildSources(localAvailable: boolean): ModelSource[] {
     sources.push(...serverSources('ollama', getOllamaServers(), 'Ollama'));
   }
   if (isProviderSupported(OPENAI_PROVIDER_ID) && enabled.includes(OPENAI_PROVIDER_ID)) {
-    sources.push(...serverSources(OPENAI_PROVIDER_ID, getOpenAIServers(), 'OpenAI API'));
+    sources.push(...serverSources(OPENAI_PROVIDER_ID, getOpenAIServers(), t('settings.service.cloudapi')));
   }
   return sources;
 }
@@ -191,7 +243,7 @@ export function migrateModelSources(settings: AppSettings): AppSettings {
   //the legacy seed only lived in the active url, keep it before beta clears it
   const legacy = settings.ollamaUrl.trim();
   const stored = settings.ollamaUrls.trim();
-  if ((!stored || stored === '[]') && legacy.length > 0 && legacy !== BETA_SERVER_URL) {
+  if ((!stored || stored === '[]') && isLegacyOllamaSeed(settings)) {
     patch.ollamaUrls = serializeServers([{ url: legacy, name: '' }]);
   }
   if (!BETA_SERVER_URL) return applyPatch(settings, patch);

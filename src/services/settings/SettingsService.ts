@@ -74,15 +74,16 @@ class SettingsService {
 
   //save a single setting key-value
   async set<K extends keyof AppSettings>(key: K, value: AppSettings[K]): Promise<void> {
+    //emit may fire during the await
+    if (this.cache) {
+      (this.cache as any)[key] = value;
+    }
     const db = this.getDb();
     await db.runAsync(
       'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
       [key, String(value)]
     );
     await this.bumpSettingsUpdatedAt();
-    if (this.cache) {
-      (this.cache as any)[key] = value;
-    }
     DeviceEventEmitter.emit(AppEvents.settingsChanged);
   }
 
@@ -99,6 +100,10 @@ class SettingsService {
   }
 
   private async writeMany(partial: Partial<AppSettings>): Promise<void> {
+    //emit may fire during the await
+    if (this.cache) {
+      Object.assign(this.cache, partial);
+    }
     const db = this.getDb();
     //avoid nested transaction from shared db
     for (const [key, value] of Object.entries(partial)) {
@@ -106,9 +111,6 @@ class SettingsService {
         'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
         [key, String(value)]
       );
-    }
-    if (this.cache) {
-      Object.assign(this.cache, partial);
     }
   }
 

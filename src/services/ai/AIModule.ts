@@ -3,6 +3,7 @@ import { OllamaProvider } from './providers/OllamaProvider';
 import { ToolManager } from './tools/ToolManager';
 import { ToolSource } from './tools/ITool';
 import { sendMessageWithToolPrompt } from './tools/fallbackToolCall';
+import { describeToolCallError } from './tools/toolCallParser';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { LocalModelSheet, LocalProvider } from './providers/LocalProvider';
 import { LiteRTProvider } from './providers/LiteRTProvider';
@@ -11,7 +12,7 @@ import { LocationService } from '../location/LocationService';
 import { Settings } from '../settings/SettingsService';
 import { DEFAULT_OLLAMA_URL, imageToBase64 } from './utils/imageToBase64';
 import { resolveQuickFlow, QuickFlowTarget } from './quickFlow';
-import { activeSourceKey, BETA_SERVER_URL, buildSources, getOllamaTuning, OPENAI_PROVIDER_ID, ModelSource } from './providers/sources';
+import { activeSourceKey, BETA_SERVER_URL, buildSources, getCapabilityOverride, getDisabledModels, getOllamaTuning, OPENAI_PROVIDER_ID, ModelSource } from './providers/sources';
 import { OpenAIProvider } from './providers/OpenAIProvider';
 import { getCachedModels, hydrateModelCache } from './providers/modelCache';
 
@@ -39,6 +40,8 @@ class CentralAIModule {
   private modeConfigured = false;
   //model caps need an http call
   private capabilitiesCache = new Map<string, string[]>();
+  //server of the active provider
+  private activeUrl = '';
 
   constructor() {
     this.providers = new Map();
@@ -65,6 +68,7 @@ class CentralAIModule {
   configure(activeUrl: string, contextLength?: number, keepAlive?: number): void {
     const raw = activeUrl.trim();
     const url = raw.length > 0 ? raw : DEFAULT_URL;
+    this.activeUrl = raw;
     this.providers.set('OLLAMA', new OllamaProvider(url, {}, contextLength, keepAlive));
     //beta shares the tuning, never the url
     if (BETA_SERVER_URL) this.providers.set('BETA', new OllamaProvider(BETA_SERVER_URL, {}, contextLength, keepAlive));
@@ -133,14 +137,18 @@ class CentralAIModule {
     }
   }
 
-  async getModelsFor(mode: string, ollamaUrl?: string): Promise<string[]> {
+  //settings need disabled models too
+  async getModelsFor(mode: string, ollamaUrl?: string, includeDisabled = false): Promise<string[]> {
     const provider = this.providerFor(mode, ollamaUrl);
     if (!provider) {
       console.warn(`[AIModule] no provider for source ${mode} ${ollamaUrl ?? ''}`);
       return [];
     }
     try {
-      return await provider.getAvailableModels();
+      const models = await provider.getAvailableModels();
+      if (includeDisabled) return models;
+      const disabled = new Set(getDisabledModels(mode, ollamaUrl ?? ''));
+      return disabled.size > 0 ? models.filter((m) => !disabled.has(m)) : models;
     } catch (error) {
       console.warn(`[AIModule] model listing threw for ${mode} ${ollamaUrl ?? ''}:`, error);
       return [];
@@ -213,6 +221,9 @@ class CentralAIModule {
     const provider = this.getActiveProvider();
     if (!provider.getModelCapabilities) return [];
 
+    const override = getCapabilityOverride(this.activeMode.toLowerCase(), this.activeUrl, modelName);
+    if (override) return override;
+
     const cacheKey = `${this.activeMode}:${modelName}`;
     const cached = this.capabilitiesCache.get(cacheKey);
     if (cached) return cached;
@@ -224,6 +235,8 @@ class CentralAIModule {
 
   //caps of any model, not just active
   async getModelCapabilitiesFor(mode: string, ollamaUrl: string | undefined, modelName: string): Promise<string[]> {
+    const override = getCapabilityOverride(mode, ollamaUrl ?? '', modelName);
+    if (override) return override;
     const provider = this.providerFor(mode, ollamaUrl);
     if (!provider?.getModelCapabilities) return [];
 
@@ -397,6 +410,15 @@ class CentralAIModule {
       if (!result?.toolCalls || result.toolCalls.length === 0) {
         //empty means the model stayed silent
         const producedText = accumulated.substring(beforeLen).replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
+        //unparsed tool call, tell the model why
+        if (producedText.includes('tool_calls')) {
+          currentMessages.push({ role: 'assistant', content: producedText });
+          currentMessages.push({
+            role: 'user',
+            content: `[SYSTEM] Your tool call could not be read: ${describeToolCallError(producedText)}. If you still need the tool, output the tool call JSON again in the exact required format. Otherwise answer the user.`,
+          });
+          return 'tools';
+        }
         return producedText.length > 0 ? 'answered' : 'empty';
       }
 

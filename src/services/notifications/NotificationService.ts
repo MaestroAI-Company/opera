@@ -50,6 +50,8 @@ class NotificationServiceImpl {
   private channels = new Map<string, string>();
   //ids holding the foreground service
   private fgOwners = new Set<string>();
+  //ids shown without the service
+  private fgDenied = new Set<string>();
 
   private async ensureChannel(id: string, name: string, importance: AndroidImportance) {
     if (Platform.OS !== 'android') return null;
@@ -120,8 +122,7 @@ class NotificationServiceImpl {
   async displayGenerationProgress(convId: string, prompt: string, step: string) {
     const channelId = await this.ensureChannel('generation', 'Background generation', AndroidImportance.LOW);
     const id = progressId(convId);
-    this.fgOwners.add(id);
-    await notifee.displayNotification({
+    const notification = {
       id,
       title: asTitle(prompt),
       body: step,
@@ -130,14 +131,26 @@ class NotificationServiceImpl {
         channelId: channelId || 'default',
         onlyAlertOnce: true,
         ongoing: true,
-        asForegroundService: true, //keep the stream alive in background
         smallIcon: 'ic_launcher',
         color: Colors.primary,
         //reply length is unknown while it streams
         progress: { indeterminate: true },
         pressAction: { id: 'default', launchActivity: 'default' },
       },
-    });
+    };
+    if (!this.fgDenied.has(id)) {
+      this.fgOwners.add(id);
+      try {
+        //keep the stream alive in background
+        await notifee.displayNotification({ ...notification, android: { ...notification.android, asForegroundService: true } });
+        return;
+      } catch {
+        //android refuses it once backgrounded
+        this.fgOwners.delete(id);
+        this.fgDenied.add(id);
+      }
+    }
+    await notifee.displayNotification(notification);
   }
 
   async displayGenerationFinished(convId: string, prompt: string, failed = false) {
@@ -159,6 +172,7 @@ class NotificationServiceImpl {
 
   async cancelGenerationProgress(convId: string) {
     const id = progressId(convId);
+    this.fgDenied.delete(id);
     await this.releaseForegroundService(id);
     await notifee.cancelNotification(id);
   }

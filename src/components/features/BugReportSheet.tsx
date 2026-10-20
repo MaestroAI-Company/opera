@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useKeyboardState } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
@@ -12,13 +12,12 @@ import Checkbox from "../ui/Checkbox";
 import Group from "../ui/Group";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
-import DrawerSheet from "./DrawerSheet";
+import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
 
 const DESKTOP_CARD_WIDTH = 380;
-const DESKTOP_MARGIN = 24;
 
 type BugReportSheetProps = {
   visible: boolean;
@@ -37,7 +36,7 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{ title: string; message: string; buttons?: ModalButton[] }>({ title: "", message: "" });
   const isKeyboardOpen = useKeyboardState((state) => state.isVisible);
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
   const notify = useCallback((title: string, message: string, buttons?: ModalButton[]) => {
@@ -51,13 +50,6 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
   useEffect(() => {
     if (visible) reset(crash, screenshot);
   }, [visible, crash, screenshot, reset]);
-
-  const centeredStyle = {
-    position: "absolute" as const,
-    left: Math.max(DESKTOP_MARGIN, (windowWidth - DESKTOP_CARD_WIDTH) / 2),
-    top: Math.max(DESKTOP_MARGIN, windowHeight * 0.12),
-    maxHeight: windowHeight * 0.76,
-  };
 
   return (
     <>
@@ -73,9 +65,9 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
           styles.sheet,
           { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + (isKeyboardOpen ? 0 : bottomInset), maxHeight: windowHeight - insets.top - Spacing.xl2 },
         ]}
-        desktopStyle={[styles.desktopCard, centeredStyle]}
+        desktopStyle={styles.desktopCard}
       >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <SheetScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.contentCard}>
             <Text style={styles.title}>{crash ? t("bugReport.crashTitle") : t("bugReport.title")}</Text>
 
@@ -132,7 +124,7 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
               />
             </Group>
           </View>
-        </ScrollView>
+        </SheetScrollView>
       </DrawerSheet>
 
       <NotificationModal
@@ -155,23 +147,19 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     backgroundColor: Colors.groupedBackground,
     borderTopLeftRadius: Radius.huge2,
     borderTopRightRadius: Radius.huge2,
-    paddingTop: 12,
+    paddingTop: Spacing.xxl,
   },
   desktopCard: {
-    backgroundColor: Colors.groupedBackground,
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
-    elevation: 5,
     width: DESKTOP_CARD_WIDTH,
-    overflow: "hidden",
   },
   sheetHandleContainer: {
+    //floats so top edge matches sides
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     alignItems: "center",
-    marginBottom: Spacing.xs2,
-    paddingVertical: 10,
-    marginTop: -10,
+    paddingVertical: Spacing.md,
   },
   content: {
     paddingHorizontal: Spacing.lg2,
@@ -189,10 +177,11 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     fontFamily: Fonts.mono,
     paddingTop: Spacing.xs,
     paddingHorizontal: Spacing.md,
-    marginBottom: 6,
+    marginBottom: Spacing.sm,
   },
   help: {
-    fontSize: FontSizes.caption,
+    fontSize: FontSizes.bodyMd,
+    lineHeight: 20,
     color: Colors.textMuted,
     fontFamily: Fonts.body,
     paddingHorizontal: Spacing.md,
@@ -202,14 +191,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     marginTop: Spacing.sm,
   },
   consent: {
-    marginTop: 12,
-    marginBottom: 12,
+    marginTop: Spacing.lg2,
+    marginBottom: Spacing.lg2,
   },
   toggleRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 8,
+    marginTop: Spacing.md,
     paddingHorizontal: Spacing.md,
   },
   checkboxRow: {

@@ -373,9 +373,23 @@ export default function Index() {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
   const [modelSelectorVisible, setModelSelectorVisible] = useState(false);
-  //desktops that can host get the sampler admin screen
+  //the desktop app always gets the sampler screen, browsers only for admins
   const [samplerMode, setSamplerMode] = useState(false);
-  const showSamplerSwitch = isDesktop && OperaHub.canHost();
+  const [samplerAdmin, setSamplerAdmin] = useState(false);
+  const checkSamplerAdmin = useCallback(async () => {
+    if (OperaHub.canHost() || !OperaHub.isSupported()) return;
+    const hub = await OperaHub.getPairedHub();
+    const profile = hub
+      ? await OperaHub.refreshProfile(hub).catch(() => OperaHub.getProfile())
+      : null;
+    setSamplerAdmin(profile?.role === "admin");
+  }, []);
+  //pairing and profiles change in the settings
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the paired hub
+    if (!settingsDrawerVisible) checkSamplerAdmin();
+  }, [settingsDrawerVisible, checkSamplerAdmin]);
+  const showSamplerSwitch = isDesktop && (OperaHub.canHost() || samplerAdmin);
   const inSampler = samplerMode && showSamplerSwitch;
   const samplerSwitchOptions = useMemo(
     () => [
@@ -2440,6 +2454,7 @@ useEffect(() => {
           <SamplerScreen
             isLargeScreen={isLargeScreen}
             isDesktop={isDesktop}
+            onHubChanged={checkSamplerAdmin}
             topBar={
               <TopBar
                 onMenuPress={() => {}}

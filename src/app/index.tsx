@@ -384,6 +384,10 @@ export default function Index() {
       : null;
     setSamplerAdmin(profile?.role === "admin");
   }, []);
+  //a hub hosted here comes back with the app
+  useEffect(() => {
+    OperaHub.startHostedHub().catch((e) => console.warn("[Sampler] hub not started:", e));
+  }, []);
   //pairing and profiles change in the settings
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the paired hub

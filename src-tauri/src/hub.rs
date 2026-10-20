@@ -416,6 +416,21 @@ pub async fn hub_mcp_overview(
 }
 
 #[tauri::command]
+pub async fn hub_mcp_manage(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    id: String,
+    action: String,
+) -> Result<Vec<McpServerSummary>, HubError> {
+    state
+        .client(&device_key)
+        .await?
+        .mcp_manage(hub, id, action)
+        .await
+}
+
+#[tauri::command]
 pub async fn hub_create_profile(
     state: State<'_, HubState>,
     device_key: String,

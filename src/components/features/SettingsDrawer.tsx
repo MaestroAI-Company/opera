@@ -4566,19 +4566,6 @@ export default function SettingsDrawer({
           </View>
         )}
 
-        {/* hub wide settings, admins only */}
-        {hubState === "online" && hubSettings && (
-          <View style={styles.contentCard}>
-            {renderHubToggle(
-              t("settings.hub.lanDiscovery"),
-              t("settings.hub.lanDiscoveryHelp"),
-              hubSettings.lanDiscovery,
-              (value) => changeHubSettings({ lanDiscovery: value }),
-              true,
-            )}
-          </View>
-        )}
-
         {/* connected devices card */}
         {hubState === "online" && (
           <View style={styles.contentCard}>

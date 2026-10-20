@@ -73,6 +73,8 @@ pub fn run() {
             #[cfg(desktop)]
             hub::hub_mcp_overview,
             #[cfg(desktop)]
+            hub::hub_mcp_manage,
+            #[cfg(desktop)]
             hub::hub_create_profile,
             #[cfg(desktop)]
             hub::hub_unlock_profile,

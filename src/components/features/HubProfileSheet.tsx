@@ -29,8 +29,7 @@ import Group from "../ui/Group";
 import { pressStyle } from "../ui/pressStyle";
 import TextInputField from "../ui/TextInputField";
 import DrawerBackButton from "./DrawerBackButton";
-import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
-import PageStack from "./PageStack";
+import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 import ProfileCard from "./ProfileCard";
 
 const keyIcon = require("../../../assets/icons/key.png");
@@ -38,6 +37,7 @@ const newIcon = require("../../../assets/icons/hyperlink2.png");
 const penIcon = require("../../../assets/icons/pencil.png");
 
 const DESKTOP_CARD_WIDTH = 560;
+const DESKTOP_CARD_WIDTH_NARROW = 440;
 //shorter passwords fall to a guessing hub
 export const MIN_PASSWORD_LENGTH = 8;
 
@@ -87,7 +87,8 @@ export default function HubProfileSheet({
   const [digits, setDigits] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [bodyWidth, setBodyWidth] = useState(0);
+  //kept through the close animation, the prop resets as soon as the parent closes
+  const [passwordOnly, setPasswordOnly] = useState(changePassword);
   const [scrolled, setScrolled] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   //parents pass a fresh callback each render
@@ -101,6 +102,7 @@ export default function HubProfileSheet({
   if (visible !== wasVisible) {
     setWasVisible(visible);
     if (visible) {
+      setPasswordOnly(changePassword);
       setPage(changePassword ? "password" : "pick");
       setProfiles(null);
       setChosen(null);
@@ -446,7 +448,7 @@ export default function HubProfileSheet({
 
       {/* floats over the scroll like the settings back button */}
       {parentOf(p) && (
-        <View style={styles.backWrapper} pointerEvents="box-none">
+        <View style={[styles.backWrapper, (isLargeScreen || isDesktop) && styles.backWrapperDesktop]} pointerEvents="box-none">
           <DrawerBackButton
             kind="back"
             onPress={handleBack}
@@ -472,28 +474,12 @@ export default function HubProfileSheet({
         styles.sheet,
         {
           paddingBottom: Platform.OS === "ios" ? 34 : 20,
-          //stacked pages cannot size the sheet
-          height: windowHeight - insets.top - Spacing.xl2,
+          maxHeight: windowHeight - insets.top - Spacing.xl2,
         },
       ]}
-      desktopStyle={[styles.desktopCard, { height: "100%" }]}
+      desktopStyle={passwordOnly ? styles.desktopCardNarrow : styles.desktopCard}
     >
-      <SheetBody
-        style={styles.body}
-        onLayout={(e) => {
-          const width = e.nativeEvent.layout.width;
-          setBodyWidth((prev) => (prev !== width ? width : prev));
-        }}
-      >
-        <PageStack
-          page={page}
-          visible={visible}
-          width={bodyWidth}
-          parentOf={parentOf}
-          onBack={handleBack}
-          renderPage={renderPage}
-        />
-      </SheetBody>
+      {renderPage(page, true)}
     </DrawerSheet>
   );
 }
@@ -524,8 +510,8 @@ const makeStyles = (Colors: ThemeColors) =>
     desktopCard: {
       width: DESKTOP_CARD_WIDTH,
     },
-    body: {
-      flex: 1,
+    desktopCardNarrow: {
+      width: DESKTOP_CARD_WIDTH_NARROW,
     },
     content: {
       paddingHorizontal: Spacing.lg2,
@@ -543,6 +529,10 @@ const makeStyles = (Colors: ThemeColors) =>
       height: 40,
       zIndex: 10,
       elevation: 10,
+    },
+    //below the desktop close button
+    backWrapperDesktop: {
+      top: Spacing.lg2 + 40 + Spacing.md,
     },
     contentCard: {
       backgroundColor: Colors.surface,

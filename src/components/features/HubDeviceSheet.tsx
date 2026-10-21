@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
@@ -9,7 +9,7 @@ import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
-import DrawerSheet from "./DrawerSheet";
+import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 const pencilIcon = require("../../../assets/icons/pencil.png");
 const binIcon = require("../../../assets/icons/bin.png");
@@ -120,7 +120,7 @@ export default function HubDeviceSheet({
       ]}
       desktopStyle={styles.desktopCard}
     >
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <SheetScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {/* name */}
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -188,7 +188,7 @@ export default function HubDeviceSheet({
             </Group>
           </View>
         )}
-      </ScrollView>
+      </SheetScrollView>
 
       <NotificationModal
         visible={confirmRemove}
@@ -219,16 +219,20 @@ const makeStyles = (Colors: ThemeColors) =>
       backgroundColor: Colors.groupedBackground,
       borderTopLeftRadius: Radius.huge2,
       borderTopRightRadius: Radius.huge2,
-      paddingTop: Spacing.lg2,
+      paddingTop: Spacing.xxl,
+      overflow: "hidden",
     },
     desktopCard: {
       width: DESKTOP_CARD_WIDTH,
     },
     sheetHandleContainer: {
+      //floats so top edge matches sides
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
       alignItems: "center",
-      marginBottom: Spacing.xs2,
-      paddingVertical: Spacing.lg,
-      marginTop: -Spacing.lg,
+      paddingVertical: Spacing.md,
     },
     content: {
       paddingHorizontal: Spacing.lg2,

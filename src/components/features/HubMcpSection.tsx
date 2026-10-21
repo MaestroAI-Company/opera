@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Image, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { mcpAvatar, mcpSourceLabel, runHubMcp, useHubMcp } from "../../hooks/useHubMcp";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
@@ -7,9 +7,9 @@ import { useT } from "../../i18n";
 import { formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
 import { HostedMcpServer, McpField } from "../../services/hub/OperaHubService";
 import ActionButton from "../ui/ActionButton";
+import CardGrid from "../ui/CardGrid";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
-import { pressStyle } from "../ui/pressStyle";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 
@@ -125,7 +125,6 @@ export default function HubMcpSection({ onAddServer, onOpenServer }: HubMcpSecti
   const t = useT();
   const stateLabel = useMcpStateLabel();
   const { api, status, error } = useHubMcp();
-  const [gridWidth, setGridWidth] = useState(0);
   const servers = status?.servers ?? [];
 
   const help = error
@@ -151,36 +150,16 @@ export default function HubMcpSection({ onAddServer, onOpenServer }: HubMcpSecti
         </Group>
 
         {servers.length > 0 && (
-          <View
-            style={[styles.grid, { marginTop: Spacing.md }]}
-            onLayout={(e) => {
-              const width = e.nativeEvent.layout.width;
-              if (width > 0 && width !== gridWidth) setGridWidth(width);
-            }}
-          >
-            {servers.map((server, index) => {
-              //a lone last card takes the row
-              const lastOdd = servers.length % 2 !== 0 && index === servers.length - 1;
-              const width = lastOdd ? "100%" : gridWidth > 0 ? Math.floor((gridWidth - Spacing.md) / 2) - 1 : "47%";
-              return (
-                <Pressable
-                  key={server.id}
-                  style={pressStyle([styles.card, { width, flexGrow: 1 }, lastOdd && styles.cardWide], "surface")}
-                  onPress={() => {
-                    Vibration.vibrate(8);
-                    onOpenServer(server.id, server.listing.title);
-                  }}
-                >
-                  <Text style={styles.cardTitle} numberOfLines={2}>
-                    {server.listing.title}
-                  </Text>
-                  <Text style={[styles.cardStatus, server.state === "failed" && styles.cardError]} numberOfLines={1}>
-                    {stateLabel(server)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <CardGrid
+            style={{ marginTop: Spacing.md }}
+            cards={servers.map((server) => ({
+              key: server.id,
+              title: server.listing.title,
+              status: stateLabel(server),
+              error: server.state === "failed",
+              onPress: () => onOpenServer(server.id, server.listing.title),
+            }))}
+          />
         )}
       </View>
     </View>
@@ -485,42 +464,6 @@ const makeStyles = (Colors: ThemeColors) =>
       color: Colors.textMuted,
       fontFamily: Fonts.mono,
       fontSize: FontSizes.label,
-    },
-    grid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: Spacing.md,
-    },
-    card: {
-      borderWidth: 2,
-      borderColor: Colors.border,
-      borderRadius: Radius.xxl,
-      backgroundColor: Colors.surface,
-      paddingHorizontal: Spacing.md,
-      paddingVertical: Spacing.lg,
-      minHeight: 76,
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    cardWide: {
-      minHeight: 70,
-    },
-    cardTitle: {
-      fontFamily: Fonts.mono,
-      fontSize: FontSizes.body,
-      lineHeight: 18,
-      color: Colors.textPrimary,
-      textAlign: "center",
-      marginBottom: Spacing.xs,
-    },
-    cardStatus: {
-      fontFamily: Fonts.body,
-      fontSize: FontSizes.caption,
-      color: Colors.textSecondary,
-      textAlign: "center",
-    },
-    cardError: {
-      color: Colors.error,
     },
     detailHeader: {
       flexDirection: "row",

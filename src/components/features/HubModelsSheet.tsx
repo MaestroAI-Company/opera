@@ -34,7 +34,7 @@ import NotificationModal from "../ui/NotificationModal";
 import { pressStyle } from "../ui/pressStyle";
 import TextInputField from "../ui/TextInputField";
 import DrawerBackButton from "./DrawerBackButton";
-import DrawerSheet from "./DrawerSheet";
+import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
 import PageStack from "./PageStack";
 
 const searchIcon = require("../../../assets/icons/search.png");
@@ -402,7 +402,7 @@ export default function HubModelsSheet({
   //catalog, search and model push like settings pages
   const renderPage = (p: Page, active: boolean) => (
     <>
-      <ScrollView
+      <SheetScrollView
         ref={active ? scrollRef : undefined}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -420,7 +420,7 @@ export default function HubModelsSheet({
             {p === "model" ? renderDetail() : searchList && <View style={styles.contentCard}>{searchList}</View>}
           </>
         )}
-      </ScrollView>
+      </SheetScrollView>
 
       {/* floats over the scroll like the settings back button */}
       {p !== "browse" && (
@@ -457,7 +457,7 @@ export default function HubModelsSheet({
       //fills the settings window, stacked pages cannot size it
       desktopStyle={[styles.desktopCard, { height: "100%" }]}
     >
-      <View
+      <SheetBody
         style={styles.body}
         onLayout={(e) => {
           const width = e.nativeEvent.layout.width;
@@ -472,7 +472,7 @@ export default function HubModelsSheet({
           onBack={handleBack}
           renderPage={renderPage}
         />
-      </View>
+      </SheetBody>
 
       <NotificationModal
         visible={!!pending}
@@ -499,17 +499,20 @@ const makeStyles = (Colors: ThemeColors) =>
       backgroundColor: Colors.groupedBackground,
       borderTopLeftRadius: Radius.huge2,
       borderTopRightRadius: Radius.huge2,
-      paddingTop: Spacing.lg2,
+      paddingTop: Spacing.xxl,
       overflow: "hidden",
     },
     desktopCard: {
       width: DESKTOP_CARD_WIDTH,
     },
     sheetHandleContainer: {
+      //floats so top edge matches sides
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
       alignItems: "center",
-      marginBottom: Spacing.xs2,
-      paddingVertical: Spacing.lg,
-      marginTop: -Spacing.lg,
+      paddingVertical: Spacing.md,
     },
     body: {
       flex: 1,

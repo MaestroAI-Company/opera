@@ -5,6 +5,10 @@ import { buildWavBuffer } from './wav';
 const SAMPLE_RATE = 16000;
 //same threshold as the chat bar
 const VAD_RMS_THRESHOLD = 0.01;
+//speech stands this far above the noise
+const VAD_NOISE_RATIO = 3;
+//quietest chunk of the last 5 s
+const NOISE_WINDOW = 20;
 //native recognizers give up too
 const NO_SPEECH_MS = 5000;
 
@@ -256,12 +260,18 @@ class SpeechToTextService {
       noSpeechTimer: setTimeout(() => this.stop(), NO_SPEECH_MS),
     };
     let speaking = false;
+    const recentRms: number[] = [];
     processor.onaudioprocess = (e) => {
       const chunk = new Float32Array(e.inputBuffer.getChannelData(0));
       capture.chunks.push(chunk.buffer);
       let sum = 0;
       for (let i = 0; i < chunk.length; i++) sum += chunk[i] * chunk[i];
-      const loud = Math.sqrt(sum / chunk.length) > VAD_RMS_THRESHOLD;
+      const rms = Math.sqrt(sum / chunk.length);
+      recentRms.push(rms);
+      if (recentRms.length > NOISE_WINDOW) recentRms.shift();
+      //steady noise like a tv stops counting
+      const noiseFloor = Math.min(...recentRms);
+      const loud = rms > Math.max(VAD_RMS_THRESHOLD, noiseFloor * VAD_NOISE_RATIO);
       if (loud === speaking) return;
       speaking = loud;
       if (loud) {

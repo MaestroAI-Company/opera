@@ -4,6 +4,7 @@ import {
   Animated,
   DeviceEventEmitter,
   Image,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -40,6 +41,7 @@ import { TTS } from "../../services/speech/TTSService";
 import { onWakeWord, startWakeWord, stopWakeWord } from "../../services/speech/WakeWord";
 import "../../services/widgets/registerWidgets";
 import { deriveChatDisplay, renderMarkdown } from "../ui/MarkdownText";
+import { StandbyCardData, StandbyCardWidget } from "../widgets/StandbyCardWidget";
 import NotificationModal from "../ui/NotificationModal";
 import { pressStyle } from "../ui/pressStyle";
 import ThinkingIcon from "../ui/ThinkingIcon";
@@ -48,12 +50,22 @@ import { ModelSelectorDrawer } from "./ModelSelector";
 
 const micIcon = require("../../../assets/icons/microphone.png");
 const stopIcon = require("../../../assets/icons/stop.png");
+const linkIcon = require("../../../assets/icons/hyperlink.png");
+
+const STANDBY_SEGMENT = `\n\n---\n\n${SYSTEM_PROMPTS.STANDBY}`;
+const CARD_FENCE = /```widget id="standby_card"[^\n]*\n?([\s\S]*?)(```|$)/;
+const WIDGET_FENCE = /```(?:widget|toolwidget)\b[^\n]*\n?[\s\S]*?(?:```|$)/g;
 
 //same silence window as the chat bar
 const VAD_SILENCE_MS = 1500;
 //recognizer may never send its end event
 //web whisper only starts after stop
 const STOP_TIMEOUT_MS = Platform.OS === "web" ? 30000 : 3000;
+//follow up gives up without speech
+//under the web recorder own timeout
+const FOLLOW_UP_SILENCE_MS = 4000;
+//ambient noise can hold the vad open
+const MAX_LISTEN_MS = 20000;
 //inactivity before the sleep phase
 const SLEEP_DELAY_MS = 15000;
 const SLEEP_OPACITY = 0.65;
@@ -102,6 +114,37 @@ function formatDate(date: Date): string {
   return new Intl.DateTimeFormat(getLocale(), { weekday: "short", day: "numeric", month: "short" }).format(date);
 }
 
+function parseCard(content: string): StandbyCardData | null {
+  const match = content.match(CARD_FENCE);
+  if (!match || match[2] !== "```") return null;
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+//widgets go to the right section
+function splitWidgets(content: string): { text: string; card: StandbyCardData | null; widgets: string } {
+  const card = parseCard(content);
+  const rest = content.replace(CARD_FENCE, "");
+  const widgets = rest.match(WIDGET_FENCE) ?? [];
+  return { text: rest.replace(WIDGET_FENCE, "").trim(), card, widgets: widgets.join("\n\n") };
+}
+
+//spoken text ending on a question
+function asksBack(content: string): boolean {
+  const { finalContent } = deriveChatDisplay(content, false, null);
+  return /[?？]$/.test(finalContent.replace(/```[\s\S]*?(?:```|$)/g, "").trim());
+}
+
+//any link with a scheme and a label
+function cardAction(card: StandbyCardData | null): { label: string; url: string } | null {
+  const open = card?.open;
+  if (!open?.label || typeof open.url !== "string" || !/^[a-z][a-z0-9+.-]*:/i.test(open.url)) return null;
+  return open;
+}
+
 function modelLabel(model: string): string {
   if (isLocalModel(model)) return getLocalModelLabel(model, true);
   if (isLiteRTModel(model)) return getLiteRTModelLabel(model);
@@ -146,6 +189,8 @@ function OperaDream() {
   const [wakeWord, setWakeWord] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [whisperMissing, setWhisperMissing] = useState(false);
+  //keeps the wake word off the mic
+  const [awaitingFollowUp, setAwaitingFollowUp] = useState(false);
 
   const [answer, setAnswer] = useState<{ msgId: string; content: string } | null>(null);
   const [generatingConvId, setGeneratingConvId] = useState<string | null>(null);
@@ -171,6 +216,10 @@ function OperaDream() {
   const audioUriRef = useRef<string | null>(null);
   const vadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const listenCapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  //reply whose end reopens the mic
+  const followUpRef = useRef<string | null>(null);
   //first of end event or timeout wins
   const settledRef = useRef(true);
 
@@ -234,6 +283,9 @@ function OperaDream() {
     return () => {
       clearTimeout(vadTimerRef.current);
       clearTimeout(stopTimerRef.current);
+      clearTimeout(silenceTimerRef.current);
+      clearTimeout(listenCapTimerRef.current);
+      followUpRef.current = null;
       STT.abort();
       TTS.stop();
     };
@@ -290,7 +342,7 @@ function OperaDream() {
       msgId,
       prompt: text,
       model,
-      systemPrompt: buildSystemPrompt(model, Settings.getCached().instruction),
+      systemPrompt: buildSystemPrompt(model, Settings.getCached().instruction, STANDBY_SEGMENT),
       history,
       think: reflection === "none" ? false : reflection,
       persist: !isIncognito,
@@ -305,7 +357,18 @@ function OperaDream() {
     if (isFirstMessage && !isIncognito && !isError) generateTitle(conv.id, text);
     //every dream question comes by voice
     if (!isError && Settings.getCached().autoSpeak) {
-      TTS.speak(run.content, { language: Settings.getCached().language, id: msgId });
+      followUpRef.current = asksBack(run.content) ? msgId : null;
+      setAwaitingFollowUp(!!followUpRef.current);
+      TTS.speak(run.content, {
+        language: Settings.getCached().language,
+        id: msgId,
+        //ref filters out stopped speech
+        onDone: () => {
+          if (followUpRef.current !== msgId) return;
+          followUpRef.current = null;
+          startListeningRef.current(true);
+        },
+      });
     }
   };
 
@@ -339,6 +402,8 @@ function OperaDream() {
     settledRef.current = true;
     clearTimeout(vadTimerRef.current);
     clearTimeout(stopTimerRef.current);
+    clearTimeout(silenceTimerRef.current);
+    clearTimeout(listenCapTimerRef.current);
     const text = await resolveTranscript(liveTextRef.current.trim() || null);
     liveTextRef.current = "";
     setVoice("idle");
@@ -347,18 +412,22 @@ function OperaDream() {
 
   const stopListening = () => {
     clearTimeout(vadTimerRef.current);
+    clearTimeout(silenceTimerRef.current);
+    clearTimeout(listenCapTimerRef.current);
     setVoice("transcribing");
     STT.stop();
     stopTimerRef.current = setTimeout(settle, STOP_TIMEOUT_MS);
   };
 
-  const startListening = async () => {
+  const startListening = async (followUp = false) => {
+    followUpRef.current = null;
     //the mic would hear the previous reply
     TTS.stop();
     //stt needs the mic to itself
     await stopWakeWord();
     const granted = await STT.requestPermissions();
     if (!granted) {
+      setAwaitingFollowUp(false);
       setAnswer({ msgId: "", content: t("chatbar.micPermission.message") });
       return;
     }
@@ -370,6 +439,7 @@ function OperaDream() {
       const whisperModel = Settings.getCached().whisperModel || "base";
       if (whisperModel === "none" || !(await WhisperSTT.isModelInstalled(whisperModel))) {
         setWhisperMissing(true);
+        setAwaitingFollowUp(false);
         return;
       }
     }
@@ -377,18 +447,40 @@ function OperaDream() {
     audioUriRef.current = null;
     settledRef.current = false;
     setVoice("listening");
+    setAwaitingFollowUp(false);
     const fail = (e: unknown) => {
       console.warn("Dream voice input failed:", e);
       settledRef.current = true;
       clearTimeout(vadTimerRef.current);
       clearTimeout(stopTimerRef.current);
+      clearTimeout(silenceTimerRef.current);
+      clearTimeout(listenCapTimerRef.current);
       setVoice("idle");
     };
+    //unanswered follow up closes the mic
+    if (followUp) {
+      silenceTimerRef.current = setTimeout(() => {
+        settledRef.current = true;
+        clearTimeout(vadTimerRef.current);
+        clearTimeout(listenCapTimerRef.current);
+        STT.abort();
+        liveTextRef.current = "";
+        setVoice("idle");
+      }, FOLLOW_UP_SILENCE_MS);
+    }
+    listenCapTimerRef.current = setTimeout(stopListening, MAX_LISTEN_MS);
     try {
       STT.start(locale, {
-        onPartial: (text) => { if (text) liveTextRef.current = text; },
+        onPartial: (text) => {
+          if (!text) return;
+          liveTextRef.current = text;
+          clearTimeout(silenceTimerRef.current);
+        },
         onFinal: (text) => { if (text) liveTextRef.current = text; },
-        onSpeechStart: () => clearTimeout(vadTimerRef.current),
+        onSpeechStart: () => {
+          clearTimeout(vadTimerRef.current);
+          clearTimeout(silenceTimerRef.current);
+        },
         //stop once the speaker stays quiet
         onSpeechEnd: () => {
           clearTimeout(vadTimerRef.current);
@@ -414,10 +506,10 @@ function OperaDream() {
 
   //only while the mic is free
   useEffect(() => {
-    if (!wakeWord || busy || speaking || whisperMissing) return;
+    if (!wakeWord || busy || speaking || whisperMissing || awaitingFollowUp) return;
     startWakeWord();
     return () => { stopWakeWord(); };
-  }, [wakeWord, busy, speaking, whisperMissing]);
+  }, [wakeWord, busy, speaking, whisperMissing, awaitingFollowUp]);
 
   //detection acts like a mic tap
   const startListeningRef = useRef(startListening);
@@ -439,6 +531,8 @@ function OperaDream() {
   //sleep drops the conversation back to the clock
   useEffect(() => {
     if (!sleeping) return;
+    followUpRef.current = null;
+    setAwaitingFollowUp(false);
     TTS.stop();
     setAnswer(null);
     convRef.current = null;
@@ -459,13 +553,19 @@ function OperaDream() {
     { opacity: actionsOpacity, pointerEvents: sleeping ? "none" : "auto" } as const,
   ];
   const conversing = answer !== null || voice !== "idle";
-  const display = answer ? deriveChatDisplay(answer.content, !!generatingConvId, null, modelCapabilities.includes("thinking") && selectedReflection !== "none") : null;
+  const { text: answerText, card, widgets } = useMemo(() => splitWidgets(answer?.content ?? ""), [answer?.content]);
+  const cardOpen = cardAction(card);
+  const display = answer ? deriveChatDisplay(answerText, !!generatingConvId, null, modelCapabilities.includes("thinking") && selectedReflection !== "none") : null;
   const showMarkdown = !!display?.showMarkdown;
   const finalContent = display?.finalContent ?? "";
   //reparse only when the text changes
   const markdown = useMemo(
     () => (showMarkdown ? renderMarkdown(finalContent, incognito, true) : null),
     [showMarkdown, finalContent, incognito]
+  );
+  const widgetsMarkdown = useMemo(
+    () => (widgets ? renderMarkdown(widgets, incognito, true) : null),
+    [widgets, incognito]
   );
   const answerView = voice === "transcribing" || display?.showThinkingRow ? <ThinkingIcon incognito={incognito} /> : markdown;
 
@@ -568,9 +668,33 @@ function OperaDream() {
   );
 
   const answerScroll = (
-    <ScrollView style={styles.fill} contentContainerStyle={[styles.answerContent, landscape && styles.floatingClearance]}>
+    <ScrollView
+      style={styles.fill}
+      contentContainerStyle={[styles.answerContent, landscape && (cardOpen ? styles.linkClearance : styles.floatingClearance)]}
+    >
       {answerView}
     </ScrollView>
+  );
+
+  const sideView = (!!card || !!widgetsMarkdown) && (
+    <View style={[styles.fill, styles.column]}>
+      {!!card && <StandbyCardWidget.component data={card} incognito={incognito} />}
+      {!!widgetsMarkdown && (
+        <ScrollView style={card ? styles.widgetsUnderCard : styles.fill} contentContainerStyle={styles.widgetsContent}>
+          {widgetsMarkdown}
+        </ScrollView>
+      )}
+    </View>
+  );
+
+  const linkButton = cardOpen && (
+    <Pressable
+      onPress={() => Linking.openURL(cardOpen.url).catch(() => { })}
+      style={pressStyle([styles.button, styles.surfaceButton, styles.linkButton], { backgroundColor: Colors.surfacePressed })}
+    >
+      <Image source={linkIcon} style={styles.micIcon} tintColor={Colors.textSecondary} />
+      <Text style={styles.buttonLabel} numberOfLines={1}>{cardOpen.label}</Text>
+    </Pressable>
   );
 
   const conversationLayout = landscape ? (
@@ -578,12 +702,13 @@ function OperaDream() {
       <View style={[styles.fill, styles.column]}>
         {answerScroll}
       </View>
-      {/* right section reserved */}
-      <View style={styles.fill} />
+      <View style={styles.fill}>{sideView}</View>
     </View>
   ) : (
     <View style={[styles.fill, styles.column]}>
       {answerScroll}
+      {sideView}
+      {linkButton}
       {actions(false)}
     </View>
   );
@@ -616,6 +741,11 @@ function OperaDream() {
         {conversing ? conversationLayout : idleLayout}
       </Animated.View>
 
+      {landscape && conversing && !!linkButton && (
+        <View style={[styles.floatingLink, { bottom: insets.bottom + Spacing.xxl + BUTTON_HEIGHT + Spacing.lg, left: insets.left + Spacing.xxl }]}>
+          {linkButton}
+        </View>
+      )}
       {landscape && actions(!conversing && showIncognitoButton)}
 
       <ModelSelectorDrawer
@@ -724,6 +854,29 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   //keeps text clear of the floating row
   floatingClearance: {
     paddingBottom: BUTTON_HEIGHT + Spacing.xxl,
+  },
+  //centered when alone in the section
+  widgetsContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+  },
+  //card keeps most of the height
+  widgetsUnderCard: {
+    flexGrow: 0,
+  },
+  //row plus the source link above it
+  linkClearance: {
+    paddingBottom: BUTTON_HEIGHT * 2 + Spacing.lg + Spacing.xxl,
+  },
+  floatingLink: {
+    position: "absolute",
+    width: "50%",
+  },
+  linkButton: {
+    flex: 0,
+    flexDirection: "row",
+    gap: Spacing.md,
+    alignSelf: "flex-start",
   },
   button: {
     flex: 1,

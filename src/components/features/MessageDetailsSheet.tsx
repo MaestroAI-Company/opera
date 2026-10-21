@@ -4,6 +4,7 @@ import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constan
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+import { STANDBY_PROMPT_TAG } from "../../services/ai/generation/chatGeneration";
 import type { ToolCall } from "../../services/ai/tools/ITool";
 import { MessageMetrics } from "../../services/db/DatabaseService";
 import ActionButton from "../ui/ActionButton";
@@ -71,15 +72,20 @@ export default function MessageDetailsSheet({ details, onClose, isLargeScreen = 
         {shown && (
           <>
             {rows.length > 0 && (
-              <Group style={styles.infoGroup}>
-                {rows.map(row => (
-                  <ActionButton
-                    key={row.label}
-                    label={row.label}
-                    rightElement={<Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="middle">{row.value}</Text>}
-                  />
-                ))}
-              </Group>
+              <View>
+                <Group style={styles.infoGroup}>
+                  {rows.map(row => (
+                    <ActionButton
+                      key={row.label}
+                      label={row.label}
+                      rightElement={<Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="middle">{row.value}</Text>}
+                    />
+                  ))}
+                </Group>
+                {!!metrics?.systemPrompt?.endsWith(STANDBY_PROMPT_TAG) && (
+                  <Text style={styles.helpText}>{t("messageDetails.standbyNote")}</Text>
+                )}
+              </View>
             )}
             {!!error && (
               <View style={styles.card}>
@@ -148,6 +154,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   infoGroup: {
     borderRadius: Radius.xxl + Spacing.md,
     borderWidth: 0,
+  },
+  helpText: {
+    fontFamily: Fonts.body,
+    fontSize: FontSizes.bodyMd,
+    color: Colors.textMuted,
+    lineHeight: 20,
+    paddingHorizontal: Spacing.md,
+    marginTop: Spacing.md,
   },
   //label takes the rest of the row
   infoValue: {

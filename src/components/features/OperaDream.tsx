@@ -40,12 +40,13 @@ import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { TTS } from "../../services/speech/TTSService";
 import { onWakeWord, startWakeWord, stopWakeWord } from "../../services/speech/WakeWord";
 import "../../services/widgets/registerWidgets";
-import { deriveChatDisplay, renderMarkdown } from "../ui/MarkdownText";
+import { deriveChatDisplay, describeToolCall, LiveTool, renderMarkdown } from "../ui/MarkdownText";
 import { StandbyCardData, StandbyCardWidget } from "../widgets/StandbyCardWidget";
 import NotificationModal from "../ui/NotificationModal";
 import { pressStyle } from "../ui/pressStyle";
 import ThinkingIcon from "../ui/ThinkingIcon";
 import ButterflyCluster from "./ButterflyCluster";
+import { FlashingText } from "./ChatView";
 import { ModelSelectorDrawer } from "./ModelSelector";
 
 const micIcon = require("../../../assets/icons/microphone.png");
@@ -68,6 +69,8 @@ const FOLLOW_UP_SILENCE_MS = 4000;
 const MAX_LISTEN_MS = 20000;
 //inactivity before the sleep phase
 const SLEEP_DELAY_MS = 15000;
+//counted from the last spoken word
+const REPLY_SLEEP_DELAY_MS = 10000;
 const SLEEP_OPACITY = 0.65;
 const SLEEP_SCALE = 1.1;
 const BUTTON_HEIGHT = 44;
@@ -290,6 +293,20 @@ function OperaDream() {
       TTS.stop();
     };
   }, []);
+
+  //tool running right now
+  const [liveTool, setLiveTool] = useState<LiveTool>(null);
+  useEffect(() => {
+    if (!generatingConvId) return;
+    const read = () => setLiveTool({
+      name: AIModule.SharedGenerationState.activeToolName,
+      args: AIModule.SharedGenerationState.activeToolArgs,
+    });
+    const unsub = AIModule.SharedGenerationState.subscribe(read);
+    //catch up with the store missed before subscribing
+    read();
+    return unsub;
+  }, [generatingConvId]);
 
   const generateTitle = async (convId: string, userMessage: string) => {
     try {
@@ -521,12 +538,13 @@ function OperaDream() {
     startListeningRef.current();
   }), []);
 
-  //every touch restarts the countdown
+  //every touch or spoken reply restarts the countdown
+  const hasReply = answer !== null;
   useEffect(() => {
-    if (sleeping || busy || modelSelectorVisible) return;
-    const timer = setTimeout(() => setSleeping(true), SLEEP_DELAY_MS);
+    if (sleeping || busy || speaking || awaitingFollowUp || modelSelectorVisible) return;
+    const timer = setTimeout(() => setSleeping(true), hasReply ? REPLY_SLEEP_DELAY_MS : SLEEP_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [sleeping, busy, modelSelectorVisible, lastTouch]);
+  }, [sleeping, busy, speaking, awaitingFollowUp, modelSelectorVisible, lastTouch, hasReply]);
 
   //sleep drops the conversation back to the clock
   useEffect(() => {
@@ -555,7 +573,11 @@ function OperaDream() {
   const conversing = answer !== null || voice !== "idle";
   const { text: answerText, card, widgets } = useMemo(() => splitWidgets(answer?.content ?? ""), [answer?.content]);
   const cardOpen = cardAction(card);
-  const display = answer ? deriveChatDisplay(answerText, !!generatingConvId, null, modelCapabilities.includes("thinking") && selectedReflection !== "none") : null;
+  const canThink = modelCapabilities.includes("thinking") && selectedReflection !== "none";
+  const display = useMemo(
+    () => (hasReply ? deriveChatDisplay(answerText, !!generatingConvId, liveTool, canThink) : null),
+    [hasReply, answerText, generatingConvId, liveTool, canThink]
+  );
   const showMarkdown = !!display?.showMarkdown;
   const finalContent = display?.finalContent ?? "";
   //reparse only when the text changes
@@ -567,7 +589,30 @@ function OperaDream() {
     () => (widgets ? renderMarkdown(widgets, incognito, true) : null),
     [widgets, incognito]
   );
-  const answerView = voice === "transcribing" || display?.showThinkingRow ? <ThinkingIcon incognito={incognito} /> : markdown;
+  //steps only when reflection is on
+  const thought = canThink && display?.showThinkingRow ? display.currentThought : "";
+  const toolCalls = display?.showToolsRow ? display.toolCalls : [];
+  const lastTool = toolCalls.length > 0 ? describeToolCall(toolCalls[toolCalls.length - 1]) : null;
+  const working = voice === "transcribing" || !!display?.showThinkingRow || !!lastTool;
+  const answerView = (
+    <>
+      {working && (
+        <View style={styles.activityRow}>
+          <ThinkingIcon incognito={incognito} />
+          <View style={styles.activityLines}>
+            {!!thought && <FlashingText text={thought} style={styles.activityText} />}
+            {!!lastTool && (
+              <FlashingText
+                text={`${toolCalls.length}. ${lastTool.name}${lastTool.detail ? ` · ${lastTool.detail}` : ""}`}
+                style={styles.activityText}
+              />
+            )}
+          </View>
+        </View>
+      )}
+      {!display?.showThinkingRow && markdown}
+    </>
+  );
 
   const time = formatTime(now);
 
@@ -677,13 +722,13 @@ function OperaDream() {
   );
 
   const sideView = (!!card || !!widgetsMarkdown) && (
-    <View style={[styles.fill, styles.column]}>
-      {!!card && <StandbyCardWidget.component data={card} incognito={incognito} />}
+    <View style={[styles.fill, styles.column, styles.sideColumn]}>
       {!!widgetsMarkdown && (
-        <ScrollView style={card ? styles.widgetsUnderCard : styles.fill} contentContainerStyle={styles.widgetsContent}>
+        <ScrollView style={styles.fill} contentContainerStyle={styles.widgetsContent}>
           {widgetsMarkdown}
         </ScrollView>
       )}
+      {!!card && <StandbyCardWidget.component data={card} incognito={incognito} />}
     </View>
   );
 
@@ -855,14 +900,28 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   floatingClearance: {
     paddingBottom: BUTTON_HEIGHT + Spacing.xxl,
   },
+  //same layout as the chat thinking row
+  activityRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: Spacing.lg2,
+  },
+  activityLines: {
+    flexShrink: 1,
+    gap: Spacing.sm,
+  },
+  //read from across the room
+  activityText: {
+    fontSize: FontSizes.lg,
+  },
   //centered when alone in the section
   widgetsContent: {
     flexGrow: 1,
     justifyContent: "center",
   },
-  //card keeps most of the height
-  widgetsUnderCard: {
-    flexGrow: 0,
+  //card sits at the bottom and grows up
+  sideColumn: {
+    justifyContent: "flex-end",
   },
   //row plus the source link above it
   linkClearance: {

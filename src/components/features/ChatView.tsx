@@ -11,8 +11,10 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StyleProp,
   StyleSheet,
   Text,
+  TextStyle,
   ToastAndroid,
   View,
 } from "react-native";
@@ -193,7 +195,7 @@ function formatDate(timestamp: number): string {
   }).format(new Date(timestamp));
 }
 
-const FlashingText = ({ text }: { text: React.ReactNode }) => {
+export const FlashingText = ({ text, style }: { text: React.ReactNode; style?: StyleProp<TextStyle> }) => {
   const styles = useThemedStyles(makeStyles);
   const opacity = useAnimatedValue(0.4);
 
@@ -210,7 +212,7 @@ const FlashingText = ({ text }: { text: React.ReactNode }) => {
   }, [opacity]);
 
   return (
-    <Animated.Text style={[styles.flashingText, { opacity }]} numberOfLines={1}>
+    <Animated.Text style={[styles.flashingText, style, { opacity }]} numberOfLines={1}>
       {text}
     </Animated.Text>
   );

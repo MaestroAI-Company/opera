@@ -156,6 +156,8 @@ export const fr: Translations = {
   "messageDetails.tokens": "Tokens",
   "messageDetails.speed": "Tokens/s",
   "messageDetails.prompt": "Prompt système",
+  "messageDetails.standbyNote":
+    "Répondu en Standby : réponses courtes à l'oral et carte à l'écran. Ces règles ne valent qu'en Standby, si tu continues cette conversation dans Opera, c'est le prompt habituel qui s'applique.",
   "messageDetails.thinking": "Réflexion",
   "messageDetails.tools": "Outils",
   "messageDetails.reasoning": "Raisonnement",

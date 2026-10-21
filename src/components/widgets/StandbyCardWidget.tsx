@@ -65,8 +65,7 @@ export const StandbyCardWidget: IWidget<StandbyCardData> = {
           </BlockRow>
         ))}
         {list.length > 0 && (
-          //fills the space a missing image leaves
-          <View style={[styles.list, !image && styles.listGrow]}>
+          <View style={styles.list}>
             {list.map((item, index) => (
               <Text key={index} style={styles.listItem}>{`• ${item}`}</Text>
             ))}
@@ -78,14 +77,17 @@ export const StandbyCardWidget: IWidget<StandbyCardData> = {
 };
 
 const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
+  //sized by its content
   container: {
-    flex: 1,
+    maxHeight: "100%",
     gap: Spacing.sm,
   },
+  //gives way first when facts pile up
   image: {
-    flex: 1,
-    //chat cards have no height to fill
-    minHeight: 160,
+    width: "100%",
+    aspectRatio: 16 / 9,
+    flexShrink: 1,
+    minHeight: 0,
     borderRadius: Radius.md,
     borderWidth: 2,
     borderColor: Colors.border,
@@ -98,9 +100,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingVertical: Spacing.xl,
     paddingHorizontal: Spacing.xl2,
     gap: Spacing.xs,
-  },
-  listGrow: {
-    flex: 1,
   },
   listItem: {
     fontFamily: Fonts.mono,

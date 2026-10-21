@@ -154,6 +154,8 @@ export const en = {
   "messageDetails.tokens": "Tokens",
   "messageDetails.speed": "Tokens/s",
   "messageDetails.prompt": "System prompt",
+  "messageDetails.standbyNote":
+    "Answered in Standby: short spoken replies and a card on screen. These rules only apply in Standby, so continuing this conversation in Opera uses the usual prompt.",
   "messageDetails.thinking": "Reflection",
   "messageDetails.tools": "Tools",
   "messageDetails.reasoning": "Reasoning",

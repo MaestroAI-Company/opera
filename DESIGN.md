@@ -227,6 +227,7 @@ The shape language is **sticker-like**: 2px outlines on nearly every interactive
 - **Chat composer:** A 56px colored pill (red, or dark #2A2A35 incognito) with a glow shadow; white 16px text, 28×28 plus/mic/send icon buttons.
 - **Code blocks:** Same background as the widget or drawer that holds them, 6px radius, mono 13px. Highlighting follows the surface: VS (light) on light, VS2015 on dark. The widget header has expand, download and copy icon buttons. Inline code is #F0F0F0 with pink #D63384 text.
 - **Drawers & modals:** Drawers and sheets sit on the grouped background with a drawer scrim (rgba(0,0,0,0.25)), modals are white windows on a modal scrim (rgba(0,0,0,0.4)); desktop sheet cards use the sticker shadow (see Drawers). Confirmation/info modals (`NotificationModal`) use a 15px window radius, with their buttons and text input kept at the 10px default.
+- **Top bar:** white 44px pills (`Radius.xxl`) with the offset sticker shadow, floating over the content. Discussions and new chat on the left (one shared pill on mobile, labeled pills on desktop), an optional centered middle pill, the settings button on the right.
 - **Snackbar:** A dark pill (`snackbar-bg`: #444444 in light, #3A3A3A in dark) floating above the composer, white mono text.
 - **Pressed state:** any element with a pressed or hover feedback lightens its main color, never darkens it. Red surfaces (buttons, checked checkbox, selected rows, banner, call-to-action) go to `primary-bright` (#FF4D4D), incognito surfaces go to `incognito-bright` (#70748E), and the chat composer and the Selector, Slider and model pills already do. An icon button on a red row lifts it with a white tint. Neutral surfaces keep their gray fill (`surface-pressed`), since white cannot get lighter. In code, use `pressStyle(base, "primary")` or `Colors.primaryBright`; never hardcode a darker red.
 
@@ -245,7 +246,7 @@ Drawer or sheet        SettingsDrawer, ConversationsDrawer, DrawerSheet
             └─ Controls    ActionButton, TextInputField, Selector, Slider...
 ```
 
-The structure styles live in `makeStyles` of `src/components/features/SettingsDrawer.tsx`. Components built outside it (`VoiceEngineCard`, `NextcloudSetup`, `BugReportSheet`, `MessageDetailsSheet`) copy the same values and must stay identical.
+The structure styles live in `makeStyles` of `src/components/features/SettingsDrawer.tsx`. Components built outside it (`VoiceEngineCard`, `NextcloudSetup`, `BugReportSheet`, `MessageDetailsSheet`, `SamplerScreen` and the `Hub*` sections and sheets) copy the same values and must stay identical.
 
 | Between                         | Style                             | Value                                   |
 | ------------------------------- | --------------------------------- | --------------------------------------- |
@@ -303,6 +304,22 @@ const renderGeneralSubPage = () => (
       value={shareInstanceUrl}
       onChangeText={setShareInstanceUrl}
     />
+  </Group>
+</View>
+```
+
+On desktop, a row holding one Slider or Selector puts it at the right of its text: the row takes `toggleGroupRow`, the text `toggleGroupContent`, and the Group `sliderGroup` (320 wide). Mobile keeps the control under the text.
+
+```tsx
+<View style={[styles.settingRowVertical, isDesktop && styles.toggleGroupRow]}>
+  <View style={isDesktop && styles.toggleGroupContent}>
+    <Text style={styles.settingLabel}>{t("sampler.model.ctx")}</Text>
+    <Text style={[styles.helpText, !isDesktop && { marginBottom: Spacing.md }]}>
+      {t("sampler.model.ctxHelp")}
+    </Text>
+  </View>
+  <Group style={isDesktop && styles.sliderGroup}>
+    <Slider options={CTX_SIZE_OPTIONS} selectedValue={ctx} onSelect={setCtx} />
   </Group>
 </View>
 ```
@@ -616,7 +633,10 @@ A pattern, not a component. Rows that open a subpage go in a page-level `<Group 
 
 Layouts used across pages that are not components:
 
-- **Card grid** (`renderCardGrid` in `SettingsDrawer.tsx`): the items the user added or installed (servers, models) as two-column framed tiles under the section's main action. A lone last tile takes the full row. A tile opens the item's page or sheet.
+- **Card grid** (`ui/CardGrid.tsx`, never a hand-made grid): the items the user added or installed (servers, models, devices) as two-column framed tiles under the section's main action. A tile is a 2px outlined white card, `Radius.xxl`, an optional 32×32 icon, the name (Fragment Mono `FontSizes.body`) and a one-line status (Figtree `FontSizes.caption`, `textSecondary`, `Colors.error` when failed). A lone last tile takes the full row. A tile opens the item's page or sheet, never a modal of actions. On the wide Sampler pages `minCardWidth={150}` fits as many columns as tiles of at least 150px allow.
+- **Profile tiles**: hub profiles show as `ProfileCard compact` tiles, 180 wide, wrapped with `Spacing.md` gaps.
+- **Usage card**: live processor and memory of the Sampler or one of its features. A row with label and help, then a Group holding a `ProgressBar` (processor) followed by info rows (processor, memory, counts).
+- **Empty state** (Sampler welcome, Sampler stopped): no nav, the content centered on the screen. A Petrona `FontSizes.displayLg` title like the chat greeting, a centered help line (Figtree `FontSizes.bodyMd`, muted, max 420 wide), then a 260 wide column of Groups (the highlight Group first).
 - **Detail header** (`litertDetailHeader`): the first block of an item page or sheet. A 120px logo tile, then the name (Fragment Mono `FontSizes.lg`), Figtree meta lines and capability icons. Related items follow as horizontal carousels of 96px tiles.
 - **Hero** (`MaestroCard`, `ProfileCard`, the cloud account avatar): an illustration that introduces a page, centered above its sections or at the top of its section.
 - **Actions section**: the reconnect, delete and remove actions of an item page close it in their own section, as one Group with no label.
@@ -629,7 +649,7 @@ Three containers hold pages. All sit on `Colors.groupedBackground`, pad their co
 | Container             | Mobile (<768)                            | Large screen (≥768)   | Desktop (≥1024, web and desktop apps)                                                                                                        |
 | --------------------- | ---------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ConversationsDrawer` | full width, slides from the left, scrim  | panel `min(90%, 360)` | docked flush left, resizable 240–480 (320 default), no scrim, no radius, no close button                                                     |
-| `SettingsDrawer`      | full width, slides from the right, scrim | panel `min(90%, 360)` | centered window max 960, `Radius.window`, 320px nav column on the left and the page on the right, close button top left of the nav, no title |
+| `SettingsDrawer`      | full width, slides from the right, scrim | panel `min(90%, 360)` | desktop app: its own OS window (`SettingsWindow`, `windowed`), sidebar on the left and the page on the right. Desktop browser: centered window max 960, `Radius.window`, the main page as the 320px nav column, close button top left of the nav, no title |
 | `DrawerSheet`         | bottom sheet                             | centered card         | centered card                                                                                                                                |
 
 ### Side drawers
@@ -642,6 +662,15 @@ Three containers hold pages. All sit on `Colors.groupedBackground`, pad their co
 - `DrawerBackButton` floats top left in `fixedBackWrapper` (top 60), above the scroll, never inside a page. `kind="close"` on the root page, `kind="back"` on a subpage. `scrolled` adds a surface and a sticker shadow once content passes under it, `pulseKey={activeSubPage}` pulses it on each page change. A page whose header does not scroll (conversation search) keeps the button in the header's left slot instead.
 - Mobile only: 60px `LinearGradient` fades at the top and bottom (grouped background to clear). None on desktop.
 - Sheets owned by a drawer are rendered after its panel, inside the drawer root, so they cover it.
+
+### Desktop sidebar
+
+The reference for any desktop screen with sections (settings window, Sampler).
+
+- A 320px column on `Colors.surface` with a 2px `Colors.border` right edge, padded `Spacing.lg2`, top padding `Spacing.lg` (plus the 32px title bar in the desktop app).
+- Items are `ActionButton` rows with `iconBadge` and `Radius.pill`, inside Groups with no outline and the section radius (`sidebarActions`), `Spacing.xxl` between Groups. One Group per family of pages, in the order of the mobile settings home.
+- The open section keeps `surfacePressed` as its fill. Its subpages keep the parent item lit.
+- The page column shows the pages with the usual Page structure in a `PageStack` keyed by section: switching section swaps pages, only nested pages push. The `DrawerBackButton` floats top left of the page column on nested pages only.
 
 ### Subpages (PageStack)
 
@@ -732,6 +761,17 @@ content: {
   paddingBottom: Spacing.lg,
 },
 ```
+
+## Sampler screen
+
+`src/components/features/SamplerScreen.tsx`. The admin screen of the Sampler (the Opera hub), desktop only: always in the desktop app, for admin profiles in a desktop browser. It follows the settings window structure.
+
+- Reached from the chat and Sampler switch: a `SliderToggle` in a 220 wide top bar pill, centered between the bar sides. In the Sampler the bar keeps only this switch and the settings button (`middleOnly`).
+- Left: the desktop sidebar (see Drawers). Right: the pages, centered in the chat column (840 minus 16 on each side), below the floating top bar.
+- Pages use the Page, Section, Row and Group structure, with the same `makeStyles` values as `SettingsDrawer.tsx`. Each feature page (models, MCP) opens with a navigation row whose trailing Toggle turns the feature off for every profile, and the row pushes the feature's list.
+- Item pages (a profile, an MCP server) pushed from a tile: info rows in an `infoGroup`, then the actions section.
+- Home gathers the cards of the other pages without their main action (the red Group stays on its own page). From 760px of page width it splits in two columns that fill independently.
+- No hub yet, no profile, hub stopped or out of reach: an empty state instead of the sidebar and pages (see Other patterns).
 
 ## Widgets
 

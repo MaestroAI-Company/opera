@@ -205,7 +205,7 @@ export default function SliderToggle({
   }, [activeIndex, labelPulse]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, !iconSource && styles.containerNoIcon]}>
       {iconSource && <Image source={iconSource} style={styles.icon} />}
       <View style={styles.optionsContainer} onLayout={handleLayout}>
         {options.map((option) => (
@@ -239,6 +239,9 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingLeft: 12,
     paddingRight: 4,
     width: "100%",
+  },
+  containerNoIcon: {
+    paddingLeft: 4,
   },
   icon: {
     width: 18,

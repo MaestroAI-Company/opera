@@ -34,7 +34,6 @@ import {
   StyleSheet,
   Text,
   useWindowDimensions,
-  Vibration,
   View,
   ViewStyle,
 } from "react-native";
@@ -146,6 +145,7 @@ import { WhisperSTT } from "../../services/speech/STTService";
 import { TTS_SPEEDS } from "../../services/speech/engines";
 import { IWidget, WidgetManager } from "../../services/widgets/WidgetManager";
 import ActionButton from "../ui/ActionButton";
+import CardGrid, { type GridCard } from "../ui/CardGrid";
 import Checkbox from "../ui/Checkbox";
 import DownloadProgress, { throttleProgress } from "../ui/DownloadProgress";
 import Group from "../ui/Group";
@@ -404,6 +404,8 @@ const HUB_DEVICE_ICONS: Record<string, ImageSourcePropType> = {
 };
 //settings rows stay readable on wide screens
 const DESKTOP_WINDOW_MAX_WIDTH = 960;
+//slider beside its text on desktop
+const SLIDER_WIDTH = 320;
 
 type LitertPage = "browse" | "search" | "model";
 type CloudModelsPage = "list" | "model";
@@ -836,7 +838,6 @@ export default function SettingsDrawer({
   const [selectedLocalModelId, setSelectedLocalModelId] = useState<
     string | null
   >(null);
-  const [cardGridWidth, setCardGridWidth] = useState(0);
   const selectedLocalModel =
     localSheet?.models.find((m) => m.id === selectedLocalModelId) ?? null;
   const [ollamaUrl, setOllamaUrlState] = useState("");
@@ -3273,74 +3274,8 @@ export default function SettingsDrawer({
   );
 
   //shared card grid for list pages
-  const renderCardGrid = (
-    cards: {
-      key: string;
-      title: string;
-      status: string;
-      icon?: ImageSourcePropType;
-      error?: boolean;
-      disabled?: boolean;
-      onPress: () => void;
-    }[],
-  ) => (
-    <View
-      style={[styles.localModelsGrid, { marginTop: Spacing.md }]}
-      onLayout={(e) => {
-        const w = e.nativeEvent.layout.width;
-        if (w > 0 && w !== cardGridWidth) setCardGridWidth(w);
-      }}
-    >
-      {cards.map((card, index) => {
-        //expand lone odd card to full row
-        const isLastOdd = cards.length % 2 !== 0 && index === cards.length - 1;
-        //prevent wrapping subpixel overflow
-        const cardWidth = isLastOdd
-          ? "100%"
-          : cardGridWidth > 0
-            ? Math.floor((cardGridWidth - Spacing.md) / 2) - 1
-            : "47%";
-
-        return (
-          <Pressable
-            key={card.key}
-            disabled={card.disabled}
-            style={pressStyle(
-              [
-                styles.localModelCard,
-                { width: cardWidth, flexGrow: 1 },
-                isLastOdd && styles.localModelCardWide,
-              ],
-              "surface",
-            )}
-            onPress={() => {
-              Vibration.vibrate(8);
-              card.onPress();
-            }}
-          >
-            {card.icon && (
-              <Image
-                source={card.icon}
-                style={styles.localModelCardIcon}
-                tintColor={Colors.textPrimary}
-              />
-            )}
-            <Text style={styles.localModelCardTitle} numberOfLines={2}>
-              {card.title}
-            </Text>
-            <Text
-              style={[
-                styles.localModelCardStatus,
-                card.error && { color: Colors.error },
-              ]}
-              numberOfLines={1}
-            >
-              {card.status}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
+  const renderCardGrid = (cards: GridCard[]) => (
+    <CardGrid cards={cards} style={{ marginTop: Spacing.md }} />
   );
 
   //desktop nav keeps the open section highlighted
@@ -3808,11 +3743,11 @@ export default function SettingsDrawer({
 
       {/* language, appearance and modes card */}
       <View style={styles.contentCard}>
-        <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+        <View style={[styles.settingRowVertical, isDesktop && styles.toggleGroupRow]}>
+          <Text style={[styles.settingLabel, isDesktop ? styles.toggleGroupContent : { marginBottom: Spacing.md }]}>
             {t("settings.general.language")}
           </Text>
-          <Group>
+          <Group style={isDesktop && styles.sliderGroup}>
             <Selector
               options={languageOptions}
               selectedValue={language}
@@ -3823,11 +3758,12 @@ export default function SettingsDrawer({
           </Group>
         </View>
 
-        <View style={styles.settingRowVertical}>
-          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+        <View style={[styles.settingRowVertical, isDesktop && styles.toggleGroupRow]}>
+          {/* desktop puts the slider at the right of the label */}
+          <Text style={[styles.settingLabel, isDesktop ? styles.toggleGroupContent : { marginBottom: Spacing.md }]}>
             {t("settings.general.theme")}
           </Text>
-          <Group>
+          <Group style={isDesktop && styles.sliderGroup}>
             <SliderToggle selectedValue={theme} onSelect={setTheme} />
           </Group>
         </View>
@@ -3975,14 +3911,16 @@ export default function SettingsDrawer({
 
       {/* quick flow card */}
       <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>
-            {t("settings.quickFlow.label")}
-          </Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.quickFlow.help")}
-          </Text>
-          <Group>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }, isDesktop && styles.toggleGroupRow]}>
+          <View style={isDesktop && styles.toggleGroupContent}>
+            <Text style={styles.settingLabel}>
+              {t("settings.quickFlow.label")}
+            </Text>
+            <Text style={[styles.helpText, !isDesktop && { marginBottom: Spacing.md }]}>
+              {t("settings.quickFlow.help")}
+            </Text>
+          </View>
+          <Group style={isDesktop && styles.sliderGroup}>
             <Selector
               options={quickFlowOptions}
               selectedValue={quickFlowId}
@@ -4017,20 +3955,23 @@ export default function SettingsDrawer({
               selectedValue={maestroButterfly}
               onSelect={selectButterfly}
             />
-            <Text style={[styles.settingLabel, { marginTop: Spacing.xxl, marginBottom: Spacing.md }]}>
-              {t("settings.tts.speed")}
-            </Text>
-            <Group>
-              <Slider
-                icon={timeIcon}
-                options={TTS_SPEEDS.map((id) => ({ id, label: `${id}×` }))}
-                selectedValue={ttsSpeed}
-                onSelect={(v) => {
-                  setTtsSpeedState(v);
-                  Settings.set("ttsSpeed", v);
-                }}
-              />
-            </Group>
+            {/* desktop puts the slider at the right of the label */}
+            <View style={[{ marginTop: Spacing.xxl }, isDesktop && styles.toggleGroupRow]}>
+              <Text style={[styles.settingLabel, isDesktop ? styles.toggleGroupContent : { marginBottom: Spacing.md }]}>
+                {t("settings.tts.speed")}
+              </Text>
+              <Group style={isDesktop && styles.sliderGroup}>
+                <Slider
+                  icon={timeIcon}
+                  options={TTS_SPEEDS.map((id) => ({ id, label: `${id}×` }))}
+                  selectedValue={ttsSpeed}
+                  onSelect={(v) => {
+                    setTtsSpeedState(v);
+                    Settings.set("ttsSpeed", v);
+                  }}
+                />
+              </Group>
+            </View>
           </View>
         </View>
       )}
@@ -4333,11 +4274,11 @@ export default function SettingsDrawer({
 
         {/* sync account card */}
         <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }, isDesktop && styles.toggleGroupRow]}>
+            <Text style={[styles.settingLabel, isDesktop ? styles.toggleGroupContent : { marginBottom: Spacing.md }]}>
               {t("settings.cloud.syncAccount")}
             </Text>
-            <Group>
+            <Group style={isDesktop && styles.sliderGroup}>
               <Selector
                 options={cloudStorageOptions}
                 selectedValue={syncAccount}
@@ -4680,7 +4621,7 @@ export default function SettingsDrawer({
                   />
                   {isAdmin && (
                     <ActionButton
-                      icon={hyperlinkIcon}
+                      icon={profilIcon}
                       label={t("settings.hub.pairDevice")}
                       onPress={() => openHubQr("invite")}
                     />
@@ -4914,21 +4855,25 @@ export default function SettingsDrawer({
           <View
             style={[styles.settingRowVertical, { zIndex: 9, marginBottom: 0 }]}
           >
-            <Text style={styles.settingLabel}>
-              {t("settings.whisper.label")}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.whisper.help")}
-            </Text>
-            <Group>
-              <Selector
-                options={whisperModelOptions}
-                selectedValue={whisperModel}
-                onSelect={handleSelectWhisperModel}
-                title={t("settings.whisper.select")}
-                fullWidth
-              />
-            </Group>
+            <View style={isDesktop && styles.toggleGroupRow}>
+              <View style={isDesktop && styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.whisper.label")}
+                </Text>
+                <Text style={[styles.helpText, !isDesktop && { marginBottom: Spacing.md }]}>
+                  {t("settings.whisper.help")}
+                </Text>
+              </View>
+              <Group style={isDesktop && styles.sliderGroup}>
+                <Selector
+                  options={whisperModelOptions}
+                  selectedValue={whisperModel}
+                  onSelect={handleSelectWhisperModel}
+                  title={t("settings.whisper.select")}
+                  fullWidth
+                />
+              </Group>
+            </View>
             {isDownloadingWhisper && (
               <DownloadProgress
                 title={t("settings.whisper.downloading", {
@@ -5023,14 +4968,17 @@ export default function SettingsDrawer({
         {/* tuning card for ollama only */}
         {server.kind === "ollama" && (
           <View style={styles.contentCard}>
-            <View style={styles.settingRowVertical}>
-              <Text style={styles.settingLabel}>
-                {t("settings.ollama.contextLength")}
-              </Text>
-              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-                {t("settings.ollama.contextHelp")}
-              </Text>
-              <Group>
+            <View style={[styles.settingRowVertical, isDesktop && styles.toggleGroupRow]}>
+              {/* desktop puts the slider at the right of the text */}
+              <View style={isDesktop && styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.ollama.contextLength")}
+                </Text>
+                <Text style={[styles.helpText, !isDesktop && { marginBottom: Spacing.md }]}>
+                  {t("settings.ollama.contextHelp")}
+                </Text>
+              </View>
+              <Group style={isDesktop && styles.sliderGroup}>
                 {advancedMode ? (
                   <TextInputField
                     icon={messageIcon}
@@ -5050,16 +4998,18 @@ export default function SettingsDrawer({
               </Group>
             </View>
 
-            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <Text style={styles.settingLabel}>
-                {t("settings.ollama.keepAlive")}
-              </Text>
-              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-                {advancedMode
-                  ? t("settings.ollama.keepAliveHelpAdvanced")
-                  : t("settings.ollama.keepAliveHelp")}
-              </Text>
-              <Group>
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }, isDesktop && styles.toggleGroupRow]}>
+              <View style={isDesktop && styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.ollama.keepAlive")}
+                </Text>
+                <Text style={[styles.helpText, !isDesktop && { marginBottom: Spacing.md }]}>
+                  {advancedMode
+                    ? t("settings.ollama.keepAliveHelpAdvanced")
+                    : t("settings.ollama.keepAliveHelp")}
+                </Text>
+              </View>
+              <Group style={isDesktop && styles.sliderGroup}>
                 {advancedMode ? (
                   <TextInputField
                     icon={timeIcon}
@@ -5206,14 +5156,16 @@ export default function SettingsDrawer({
 
       {litertSupported && (
         <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={styles.settingLabel}>
-              {t("settings.litert.contextTitle")}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.litert.contextHelp")}
-            </Text>
-            <Group>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }, isDesktop && styles.toggleGroupRow]}>
+            <View style={isDesktop && styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.litert.contextTitle")}
+              </Text>
+              <Text style={[styles.helpText, !isDesktop && { marginBottom: Spacing.md }]}>
+                {t("settings.litert.contextHelp")}
+              </Text>
+            </View>
+            <Group style={isDesktop && styles.sliderGroup}>
               <Slider
                 icon={messageIcon}
                 options={litertContextLengthOptions}
@@ -5422,14 +5374,16 @@ export default function SettingsDrawer({
             </Group>
           </View>
 
-          <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>
-              {t("settings.ollama.contextLength")}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.ollama.contextHelp")}
-            </Text>
-            <Group>
+          <View style={[styles.settingRowVertical, isDesktop && styles.toggleGroupRow]}>
+            <View style={isDesktop && styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.ollama.contextLength")}
+              </Text>
+              <Text style={[styles.helpText, !isDesktop && { marginBottom: Spacing.md }]}>
+                {t("settings.ollama.contextHelp")}
+              </Text>
+            </View>
+            <Group style={isDesktop && styles.sliderGroup}>
               {advancedMode ? (
                 <TextInputField
                   icon={messageIcon}
@@ -5449,16 +5403,18 @@ export default function SettingsDrawer({
             </Group>
           </View>
 
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={styles.settingLabel}>
-              {t("settings.ollama.keepAlive")}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {advancedMode
-                ? t("settings.ollama.keepAliveHelpAdvanced")
-                : t("settings.ollama.keepAliveHelp")}
-            </Text>
-            <Group>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }, isDesktop && styles.toggleGroupRow]}>
+            <View style={isDesktop && styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.ollama.keepAlive")}
+              </Text>
+              <Text style={[styles.helpText, !isDesktop && { marginBottom: Spacing.md }]}>
+                {advancedMode
+                  ? t("settings.ollama.keepAliveHelpAdvanced")
+                  : t("settings.ollama.keepAliveHelp")}
+              </Text>
+            </View>
+            <Group style={isDesktop && styles.sliderGroup}>
               {advancedMode ? (
                 <TextInputField
                   icon={timeIcon}
@@ -8161,44 +8117,6 @@ const makeStyles = (Colors: ThemeColors) =>
     addModelSheetDesktop: {
       width: 560,
     },
-    localModelsGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: Spacing.md,
-    },
-    localModelCard: {
-      borderWidth: 2,
-      borderColor: Colors.border,
-      borderRadius: Radius.xxl,
-      backgroundColor: Colors.surface,
-      paddingHorizontal: Spacing.md,
-      paddingVertical: Spacing.lg,
-      minHeight: 76,
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    localModelCardIcon: {
-      width: 32,
-      height: 32,
-      marginBottom: Spacing.md,
-    },
-    localModelCardWide: {
-      minHeight: 70,
-    },
-    localModelCardTitle: {
-      fontFamily: Fonts.mono,
-      fontSize: FontSizes.body,
-      lineHeight: 18,
-      color: Colors.textPrimary,
-      textAlign: "center",
-      marginBottom: Spacing.xs,
-    },
-    localModelCardStatus: {
-      fontFamily: Fonts.body,
-      fontSize: FontSizes.caption,
-      color: Colors.textSecondary,
-      textAlign: "center",
-    },
     //rows like the chat details sheet
     infoGroup: {
       borderWidth: 0,
@@ -8523,6 +8441,9 @@ const makeStyles = (Colors: ThemeColors) =>
     toggleGroupContent: {
       flex: 1,
       marginRight: Spacing.lg2,
+    },
+    sliderGroup: {
+      width: SLIDER_WIDTH,
     },
     toggleGroupRowItem: {
       paddingHorizontal: Spacing.md,

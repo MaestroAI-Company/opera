@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import {
   hubModelAvatar,
@@ -12,14 +12,12 @@ import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { fetchModelDescription, formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
 import ActionButton from "../ui/ActionButton";
+import CardGrid, { type GridCard } from "../ui/CardGrid";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
-import { pressStyle } from "../ui/pressStyle";
 
 const addIcon = require("../../../assets/icons/add.png");
 const binIcon = require("../../../assets/icons/bin.png");
-
-type Card = { key: string; title: string; status: string; error?: boolean; onPress: () => void };
 
 type HubModelsSectionProps = {
   onAddModel: () => void;
@@ -35,7 +33,6 @@ export default function HubModelsSection({ onAddModel, onOpenModel, highlight = 
   const { api, status, catalog, error } = useHubModels();
   const [actionError, setActionError] = useState<string | null>(null);
   const [cancelFile, setCancelFile] = useState<string | null>(null);
-  const [gridWidth, setGridWidth] = useState(0);
 
   const message = (e: unknown) => t("hubModels.failed", { error: e instanceof Error ? e.message : String(e) });
 
@@ -52,7 +49,7 @@ export default function HubModelsSection({ onAddModel, onOpenModel, highlight = 
   };
 
   const nameOf = (file: string) => hubModelName(file, catalog);
-  const cards: Card[] = [
+  const cards: GridCard[] = [
     ...(status?.downloads ?? []).map((d) => ({
       key: `download-${d.file}`,
       title: nameOf(d.file),
@@ -100,38 +97,7 @@ export default function HubModelsSection({ onAddModel, onOpenModel, highlight = 
             />
           </Group>
 
-          {cards.length > 0 && (
-            <View
-              style={[styles.grid, { marginTop: Spacing.md }]}
-              onLayout={(e) => {
-                const width = e.nativeEvent.layout.width;
-                if (width > 0 && width !== gridWidth) setGridWidth(width);
-              }}
-            >
-              {cards.map((card, index) => {
-                //a lone last card takes the row
-                const lastOdd = cards.length % 2 !== 0 && index === cards.length - 1;
-                const width = lastOdd ? "100%" : gridWidth > 0 ? Math.floor((gridWidth - Spacing.md) / 2) - 1 : "47%";
-                return (
-                  <Pressable
-                    key={card.key}
-                    style={pressStyle([styles.card, { width, flexGrow: 1 }, lastOdd && styles.cardWide], "surface")}
-                    onPress={() => {
-                      Vibration.vibrate(8);
-                      card.onPress();
-                    }}
-                  >
-                    <Text style={styles.cardTitle} numberOfLines={2}>
-                      {card.title}
-                    </Text>
-                    <Text style={[styles.cardStatus, card.error && styles.cardError]} numberOfLines={1}>
-                      {card.status}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
+          {cards.length > 0 && <CardGrid cards={cards} style={{ marginTop: Spacing.md }} />}
         </View>
       </View>
 
@@ -278,42 +244,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     highlightGroupDisabled: {
       opacity: 0.5,
-    },
-    grid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: Spacing.md,
-    },
-    card: {
-      borderWidth: 2,
-      borderColor: Colors.border,
-      borderRadius: Radius.xxl,
-      backgroundColor: Colors.surface,
-      paddingHorizontal: Spacing.md,
-      paddingVertical: Spacing.lg,
-      minHeight: 76,
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    cardWide: {
-      minHeight: 70,
-    },
-    cardTitle: {
-      fontFamily: Fonts.mono,
-      fontSize: FontSizes.body,
-      lineHeight: 18,
-      color: Colors.textPrimary,
-      textAlign: "center",
-      marginBottom: Spacing.xs,
-    },
-    cardStatus: {
-      fontFamily: Fonts.body,
-      fontSize: FontSizes.caption,
-      color: Colors.textSecondary,
-      textAlign: "center",
-    },
-    cardError: {
-      color: Colors.error,
     },
     detailHeader: {
       flexDirection: "row",

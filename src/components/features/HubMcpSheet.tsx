@@ -25,7 +25,7 @@ import { pressStyle } from "../ui/pressStyle";
 import Selector from "../ui/Selector";
 import TextInputField from "../ui/TextInputField";
 import DrawerBackButton from "./DrawerBackButton";
-import DrawerSheet from "./DrawerSheet";
+import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
 import { McpFieldRows } from "./HubMcpSection";
 import PageStack from "./PageStack";
 
@@ -547,7 +547,7 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
   //selection, search and server push like settings pages
   const renderPage = (p: Page, active: boolean) => (
     <>
-      <ScrollView
+      <SheetScrollView
         ref={active ? scrollRef : undefined}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -589,7 +589,7 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
             )}
           </>
         )}
-      </ScrollView>
+      </SheetScrollView>
 
       {/* floats over the scroll like the settings back button */}
       {p !== "browse" && (
@@ -621,7 +621,7 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
       //fills the settings window, stacked pages cannot size it
       desktopStyle={[styles.desktopCard, { height: "100%" }]}
     >
-      <View
+      <SheetBody
         style={styles.body}
         onLayout={(e) => {
           const width = e.nativeEvent.layout.width;
@@ -636,7 +636,7 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
           onBack={handleBack}
           renderPage={renderPage}
         />
-      </View>
+      </SheetBody>
 
       <NotificationModal
         visible={confirmPartial}
@@ -711,11 +711,11 @@ export function HubFolderSheet({ start, visible, onPick, onClose, isLargeScreen 
       ]}
       desktopStyle={styles.desktopCard}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <SheetScrollView contentContainerStyle={styles.content}>
         <View style={[styles.contentCard, { marginBottom: 0 }]}>
           <McpFolderList folders={folders} onOpen={open} onUse={onPick} />
         </View>
-      </ScrollView>
+      </SheetScrollView>
     </DrawerSheet>
   );
 }
@@ -731,17 +731,20 @@ const makeStyles = (Colors: ThemeColors) =>
       backgroundColor: Colors.groupedBackground,
       borderTopLeftRadius: Radius.huge2,
       borderTopRightRadius: Radius.huge2,
-      paddingTop: Spacing.lg2,
+      paddingTop: Spacing.xxl,
       overflow: "hidden",
     },
     desktopCard: {
       width: DESKTOP_CARD_WIDTH,
     },
     sheetHandleContainer: {
+      //floats so top edge matches sides
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
       alignItems: "center",
-      marginBottom: Spacing.xs2,
-      paddingVertical: Spacing.lg,
-      marginTop: -Spacing.lg,
+      paddingVertical: Spacing.md,
     },
     body: {
       flex: 1,

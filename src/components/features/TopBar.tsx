@@ -15,7 +15,7 @@ type TopBarProps = {
   rightElement?: ReactNode;
   //centered in the bar, between both sides
   middleElement?: ReactNode;
-  //only the middle element, for the sampler screen
+  //only the middle and right elements, for the sampler screen
   middleOnly?: boolean;
   isDesktop?: boolean;
 };
@@ -60,7 +60,7 @@ export default function TopBar({
         {!middleOnly && centerElement && (
           <View style={isDesktop ? styles.centerDesktop : styles.centerMobile}>{centerElement}</View>
         )}
-        {!middleOnly && rightElement}
+        {rightElement}
       </View>
     </View>
   );

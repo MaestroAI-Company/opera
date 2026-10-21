@@ -138,8 +138,6 @@ import { STT, WhisperSTT } from "../services/speech/STTService";
 const texture2 = require("../../assets/images/texture2.png");
 const settingsIcon = require("../../assets/icons/settings.png");
 const addIcon = require("../../assets/icons/add.png");
-const chatIcon = require("../../assets/icons/chat.png");
-const samplerIcon = require("../../assets/icons/operaicon5.png");
 
 function shareConsentMessage(): string {
   const host = resolvePasteHost()
@@ -402,8 +400,8 @@ export default function Index() {
   const inSampler = samplerMode && showSamplerSwitch;
   const samplerSwitchOptions = useMemo(
     () => [
-      { id: "chat", label: t("sampler.switch.chat"), icon: chatIcon },
-      { id: "sampler", label: t("sampler.switch.sampler"), icon: samplerIcon },
+      { id: "chat", label: t("sampler.switch.chat") },
+      { id: "sampler", label: t("sampler.switch.sampler") },
     ],
     [t],
   );
@@ -2200,10 +2198,48 @@ useEffect(() => {
     />
   );
 
+  //opens the settings, in the chat and sampler bars
+  const settingsButton = (
+    <View style={styles.settingsShadowLayer}>
+      <View style={styles.settingsShadowBlock} />
+      <Pressable
+        style={pressStyle(
+          [
+            styles.settingsButton,
+            !isDesktop && { paddingHorizontal: 0, width: 44 },
+          ],
+          "surface",
+        )}
+        onPress={() => {
+          if (!isDesktop && drawerVisible) return;
+          openDrawerSafely(() => {
+            if (settingsDrawerVisible) {
+              closeSettings();
+            } else {
+              setSettingsDrawerVisible(true);
+            }
+          });
+        }}
+      >
+        <Image
+          source={settingsIcon}
+          style={[
+            styles.settingsIcon,
+            !isDesktop && { marginRight: 0 },
+          ]}
+        />
+        {isDesktop && (
+          <Text style={styles.settingsButtonText}>
+            {t("home.settings")}
+          </Text>
+        )}
+      </Pressable>
+    </View>
+  );
+
   const conversationsDrawer = (
     <ConversationsDrawer
       isDesktop={isDesktop}
-      onSettingsPress={() => openDrawerSafely(() => (settingsDrawerVisible ? closeSettings() : setSettingsDrawerVisible(true)))}
       visible={drawerVisible}
       onClose={closeConversationsDrawer}
       conversations={conversations}
@@ -2384,44 +2420,7 @@ useEffect(() => {
                 isDesktop={isDesktop}
                 middleElement={samplerSwitch}
                 centerElement={isDesktop ? undefined : modelTrigger}
-                rightElement={
-                  isDesktop ? undefined :
-                  <View style={styles.settingsShadowLayer}>
-                    <View style={styles.settingsShadowBlock} />
-                    <Pressable
-                      style={pressStyle(
-                        [
-                          styles.settingsButton,
-                          !isDesktop && { paddingHorizontal: 0, width: 44 },
-                        ],
-                        "surface",
-                      )}
-                      onPress={() => {
-                        if (!isDesktop && drawerVisible) return;
-                        openDrawerSafely(() => {
-                          if (settingsDrawerVisible) {
-                            closeSettings();
-                          } else {
-                            setSettingsDrawerVisible(true);
-                          }
-                        });
-                      }}
-                    >
-                      <Image
-                        source={settingsIcon}
-                        style={[
-                          styles.settingsIcon,
-                          !isDesktop && { marginRight: 0 },
-                        ]}
-                      />
-                      {isDesktop && (
-                        <Text style={styles.settingsButtonText}>
-                          {t("home.settings")}
-                        </Text>
-                      )}
-                    </Pressable>
-                  </View>
-                }
+                rightElement={settingsButton}
               />
             </View>
 
@@ -2511,6 +2510,7 @@ useEffect(() => {
                 onNewPress={() => {}}
                 isDesktop={isDesktop}
                 middleElement={samplerSwitch}
+                rightElement={settingsButton}
                 middleOnly
               />
             }

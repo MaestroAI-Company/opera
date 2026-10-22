@@ -2,22 +2,12 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Windo
 
 const LABEL: &str = "settings";
 
-//opens the settings window or brings the open one forward
-#[tauri::command]
-pub fn open_settings_window(
-    app: AppHandle,
+fn build_settings_window(
+    app: &AppHandle,
     page: Option<String>,
     pair: Option<String>,
-) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window(LABEL) {
-        window.unminimize().map_err(|e| e.to_string())?;
-        window.set_focus().map_err(|e| e.to_string())?;
-        //an open window keeps its url, so the target travels as an event
-        app.emit_to(LABEL, "settings-navigate", (page, pair))
-            .map_err(|e| e.to_string())?;
-        return Ok(());
-    }
-
+    visible: bool,
+) -> Result<tauri::WebviewWindow, String> {
     //first paint already knows the target page
     let mut query = tauri::Url::parse("tauri://localhost/").map_err(|e| e.to_string())?;
     {
@@ -33,7 +23,7 @@ pub fn open_settings_window(
     let url = format!("?{}", query.query().unwrap_or_default());
 
     #[allow(unused_mut)]
-    let mut builder = WebviewWindowBuilder::new(&app, LABEL, WebviewUrl::App(url.into()))
+    let mut builder = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App(url.into()))
         .title("Opera")
         .inner_size(1000.0, 700.0)
         .min_inner_size(780.0, 520.0)
@@ -41,6 +31,7 @@ pub fn open_settings_window(
         //macos folds fullscreen into the zoom button
         .maximizable(false)
         .center()
+        .visible(visible)
         .background_color(tauri::window::Color(253, 248, 241, 255));
 
     #[cfg(target_os = "macos")]
@@ -52,7 +43,7 @@ pub fn open_settings_window(
 
     //same data folder as the main window or storage would be empty
     #[cfg(windows)]
-    if let Some(dir) = crate::webview_data_dir(&app) {
+    if let Some(dir) = crate::webview_data_dir(app) {
         builder = builder.data_directory(dir);
     }
 
@@ -64,6 +55,12 @@ pub fn open_settings_window(
     let handle = app.clone();
     let guard = window.clone();
     window.on_window_event(move |event| match event {
+        //keep reopen instant on close
+        WindowEvent::CloseRequested { api, .. } => {
+            api.prevent_close();
+            let _ = guard.hide();
+            let _ = handle.emit("settings-window-closed", ());
+        }
         //main window refreshes what settings changed
         WindowEvent::Destroyed => {
             let _ = handle.emit("settings-window-closed", ());
@@ -81,5 +78,40 @@ pub fn open_settings_window(
         }
         _ => {}
     });
+
+    Ok(window)
+}
+
+//warm webview before first open
+pub fn warmup_settings_window(app: &AppHandle) -> Result<(), String> {
+    if app.get_webview_window(LABEL).is_some() {
+        return Ok(());
+    }
+    build_settings_window(app, None, None, false)?;
+    Ok(())
+}
+
+//opens the settings window or brings the open one forward
+#[tauri::command]
+//prevent main thread deadlock on windows
+pub async fn open_settings_window(
+    app: AppHandle,
+    page: Option<String>,
+    pair: Option<String>,
+) -> Result<(), String> {
+    let window = match app.get_webview_window(LABEL) {
+        Some(window) => window,
+        None => build_settings_window(&app, page.clone(), pair.clone(), true)?,
+    };
+
+    window.show().map_err(|e| e.to_string())?;
+    window.unminimize().map_err(|e| e.to_string())?;
+    //bypass windows focus stealing guard
+    let _ = window.set_always_on_top(true);
+    let _ = window.set_always_on_top(false);
+    window.set_focus().map_err(|e| e.to_string())?;
+    //navigate open webview via event
+    app.emit_to(LABEL, "settings-navigate", (page, pair))
+        .map_err(|e| e.to_string())?;
     Ok(())
 }

@@ -179,9 +179,17 @@ pub fn run() {
                 main_window.on_window_event(move |event| {
                     if matches!(event, tauri::WindowEvent::Destroyed) {
                         if let Some(settings) = handle.get_webview_window("settings") {
-                            let _ = settings.close();
+                            //prevent hidden window leaking on exit
+                            let _ = settings.destroy();
                         }
                     }
+                });
+
+                let warmup_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    //avoid competing with main window mount
+                    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+                    let _ = settings_window::warmup_settings_window(&warmup_handle);
                 });
             }
 

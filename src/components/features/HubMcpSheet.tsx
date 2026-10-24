@@ -40,7 +40,8 @@ const linkIcon = require("../../../assets/icons/link.png");
 const errorIcon = require("../../../assets/icons/error.png");
 const validIcon = require("../../../assets/icons/valid.png");
 
-const DESKTOP_CARD_WIDTH = 560;
+const DESKTOP_CARD_WIDTH = 840;
+const DESKTOP_FOLDER_CARD_WIDTH = 720;
 
 type Page = "browse" | "search" | "server" | "configure" | "folders" | "manual";
 type SourceType = McpSource["type"];
@@ -455,57 +456,61 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
           style={styles.notice}
         />
         <View style={styles.contentCard}>
-          <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("hubMcp.manualSource")}</Text>
-            <Group>
-              <Selector
-                options={[
-                  { id: "npm", label: "npm" },
-                  { id: "pypi", label: "PyPI" },
-                  { id: "mcpb", label: "MCPB" },
-                ]}
-                selectedValue={manualType}
-                onSelect={(value) => setManualType(value as SourceType)}
-                title={t("hubMcp.manualSource")}
-                fullWidth
-              />
-            </Group>
+          <View style={isDesktop && styles.formRow}>
+            <View style={[styles.settingRowVertical, isDesktop && styles.formCol]}>
+              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("hubMcp.manualSource")}</Text>
+              <Group>
+                <Selector
+                  options={[
+                    { id: "npm", label: "npm" },
+                    { id: "pypi", label: "PyPI" },
+                    { id: "mcpb", label: "MCPB" },
+                  ]}
+                  selectedValue={manualType}
+                  onSelect={(value) => setManualType(value as SourceType)}
+                  title={t("hubMcp.manualSource")}
+                  fullWidth
+                />
+              </Group>
+            </View>
+            <View style={[styles.settingRowVertical, isDesktop && styles.formCol]}>
+              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("hubMcp.manualName")}</Text>
+              <Group>
+                <TextInputField icon={pencilIcon} value={manualName} onChangeText={setManualName} />
+              </Group>
+            </View>
           </View>
-          <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("hubMcp.manualName")}</Text>
-            <Group>
-              <TextInputField icon={pencilIcon} value={manualName} onChangeText={setManualName} />
-            </Group>
-          </View>
-          <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>{isBundle ? t("hubMcp.manualUrl") : t("hubMcp.manualPackage")}</Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {isBundle ? t("hubMcp.manualUrlHelp") : t("hubMcp.manualPackageHelp")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={linkIcon}
-                value={manualId}
-                onChangeText={setManualId}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </Group>
-          </View>
-          <View style={[styles.settingRowVertical, { marginBottom: Spacing.lg2 }]}>
-            <Text style={styles.settingLabel}>{isBundle ? t("hubMcp.manualChecksum") : t("hubMcp.manualVersion")}</Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {isBundle ? t("hubMcp.manualChecksumHelp") : t("hubMcp.manualVersionHelp")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={pencilIcon}
-                value={manualVersion}
-                onChangeText={setManualVersion}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </Group>
+          <View style={isDesktop && styles.formRow}>
+            <View style={[styles.settingRowVertical, isDesktop && styles.formCol, isDesktop && { marginBottom: Spacing.lg2 }]}>
+              <Text style={styles.settingLabel}>{isBundle ? t("hubMcp.manualUrl") : t("hubMcp.manualPackage")}</Text>
+              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                {isBundle ? t("hubMcp.manualUrlHelp") : t("hubMcp.manualPackageHelp")}
+              </Text>
+              <Group>
+                <TextInputField
+                  icon={linkIcon}
+                  value={manualId}
+                  onChangeText={setManualId}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </Group>
+            </View>
+            <View style={[styles.settingRowVertical, { marginBottom: Spacing.lg2 }, isDesktop && styles.formCol]}>
+              <Text style={styles.settingLabel}>{isBundle ? t("hubMcp.manualChecksum") : t("hubMcp.manualVersion")}</Text>
+              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                {isBundle ? t("hubMcp.manualChecksumHelp") : t("hubMcp.manualVersionHelp")}
+              </Text>
+              <Group>
+                <TextInputField
+                  icon={pencilIcon}
+                  value={manualVersion}
+                  onChangeText={setManualVersion}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </Group>
+            </View>
           </View>
           <Group style={[styles.highlightGroup, !ready && styles.highlightGroupDisabled]}>
             <ActionButton
@@ -527,9 +532,13 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
     ) : (
       <View>
         <Text style={[styles.settingLabel, styles.familyTitle]}>{t("hubMcp.selection")}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
-          {catalog.map(renderCard)}
-        </ScrollView>
+        {isDesktop ? (
+          <View style={styles.carouselWrap}>{catalog.map(renderCard)}</View>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+            {catalog.map(renderCard)}
+          </ScrollView>
+        )}
       </View>
     );
 
@@ -709,7 +718,7 @@ export function HubFolderSheet({ start, visible, onPick, onClose, isLargeScreen 
           maxHeight: windowHeight - insets.top - Spacing.xl2,
         },
       ]}
-      desktopStyle={styles.desktopCard}
+      desktopStyle={styles.desktopFolderCard}
     >
       <SheetScrollView contentContainerStyle={styles.content}>
         <View style={[styles.contentCard, { marginBottom: 0 }]}>
@@ -736,6 +745,9 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     desktopCard: {
       width: DESKTOP_CARD_WIDTH,
+    },
+    desktopFolderCard: {
+      width: DESKTOP_FOLDER_CARD_WIDTH,
     },
     sheetHandleContainer: {
       //floats so top edge matches sides
@@ -784,6 +796,14 @@ const makeStyles = (Colors: ThemeColors) =>
     settingRowVertical: {
       marginBottom: Spacing.xxl,
     },
+    formRow: {
+      flexDirection: "row",
+      gap: Spacing.lg2,
+    },
+    formCol: {
+      flex: 1,
+      justifyContent: "space-between",
+    },
     settingLabel: {
       fontSize: FontSizes.body,
       color: Colors.textPrimary,
@@ -829,6 +849,12 @@ const makeStyles = (Colors: ThemeColors) =>
       marginBottom: Spacing.md,
     },
     carousel: {
+      gap: Spacing.lg2,
+      paddingHorizontal: Spacing.md,
+    },
+    carouselWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
       gap: Spacing.lg2,
       paddingHorizontal: Spacing.md,
     },

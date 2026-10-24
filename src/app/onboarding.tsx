@@ -74,7 +74,7 @@ const hubIcon = require("../../assets/icons/server.png");
 const isWeb = Platform.OS === "web";
 
 const BACK_BUTTON_SIZE = 56;
-const DESKTOP_CARD_WIDTH = 560;
+const DESKTOP_CARD_WIDTH = 720;
 
 type IntroPhase = "logo" | "phrases";
 

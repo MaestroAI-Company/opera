@@ -1,8 +1,7 @@
 import { ReactNode } from "react";
-import { Image, ImageSourcePropType, Platform, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
-import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import { Image, ImageSourcePropType, Pressable, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
+import { Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
-import { useT } from "../../i18n";
 import { pressStyle } from "../ui/pressStyle";
 
 const moreIcon = require("../../../assets/icons/More.png");
@@ -17,6 +16,7 @@ type TopBarProps = {
   middleElement?: ReactNode;
   //only the middle and right elements, for the sampler screen
   middleOnly?: boolean;
+  showNewButton?: boolean;
   isDesktop?: boolean;
 };
 
@@ -27,29 +27,22 @@ export default function TopBar({
   rightElement,
   middleElement,
   middleOnly = false,
+  showNewButton = true,
   isDesktop = false,
 }: TopBarProps) {
   const styles = useThemedStyles(makeStyles);
-  const t = useT();
-  //native desktop has no new button
-  const showNewButton = !isDesktop || Platform.OS === "web";
 
-  const menuButton = <BarButton icon={moreIcon} label={isDesktop ? t("topbar.discussions") : undefined} onPress={onMenuPress} />;
-  const newButton = showNewButton && <BarButton icon={addIcon} label={isDesktop ? t("topbar.new") : undefined} onPress={onNewPress} />;
+  const menuButton = <BarButton icon={moreIcon} onPress={onMenuPress} />;
+  const newButton = <BarButton icon={addIcon} onPress={onNewPress} />;
 
   return (
     <View style={styles.topBar}>
       <View style={styles.leftSection}>
-        {middleOnly ? null : isDesktop ? (
-          <>
-            <Pill>{menuButton}</Pill>
-            {newButton && <Pill style={styles.newGap}>{newButton}</Pill>}
-          </>
-        ) : (
+        {middleOnly || isDesktop ? null : (
           //mobile shares one segmented pill
           <Pill>
             {menuButton}
-            {newButton}
+            {showNewButton && newButton}
           </Pill>
         )}
       </View>
@@ -77,16 +70,15 @@ function Pill({ children, style }: { children: ReactNode; style?: StyleProp<View
   );
 }
 
-function BarButton({ icon, label, onPress }: { icon: ImageSourcePropType; label?: string; onPress: () => void }) {
+function BarButton({ icon, onPress }: { icon: ImageSourcePropType; onPress: () => void }) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   return (
     <Pressable
       onPress={onPress}
-      style={pressStyle([styles.button, label ? styles.buttonLabeled : null], "surface")}
+      style={pressStyle(styles.button, "surface")}
     >
       <Image source={icon} style={styles.buttonIcon} resizeMode="contain" tintColor={Colors.textPrimary} />
-      {label && <Text style={styles.buttonText}>{label}</Text>}
     </Pressable>
   );
 }
@@ -103,9 +95,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-  },
-  newGap: {
-    marginLeft: Spacing.xl2,
   },
   //fits the chat and sampler switch
   middle: {
@@ -154,18 +143,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  //labeled pill on desktop is slightly wider
-  buttonLabeled: {
-    paddingHorizontal: Spacing.lg2,
-  },
   buttonIcon: {
     width: 18,
     height: 18,
-  },
-  buttonText: {
-    fontSize: FontSizes.bodyMd,
-    fontFamily: Fonts.mono,
-    color: Colors.textSecondary,
-    marginLeft: Spacing.md,
   },
 });

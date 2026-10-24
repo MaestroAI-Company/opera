@@ -389,6 +389,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     elevation: 5,
     overflow: "hidden",
     //content scrolls instead of leaving the screen
+    maxWidth: "100%",
     maxHeight: "100%",
     paddingBottom: Spacing.lg,
   },

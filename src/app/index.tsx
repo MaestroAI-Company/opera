@@ -43,15 +43,19 @@ import ChatView from "../components/features/ChatView";
 import CodePreviewSheet, {
   PreviewCode,
 } from "../components/features/CodePreviewSheet";
-import ConversationsDrawer from "../components/features/ConversationsDrawer";
+import ConversationsDrawer, {
+  ConversationSearchSheet,
+} from "../components/features/ConversationsDrawer";
 import {
   conversationsProgress,
   dragDrawer,
   drawerWidthFor,
   gestureVelocity,
   releaseOpens,
+  samplerDrawerProgress,
   settingsProgress,
   settleDrawer,
+  useDockedWidth,
 } from "../components/features/drawerAnimation";
 import { sheetTravel } from "../components/features/DrawerSheet";
 import ImagePreviewSheet, {
@@ -367,6 +371,7 @@ export default function Index() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { width, isLargeScreen, isDesktop } = useResponsive();
+  const { dockedWidth } = useDockedWidth();
   //edge drag maps to drawer progress
   const dragWidth = drawerWidthFor(width);
   //computed once per mount so it doesn't shift mid-session
@@ -374,11 +379,14 @@ export default function Index() {
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedReflection, setSelectedReflection] = useState("none");
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [samplerDrawerVisible, setSamplerDrawerVisible] = useState(false);
+  const [conversationSearchVisible, setConversationSearchVisible] = useState(false);
   const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
   const [modelSelectorVisible, setModelSelectorVisible] = useState(false);
   //the desktop app always gets the sampler screen, browsers only for admins
   const [samplerMode, setSamplerMode] = useState(false);
   const [samplerAdmin, setSamplerAdmin] = useState(false);
+  const [samplerReady, setSamplerReady] = useState(false);
   const checkSamplerAdmin = useCallback(async () => {
     if (OperaHub.canHost() || !OperaHub.isSupported()) return;
     const hub = await OperaHub.getPairedHub();
@@ -397,7 +405,50 @@ export default function Index() {
     if (!settingsDrawerVisible) checkSamplerAdmin();
   }, [settingsDrawerVisible, checkSamplerAdmin]);
   const showSamplerSwitch = isDesktop && (OperaHub.canHost() || samplerAdmin);
-  const inSampler = samplerMode && showSamplerSwitch;
+  const inSampler = samplerMode && (!isDesktop || showSamplerSwitch);
+  //slide between chat and sampler
+  const samplerAnim = useAnimatedValue(inSampler ? 1 : 0);
+
+  useEffect(() => {
+    Animated.timing(samplerAnim, {
+      toValue: inSampler ? 1 : 0,
+      duration: 380,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
+  }, [inSampler, samplerAnim]);
+
+  const chatTranslateX = useMemo(
+    () =>
+      samplerAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, -width],
+      }),
+    [samplerAnim, width],
+  );
+  const samplerTranslateX = useMemo(
+    () =>
+      samplerAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [width, 0],
+      }),
+    [samplerAnim, width],
+  );
+  //sampler onboarding has no sidebar
+  const topBarLeft = useMemo(
+    () =>
+      !isDesktop
+        ? 0
+        : Platform.OS === "web"
+          ? samplerAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [dockedWidth, samplerReady ? dockedWidth : 0],
+            })
+          : !inSampler || samplerReady
+            ? dockedWidth
+            : 0,
+    [isDesktop, samplerAnim, dockedWidth, samplerReady, inSampler],
+  );
   const samplerSwitchOptions = useMemo(
     () => [
       { id: "chat", label: t("sampler.switch.chat") },
@@ -434,6 +485,16 @@ export default function Index() {
   useEffect(() => {
     drawerVisibleRef.current = drawerVisible;
   }, [drawerVisible]);
+
+  const samplerDrawerVisibleRef = useRef(samplerDrawerVisible);
+  useEffect(() => {
+    samplerDrawerVisibleRef.current = samplerDrawerVisible;
+  }, [samplerDrawerVisible]);
+
+  const inSamplerRef = useRef(inSampler);
+  useEffect(() => {
+    inSamplerRef.current = inSampler;
+  }, [inSampler]);
 
   const settingsDrawerVisibleRef = useRef(settingsDrawerVisible);
   useEffect(() => {
@@ -608,8 +669,16 @@ useEffect(() => {
         closeSettings();
         return true;
       }
+      if (samplerDrawerVisibleRef.current) {
+        setSamplerDrawerVisible(false);
+        return true;
+      }
       if (drawerVisibleRef.current) {
         setDrawerVisible(false);
+        return true;
+      }
+      if (!isDesktop && inSamplerRef.current) {
+        setSamplerMode(false);
         return true;
       }
       return false;
@@ -620,7 +689,7 @@ useEffect(() => {
       handleBackButton,
     );
     return () => backHandler.remove();
-  }, [closeSettings]);
+  }, [closeSettings, isDesktop]);
 
   const openDrawerSafely = useCallback((openFn: () => void) => {
     //skip pointless native round trip
@@ -668,7 +737,11 @@ useEffect(() => {
 
   //overlay inputs must not lift the chat
   const keyboardLift = useKeyboardLift(
-    !drawerVisible && !settingsDrawerVisible && !bugReportVisible,
+    !drawerVisible &&
+      !samplerDrawerVisible &&
+      !settingsDrawerVisible &&
+      !bugReportVisible &&
+      !inSampler,
   );
   const keyboardLiftStyle = useAnimatedStyle(() => ({
     //bar's safe area spacer sits under the keyboard
@@ -721,7 +794,12 @@ useEffect(() => {
       PanResponder.create({
         onMoveShouldSetPanResponder: (evt, gestureState) => {
           //an open panel covers the screen and owns its gestures
-          if (drawerVisible || settingsDrawerVisible || modelSelectorVisible)
+          if (
+            drawerVisible ||
+            samplerDrawerVisible ||
+            settingsDrawerVisible ||
+            modelSelectorVisible
+          )
             return false;
           //an interactive widget owns the gesture it started
           if (isWidgetTouchActive()) return false;
@@ -737,7 +815,7 @@ useEffect(() => {
           if (touchInComposerRef.current) return false;
 
           //swipe up on homepage opens model selector
-          return !activeConversation && gestureState.dy < -15;
+          return !inSampler && !activeConversation && gestureState.dy < -15;
         },
         onPanResponderGrant: () => {
           //retract before keyboard shrinks panel
@@ -746,7 +824,10 @@ useEffect(() => {
         onPanResponderMove: (evt, gestureState) => {
           if (swipeAxisRef.current === "x") {
             //clamp keeps the other panel out
-            dragDrawer(conversationsProgress, gestureState.dx / dragWidth);
+            dragDrawer(
+              inSampler ? samplerDrawerProgress : conversationsProgress,
+              gestureState.dx / dragWidth,
+            );
             dragDrawer(settingsProgress, -gestureState.dx / dragWidth);
           } else {
             //carries the model selector up with the finger, same as the horizontal drawers
@@ -772,14 +853,18 @@ useEffect(() => {
             return;
           }
 
+          const leftProgress = inSampler
+            ? samplerDrawerProgress
+            : conversationsProgress;
           const velocity = gestureVelocity(gestureState.vx, dragWidth);
           //same release rule as the drawers
           if (
             gestureState.dx > 0 &&
             releaseOpens(gestureState.dx / dragWidth, gestureState.vx)
           ) {
-            settleDrawer(conversationsProgress, true, velocity);
-            setDrawerVisible(true);
+            settleDrawer(leftProgress, true, velocity);
+            if (inSampler) setSamplerDrawerVisible(true);
+            else setDrawerVisible(true);
           } else if (
             gestureState.dx < 0 &&
             releaseOpens(-gestureState.dx / dragWidth, -gestureState.vx)
@@ -788,20 +873,25 @@ useEffect(() => {
             setSettingsDrawerVisible(true);
           } else {
             //send peeked panel back off
-            settleDrawer(conversationsProgress, false, velocity);
+            settleDrawer(leftProgress, false, velocity);
             settleDrawer(settingsProgress, false, -velocity);
           }
         },
         onPanResponderTerminate: () => {
-          settleDrawer(conversationsProgress, false);
+          settleDrawer(
+            inSampler ? samplerDrawerProgress : conversationsProgress,
+            false,
+          );
           settleDrawer(settingsProgress, false);
           settleDrawer(modelSelectorProgress, false);
         },
       }),
     [
       drawerVisible,
+      samplerDrawerVisible,
       settingsDrawerVisible,
       modelSelectorVisible,
+      inSampler,
       dragWidth,
       activeConversation,
       modelSelectorProgress,
@@ -838,12 +928,16 @@ useEffect(() => {
       if (total >= SWIPE_THRESHOLD) {
         if (settingsDrawerVisibleRef.current) {
           closeSettings();
+        } else if (inSamplerRef.current) {
+          if (!isDesktop) openDrawerSafely(() => setSamplerDrawerVisible(true));
         } else {
           openDrawerSafely(() => setDrawerVisible(true));
         }
       } else if (total <= -SWIPE_THRESHOLD) {
-        if (drawerVisibleRef.current) {
+        if (!isDesktop && drawerVisibleRef.current) {
           setDrawerVisible(false);
+        } else if (!isDesktop && samplerDrawerVisibleRef.current) {
+          setSamplerDrawerVisible(false);
         } else {
           openDrawerSafely(() => setSettingsDrawerVisible(true));
         }
@@ -1250,8 +1344,10 @@ useEffect(() => {
 
   //stable ref keeps drawer rows memoized
   const closeConversationsDrawer = useCallback(
-    () => setDrawerVisible(false),
-    [],
+    () => {
+      if (!isDesktop) setDrawerVisible(false);
+    },
+    [isDesktop],
   );
 
   //defer upload until accepted
@@ -1351,7 +1447,7 @@ useEffect(() => {
         //the drawer asks before pairing
         openDrawerSafely(() => {
           setHubPairLink(route.link);
-          setSettingsInitialSubPage("operahub");
+          setSettingsInitialSubPage("main");
           setSettingsDrawerVisible(true);
         });
       }
@@ -2211,7 +2307,7 @@ useEffect(() => {
           "surface",
         )}
         onPress={() => {
-          if (!isDesktop && drawerVisible) return;
+          if (!isDesktop && (drawerVisible || samplerDrawerVisible)) return;
           openDrawerSafely(() => {
             if (settingsDrawerVisible) {
               closeSettings();
@@ -2240,7 +2336,8 @@ useEffect(() => {
   const conversationsDrawer = (
     <ConversationsDrawer
       isDesktop={isDesktop}
-      visible={drawerVisible}
+      visible={isDesktop ? true : drawerVisible}
+      transitionProgress={samplerAnim}
       onClose={closeConversationsDrawer}
       conversations={conversations}
       selectedConversationId={activeConversation?.id ?? null}
@@ -2249,6 +2346,8 @@ useEffect(() => {
       onDeleteConversation={deleteConversation}
       onTogglePinConversation={togglePinConversation}
       onShareConversation={askToShareConversation}
+      onOpenSearch={() => setConversationSearchVisible(true)}
+      onOpenSampler={() => setSamplerMode(true)}
     />
   );
 
@@ -2299,227 +2398,247 @@ useEffect(() => {
         ]}
         {...(isLargeScreen ? {} : panResponder.panHandlers)}
       >
-        <View
-          style={[
-            { flex: 1, flexDirection: isLargeScreen ? "row" : "column" },
-            //hidden, not unmounted, so a running answer keeps going
-            inSampler && { display: "none" },
-          ]}
-          pointerEvents="box-none"
-        >
-          {/* only the desktop panels take part in layout, the overlay ones live outside the
-              keyboard avoiding view or they get clipped to its shrunken height */}
-          {isDesktop ? conversationsDrawer : null}
-
+        <View style={styles.pagesContainer} pointerEvents="box-none">
           <View
-            style={{ flex: 1, backgroundColor: "transparent" }}
-            pointerEvents="box-none"
+            style={[
+              StyleSheet.absoluteFill,
+              { flexDirection: isLargeScreen ? "row" : "column" },
+            ]}
+            pointerEvents={inSampler ? "none" : "box-none"}
           >
-            {!activeConversation && (
-              <Reanimated.View style={[styles.centerContent, homeFreezeStyle]}>
-                <ButterflyCluster
-                  ref={homeButterflyRef}
-                  incognito={incognitoMode}
-                  style={styles.butterfly}
-                />
-                <TypewriterWelcome
-                  text={userName ? `${greeting}\n${userName}` : greeting}
-                  style={styles.welcomeText}
-                  reserveLines={userName ? 2 : 1}
-                />
-                <DissolveIn delay={2200}>
-                  <IncognitoToggle
+            {/* only the desktop panels take part in layout, the overlay ones live outside the
+                keyboard avoiding view or they get clipped to its shrunken height */}
+            {isDesktop ? conversationsDrawer : null}
+
+            <Animated.View
+              style={{
+                flex: 1,
+                backgroundColor: "transparent",
+                transform: [{ translateX: chatTranslateX }],
+              }}
+              pointerEvents="box-none"
+            >
+              {!activeConversation && (
+                <Reanimated.View style={[styles.centerContent, homeFreezeStyle]}>
+                  <ButterflyCluster
+                    ref={homeButterflyRef}
                     incognito={incognitoMode}
-                    onPress={() => {
-                      Vibration.vibrate(10);
-                      setIncognitoMode((prev) => !prev);
-                    }}
+                    style={styles.butterfly}
                   />
-                </DissolveIn>
-                <Animated.Text
-                  style={[
-                    styles.incognitoDescription,
-                    {
-                      opacity: incognitoProgress,
-                      transform: [
-                        {
-                          translateY: incognitoProgress.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [6, 0],
-                          }),
-                        },
-                      ],
-                    },
-                  ]}
-                >
-                  Welcome to incognito mode. You can ask quick questions without
-                  leaving a trace. Once you close the window, your conversation
-                  disappears forever.
-                </Animated.Text>
-              </Reanimated.View>
-            )}
+                  <TypewriterWelcome
+                    text={userName ? `${greeting}\n${userName}` : greeting}
+                    style={styles.welcomeText}
+                    reserveLines={userName ? 2 : 1}
+                  />
+                  <DissolveIn delay={2200}>
+                    <IncognitoToggle
+                      incognito={incognitoMode}
+                      onPress={() => {
+                        Vibration.vibrate(10);
+                        setIncognitoMode((prev) => !prev);
+                      }}
+                    />
+                  </DissolveIn>
+                  <Animated.Text
+                    style={[
+                      styles.incognitoDescription,
+                      {
+                        opacity: incognitoProgress,
+                        transform: [
+                          {
+                            translateY: incognitoProgress.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [6, 0],
+                            }),
+                          },
+                        ],
+                      },
+                    ]}
+                  >
+                    Welcome to incognito mode. You can ask quick questions without
+                    leaving a trace. Once you close the window, your conversation
+                    disappears forever.
+                  </Animated.Text>
+                </Reanimated.View>
+              )}
 
-            {activeConversation && (
-              <ChatView
-                suggestions={editSession ? undefined : activeSuggestions}
-                onSuggestionPress={handleSend}
-                messages={displayMessages}
-                conversation={activeConversation}
-                contentTopPadding={insets.top + 72}
-                contentBottomPadding={88 + insets.bottom}
-                incognito={activeConversation.id.startsWith("incognito_")}
-                onRegenerate={handleRegenerate}
-                onEditMessage={handleEditStart}
-                editAiEnabled={editAiEnabled}
-                speakerEnabled={speakerEnabled}
-                showMetrics={showTechnicalDetails}
-                generatingMessageId={
-                  generatingConvId === activeConversation.id
-                    ? streamingMsgId
-                    : null
-                }
-                queuedMessageIds={pendingMsgIds}
-                hideGradients={isDesktop}
-                onOpenConfidentiality={() => {
-                  openDrawerSafely(() => {
-                    setSettingsInitialSubPage("confidentiality");
-                    setSettingsDrawerVisible(true);
-                  });
-                }}
-                canThink={
-                  modelCapabilities.includes("thinking") &&
-                  selectedReflection !== "none"
-                }
-                onImagePress={setPreviewImage}
-                onDetailsPress={setPreviewDetails}
-                butterflyFrom={butterflyFrom}
-              />
-            )}
-
-            <View
-              style={[
-                styles.topBarOverlay,
-                {
-                  paddingTop:
-                    insets.top +
-                    (typeof window !== "undefined" &&
-                    "__TAURI_INTERNALS__" in window
-                      ? 32
-                      : 0),
-                  zIndex: attachmentSheetVisible ? 200 : undefined,
-                },
-              ]}
-              pointerEvents="box-none"
-            >
-              <TopBar
-                onMenuPress={() => {
-                  if (!isDesktop && settingsDrawerVisible) return;
-                  openDrawerSafely(() => setDrawerVisible((prev) => !prev));
-                }}
-                onNewPress={startNewConversation}
-                isDesktop={isDesktop}
-                middleElement={samplerSwitch}
-                centerElement={isDesktop ? undefined : modelTrigger}
-                rightElement={settingsButton}
-              />
-            </View>
-
-            {/* bottom bar overlay */}
-            <View
-              style={[styles.bottomBarOverlay]}
-              pointerEvents="box-none"
-              onTouchStart={() => {
-                touchInComposerRef.current = true;
-              }}
-              onTouchEnd={() => {
-                touchInComposerRef.current = false;
-              }}
-              onTouchCancel={() => {
-                touchInComposerRef.current = false;
-              }}
-            >
-              {isSharedPreview ? (
-                <View style={styles.addSharedContainer}>
-                  <View style={styles.addSharedInner}>
-                    <View style={styles.addSharedWrapper}>
-                      <Group>
-                        <ActionButton
-                          icon={addIcon}
-                          label={t("share.preview.add")}
-                          labelStyle={styles.addSharedLabel}
-                          onPress={saveSharedConversation}
-                          style={styles.addSharedButton}
-                        />
-                      </Group>
-                    </View>
-                  </View>
-                  <View style={{ width: "100%", height: insets.bottom }} />
-                </View>
-              ) : (
-                <ChatBar
-                  onSend={(text, images, viaVoice) =>
-                    editSession
-                      ? confirmEdit(text, images)
-                      : handleSend(text, images, viaVoice)
+              {activeConversation && (
+                <ChatView
+                  suggestions={editSession ? undefined : activeSuggestions}
+                  onSuggestionPress={handleSend}
+                  messages={displayMessages}
+                  conversation={activeConversation}
+                  contentTopPadding={insets.top + 72}
+                  contentBottomPadding={88 + insets.bottom}
+                  incognito={activeConversation.id.startsWith("incognito_")}
+                  onRegenerate={handleRegenerate}
+                  onEditMessage={handleEditStart}
+                  editAiEnabled={editAiEnabled}
+                  speakerEnabled={speakerEnabled}
+                  showMetrics={showTechnicalDetails}
+                  generatingMessageId={
+                    generatingConvId === activeConversation.id
+                      ? streamingMsgId
+                      : null
                   }
-                  editing={!!editSession}
-                  onEditCancel={handleEditCancel}
-                  editDraft={editDraft}
-                  editFiles={editFiles}
-                  incognito={
-                    activeConversation
-                      ? activeConversation.id.startsWith("incognito_")
-                      : incognitoMode
-                  }
-                  isGenerating={
-                    activeConversation
-                      ? generatingConvId === activeConversation.id ||
-                        pendingConvIds.includes(activeConversation.id)
-                      : false
-                  }
-                  onStop={handleStop}
-                  onTranscribe={handleTranscribe}
-                  canTranscribeRemotely={
-                    !alwaysWhisper &&
-                    modelCapabilities.includes("audio") &&
-                    !!selectedModel
-                  }
-                  modelCapabilities={modelCapabilities}
-                  onOpenSettings={() => {
+                  queuedMessageIds={pendingMsgIds}
+                  hideGradients={isDesktop}
+                  onOpenConfidentiality={() => {
                     openDrawerSafely(() => {
-                      setSettingsInitialSubPage("main");
+                      setSettingsInitialSubPage("confidentiality");
                       setSettingsDrawerVisible(true);
                     });
                   }}
-                  onAttachmentSheetVisibilityChange={setAttachmentSheetVisible}
-                  leadingElement={isDesktop ? modelTrigger : undefined}
+                  canThink={
+                    modelCapabilities.includes("thinking") &&
+                    selectedReflection !== "none"
+                  }
+                  onImagePress={setPreviewImage}
+                  onDetailsPress={setPreviewDetails}
+                  butterflyFrom={butterflyFrom}
                 />
               )}
-            </View>
-          </View>
-        </View>
 
-        {inSampler && (
-          <SamplerScreen
-            isLargeScreen={isLargeScreen}
-            isDesktop={isDesktop}
-            onHubChanged={checkSamplerAdmin}
-            topBar={
-              <TopBar
-                onMenuPress={() => {}}
-                onNewPress={() => {}}
-                isDesktop={isDesktop}
-                middleElement={samplerSwitch}
-                rightElement={settingsButton}
-                middleOnly
-              />
-            }
-          />
-        )}
+              {/* bottom bar overlay */}
+              <View
+                style={[styles.bottomBarOverlay]}
+                pointerEvents="box-none"
+                onTouchStart={() => {
+                  touchInComposerRef.current = true;
+                }}
+                onTouchEnd={() => {
+                  touchInComposerRef.current = false;
+                }}
+                onTouchCancel={() => {
+                  touchInComposerRef.current = false;
+                }}
+              >
+                {isSharedPreview ? (
+                  <View style={styles.addSharedContainer}>
+                    <View style={styles.addSharedInner}>
+                      <View style={styles.addSharedWrapper}>
+                        <Group>
+                          <ActionButton
+                            icon={addIcon}
+                            label={t("share.preview.add")}
+                            labelStyle={styles.addSharedLabel}
+                            onPress={saveSharedConversation}
+                            style={styles.addSharedButton}
+                          />
+                        </Group>
+                      </View>
+                    </View>
+                    <View style={{ width: "100%", height: insets.bottom }} />
+                  </View>
+                ) : (
+                  <ChatBar
+                    onSend={(text, images, viaVoice) =>
+                      editSession
+                        ? confirmEdit(text, images)
+                        : handleSend(text, images, viaVoice)
+                    }
+                    editing={!!editSession}
+                    onEditCancel={handleEditCancel}
+                    editDraft={editDraft}
+                    editFiles={editFiles}
+                    incognito={
+                      activeConversation
+                        ? activeConversation.id.startsWith("incognito_")
+                        : incognitoMode
+                    }
+                    isGenerating={
+                      activeConversation
+                        ? generatingConvId === activeConversation.id ||
+                          pendingConvIds.includes(activeConversation.id)
+                        : false
+                    }
+                    onStop={handleStop}
+                    onTranscribe={handleTranscribe}
+                    canTranscribeRemotely={
+                      !alwaysWhisper &&
+                      modelCapabilities.includes("audio") &&
+                      !!selectedModel
+                    }
+                    modelCapabilities={modelCapabilities}
+                    onOpenSettings={() => {
+                      openDrawerSafely(() => {
+                        setSettingsInitialSubPage("main");
+                        setSettingsDrawerVisible(true);
+                      });
+                    }}
+                    onAttachmentSheetVisibilityChange={setAttachmentSheetVisible}
+                    leadingElement={isDesktop ? modelTrigger : undefined}
+                  />
+                )}
+              </View>
+            </Animated.View>
+          </View>
+
+          {(showSamplerSwitch || !isDesktop) && (
+            <SamplerScreen
+              visible={inSampler}
+              transitionProgress={samplerAnim}
+              mainTranslateX={samplerTranslateX}
+              isLargeScreen={isLargeScreen}
+              isDesktop={isDesktop}
+              drawerVisible={samplerDrawerVisible}
+              onCloseDrawer={() => setSamplerDrawerVisible(false)}
+              onOpenChat={() => setSamplerMode(false)}
+              onHubChanged={checkSamplerAdmin}
+              onReadyChange={setSamplerReady}
+            />
+          )}
+
+          <Animated.View
+            style={[
+              styles.topBarOverlay,
+              {
+                left: topBarLeft,
+                paddingTop:
+                  insets.top +
+                  (typeof window !== "undefined" &&
+                  "__TAURI_INTERNALS__" in window
+                    ? 32
+                    : 0),
+                zIndex: attachmentSheetVisible ? 200 : 100,
+              },
+            ]}
+            pointerEvents="box-none"
+          >
+            <TopBar
+              onMenuPress={() => {
+                if (!isDesktop && settingsDrawerVisible) return;
+                openDrawerSafely(() => {
+                  if (inSampler) setSamplerDrawerVisible((prev) => !prev);
+                  else setDrawerVisible((prev) => !prev);
+                });
+              }}
+              onNewPress={startNewConversation}
+              showNewButton={!inSampler}
+              isDesktop={isDesktop}
+              middleElement={samplerSwitch}
+              centerElement={isDesktop || inSampler ? undefined : modelTrigger}
+              rightElement={settingsButton}
+            />
+          </Animated.View>
+        </View>
       </Reanimated.View>
 
       {isDesktop ? null : conversationsDrawer}
       {settingsDrawer}
+
+      <ConversationSearchSheet
+        visible={conversationSearchVisible}
+        onClose={() => setConversationSearchVisible(false)}
+        conversations={conversations}
+        selectedConversationId={activeConversation?.id ?? null}
+        onSelectConversation={selectConversation}
+        onDeleteConversation={deleteConversation}
+        onTogglePinConversation={togglePinConversation}
+        onShareConversation={askToShareConversation}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
 
       <BugReportSheet
         visible={bugReportVisible}
@@ -2713,6 +2832,10 @@ const makeStyles = (Colors: ThemeColors) =>
     container: {
       flex: 1,
       backgroundColor: Colors.background,
+    },
+    pagesContainer: {
+      flex: 1,
+      overflow: "hidden",
     },
     backgroundTexture: { opacity: 0.02, width: "100%", height: "100%" },
     topBarOverlay: {

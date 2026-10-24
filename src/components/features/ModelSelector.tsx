@@ -95,7 +95,7 @@ const WINDOW_BUFFER = 20;
 const ANCHOR_GAP = 8;
 const ANCHOR_MARGIN = 8;
 const ANCHORED_CARD_WIDTH = 320;
-const CENTERED_CARD_WIDTH = 640;
+const CENTERED_CARD_WIDTH = 840;
 
 //context size configured for the active source
 const contextWindowFor = (service: string, ollamaUrl: string) => {
@@ -1098,7 +1098,7 @@ const makeStyles = (Colors: ThemeColors) =>
       paddingHorizontal: Spacing.lg2,
     },
     tabsColumn: {
-      width: 180,
+      width: 220,
       gap: Spacing.xs,
     },
     desktopModels: {

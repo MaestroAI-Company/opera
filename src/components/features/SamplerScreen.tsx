@@ -1,8 +1,24 @@
-import { ReactNode, useCallback, useEffect, useState } from "react";
-import { Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Animated,
+  BackHandler,
+  Image,
+  ImageSourcePropType,
+  Keyboard,
+  PanResponder,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useHubModels } from "../../hooks/useHubModels";
+import { useResponsive } from "../../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
@@ -32,7 +48,22 @@ import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 import { pressStyle } from "../ui/pressStyle";
 import DrawerBackButton from "./DrawerBackButton";
+import DrawerSheet, {
+  SheetKeyboardAwareScrollView,
+  SheetScrollView,
+} from "./DrawerSheet";
+import {
+  dragDrawer,
+  drawerWidthFor,
+  gestureVelocity,
+  releaseOpens,
+  samplerDrawerProgress,
+  settleDrawer,
+  useDockedWidth,
+} from "./drawerAnimation";
 import HubDeviceSheet from "./HubDeviceSheet";
+import HubMcpSection, { HubMcpServerPage } from "./HubMcpSection";
+import HubMcpSheet, { HubFolderSheet } from "./HubMcpSheet";
 import HubModelsSection, { HubModelPage } from "./HubModelsSection";
 import HubModelsSheet from "./HubModelsSheet";
 import HubPairingSheet from "./HubPairingSheet";
@@ -70,11 +101,9 @@ const USAGE_POLL_MS = 5000;
 const OVERVIEW_POLL_MS = 10000;
 //same column as the chat: 840 wide with 16 on each side
 const PAGE_MAX_WIDTH = 840 - 2 * Spacing.xl2;
-const NAV_WIDTH = 320;
 //two home columns from this page width
 const TWO_COLUMNS_FROM = 760;
 const TILE_MIN_WIDTH = 150;
-const PROFILE_TILE_WIDTH = 180;
 //slider beside its text on desktop
 const SLIDER_WIDTH = 320;
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -83,7 +112,7 @@ const CONTENT_TOP = (isTauri ? 32 : 0) + 60 + Spacing.xl2;
 
 type Page = "home" | "profiles" | "models" | "mcp" | "performance" | "preferences";
 //pages pushed from a section page
-type SubPage = Page | "profile" | "modelsList" | "model" | "mcpServer";
+type SubPage = Page | "profile" | "modelsList";
 type Detail = { file: string; name: string };
 type HubState = "checking" | "online" | "offline" | "revoked" | "outdated";
 
@@ -99,12 +128,17 @@ type Modal = {
 };
 
 type SamplerScreenProps = {
-  //the chat and sampler switch
-  topBar: ReactNode;
+  visible?: boolean;
+  transitionProgress?: Animated.Value;
+  mainTranslateX?: Animated.AnimatedInterpolation<number>;
   isLargeScreen: boolean;
   isDesktop: boolean;
+  drawerVisible?: boolean;
+  onCloseDrawer?: () => void;
+  onOpenChat?: () => void;
   //after each reload, pairing or role may have changed
   onHubChanged?: () => void;
+  onReadyChange?: (ready: boolean) => void;
 };
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -112,8 +146,6 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const PARENT: Partial<Record<SubPage, SubPage>> = {
   profile: "profiles",
   modelsList: "models",
-  model: "modelsList",
-  mcpServer: "mcp",
 };
 
 const parentOf = (page: SubPage): SubPage | null => PARENT[page] ?? null;
@@ -125,17 +157,34 @@ const sectionOf = (page: SubPage): Page => {
 };
 
 //admin page of the sampler, desktop app and admin browsers
-export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubChanged }: SamplerScreenProps) {
+export default function SamplerScreen({
+  visible = true,
+  transitionProgress,
+  mainTranslateX,
+  isLargeScreen,
+  isDesktop,
+  drawerVisible = false,
+  onCloseDrawer,
+  onOpenChat,
+  onHubChanged,
+  onReadyChange,
+}: SamplerScreenProps) {
   const styles = useThemedStyles(makeStyles);
   const Colors = useColors();
   const t = useT();
+  const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useResponsive();
+  const drawerWidth = drawerWidthFor(windowWidth);
+  const sheetMaxHeight = windowHeight - insets.top - Spacing.xl2;
+  const contentTop = (isDesktop ? (isTauri ? 32 : 0) : insets.top) + 60 + Spacing.xl2;
 
   const [page, setPage] = useState<SubPage>("home");
-  //kept after going back, the leaving page still shows it
   const [detail, setDetail] = useState<Detail | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
-  const [serverId, setServerId] = useState<string | null>(null);
+  const [selectedMcpServerId, setSelectedMcpServerId] = useState<string | null>(null);
+  const [myMcpDetail, setMyMcpDetail] = useState<{ id: string; title: string } | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [drawerScrolled, setDrawerScrolled] = useState(false);
   const [stackWidth, setStackWidth] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [pairedHub, setPairedHub] = useState<PairedHub | null>(null);
@@ -165,11 +214,14 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
   const [registryDraft, setRegistryDraft] = useState("");
   const [registryError, setRegistryError] = useState<string | null>(null);
   const [pageWidth, setPageWidth] = useState(0);
-  const [profileSheet, setProfileSheet] = useState<"pick" | "password" | null>(null);
+  const [profileSheet, setProfileSheet] = useState<"pick" | "view" | "password" | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<HubProfile | null>(null);
   const [pairingVisible, setPairingVisible] = useState(false);
   const [qrMode, setQrMode] = useState<"invite" | "link" | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [modelsSheetVisible, setModelsSheetVisible] = useState(false);
+  const [mcpSheetVisible, setMcpSheetVisible] = useState(false);
+  const [folderPick, setFolderPick] = useState<{ start?: string; done: (path: string) => void } | null>(null);
   const [modal, setModal] = useState<Modal | null>(null);
 
   //every answer also feeds the graphs
@@ -187,7 +239,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     const hub = await OperaHub.getPairedHub();
     setPairedHub(hub);
     setProfile(await OperaHub.getProfile());
-    setHostStatus(await OperaHub.hostStatus().catch(() => null));
+    setHostStatus(isDesktop && OperaHub.canHost() ? await OperaHub.hostStatus().catch(() => null) : null);
     setLoaded(true);
     if (!hub) return;
     OperaHub.deviceId()
@@ -211,7 +263,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
       //the switch follows pairing and role
       onHubChanged?.();
     }
-  }, [onHubChanged, receiveStatus]);
+  }, [isDesktop, onHubChanged, receiveStatus]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the paired hub
@@ -220,7 +272,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
 
   //usage stays live while the screen shows
   useEffect(() => {
-    if (!pairedHub || hubState === "checking") return;
+    if (!visible || !pairedHub || hubState === "checking") return;
     const timer = setInterval(() => {
       OperaHub.status(pairedHub)
         //a hub that came back reloads everything
@@ -228,7 +280,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
         .catch((e) => setHubState(failedState(e)));
     }, USAGE_POLL_MS);
     return () => clearInterval(timer);
-  }, [pairedHub, hubState, refresh, receiveStatus]);
+  }, [visible, pairedHub, hubState, refresh, receiveStatus]);
 
   //the role may have changed since the profile was unlocked
   const role = profiles?.find((p) => p.id === profile?.id)?.role ?? profile?.role;
@@ -236,16 +288,20 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
   const online = hubState === "online";
   //nothing until the hub first answers
   const firstCheck = hubState === "checking" && !status;
-  const hostsHub = !!hostStatus?.id && pairedHub?.id === hostStatus.id;
+  //hosting is desktop-only
+  const canHost = isDesktop && OperaHub.canHost();
+  const hostsHub = canHost && !!hostStatus?.id && pairedHub?.id === hostStatus.id;
   const showModels = isAdmin && OperaHub.canManageModels();
   //llama.cpp usage for the performance page
-  const { status: modelsStatus } = useHubModels(online && showModels && page === "performance");
-  //every profile's servers, nothing to install here
-  const showMcp = isAdmin && OperaHub.canSeeMcpServers();
+  const { status: modelsStatus } = useHubModels(visible && online && showModels && page === "performance");
+  //every profile's servers on desktop, personal servers on mobile
+  const showMcpOverview = isAdmin && OperaHub.canSeeMcpServers();
+  const canManageMcp = OperaHub.canManageMcp();
+  const showMcp = showMcpOverview || canManageMcp;
 
   //read only, on home, performance and its pages
   useEffect(() => {
-    if ((page !== "home" && page !== "performance" && sectionOf(page) !== "mcp") || !showMcp || !online || !pairedHub) return;
+    if (!visible || (page !== "home" && page !== "performance" && sectionOf(page) !== "mcp") || !showMcpOverview || !online || !pairedHub) return;
     let live = true;
     const load = () =>
       OperaHub.mcpOverview(pairedHub)
@@ -255,13 +311,15 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
           setOverviewError(null);
         })
         .catch((e) => live && setOverviewError(message(e)));
-    load();
+    //let the page slide finish before updating state
+    const startTimer = setTimeout(load, 300);
     const timer = setInterval(load, OVERVIEW_POLL_MS);
     return () => {
       live = false;
+      clearTimeout(startTimer);
       clearInterval(timer);
     };
-  }, [page, showMcp, online, pairedHub]);
+  }, [visible, page, showMcpOverview, online, pairedHub]);
 
   useEffect(() => {
     if (page !== "preferences" || !isAdmin || !online) return;
@@ -375,6 +433,8 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
             closeModal();
             setPage("home");
             setDetail(null);
+            setSelectedMcpServerId(null);
+            setMyMcpDetail(null);
             setProfile(null);
             setStatus(null);
             setDevices(null);
@@ -419,13 +479,10 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     });
 
   const openProfile = (target: HubProfile) => {
-    if (target.id === profile?.id) {
-      setProfileSheet("password");
-      return;
-    }
-    if (!isAdmin || !pairedHub || !OperaHub.canManageProfiles()) return;
+    if (target.id !== profile?.id && (!isAdmin || !pairedHub || !OperaHub.canManageProfiles())) return;
     setProfileId(target.id);
-    openPage("profile");
+    setSelectedProfile(target);
+    setProfileSheet("view");
   };
 
   const saveRegistries = async (urls: string[]) => {
@@ -483,6 +540,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     </View>
   );
 
+
   //stopped from preferences, started again from its page
   const hubStopped = hostsHub && !hostStatus?.running;
 
@@ -533,25 +591,48 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
                 refresh();
               }}
             />
-            {!isAdmin && <ActionButton icon={cancelIcon} label={t("settings.hub.unpair")} onPress={unpair} />}
+            <ActionButton icon={cancelIcon} label={t("settings.hub.unpair")} onPress={unpair} />
           </Group>
         </View>
       </View>
     );
   };
 
-  const profilesCard = (
+  const shownProfiles = profiles ?? (profile ? [profile] : []);
+  //two cards per row
+  const profileRows = useMemo(() => {
+    const rows: HubProfile[][] = [];
+    for (let i = 0; i < shownProfiles.length; i += 2) {
+      rows.push(shownProfiles.slice(i, i + 2));
+    }
+    return rows;
+  }, [shownProfiles]);
+  const renderProfilesCard = (withActions: boolean) => (
     <View style={styles.contentCard}>
       <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
         <Text style={styles.settingLabel}>{t("sampler.profiles")}</Text>
         <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("sampler.profilesHelp")}</Text>
         <View style={styles.profileTiles}>
-          {(profiles ?? []).map((p) => (
-            <Pressable key={p.id} style={pressStyle(styles.profileTile, "fadeLight")} onPress={() => openProfile(p)}>
-              <ProfileCard name={p.name} createdAt={p.createdAt * 1000} compact />
-            </Pressable>
+          {profileRows.map((row) => (
+            <View key={row[0].id} style={styles.profileRow}>
+              {row.map((p) => (
+                <Pressable key={p.id} style={pressStyle(styles.profileTile, "fadeLight")} onPress={() => openProfile(p)}>
+                  <ProfileCard name={p.name} createdAt={p.createdAt * 1000} compact />
+                </Pressable>
+              ))}
+              {row.length === 1 && <View style={styles.profileTilePlaceholder} />}
+            </View>
           ))}
         </View>
+        {withActions && isAdmin && (
+          <Group style={{ marginTop: Spacing.md }}>
+            <ActionButton
+              icon={profilIcon}
+              label={t("settings.hub.pairDevice")}
+              onPress={() => setQrMode("invite")}
+            />
+          </Group>
+        )}
       </View>
     </View>
   );
@@ -592,13 +673,6 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
         {withActions && (
           <Group>
             <ActionButton icon={addIcon} label={t("settings.hub.addMyDevice")} onPress={() => setQrMode("link")} />
-            {isAdmin && (
-              <ActionButton
-                icon={profilIcon}
-                label={t("settings.hub.pairDevice")}
-                onPress={() => setQrMode("invite")}
-              />
-            )}
           </Group>
         )}
       </View>
@@ -609,10 +683,15 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     <HubModelsSection
       highlight={highlight}
       onAddModel={() => setModelsSheetVisible(true)}
-      onOpenModel={(file, name) => {
-        setDetail({ file, name });
-        openPage("model");
-      }}
+      onOpenModel={(file, name) => setDetail({ file, name })}
+    />
+  );
+
+  const myMcpSection = (highlight: boolean) => (
+    <HubMcpSection
+      highlight={highlight}
+      onAddServer={() => setMcpSheetVisible(true)}
+      onOpenServer={(id, title) => setMyMcpDetail({ id, title })}
     />
   );
 
@@ -658,8 +737,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
           text: t("common.remove"),
           style: "danger",
           onPress: () => {
-            //its page has nothing left to show
-            openPage("mcp");
+            setSelectedMcpServerId(null);
             runMcp(server.id, "remove");
           },
         },
@@ -671,7 +749,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
 
   //an admin runs anyone's server, its settings stay private
   const renderMcpServer = () => {
-    const server = overview?.find((s) => s.id === serverId);
+    const server = overview?.find((s) => s.id === selectedMcpServerId);
     if (!server) return null;
     const owner = ownerName(ownerOf(server));
     const rows = [
@@ -712,7 +790,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
         </View>
 
         {/* actions section */}
-        <View style={styles.contentCard}>
+        <View style={[styles.contentCard, { marginBottom: 0 }]}>
           <Group>
             <ActionButton
               icon={server.enabled ? stopIcon : activateIcon}
@@ -741,8 +819,25 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
   const renderProfile = () => {
     const target = profiles?.find((p) => p.id === profileId);
     if (!target || !pairedHub) return null;
-    const count = devices?.filter((d) => d.profile === target.id).length ?? 0;
+    const targetDevices = (devices ?? []).filter((d) => d.profile === target.id);
+    const count = targetDevices.length;
     const nextRole = target.role === "admin" ? "member" : "admin";
+    const targetDeviceTiles: GridCard[] = targetDevices.map((d) => {
+      const seen =
+        d.id === thisDeviceId
+          ? t("settings.hub.thisDevice")
+          : d.lastSeen && devicesAt - d.lastSeen > HUB_INACTIVE_AFTER_S
+            ? t("settings.hub.inactive")
+            : null;
+      const kind = d.kind in HUB_DEVICE_ICONS ? (d.kind as "phone" | "desktop" | "web") : "other";
+      return {
+        key: d.id,
+        icon: HUB_DEVICE_ICONS[d.kind] ?? operaIcon,
+        title: d.name,
+        status: [seen ?? t(`hubDevice.kinds.${kind}`)].filter(Boolean).join(" · "),
+        onPress: isAdmin || d.id === thisDeviceId ? () => setSelectedDeviceId(d.id) : undefined,
+      };
+    });
     return (
       <>
         <View style={styles.contentCard}>
@@ -768,6 +863,18 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
               />
             ))}
           </Group>
+        </View>
+
+        {/* devices section */}
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.hub.devices")}</Text>
+            {targetDeviceTiles.length > 0 ? (
+              <CardGrid cards={targetDeviceTiles} minCardWidth={TILE_MIN_WIDTH} />
+            ) : (
+              <Text style={styles.helpText}>{t("hubProfile.noDevices")}</Text>
+            )}
+          </View>
         </View>
 
         {/* actions section */}
@@ -824,10 +931,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
                     title: server.title,
                     error: server.state === "failed",
                     status: serverStatus(server),
-                    onPress: () => {
-                      setServerId(server.id);
-                      openPage("mcpServer");
-                    },
+                    onPress: () => setSelectedMcpServerId(server.id),
                   }))}
                 />
               ) : (
@@ -909,7 +1013,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     );
   };
 
-  //opens the feature list, the toggle turns it off for every profile
+  //opens feature list and toggles state
   const renderFeatureRow = (label: string, help: string, on: boolean, key: "models" | "mcpServers", list: SubPage) => (
     <Group style={styles.groupSpacing}>
       <Pressable style={pressStyle(styles.toggleGroupRowItem, "surface")} disabled={!on} onPress={() => openPage(list)}>
@@ -929,8 +1033,6 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     </Group>
   );
 
-  //this computer runs the hub, stopped from preferences
-  const showHost = hostsHub && !hubStopped;
   const hostHero = (
     <>
       <Image source={HUB_DEVICE_ICONS.desktop} style={styles.hostIcon} tintColor={Colors.textPrimary} />
@@ -950,15 +1052,6 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
       online: status?.direct ? t("settings.hub.direct") : t("settings.hub.relay"),
     }[hubState];
     const rows = [
-      //the hero already shows the name
-      ...(showHost
-        ? []
-        : [
-            {
-              label: t("settings.hub.name"),
-              value: status?.name ?? pairedHub?.name ?? "",
-            },
-          ]),
       { label: t("settings.hub.connection"), value: connection },
       ...(status ? [{ label: t("settings.hub.version"), value: status.version }] : []),
       ...(status?.update
@@ -975,7 +1068,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     return (
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          {showHost && hostHero}
+          {hostHero}
           <Group style={[styles.infoGroup, styles.groupSpacingTight]}>
             {rows.map((row) => (
               <ActionButton
@@ -1000,7 +1093,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
             {hostsHub && !hubStopped && (
               <ActionButton icon={cancelIcon} label={t("settings.hub.stopHosting")} disabled={hostBusy} onPress={confirmStop} />
             )}
-            {!isAdmin && <ActionButton icon={cancelIcon} label={t("settings.hub.unpair")} onPress={unpair} />}
+            <ActionButton icon={cancelIcon} label={t("settings.hub.unpair")} onPress={unpair} />
           </Group>
         </View>
       </View>
@@ -1009,26 +1102,33 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
 
   const renderHome = () => {
     const cards = [
-      <View key="hub">{renderHubCard()}</View>,
-      <View key="profiles">{profilesCard}</View>,
+      <View key="profiles">{renderProfilesCard(false)}</View>,
       <View key="devices">{renderDevicesCard(false)}</View>,
-      ...(showModels && modelsOn ? [<View key="models">{modelsSection(false)}</View>] : []),
-      ...(showMcp && mcpOn ? [<View key="mcp">{renderMcpServers()}</View>] : []),
     ];
-    if (pageWidth < TWO_COLUMNS_FROM) return cards;
+    if (pageWidth < TWO_COLUMNS_FROM) {
+      return (
+        <>
+          {renderHubCard()}
+          {cards}
+        </>
+      );
+    }
     //two columns that fill independently
     const half = Math.floor((pageWidth - Spacing.xxl2) / 2);
     return (
-      <View style={styles.columns}>
-        <View style={{ width: half }}>{cards.filter((_, i) => i % 2 === 0)}</View>
-        <View style={{ width: half }}>{cards.filter((_, i) => i % 2 === 1)}</View>
-      </View>
+      <>
+        {renderHubCard()}
+        <View style={styles.columns}>
+          <View style={{ width: half }}>{cards.filter((_, i) => i % 2 === 0)}</View>
+          <View style={{ width: half }}>{cards.filter((_, i) => i % 2 === 1)}</View>
+        </View>
+      </>
     );
   };
 
   const renderProfiles = () => (
     <>
-      {profilesCard}
+      {renderProfilesCard(true)}
       {renderDevicesCard(true)}
     </>
   );
@@ -1130,7 +1230,12 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     );
   };
 
-  const renderMcp = () => showMcp && renderMcpServers();
+  const renderMcp = () => (
+    <>
+      {canManageMcp && mcpOn && myMcpSection(true)}
+      {showMcpOverview && renderMcpServers()}
+    </>
+  );
 
   const renderPreferences = () => {
     return (
@@ -1196,8 +1301,6 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     preferences: t("sampler.nav.preferences"),
     profile: profiles?.find((p) => p.id === profileId)?.name ?? "",
     modelsList: t("hubModels.title"),
-    model: detail?.name ?? "",
-    mcpServer: overview?.find((s) => s.id === serverId)?.title ?? "",
   };
 
   //one group per family, like the settings sidebar
@@ -1221,7 +1324,69 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
   const shownPage = navItems.some((item) => item.page === sectionOf(page)) ? page : "home";
   const section = sectionOf(shownPage);
 
-  const handleBack = () => openPage(parentOf(shownPage) ?? "home");
+  //open sheets keep the back press for themselves
+  const sheetOpen =
+    pairingVisible ||
+    profileSheet !== null ||
+    qrMode !== null ||
+    selectedDeviceId !== null ||
+    modelsSheetVisible ||
+    mcpSheetVisible ||
+    folderPick !== null ||
+    detail !== null ||
+    selectedMcpServerId !== null ||
+    myMcpDetail !== null;
+
+  const handleBack = useCallback(() => openPage(parentOf(shownPage) ?? "home"), [shownPage]);
+
+  //android back pops nested subpages before leaving sampler
+  useEffect(() => {
+    if (!visible || isDesktop || drawerVisible || sheetOpen) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (parentOf(shownPage)) {
+        handleBack();
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [visible, isDesktop, drawerVisible, sheetOpen, shownPage, handleBack]);
+
+  const [prevDrawerVisible, setPrevDrawerVisible] = useState(drawerVisible);
+  if (drawerVisible !== prevDrawerVisible) {
+    setPrevDrawerVisible(drawerVisible);
+    if (drawerVisible) setDrawerScrolled(false);
+  }
+
+  useEffect(() => {
+    if (isDesktop) return;
+    if (drawerVisible) {
+      Keyboard.dismiss();
+      settleDrawer(samplerDrawerProgress, true);
+    } else {
+      settleDrawer(samplerDrawerProgress, false);
+    }
+  }, [drawerVisible, isDesktop]);
+
+  const drawerPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          gestureState.dx < -10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+        onPanResponderMove: (_, gestureState) => {
+          dragDrawer(samplerDrawerProgress, 1 + gestureState.dx / drawerWidth);
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          const open = releaseOpens(1 + gestureState.dx / drawerWidth, gestureState.vx);
+          settleDrawer(samplerDrawerProgress, open, gestureVelocity(gestureState.vx, drawerWidth));
+          if (!open) onCloseDrawer?.();
+        },
+        onPanResponderTerminate: () => {
+          settleDrawer(samplerDrawerProgress, true);
+        },
+      }),
+    [onCloseDrawer, drawerWidth],
+  );
 
   const renderPageContent = (shown: SubPage) => {
     switch (shown) {
@@ -1233,12 +1398,8 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
         return renderModels();
       case "modelsList":
         return modelsSection(true);
-      case "model":
-        return detail && <HubModelPage file={detail.file} onDeleted={() => openPage("modelsList")} />;
       case "mcp":
         return renderMcp();
-      case "mcpServer":
-        return renderMcpServer();
       case "performance":
         return renderPerformance();
       case "preferences":
@@ -1252,7 +1413,13 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     //focused field scrolls just above the keyboard
     <KeyboardAwareScrollView
       bottomOffset={Spacing.xl2}
-      contentContainerStyle={styles.scroll}
+      contentContainerStyle={[
+        styles.scroll,
+        {
+          paddingTop: contentTop,
+          paddingBottom: 40 + (isDesktop ? 0 : insets.bottom),
+        },
+      ]}
       showsVerticalScrollIndicator={false}
       scrollEventThrottle={16}
       onScroll={active ? (e) => setScrolled(e.nativeEvent.contentOffset.y > 10) : undefined}
@@ -1276,9 +1443,43 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     const paired = !!pairedHub && !hubStopped;
     if (paired && firstCheck) return null;
     //a browser cannot host, it leaves the screen once unpaired
-    if (!paired && !OperaHub.canHost()) return null;
+    if (!paired && isDesktop && !canHost) return null;
     if (paired && !online) {
       return renderStopped();
+    }
+    if (paired && !profile) {
+      return (
+        <View style={styles.welcome}>
+          <Text style={styles.welcomeText}>{status?.name ?? pairedHub.name}</Text>
+          <Text style={styles.welcomeHelp}>{t("settings.hub.noProfileHelp")}</Text>
+          <View style={styles.welcomeAction}>
+            <Group style={[styles.highlightGroup, styles.groupSpacingTight]}>
+              <ActionButton
+                icon={profilIcon}
+                label={t("settings.hub.chooseProfile")}
+                variant="highlight"
+                onPress={() => setProfileSheet("pick")}
+              />
+            </Group>
+            <Group>
+              <ActionButton icon={cancelIcon} label={t("settings.hub.unpair")} onPress={unpair} />
+            </Group>
+          </View>
+        </View>
+      );
+    }
+    if (!canHost) {
+      return (
+        <View style={styles.welcome}>
+          <Text style={styles.welcomeText}>{t("sampler.welcome")}</Text>
+          <Text style={styles.welcomeHelp}>{t("settings.hub.help")}</Text>
+          <View style={styles.welcomeAction}>
+            <Pressable style={pressStyle(styles.welcomePill, "surface")} onPress={() => setPairingVisible(true)}>
+              <Text style={styles.welcomePillText}>{t("sampler.linkHub")}</Text>
+            </Pressable>
+          </View>
+        </View>
+      );
     }
     return (
       <View style={styles.welcome}>
@@ -1299,59 +1500,290 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
   //the nav and pages need the hub up and a profile
   //a stopped hub may still answer for a moment
   const ready = !!pairedHub && !!profile && online && !hubStopped;
+  const { dockedWidth, resizeResponder } = useDockedWidth();
+
+  useEffect(() => {
+    onReadyChange?.(ready);
+  }, [ready, onReadyChange]);
+
+  //appears and slides in from left after the chat sidebar leaves
+  const navTranslateX = useMemo(
+    () =>
+      transitionProgress
+        ? transitionProgress.interpolate({
+            inputRange: [0, 0.5, 1],
+            outputRange: [-dockedWidth, -dockedWidth, 0],
+          })
+        : 0,
+    [transitionProgress, dockedWidth],
+  );
+  const navOpacity = useMemo(
+    () =>
+      transitionProgress
+        ? transitionProgress.interpolate({
+            inputRange: [0, 0.55, 1],
+            outputRange: [0, 0, 1],
+          })
+        : 1,
+    [transitionProgress],
+  );
+
+  const drawerTranslateX = samplerDrawerProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-drawerWidth, 0],
+  });
+
+  const dismissDrawer = () => {
+    settleDrawer(samplerDrawerProgress, false);
+    onCloseDrawer?.();
+  };
+
+  const mobileDrawer = (
+    <View style={[styles.drawerRoot, { pointerEvents: drawerVisible ? "auto" : "none" }]}>
+      <Animated.View style={[styles.drawerOverlay, { opacity: samplerDrawerProgress }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={dismissDrawer} />
+      </Animated.View>
+
+      <Animated.View
+        style={[styles.drawerContent, { width: drawerWidth }, { transform: [{ translateX: drawerTranslateX }] }]}
+        {...drawerPanResponder.panHandlers}
+      >
+        <View style={styles.drawerScrollContainer}>
+          <View style={[styles.fixedCloseWrapper, { top: 60 }]} pointerEvents="box-none">
+            <DrawerBackButton kind="close" onPress={dismissDrawer} scrolled={drawerScrolled} />
+          </View>
+
+          <ScrollView
+            onScroll={(e) => setDrawerScrolled(e.nativeEvent.contentOffset.y > 10)}
+            scrollEventThrottle={16}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingTop: 60, paddingBottom: 40 }}
+          >
+            <View style={styles.header}>
+              <View style={styles.headerSpacer} />
+              <Text style={styles.title} numberOfLines={1}>
+                {t("sampler.switch.sampler")}
+              </Text>
+              <View style={styles.headerSpacer} />
+            </View>
+
+            {onOpenChat && (
+              <Group style={styles.navGroup}>
+                <ActionButton
+                  icon={messageIcon}
+                  iconBadge
+                  label={t("sampler.switch.chat")}
+                  onPress={() => {
+                    dismissDrawer();
+                    onOpenChat();
+                  }}
+                />
+              </Group>
+            )}
+
+            {ready &&
+              navGroups.map((items, index) => (
+                <Group key={index} style={styles.navGroup}>
+                  {items.map((item) => (
+                    <ActionButton
+                      key={item.page}
+                      icon={item.icon}
+                      iconBadge
+                      label={pageTitles[item.page]}
+                      onPress={() => {
+                        openPage(item.page);
+                        dismissDrawer();
+                      }}
+                    />
+                  ))}
+                </Group>
+              ))}
+          </ScrollView>
+
+          <LinearGradient
+            colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
+            style={styles.screenGradientTop}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={[Colors.groupedBackgroundClear, Colors.groupedBackgroundFade, Colors.groupedBackground]}
+            style={styles.screenGradientBottom}
+            pointerEvents="none"
+          />
+        </View>
+      </Animated.View>
+    </View>
+  );
+
+  const selectedMcpServer = overview?.find((s) => s.id === selectedMcpServerId) ?? null;
+
+  //installed model detail sheet
+  const hubModelSheet = (
+    <DrawerSheet
+      visible={detail !== null}
+      onClose={() => setDetail(null)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      sheetStyle={[
+        styles.sheet,
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.desktopCard}
+    >
+      <SheetScrollView
+        contentContainerStyle={styles.sheetContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {detail && (
+          <HubModelPage
+            file={detail.file}
+            onDeleted={() => setDetail(null)}
+          />
+        )}
+      </SheetScrollView>
+    </DrawerSheet>
+  );
+
+  //mcp server overview detail sheet
+  const mcpServerSheet = (
+    <DrawerSheet
+      visible={selectedMcpServerId !== null && selectedMcpServer !== null}
+      onClose={() => setSelectedMcpServerId(null)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      sheetStyle={[
+        styles.sheet,
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.desktopCard}
+    >
+      <SheetScrollView
+        contentContainerStyle={styles.sheetContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {renderMcpServer()}
+      </SheetScrollView>
+    </DrawerSheet>
+  );
+
+  //personal mcp server detail sheet
+  const myMcpServerSheet = (
+    <DrawerSheet
+      visible={myMcpDetail !== null}
+      onClose={() => setMyMcpDetail(null)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      avoidKeyboard
+      sheetStyle={[
+        styles.sheet,
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.desktopCard}
+    >
+      <SheetKeyboardAwareScrollView
+        bottomOffset={Spacing.xl2}
+        contentContainerStyle={styles.sheetContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {myMcpDetail && (
+          <HubMcpServerPage
+            id={myMcpDetail.id}
+            onRemoved={() => setMyMcpDetail(null)}
+            onPickFolder={(start, done) => setFolderPick({ start, done })}
+          />
+        )}
+      </SheetKeyboardAwareScrollView>
+    </DrawerSheet>
+  );
 
   return (
-    <View style={styles.root}>
-      {ready && (
-        <View style={styles.nav}>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.navScroll}>
-            {navGroups.map((items, index) => (
-              <Group key={index} style={styles.navGroup}>
-                {items.map((item) => (
-                  <ActionButton
-                    key={item.page}
-                    icon={item.icon}
-                    iconBadge
-                    label={pageTitles[item.page]}
-                    style={[styles.navButton, section === item.page && styles.navButtonSelected]}
-                    onPress={() => openPage(item.page)}
-                  />
-                ))}
-              </Group>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+    <>
+      <View style={styles.root} pointerEvents={visible ? "box-none" : "none"}>
+        {isDesktop && ready && (
+          <Animated.View
+            style={[
+              styles.nav,
+              {
+                width: dockedWidth,
+                opacity: navOpacity,
+                transform: [{ translateX: navTranslateX }],
+              },
+            ]}
+          >
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.navScroll}>
+              {navGroups.map((items, index) => (
+                <Group key={index} style={styles.navGroup}>
+                  {items.map((item) => (
+                    <ActionButton
+                      key={item.page}
+                      icon={item.icon}
+                      iconBadge
+                      label={pageTitles[item.page]}
+                      style={[styles.navButton, section === item.page && styles.navButtonSelected]}
+                      onPress={() => openPage(item.page)}
+                    />
+                  ))}
+                </Group>
+              ))}
+            </ScrollView>
+            <View
+              //web accepts any css cursor
+              style={[styles.resizeHandle, { cursor: "col-resize" } as any]}
+              {...resizeResponder.panHandlers}
+            />
+          </Animated.View>
+        )}
 
-      <View style={styles.main}>
-        {loaded &&
-          (ready ? (
-            <View style={styles.stack} onLayout={(e) => setStackWidth(e.nativeEvent.layout.width)}>
-              {parentOf(shownPage) && (
-                <View style={styles.backWrapper} pointerEvents="box-none">
-                  <View style={styles.backColumn} pointerEvents="box-none">
-                    <DrawerBackButton kind="back" onPress={handleBack} scrolled={scrolled} pulseKey={shownPage} />
+        <Animated.View
+          style={[
+            styles.main,
+            mainTranslateX && { transform: [{ translateX: mainTranslateX }] },
+          ]}
+        >
+          {loaded &&
+            (ready ? (
+              <View style={styles.stack} onLayout={(e) => setStackWidth(e.nativeEvent.layout.width)}>
+                {parentOf(shownPage) && (
+                  <View style={[styles.backWrapper, { top: contentTop }]} pointerEvents="box-none">
+                    <View style={styles.backColumn} pointerEvents="box-none">
+                      <DrawerBackButton kind="back" onPress={handleBack} scrolled={scrolled} pulseKey={shownPage} />
+                    </View>
                   </View>
-                </View>
-              )}
-              {/* switching section swaps pages, only nested pages push */}
-              <PageStack
-                key={section}
-                page={shownPage}
-                visible
-                width={stackWidth || 1000}
-                parentOf={parentOf}
-                onBack={handleBack}
-                renderPage={renderScrollPage}
-              />
-            </View>
-          ) : (
-            renderWelcome()
-          ))}
-        <View style={styles.topBar} pointerEvents="box-none">
-          {topBar}
-        </View>
+                )}
+                {/* switching section swaps pages, only nested pages push */}
+                <PageStack
+                  key={section}
+                  page={shownPage}
+                  visible
+                  width={stackWidth || 1000}
+                  parentOf={parentOf}
+                  gestureEnabled={!sheetOpen}
+                  onBack={handleBack}
+                  renderPage={renderScrollPage}
+                />
+              </View>
+            ) : (
+              renderWelcome()
+            ))}
+        </Animated.View>
       </View>
+
+      {!isDesktop && mobileDrawer}
 
       <HubPairingSheet
         visible={pairingVisible}
@@ -1368,10 +1800,33 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
       <HubProfileSheet
         visible={profileSheet !== null}
         hub={pairedHub}
+        profile={selectedProfile ?? profile}
+        devices={devices}
+        thisDeviceId={thisDeviceId}
+        isSelf={!selectedProfile || selectedProfile.id === profile?.id}
+        canManage={isAdmin}
         changePassword={profileSheet === "password"}
         defaultName={Settings.getCached().name}
-        onClose={() => setProfileSheet(null)}
+        onClose={() => {
+          setProfileSheet(null);
+          setSelectedProfile(null);
+        }}
         onDone={handleProfileDone}
+        onSelectDevice={(device) => {
+          setProfileSheet(null);
+          setSelectedDeviceId(device.id);
+        }}
+        onToggleRole={(target) => {
+          const nextRole = target.role === "admin" ? "member" : "admin";
+          runAdmin(async () => {
+            await OperaHub.setProfileRole(pairedHub!, target.id, nextRole);
+            refresh();
+          });
+        }}
+        onRemoveProfile={(target) => {
+          setProfileSheet(null);
+          confirmRemoveProfile(target);
+        }}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />
@@ -1407,6 +1862,26 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />
+      {hubModelSheet}
+      <HubMcpSheet
+        visible={mcpSheetVisible}
+        onClose={() => setMcpSheetVisible(false)}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
+      {mcpServerSheet}
+      {myMcpServerSheet}
+      <HubFolderSheet
+        visible={folderPick !== null}
+        start={folderPick?.start}
+        onPick={(path) => {
+          folderPick?.done(path);
+          setFolderPick(null);
+        }}
+        onClose={() => setFolderPick(null)}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
       <NotificationModal
         visible={modal !== null}
         title={modal?.title}
@@ -1415,24 +1890,73 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
         loading={modal?.loading}
         onClose={closeModal}
       />
-    </View>
+    </>
   );
 }
 
 const makeStyles = (Colors: ThemeColors) =>
   StyleSheet.create({
     root: {
-      flex: 1,
+      ...StyleSheet.absoluteFill,
       flexDirection: "row",
+    },
+    drawerRoot: {
+      ...StyleSheet.absoluteFill,
+      zIndex: 1000,
+      elevation: 1000,
+    },
+    drawerOverlay: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: Colors.scrimDrawer,
+    },
+    drawerContent: {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      left: 0,
+      backgroundColor: Colors.groupedBackground,
+      paddingHorizontal: Spacing.lg2,
+      overflow: "hidden",
+    },
+    drawerScrollContainer: {
+      flex: 1,
+      position: "relative",
+    },
+    fixedCloseWrapper: {
+      position: "absolute",
+      right: 0,
+      zIndex: 100,
+    },
+    screenGradientTop: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 50,
+    },
+    screenGradientBottom: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 40,
     },
     //same column as the settings sidebar
     nav: {
-      width: NAV_WIDTH,
       backgroundColor: Colors.surface,
       borderRightWidth: 2,
       borderRightColor: Colors.border,
       paddingTop: isTauri ? 32 : 0,
       paddingHorizontal: Spacing.lg2,
+      zIndex: 10,
+    },
+    //sits over the border
+    resizeHandle: {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      right: 0,
+      width: 8,
     },
     navScroll: {
       paddingTop: Spacing.lg,
@@ -1451,12 +1975,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     main: {
       flex: 1,
-    },
-    topBar: {
-      position: "absolute",
-      top: isTauri ? 32 : 0,
-      left: 0,
-      right: 0,
     },
     //clips the pages sliding in and out
     stack: {
@@ -1595,9 +2113,6 @@ const makeStyles = (Colors: ThemeColors) =>
       flex: 1,
       marginRight: Spacing.lg2,
     },
-    sliderGroup: {
-      width: SLIDER_WIDTH,
-    },
     toggleGroupRowItem: {
       paddingHorizontal: Spacing.md,
       paddingVertical: Spacing.md,
@@ -1612,6 +2127,9 @@ const makeStyles = (Colors: ThemeColors) =>
       marginBottom: Spacing.xxl,
       borderRadius: Radius.xxl + Spacing.md,
       borderWidth: 0,
+    },
+    sliderGroup: {
+      width: SLIDER_WIDTH,
     },
     groupSpacingTight: {
       marginBottom: Spacing.lg2,
@@ -1635,13 +2153,18 @@ const makeStyles = (Colors: ThemeColors) =>
       fontSize: FontSizes.label,
     },
     profileTiles: {
+      gap: Spacing.md,
+    },
+    profileRow: {
       flexDirection: "row",
-      flexWrap: "wrap",
       gap: Spacing.md,
     },
     profileTile: {
-      width: PROFILE_TILE_WIDTH,
+      flex: 1,
       borderRadius: Radius.xl,
+    },
+    profileTilePlaceholder: {
+      flex: 1,
     },
     hostIcon: {
       width: 120,
@@ -1655,5 +2178,31 @@ const makeStyles = (Colors: ThemeColors) =>
       color: Colors.textPrimary,
       textAlign: "center",
       marginBottom: Spacing.md,
+    },
+    sheet: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: Colors.groupedBackground,
+      borderTopLeftRadius: Radius.huge2,
+      borderTopRightRadius: Radius.huge2,
+      paddingTop: Spacing.xxl,
+      overflow: "hidden",
+    },
+    sheetHandleContainer: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      alignItems: "center",
+      paddingVertical: Spacing.md,
+    },
+    desktopCard: {
+      width: 560,
+    },
+    sheetContent: {
+      paddingHorizontal: Spacing.lg2,
+      paddingBottom: Spacing.lg,
     },
   });

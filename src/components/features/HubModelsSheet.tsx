@@ -40,7 +40,7 @@ import PageStack from "./PageStack";
 const searchIcon = require("../../../assets/icons/search.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 
-const DESKTOP_CARD_WIDTH = 560;
+const DESKTOP_CARD_WIDTH = 840;
 const OTHER_FAMILY = "other";
 
 type Page = "browse" | "search" | "model";
@@ -271,9 +271,13 @@ export default function HubModelsSheet({
             <Text style={[styles.settingLabel, styles.familyTitle]}>
               {family.id === OTHER_FAMILY ? t("settings.litert.familyOther") : family.id}
             </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
-              {family.models.map(renderCard)}
-            </ScrollView>
+            {isDesktop ? (
+              <View style={styles.carouselWrap}>{family.models.map(renderCard)}</View>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+                {family.models.map(renderCard)}
+              </ScrollView>
+            )}
           </View>
         ))}
       </View>
@@ -373,9 +377,13 @@ export default function HubModelsSheet({
           <View style={[styles.contentCard, styles.families]}>
             <View>
               <Text style={[styles.settingLabel, styles.familyTitle]}>{t("settings.litert.otherModels")}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
-                {others.map(renderCard)}
-              </ScrollView>
+              {isDesktop ? (
+                <View style={styles.carouselWrap}>{others.map(renderCard)}</View>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+                  {others.map(renderCard)}
+                </ScrollView>
+              )}
             </View>
           </View>
         )}
@@ -583,6 +591,12 @@ const makeStyles = (Colors: ThemeColors) =>
       marginBottom: Spacing.md,
     },
     carousel: {
+      gap: Spacing.lg2,
+      paddingHorizontal: Spacing.md,
+    },
+    carouselWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
       gap: Spacing.lg2,
       paddingHorizontal: Spacing.md,
     },

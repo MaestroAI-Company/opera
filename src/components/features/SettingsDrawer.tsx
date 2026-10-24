@@ -125,11 +125,7 @@ import {
 } from "../../services/cloud/registry";
 import { CloudSync } from "../../services/CloudSyncService";
 import {
-  HostStatus,
-  HubDevice,
-  hubErrorCode,
   HubProfile,
-  HubSettings,
   HubStatus,
   OperaHub,
   PairedHub,
@@ -164,14 +160,6 @@ import DrawerSheet, {
   SheetKeyboardAwareScrollView,
   SheetScrollView,
 } from "./DrawerSheet";
-import HubPairingSheet from "./HubPairingSheet";
-import HubProfileSheet from "./HubProfileSheet";
-import HubDeviceSheet from "./HubDeviceSheet";
-import HubModelsSection, { HubModelPage } from "./HubModelsSection";
-import HubModelsSheet from "./HubModelsSheet";
-import HubMcpSection, { HubMcpServerPage } from "./HubMcpSection";
-import HubMcpSheet, { HubFolderSheet } from "./HubMcpSheet";
-import HubQrSheet from "./HubQrSheet";
 import {
   CTX_SIZE_OPTIONS,
   KEEP_ALIVE_OPTIONS,
@@ -321,24 +309,16 @@ export type SubPage =
   | "service"
   | "beta"
   | "litert"
-  | "litertmodel"
   | "ollama"
-  | "ollamaserver"
   | "openai"
-  | "openaiserver"
   | "confidentiality"
   | "reports"
   | "tools"
   | "widgets"
   | "profile"
   | "cloud"
-  | "operahub"
   | "hubprovider"
   | "hubserver"
-  | "hubmodels"
-  | "hubmodel"
-  | "hubmcp"
-  | "hubmcpserver"
   | "mobileactions"
   | "mcpservers"
   | "mcpserver"
@@ -356,23 +336,15 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   service: "main",
   beta: "service",
   litert: "service",
-  litertmodel: "litert",
   ollama: "service",
-  ollamaserver: "ollama",
   openai: "service",
-  openaiserver: "openai",
   confidentiality: "main",
   reports: "main",
   tools: "main",
   profile: "main",
   cloud: "main",
-  operahub: "main",
   hubprovider: "service",
   hubserver: "hubprovider",
-  hubmodels: "operahub",
-  hubmodel: "hubmodels",
-  hubmcp: "operahub",
-  hubmcpserver: "hubmcp",
   sociallinks: "main",
   widgets: "tools",
   mobileactions: "tools",
@@ -393,22 +365,13 @@ const sectionOf = (page: SubPage): SubPage => {
 
 //desktop always shows a page next to the nav
 const DESKTOP_ENTRY_PAGE: SubPage = "general";
-//a device unseen this long is flagged, never removed
-const HUB_INACTIVE_AFTER_S = 30 * 24 * 60 * 60;
-const HUB_USAGE_POLL_MS = 5000;
-//hub device images by kind
-const HUB_DEVICE_ICONS: Record<string, ImageSourcePropType> = {
-  phone: require("../../../assets/icons/phone.png"),
-  desktop: require("../../../assets/icons/laptop.png"),
-  web: require("../../../assets/icons/website.png"),
-};
 //settings rows stay readable on wide screens
 const DESKTOP_WINDOW_MAX_WIDTH = 960;
 //slider beside its text on desktop
 const SLIDER_WIDTH = 320;
 
 type LitertPage = "browse" | "search" | "model";
-type CloudModelsPage = "list" | "model";
+type CloudModelsPage = "server" | "list" | "model";
 
 const MODEL_PAGE_SIZE = 50;
 //cloud page previews before the full sheet
@@ -566,9 +529,12 @@ const ModelToggleList = memo(function ModelToggleList({
   onCapabilitiesChange,
   onShowAll,
   onOpenModel,
+  onOpenSearch,
   showAll = false,
   autoFocusSearch = false,
   onSearchFocus,
+  hideSearch = false,
+  searchQuery,
 }: {
   models: string[];
   loading: boolean;
@@ -583,9 +549,14 @@ const ModelToggleList = memo(function ModelToggleList({
   onShowAll?: () => void;
   //rows open a model page instead of expanding
   onOpenModel?: (model: string) => void;
+  //search opens full models sheet
+  onOpenSearch?: () => void;
   showAll?: boolean;
   autoFocusSearch?: boolean;
   onSearchFocus?: () => void;
+  //search input moved outside the card
+  hideSearch?: boolean;
+  searchQuery?: string;
 }) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
@@ -594,7 +565,8 @@ const ModelToggleList = memo(function ModelToggleList({
     : onShowAll
       ? MODEL_PREVIEW_SIZE
       : MODEL_PAGE_SIZE;
-  const [search, setSearch] = useState("");
+  const [localSearch, setLocalSearch] = useState("");
+  const search = searchQuery !== undefined ? searchQuery : localSearch;
   const [limit, setLimit] = useState(pageSize);
 
   const disabledSet = useMemo(() => new Set(disabled), [disabled]);
@@ -654,21 +626,31 @@ const ModelToggleList = memo(function ModelToggleList({
           </Text>
         ) : (
           <>
-            <Group style={styles.groupSpacingTight}>
-              <TextInputField
-                icon={searchIcon}
-                placeholder={t("settings.ollama.searchModels")}
-                value={search}
-                onChangeText={(v) => {
-                  setSearch(v);
-                  setLimit(pageSize);
-                }}
-                autoFocus={autoFocusSearch}
-                onFocus={onSearchFocus}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </Group>
+            {!hideSearch && (
+              <Group style={styles.groupSpacingTight}>
+                {onOpenSearch ? (
+                  <ActionButton
+                    icon={searchIcon}
+                    label={t("settings.ollama.searchModels")}
+                    onPress={onOpenSearch}
+                  />
+                ) : (
+                  <TextInputField
+                    icon={searchIcon}
+                    placeholder={t("settings.ollama.searchModels")}
+                    value={search}
+                    onChangeText={(v) => {
+                      setLocalSearch(v);
+                      setLimit(pageSize);
+                    }}
+                    autoFocus={autoFocusSearch}
+                    onFocus={onSearchFocus}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                )}
+              </Group>
+            )}
             <Group style={{ marginBottom: Spacing.xxl }}>
               <ActionButton
                 icon={activateIcon}
@@ -873,31 +855,20 @@ export default function SettingsDrawer({
   const [lastSyncSize, setLastSyncSize] = useState<number | null>(null);
 
   const [addModelSheetVisible, setAddModelSheetVisible] = useState(false);
-  const [hubModelsSheetVisible, setHubModelsSheetVisible] = useState(false);
-  const [hubMcpSheetVisible, setHubMcpSheetVisible] = useState(false);
-  const [selectedHubMcp, setSelectedHubMcp] = useState<{
-    id: string;
-    title: string;
-  } | null>(null);
-  //folder field waiting for a pick
-  const [folderPick, setFolderPick] = useState<{
-    start?: string;
-    done: (path: string) => void;
-  } | null>(null);
-  const [selectedHubModel, setSelectedHubModel] = useState<{
-    file: string;
-    name: string;
-  } | null>(null);
   const [ollamaAddVisible, setOllamaAddVisible] = useState(false);
   const [openaiAddVisible, setOpenAIAddVisible] = useState(false);
-  const [openaiModelsVisible, setOpenAIModelsVisible] = useState(false);
   const [openaiModelsPage, setOpenAIModelsPage] =
-    useState<CloudModelsPage>("list");
+    useState<CloudModelsPage>("server");
+  //model steps back to the page it came from
+  const [openaiModelFrom, setOpenAIModelFrom] = useState<"server" | "list">(
+    "server",
+  );
   const [openaiModelDetail, setOpenAIModelDetail] = useState<string | null>(
     null,
   );
   const [openaiModelsScrolled, setOpenAIModelsScrolled] = useState(false);
   const [openaiModelsWidth, setOpenAIModelsWidth] = useState(320);
+  const [openaiSearchQuery, setOpenAISearchQuery] = useState("");
   //model page search hands focus to the list
   const [openaiModelsSearchHandoff, setOpenAIModelsSearchHandoff] =
     useState(false);
@@ -920,7 +891,7 @@ export default function SettingsDrawer({
     //undefined while the card loads
     description?: string | null;
   } | null>(null);
-  //installed model shown on its own subpage
+  //installed model shown in detail sheet
   const [installedModel, setInstalledModel] = useState<{
     id: string;
     description?: string | null;
@@ -932,106 +903,45 @@ export default function SettingsDrawer({
 
   const hubSupported = OperaHub.isSupported();
   const [pairedHub, setPairedHub] = useState<PairedHub | null>(null);
-  const [hubState, setHubState] = useState<
-    "checking" | "online" | "offline" | "revoked" | "outdated"
-  >("checking");
   const [hubStatus, setHubStatus] = useState<HubStatus | null>(null);
-  const [hubDevices, setHubDevices] = useState<HubDevice[] | null>(null);
-  const [hubPairingVisible, setHubPairingVisible] = useState(false);
-  const [hubQrVisible, setHubQrVisible] = useState(false);
-  //link adds one of my devices, invite anyone
-  const [hubQrMode, setHubQrMode] = useState<"invite" | "link">("invite");
   //null until this device unlocks a profile
   const [hubProfile, setHubProfile] = useState<HubProfile | null>(null);
-  const [hubProfileSheet, setHubProfileSheet] = useState<"pick" | "password" | null>(null);
-  //the device whose sheet is open
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
-  //desktop only, the hub on this computer
-  const [hostStatus, setHostStatus] = useState<HostStatus | null>(null);
-  const [hostBusy, setHostBusy] = useState(false);
-  const [hostError, setHostError] = useState<string | null>(null);
-  const [thisDeviceId, setThisDeviceId] = useState<string | null>(null);
   const [syncPrefs, setSyncPrefs] = useState<SyncPrefs | null>(null);
   //another sync account was picked
   const [hubSyncPaused, setHubSyncPaused] = useState(false);
-  //pairing started from the account list
-  const [hubPickedForSync, setHubPickedForSync] = useState(false);
   //sampler syncs while the cloud keeps a daily backup
   const [cloudBackupMode, setCloudBackupMode] = useState(false);
   //backup turned on, its cloud not picked yet
   const [cloudBackupPicking, setCloudBackupPicking] = useState(false);
-  //null without the admin scope
-  const [hubSettings, setHubSettings] = useState<HubSettings | null>(null);
 
   const refreshHub = useCallback(async () => {
     const hub = await OperaHub.getPairedHub();
     setPairedHub(hub);
     setHubProfile(await OperaHub.getProfile());
-    if (OperaHub.canHost()) {
-      setHostStatus(await OperaHub.hostStatus().catch(() => null));
-    }
     if (!hub) return;
     setHubSyncPaused(await HubSync.isPaused());
-    OperaHub.deviceId()
-      .then(setThisDeviceId)
-      .catch(() => setThisDeviceId(null));
-    setHubState("checking");
-    try {
-      setHubStatus(await OperaHub.status(hub));
-      setHubState("online");
-      //a role changed by an admin shows at once
-      const liveProfile = await OperaHub.refreshProfile(hub).catch(() => null);
-      if (liveProfile) setHubProfile(liveProfile);
-      setHubDevices(await OperaHub.devices(hub).catch(() => null));
-      setHubSettings(await OperaHub.hubSettings(hub).catch(() => null));
-    } catch (e) {
-      const code = hubErrorCode(e);
-      setHubState(
-        code === "Unauthorized" ? "revoked" : code === "Outdated" ? "outdated" : "offline",
-      );
-    }
+    OperaHub.status(hub).then(setHubStatus).catch(() => {});
   }, []);
 
-  //usage stays live while the sampler page shows
-  useEffect(() => {
-    if (activeSubPage !== "operahub" || !pairedHub || hubState !== "online") return;
-    const timer = setInterval(() => {
-      OperaHub.status(pairedHub)
-        .then(setHubStatus)
-        .catch(() => {});
-    }, HUB_USAGE_POLL_MS);
-    return () => clearInterval(timer);
-  }, [activeSubPage, pairedHub, hubState]);
-
-  //a pairing link opens its confirmation
-  const [prevHubPairLink, setPrevHubPairLink] = useState(hubPairLink);
-  if (hubPairLink !== prevHubPairLink) {
-    setPrevHubPairLink(hubPairLink);
-    if (hubPairLink) setHubPairingVisible(true);
-  }
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the paired hub
-    if (visible && hubPairLink) refreshHub();
-  }, [visible, hubPairLink, refreshHub]);
+    if (visible && OperaHub.isSupported()) refreshHub();
+  }, [visible, refreshHub]);
 
   //open sheets keep the back press for themselves
   const sheetOpen =
-    hubPairingVisible ||
-    hubQrVisible ||
-    hubProfileSheet !== null ||
-    selectedDeviceId !== null ||
     profileEditVisible ||
     addModelSheetVisible ||
-    hubModelsSheetVisible ||
-    hubMcpSheetVisible ||
-    folderPick !== null ||
     ollamaAddVisible ||
+    ollamaDetailIndex !== null ||
     openaiAddVisible ||
-    openaiModelsVisible ||
+    openaiDetailIndex !== null ||
     mcpAddVisible ||
     litertDownloadVisible ||
     cloudSetupVisible ||
-    selectedLocalModel !== null;
+    selectedLocalModel !== null ||
+    installedModel !== null;
+
 
   const [hfModelInput, setHfModelInput] = useState("");
   //entry fields hand their focus to the search page
@@ -1187,7 +1097,7 @@ export default function SettingsDrawer({
   const cloudStorageOptions = [
     { id: "none", label: t("settings.cloud.none") },
     ...CLOUD_PROVIDERS.map((def) => ({ id: def.id, label: def.label })),
-    ...(hubSupported
+    ...(hubSupported && pairedHub
       ? [{ id: HUB_SYNC_ID, label: t("settings.nav.hub.title") }]
       : []),
   ];
@@ -1665,7 +1575,7 @@ export default function SettingsDrawer({
       activeSubPage !== "tools" &&
       activeSubPage !== "widgets" &&
       activeSubPage !== "mobileactions" &&
-      activeSubPage !== "mcpserver"
+      mcpDetailId === null
     )
       return;
     const states: Record<string, boolean> = {};
@@ -1685,7 +1595,7 @@ export default function SettingsDrawer({
       );
     }
     setPluginStates(states);
-  }, [activeSubPage, mcpTick]);
+  }, [activeSubPage, mcpTick, mcpDetailId]);
 
   //sync list when connections change
   useEffect(() => {
@@ -1701,7 +1611,7 @@ export default function SettingsDrawer({
 
   //read from secret store on mount
   useEffect(() => {
-    if (activeSubPage !== "mcpservers" && activeSubPage !== "mcpserver") return;
+    if (activeSubPage !== "mcpservers" && mcpDetailId === null) return;
     const servers = McpService.getServers();
     //avoid flash of missing headers
     Promise.all(
@@ -1715,7 +1625,7 @@ export default function SettingsDrawer({
         setMcpHeaderValues(Object.fromEntries(entries));
       })
       .catch(() => setMcpServers([...servers]));
-  }, [activeSubPage]);
+  }, [activeSubPage, mcpDetailId]);
 
   //local spinner while connecting
   const connectMcpServer = async (id: string) => {
@@ -2105,7 +2015,6 @@ export default function SettingsDrawer({
     );
     setOllamaModels([]);
     loadOllamaModels(server?.url ?? "");
-    setActiveSubPage("ollamaserver");
   };
 
   const openHubServer = (server: OllamaServer) => {
@@ -2177,7 +2086,6 @@ export default function SettingsDrawer({
             setAlertModalVisible(false);
             saveOllamaServers(ollamaServers.filter((_, i) => i !== index));
             setOllamaDetailIndex(null);
-            setActiveSubPage("ollama");
           },
         },
       ],
@@ -2190,7 +2098,6 @@ export default function SettingsDrawer({
     if (!url) {
       saveOllamaServers(ollamaServers.filter((_, i) => i !== index));
       setOllamaDetailIndex(null);
-      setActiveSubPage("ollama");
       return;
     }
     checkServers();
@@ -2253,7 +2160,9 @@ export default function SettingsDrawer({
     if (server?.id) getOpenAIApiKeyById(server.id).then(setOpenAIKeyDraft);
     setOpenAIModels([]);
     loadOpenAIModels(server?.url ?? "");
-    setActiveSubPage("openaiserver");
+    setOpenAISearchQuery("");
+    setOpenAIModelsSearchHandoff(false);
+    showOpenAIModelsPage("server");
   };
 
   //empty link drops the server
@@ -2264,7 +2173,6 @@ export default function SettingsDrawer({
       if (server?.id) setOpenAIApiKey(server.id, "");
       saveOpenAIServers(openaiServers.filter((_, i) => i !== index));
       setOpenAIDetailIndex(null);
-      setActiveSubPage("openai");
       return;
     }
     checkServers();
@@ -2311,7 +2219,6 @@ export default function SettingsDrawer({
             if (server.id) setOpenAIApiKey(server.id, "");
             saveOpenAIServers(openaiServers.filter((_, i) => i !== index));
             setOpenAIDetailIndex(null);
-            setActiveSubPage("openai");
           },
         },
       ],
@@ -2402,7 +2309,6 @@ export default function SettingsDrawer({
             }
             refreshLitertModels();
             setInstalledModel(null);
-            setActiveSubPage("litert");
           },
         },
         {
@@ -2497,7 +2403,6 @@ export default function SettingsDrawer({
 
   const openInstalledLitert = (repoId: string) => {
     setInstalledModel({ id: repoId });
-    setActiveSubPage("litertmodel");
     fetchModelDescription(repoId).then((description) =>
       setInstalledModel((prev) =>
         prev?.id === repoId ? { ...prev, description } : prev,
@@ -2754,9 +2659,6 @@ export default function SettingsDrawer({
     if (v === HUB_SYNC_ID) {
       if (pairedHub) {
         await selectHubSync();
-      } else {
-        setHubPickedForSync(true);
-        setHubPairingVisible(true);
       }
       return;
     }
@@ -2840,126 +2742,12 @@ export default function SettingsDrawer({
     );
   };
 
-  //a paired device still needs its profile
-  const handleHubPaired = () => {
-    setHubPairingVisible(false);
-    onHubPairLinkHandled?.();
-    refreshHub();
-    setHubProfileSheet("pick");
-  };
-
-  const handleHubProfileDone = (profile: HubProfile) => {
-    setHubProfileSheet(null);
-    setHubProfile(profile);
-    refreshHub();
-    if (!enabledProviders.includes(HUB_PROVIDER_ID)) {
-      setProviderEnabled(HUB_PROVIDER_ID, true);
-    }
-    if (hubPickedForSync) {
-      setHubPickedForSync(false);
-      selectHubSync();
-    }
-    HubSync.joinedProfile().catch((e) => console.warn("[HubSync] first sync failed:", e));
-  };
-
-  const openHubQr = (mode: "invite" | "link") => {
-    setHubQrMode(mode);
-    setHubQrVisible(true);
-  };
-
-  const pairWithThisComputer = async () => {
-    try {
-      await OperaHub.pairWithThisComputer();
-      handleHubPaired();
-    } catch (e) {
-      setHostError(t(`hubPairing.error.${hubErrorCode(e)}`));
-    }
-  };
-
-  const joinThisComputerHub = async () => {
-    setHostBusy(true);
-    setHostError(null);
-    await pairWithThisComputer();
-    setHostBusy(false);
-  };
-
-  const setHosting = async (enabled: boolean) => {
-    setHostBusy(true);
-    setHostError(null);
-    try {
-      await OperaHub.setHosting(enabled);
-      //this computer joins its own hub
-      if (enabled && !pairedHub) await pairWithThisComputer();
-    } catch (e) {
-      console.warn("[OperaHub] hosting failed:", e);
-      setHostError(t("settings.hub.hostFailed"));
-    } finally {
-      setHostBusy(false);
-      refreshHub();
-    }
-  };
-
-  const installHubUpdate = async (version: string) => {
-    if (!pairedHub) return;
-    try {
-      await OperaHub.updateHub(pairedHub, version);
-    } catch (e) {
-      showAlert(
-        t("hubUpdate.title"),
-        t("hubUpdate.failed", {
-          error: e instanceof Error ? e.message : String(e),
-        }),
-      );
-    }
-  };
-
   const setSyncPref = async (key: keyof SyncPrefs, enabled: boolean) => {
     setSyncPrefs(await SyncPrefsStore.set(key, enabled));
     //changes made while off go up now
     if (!enabled) return;
     HubSync.request(0);
     CloudSync.requestAutoSync(0);
-  };
-
-  const changeHubSettings = async (patch: Partial<HubSettings>) => {
-    if (!pairedHub || !hubSettings) return;
-    const wanted = { ...hubSettings, ...patch };
-    setHubSettings(wanted);
-    try {
-      setHubSettings(await OperaHub.setHubSettings(pairedHub, wanted));
-    } catch (e) {
-      console.warn("[OperaHub] hub settings not saved:", e);
-      setHubSettings(hubSettings);
-    }
-  };
-
-  const handleUnpairHub = () => {
-    if (!pairedHub) return;
-    showAlert(
-      t("settings.hub.unpairTitle"),
-      t("settings.hub.unpairMessage", { name: pairedHub.name }),
-      [
-        {
-          text: t("settings.hub.unpair"),
-          style: "danger",
-          onPress: async () => {
-            setAlertModalVisible(false);
-            await OperaHub.unpair(pairedHub);
-            await HubSync.forgetHub();
-            setHubSyncPaused(false);
-            setPairedHub(null);
-            setHubProfile(null);
-            setHubStatus(null);
-            setHubDevices(null);
-          },
-        },
-        {
-          text: t("common.cancel"),
-          onPress: () => setAlertModalVisible(false),
-          style: "secondary",
-        },
-      ],
-    );
   };
 
   const handleCreateSyncPin = () => {
@@ -3249,7 +3037,12 @@ export default function SettingsDrawer({
       }
     } else {
       //reset once the close settles
-      const reset = () => setActiveSubPage("main");
+      const reset = () => {
+        setActiveSubPage("main");
+        setInstalledModel(null);
+        setOllamaDetailIndex(null);
+        setOpenAIDetailIndex(null);
+      };
       if (isDesktop) {
         settleLayoutDrawer(largeScreenAnim, false, () => {
           reset();
@@ -3296,7 +3089,6 @@ export default function SettingsDrawer({
         { page: "profile", icon: profilIcon, label: name || t("settings.nav.profile.title") },
         { page: "cloud", icon: cloudIcon, label: t("settings.nav.cloud.title") },
         { page: "maestro", icon: operaIcon, label: t("settings.nav.maestro.title") },
-        { page: "operahub", icon: samplerIcon, label: t("settings.nav.hub.title"), show: hubSupported },
       ],
       [
         { page: "general", icon: generalIcon, label: t("settings.nav.general.title") },
@@ -3332,7 +3124,6 @@ export default function SettingsDrawer({
                   ]}
                   onPress={() => {
                     setActiveSubPage(item.page as SubPage);
-                    if (item.page === "operahub") refreshHub();
                   }}
                 />
               ))}
@@ -3421,7 +3212,7 @@ export default function SettingsDrawer({
         </Pressable>
 
         <Pressable
-          style={navItemStyle("maestro", !hubSupported)}
+          style={navItemStyle("maestro", true)}
           onPress={() => setActiveSubPage("maestro")}
         >
           <View style={styles.menuIconWrap}>
@@ -3442,32 +3233,6 @@ export default function SettingsDrawer({
             </Text>
           </View>
         </Pressable>
-
-        {hubSupported && (
-          <Pressable
-            style={navItemStyle("operahub", true)}
-            onPress={() => {
-              setActiveSubPage("operahub");
-              refreshHub();
-            }}
-          >
-            <View style={styles.menuIconWrap}>
-              <Image
-                source={samplerIcon}
-                style={styles.menuIcon}
-                tintColor={Colors.textOnPrimary}
-              />
-            </View>
-            <View style={styles.navTextContainer}>
-              <Text style={styles.navTitle}>
-                {t("settings.nav.hub.title")}
-              </Text>
-              <Text style={styles.navSubtitle}>
-                {t("settings.nav.hub.subtitle")}
-              </Text>
-            </View>
-          </Pressable>
-        )}
       </Group>
 
       <Group style={[styles.groupSpacing, styles.mainPageGroup]}>
@@ -4344,13 +4109,6 @@ export default function SettingsDrawer({
     );
   };
 
-  //this computer runs the hub it is paired with
-  const hostsPairedHub =
-    OperaHub.canHost() &&
-    !!hostStatus &&
-    !!pairedHub &&
-    pairedHub.id === hostStatus.id;
-
   //one toggle row of the hub page
   const renderHubToggle = (
     label: string,
@@ -4373,337 +4131,6 @@ export default function SettingsDrawer({
       </View>
     </View>
   );
-
-  //the profile role decides, the hub checks it again
-  const isHubAdmin = () => hubProfile?.role === "admin";
-
-  const renderOperaHubSubPage = () => {
-    const hubIcon = (
-      <Image
-        source={HUB_DEVICE_ICONS.desktop}
-        style={styles.hubPageIcon}
-        tintColor={Colors.textPrimary}
-      />
-    );
-    if (!pairedHub) {
-      return (
-        <View style={styles.subPageContainer}>
-          {renderSubPageHeader(t("settings.nav.hub.title"))}
-
-          {/* pairing card */}
-          <View style={styles.contentCard}>
-            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <Text style={styles.settingLabel}>{t("settings.hub.title")}</Text>
-              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-                {hostError ??
-                  (OperaHub.canHost()
-                    ? t("settings.hub.helpDesktop")
-                    : t("settings.hub.help"))}
-              </Text>
-              {OperaHub.canHost() ? (
-                //pair with a hub or become one
-                <Group>
-                  <ActionButton
-                    icon={addIcon}
-                    label={t("settings.hub.pair")}
-                    disabled={hostBusy}
-                    onPress={() => setHubPairingVisible(true)}
-                  />
-                  {hostStatus?.running ? (
-                    <ActionButton
-                      icon={HUB_DEVICE_ICONS.desktop}
-                      label={t("settings.hub.useThisComputer")}
-                      disabled={hostBusy}
-                      onPress={joinThisComputerHub}
-                    />
-                  ) : (
-                    <ActionButton
-                      icon={HUB_DEVICE_ICONS.desktop}
-                      label={t("settings.hub.host")}
-                      disabled={hostBusy}
-                      onPress={() => setHosting(true)}
-                    />
-                  )}
-                </Group>
-              ) : (
-                <Group style={styles.highlightGroup}>
-                  <ActionButton
-                    icon={addIcon}
-                    label={t("settings.hub.pair")}
-                    variant="highlight"
-                    onPress={() => setHubPairingVisible(true)}
-                  />
-                </Group>
-              )}
-            </View>
-          </View>
-        </View>
-      );
-    }
-
-    const connection = {
-      checking: t("settings.hub.checking"),
-      offline: t("settings.hub.offline"),
-      revoked: t("settings.hub.offline"),
-      outdated: t("settings.hub.outdated"),
-      online: hubStatus?.direct
-        ? t("settings.hub.direct")
-        : t("settings.hub.relay"),
-    }[hubState];
-    const hubRows = [
-      {
-        label: t("settings.hub.name"),
-        value: hubStatus?.name ?? pairedHub.name,
-      },
-      { label: t("settings.hub.connection"), value: connection },
-      ...(hubStatus
-        ? [{ label: t("settings.hub.version"), value: hubStatus.version }]
-        : []),
-      //the hub with llama.cpp and its mcp servers
-      ...(hubStatus?.memory != null
-        ? [
-            {
-              label: t("settings.hub.cpu"),
-              value: t("hubMcp.cpuValue", { value: Math.round(hubStatus.cpu ?? 0) }),
-            },
-            {
-              label: t("settings.hub.memory"),
-              value: formatBytes(hubStatus.memory),
-            },
-          ]
-        : []),
-      ...(hubStatus?.update
-        ? [
-            {
-              label: t("settings.hub.update"),
-              value: t("settings.hub.updateAvailable", {
-                version: hubStatus.update,
-              }),
-            },
-          ]
-        : []),
-    ];
-
-    const isAdmin = isHubAdmin();
-    return (
-      <View style={styles.subPageContainer}>
-        {renderSubPageHeader(hubStatus?.name ?? pairedHub.name)}
-        {hubIcon}
-
-        {/* a paired device picks its profile first */}
-        {hubState === "online" && !hubProfile && (
-          <View style={styles.contentCard}>
-            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <Text style={styles.settingLabel}>{t("settings.hub.noProfile")}</Text>
-              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-                {t("settings.hub.noProfileHelp")}
-              </Text>
-              <Group style={styles.highlightGroup}>
-                <ActionButton
-                  icon={hyperlinkIcon}
-                  label={t("settings.hub.chooseProfile")}
-                  variant="highlight"
-                  onPress={() => setHubProfileSheet("pick")}
-                />
-              </Group>
-            </View>
-          </View>
-        )}
-
-        {/* hub models for admins, own mcp servers for members */}
-        {hubState === "online" &&
-          !!hubProfile &&
-          ((isAdmin && OperaHub.canManageModels()) || OperaHub.canManageMcp()) && (
-            <Group style={styles.groupSpacing}>
-              {isAdmin &&
-                OperaHub.canManageModels() &&
-                renderToolsNavRow(
-                  "hubmodels",
-                  t("hubModels.pageTitle"),
-                  t("hubModels.navHelp"),
-                )}
-              {OperaHub.canManageMcp() &&
-                renderToolsNavRow(
-                  "hubmcp",
-                  t("hubMcp.pageTitle"),
-                  t("hubMcp.navHelp"),
-                )}
-            </Group>
-          )}
-
-        {/* the profile sealing this device's data */}
-        {hubProfile && (
-          <View style={styles.contentCard}>
-            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <Text style={styles.settingLabel}>{t("settings.hub.profile")}</Text>
-              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-                {t("settings.hub.profileHelp")}
-              </Text>
-              <Group style={[styles.infoGroup, styles.groupSpacingTight]}>
-                {[
-                  { label: t("settings.hub.name"), value: hubProfile.name },
-                  {
-                    label: t("settings.hub.role"),
-                    value:
-                      hubProfile.role === "admin"
-                        ? t("settings.hub.roleAdmin")
-                        : t("settings.hub.roleMember"),
-                  },
-                ].map((row) => (
-                  <ActionButton
-                    key={row.label}
-                    label={row.label}
-                    rightElement={
-                      <Text style={styles.infoValue} numberOfLines={1}>
-                        {row.value}
-                      </Text>
-                    }
-                  />
-                ))}
-              </Group>
-              <Group>
-                <ActionButton
-                  icon={keyIcon}
-                  label={t("settings.hub.changePassword")}
-                  onPress={() => setHubProfileSheet("password")}
-                />
-              </Group>
-            </View>
-          </View>
-        )}
-
-        {/* connected devices card */}
-        {hubState === "online" && (
-          <View style={styles.contentCard}>
-            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <Text
-                style={[styles.settingLabel, { marginBottom: Spacing.md }]}
-              >
-                {t("settings.hub.devices")}
-              </Text>
-              {hubDevices ? (
-                //admins open each device, so the rows get an outline
-                <View style={!!hubProfile && { marginBottom: Spacing.md }}>
-                  {renderCardGrid(
-                    hubDevices.map((device) => ({
-                      key: device.id,
-                      icon: HUB_DEVICE_ICONS[device.kind] ?? operaIcon,
-                      title: device.name,
-                      status:
-                        device.id === thisDeviceId
-                          ? t("settings.hub.thisDevice")
-                          : device.lastSeen
-                            ? Date.now() / 1000 - device.lastSeen >
-                              HUB_INACTIVE_AFTER_S
-                              ? t("settings.hub.inactive")
-                              : new Date(
-                                  device.lastSeen * 1000,
-                                ).toLocaleDateString()
-                            : "",
-                      disabled: !(isAdmin || device.id === thisDeviceId),
-                      onPress: () => setSelectedDeviceId(device.id),
-                    })),
-                  )}
-                </View>
-              ) : (
-                <Text
-                  style={[styles.helpText, !!hubProfile && { marginBottom: Spacing.md }]}
-                >
-                  {t("settings.hub.devicesEmpty")}
-                </Text>
-              )}
-              {hubProfile && (
-                <Group>
-                  <ActionButton
-                    icon={addIcon}
-                    label={t("settings.hub.addMyDevice")}
-                    onPress={() => openHubQr("link")}
-                  />
-                  {isAdmin && (
-                    <ActionButton
-                      icon={profilIcon}
-                      label={t("settings.hub.pairDevice")}
-                      onPress={() => openHubQr("invite")}
-                    />
-                  )}
-                </Group>
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* hub info, then its actions */}
-        <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Group style={[styles.infoGroup, styles.groupSpacingTight]}>
-              {hubRows.map((row) => (
-                <ActionButton
-                  key={row.label}
-                  label={row.label}
-                  rightElement={
-                    <Text
-                      style={styles.infoValue}
-                      numberOfLines={1}
-                      ellipsizeMode="middle"
-                    >
-                      {row.value}
-                    </Text>
-                  }
-                />
-              ))}
-            </Group>
-            {hubState === "revoked" && (
-              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-                {t("settings.hub.revoked")}
-              </Text>
-            )}
-            {hostsPairedHub && !!hostError && (
-              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-                {hostError}
-              </Text>
-            )}
-            <Group>
-              {hubStatus?.update && isAdmin && OperaHub.canUpdateHub() && (
-                <ActionButton
-                  icon={downloadIcon}
-                  label={t("settings.hub.installUpdate")}
-                  onPress={() => installHubUpdate(hubStatus.update!)}
-                />
-              )}
-              <ActionButton
-                icon={reconnectIcon}
-                label={t("settings.hub.check")}
-                disabled={hubState === "checking"}
-                style={hubState === "checking" && styles.highlightGroupDisabled}
-                onPress={refreshHub}
-              />
-              {hostsPairedHub &&
-                (hostStatus?.running ? (
-                  <ActionButton
-                    icon={cancelIcon}
-                    label={t("settings.hub.stopHosting")}
-                    disabled={hostBusy}
-                    onPress={() => setHosting(false)}
-                  />
-                ) : (
-                  <ActionButton
-                    icon={HUB_DEVICE_ICONS.desktop}
-                    label={t("settings.hub.host")}
-                    disabled={hostBusy}
-                    onPress={() => setHosting(true)}
-                  />
-                ))}
-              <ActionButton
-                icon={cancelIcon}
-                label={t("settings.hub.unpair")}
-                onPress={handleUnpairHub}
-              />
-            </Group>
-          </View>
-        </View>
-      </View>
-    );
-  };
 
   // service subpage content
   //the hub row shows once a provider is detected
@@ -5179,88 +4606,6 @@ export default function SettingsDrawer({
     </View>
   );
 
-  //installed on-device model subpage
-  const renderLitertModelSubPage = () => {
-    const entry = installedModel ? getCatalogEntry(installedModel.id) : null;
-    if (!installedModel || !entry) return renderLitertSubPage();
-
-    const publisher = familyPublisher(entry.family);
-    const capabilities = entry.capabilities
-      .filter((c): c is ModelCapabilityId =>
-        LITERT_CAPABILITY_IDS.includes(c as ModelCapabilityId),
-      )
-      .map((c) => ({
-        id: c,
-        label: t(MODEL_CAPABILITY_KEYS[c]),
-        icon: MODEL_CAPABILITY_ICONS[c],
-      }));
-    const { description } = installedModel;
-
-    return (
-      <View style={styles.subPageContainer}>
-        {renderSubPageHeader(entry.label)}
-
-        <View style={styles.contentCard}>
-          <View style={styles.litertDetailHeader}>
-            <View style={styles.litertDetailTile}>
-              <Image
-                source={{ uri: modelAvatarUrl(entry, entry.repoId) }}
-                style={styles.litertTileImage}
-              />
-            </View>
-            <View style={styles.litertDetailInfo}>
-              <Text style={styles.litertDetailName}>{entry.label}</Text>
-              {!!publisher && (
-                <Text style={styles.litertDetailMeta}>{publisher}</Text>
-              )}
-              <Text style={styles.litertDetailMeta}>
-                {formatBytes(entry.sizeBytes)}
-              </Text>
-              {capabilities.map((capability) => (
-                <View key={capability.id} style={styles.litertCapability}>
-                  <Image
-                    source={capability.icon}
-                    style={styles.litertCapabilityIcon}
-                    tintColor={Colors.textSecondary}
-                  />
-                  <Text style={styles.litertDetailMeta}>
-                    {capability.label}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          <Text style={[styles.settingLabel, styles.litertDetailSection]}>
-            {t("settings.litert.description")}
-          </Text>
-          <Text style={styles.helpText}>
-            {description === undefined
-              ? t("settings.litert.loading")
-              : (description ?? t("settings.litert.noDescription"))}
-          </Text>
-        </View>
-
-        <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Group>
-              <ActionButton
-                icon={binIcon}
-                label={t("settings.litert.deleteModel")}
-                onPress={() =>
-                  handleDeleteLitert({
-                    id: entry.repoId,
-                    label: entry.label,
-                    sizeStr: formatBytes(entry.sizeBytes),
-                  })
-                }
-              />
-            </Group>
-          </View>
-        </View>
-      </View>
-    );
-  };
 
   //ollama server list subpage
   const renderOllamaSubPage = () => (
@@ -5315,168 +4660,6 @@ export default function SettingsDrawer({
       </View>
     </View>
   );
-
-  //ollama server detail page
-  const renderOllamaServerSubPage = () => {
-    const index = ollamaDetailIndex ?? -1;
-    const server = ollamaServers[index];
-    if (!server) return renderOllamaSubPage();
-
-    const url = server.url.trim();
-    const connected = url.length > 0 && serverErrors[url] === false;
-
-    return (
-      <View style={styles.subPageContainer}>
-        {renderSubPageHeader(ollamaServerLabel(server))}
-
-        <View style={styles.contentCard}>
-          <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {t("settings.server.name")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={penPlaceholderIcon}
-                placeholder={t("settings.server.namePlaceholder")}
-                value={server.name}
-                onChangeText={(v) => patchOllamaServer(index, { name: v })}
-              />
-            </Group>
-          </View>
-
-          <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {t("settings.server.link")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={linkIcon}
-                placeholder={t("settings.service.serverLink")}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-                value={server.url}
-                onChangeText={(v) => patchOllamaServer(index, { url: v })}
-                onBlur={() => handleOllamaUrlBlur(index)}
-                rightIcon={
-                  serverErrors[server.url.trim()] ? errorIcon : undefined
-                }
-                rightIconLabel={t("common.error")}
-                onRightIconPress={() =>
-                  showAlert(
-                    t("settings.ollama.unreachableTitle"),
-                    t("settings.ollama.unreachableInfo"),
-                    undefined,
-                    { image: errorImage, messageAlign: "left" },
-                  )
-                }
-              />
-            </Group>
-          </View>
-
-          <View style={[styles.settingRowVertical, isDesktop && styles.toggleGroupRow]}>
-            <View style={isDesktop && styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>
-                {t("settings.ollama.contextLength")}
-              </Text>
-              <Text style={[styles.helpText, !isDesktop && { marginBottom: Spacing.md }]}>
-                {t("settings.ollama.contextHelp")}
-              </Text>
-            </View>
-            <Group style={isDesktop && styles.sliderGroup}>
-              {advancedMode ? (
-                <TextInputField
-                  icon={messageIcon}
-                  placeholder="8192"
-                  value={ollamaContextDraft}
-                  onChangeText={(v) => setOllamaServerContext(index, v)}
-                  keyboardType="numeric"
-                />
-              ) : (
-                <Slider
-                  icon={messageIcon}
-                  options={ollamaContextLengthOptions}
-                  selectedValue={String(serverContextLength(server))}
-                  onSelect={(v) => setOllamaServerContext(index, v)}
-                />
-              )}
-            </Group>
-          </View>
-
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }, isDesktop && styles.toggleGroupRow]}>
-            <View style={isDesktop && styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>
-                {t("settings.ollama.keepAlive")}
-              </Text>
-              <Text style={[styles.helpText, !isDesktop && { marginBottom: Spacing.md }]}>
-                {advancedMode
-                  ? t("settings.ollama.keepAliveHelpAdvanced")
-                  : t("settings.ollama.keepAliveHelp")}
-              </Text>
-            </View>
-            <Group style={isDesktop && styles.sliderGroup}>
-              {advancedMode ? (
-                <TextInputField
-                  icon={timeIcon}
-                  placeholder="300"
-                  value={ollamaKeepAliveDraft}
-                  onChangeText={(v) => setOllamaServerKeepAlive(index, v)}
-                  keyboardType="numeric"
-                />
-              ) : (
-                <Slider
-                  icon={timeIcon}
-                  options={ollamaKeepAliveOptions}
-                  selectedValue={String(serverKeepAlive(server))}
-                  onSelect={(v) => setOllamaServerKeepAlive(index, v)}
-                />
-              )}
-            </Group>
-          </View>
-        </View>
-
-        <ModelToggleList
-          key={url}
-          models={ollamaModels}
-          loading={ollamaModelsLoading}
-          service="ollama"
-          url={url}
-          disabled={server.disabledModels}
-          capabilities={server.capabilities}
-          onChange={(next) =>
-            patchOllamaServer(index, { disabledModels: next })
-          }
-          onCapabilitiesChange={(next) =>
-            patchOllamaServer(index, { capabilities: next })
-          }
-        />
-
-        <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Group>
-              {!connected && (
-                <ActionButton
-                  icon={reconnectIcon}
-                  label={
-                    ollamaModelsLoading
-                      ? t("settings.ollama.connecting")
-                      : t("settings.ollama.reconnect")
-                  }
-                  disabled={ollamaModelsLoading || url.length === 0}
-                  onPress={() => reconnectOllamaServer(index)}
-                />
-              )}
-              <ActionButton
-                icon={binIcon}
-                label={t("settings.ollama.remove.action")}
-                onPress={() => removeOllamaServer(index)}
-              />
-            </Group>
-          </View>
-        </View>
-      </View>
-    );
-  };
 
   //openai server list subpage
   const renderOpenAISubPage = () => (
@@ -5539,140 +4722,30 @@ export default function SettingsDrawer({
     setOpenAIModelsPage(page);
   };
 
-  const openOpenAIModels = (page: CloudModelsPage, model?: string) => {
-    showOpenAIModelsPage(page, model);
-    setOpenAIModelsVisible(true);
+  const openOpenAIModelDetail = (model: string) => {
+    Keyboard.dismiss();
+    setOpenAIModelFrom(openaiModelsPage === "list" ? "list" : "server");
+    showOpenAIModelsPage("model", model);
   };
+
+  //search opens models sheet focused
+  const openOpenAISearch = () => {
+    setOpenAIModelsSearchHandoff(true);
+    showOpenAIModelsPage("list");
+  };
+
+  const openaiModelsPageParent = (page: CloudModelsPage) =>
+    page === "model" ? openaiModelFrom : page === "list" ? "server" : null;
 
   //android back steps up to the list before the sheet closes
   const handleOpenAIModelsBack = () => {
-    if (openaiModelsPage === "list") return false;
+    const parent = openaiModelsPageParent(openaiModelsPage);
+    if (parent === null) return false;
     //keyboard slides away with the pop
     Keyboard.dismiss();
     setOpenAIModelsSearchHandoff(false);
-    showOpenAIModelsPage("list");
+    showOpenAIModelsPage(parent);
     return true;
-  };
-
-  //openai server detail page
-  const renderOpenAIServerSubPage = () => {
-    const index = openaiDetailIndex ?? -1;
-    const server = openaiServers[index];
-    if (!server) return renderOpenAISubPage();
-
-    const url = server.url.trim();
-    const connected = url.length > 0 && serverErrors[url] === false;
-
-    return (
-      <View style={styles.subPageContainer}>
-        {renderSubPageHeader(openAIServerLabel(index))}
-
-        <View style={styles.contentCard}>
-          <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {t("settings.server.name")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={penPlaceholderIcon}
-                placeholder={t("settings.server.namePlaceholder")}
-                value={server.name}
-                onChangeText={(v) => patchOpenAIServer(index, { name: v })}
-              />
-            </Group>
-          </View>
-
-          <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {t("settings.server.link")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={linkIcon}
-                placeholder={t("settings.service.serverLink")}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-                value={server.url}
-                onChangeText={(v) => patchOpenAIServer(index, { url: v })}
-                onBlur={() => handleOpenAIUrlBlur(index)}
-                rightIcon={
-                  serverErrors[server.url.trim()] ? errorIcon : undefined
-                }
-                rightIconLabel={t("common.error")}
-                onRightIconPress={() =>
-                  showAlert(
-                    t("settings.ollama.unreachableTitle"),
-                    t("settings.cloudapi.unreachableInfo"),
-                    undefined,
-                    { messageAlign: "left" },
-                  )
-                }
-              />
-            </Group>
-          </View>
-
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={styles.settingLabel}>
-              {t("settings.cloudapi.apiKey")}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.cloudapi.apiKeyHelp")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={keyIcon}
-                placeholder={t("settings.cloudapi.apiKeyPlaceholder")}
-                autoCapitalize="none"
-                autoCorrect={false}
-                secureTextEntry
-                value={openaiKeyDraft}
-                onChangeText={setOpenAIKeyDraft}
-                onBlur={() => handleOpenAIKeyBlur(index)}
-              />
-            </Group>
-          </View>
-        </View>
-
-        <ModelToggleList
-          key={url}
-          models={openaiModels}
-          loading={openaiModelsLoading}
-          service={OPENAI_PROVIDER_ID}
-          url={url}
-          disabled={server.disabledModels}
-          onChange={(next) =>
-            patchOpenAIServer(index, { disabledModels: next })
-          }
-          onShowAll={() => openOpenAIModels("list")}
-          onOpenModel={(model) => openOpenAIModels("model", model)}
-        />
-
-        <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Group>
-              {!connected && (
-                <ActionButton
-                  icon={reconnectIcon}
-                  label={
-                    openaiModelsLoading
-                      ? t("settings.ollama.connecting")
-                      : t("settings.ollama.reconnect")
-                  }
-                  disabled={openaiModelsLoading || url.length === 0}
-                  onPress={() => reconnectOpenAIServer(index)}
-                />
-              )}
-              <ActionButton
-                icon={binIcon}
-                label={t("settings.ollama.remove.action")}
-                onPress={() => removeOpenAIServer(index)}
-              />
-            </Group>
-          </View>
-        </View>
-      </View>
-    );
   };
 
   // confidentiality subpage content
@@ -6031,7 +5104,6 @@ export default function SettingsDrawer({
                 error: McpService.getStatus(server.id).state === "error",
                 onPress: () => {
                   setMcpDetailId(server.id);
-                  setActiveSubPage("mcpserver");
                 },
               })),
               //hosted by the sampler
@@ -6043,7 +5115,6 @@ export default function SettingsDrawer({
                 error: McpService.getStatus(server.id).state === "error",
                 onPress: () => {
                   setMcpDetailId(server.id);
-                  setActiveSubPage("mcpserver");
                 },
               })),
             ])}
@@ -6051,235 +5122,6 @@ export default function SettingsDrawer({
       </View>
     </View>
   );
-
-  //server detail page
-  const renderMcpServerSubPage = () => {
-    const hosted = McpService.getHubServers().find(
-      (s) => s.id === mcpDetailId,
-    );
-    const server = hosted ?? mcpServers.find((s) => s.id === mcpDetailId);
-    if (!server) return renderMcpServersSubPage();
-
-    const status = McpService.getStatus(server.id);
-    const tools = McpService.getTools(server.id);
-    const busy = mcpConnecting[server.id];
-
-    return (
-      <View style={styles.subPageContainer}>
-        {renderSubPageHeader(server.name)}
-
-        {status.error ? (
-          <View style={styles.contentCard}>
-            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <Text style={[styles.helpText, { color: Colors.error }]}>
-                {status.error}
-              </Text>
-            </View>
-          </View>
-        ) : null}
-
-        {/* server settings link, the sampler owns hosted ones */}
-        {!hosted && (
-          <Group style={styles.groupSpacing}>
-            {renderToolsNavRow(
-              "mcpserversettings",
-              t("settings.server.settings"),
-              server.url,
-            )}
-          </Group>
-        )}
-
-        {/* tools card */}
-        {tools.length > 0 && (
-          <View style={styles.contentCard}>
-            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-                {t("settings.mcp.tools", { count: tools.length })}
-              </Text>
-              {tools.map((tool, index) => {
-                const name = tool.definition.function.name;
-                const key = `tool:${name}`;
-                const enabled =
-                  pluginStates[key] ?? tool.enabledByDefault ?? false;
-                return (
-                  <View
-                    key={name}
-                    style={
-                      index < tools.length - 1 && { marginBottom: Spacing.xxl }
-                    }
-                  >
-                    <View style={styles.toggleGroupRow}>
-                      <View style={styles.toggleGroupContent}>
-                        <Text style={styles.settingLabel}>
-                          {tool.displayName ?? name}
-                        </Text>
-                        {tool.displayDescription ? (
-                          <Text style={styles.helpText}>
-                            {shortDescription(tool.displayDescription)}
-                          </Text>
-                        ) : null}
-                      </View>
-                      <Toggle
-                        checked={enabled}
-                        onToggle={async (v) => {
-                          setPluginStates((prev) => ({ ...prev, [key]: v }));
-                          await PluginRegistry.setEnabled("tool", name, v);
-                        }}
-                      />
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        )}
-
-        {/* server actions card, hosted ones only reconnect */}
-        {(!hosted || status.state !== "connected") && (
-          <View style={styles.contentCard}>
-            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <Group>
-                {/* reconnect only while offline */}
-                {status.state !== "connected" && (
-                  <ActionButton
-                    icon={reconnectIcon}
-                    label={
-                      busy
-                        ? t("settings.mcp.connecting")
-                        : t("settings.mcp.reconnect")
-                    }
-                    disabled={busy || !server.url.trim()}
-                    onPress={() => connectMcpServer(server.id)}
-                  />
-                )}
-                {!hosted && (
-                  <ActionButton
-                    icon={binIcon}
-                    label={t("settings.mcp.remove.action")}
-                    onPress={() => removeMcpServer(server.id, server.name)}
-                  />
-                )}
-              </Group>
-            </View>
-          </View>
-        )}
-      </View>
-    );
-  };
-
-  //server settings subpage
-  const renderMcpServerSettingsSubPage = () => {
-    const server = mcpServers.find((s) => s.id === mcpDetailId);
-    if (!server) return renderMcpServersSubPage();
-
-    return (
-      <View style={styles.subPageContainer}>
-        {renderSubPageHeader(t("settings.server.settings"))}
-
-        <View style={styles.contentCard}>
-          <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {t("settings.server.link")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={linkIcon}
-                placeholder={t("settings.service.serverLink")}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-                value={server.url}
-                onChangeText={(v) =>
-                  setMcpServers((prev) =>
-                    prev.map((s) =>
-                      s.id === server.id ? { ...s, url: v } : s,
-                    ),
-                  )
-                }
-                onBlur={() => handleMcpUrlBlur(server.id, server.url)}
-                rightIcon={mcpNeedsAuth(server.id) ? infoIcon : undefined}
-                rightIconTint={Colors.textMuted}
-                rightIconLabel={t("common.info")}
-                onRightIconPress={() => showMcpAuthInfo(server.id)}
-              />
-            </Group>
-          </View>
-
-          <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>
-              {t("settings.mcp.headerLabel")}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.mcp.headerHelp")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={penPlaceholderIcon}
-                placeholder={t("settings.mcp.headerName")}
-                autoCapitalize="none"
-                autoCorrect={false}
-                value={server.headerName}
-                onChangeText={(v) =>
-                  setMcpServers((prev) =>
-                    prev.map((s) =>
-                      s.id === server.id ? { ...s, headerName: v } : s,
-                    ),
-                  )
-                }
-                onBlur={() =>
-                  saveMcpServer(server.id, { headerName: server.headerName })
-                }
-              />
-              <TextInputField
-                icon={penPlaceholderIcon}
-                placeholder={t("settings.mcp.headerValue")}
-                autoCapitalize="none"
-                secureTextEntry
-                value={mcpHeaderValues[server.id] ?? ""}
-                onChangeText={(v) =>
-                  setMcpHeaderValues((prev) => ({ ...prev, [server.id]: v }))
-                }
-                onBlur={() =>
-                  McpService.setHeaderValue(
-                    server.id,
-                    mcpHeaderValues[server.id] ?? "",
-                  )
-                }
-              />
-            </Group>
-          </View>
-
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={styles.settingLabel}>
-              {t("settings.mcp.clientIdLabel")}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.mcp.clientIdHelp")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={penPlaceholderIcon}
-                placeholder={t("settings.mcp.clientId")}
-                autoCapitalize="none"
-                autoCorrect={false}
-                value={server.clientId ?? ""}
-                onChangeText={(v) =>
-                  setMcpServers((prev) =>
-                    prev.map((s) =>
-                      s.id === server.id ? { ...s, clientId: v } : s,
-                    ),
-                  )
-                }
-                onBlur={() =>
-                  saveMcpServer(server.id, { clientId: server.clientId ?? "" })
-                }
-              />
-            </Group>
-          </View>
-        </View>
-      </View>
-    );
-  };
 
   // widgets subpage content
   const renderWidgetsSubPage = () => (
@@ -6371,74 +5213,10 @@ export default function SettingsDrawer({
         return renderProfileSubPage();
       case "cloud":
         return renderCloudSubPage();
-      case "operahub":
-        return renderOperaHubSubPage();
       case "hubprovider":
         return renderHubProviderSubPage();
       case "hubserver":
         return renderHubServerSubPage();
-      case "hubmodels":
-        return (
-          <View style={styles.subPageContainer}>
-            {renderSubPageHeader(t("hubModels.pageTitle"))}
-            {hubSettings && (
-              <View style={styles.contentCard}>
-                {renderHubToggle(
-                  t("settings.hub.shareProviders"),
-                  t("settings.hub.shareProvidersHelp"),
-                  hubSettings.shareProviders,
-                  (value) => changeHubSettings({ shareProviders: value }),
-                  true,
-                )}
-              </View>
-            )}
-            <HubModelsSection
-              onAddModel={() => setHubModelsSheetVisible(true)}
-              onOpenModel={(file, name) => {
-                setSelectedHubModel({ file, name });
-                setActiveSubPage("hubmodel");
-              }}
-            />
-          </View>
-        );
-      case "hubmcp":
-        return (
-          <View style={styles.subPageContainer}>
-            {renderSubPageHeader(t("hubMcp.pageTitle"))}
-            <HubMcpSection
-              onAddServer={() => setHubMcpSheetVisible(true)}
-              onOpenServer={(id, title) => {
-                setSelectedHubMcp({ id, title });
-                setActiveSubPage("hubmcpserver");
-              }}
-            />
-          </View>
-        );
-      case "hubmcpserver":
-        return (
-          <View style={styles.subPageContainer}>
-            {renderSubPageHeader(selectedHubMcp?.title ?? "")}
-            {selectedHubMcp && (
-              <HubMcpServerPage
-                id={selectedHubMcp.id}
-                onRemoved={() => setActiveSubPage("hubmcp")}
-                onPickFolder={(start, done) => setFolderPick({ start, done })}
-              />
-            )}
-          </View>
-        );
-      case "hubmodel":
-        return (
-          <View style={styles.subPageContainer}>
-            {renderSubPageHeader(selectedHubModel?.name ?? "")}
-            {selectedHubModel && (
-              <HubModelPage
-                file={selectedHubModel.file}
-                onDeleted={() => setActiveSubPage("hubmodels")}
-              />
-            )}
-          </View>
-        );
       case "general":
         return renderGeneralSubPage();
       case "maestro":
@@ -6453,16 +5231,10 @@ export default function SettingsDrawer({
         return renderBetaSubPage();
       case "litert":
         return renderLitertSubPage();
-      case "litertmodel":
-        return renderLitertModelSubPage();
       case "ollama":
         return renderOllamaSubPage();
-      case "ollamaserver":
-        return renderOllamaServerSubPage();
       case "openai":
         return renderOpenAISubPage();
-      case "openaiserver":
-        return renderOpenAIServerSubPage();
       case "confidentiality":
         return renderConfidentialitySubPage();
       case "advanced":
@@ -6477,10 +5249,6 @@ export default function SettingsDrawer({
         return renderMobileActionsSubPage();
       case "mcpservers":
         return renderMcpServersSubPage();
-      case "mcpserver":
-        return renderMcpServerSubPage();
-      case "mcpserversettings":
-        return renderMcpServerSettingsSubPage();
       case "sociallinks":
         return renderSocialLinksSubPage();
       case "main":
@@ -7034,10 +5802,262 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
+  const ollamaDetailServer =
+    ollamaDetailIndex !== null ? ollamaServers[ollamaDetailIndex] : undefined;
+  const ollamaDetailUrl = ollamaDetailServer?.url.trim() ?? "";
+  const ollamaDetailConnected =
+    ollamaDetailUrl.length > 0 && serverErrors[ollamaDetailUrl] === false;
+
+  //ollama server detail sheet
+  const ollamaServerSheet = (
+    <DrawerSheet
+      visible={ollamaDetailIndex !== null && !!ollamaDetailServer}
+      onClose={() => setOllamaDetailIndex(null)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      avoidKeyboard
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.addModelSheetDesktop}
+    >
+      <SheetKeyboardAwareScrollView
+        bottomOffset={Spacing.xl2}
+        contentContainerStyle={styles.addModelSheetContent}
+        keyboardShouldPersistTaps="handled"
+      >
+          {ollamaDetailServer && ollamaDetailIndex !== null && (
+            <>
+              <View style={styles.contentCard}>
+                <View style={styles.settingRowVertical}>
+                  <Text
+                    style={[styles.settingLabel, { marginBottom: Spacing.md }]}
+                  >
+                    {t("settings.server.name")}
+                  </Text>
+                  <Group>
+                    <TextInputField
+                      icon={penPlaceholderIcon}
+                      placeholder={t("settings.server.namePlaceholder")}
+                      value={ollamaDetailServer.name}
+                      onChangeText={(v) =>
+                        patchOllamaServer(ollamaDetailIndex, { name: v })
+                      }
+                    />
+                  </Group>
+                </View>
+
+                <View style={styles.settingRowVertical}>
+                  <Text
+                    style={[styles.settingLabel, { marginBottom: Spacing.md }]}
+                  >
+                    {t("settings.server.link")}
+                  </Text>
+                  <Group>
+                    <TextInputField
+                      icon={linkIcon}
+                      placeholder={t("settings.service.serverLink")}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="url"
+                      value={ollamaDetailServer.url}
+                      onChangeText={(v) =>
+                        patchOllamaServer(ollamaDetailIndex, { url: v })
+                      }
+                      onBlur={() => handleOllamaUrlBlur(ollamaDetailIndex)}
+                      rightIcon={
+                        serverErrors[ollamaDetailUrl] ? errorIcon : undefined
+                      }
+                      rightIconLabel={t("common.error")}
+                      onRightIconPress={() =>
+                        showAlert(
+                          t("settings.ollama.unreachableTitle"),
+                          t("settings.ollama.unreachableInfo"),
+                          undefined,
+                          { image: errorImage, messageAlign: "left" },
+                        )
+                      }
+                    />
+                  </Group>
+                </View>
+
+                <View
+                  style={[
+                    styles.settingRowVertical,
+                    isDesktop && styles.toggleGroupRow,
+                  ]}
+                >
+                  <View style={isDesktop && styles.toggleGroupContent}>
+                    <Text style={styles.settingLabel}>
+                      {t("settings.ollama.contextLength")}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.helpText,
+                        !isDesktop && { marginBottom: Spacing.md },
+                      ]}
+                    >
+                      {t("settings.ollama.contextHelp")}
+                    </Text>
+                  </View>
+                  <Group style={isDesktop && styles.sliderGroup}>
+                    {advancedMode ? (
+                      <TextInputField
+                        icon={messageIcon}
+                        placeholder="8192"
+                        value={ollamaContextDraft}
+                        onChangeText={(v) =>
+                          setOllamaServerContext(ollamaDetailIndex, v)
+                        }
+                        keyboardType="numeric"
+                      />
+                    ) : (
+                      <Slider
+                        icon={messageIcon}
+                        options={ollamaContextLengthOptions}
+                        selectedValue={String(
+                          serverContextLength(ollamaDetailServer),
+                        )}
+                        onSelect={(v) =>
+                          setOllamaServerContext(ollamaDetailIndex, v)
+                        }
+                      />
+                    )}
+                  </Group>
+                </View>
+
+                <View
+                  style={[
+                    styles.settingRowVertical,
+                    { marginBottom: 0 },
+                    isDesktop && styles.toggleGroupRow,
+                  ]}
+                >
+                  <View style={isDesktop && styles.toggleGroupContent}>
+                    <Text style={styles.settingLabel}>
+                      {t("settings.ollama.keepAlive")}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.helpText,
+                        !isDesktop && { marginBottom: Spacing.md },
+                      ]}
+                    >
+                      {advancedMode
+                        ? t("settings.ollama.keepAliveHelpAdvanced")
+                        : t("settings.ollama.keepAliveHelp")}
+                    </Text>
+                  </View>
+                  <Group style={isDesktop && styles.sliderGroup}>
+                    {advancedMode ? (
+                      <TextInputField
+                        icon={timeIcon}
+                        placeholder="300"
+                        value={ollamaKeepAliveDraft}
+                        onChangeText={(v) =>
+                          setOllamaServerKeepAlive(ollamaDetailIndex, v)
+                        }
+                        keyboardType="numeric"
+                      />
+                    ) : (
+                      <Slider
+                        icon={timeIcon}
+                        options={ollamaKeepAliveOptions}
+                        selectedValue={String(
+                          serverKeepAlive(ollamaDetailServer),
+                        )}
+                        onSelect={(v) =>
+                          setOllamaServerKeepAlive(ollamaDetailIndex, v)
+                        }
+                      />
+                    )}
+                  </Group>
+                </View>
+              </View>
+
+              <ModelToggleList
+                key={ollamaDetailUrl}
+                models={ollamaModels}
+                loading={ollamaModelsLoading}
+                service="ollama"
+                url={ollamaDetailUrl}
+                disabled={ollamaDetailServer.disabledModels}
+                capabilities={ollamaDetailServer.capabilities}
+                onChange={(next) =>
+                  patchOllamaServer(ollamaDetailIndex, { disabledModels: next })
+                }
+                onCapabilitiesChange={(next) =>
+                  patchOllamaServer(ollamaDetailIndex, { capabilities: next })
+                }
+              />
+
+              <View style={[styles.contentCard, { marginBottom: 0 }]}>
+                <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+                  <Group>
+                    {!ollamaDetailConnected && (
+                      <ActionButton
+                        icon={reconnectIcon}
+                        label={
+                          ollamaModelsLoading
+                            ? t("settings.ollama.connecting")
+                            : t("settings.ollama.reconnect")
+                        }
+                        disabled={
+                          ollamaModelsLoading || ollamaDetailUrl.length === 0
+                        }
+                        onPress={() => reconnectOllamaServer(ollamaDetailIndex)}
+                      />
+                    )}
+                    <ActionButton
+                      icon={binIcon}
+                      label={t("settings.ollama.remove.action")}
+                      onPress={() => removeOllamaServer(ollamaDetailIndex)}
+                    />
+                  </Group>
+                </View>
+              </View>
+            </>
+          )}
+        </SheetKeyboardAwareScrollView>
+    </DrawerSheet>
+  );
+
   const openaiModelsServer =
     openaiDetailIndex !== null ? openaiServers[openaiDetailIndex] : undefined;
+  const openaiDetailUrl = openaiModelsServer?.url.trim() ?? "";
+  const openaiDetailConnected =
+    openaiDetailUrl.length > 0 && serverErrors[openaiDetailUrl] === false;
 
-  const renderOpenAIModelsPage = (page: CloudModelsPage, active: boolean) => {
+  const renderOpenAISearchField = (page: CloudModelsPage) => (
+    <Group>
+      <TextInputField
+        icon={searchIcon}
+        placeholder={t("settings.ollama.searchModels")}
+        //only list page edits the search
+        value={page === "list" ? openaiSearchQuery : ""}
+        onChangeText={setOpenAISearchQuery}
+        onFocus={
+          page === "list"
+            ? () => setOpenAIModelsSearchHandoff(false)
+            : () => {
+                setOpenAIModelsSearchHandoff(true);
+                showOpenAIModelsPage("list");
+              }
+        }
+        autoFocus={page === "list" && openaiModelsSearchHandoff}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+    </Group>
+  );
+
+  const renderOpenAIServerPage = (page: CloudModelsPage, active: boolean) => {
     const server = openaiModelsServer;
     const index = openaiDetailIndex;
     if (!server || index === null) return null;
@@ -7047,18 +6067,94 @@ export default function SettingsDrawer({
 
     return (
       <>
-        <SheetScrollView
-          contentContainerStyle={styles.addModelSheetContent}
-          keyboardShouldPersistTaps="handled"
-          onScroll={
-            active
-              ? (e) =>
-                  setOpenAIModelsScrolled(e.nativeEvent.contentOffset.y > 4)
-              : undefined
-          }
-          scrollEventThrottle={16}
-        >
-          {page === "list" ? (
+        {page === "server" ? (
+          <SheetKeyboardAwareScrollView
+            bottomOffset={Spacing.xl2}
+            contentContainerStyle={styles.addModelSheetContent}
+            keyboardShouldPersistTaps="handled"
+            onScroll={
+              active
+                ? (e) =>
+                    setOpenAIModelsScrolled(e.nativeEvent.contentOffset.y > 4)
+                : undefined
+            }
+            scrollEventThrottle={16}
+          >
+            <View style={styles.contentCard}>
+              <View style={styles.settingRowVertical}>
+                <Text
+                  style={[styles.settingLabel, { marginBottom: Spacing.md }]}
+                >
+                  {t("settings.server.name")}
+                </Text>
+                <Group>
+                  <TextInputField
+                    icon={penPlaceholderIcon}
+                    placeholder={t("settings.server.namePlaceholder")}
+                    value={server.name}
+                    onChangeText={(v) =>
+                      patchOpenAIServer(index, { name: v })
+                    }
+                  />
+                </Group>
+              </View>
+
+              <View style={styles.settingRowVertical}>
+                <Text
+                  style={[styles.settingLabel, { marginBottom: Spacing.md }]}
+                >
+                  {t("settings.server.link")}
+                </Text>
+                <Group>
+                  <TextInputField
+                    icon={linkIcon}
+                    placeholder={t("settings.service.serverLink")}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                    value={server.url}
+                    onChangeText={(v) =>
+                      patchOpenAIServer(index, { url: v })
+                    }
+                    onBlur={() => handleOpenAIUrlBlur(index)}
+                    rightIcon={
+                      serverErrors[url] ? errorIcon : undefined
+                    }
+                    rightIconLabel={t("common.error")}
+                    onRightIconPress={() =>
+                      showAlert(
+                        t("settings.ollama.unreachableTitle"),
+                        t("settings.cloudapi.unreachableInfo"),
+                        undefined,
+                        { messageAlign: "left" },
+                      )
+                    }
+                  />
+                </Group>
+              </View>
+
+              <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.cloudapi.apiKey")}
+                </Text>
+                <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                  {t("settings.cloudapi.apiKeyHelp")}
+                </Text>
+                <Group>
+                  <TextInputField
+                    icon={keyIcon}
+                    placeholder={t("settings.cloudapi.apiKeyPlaceholder")}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    secureTextEntry
+                    value={openaiKeyDraft}
+                    onChangeText={setOpenAIKeyDraft}
+                    onBlur={() => handleOpenAIKeyBlur(index)}
+                  />
+                </Group>
+              </View>
+            </View>
+
             <ModelToggleList
               key={url}
               models={openaiModels}
@@ -7069,33 +6165,73 @@ export default function SettingsDrawer({
               onChange={(next) =>
                 patchOpenAIServer(index, { disabledModels: next })
               }
-              onOpenModel={(m) => {
-                Keyboard.dismiss();
-                showOpenAIModelsPage("model", m);
+              onShowAll={() => {
+                setOpenAIModelsSearchHandoff(false);
+                showOpenAIModelsPage("list");
               }}
-              showAll
-              autoFocusSearch={openaiModelsSearchHandoff}
-              onSearchFocus={() => setOpenAIModelsSearchHandoff(false)}
+              onOpenModel={openOpenAIModelDetail}
+              onOpenSearch={openOpenAISearch}
             />
-          ) : (
-            model && (
-              <>
-                <View style={[styles.contentCard, styles.litertSearchWithBack]}>
-                  <Group>
-                    <TextInputField
-                      icon={searchIcon}
-                      placeholder={t("settings.ollama.searchModels")}
-                      //only leads to the list search
-                      value=""
-                      onFocus={() => {
-                        setOpenAIModelsSearchHandoff(true);
-                        showOpenAIModelsPage("list");
-                      }}
-                      autoCapitalize="none"
-                      autoCorrect={false}
+
+            <View style={[styles.contentCard, { marginBottom: 0 }]}>
+              <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+                <Group>
+                  {!openaiDetailConnected && (
+                    <ActionButton
+                      icon={reconnectIcon}
+                      label={
+                        openaiModelsLoading
+                          ? t("settings.ollama.connecting")
+                          : t("settings.ollama.reconnect")
+                      }
+                      disabled={
+                        openaiModelsLoading || url.length === 0
+                      }
+                      onPress={() => reconnectOpenAIServer(index)}
                     />
-                  </Group>
-                </View>
+                  )}
+                  <ActionButton
+                    icon={binIcon}
+                    label={t("settings.ollama.remove.action")}
+                    onPress={() => removeOpenAIServer(index)}
+                  />
+                </Group>
+              </View>
+            </View>
+          </SheetKeyboardAwareScrollView>
+        ) : (
+          <SheetScrollView
+            contentContainerStyle={styles.addModelSheetContent}
+            keyboardShouldPersistTaps="handled"
+            onScroll={
+              active
+                ? (e) =>
+                    setOpenAIModelsScrolled(e.nativeEvent.contentOffset.y > 4)
+                : undefined
+            }
+            scrollEventThrottle={16}
+          >
+            <View style={[styles.contentCard, styles.litertSearchWithBack]}>
+              {renderOpenAISearchField(page)}
+            </View>
+            {page === "list" ? (
+              <ModelToggleList
+                key={url}
+                models={openaiModels}
+                loading={openaiModelsLoading}
+                service={OPENAI_PROVIDER_ID}
+                url={url}
+                disabled={server.disabledModels}
+                onChange={(next) =>
+                  patchOpenAIServer(index, { disabledModels: next })
+                }
+                onOpenModel={openOpenAIModelDetail}
+                showAll
+                hideSearch
+                searchQuery={openaiSearchQuery}
+              />
+            ) : (
+              model && (
                 <View style={styles.contentCard}>
                   <View style={styles.toggleGroupRow}>
                     <View
@@ -7137,13 +6273,13 @@ export default function SettingsDrawer({
                     checkboxes
                   />
                 </View>
-              </>
-            )
-          )}
-        </SheetScrollView>
+              )
+            )}
+          </SheetScrollView>
+        )}
 
         {/* floats over the scroll like the settings back button */}
-        {page !== "list" && (
+        {page !== "server" && (
           <View style={styles.litertBackWrapper} pointerEvents="box-none">
             <DrawerBackButton
               kind="back"
@@ -7157,10 +6293,11 @@ export default function SettingsDrawer({
     );
   };
 
-  const openaiModelsSheet = (
+  //openai server detail sheet
+  const openaiServerSheet = (
     <DrawerSheet
-      visible={openaiModelsVisible && !!openaiModelsServer}
-      onClose={() => setOpenAIModelsVisible(false)}
+      visible={openaiDetailIndex !== null && !!openaiModelsServer}
+      onClose={() => setOpenAIDetailIndex(null)}
       onBackPress={handleOpenAIModelsBack}
       mode="overlay"
       isLargeScreen={isLargeScreen}
@@ -7171,7 +6308,6 @@ export default function SettingsDrawer({
         styles.addModelSheet,
         {
           paddingBottom: Platform.OS === "ios" ? 34 : 20,
-          //stacked pages cannot size the sheet
           height: sheetMaxHeight,
         },
       ]}
@@ -7186,11 +6322,11 @@ export default function SettingsDrawer({
       >
         <PageStack
           page={openaiModelsPage}
-          visible={openaiModelsVisible}
+          visible={openaiDetailIndex !== null && !!openaiModelsServer}
           width={openaiModelsWidth}
-          parentOf={(page) => (page === "model" ? "list" : null)}
+          parentOf={openaiModelsPageParent}
           onBack={handleOpenAIModelsBack}
-          renderPage={renderOpenAIModelsPage}
+          renderPage={renderOpenAIServerPage}
         />
       </SheetBody>
     </DrawerSheet>
@@ -7439,84 +6575,261 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
+  const mcpServerDetail =
+    mcpDetailId !== null
+      ? (McpService.getHubServers().find((s) => s.id === mcpDetailId) ??
+        mcpServers.find((s) => s.id === mcpDetailId))
+      : undefined;
+  const mcpServerHosted =
+    mcpDetailId !== null
+      ? McpService.getHubServers().some((s) => s.id === mcpDetailId)
+      : false;
+
+  const mcpDetailSheet = (
+    <DrawerSheet
+      visible={mcpDetailId !== null && !!mcpServerDetail}
+      onClose={() => setMcpDetailId(null)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      avoidKeyboard
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.addModelSheetDesktop}
+    >
+      {mcpServerDetail && (() => {
+        const server = mcpServerDetail;
+        const hosted = mcpServerHosted;
+        const status = McpService.getStatus(server.id);
+        const tools = McpService.getTools(server.id);
+        const busy = mcpConnecting[server.id];
+
+        return (
+          <SheetKeyboardAwareScrollView
+            bottomOffset={Spacing.xl2}
+            contentContainerStyle={styles.addModelSheetContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.contentCard}>
+              <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+                <Text style={styles.settingLabel}>{server.name}</Text>
+                <Text
+                  style={[
+                    styles.helpText,
+                    status.error ? { color: Colors.error } : undefined,
+                  ]}
+                >
+                  {status.error ?? mcpStatusLabel(server.id)}
+                </Text>
+              </View>
+            </View>
+
+            {tools.length > 0 && (
+              <View style={styles.contentCard}>
+                <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+                  <Text
+                    style={[styles.settingLabel, { marginBottom: Spacing.md }]}
+                  >
+                    {t("settings.mcp.tools", { count: tools.length })}
+                  </Text>
+                  {tools.map((tool, index) => {
+                    const name = tool.definition.function.name;
+                    const key = `tool:${name}`;
+                    const enabled =
+                      pluginStates[key] ?? tool.enabledByDefault ?? false;
+                    return (
+                      <View
+                        key={name}
+                        style={
+                          index < tools.length - 1 && {
+                            marginBottom: Spacing.xxl,
+                          }
+                        }
+                      >
+                        <View style={styles.toggleGroupRow}>
+                          <View style={styles.toggleGroupContent}>
+                            <Text style={styles.settingLabel}>
+                              {tool.displayName ?? name}
+                            </Text>
+                            {tool.displayDescription ? (
+                              <Text style={styles.helpText}>
+                                {shortDescription(tool.displayDescription)}
+                              </Text>
+                            ) : null}
+                          </View>
+                          <Toggle
+                            checked={enabled}
+                            onToggle={async (v) => {
+                              setPluginStates((prev) => ({
+                                ...prev,
+                                [key]: v,
+                              }));
+                              await PluginRegistry.setEnabled("tool", name, v);
+                            }}
+                          />
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {!hosted && (
+              <View style={styles.contentCard}>
+                <View style={styles.settingRowVertical}>
+                  <Text
+                    style={[styles.settingLabel, { marginBottom: Spacing.md }]}
+                  >
+                    {t("settings.server.link")}
+                  </Text>
+                  <Group>
+                    <TextInputField
+                      icon={linkIcon}
+                      placeholder={t("settings.service.serverLink")}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="url"
+                      value={server.url}
+                      onChangeText={(v) =>
+                        setMcpServers((prev) =>
+                          prev.map((s) =>
+                            s.id === server.id ? { ...s, url: v } : s,
+                          ),
+                        )
+                      }
+                      onBlur={() => handleMcpUrlBlur(server.id, server.url)}
+                      rightIcon={mcpNeedsAuth(server.id) ? infoIcon : undefined}
+                      rightIconTint={Colors.textMuted}
+                      rightIconLabel={t("common.info")}
+                      onRightIconPress={() => showMcpAuthInfo(server.id)}
+                    />
+                  </Group>
+                </View>
+
+                <View style={styles.settingRowVertical}>
+                  <Text style={styles.settingLabel}>
+                    {t("settings.mcp.headerLabel")}
+                  </Text>
+                  <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                    {t("settings.mcp.headerHelp")}
+                  </Text>
+                  <Group>
+                    <TextInputField
+                      icon={penPlaceholderIcon}
+                      placeholder={t("settings.mcp.headerName")}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      value={server.headerName}
+                      onChangeText={(v) =>
+                        setMcpServers((prev) =>
+                          prev.map((s) =>
+                            s.id === server.id ? { ...s, headerName: v } : s,
+                          ),
+                        )
+                      }
+                      onBlur={() =>
+                        saveMcpServer(server.id, {
+                          headerName: server.headerName,
+                        })
+                      }
+                    />
+                    <TextInputField
+                      icon={penPlaceholderIcon}
+                      placeholder={t("settings.mcp.headerValue")}
+                      autoCapitalize="none"
+                      secureTextEntry
+                      value={mcpHeaderValues[server.id] ?? ""}
+                      onChangeText={(v) =>
+                        setMcpHeaderValues((prev) => ({
+                          ...prev,
+                          [server.id]: v,
+                        }))
+                      }
+                      onBlur={() =>
+                        McpService.setHeaderValue(
+                          server.id,
+                          mcpHeaderValues[server.id] ?? "",
+                        )
+                      }
+                    />
+                  </Group>
+                </View>
+
+                <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+                  <Text style={styles.settingLabel}>
+                    {t("settings.mcp.clientIdLabel")}
+                  </Text>
+                  <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                    {t("settings.mcp.clientIdHelp")}
+                  </Text>
+                  <Group>
+                    <TextInputField
+                      icon={penPlaceholderIcon}
+                      placeholder={t("settings.mcp.clientId")}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      value={server.clientId ?? ""}
+                      onChangeText={(v) =>
+                        setMcpServers((prev) =>
+                          prev.map((s) =>
+                            s.id === server.id ? { ...s, clientId: v } : s,
+                          ),
+                        )
+                      }
+                      onBlur={() =>
+                        saveMcpServer(server.id, {
+                          clientId: server.clientId ?? "",
+                        })
+                      }
+                    />
+                  </Group>
+                </View>
+              </View>
+            )}
+
+            {(!hosted || status.state !== "connected") && (
+              <View style={[styles.contentCard, { marginBottom: 0 }]}>
+                <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+                  <Group>
+                    {//reconnect only while offline
+                    status.state !== "connected" && (
+                      <ActionButton
+                        icon={reconnectIcon}
+                        label={
+                          busy
+                            ? t("settings.mcp.connecting")
+                            : t("settings.mcp.reconnect")
+                        }
+                        disabled={busy || !server.url.trim()}
+                        onPress={() => connectMcpServer(server.id)}
+                      />
+                    )}
+                    {!hosted && (
+                      <ActionButton
+                        icon={binIcon}
+                        label={t("settings.mcp.remove.action")}
+                        onPress={() => removeMcpServer(server.id, server.name)}
+                      />
+                    )}
+                  </Group>
+                </View>
+              </View>
+            )}
+          </SheetKeyboardAwareScrollView>
+        );
+      })()}
+    </DrawerSheet>
+  );
+
   //storage switches only once the setup connects
   const CloudSetup = getCloudProviderDefinition(cloudSetupId)?.SetupComponent;
-  const hubPairingSheet = hubSupported && (
-    <>
-      <HubPairingSheet
-        visible={hubPairingVisible}
-        onClose={() => {
-          setHubPairingVisible(false);
-          setHubPickedForSync(false);
-          onHubPairLinkHandled?.();
-        }}
-        onPaired={handleHubPaired}
-        link={hubPairLink}
-        pairedHub={hubPairLink ? pairedHub : null}
-        isLargeScreen={isLargeScreen}
-        isDesktop={isDesktop}
-      />
-      <HubDeviceSheet
-        device={hubDevices?.find((d) => d.id === selectedDeviceId) ?? null}
-        hub={pairedHub}
-        isSelf={selectedDeviceId === thisDeviceId}
-        canManage={isHubAdmin()}
-        onClose={() => setSelectedDeviceId(null)}
-        onChanged={refreshHub}
-        onUnpairSelf={() => {
-          setSelectedDeviceId(null);
-          handleUnpairHub();
-        }}
-        isLargeScreen={isLargeScreen}
-        isDesktop={isDesktop}
-      />
-      <HubModelsSheet
-        visible={hubModelsSheetVisible}
-        onClose={() => setHubModelsSheetVisible(false)}
-        isLargeScreen={isLargeScreen}
-        isDesktop={isDesktop}
-      />
-      <HubMcpSheet
-        visible={hubMcpSheetVisible}
-        onClose={() => setHubMcpSheetVisible(false)}
-        isLargeScreen={isLargeScreen}
-        isDesktop={isDesktop}
-      />
-      <HubFolderSheet
-        visible={folderPick !== null}
-        start={folderPick?.start}
-        onPick={(path) => {
-          folderPick?.done(path);
-          setFolderPick(null);
-        }}
-        onClose={() => setFolderPick(null)}
-        isLargeScreen={isLargeScreen}
-        isDesktop={isDesktop}
-      />
-      <HubQrSheet
-        visible={hubQrVisible}
-        onClose={() => {
-          setHubQrVisible(false);
-          //an approved device shows up in the list
-          refreshHub();
-        }}
-        hub={pairedHub}
-        mode={hubQrMode}
-        isLargeScreen={isLargeScreen}
-        isDesktop={isDesktop}
-      />
-      <HubProfileSheet
-        visible={hubProfileSheet !== null}
-        hub={pairedHub}
-        changePassword={hubProfileSheet === "password"}
-        defaultName={confirmedName}
-        onClose={() => setHubProfileSheet(null)}
-        onDone={handleHubProfileDone}
-        isLargeScreen={isLargeScreen}
-        isDesktop={isDesktop}
-      />
-    </>
-  );
 
   const cloudSetupSheet = (
     <DrawerSheet
@@ -7755,6 +7068,120 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
+  const installedEntry = installedModel
+    ? getCatalogEntry(installedModel.id)
+    : null;
+  const installedPublisher = installedEntry
+    ? familyPublisher(installedEntry.family)
+    : "";
+  const installedCapabilities = (installedEntry?.capabilities ?? [])
+    .filter((c): c is ModelCapabilityId =>
+      LITERT_CAPABILITY_IDS.includes(c as ModelCapabilityId),
+    )
+    .map((c) => ({
+      id: c,
+      label: t(MODEL_CAPABILITY_KEYS[c]),
+      icon: MODEL_CAPABILITY_ICONS[c],
+    }));
+
+  //installed model detail sheet
+  const litertModelDetailSheet = (
+    <DrawerSheet
+      visible={installedModel !== null}
+      onClose={() => setInstalledModel(null)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.addModelSheetDesktop}
+    >
+      {installedModel && installedEntry && (
+        <SheetBody style={styles.addModelSheetBody}>
+          <SheetScrollView
+            contentContainerStyle={styles.addModelSheetContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.contentCard}>
+              <View style={styles.litertDetailHeader}>
+                <View style={styles.litertDetailTile}>
+                  <Image
+                    source={{
+                      uri: modelAvatarUrl(
+                        installedEntry,
+                        installedEntry.repoId,
+                      ),
+                    }}
+                    style={styles.litertTileImage}
+                  />
+                </View>
+                <View style={styles.litertDetailInfo}>
+                  <Text style={styles.litertDetailName}>
+                    {installedEntry.label}
+                  </Text>
+                  {!!installedPublisher && (
+                    <Text style={styles.litertDetailMeta}>
+                      {installedPublisher}
+                    </Text>
+                  )}
+                  <Text style={styles.litertDetailMeta}>
+                    {formatBytes(installedEntry.sizeBytes)}
+                  </Text>
+                  {installedCapabilities.map((capability) => (
+                    <View key={capability.id} style={styles.litertCapability}>
+                      <Image
+                        source={capability.icon}
+                        style={styles.litertCapabilityIcon}
+                        tintColor={Colors.textSecondary}
+                      />
+                      <Text style={styles.litertDetailMeta}>
+                        {capability.label}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              <Text style={[styles.settingLabel, styles.litertDetailSection]}>
+                {t("settings.litert.description")}
+              </Text>
+              <Text style={styles.helpText}>
+                {installedModel.description === undefined
+                  ? t("settings.litert.loading")
+                  : (installedModel.description ??
+                    t("settings.litert.noDescription"))}
+              </Text>
+            </View>
+
+            <View style={styles.contentCard}>
+              <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+                <Group>
+                  <ActionButton
+                    icon={binIcon}
+                    label={t("settings.litert.deleteModel")}
+                    onPress={() =>
+                      handleDeleteLitert({
+                        id: installedEntry.repoId,
+                        label: installedEntry.label,
+                        sizeStr: formatBytes(installedEntry.sizeBytes),
+                      })
+                    }
+                  />
+                </Group>
+              </View>
+            </View>
+          </SheetScrollView>
+        </SheetBody>
+      )}
+    </DrawerSheet>
+  );
+
   const profileEditSheet = (
     <DrawerSheet
       visible={profileEditVisible}
@@ -7898,13 +7325,15 @@ export default function SettingsDrawer({
 
             {addModelSheet}
             {ollamaAddServerSheet}
+            {ollamaServerSheet}
             {openaiAddServerSheet}
-            {openaiModelsSheet}
+            {openaiServerSheet}
             {mcpAddServerSheet}
+            {mcpDetailSheet}
             {cloudSetupSheet}
-            {hubPairingSheet}
             {localModelDetailSheet}
             {litertDownloadSheet}
+            {litertModelDetailSheet}
             {profileEditSheet}
           </Animated.View>
         </View>
@@ -7944,13 +7373,15 @@ export default function SettingsDrawer({
       {notificationModal}
       {addModelSheet}
       {ollamaAddServerSheet}
+      {ollamaServerSheet}
       {openaiAddServerSheet}
-      {openaiModelsSheet}
+      {openaiServerSheet}
       {mcpAddServerSheet}
+      {mcpDetailSheet}
       {cloudSetupSheet}
-      {hubPairingSheet}
       {localModelDetailSheet}
       {litertDownloadSheet}
+      {litertModelDetailSheet}
       {profileEditSheet}
     </View>
   );
@@ -8293,12 +7724,6 @@ const makeStyles = (Colors: ThemeColors) =>
     addModelSheetContent: {
       paddingHorizontal: Spacing.lg2,
       paddingBottom: Spacing.lg,
-    },
-    hubPageIcon: {
-      width: 120,
-      height: 120,
-      alignSelf: "center",
-      marginVertical: Spacing.xl2,
     },
     groupSpacing: {
       marginBottom: Spacing.xxl,

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  ImageSourcePropType,
+  Keyboard,
   Platform,
   Pressable,
   ScrollView,
@@ -19,29 +21,47 @@ import {
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import {
+  HubDevice,
   HubProfile,
   hubErrorCode,
   OperaHub,
   PairedHub,
 } from "../../services/hub/OperaHubService";
 import ActionButton from "../ui/ActionButton";
+import CardGrid, { GridCard } from "../ui/CardGrid";
 import Group from "../ui/Group";
 import { pressStyle } from "../ui/pressStyle";
 import TextInputField from "../ui/TextInputField";
 import DrawerBackButton from "./DrawerBackButton";
-import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
+import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
+import PageStack from "./PageStack";
 import ProfileCard from "./ProfileCard";
 
 const keyIcon = require("../../../assets/icons/key.png");
 const newIcon = require("../../../assets/icons/hyperlink2.png");
 const penIcon = require("../../../assets/icons/pencil.png");
+const binIcon = require("../../../assets/icons/bin.png");
+const profilIcon = require("../../../assets/icons/profil.png");
+const phoneIcon = require("../../../assets/icons/phone.png");
+const laptopIcon = require("../../../assets/icons/laptop.png");
+const webIcon = require("../../../assets/icons/website.png");
+const operaIcon = require("../../../assets/icons/operaicon.png");
 
-const DESKTOP_CARD_WIDTH = 560;
-const DESKTOP_CARD_WIDTH_NARROW = 440;
+const HUB_DEVICE_ICONS: Record<string, ImageSourcePropType> = {
+  phone: phoneIcon,
+  desktop: laptopIcon,
+  web: webIcon,
+};
+
+const KINDS = ["phone", "desktop", "web"] as const;
+type DeviceKind = (typeof KINDS)[number] | "other";
+
+const DESKTOP_CARD_WIDTH = 720;
+const DESKTOP_CARD_WIDTH_NARROW = 560;
 //shorter passwords fall to a guessing hub
 export const MIN_PASSWORD_LENGTH = 8;
 
-type Page = "pick" | "create" | "unlock" | "link" | "password";
+type Page = "pick" | "create" | "unlock" | "link" | "profile" | "password";
 
 type HubProfileSheetProps = {
   visible: boolean;
@@ -52,14 +72,31 @@ type HubProfileSheetProps = {
   defaultName?: string;
   //opens on the password change instead
   changePassword?: boolean;
+  //target profile shown in drawer
+  profile?: HubProfile | null;
+  //hub devices of the profile
+  devices?: HubDevice[] | null;
+  //identify active device
+  thisDeviceId?: string | null;
+  //show password action for self
+  isSelf?: boolean;
+  //admins can manage other profiles
+  canManage?: boolean;
   onClose: () => void;
   onDone: (profile: HubProfile) => void;
+  onSelectDevice?: (device: HubDevice) => void;
+  onToggleRole?: (profile: HubProfile) => void;
+  onRemoveProfile?: (profile: HubProfile) => void;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
 };
 
-const parentOf = (page: Page): Page | null =>
-  page === "create" || page === "unlock" ? "pick" : null;
+//navigate up stack
+const parentOf = (page: Page): Page | null => {
+  if (page === "create" || page === "unlock" || page === "link") return "pick";
+  if (page === "password") return "profile";
+  return null;
+};
 
 //pick, create, unlock or link a profile on a sampler
 export default function HubProfileSheet({
@@ -68,8 +105,16 @@ export default function HubProfileSheet({
   allowCreate = true,
   defaultName = "",
   changePassword = false,
+  profile: profileProp = null,
+  devices: devicesProp = null,
+  thisDeviceId: thisDeviceIdProp = null,
+  isSelf: isSelfProp,
+  canManage = false,
   onClose,
   onDone,
+  onSelectDevice,
+  onToggleRole,
+  onRemoveProfile,
   isLargeScreen = false,
   isDesktop = false,
 }: HubProfileSheetProps) {
@@ -78,6 +123,10 @@ export default function HubProfileSheet({
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [page, setPage] = useState<Page>("pick");
+  const [bodyWidth, setBodyWidth] = useState(0);
+  const [selfProfile, setSelfProfile] = useState<HubProfile | null>(null);
+  const [loadedDevices, setLoadedDevices] = useState<HubDevice[] | null>(null);
+  const [loadedDeviceId, setLoadedDeviceId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<HubProfile[] | null>(null);
   const [chosen, setChosen] = useState<HubProfile | null>(null);
   const [name, setName] = useState(defaultName);
@@ -87,8 +136,6 @@ export default function HubProfileSheet({
   const [digits, setDigits] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  //kept through the close animation, the prop resets as soon as the parent closes
-  const [passwordOnly, setPasswordOnly] = useState(changePassword);
   const [scrolled, setScrolled] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   //parents pass a fresh callback each render
@@ -97,13 +144,20 @@ export default function HubProfileSheet({
     onDoneRef.current = onDone;
   }, [onDone]);
 
+  const effectiveProfile = profileProp ?? selfProfile;
+  const effectiveDevices = devicesProp ?? loadedDevices;
+  const effectiveThisDeviceId = thisDeviceIdProp ?? loadedDeviceId;
+  const effectiveIsSelf =
+    isSelfProp !== undefined
+      ? isSelfProp
+      : !effectiveProfile || !selfProfile || effectiveProfile.id === selfProfile.id;
+
   //each opening starts clean
   const [wasVisible, setWasVisible] = useState(visible);
   if (visible !== wasVisible) {
     setWasVisible(visible);
     if (visible) {
-      setPasswordOnly(changePassword);
-      setPage(changePassword ? "password" : "pick");
+      setPage(changePassword ? "password" : profileProp ? "profile" : "pick");
       setProfiles(null);
       setChosen(null);
       setName(defaultName);
@@ -116,9 +170,41 @@ export default function HubProfileSheet({
     }
   }
 
+  const [prevProfile, setPrevProfile] = useState(profileProp);
+  if (profileProp !== prevProfile) {
+    setPrevProfile(profileProp);
+    if (profileProp) {
+      setPage("profile");
+      setPassword("");
+      setConfirm("");
+      setCurrent("");
+      setError(null);
+    }
+  }
+
+  //fetch profile when omitted
+  useEffect(() => {
+    if (!visible || profileProp) return;
+    OperaHub.getProfile().then((p) => {
+      if (p) setSelfProfile(p);
+    });
+  }, [visible, profileProp]);
+
+  //fetch devices when omitted
+  useEffect(() => {
+    if (!visible || !hub || devicesProp) return;
+    OperaHub.devices(hub).then(setLoadedDevices).catch(() => null);
+  }, [visible, hub, devicesProp]);
+
+  //fetch device id when omitted
+  useEffect(() => {
+    if (!visible || thisDeviceIdProp) return;
+    OperaHub.deviceId().then(setLoadedDeviceId).catch(() => null);
+  }, [visible, thisDeviceIdProp]);
+
   //a link code joins at once, an admin code lists profiles
   useEffect(() => {
-    if (!visible || !hub || changePassword) return;
+    if (!visible || !hub || changePassword || profileProp) return;
     let stopped = false;
     (async () => {
       try {
@@ -143,9 +229,10 @@ export default function HubProfileSheet({
     return () => {
       stopped = true;
     };
-  }, [visible, hub, changePassword, t]);
+  }, [visible, hub, changePassword, profileProp, t]);
 
   const showPage = (next: Page) => {
+    Keyboard.dismiss();
     setScrolled(false);
     setError(null);
     setPassword("");
@@ -156,6 +243,7 @@ export default function HubProfileSheet({
   const handleBack = () => {
     const parent = parentOf(page);
     if (!parent || busy) return false;
+    Keyboard.dismiss();
     showPage(parent);
     return true;
   };
@@ -212,7 +300,10 @@ export default function HubProfileSheet({
     if (problem) return setError(problem);
     run(async () => {
       await OperaHub.changePassword(hub!, current, password);
-      onClose();
+      setPassword("");
+      setConfirm("");
+      setCurrent("");
+      showPage("profile");
     });
   };
 
@@ -258,7 +349,7 @@ export default function HubProfileSheet({
             {profiles.map((profile) => (
               <Pressable
                 key={profile.id}
-                style={pressStyle(styles.gridCard, "fadeLight")}
+                style={pressStyle([styles.gridCard, isDesktop && styles.gridCardDesktop], "fadeLight")}
                 onPress={() => {
                   setChosen(profile);
                   showPage("unlock");
@@ -423,6 +514,86 @@ export default function HubProfileSheet({
     </View>
   );
 
+  const renderProfileView = () => {
+    const target = effectiveProfile;
+    if (!target) return null;
+
+    const profileDevices = (effectiveDevices ?? []).filter((d) => d.profile === target.id);
+    const deviceCards: GridCard[] = profileDevices.map((device) => {
+      const kind: DeviceKind = KINDS.find((k) => k === device.kind) ?? "other";
+      const icon = HUB_DEVICE_ICONS[device.kind] ?? operaIcon;
+      const status =
+        device.id === effectiveThisDeviceId
+          ? t("settings.hub.thisDevice")
+          : t(`hubDevice.kinds.${kind}`);
+      return {
+        key: device.id,
+        title: device.name,
+        icon,
+        status,
+        onPress: onSelectDevice ? () => onSelectDevice(device) : undefined,
+      };
+    });
+
+    return (
+      <>
+        {/* profile card */}
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <ProfileCard name={target.name} createdAt={target.createdAt ? target.createdAt * 1000 : undefined} />
+          </View>
+        </View>
+
+        {/* devices section */}
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.hub.devices")}
+            </Text>
+            {deviceCards.length > 0 ? (
+              <CardGrid cards={deviceCards} minCardWidth={140} />
+            ) : (
+              <Text style={styles.helpText}>{t("hubProfile.noDevices")}</Text>
+            )}
+          </View>
+        </View>
+
+        {/* actions section */}
+        {(effectiveIsSelf || (canManage && !effectiveIsSelf)) && (
+          <View style={[styles.contentCard, { marginBottom: 0 }]}>
+            <Group>
+              {effectiveIsSelf && (
+                <ActionButton
+                  icon={keyIcon}
+                  label={t("hubProfile.changeMyPassword")}
+                  onPress={() => showPage("password")}
+                />
+              )}
+              {!effectiveIsSelf && canManage && (
+                <>
+                  <ActionButton
+                    icon={profilIcon}
+                    label={
+                      target.role === "admin"
+                        ? t("sampler.profile.makeMember")
+                        : t("sampler.profile.makeAdmin")
+                    }
+                    onPress={() => onToggleRole?.(target)}
+                  />
+                  <ActionButton
+                    icon={binIcon}
+                    label={t("sampler.profile.remove")}
+                    onPress={() => onRemoveProfile?.(target)}
+                  />
+                </>
+              )}
+            </Group>
+          </View>
+        )}
+      </>
+    );
+  };
+
   const renderPage = (p: Page, active: boolean) => (
     <>
       <SheetScrollView
@@ -443,12 +614,13 @@ export default function HubProfileSheet({
         {p === "unlock" && renderUnlock()}
         {p === "create" && renderCreate()}
         {p === "link" && renderLink()}
+        {p === "profile" && renderProfileView()}
         {p === "password" && renderPasswordChange()}
       </SheetScrollView>
 
       {/* floats over the scroll like the settings back button */}
       {parentOf(p) && (
-        <View style={[styles.backWrapper, (isLargeScreen || isDesktop) && styles.backWrapperDesktop]} pointerEvents="box-none">
+        <View style={styles.backWrapper} pointerEvents="box-none">
           <DrawerBackButton
             kind="back"
             onPress={handleBack}
@@ -474,12 +646,29 @@ export default function HubProfileSheet({
         styles.sheet,
         {
           paddingBottom: Platform.OS === "ios" ? 34 : 20,
-          maxHeight: windowHeight - insets.top - Spacing.xl2,
+          //stacked pages need fixed height
+          height: windowHeight - insets.top - Spacing.xl2,
         },
       ]}
-      desktopStyle={passwordOnly ? styles.desktopCardNarrow : styles.desktopCard}
+      //desktop card fills drawer height
+      desktopStyle={[styles.desktopCard, { height: "100%" }]}
     >
-      {renderPage(page, true)}
+      <SheetBody
+        style={styles.body}
+        onLayout={(e) => {
+          const width = e.nativeEvent.layout.width;
+          setBodyWidth((prev) => (prev !== width ? width : prev));
+        }}
+      >
+        <PageStack
+          page={page}
+          visible={visible}
+          width={bodyWidth}
+          parentOf={parentOf}
+          onBack={handleBack}
+          renderPage={renderPage}
+        />
+      </SheetBody>
     </DrawerSheet>
   );
 }
@@ -487,6 +676,9 @@ export default function HubProfileSheet({
 //same values as the settings sheets
 const makeStyles = (Colors: ThemeColors) =>
   StyleSheet.create({
+    body: {
+      flex: 1,
+    },
     sheet: {
       position: "absolute",
       bottom: 0,
@@ -519,7 +711,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     //room for the floating back button
     contentWithBack: {
-      paddingTop: 40 + Spacing.md,
+      paddingTop: 40 + Spacing.xxl,
     },
     backWrapper: {
       position: "absolute",
@@ -529,10 +721,6 @@ const makeStyles = (Colors: ThemeColors) =>
       height: 40,
       zIndex: 10,
       elevation: 10,
-    },
-    //below the desktop close button
-    backWrapperDesktop: {
-      top: Spacing.lg2 + 40 + Spacing.md,
     },
     contentCard: {
       backgroundColor: Colors.surface,
@@ -575,11 +763,14 @@ const makeStyles = (Colors: ThemeColors) =>
       gap: Spacing.md,
       marginBottom: Spacing.md,
     },
-    //two per row, a lone last card fills it
+    //two per row, three on desktop, a lone last card fills it
     gridCard: {
       flexGrow: 1,
       flexBasis: "40%",
       borderRadius: Radius.xl,
+    },
+    gridCardDesktop: {
+      flexBasis: "30%",
     },
     digits: {
       fontFamily: Fonts.mono,

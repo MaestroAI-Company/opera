@@ -182,7 +182,7 @@ export function HubModelPage({ file, onDeleted }: { file: string; onDeleted: () 
       </View>
 
       {/* actions section */}
-      <View style={styles.contentCard}>
+      <View style={[styles.contentCard, { marginBottom: 0 }]}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           {!!error && <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{error}</Text>}
           <Group>

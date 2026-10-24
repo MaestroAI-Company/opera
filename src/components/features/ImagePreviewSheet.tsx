@@ -8,7 +8,7 @@ import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
-const DESKTOP_CARD_WIDTH = 620;
+const DESKTOP_CARD_WIDTH = 840;
 
 export type PreviewImage = { uri: string };
 

@@ -318,7 +318,6 @@ export type SubPage =
   | "profile"
   | "cloud"
   | "hubprovider"
-  | "hubserver"
   | "mobileactions"
   | "mcpservers"
   | "mcpserver"
@@ -344,7 +343,6 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   profile: "main",
   cloud: "main",
   hubprovider: "service",
-  hubserver: "hubprovider",
   sociallinks: "main",
   widgets: "tools",
   mobileactions: "tools",
@@ -838,6 +836,11 @@ export default function SettingsDrawer({
   const [ollamaModels, setOllamaModels] = useState<string[]>([]);
   const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
   const [hubDetailUrl, setHubDetailUrl] = useState<string | null>(null);
+  //closing clears the url, the slide out keeps the last server
+  const [shownHubUrl, setShownHubUrl] = useState<string | null>(null);
+  if (hubDetailUrl !== null && hubDetailUrl !== shownHubUrl) {
+    setShownHubUrl(hubDetailUrl);
+  }
   //hub server prefs live outside react state
   const [, setHubPrefsTick] = useState(0);
   //ignore stale server answers
@@ -934,6 +937,7 @@ export default function SettingsDrawer({
     addModelSheetVisible ||
     ollamaAddVisible ||
     ollamaDetailIndex !== null ||
+    hubDetailUrl !== null ||
     openaiAddVisible ||
     openaiDetailIndex !== null ||
     mcpAddVisible ||
@@ -2029,7 +2033,6 @@ export default function SettingsDrawer({
     );
     setOllamaModels([]);
     loadOllamaModels(server.url, HUB_PROVIDER_ID);
-    setActiveSubPage("hubserver");
   };
 
   //active server picks up new tuning
@@ -3041,6 +3044,7 @@ export default function SettingsDrawer({
         setActiveSubPage("main");
         setInstalledModel(null);
         setOllamaDetailIndex(null);
+        setHubDetailUrl(null);
         setOpenAIDetailIndex(null);
       };
       if (isDesktop) {
@@ -4344,15 +4348,14 @@ export default function SettingsDrawer({
     </View>
   );
 
-  //hub server page like the ollama one
-  const renderHubServerSubPage = () => {
-    const server = getHubServers().find((s) => s.url === hubDetailUrl);
-    if (!server) return renderHubProviderSubPage();
+  //hub server drawer content like the ollama one
+  const renderHubServerContent = (
+    server: ReturnType<typeof getHubServers>[number],
+  ) => {
     const url = server.url;
 
     return (
-      <View style={styles.subPageContainer}>
-        {renderSubPageHeader(server.name)}
+      <>
 
         {/* llama.cpp options, set in the sampler screen */}
         {url === LLAMA_SERVER_URL && hubStatus?.ctxSize != null && (
@@ -4484,7 +4487,7 @@ export default function SettingsDrawer({
             </Group>
           </View>
         )}
-      </View>
+      </>
     );
   };
 
@@ -5215,8 +5218,6 @@ export default function SettingsDrawer({
         return renderCloudSubPage();
       case "hubprovider":
         return renderHubProviderSubPage();
-      case "hubserver":
-        return renderHubServerSubPage();
       case "general":
         return renderGeneralSubPage();
       case "maestro":
@@ -5802,8 +5803,23 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
-  const ollamaDetailServer =
+  const liveOllamaServer =
     ollamaDetailIndex !== null ? ollamaServers[ollamaDetailIndex] : undefined;
+  //closing clears the index, the slide out keeps the last server
+  const [shownOllama, setShownOllama] = useState<{
+    index: number;
+    server: OllamaServer;
+  } | null>(null);
+  if (
+    ollamaDetailIndex !== null &&
+    liveOllamaServer &&
+    (shownOllama?.index !== ollamaDetailIndex ||
+      shownOllama.server !== liveOllamaServer)
+  ) {
+    setShownOllama({ index: ollamaDetailIndex, server: liveOllamaServer });
+  }
+  const ollamaDetailServer = shownOllama?.server;
+  const shownOllamaIndex = shownOllama?.index ?? null;
   const ollamaDetailUrl = ollamaDetailServer?.url.trim() ?? "";
   const ollamaDetailConnected =
     ollamaDetailUrl.length > 0 && serverErrors[ollamaDetailUrl] === false;
@@ -5811,7 +5827,7 @@ export default function SettingsDrawer({
   //ollama server detail sheet
   const ollamaServerSheet = (
     <DrawerSheet
-      visible={ollamaDetailIndex !== null && !!ollamaDetailServer}
+      visible={ollamaDetailIndex !== null && !!liveOllamaServer}
       onClose={() => setOllamaDetailIndex(null)}
       mode="overlay"
       isLargeScreen={isLargeScreen}
@@ -5832,7 +5848,7 @@ export default function SettingsDrawer({
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
-          {ollamaDetailServer && ollamaDetailIndex !== null && (
+          {ollamaDetailServer && shownOllamaIndex !== null && (
             <>
               <View style={styles.contentCard}>
                 <View style={styles.settingRowVertical}>
@@ -5847,7 +5863,7 @@ export default function SettingsDrawer({
                       placeholder={t("settings.server.namePlaceholder")}
                       value={ollamaDetailServer.name}
                       onChangeText={(v) =>
-                        patchOllamaServer(ollamaDetailIndex, { name: v })
+                        patchOllamaServer(shownOllamaIndex, { name: v })
                       }
                     />
                   </Group>
@@ -5868,9 +5884,9 @@ export default function SettingsDrawer({
                       keyboardType="url"
                       value={ollamaDetailServer.url}
                       onChangeText={(v) =>
-                        patchOllamaServer(ollamaDetailIndex, { url: v })
+                        patchOllamaServer(shownOllamaIndex, { url: v })
                       }
-                      onBlur={() => handleOllamaUrlBlur(ollamaDetailIndex)}
+                      onBlur={() => handleOllamaUrlBlur(shownOllamaIndex)}
                       rightIcon={
                         serverErrors[ollamaDetailUrl] ? errorIcon : undefined
                       }
@@ -5913,7 +5929,7 @@ export default function SettingsDrawer({
                         placeholder="8192"
                         value={ollamaContextDraft}
                         onChangeText={(v) =>
-                          setOllamaServerContext(ollamaDetailIndex, v)
+                          setOllamaServerContext(shownOllamaIndex, v)
                         }
                         keyboardType="numeric"
                       />
@@ -5925,7 +5941,7 @@ export default function SettingsDrawer({
                           serverContextLength(ollamaDetailServer),
                         )}
                         onSelect={(v) =>
-                          setOllamaServerContext(ollamaDetailIndex, v)
+                          setOllamaServerContext(shownOllamaIndex, v)
                         }
                       />
                     )}
@@ -5961,7 +5977,7 @@ export default function SettingsDrawer({
                         placeholder="300"
                         value={ollamaKeepAliveDraft}
                         onChangeText={(v) =>
-                          setOllamaServerKeepAlive(ollamaDetailIndex, v)
+                          setOllamaServerKeepAlive(shownOllamaIndex, v)
                         }
                         keyboardType="numeric"
                       />
@@ -5973,7 +5989,7 @@ export default function SettingsDrawer({
                           serverKeepAlive(ollamaDetailServer),
                         )}
                         onSelect={(v) =>
-                          setOllamaServerKeepAlive(ollamaDetailIndex, v)
+                          setOllamaServerKeepAlive(shownOllamaIndex, v)
                         }
                       />
                     )}
@@ -5990,10 +6006,10 @@ export default function SettingsDrawer({
                 disabled={ollamaDetailServer.disabledModels}
                 capabilities={ollamaDetailServer.capabilities}
                 onChange={(next) =>
-                  patchOllamaServer(ollamaDetailIndex, { disabledModels: next })
+                  patchOllamaServer(shownOllamaIndex, { disabledModels: next })
                 }
                 onCapabilitiesChange={(next) =>
-                  patchOllamaServer(ollamaDetailIndex, { capabilities: next })
+                  patchOllamaServer(shownOllamaIndex, { capabilities: next })
                 }
               />
 
@@ -6011,13 +6027,13 @@ export default function SettingsDrawer({
                         disabled={
                           ollamaModelsLoading || ollamaDetailUrl.length === 0
                         }
-                        onPress={() => reconnectOllamaServer(ollamaDetailIndex)}
+                        onPress={() => reconnectOllamaServer(shownOllamaIndex)}
                       />
                     )}
                     <ActionButton
                       icon={binIcon}
                       label={t("settings.ollama.remove.action")}
-                      onPress={() => removeOllamaServer(ollamaDetailIndex)}
+                      onPress={() => removeOllamaServer(shownOllamaIndex)}
                     />
                   </Group>
                 </View>
@@ -6025,6 +6041,37 @@ export default function SettingsDrawer({
             </>
           )}
         </SheetKeyboardAwareScrollView>
+    </DrawerSheet>
+  );
+
+  const shownHubServer = getHubServers().find((s) => s.url === shownHubUrl);
+
+  //hub server detail sheet
+  const hubServerSheet = (
+    <DrawerSheet
+      visible={hubDetailUrl !== null && !!shownHubServer}
+      onClose={() => setHubDetailUrl(null)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      avoidKeyboard
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.addModelSheetDesktop}
+    >
+      <SheetKeyboardAwareScrollView
+        bottomOffset={Spacing.xl2}
+        contentContainerStyle={styles.addModelSheetContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {shownHubServer && renderHubServerContent(shownHubServer)}
+      </SheetKeyboardAwareScrollView>
     </DrawerSheet>
   );
 
@@ -7326,6 +7373,7 @@ export default function SettingsDrawer({
             {addModelSheet}
             {ollamaAddServerSheet}
             {ollamaServerSheet}
+            {hubServerSheet}
             {openaiAddServerSheet}
             {openaiServerSheet}
             {mcpAddServerSheet}
@@ -7374,6 +7422,7 @@ export default function SettingsDrawer({
       {addModelSheet}
       {ollamaAddServerSheet}
       {ollamaServerSheet}
+      {hubServerSheet}
       {openaiAddServerSheet}
       {openaiServerSheet}
       {mcpAddServerSheet}

@@ -81,6 +81,8 @@ export function formatBytes(bytes: number): string {
 }
 
 export function fitsInDeviceMemory(sizeBytes: number): boolean {
+  //force load lifts the size gate
+  if (Settings.getCached().litertForceLoad) return true;
   const totalMemory = Device.totalMemory;
   if (!totalMemory) return true;
   return totalMemory >= sizeBytes * MIN_TOTAL_RAM_RATIO;

@@ -519,7 +519,7 @@ export const fr: Translations = {
     "Budget du cache KV — des valeurs basses consomment moins de mémoire.",
   "settings.litert.forceLoad": "Forcer le chargement",
   "settings.litert.forceLoadHelp":
-    "Ignore la vérification de mémoire préalable. Peut planter si l'appareil manque de mémoire.",
+    "Ignore la vérification de mémoire préalable et autorise le téléchargement de modèles trop gros pour cet appareil. Peut planter si l'appareil manque de mémoire.",
   "generation.error.contextLength":
     "Cette conversation est trop longue pour le modèle. Lance une nouvelle discussion, ou augmente la longueur de contexte dans les réglages.",
   "generation.error.memory":

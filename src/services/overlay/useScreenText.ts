@@ -15,7 +15,8 @@ export function useScreenText(session: number, enabled: boolean) {
     let cancelled = false;
     //codes unread when overlay hidden
     const appState = AppState.addEventListener('change', state => {
-      if (state !== 'active') cancelled = true;
+      //brief pause resumes after prompt
+      cancelled = state !== 'active';
     });
 
     const task = InteractionManager.runAfterInteractions(async () => {

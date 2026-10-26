@@ -18,6 +18,8 @@
     "oauth:allow-start",
     "oauth:allow-cancel",
     "opener:default",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text",
     {
       "identifier": "http:default",
       "allow": [

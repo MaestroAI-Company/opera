@@ -55,6 +55,9 @@ class SpeechToTextService {
   //request speech permissions
   async requestPermissions(): Promise<boolean> {
     try {
+      //prompt pauses activity even if granted
+      const current = await ExpoSpeechRecognitionModule.getPermissionsAsync();
+      if (current.granted) return true;
       const result = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
       return !!result.granted;
     } catch (e) {

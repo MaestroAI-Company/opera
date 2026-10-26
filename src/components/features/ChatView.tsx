@@ -32,13 +32,13 @@ import IconButton from "../ui/IconButton";
 import { deriveChatDisplay, describeToolCall, renderMarkdown } from "../ui/MarkdownText";
 import SuggestionPill from "../ui/SuggestionPill";
 import ThinkingIcon from "../ui/ThinkingIcon";
+import ButterflyCluster from "./ButterflyCluster";
 import type { PreviewImage } from "./ImagePreviewSheet";
 import type { PreviewDetails } from "./MessageDetailsSheet";
 import { pressStyle } from "../ui/pressStyle";
 
-const butterflyImage = require("../../../assets/images/butterfly5.png");
-const butterflyGreyImage = require("../../../assets/images/butterfly2_grey.png");
 const speakerIcon = require("../../../assets/icons/speaker.png");
+const videoIcon = require("../../../assets/icons/camera.png");
 const reloadIcon = require("../../../assets/icons/reload.png");
 const copyIcon = require("../../../assets/icons/copy.png");
 const infoIcon = require("../../../assets/icons/info.png");
@@ -49,6 +49,7 @@ const linkSourceIcon = require("../../../assets/icons/hyperlink.png");
 const arrowIcon = require("../../../assets/icons/return.png");
 const fileIcon = require("../../../assets/icons/file.png");
 const rightArrowIcon = require("../../../assets/icons/right.png");
+const pencilIcon = require("../../../assets/icons/edit.png");
 
 //android 13+ shows its own clipboard confirmation
 const ANDROID_CLIPBOARD_UI_API = 33;
@@ -118,7 +119,8 @@ const SourcePill = ({ source }: { source: MessageSource }) => {
 
 //readable name from a data uri or path
 function attachmentFilename(path: string): string {
-  if (path.startsWith('data:')) return 'Audio Recording.wav';
+  //pasted files carry their own name
+  if (path.startsWith('data:') && !path.includes('?name=')) return 'Audio Recording.wav';
   if (path.includes('?name=')) {
     try {
       return decodeURIComponent(path.split('?name=')[1]);
@@ -168,10 +170,16 @@ type ChatViewProps = {
   onSuggestionPress?: (text: string) => void;
   onImagePress?: (image: PreviewImage) => void;
   onDetailsPress?: (details: PreviewDetails) => void;
+  onEditMessage?: (item: Message) => void;
+  //toggle gates the ai edit button
+  editAiEnabled?: boolean;
+  //home butterfly frame to fly from
+  butterflyFrom?: DOMRect | null;
 };
 
 const stripMarkdown = (md: string) => {
   return md
+    .replace(/!\[([^\]]*)\]\([^\)]+\)/g, '$1')
     .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
     .replace(/[#_*~`]/g, '')
     .replace(/^> /gm, '')
@@ -245,7 +253,7 @@ const ToolsPill = ({ calls }: { calls: ToolCall[] }) => {
   );
 };
 
-const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isQueued, isChatGenerating, showMetrics, fallbackModel, canThink, dark, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isQueued?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string; canThink?: boolean; dark?: boolean; onOpenInApp?: (item: Message) => void; suggestions?: Suggestion[]; onSuggestionPress?: (text: string) => void; onImagePress?: (image: PreviewImage) => void; onDetailsPress?: (details: PreviewDetails) => void }) => {
+const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled, onSpeak, isSpeaking, showSnackbar, isGenerating, isQueued, isChatGenerating, showMetrics, fallbackModel, canThink, dark, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress, onEditMessage, editAiEnabled }: { item: Message; incognito?: boolean; onRegenerate?: (id: string) => void; speakerEnabled?: boolean; onSpeak?: (item: Message) => void; isSpeaking?: boolean; showSnackbar: (msg: string) => void; isGenerating?: boolean; isQueued?: boolean; isChatGenerating?: boolean; showMetrics?: boolean; fallbackModel?: string; canThink?: boolean; dark?: boolean; onOpenInApp?: (item: Message) => void; suggestions?: Suggestion[]; onSuggestionPress?: (text: string) => void; onImagePress?: (image: PreviewImage) => void; onDetailsPress?: (details: PreviewDetails) => void; onEditMessage?: (item: Message) => void; editAiEnabled?: boolean }) => {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const isUser = item.role === "user";
@@ -323,8 +331,9 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               )}
               {item.images?.map((uri, i) => {
                 const isAudio = uri.startsWith('data:audio') || /\.(wav|mp3|m4a|aac|flac|ogg)(?:\?.*)?$/i.test(uri);
-                return isAudio ? (
-                  <AttachmentChip key={i} icon={speakerIcon} label={attachmentFilename(uri)} />
+                const isVideo = uri.startsWith('data:video') || /\.(mp4|mov|webm)(?:\?.*)?$/i.test(uri);
+                return isAudio || isVideo ? (
+                  <AttachmentChip key={i} icon={isVideo ? videoIcon : speakerIcon} label={attachmentFilename(uri)} />
                 ) : (
                   <Pressable key={i} onPress={() => onImagePress?.({ uri })} style={pressStyle(null, "fadeLight")}>
                     <Image source={{ uri }} style={styles.messageImage} />
@@ -348,6 +357,18 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
               >
                 {visibleContent}
               </Text>
+            </View>
+          )}
+          {!!visibleContent && !isBusy && !isChatGenerating && (
+            <View style={styles.userToolbar}>
+              <IconButton
+                icon={pencilIcon}
+                label={t("common.edit")}
+                onPress={() => onEditMessage?.(item)}
+                containerSize={32}
+                pressedColor={Colors.surfacePressed}
+                tintColor={dark ? Colors.surface : Colors.textMuted}
+              />
             </View>
           )}
         </>
@@ -428,6 +449,17 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                   tintColor={dark ? Colors.surface : Colors.textMuted}
                 />
               )}
+              {editAiEnabled && !!onEditMessage && (
+                <IconButton
+                  icon={pencilIcon}
+                  label={t("common.edit")}
+                  onPress={() => onEditMessage(item)}
+                  disabled={isChatGenerating}
+                  containerSize={32}
+                  pressedColor={Colors.surfacePressed}
+                  tintColor={dark ? Colors.surface : Colors.textMuted}
+                />
+              )}
               {showMetrics && !!onDetailsPress && (
                 <IconButton
                   icon={infoIcon}
@@ -492,16 +524,19 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   prev.onOpenInApp === next.onOpenInApp &&
   prev.onSuggestionPress === next.onSuggestionPress &&
   prev.onImagePress === next.onImagePress &&
-  prev.onDetailsPress === next.onDetailsPress);
+  prev.onDetailsPress === next.onDetailsPress &&
+  prev.onEditMessage === next.onEditMessage &&
+  prev.editAiEnabled === next.editAiEnabled);
 MessageItem.displayName = "MessageItem";
 
-export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, queuedMessageIds, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress }: ChatViewProps) {
+export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, queuedMessageIds, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress, onEditMessage, editAiEnabled, butterflyFrom }: ChatViewProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const listRef = useRef<FlatList>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
   const isAtBottomRef = useRef(true);
-  const initialScrollDone = useRef(false);
+  //chat from home keeps its header in view
+  const initialScrollDone = useRef(!!butterflyFrom);
 
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
 
@@ -563,8 +598,8 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   }, [messages]);
 
   const renderItem = useCallback(({ item }: { item: Message }) => {
-    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isQueued={!!queuedMessageIds?.includes(item.id)} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} suggestions={item.id === lastAssistantId ? suggestions : undefined} onSuggestionPress={onSuggestionPress} onImagePress={onImagePress} onDetailsPress={onDetailsPress} />;
-  }, [incognito, onRegenerate, speakerEnabled, handleSpeak, speakingMessageId, generatingMessageId, queuedMessageIds, showMetrics, conversation?.model, canThink, dark, onOpenInApp, lastAssistantId, suggestions, onSuggestionPress, onImagePress, onDetailsPress]);
+    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isQueued={!!queuedMessageIds?.includes(item.id)} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} suggestions={item.id === lastAssistantId ? suggestions : undefined} onSuggestionPress={onSuggestionPress} onImagePress={onImagePress} onDetailsPress={onDetailsPress} onEditMessage={onEditMessage} editAiEnabled={editAiEnabled} />;
+  }, [incognito, onRegenerate, speakerEnabled, handleSpeak, speakingMessageId, generatingMessageId, queuedMessageIds, showMetrics, conversation?.model, canThink, dark, onOpenInApp, lastAssistantId, suggestions, onSuggestionPress, onImagePress, onDetailsPress, onEditMessage, editAiEnabled]);
 
   return (
     <View style={styles.container}>
@@ -579,12 +614,17 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
           !hideHeader && conversation ? (
             <View
               style={styles.headerBlock}
-              onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
+              //only the initial scroll reads it
+              onLayout={(e) => {
+                if (!initialScrollDone.current) setHeaderHeight(e.nativeEvent.layout.height);
+              }}
             >
-              <Image
-                source={incognito ? butterflyGreyImage : butterflyImage}
+              <ButterflyCluster
+                incognito={incognito}
                 style={styles.headerButterfly}
-                resizeMode="contain"
+                from={butterflyFrom}
+                parallax={false}
+                intro={false}
               />
               <Text style={styles.headerTitle} numberOfLines={2}>
                 {conversation.name}
@@ -716,8 +756,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingBottom: 32,
   },
   headerButterfly: {
-    width: 100,
-    height: 90,
+    width: 140,
+    height: 126,
     marginBottom: 22,
   },
   headerTitle: {
@@ -813,6 +853,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     marginTop: 8,
     gap: 16,
   },
+  //right aligned under user bubble
+  userToolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    marginTop: 4,
+    gap: 16,
+  },
   suggestionBar: {
     marginTop: Spacing.md,
     //row sizes itself inside column
@@ -836,7 +884,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     zIndex: 1000,
   },
   snackbar: {
-    backgroundColor: Colors.textSecondary,
+    backgroundColor: Colors.snackbarBg,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: Radius.pill,
@@ -844,7 +892,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     elevation: 5,
   },
   snackbarText: {
-    color: Colors.surface,
+    color: Colors.textOnPrimary,
+    fontFamily: Fonts.mono,
     fontSize: FontSizes.bodyMd,
   },
   messageImage: {

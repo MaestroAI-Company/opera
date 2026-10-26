@@ -37,7 +37,7 @@ export default function ActionButton({
     <Pressable
       style={({ pressed, hovered }) => [
         styles.navItem,
-        (pressed || hovered) && !disabled && (isHighlight ? { backgroundColor: Colors.primaryPressed } : styles.navItemPressed),
+        (pressed || hovered) && !disabled && (isHighlight ? { backgroundColor: Colors.primaryBright } : styles.navItemPressed),
         style,
       ]}
       onPress={onPress}

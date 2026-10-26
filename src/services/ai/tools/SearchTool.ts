@@ -2,6 +2,7 @@ import { ITool, ToolDefinition, ToolPlatform, ToolSource } from './ITool';
 import { SearchBridge } from '../../search/SearchBridge';
 import { Platform } from 'react-native';
 import { universalFetch } from '../utils/universalFetch';
+import { isTauri } from '../../platform';
 
 export class SearchTool implements ITool {
   displayName = 'Web Search';
@@ -42,16 +43,18 @@ export class SearchTool implements ITool {
     try {
       let results: any[] = [];
 
-      if (Platform.OS === 'web') {
+      //desktop reuses the mobile path
+      if (Platform.OS === 'web' && !isTauri) {
         const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
         const res = await universalFetch(url, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
           }
         });
-        
-        if (!res.ok) {
-          throw new Error(`Failed to fetch search results: ${res.status}`);
+
+        //202 returns the anti-bot page
+        if (res.status !== 200) {
+          throw new Error(`blocked or rate-limited by DuckDuckGo (HTTP ${res.status})`);
         }
         
         const html = await res.text();
@@ -95,7 +98,7 @@ export class SearchTool implements ITool {
       return `Search results for "${query}":\n\n${formatted.join('\n\n---\n\n')}\n\nNow call fetch_pages on up to 2 of the most relevant URLs above to read their full contents. Prioritize official and trusted sources.`;
     } catch (e: any) {
       console.error('[SearchTool] error:', e?.message || e);
-      return `Search failed: ${e.message}`;
+      throw new Error(`search failed: ${e?.message || e}`);
     }
   }
 }

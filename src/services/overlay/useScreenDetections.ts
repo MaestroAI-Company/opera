@@ -17,7 +17,8 @@ export function useScreenDetections(session: number, enabled: boolean): CaptureR
     let cancelled = false;
     //boxes unread when overlay hidden
     const appState = AppState.addEventListener('change', state => {
-      if (state !== 'active') cancelled = true;
+      //brief pause resumes after prompt
+      cancelled = state !== 'active';
     });
 
     const task = InteractionManager.runAfterInteractions(async () => {

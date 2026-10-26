@@ -1,5 +1,7 @@
-import { Linking, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { ITool, ToolDefinition } from './ITool';
+import { isTauri } from '../../platform';
+import { openExternalUrl } from '../utils/openExternalUrl';
 
 export class SendMessageTool implements ITool {
   displayName = 'Communications';
@@ -51,30 +53,27 @@ export class SendMessageTool implements ITool {
       return 'Error: missing "to" (phone number or email address).';
     }
 
-    try {
-      if (method === 'call') {
-        await Linking.openURL(`tel:${to}`);
-        return `Opened dialer for ${to}.`;
-      }
-
-      if (method === 'text') {
-        const body = typeof args.body === 'string' ? args.body : '';
-        //platforms differ on the sms separator
-        const separator = Platform.OS === 'ios' ? '&' : '?';
-        const url = body ? `sms:${to}${separator}body=${encodeURIComponent(body)}` : `sms:${to}`;
-        await Linking.openURL(url);
-        return `Opened text message to ${to}.`;
-      }
-
-      const params = new URLSearchParams();
-      if (typeof args.subject === 'string' && args.subject) params.set('subject', args.subject);
-      if (typeof args.body === 'string' && args.body) params.set('body', args.body);
-      const query = params.toString();
-      await Linking.openURL(`mailto:${to}${query ? `?${query}` : ''}`);
-      return `Opened email to ${to}.`;
-    } catch (e: any) {
-      console.error('[SendMessageTool] error:', e?.message || e);
-      return `Could not open ${method}: ${e.message}. The target app may not be installed.`;
+    if (method === 'call') {
+      await openExternalUrl(`tel:${to}`);
+      return `Opened the dialer for ${to}. The user still has to place the call.`;
     }
+
+    if (method === 'text') {
+      //no sms handler on desktop
+      if (isTauri) throw new Error('SMS is not supported on desktop');
+      const body = typeof args.body === 'string' ? args.body : '';
+      //platforms differ on the sms separator
+      const separator = Platform.OS === 'ios' ? '&' : '?';
+      const url = body ? `sms:${to}${separator}body=${encodeURIComponent(body)}` : `sms:${to}`;
+      await openExternalUrl(url);
+      return `Opened a text message draft to ${to}. The user still has to send it.`;
+    }
+
+    const params = new URLSearchParams();
+    if (typeof args.subject === 'string' && args.subject) params.set('subject', args.subject);
+    if (typeof args.body === 'string' && args.body) params.set('body', args.body);
+    const query = params.toString();
+    await openExternalUrl(`mailto:${to}${query ? `?${query}` : ''}`);
+    return `Opened an email draft to ${to}. The user still has to send it.`;
   }
 }

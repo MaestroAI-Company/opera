@@ -46,7 +46,10 @@ export function initTheme(): void {
     try {
       await Settings.init();
       const saved = await Settings.load();
-      setThemeMode(saved.theme as ThemeMode);
+      //os scheme read at module load can be stale on cold start
+      systemDark = Appearance.getColorScheme() === "dark";
+      mode = saved.theme as ThemeMode;
+      resolve();
     } catch {
       //keep the os scheme when settings are unavailable
     }

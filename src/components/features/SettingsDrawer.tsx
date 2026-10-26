@@ -954,6 +954,7 @@ export default function SettingsDrawer({
   const [useAppContext, setUseAppContextState] = useState(true);
   const [autoStartMic, setAutoStartMicState] = useState(true);
   const [shareInstanceUrl, setShareInstanceUrlState] = useState("");
+  const [showRemoteImages, setShowRemoteImagesState] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   //plugin enabled states (tool name or widget id -> bool)
@@ -1329,6 +1330,7 @@ export default function SettingsDrawer({
         setAutoStartMicState(s.autoStartMic);
         setModelFailoverState(s.modelFailover);
         setShareInstanceUrlState(s.shareInstanceUrl || "");
+        setShowRemoteImagesState(s.showRemoteImages);
         setLitertForceLoadState(s.litertForceLoad);
         setLitertContextLengthState(String(s.litertContextLength));
         //installed read is synchronous while rendering
@@ -2391,6 +2393,11 @@ export default function SettingsDrawer({
   const setAutoStartMic = (v: boolean) => {
     setAutoStartMicState(v);
     Settings.set("autoStartMic", v);
+  };
+
+  const setShowRemoteImages = (v: boolean) => {
+    setShowRemoteImagesState(v);
+    Settings.set("showRemoteImages", v);
   };
 
   //same modal stays open between cloud steps
@@ -4641,6 +4648,22 @@ export default function SettingsDrawer({
               />
             )}
           </Group>
+        </View>
+      </View>
+
+      <View style={styles.contentCard}>
+        <View style={styles.settingRowVertical}>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.privacy.remoteImages")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.privacy.remoteImagesHelp")}
+              </Text>
+            </View>
+            <Toggle checked={showRemoteImages} onToggle={setShowRemoteImages} />
+          </View>
         </View>
       </View>
 

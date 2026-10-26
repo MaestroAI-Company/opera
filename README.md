@@ -17,7 +17,7 @@
   </p>
 </div>
 
-Opera is a privacy-first AI assistant. Run a model on the device itself, on your own Ollama server, or on any OpenAI-compatible endpoint — no account, and nothing leaves your device unless you pick an online model, a cloud sync or a web search.
+Opera is a privacy-first AI assistant. Run a model on the device itself, on your own Ollama server, or on any OpenAI-compatible endpoint - no account, and nothing leaves your device unless you pick an online model, a cloud sync or a web search.
 
 ## Features
 
@@ -82,17 +82,17 @@ assets/                icons, images, fonts, animations, on-device models
 
 ## Getting started
 
-**Prerequisites** — Node.js & npm, [Expo CLI](https://docs.expo.dev/more/expo-cli/) (via `npx`), and for native builds: Android Studio/SDK. The desktop build also needs a Rust toolchain.
+**Prerequisites** - Node.js & npm, [Expo CLI](https://docs.expo.dev/more/expo-cli/) (via `npx`), and for native builds: Android Studio/SDK. The desktop build also needs a Rust toolchain.
 
 ```bash
 npm install
 
-npm start          # Expo dev server — scan the QR, or press a/w for android/web
+npm start          # Expo dev server - scan the QR, or press a/w for android/web
 npm run android    # run on a connected device/emulator
 npm run web        # run in the browser
 ```
 
-**Dev builds on Android** — debug builds install as **Opera Dev** (`ai.maestro.opera.dev`, blue icon), so they sit next to the Play Store version instead of clashing with its signature. Expo CLI doesn't see the suffix, so launch with `--app-id` (the npm scripts already pass it):
+**Dev builds on Android** - debug builds install as **Opera Dev** (`ai.maestro.opera.dev`, blue icon), so they sit next to the Play Store version instead of clashing with its signature. Expo CLI doesn't see the suffix, so launch with `--app-id` (the npm scripts already pass it):
 
 ```bash
 npm run android           # debug build, JS served by Metro
@@ -114,8 +114,8 @@ npm run build:android   # Expo prebuild + Gradle release APK
 npm run lint            # ESLint
 ```
 
-Coding conventions for this repo are in [AGENTS.md](./AGENTS.md); the visual language — colors, type, spacing, component specs — is documented separately in [DESIGN.md](./DESIGN.md).
+Coding conventions for this repo are in [AGENTS.md](./AGENTS.md); the visual language - colors, type, spacing, component specs - is documented separately in [DESIGN.md](./DESIGN.md).
 
 ## License
 
-[AGPLv3](./LICENSE) — if you run a modified version of Opera as a network service, you must make your source available too.
+[AGPLv3](./LICENSE) - if you run a modified version of Opera as a network service, you must make your source available too.

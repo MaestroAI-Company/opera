@@ -28,23 +28,25 @@
       },
       "predictiveBackGestureEnabled": true,
       "package": "ai.maestro.opera",
-      "versionCode": 6,
+      "versionCode": 7,
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
-        "android.permission.READ_MEDIA_IMAGES",
-        "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.READ_MEDIA_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
         "com.android.alarm.permission.SET_ALARM"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
       ]
     },
     "web": {
@@ -58,9 +60,30 @@
         {
           "android": {
             "fonts": [
-              { "fontFamily": "Petrona", "fontDefinitions": [{ "path": "./assets/fonts/Petrona-Medium.ttf", "weight": 400 }] },
-              { "fontFamily": "Figtree", "fontDefinitions": [{ "path": "./assets/fonts/Figtree-Regular.ttf", "weight": 400 }] },
-              { "fontFamily": "FragmentMono", "fontDefinitions": [{ "path": "./assets/fonts/FragmentMono-Regular.ttf", "weight": 400 }] }
+              {
+                "fontFamily": "Petrona",
+                "fontDefinitions": [
+                  { "path": "./assets/fonts/Petrona-Medium.ttf", "weight": 400 }
+                ]
+              },
+              {
+                "fontFamily": "Figtree",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/Figtree-Regular.ttf",
+                    "weight": 400
+                  }
+                ]
+              },
+              {
+                "fontFamily": "FragmentMono",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/FragmentMono-Regular.ttf",
+                    "weight": 400
+                  }
+                ]
+              }
             ]
           }
         }
@@ -105,7 +128,8 @@
         "expo-media-library",
         {
           "photosPermission": "Opera needs access to your photos to attach them.",
-          "savePhotosPermission": "Opera needs access to save photos."
+          "savePhotosPermission": "Opera needs access to save photos.",
+          "granularPermissions": []
         }
       ],
       [
@@ -136,6 +160,7 @@
       ],
       "./plugins/withNotifeeRepo.js",
       "./plugins/withNativeAndroid",
+      "./plugins/withDebugVariant",
       "expo-speech-recognition",
       [
         "expo-quick-actions",
@@ -160,7 +185,16 @@
         }
       ],
       "react-native-quick-crypto",
-      "react-native-litert-lm"
+      "react-native-litert-lm",
+      [
+        "react-native-audio-api",
+        {
+          "iosBackgroundMode": false,
+          "androidPermissions": [],
+          "androidForegroundService": false,
+          "disableFFmpeg": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

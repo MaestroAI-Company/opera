@@ -21,12 +21,17 @@ export type AppSettings = {
   instruction: string;
   speaker: boolean;
   autoSpeak: boolean;
+  maestroButterfly: string;
+  ttsEngine: string;
+  ttsVoices: string;
+  ttsSpeed: string;
   alwaysWhisper: boolean;
   autoStartMic: boolean;
   hasSeenOnboarding: boolean;
   name: string;
   includeDateTime: boolean;
   showTechnicalDetails: boolean;
+  editAiMessages: boolean;
   showDetectionBoxes: boolean;
   advancedMode: boolean;
   dataWarningDismissed: boolean;
@@ -37,6 +42,7 @@ export type AppSettings = {
   shareInstanceUrl: string;
   litertForceLoad: boolean;
   litertContextLength: number;
+  showRemoteImages: boolean;
 };
 
 //shared by both platforms, web overrides ollamaUrl
@@ -68,12 +74,21 @@ export const BASE_DEFAULTS: AppSettings = {
   instruction: '',
   speaker: true,
   autoSpeak: true,
+  //empty means the first butterfly
+  maestroButterfly: '',
+  //supertonic until the user picks system
+  ttsEngine: 'supertonic',
+  //engine id to voice json
+  ttsVoices: '{}',
+  //string keeps fractional rates
+  ttsSpeed: '1',
   alwaysWhisper: false,
   autoStartMic: true,
   hasSeenOnboarding: false,
   name: '',
   includeDateTime: true,
   showTechnicalDetails: false,
+  editAiMessages: false,
   showDetectionBoxes: false,
   advancedMode: false,
   dataWarningDismissed: false,
@@ -85,6 +100,7 @@ export const BASE_DEFAULTS: AppSettings = {
   shareInstanceUrl: '',
   litertForceLoad: false,
   litertContextLength: 8192,
+  showRemoteImages: false,
 };
 
 //text storage needs per-key readers
@@ -97,6 +113,7 @@ const BOOLEAN_KEYS = [
   'hasSeenOnboarding',
   'includeDateTime',
   'showTechnicalDetails',
+  'editAiMessages',
   'showDetectionBoxes',
   'advancedMode',
   'dataWarningDismissed',
@@ -105,6 +122,7 @@ const BOOLEAN_KEYS = [
   'assistantPromptDismissed',
   'hasSeenAssistantOverlay',
   'litertForceLoad',
+  'showRemoteImages',
 ] as const;
 
 const NUMBER_KEYS = [

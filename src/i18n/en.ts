@@ -12,11 +12,13 @@ export const en = {
   "common.pin": "Pin",
   "common.unpin": "Unpin",
   "common.copy": "Copy",
+  "common.download": "Download",
   "common.expand": "Expand",
   "common.regenerate": "Regenerate",
   "common.listen": "Listen",
   "common.stop": "Stop",
   "common.details": "Details",
+  "common.edit": "Edit",
   "common.openInApp": "Open in app",
   "common.info": "Info",
   "common.clear": "Clear",
@@ -33,23 +35,18 @@ export const en = {
   "onboarding.intro.privacy": "Made to respect your privacy.",
   "onboarding.intro.noAccount": "No account required. Ready to go.",
   "onboarding.intro.openSource": "Open source, transparent, and independent.",
-  "onboarding.welcome.title": "AI for all,\nprivacy for freedom.",
-  "onboarding.welcome.subtitle":
-    "Meet Maestro, the assistant inside Opera. It works for you, and only for you.",
-  "onboarding.welcome.local.title": "Local first",
-  "onboarding.welcome.local.description":
-    "Runs on your device, no server required.",
-  "onboarding.welcome.account.title": "No account",
-  "onboarding.welcome.account.description": "Open the app and start talking.",
-  "onboarding.welcome.open.title": "Open source",
-  "onboarding.welcome.open.description": "Code anyone can read and verify.",
   "onboarding.welcome.cta": "Get started",
+  "onboarding.restore.cta": "Connection from a save",
+  "onboarding.restore.fromCloud": "From cloud",
+  "onboarding.restore.fromFiles": "From files",
+  "onboarding.restore.noCloudBackup":
+    "No cloud backup was found on this account.",
   "onboarding.name.placeholder": "Enter your name",
   "onboarding.profile.title": "What should Maestro call you?",
   "onboarding.profile.subtitle":
     "Maestro will use it to greet you. You can change it anytime in settings.",
-  "onboarding.profile.card": "Card",
   "profileCard.placeholder": "Your name",
+  "onboarding.voice.title": "Give Maestro a voice",
   "onboarding.permissions.title": "What can Maestro use?",
   "onboarding.permissions.subtitle":
     "Only what you allow. You can change your mind anytime in your",
@@ -67,20 +64,11 @@ export const en = {
   "permissions.allowed": "Allowed",
   "permissions.denied": "Denied",
   "permissions.microphone.label": "Microphone",
-  "permissions.microphone.description": "To dictate your messages by voice.",
   "permissions.camera.label": "Camera",
-  "permissions.camera.description": "To photograph and analyze documents.",
   "permissions.photos.label": "Photos",
-  "permissions.photos.description": "To share images from your gallery.",
   "permissions.contacts.label": "Contacts",
-  "permissions.contacts.description":
-    "To search your contacts for phone numbers and emails.",
   "permissions.calendar.label": "Calendar",
-  "permissions.calendar.description":
-    "To read and manage events on your calendar.",
   "permissions.location.label": "Location",
-  "permissions.location.description":
-    "To give the assistant local context for more relevant answers.",
 
   "theme.system": "Auto",
   "theme.light": "Light",
@@ -131,6 +119,9 @@ export const en = {
     "Do you want to download the Gemma4 model to your Ollama server? This model is several GB in size.",
   "modelSelector.download.confirm": "Download",
   "modelSelector.tokenWindow": "Token window",
+  "modelSelector.placeholder": "Model",
+  "modelSelector.noProvider":
+    "No provider enabled, turn one on in Settings → Service",
 
   "selector.placeholder": "Select...",
 
@@ -140,6 +131,13 @@ export const en = {
   "widget.html.empty": "No content provided",
 
   "markdown.thinking": "Thinking...",
+
+  "markdown.image.external": "Remote image",
+  "markdown.image.warning":
+    "This image is hosted on an external server ({domain}). Loading it may reveal your IP address to third parties.",
+  "markdown.image.show": "Show image",
+  "markdown.image.alwaysShow": "Always show",
+  "markdown.image.failed": "Failed to load image",
 
   "nextcloud.connect": "Connect",
   "nextcloud.waiting": "Waiting for you to approve it in your browser...",
@@ -229,6 +227,7 @@ export const en = {
 
   "chatbar.placeholder": "Ask Maestro",
   "chatbar.transcribing": "Transcribing...",
+  "chatbar.editingMessage": "Editing message...",
   "chatbar.settings": "Settings",
   "chatbar.install": "Install",
   "chatbar.fileCount.one": "{count} File",
@@ -244,6 +243,8 @@ export const en = {
     "This model cannot read images. Pick a model with vision support to attach one.",
   "chatbar.modelNoAudio":
     "This model cannot read audio. Pick a model with audio support to attach one.",
+  "chatbar.modelNoVideo":
+    "This model cannot read video. Pick a model with video support to attach one.",
   "chatbar.permissionDenied": "Permission Denied",
   "chatbar.cameraDenied":
     "You've refused to allow this app to access your camera!",
@@ -271,7 +272,6 @@ export const en = {
     "This is your floating assistant. You can Circle To Ask on your screen with any content. It's here to help you across your usage.",
 
   "settings.title": "Settings",
-  "settings.notice.assistant": "Add Opera as an assistant",
   "settings.notice.update": "Opera {version} is available",
 
   "settings.nav.profile.title": "Profile",
@@ -280,17 +280,23 @@ export const en = {
   "settings.nav.cloud.subtitle": "Cloud storage, Backup",
   "settings.nav.general.title": "General",
   "settings.nav.general.subtitle": "Language, Theme",
+  "settings.nav.maestro.title": "Maestro",
+  "settings.nav.maestro.subtitle": "Voice, preferences",
+  "settings.nav.maestro.subtitleDesktop": "Instructions",
+  "settings.maestro.voice": "Voice",
   "settings.nav.overlay.title": "Assistant Overlay",
   "settings.nav.overlay.subtitle": "Voice, Screen context",
+  "settings.nav.maestroPreferences.title": "Preferences",
+  "settings.nav.maestroPreferences.subtitle": "Instructions, Auto-read replies",
   "settings.nav.service.title": "Service",
   "settings.nav.service.subtitle": "AI Service, Ollama server",
   "settings.nav.tools.title": "Tools",
-  "settings.nav.tools.subtitle": "Assistant Tools, Widgets, Mobile actions",
-  "settings.nav.tools.subtitleDesktop": "Assistant Tools, Widgets",
+  "settings.nav.tools.subtitle": "Assistant Tools, Mobile actions",
+  "settings.nav.tools.subtitleDesktop": "Assistant Tools",
   "settings.nav.advanced.title": "Advanced",
   "settings.nav.advanced.subtitle": "Quick flow, Transcription, Sharing",
   "settings.nav.privacy.title": "Confidentiality",
-  "settings.nav.privacy.subtitle": "Data privacy, Usage analytics",
+  "settings.nav.privacy.subtitle": "Data privacy, Permissions",
   "settings.nav.support.title": "Support",
   "settings.nav.support.subtitle": "Send an issue, contact support",
   "settings.nav.info.title": "Informations",
@@ -302,8 +308,10 @@ export const en = {
     "Find Opera online, follow our updates, and contribute to the project.",
   "settings.info.website": "Website",
 
+  "settings.profile.personalize": "Personalize my profile",
+  "settings.profile.exportCard": "Share my Profile Card",
   "settings.profile.name": "Name",
-  "settings.profile.instructions": "Write your instructions to AI",
+  "settings.profile.instructions": "Write instructions for Maestro",
   "settings.profile.instructionsPlaceholder": "write",
 
   "settings.general.language": "Language",
@@ -312,6 +320,9 @@ export const en = {
   "settings.general.technicalDetails": "Show technical details",
   "settings.general.technicalDetailsHelp":
     "Add an info button below answers to inspect AI technical data.",
+  "settings.general.editAiMessages": "Edit AI answers",
+  "settings.general.editAiMessagesHelp":
+    "Add an edit button below answers to correct the AI reply text.",
   "settings.general.detectionBoxes": "Show detection boxes",
   "settings.general.detectionBoxesHelp":
     "Outline the screen elements the overlay selection snaps to.",
@@ -340,13 +351,13 @@ export const en = {
   "settings.sharing.instanceHelp":
     "They are stored on a PrivateBin instance. Leave this empty to use privatebin.net, or enter the address of another instance, including one you host yourself. The address is carried inside the links you create, so the people you share with reach the right server on their own.",
 
-  "settings.overlay.default": "Default assistant",
+  "settings.overlay.default": "Set Opera as assistant app",
   "settings.overlay.defaultHelp":
     "Get help from Opera anywhere on your device, from any app.",
   "settings.overlay.isDefault": "Opera is set as your default assistant.",
   "settings.overlay.isNotDefault":
     "Opera is not set as your default assistant.",
-  "settings.overlay.setDefault": "Set as default assistant",
+  "settings.overlay.setDefault": "Open settings",
   "settings.overlay.autoMic": "Auto-start microphone",
   "settings.overlay.autoMicHelp":
     "Automatically activate the microphone as soon as the assistant opens.",
@@ -402,21 +413,16 @@ export const en = {
   "settings.service.ollama": "Ollama",
   "settings.service.ollamaHelp":
     "Use your Ollama servers to run powerful AI models at home.",
-  "settings.service.openai": "OpenAI-compatible",
-  "settings.service.openaiHelp":
-    "Connect OpenAI, Gemini, Mistral, LM Studio or any server that speaks the OpenAI API.",
+  "settings.service.cloudapi": "Cloud API",
+  "settings.service.cloudapiHelp":
+    "Connect Mistral, LM Studio or any server that speaks the OpenAI API.",
   "settings.service.local": "Built-in",
   "settings.service.localHelp":
     "Use the AI model that ships with your device. Nothing to download.",
-  "settings.local.title": "Built-in",
   "settings.local.help":
     "Your device comes with its own AI model. It is always available and needs no setup.",
   "settings.local.browserModel": "Browser model",
-  "settings.local.sheetTitle": "Model sheet",
-  "settings.local.sheetHelp": "Only what the system reports is shown.",
-  "settings.local.modelsTitle": "Offered models",
   "settings.local.sheet.family": "Family",
-  "settings.local.sheet.status": "Status",
   "settings.local.sheet.runtime": "Runtime",
   "settings.local.sheet.browser": "Browser",
   "settings.local.sheet.version": "Version",
@@ -431,7 +437,14 @@ export const en = {
   "settings.local.status.unavailable": "Unavailable",
   "settings.local.download": "Download the model",
   "settings.local.downloading": "Downloading the browser model",
-  "settings.local.notDownloaded": "The browser model is not downloaded yet. Download it in Settings, Built-in.",
+  "settings.local.notDownloaded": "The browser model is not downloaded yet. Download it in Settings, On-Device.",
+
+  "settings.model.capTools": "Tools",
+  "settings.model.capVision": "Vision",
+  "settings.model.capThinking": "Thinking",
+  "settings.model.capAudio": "Audio",
+  "settings.model.capVideo": "Video",
+
   "settings.service.litert": "On-Device",
   "settings.service.litertHelp":
     "Download open models from Hugging Face and run them on this device.",
@@ -444,9 +457,6 @@ export const en = {
   "settings.litert.loading": "Loading...",
   "settings.litert.familyOther": "Other",
   "settings.litert.unavailable": "This model does not fit this device or could not be loaded.",
-  "settings.litert.capVision": "Vision",
-  "settings.litert.capAudio": "Audio",
-  "settings.litert.capThinking": "Thinking",
   "settings.litert.description": "Description",
   "settings.litert.noDescription": "No description available on Hugging Face.",
   "settings.litert.otherModels": "Other models",
@@ -463,6 +473,7 @@ export const en = {
   "settings.litert.downloadMessage":
     "{name} takes {size} and will be downloaded over your current connection.",
   "settings.litert.downloadAction": "Download",
+  "settings.litert.deleteModel": "Delete model",
   "settings.litert.deleteTitle": "Delete {name}?",
   "settings.litert.deleteMessage":
     "The model is removed from this device. You can download it again later.",
@@ -509,6 +520,36 @@ export const en = {
     "Are you sure you want to download the Whisper {model} model ({size})?",
   "settings.whisper.download.confirm": "Download",
 
+  "settings.tts.label": "Voice engine",
+  "settings.tts.help":
+    "Natural voices that run offline. Unsupported languages use the system voice.",
+  "settings.tts.select": "Select voice engine",
+  "settings.tts.system": "System",
+  "settings.tts.supertonic": "Supertonic",
+  "settings.tts.voiceLabel": "Voice",
+  "settings.tts.selectVoice": "Select voice",
+  "settings.tts.pack.title": "Download Maestro voices",
+  "settings.tts.pack.help": "Install the voice pack to use and personalize Maestro's voice.",
+  "settings.tts.pack.download": "Download Maestro voices",
+  "settings.tts.speed": "Speaking speed",
+  "settings.tts.downloading": "Downloading {engine}...",
+  "settings.tts.downloadSuccess": "{engine} voice downloaded successfully.",
+  "settings.tts.downloadFailed": "Failed to download the {engine} voice.",
+  "settings.tts.delete.title": "Delete {engine} voice",
+  "settings.tts.delete.message":
+    "Are you sure you want to delete the {engine} voice? Maestro will use the system voice.",
+  "settings.tts.download.title": "Download {engine} voice",
+  "settings.tts.download.message":
+    "Are you sure you want to download the {engine} voice ({size})?",
+  "settings.tts.download.confirm": "Download",
+  "settings.tts.voicePack.title": "Install the voice pack",
+  "settings.tts.voicePack.message":
+    "For a better experience, install the offline natural voice pack ({size}). Otherwise Maestro will use the system voice.",
+  "settings.tts.voicePack.install": "Install",
+  "settings.tts.voicePack.system": "System voice",
+  "settings.tts.voicePack.installed": "Voice pack installed",
+  "settings.tts.voicePack.failed": "Failed to download the voice pack",
+
   "settings.privacy.data": "Data privacy",
   "settings.privacy.intro":
     "By default, everything stays on your phone: your conversations, settings, and local models work offline without the internet.",
@@ -521,6 +562,9 @@ export const en = {
     "Opera needs a few permissions to work at its best. You can manage them from your browser's site settings.",
   "settings.privacy.permissionsNative":
     "Opera needs a few permissions to work at its best. You can change them in your device settings.",
+  "settings.privacy.remoteImages": "Always show remote images",
+  "settings.privacy.remoteImagesHelp":
+    "Images from external URLs load automatically. Loading remote images allows the external server to log your IP address and track your activity. Disable this to be prompted before any remote image is displayed.",
 
   "settings.data.management": "Data management",
   "settings.data.managementHelp":
@@ -550,15 +594,9 @@ export const en = {
     "Contact our support team for additional assistance and resources.",
   "settings.support.contact": "Contact support",
 
-  "settings.tools.widgets.title": "Widgets",
-  "settings.tools.widgets.help":
-    "Structured results the assistant can display: {list}.",
   "settings.tools.mcp.title": "MCP Servers",
   "settings.tools.mcp.help":
     "Connect Opera to external MCP servers so the assistant can use their tools.",
-  "settings.tools.mobile.title": "Mobile actions",
-  "settings.tools.mobile.help":
-    "Allow the assistant to integrate with installed apps: {list}.",
 
   "tools.consent.allow": "Allow",
   "tools.consent.decline": "Decline",
@@ -575,10 +613,12 @@ export const en = {
   "settings.mcp.reconnect": "Reconnect",
   "settings.mcp.tools": "Tools ({count})",
   "settings.server.settings": "Settings",
+  "settings.mcp.headerLabel": "Header",
   "settings.mcp.headerHelp":
     "A header sent with every request, for servers that take an access token instead of a sign-in. For GitHub, use Authorization and Bearer followed by your token.",
   "settings.mcp.headerName": "header name",
   "settings.mcp.headerValue": "header value",
+  "settings.mcp.clientIdLabel": "Client ID",
   "settings.mcp.clientIdHelp":
     "Only needed when a server offers a sign-in but will not register Opera on its own. Leave empty otherwise.",
   "settings.mcp.clientId": "oauth client id",
@@ -609,6 +649,12 @@ export const en = {
   "settings.ollama.modelsCount": "Models ({count})",
   "settings.ollama.modelsLoading": "Looking for models...",
   "settings.ollama.noModels": "No models on this server yet.",
+  "settings.ollama.searchModels": "search models",
+  "settings.ollama.enableAll": "Enable all",
+  "settings.ollama.disableAll": "Disable all",
+  "settings.ollama.noMatch": "No model matches this search.",
+  "settings.ollama.showMore": "Show more ({count})",
+  "settings.ollama.capabilities": "Capabilities",
   "settings.ollama.contextLength": "Context Length",
   "settings.ollama.contextHelp": "Maximum number of tokens the model can use.",
   "settings.ollama.keepAlive": "Model Keep Alive",
@@ -620,14 +666,14 @@ export const en = {
   "settings.ollama.unreachableInfo":
     "This server could not be reached.\n\n- Check that the server is running.\n- Check the server's network connection.\n- Make sure the URL and port are correct.",
   "settings.ollama.remove.action": "Remove server",
-  "settings.openai.title": "OpenAI-compatible servers",
-  "settings.openai.help":
-    "Add the API link of your service or server, for example https://api.openai.com/v1, https://generativelanguage.googleapis.com/v1beta/openai or http://localhost:1234/v1.",
-  "settings.openai.apiKey": "API key",
-  "settings.openai.apiKeyHelp":
-    "Required by cloud services like OpenAI or Gemini. Leave empty for a local server.",
-  "settings.openai.apiKeyPlaceholder": "api key",
-  "settings.openai.unreachableInfo":
+  "settings.cloudapi.title": "OpenAI-compatible servers",
+  "settings.cloudapi.help":
+    "Add the API link of your service or server, for example https://api.mistral.ai/v1 for Mistral or http://localhost:1234/v1 for LM Studio.",
+  "settings.cloudapi.apiKey": "API key",
+  "settings.cloudapi.apiKeyHelp":
+    "Required by cloud services like Mistral. Leave empty for a local server like LM Studio.",
+  "settings.cloudapi.apiKeyPlaceholder": "api key",
+  "settings.cloudapi.unreachableInfo":
     "This server could not be reached.\n\n- Check that the server is running.\n- Make sure the link is the API link, often ending with /v1.\n- Check the API key if the service needs one.",
   "settings.ollama.remove.title": "Remove server",
   "settings.ollama.remove.message":

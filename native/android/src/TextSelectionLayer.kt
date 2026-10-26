@@ -12,7 +12,7 @@ import kotlin.math.atan2
 
 private const val TAG = "TextSelectionLayer"
 
-//keep words off the nav bars
+//keep words off chat bar
 private const val BOTTOM_GUARD = 140
 
 object TextSelectionLayer {
@@ -36,7 +36,8 @@ object TextSelectionLayer {
     host.getLocationOnScreen(origin)
 
     //no height yet keeps every word
-    val floor = if (host.height > 0) host.height - BOTTOM_GUARD else Int.MAX_VALUE
+    val guard = BOTTOM_GUARD * activity.resources.displayMetrics.density
+    val floor = if (host.height > 0) host.height - guard else Float.MAX_VALUE
     //one angle per line
     val angles = words.groupBy { it.line }.mapValues { (_, line) ->
       var dx = 0f

@@ -1,5 +1,5 @@
-import { Linking } from 'react-native';
 import { ITool, ToolDefinition } from './ITool';
+import { openExternalUrl } from '../utils/openExternalUrl';
 
 //never open these schemes
 //handled by the send_message tool
@@ -42,12 +42,7 @@ export class OpenAppTool implements ITool {
       return 'Error: this URL scheme is not allowed.';
     }
 
-    try {
-      await Linking.openURL(url);
-      return `Opened: ${url}`;
-    } catch (e: any) {
-      console.error('[OpenAppTool] error:', e?.message || e);
-      return `Could not open "${url}": ${e.message}. The target app may not be installed.`;
-    }
+    await openExternalUrl(url);
+    return `Opened ${url} in the default app.`;
   }
 }

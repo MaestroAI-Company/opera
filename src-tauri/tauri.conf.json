@@ -15,7 +15,7 @@
         "title": "Opera",
         "width": 800,
         "height": 600,
-        "backgroundColor": "#FDF8F1",
+        "backgroundColor": "#FEFBF6",
         "resizable": true,
         "fullscreen": false,
         "decorations": true,

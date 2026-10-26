@@ -1,6 +1,6 @@
 import * as Clipboard from "expo-clipboard";
 import { useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemedStyles } from "../../hooks/useTheme";
@@ -8,12 +8,13 @@ import { useT } from "../../i18n";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import { CodeContent, codeLanguageName } from "../ui/MarkdownText";
-import DrawerSheet from "./DrawerSheet";
+import { downloadCodeFile } from "../../services/codeDownload";
+import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 const copyIcon = require("../../../assets/icons/copy2.png");
+const downloadIcon = require("../../../assets/icons/download.png");
 
 const DESKTOP_CARD_WIDTH = 560;
-const DESKTOP_MARGIN = 24;
 
 export type PreviewCode = { code: string; language?: string; title?: string; incognito?: boolean };
 
@@ -29,7 +30,7 @@ type CodePreviewSheetProps = {
 export default function CodePreviewSheet({ code, onClose, isLargeScreen = false, isDesktop = false, bottomInset = 0 }: CodePreviewSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   //last code stays during close animation
   const [shown, setShown] = useState<PreviewCode | null>(code);
@@ -53,11 +54,9 @@ export default function CodePreviewSheet({ code, onClose, isLargeScreen = false,
     setCopied(true);
   };
 
-  const centeredStyle = {
-    position: "absolute" as const,
-    left: Math.max(DESKTOP_MARGIN, (windowWidth - DESKTOP_CARD_WIDTH) / 2),
-    top: Math.max(DESKTOP_MARGIN, windowHeight * 0.08),
-    maxHeight: windowHeight * 0.84,
+  const handleDownload = () => {
+    if (!shown) return;
+    downloadCodeFile(shown.code, shown.language, shown.title).catch(() => {});
   };
 
   return (
@@ -70,9 +69,9 @@ export default function CodePreviewSheet({ code, onClose, isLargeScreen = false,
       handleContainerStyle={styles.sheetHandleContainer}
       //sheet may grow up to just under the status bar
       sheetStyle={[styles.sheet, { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + bottomInset, maxHeight: windowHeight - insets.top - Spacing.xl2 }]}
-      desktopStyle={[styles.desktopCard, centeredStyle]}
+      desktopStyle={styles.desktopCard}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <SheetScrollView contentContainerStyle={styles.content}>
         {shown && (
           <>
             <Group style={styles.infoGroup}>
@@ -94,11 +93,16 @@ export default function CodePreviewSheet({ code, onClose, isLargeScreen = false,
                   label={copied ? t("chat.copied") : t("common.copy")}
                   onPress={handleCopy}
                 />
+                <ActionButton
+                  icon={downloadIcon}
+                  label={t("common.download")}
+                  onPress={handleDownload}
+                />
               </Group>
             </View>
           </>
         )}
-      </ScrollView>
+      </SheetScrollView>
     </DrawerSheet>
   );
 }
@@ -112,23 +116,19 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     backgroundColor: Colors.groupedBackground,
     borderTopLeftRadius: Radius.huge2,
     borderTopRightRadius: Radius.huge2,
-    paddingTop: 12,
+    paddingTop: Spacing.xxl,
   },
   desktopCard: {
-    backgroundColor: Colors.groupedBackground,
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
-    elevation: 5,
     width: DESKTOP_CARD_WIDTH,
-    overflow: "hidden",
   },
   sheetHandleContainer: {
+    //floats so top edge matches sides
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     alignItems: "center",
-    marginBottom: Spacing.xs2,
-    paddingVertical: 10,
-    marginTop: -10,
+    paddingVertical: Spacing.md,
   },
   content: {
     paddingHorizontal: Spacing.lg2,

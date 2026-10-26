@@ -7,12 +7,18 @@ export const AppEvents = {
   syncCompleted: 'SYNC_COMPLETED',
   syncPinInvalidated: 'SYNC_PIN_INVALIDATED',
   overlayReopened: 'OVERLAY_REOPENED',
+  //user left the overlay via home
+  overlayLeaving: 'OVERLAY_LEAVING',
+  //overlay shown or hidden
+  overlayVisibility: 'OVERLAY_VISIBILITY',
   //a screen text selection is being dragged
   textSelectionDrag: 'TEXT_SELECTION_DRAG',
   openModelSelector: 'OPEN_MODEL_SELECTOR',
   openBugReport: 'OPEN_BUG_REPORT',
   //a chat code block was tapped
   openCodePreview: 'OPEN_CODE_PREVIEW',
+  //open full image preview
+  openImagePreview: 'OPEN_IMAGE_PREVIEW',
   //mcp server state changed
   mcpServersChanged: 'MCP_SERVERS_CHANGED',
 } as const;

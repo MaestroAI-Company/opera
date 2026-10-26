@@ -19,6 +19,12 @@ const cameraIcon = require("../../../assets/icons/camera.png");
 const fileIcon = require("../../../assets/icons/file.png");
 const photoIcon = require("../../../assets/icons/photo.png");
 
+//seconds to m:ss
+function formatDuration(seconds: number): string {
+  const total = Math.round(seconds);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}
+
 export type SelectedFile = { uri: string; type: string; name: string; id?: string; mimeType?: string };
 
 type AttachmentSheetProps = {
@@ -111,6 +117,9 @@ export default function AttachmentSheet({
                   }
                 ]}
               />
+              {photo.mediaType === 'video' && (
+                <Text style={styles.sheetRecentVideoDuration}>{formatDuration(photo.duration ?? 0)}</Text>
+              )}
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -124,7 +133,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     backgroundColor: Colors.groupedBackground,
     borderTopLeftRadius: Radius.huge2,
     borderTopRightRadius: Radius.huge2,
-    paddingTop: 12,
+    paddingTop: Spacing.lg2,
     width: '100%',
   },
   inlineSheetIncognito: {
@@ -137,8 +146,8 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   sheetHandleContainer: {
     alignItems: 'center',
     marginBottom: Spacing.xs2,
-    paddingVertical: 10,
-    marginTop: -10,
+    paddingVertical: Spacing.lg,
+    marginTop: -Spacing.lg,
   },
   sheetHandle: {
     width: 40,
@@ -204,5 +213,17 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: Radius.xxl,
+  },
+  sheetRecentVideoDuration: {
+    position: 'absolute',
+    right: Spacing.sm,
+    bottom: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    borderRadius: Radius.sm,
+    overflow: 'hidden',
+    backgroundColor: Colors.scrimModal,
+    color: Colors.textOnPrimary,
+    fontSize: FontSizes.label,
+    fontFamily: Fonts.mono,
   },
 });

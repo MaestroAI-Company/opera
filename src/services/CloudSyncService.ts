@@ -9,6 +9,7 @@ import { Settings, AppSettings } from './settings/SettingsService';
 import { CloudProvider, CloudUserInfo } from './cloud/CloudProvider';
 import { getCloudProviderDefinition } from './cloud/registry';
 import { AppEvents } from './events';
+import { OverlayPresence } from './overlay/overlayPresence';
 import * as SecureStore from 'expo-secure-store';
 import { Platform, AppState, DeviceEventEmitter } from 'react-native';
 
@@ -121,7 +122,8 @@ class CloudSyncServiceImpl {
 
     //auto-sync on app active
     AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
+      //overlay opening must skip backup
+      if (nextAppState === 'active' && !OverlayPresence.isShown()) {
         this.requestAutoSync(0); //trigger on foreground
       }
     });

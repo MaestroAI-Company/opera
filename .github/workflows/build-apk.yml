@@ -107,7 +107,9 @@ jobs:
           ./gradlew --stop
           ./gradlew bundleRelease
 
+      # a full artifact quota must not block the release
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: app-release.apk
           path: android/app/build/outputs/apk/release/app-release.apk

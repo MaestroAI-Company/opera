@@ -3,20 +3,23 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { DeviceEventEmitter, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import AutoHeightWebView from "react-native-autoheight-webview";
 import CodeHighlighter from "react-native-code-highlighter";
-import { vs2015 } from "react-syntax-highlighter/dist/esm/styles/hljs";
+import { vs, vs2015 } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
-import { getColors, getThemedStyles, useColors, useThemedStyles } from "../../hooks/useTheme";
+import { getColors, getThemedStyles, useColors, useIsDark, useThemedStyles } from "../../hooks/useTheme";
 import { t } from "../../i18n";
 import type { ToolCall } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { AppEvents } from "../../services/events";
+import { downloadCodeFile } from "../../services/codeDownload";
 import { WidgetManager } from "../../services/widgets/WidgetManager";
 import WidgetWrapper from "../widgets/WidgetWrapper";
 import IconButton from "./IconButton";
+import MarkdownImage from "./MarkdownImage";
 import { ensureKatexStylesheet, getKatexCss, KATEX_STYLESHEET_NAME } from "./katexStylesheet";
 
 const copyIcon = require("../../../assets/icons/copy.png");
 const fullIcon = require("../../../assets/icons/full.png");
+const downloadIcon = require("../../../assets/icons/download2.png");
 
 const makeS = (Colors: ThemeColors) => StyleSheet.create({
   base: { fontSize: FontSizes.xl, lineHeight: 28, color: Colors.textPrimary, fontFamily: Fonts.body },
@@ -48,7 +51,7 @@ const makeS = (Colors: ThemeColors) => StyleSheet.create({
   },
   codeTitle: {
     fontFamily: Fonts.mono,
-    fontSize: FontSizes.title,
+    fontSize: FontSizes.lg,
     color: Colors.textPrimary,
     flex: 1,
     marginRight: Spacing.sm,
@@ -67,7 +70,7 @@ const makeS = (Colors: ThemeColors) => StyleSheet.create({
   },
   h1: { fontSize: FontSizes.displaySm, fontWeight: "bold", marginTop: 8, marginBottom: 4, color: Colors.textPrimary },
   h2: { fontSize: FontSizes.xl, fontWeight: "bold", marginTop: 7, marginBottom: 3, color: Colors.textPrimary },
-  h3: { fontSize: FontSizes.title, fontWeight: "bold", marginTop: 6, marginBottom: 3, color: Colors.textPrimary },
+  h3: { fontSize: FontSizes.lg, fontWeight: "bold", marginTop: 6, marginBottom: 3, color: Colors.textPrimary },
   h4: { fontSize: FontSizes.lg, fontWeight: "bold", marginTop: 5, marginBottom: 3, color: Colors.textPrimary },
   paragraph: { marginVertical: 2 },
   spacing: { height: 8 },
@@ -122,6 +125,23 @@ function parseInline(text: string): Token[] {
         continue;
       }
     }
+    //fallback image to link token
+    if (text[i] === "!" && text[i + 1] === "[") {
+      const close = text.indexOf("]", i + 2);
+      if (close !== -1 && text[close + 1] === "(") {
+        const closeParen = text.indexOf(")", close + 2);
+        if (closeParen !== -1) {
+          const rawUrl = text.slice(close + 2, closeParen).trim();
+          const cleanUrl = rawUrl.split(/\s+/)[0];
+          const alt = text.slice(i + 2, close);
+          if (cleanUrl) {
+            tokens.push({ type: "link", url: cleanUrl, children: [{ type: "text", content: alt || cleanUrl }] });
+            i = closeParen + 1;
+            continue;
+          }
+        }
+      }
+    }
     // link [text](url)
     if (text[i] === "[") {
       const close = text.indexOf("]", i + 1);
@@ -174,7 +194,7 @@ function parseInline(text: string): Token[] {
     }
     // plain text collect until next special char
     let j = i + 1;
-    while (j < text.length && text[j] !== "*" && text[j] !== "_" && text[j] !== "`" && text[j] !== "~" && text[j] !== "[") j++;
+    while (j < text.length && text[j] !== "*" && text[j] !== "_" && text[j] !== "`" && text[j] !== "~" && text[j] !== "[" && text[j] !== "!") j++;
     tokens.push({ type: "text", content: text.slice(i, j) });
     i = j;
   }
@@ -529,6 +549,66 @@ function wrapContent(
   );
 }
 
+const IMAGE_REGEX = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+(?:"([^"]*)"|'([^']*)'))?\)/g;
+
+//split images into standalone blocks
+function renderParagraphWithImages(
+  text: string,
+  keyPrefix: string,
+  style: any,
+  keyBase: number,
+  incognito?: boolean,
+  selColor?: string,
+  dark?: boolean
+): React.ReactNode[] {
+  if (!text.includes("![")) {
+    return [wrapContent(text, keyPrefix, style, keyBase, incognito, selColor)];
+  }
+
+  const nodes: React.ReactNode[] = [];
+  const regex = new RegExp(IMAGE_REGEX.source, "g");
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      const before = text.slice(lastIndex, match.index).trim();
+      if (before) {
+        nodes.push(
+          wrapContent(before, `${keyPrefix}-t-${lastIndex}`, style, keyBase + lastIndex, incognito, selColor)
+        );
+      }
+    }
+
+    const alt = match[1];
+    const url = match[2];
+    const title = match[3] || match[4] || undefined;
+    nodes.push(
+      <MarkdownImage
+        key={`${keyPrefix}-img-${match.index}`}
+        url={url}
+        alt={alt}
+        title={title}
+        incognito={incognito}
+        dark={dark}
+      />
+    );
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    const after = text.slice(lastIndex).trim();
+    if (after) {
+      nodes.push(
+        wrapContent(after, `${keyPrefix}-t-${lastIndex}`, style, keyBase + lastIndex, incognito, selColor)
+      );
+    }
+  }
+
+  return nodes;
+}
+
 const LANG_ALIASES: Record<string, string> = {
   js: "javascript", jsx: "javascript", ts: "typescript", tsx: "typescript",
   py: "python", rb: "ruby", sh: "bash", shell: "bash", zsh: "bash",
@@ -583,20 +663,23 @@ export function codeLanguageName(language?: string): string | null {
   return LANG_DISPLAY_NAMES[rawLang] ?? (rawLang.length <= 4 ? rawLang.toUpperCase() : rawLang.charAt(0).toUpperCase() + rawLang.slice(1));
 }
 
-//dark highlighted code surface
-export function CodeContent({ code, language, incognito, maxHeight, radius }: { code: string; language?: string; incognito?: boolean; maxHeight?: number; radius?: number }) {
+//highlighted code on the host surface
+export function CodeContent({ code, language, incognito, maxHeight, radius, background, dark }: { code: string; language?: string; incognito?: boolean; maxHeight?: number; radius?: number; background?: string; dark?: boolean }) {
   const Colors = useColors();
+  const themeDark = useIsDark();
   const s = useThemedStyles(makeS);
   const lang = language ? LANG_ALIASES[language] ?? language : undefined;
   const textStyle = { fontFamily: Fonts.mono, fontSize: FontSizes.code, lineHeight: 18 } as const;
   const codeBorderColor = incognito ? Colors.incognito : Colors.responseBorder;
+  //light text only reads on a dark surface
+  const onDark = dark ?? themeDark;
 
   return (
-    <View style={[s.codeContent, { maxHeight, borderColor: codeBorderColor, backgroundColor: Colors.codeBlockBg, borderRadius: radius ?? s.codeContent.borderRadius }]}>
+    <View style={[s.codeContent, { maxHeight, borderColor: codeBorderColor, backgroundColor: background ?? Colors.surface, borderRadius: radius ?? s.codeContent.borderRadius }]}>
       {lang ? (
         <CodeHighlighter
           language={lang}
-          hljsStyle={vs2015}
+          hljsStyle={onDark ? vs2015 : vs}
           textStyle={textStyle}
           scrollViewProps={{
             nestedScrollEnabled: true,
@@ -614,7 +697,7 @@ export function CodeContent({ code, language, incognito, maxHeight, radius }: { 
           nestedScrollEnabled={true}
           contentContainerStyle={{ padding: Spacing.md }}
         >
-          <Text style={[textStyle, { color: Colors.codeBlockText }]} selectable={true}>
+          <Text style={[textStyle, { color: onDark ? Colors.codeBlockText : Colors.textPrimary }]} selectable={true}>
             {code}
           </Text>
         </ScrollView>
@@ -641,12 +724,18 @@ const CodeBlock = React.memo(function CodeBlock({
   incognito?: boolean;
 }) {
   const Colors = useColors();
+  const themeDark = useIsDark();
   const s = useThemedStyles(makeS);
 
   //copy code to clipboard
   const handleCopy = useCallback(() => {
     Clipboard.setStringAsync(code);
   }, [code]);
+
+  //save code as a file
+  const handleDownload = useCallback(() => {
+    downloadCodeFile(code, language, title).catch(() => {});
+  }, [code, language, title]);
 
   //full view opens at app root
   const handleOpen = useCallback(() => {
@@ -675,6 +764,15 @@ const CodeBlock = React.memo(function CodeBlock({
             tintColor={dark ? Colors.responseTextMuted : Colors.textSecondary}
           />
           <IconButton
+            icon={downloadIcon}
+            label={t("common.download")}
+            onPress={handleDownload}
+            containerSize={28}
+            size={16}
+            pressedColor={Colors.surfacePressed}
+            tintColor={dark ? Colors.responseTextMuted : Colors.textSecondary}
+          />
+          <IconButton
             icon={copyIcon}
             label={t("common.copy")}
             onPress={handleCopy}
@@ -685,7 +783,7 @@ const CodeBlock = React.memo(function CodeBlock({
           />
         </View>
       </View>
-      <CodeContent code={code} language={language} incognito={incognito} maxHeight={CODE_BLOCK_MAX_HEIGHT} />
+      <CodeContent code={code} language={language} incognito={incognito} maxHeight={CODE_BLOCK_MAX_HEIGHT} background={cardBg} dark={dark || themeDark} />
     </Pressable>
   );
 });
@@ -939,7 +1037,15 @@ export function renderMarkdown(md: string, incognito?: boolean, dark?: boolean):
       const depth = Math.min(2, Math.floor(bulletMatch[1].replace(/\t/g, "  ").length / 2));
       const glyph = ["•", "◦", "▪"][depth] || "•";
       elements.push(
-        wrapContent(`${glyph} ${bulletMatch[3]}`, `li-${i}`, [s.base, s.paragraph, { paddingLeft: depth * 14 }, textColor && { color: textColor }], i, incognito, selColor)
+        ...renderParagraphWithImages(
+          `${glyph} ${bulletMatch[3]}`,
+          `li-${i}`,
+          [s.base, s.paragraph, { paddingLeft: depth * 14 }, textColor && { color: textColor }],
+          i,
+          incognito,
+          selColor,
+          dark
+        )
       );
       i++;
       continue;
@@ -965,7 +1071,15 @@ export function renderMarkdown(md: string, incognito?: boolean, dark?: boolean):
         i++;
       }
       elements.push(
-        wrapContent(itemLines.join("\n"), `oli-${i}`, [s.base, s.paragraph, textColor && { color: textColor }], i, incognito, selColor)
+        ...renderParagraphWithImages(
+          itemLines.join("\n"),
+          `oli-${i}`,
+          [s.base, s.paragraph, textColor && { color: textColor }],
+          i,
+          incognito,
+          selColor,
+          dark
+        )
       );
       continue;
     }
@@ -974,7 +1088,15 @@ export function renderMarkdown(md: string, incognito?: boolean, dark?: boolean):
     if (line.trimStart().startsWith("> ")) {
       const quoteText = line.replace(/^[\s]*>\s?/, "");
       elements.push(
-        wrapContent(quoteText, `quote-${i}`, [s.base, { borderLeftColor: incognito ? Colors.incognito : (dark ? Colors.responseTextStrong : Colors.primary), borderLeftWidth: 3, paddingLeft: 10, marginVertical: 4 }, textColor && { color: textColor }], i, incognito, selColor)
+        ...renderParagraphWithImages(
+          quoteText,
+          `quote-${i}`,
+          [s.base, { borderLeftColor: incognito ? Colors.incognito : (dark ? Colors.responseTextStrong : Colors.primary), borderLeftWidth: 3, paddingLeft: 10, marginVertical: 4 }, textColor && { color: textColor }],
+          i,
+          incognito,
+          selColor,
+          dark
+        )
       );
       i++;
       continue;
@@ -1017,7 +1139,15 @@ export function renderMarkdown(md: string, incognito?: boolean, dark?: boolean):
 
     if (paraLines.length > 0) {
       elements.push(
-        wrapContent(paraLines.join("\n"), `p-${i}`, [s.base, s.paragraph, textColor && { color: textColor }], i, incognito, selColor)
+        ...renderParagraphWithImages(
+          paraLines.join("\n"),
+          `p-${i}`,
+          [s.base, s.paragraph, textColor && { color: textColor }],
+          i,
+          incognito,
+          selColor,
+          dark
+        )
       );
     } else {
       i++;

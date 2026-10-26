@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Image, ImageSourcePropType, LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
-import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { Image, ImageSourcePropType, LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Vibration, View } from "react-native";
+import Animated, { Easing, interpolate, interpolateColor, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { pressStyle } from "./pressStyle";
@@ -64,6 +64,7 @@ export default function Slider({
   const pillX = useSharedValue(0);
   const scale = useSharedValue(1);
   const pillLit = useSharedValue(0);
+  const labelPulse = useSharedValue(0);
 
   const buttonWidthRef = useRef(0);
   const pillWidthRef = useRef(0);
@@ -188,9 +189,25 @@ export default function Slider({
     backgroundColor: interpolateColor(pillLit.value, [0, 1], [Colors.primary, Colors.primaryBright]),
   }));
 
+  const labelPulseStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(labelPulse.value, [0, 1], [1, 0.6]),
+    transform: [{ scale: interpolate(labelPulse.value, [0, 1], [1, 1.2]) }],
+  }));
+
   const activeIndex = previewIndex ?? selectedIndex;
   const activeOption = options[activeIndex] ?? options[0];
   const iconSource = icon ?? activeOption?.icon;
+
+  //pulse the pill label when it switches option
+  const shownIndexRef = useRef(activeIndex);
+  useEffect(() => {
+    if (shownIndexRef.current === activeIndex) return;
+    shownIndexRef.current = activeIndex;
+    labelPulse.set(withSequence(
+      withTiming(1, { duration: 120, easing: Easing.out(Easing.quad) }),
+      withTiming(0, { duration: 160, easing: Easing.in(Easing.quad) }),
+    ));
+  }, [activeIndex, labelPulse]);
 
   return (
     <View style={[styles.container, !iconSource && styles.containerNoIcon]}>
@@ -210,7 +227,7 @@ export default function Slider({
         ))}
         {pillWidth > 0 && activeOption && (
           <Animated.View style={[styles.pill, { width: pillWidth }, pillAnimatedStyle]} {...panResponder.panHandlers}>
-            <Text style={styles.pillText} numberOfLines={1} adjustsFontSizeToFit>{activeOption.label}</Text>
+            <Animated.Text style={[styles.pillText, labelPulseStyle]} numberOfLines={1} adjustsFontSizeToFit>{activeOption.label}</Animated.Text>
           </Animated.View>
         )}
       </View>

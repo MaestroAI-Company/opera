@@ -2,6 +2,7 @@ import { ITool, ToolDefinition, ToolPlatform, ToolSource } from './ITool';
 import { SearchBridge } from '../../search/SearchBridge';
 import { Platform } from 'react-native';
 import { universalFetch } from '../utils/universalFetch';
+import { isTauri } from '../../platform';
 
 const MAX_CONTENT_LENGTH = 4000;
 const SUMMARIZE_THRESHOLD = 8000;
@@ -47,7 +48,8 @@ export class FetchPagesTool implements ITool {
     try {
       let results: any[] = [];
       
-      if (Platform.OS === 'web') {
+      //desktop reuses the mobile path
+      if (Platform.OS === 'web' && !isTauri) {
         const fetchPromises = targetUrls.map(async (url) => {
           try {
             const res = await universalFetch(url, {
@@ -87,8 +89,9 @@ export class FetchPagesTool implements ITool {
         results = await SearchBridge.fetchPages(targetUrls);
       }
 
-      if (results.length === 0) {
-        return 'No page content could be extracted.';
+      //both platforms prefix failures this way
+      if (results.every(r => r.content?.startsWith('Failed to'))) {
+        throw new Error(results.map(r => r.content).join('; ') || 'no page content could be extracted');
       }
 
       for (const r of results) {
@@ -119,7 +122,7 @@ export class FetchPagesTool implements ITool {
       return `Fetched page contents:\n\n${formatted.join('\n\n---\n\n')}`;
     } catch (e: any) {
       console.error('[FetchPagesTool] error:', e?.message || e);
-      return `Fetch failed: ${e.message}`;
+      throw new Error(`fetch failed: ${e?.message || e}`);
     }
   }
 }

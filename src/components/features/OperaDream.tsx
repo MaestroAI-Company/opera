@@ -37,6 +37,7 @@ import { McpService } from "../../services/mcp/McpService";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { AppSettings, Settings } from "../../services/settings/SettingsService";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
+import { NEURAL_ENGINES } from "../../services/speech/engines";
 import { TTS } from "../../services/speech/TTSService";
 import { onWakeWord, startWakeWord, stopWakeWord } from "../../services/speech/WakeWord";
 import "../../services/widgets/registerWidgets";
@@ -192,6 +193,7 @@ function OperaDream() {
   const [wakeWord, setWakeWord] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [whisperMissing, setWhisperMissing] = useState(false);
+  const [voiceMissing, setVoiceMissing] = useState(false);
   //keeps the wake word off the mic
   const [awaitingFollowUp, setAwaitingFollowUp] = useState(false);
 
@@ -460,6 +462,13 @@ function OperaDream() {
         return;
       }
     }
+    //replies need the neural voice
+    const engine = NEURAL_ENGINES[Settings.getCached().ttsEngine];
+    if (engine?.isSupported() && !engine.isInstalled()) {
+      setVoiceMissing(true);
+      setAwaitingFollowUp(false);
+      return;
+    }
     liveTextRef.current = "";
     audioUriRef.current = null;
     settledRef.current = false;
@@ -523,10 +532,10 @@ function OperaDream() {
 
   //only while the mic is free
   useEffect(() => {
-    if (!wakeWord || busy || speaking || whisperMissing || awaitingFollowUp) return;
+    if (!wakeWord || busy || speaking || whisperMissing || voiceMissing || awaitingFollowUp) return;
     startWakeWord();
     return () => { stopWakeWord(); };
-  }, [wakeWord, busy, speaking, whisperMissing, awaitingFollowUp]);
+  }, [wakeWord, busy, speaking, whisperMissing, voiceMissing, awaitingFollowUp]);
 
   //detection acts like a mic tap
   const startListeningRef = useRef(startListening);
@@ -829,6 +838,14 @@ function OperaDream() {
         message={t("dream.whisperRequired")}
         buttons={[{ text: "OK", onPress: () => setWhisperMissing(false), style: "primary" }]}
         onClose={() => setWhisperMissing(false)}
+      />
+
+      <NotificationModal
+        visible={voiceMissing}
+        title={t("dream.voiceMissing.title")}
+        message={t("dream.voiceRequired")}
+        buttons={[{ text: "OK", onPress: () => setVoiceMissing(false), style: "primary" }]}
+        onClose={() => setVoiceMissing(false)}
       />
 
       <HeadlessWebView />

@@ -199,6 +199,9 @@ export const fr: Translations = {
   "dream.model": "Modèle",
   "dream.incognito": "Mode incognito",
   "dream.noModel": "Choisissez un modèle avec le bouton en bas, puis reposez votre question.",
+  "dream.voiceMissing.title": "Voix non installée",
+  "dream.voiceRequired":
+    "Téléchargez la voix de Maestro dans les réglages d'Opera pour lui parler ici.",
   "dream.whisperRequired":
     "Installez un modèle Whisper dans les réglages d'Opera pour parler à Maestro ici. Sans lui, la voix et « Maestro » ne fonctionnent pas.",
 
@@ -293,7 +296,7 @@ export const fr: Translations = {
   "settings.nav.maestroPreferences.title": "Préférences",
   "settings.nav.maestroPreferences.subtitle": "Instructions, lecture automatique",
   "settings.nav.screenSaver.title": "Écran de veille",
-  "settings.nav.screenSaver.subtitle": "Bientôt disponible",
+  "settings.nav.screenSaver.subtitle": "Stand-by, anti burn-in, mot de réveil",
   "settings.nav.service.title": "Service",
   "settings.nav.service.subtitle": "Service IA, serveur Ollama",
   "settings.nav.tools.title": "Outils",

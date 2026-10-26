@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from '../../../constants/theme';
 import { useColors, useThemedStyles } from '../../hooks/useTheme';
 
@@ -33,11 +33,15 @@ interface BlockProps {
   //serif names else mono
   serif?: boolean;
   grow?: boolean;
+  //forces the text step so blocks of a grid match
+  long?: boolean;
   //incognito discussion swaps the fill to purple-gray
   incognito?: boolean;
+  //overrides the block look
+  style?: StyleProp<ViewStyle>;
 }
 
-export function Block({ text, filled, serif, grow = true, incognito }: BlockProps) {
+export function Block({ text, filled, serif, grow = true, long, incognito, style }: BlockProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   return (
@@ -47,6 +51,7 @@ export function Block({ text, filled, serif, grow = true, incognito }: BlockProp
         filled ? styles.blockFilled : styles.blockOutlined,
         grow && styles.blockGrow,
         filled && incognito && { backgroundColor: Colors.incognito },
+        style,
       ]}
     >
       <Text
@@ -54,7 +59,7 @@ export function Block({ text, filled, serif, grow = true, incognito }: BlockProp
         adjustsFontSizeToFit
         style={[
           //long values step down not shrink
-          text.length > 16 ? styles.blockTextLong : styles.blockText,
+          (long ?? text.length > 16) ? styles.blockTextLong : styles.blockText,
           serif ? styles.blockTextSerif : styles.blockTextMono,
           filled ? styles.blockTextOnPrimary : styles.blockTextPrimary,
         ]}

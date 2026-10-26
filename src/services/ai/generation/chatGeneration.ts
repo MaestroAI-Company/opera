@@ -167,12 +167,16 @@ function resolveCitedSources(content: string, recorded: ToolSource[] | undefined
 }
 
 //not every provider reports token counts
-function completeMetrics(metrics: MessageMetrics, content: string, think: boolean | string, model: string): MessageMetrics {
+function completeMetrics(metrics: MessageMetrics, content: string, think: boolean | string, model: string, systemPrompt: string): MessageMetrics {
   const tokens = metrics.tokens || estimateTokens(content);
   const tokensPerSec = metrics.tokensPerSec || (metrics.timeSec ? tokens / metrics.timeSec : undefined);
   const thinking = think === false ? 'none' : think === true ? 'high' : think;
-  return { ...metrics, tokens, tokensPerSec, thinking, systemPrompt: modelTier(model) };
+  //standby rules only ride along in the screen saver
+  const standby = systemPrompt.includes(SYSTEM_PROMPTS.STANDBY) ? ` + ${STANDBY_PROMPT_TAG}` : '';
+  return { ...metrics, tokens, tokensPerSec, thinking, systemPrompt: modelTier(model) + standby };
 }
+
+export const STANDBY_PROMPT_TAG = 'standby';
 
 //one streaming path for both screens
 export async function streamAssistantReply(params: {
@@ -202,7 +206,7 @@ export async function streamAssistantReply(params: {
       params.signal,
       { think: params.think },
       (received) => {
-        metrics = completeMetrics(received, content, params.think, params.model);
+        metrics = completeMetrics(received, content, params.think, params.model, params.systemPrompt);
         params.onMetrics?.(metrics);
       },
       (received) => {

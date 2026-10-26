@@ -1,8 +1,32 @@
-import type { WhisperSurface } from './STTService';
+import { Settings } from '../settings/SettingsService';
+import type { SpeechToTextCallbacks, WhisperSurface } from './STTService';
+import { buildWavBuffer } from './wav';
+
+const SAMPLE_RATE = 16000;
+//same threshold as the chat bar
+const VAD_RMS_THRESHOLD = 0.01;
+//speech stands this far above the noise
+const VAD_NOISE_RATIO = 3;
+//quietest chunk of the last 5 s
+const NOISE_WINDOW = 20;
+//native recognizers give up too
+const NO_SPEECH_MS = 5000;
+
+type Capture = {
+  stream: MediaStream;
+  context: AudioContext;
+  processor: ScriptProcessorNode;
+  chunks: ArrayBuffer[];
+  callbacks: SpeechToTextCallbacks;
+  recordAudio: boolean;
+  noSpeechTimer: ReturnType<typeof setTimeout>;
+};
 
 class SpeechToTextService {
   private transcriber: any = null;
   private currentLang: string = 'en';
+  private capture: Capture | null = null;
+  private session = 0;
 
   private async getTransformers() {
     if (typeof self === 'undefined') {
@@ -195,6 +219,110 @@ class SpeechToTextService {
         audioContext.close();
       }
     }
+  }
+
+  //caller gets the wav not whisper
+  supportsRecording(): boolean {
+    return true;
+  }
+
+  async requestPermissions(): Promise<boolean> {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  //records until stop then transcribes
+  start(_locale: string, callbacks: SpeechToTextCallbacks, recordAudio = false): void {
+    this.open(++this.session, callbacks, recordAudio).catch((e) => callbacks.onError?.(String(e?.message ?? e)));
+  }
+
+  private async open(session: number, callbacks: SpeechToTextCallbacks, recordAudio: boolean): Promise<void> {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    //stopped while the prompt was open
+    if (session !== this.session) {
+      stream.getTracks().forEach((track) => track.stop());
+      return;
+    }
+    const context = new AudioContext({ sampleRate: SAMPLE_RATE });
+    const processor = context.createScriptProcessor(4096, 1, 1);
+    const capture: Capture = {
+      stream,
+      context,
+      processor,
+      chunks: [],
+      callbacks,
+      recordAudio,
+      noSpeechTimer: setTimeout(() => this.stop(), NO_SPEECH_MS),
+    };
+    let speaking = false;
+    const recentRms: number[] = [];
+    processor.onaudioprocess = (e) => {
+      const chunk = new Float32Array(e.inputBuffer.getChannelData(0));
+      capture.chunks.push(chunk.buffer);
+      let sum = 0;
+      for (let i = 0; i < chunk.length; i++) sum += chunk[i] * chunk[i];
+      const rms = Math.sqrt(sum / chunk.length);
+      recentRms.push(rms);
+      if (recentRms.length > NOISE_WINDOW) recentRms.shift();
+      //steady noise like a tv stops counting
+      const noiseFloor = Math.min(...recentRms);
+      const loud = rms > Math.max(VAD_RMS_THRESHOLD, noiseFloor * VAD_NOISE_RATIO);
+      if (loud === speaking) return;
+      speaking = loud;
+      if (loud) {
+        clearTimeout(capture.noSpeechTimer);
+        callbacks.onSpeechStart?.();
+      } else {
+        callbacks.onSpeechEnd?.();
+      }
+    };
+    context.createMediaStreamSource(stream).connect(processor);
+    processor.connect(context.destination);
+    this.capture = capture;
+  }
+
+  private close(): Capture | null {
+    this.session++;
+    const capture = this.capture;
+    this.capture = null;
+    if (!capture) return null;
+    clearTimeout(capture.noSpeechTimer);
+    capture.processor.disconnect();
+    capture.context.close();
+    capture.stream.getTracks().forEach((track) => track.stop());
+    return capture;
+  }
+
+  stop(): void {
+    const capture = this.close();
+    if (capture) this.finish(capture);
+  }
+
+  abort(): void {
+    this.close();
+  }
+
+  private async finish({ chunks, callbacks, recordAudio }: Capture): Promise<void> {
+    try {
+      const wav = buildWavBuffer(chunks, SAMPLE_RATE);
+      if (recordAudio) {
+        callbacks.onAudioFile?.(URL.createObjectURL(new Blob([wav], { type: 'audio/wav' })));
+      } else {
+        const model = Settings.getCached().whisperModel || 'base';
+        //lazy load like the chat bar
+        if (!this.transcriber && model !== 'none' && (await this.isModelInstalled(model))) await this.init(model);
+        if (!this.transcriber) throw new Error('whisper not installed');
+        callbacks.onFinal?.((await this.transcribeData(wav)).trim());
+      }
+    } catch (e: any) {
+      callbacks.onError?.(String(e?.message ?? e));
+    }
+    callbacks.onDone?.();
   }
 
   // release resources

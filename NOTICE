@@ -17,32 +17,90 @@ visual identity.
 
 Opera is built on the open source components below. Each one remains under
 its own license; the full license text ships in the package of the component
-(node_modules/<name>/LICENSE) and is available from its repository.
+(node_modules/<name>/LICENSE) and is available from its repository. The full
+text of the Apache License 2.0 is in licenses/Apache-2.0.txt.
 
 MIT
 React, React Native, React Native Web, Expo and the expo-_ modules,
 @expo/ui, react-native-_ libraries (gesture-handler, reanimated, worklets,
 screens, safe-area-context, svg, webview, view-shot, keyboard-controller,
 quick-base64, quick-crypto, get-random-values, audio-api, executorch,
-litert-lm, nitro-modules, code-highlighter), onnxruntime-react-native,
-KaTeX, fflate, buffer, @lottiefiles/dotlottie-react, core-js (bundled in
-pdf.js), Whisper (OpenAI), Tauri plugins (oauth, deep-link, http, opener)
+executorch-expo-resource-fetcher, litert-lm, nitro-modules,
+code-highlighter), expo-paste-input, expo-quick-actions,
+expo-speech-recognition, onnxruntime-react-native and ONNX Runtime
+(Microsoft, native Android library and onnxruntime-web), KaTeX (code and
+fonts, embedded in src/components/ui/katexAssets.ts), fflate, buffer,
+@lottiefiles/dotlottie-react, core-js (bundled in pdf.js), Mermaid (loaded
+from a CDN), Tauri plugins (oauth, deep-link, http, opener)
 
 Apache License 2.0
 @notifee/react-native, lottie-react-native, @xenova/transformers,
-@tauri-apps/api, pdf.js (Mozilla, vendored in
-src/services/documents/vendor), Tauri plugins
+@tauri-apps/api, pdf.js 3.11.174 (Mozilla, vendored in
+src/services/documents/vendor), LiteRT-LM (Google, native Android library),
+OpenSSL 3 (native library of react-native-quick-crypto), Tauri plugins
 (dual licensed MIT OR Apache-2.0)
 
+BSD
+ExecuTorch (Meta, native runtime of react-native-executorch), Leaflet
+(BSD-2-Clause, loaded from a CDN)
+
 ISC
-react-native-autoheight-webview
+react-native-autoheight-webview, libsodium (native library of
+react-native-quick-crypto)
 
 SIL Open Font License 1.1
-Figtree, Petrona, Fragment Mono (assets/fonts)
+Figtree, Copyright 2022 The Figtree Project Authors
+Petrona, Copyright 2019 The Petrona Project Authors
+Fragment Mono, Copyright 2022 The Fragment-Mono Project Authors
+(assets/fonts, the license is embedded in each font file)
+
+## Proprietary components
+
+The Android build includes Google ML Kit (text recognition, barcode
+scanning, GenAI prompt and speech recognition). ML Kit is not open source
+and is used under the ML Kit Terms of Service,
+https://developers.google.com/ml-kit/terms
+
+## Map data
+
+Map tiles (c) OpenStreetMap contributors, available under the Open Database
+License, https://www.openstreetmap.org/copyright
+Basemap (c) CARTO, https://carto.com/attributions
+
+## Models shipped with Opera
+
+UI element detector (assets/models/deki-yolo-int8.pte)
+  deki-yolo by orasul (GNU General Public License v3.0),
+  https://huggingface.co/orasul/deki-yolo, trained with Ultralytics YOLO.
+  Converted to ExecuTorch and quantized to int8 for Opera.
+
+Wake word model "Maestro" (public/wakeword/maestro.onnx, maestro_v3b)
+  Trained with livekit-wakeword (Apache License 2.0),
+    https://github.com/livekit/livekit-wakeword
+  Audio front end: mel spectrogram from openWakeWord (Apache License 2.0
+    repository), https://github.com/dscripka/openWakeWord
+    Shipped as public/wakeword/melspectrogram_raw.onnx, modified for Opera:
+    the graph stops before the final top_db clip.
+  Speech embedding model: Google speech_embedding (Apache License 2.0),
+    distributed through TensorFlow Hub and openWakeWord
+    (public/wakeword/embedding_model.onnx, unmodified)
+  Synthetic training speech: VoxCPM2 by OpenBMB (Apache License 2.0),
+    https://huggingface.co/openbmb/VoxCPM2
+  Negative and validation speech: FLEURS by Google (Creative Commons
+    Attribution 4.0, https://creativecommons.org/licenses/by/4.0/),
+    https://huggingface.co/datasets/google/fleurs. Audio was resampled and
+    converted to speech embeddings, the audio is not redistributed.
+  Background noise: MUSAN noise subset (public domain and Creative Commons
+    Attribution 3.0 items), Snyder, Chen, Povey, "MUSAN: A Music, Speech,
+    and Noise Corpus", arXiv:1510.08484
+  Room impulse responses: OpenSLR RIRS_NOISES simulated RIRs (Apache
+    License 2.0), https://www.openslr.org/28/
 
 ## Models downloaded by the user
 
-Language, speech and voice models are not distributed with Opera. They are
-downloaded on request from their publishers (for example Hugging Face) and
-stay under the license chosen by their authors (Gemma Terms of Use, Apache
-2.0, OpenRAIL...). The user is responsible for accepting those terms.
+Language, speech and voice models other than the ones above are not
+distributed with Opera. They are downloaded on request from their publishers
+(for example Hugging Face: Whisper by OpenAI, Supertonic by Supertone, LLMs)
+and stay under the license chosen by their authors (Gemma Terms of Use,
+Apache 2.0, MIT, OpenRAIL...). The user is responsible for accepting those
+terms.

@@ -161,6 +161,8 @@ export const en = {
   "messageDetails.tokens": "Tokens",
   "messageDetails.speed": "Tokens/s",
   "messageDetails.prompt": "System prompt",
+  "messageDetails.standbyNote":
+    "Answered in Standby: short spoken replies and a card on screen. These rules only apply in Standby, so continuing this conversation in Opera uses the usual prompt.",
   "messageDetails.thinking": "Reflection",
   "messageDetails.tools": "Tools",
   "messageDetails.reasoning": "Reasoning",
@@ -198,6 +200,15 @@ export const en = {
     "After this update, some saved data may be inconsistent. If you encounter any problems, go to Settings → Confidentiality to export your data or delete all conversations.",
   "home.dataWarning.goToSettings": "Go to Settings",
   "home.dataWarning.later": "Later",
+
+  "dream.model": "Model",
+  "dream.incognito": "Incognito mode",
+  "dream.noModel": "Choose a model with the button below, then ask your question again.",
+  "dream.voiceMissing.title": "Voice not installed",
+  "dream.voiceRequired":
+    "Download Maestro's voice in Opera's settings to talk to him here.",
+  "dream.whisperRequired":
+    "Install a Whisper model in Opera's settings to talk to Maestro here. Without it, voice and \"Maestro\" won't work.",
 
   "chat.noModel":
     "Please select a model from the top menu before sending a message.",
@@ -288,6 +299,8 @@ export const en = {
   "settings.nav.overlay.subtitle": "Voice, Screen context",
   "settings.nav.maestroPreferences.title": "Preferences",
   "settings.nav.maestroPreferences.subtitle": "Instructions, Auto-read replies",
+  "settings.nav.screenSaver.title": "Screen Saver",
+  "settings.nav.screenSaver.subtitle": "Standby, anti burn-in, wake word",
   "settings.nav.service.title": "Service",
   "settings.nav.service.subtitle": "AI Service, Ollama server",
   "settings.nav.tools.title": "Tools",
@@ -301,6 +314,18 @@ export const en = {
   "settings.nav.support.subtitle": "Send an issue, contact support",
   "settings.nav.info.title": "Informations",
   "settings.nav.info.subtitle": "Version App, Github, Instagram, TikTok",
+  "settings.screenSaver.help":
+    "Choose what your device shows while it charges or sits idle.",
+  "settings.screenSaver.open": "Open screen saver settings",
+  "settings.screenSaver.antiBurnIn": "Anti burn-in",
+  "settings.screenSaver.antiBurnInHelp":
+    "Shift the clock and butterflies a few pixels every minute to protect OLED screens.",
+  "settings.screenSaver.incognito": "Incognito mode button",
+  "settings.screenSaver.incognitoHelp":
+    "Show the incognito mode button on the screen saver.",
+  "settings.screenSaver.wakeWord": "Say \"Maestro\"",
+  "settings.screenSaver.wakeWordHelp":
+    "Ask Maestro hands free on the screen saver. Listening happens on this device.",
 
   "settings.info.version": "Version",
   "settings.info.links": "Links",

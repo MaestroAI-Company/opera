@@ -14,6 +14,7 @@ import { downloadCodeFile } from "../../services/codeDownload";
 import { WidgetManager } from "../../services/widgets/WidgetManager";
 import WidgetWrapper from "../widgets/WidgetWrapper";
 import IconButton from "./IconButton";
+import MarkdownImage from "./MarkdownImage";
 import { ensureKatexStylesheet, getKatexCss, KATEX_STYLESHEET_NAME } from "./katexStylesheet";
 
 const copyIcon = require("../../../assets/icons/copy.png");
@@ -124,6 +125,23 @@ function parseInline(text: string): Token[] {
         continue;
       }
     }
+    //fallback image to link token
+    if (text[i] === "!" && text[i + 1] === "[") {
+      const close = text.indexOf("]", i + 2);
+      if (close !== -1 && text[close + 1] === "(") {
+        const closeParen = text.indexOf(")", close + 2);
+        if (closeParen !== -1) {
+          const rawUrl = text.slice(close + 2, closeParen).trim();
+          const cleanUrl = rawUrl.split(/\s+/)[0];
+          const alt = text.slice(i + 2, close);
+          if (cleanUrl) {
+            tokens.push({ type: "link", url: cleanUrl, children: [{ type: "text", content: alt || cleanUrl }] });
+            i = closeParen + 1;
+            continue;
+          }
+        }
+      }
+    }
     // link [text](url)
     if (text[i] === "[") {
       const close = text.indexOf("]", i + 1);
@@ -176,7 +194,7 @@ function parseInline(text: string): Token[] {
     }
     // plain text collect until next special char
     let j = i + 1;
-    while (j < text.length && text[j] !== "*" && text[j] !== "_" && text[j] !== "`" && text[j] !== "~" && text[j] !== "[") j++;
+    while (j < text.length && text[j] !== "*" && text[j] !== "_" && text[j] !== "`" && text[j] !== "~" && text[j] !== "[" && text[j] !== "!") j++;
     tokens.push({ type: "text", content: text.slice(i, j) });
     i = j;
   }
@@ -529,6 +547,66 @@ function wrapContent(
       {renderContent(text, keyBase, incognito)}
     </View>
   );
+}
+
+const IMAGE_REGEX = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+(?:"([^"]*)"|'([^']*)'))?\)/g;
+
+//split images into standalone blocks
+function renderParagraphWithImages(
+  text: string,
+  keyPrefix: string,
+  style: any,
+  keyBase: number,
+  incognito?: boolean,
+  selColor?: string,
+  dark?: boolean
+): React.ReactNode[] {
+  if (!text.includes("![")) {
+    return [wrapContent(text, keyPrefix, style, keyBase, incognito, selColor)];
+  }
+
+  const nodes: React.ReactNode[] = [];
+  const regex = new RegExp(IMAGE_REGEX.source, "g");
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      const before = text.slice(lastIndex, match.index).trim();
+      if (before) {
+        nodes.push(
+          wrapContent(before, `${keyPrefix}-t-${lastIndex}`, style, keyBase + lastIndex, incognito, selColor)
+        );
+      }
+    }
+
+    const alt = match[1];
+    const url = match[2];
+    const title = match[3] || match[4] || undefined;
+    nodes.push(
+      <MarkdownImage
+        key={`${keyPrefix}-img-${match.index}`}
+        url={url}
+        alt={alt}
+        title={title}
+        incognito={incognito}
+        dark={dark}
+      />
+    );
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    const after = text.slice(lastIndex).trim();
+    if (after) {
+      nodes.push(
+        wrapContent(after, `${keyPrefix}-t-${lastIndex}`, style, keyBase + lastIndex, incognito, selColor)
+      );
+    }
+  }
+
+  return nodes;
 }
 
 const LANG_ALIASES: Record<string, string> = {
@@ -959,7 +1037,15 @@ export function renderMarkdown(md: string, incognito?: boolean, dark?: boolean):
       const depth = Math.min(2, Math.floor(bulletMatch[1].replace(/\t/g, "  ").length / 2));
       const glyph = ["•", "◦", "▪"][depth] || "•";
       elements.push(
-        wrapContent(`${glyph} ${bulletMatch[3]}`, `li-${i}`, [s.base, s.paragraph, { paddingLeft: depth * 14 }, textColor && { color: textColor }], i, incognito, selColor)
+        ...renderParagraphWithImages(
+          `${glyph} ${bulletMatch[3]}`,
+          `li-${i}`,
+          [s.base, s.paragraph, { paddingLeft: depth * 14 }, textColor && { color: textColor }],
+          i,
+          incognito,
+          selColor,
+          dark
+        )
       );
       i++;
       continue;
@@ -985,7 +1071,15 @@ export function renderMarkdown(md: string, incognito?: boolean, dark?: boolean):
         i++;
       }
       elements.push(
-        wrapContent(itemLines.join("\n"), `oli-${i}`, [s.base, s.paragraph, textColor && { color: textColor }], i, incognito, selColor)
+        ...renderParagraphWithImages(
+          itemLines.join("\n"),
+          `oli-${i}`,
+          [s.base, s.paragraph, textColor && { color: textColor }],
+          i,
+          incognito,
+          selColor,
+          dark
+        )
       );
       continue;
     }
@@ -994,7 +1088,15 @@ export function renderMarkdown(md: string, incognito?: boolean, dark?: boolean):
     if (line.trimStart().startsWith("> ")) {
       const quoteText = line.replace(/^[\s]*>\s?/, "");
       elements.push(
-        wrapContent(quoteText, `quote-${i}`, [s.base, { borderLeftColor: incognito ? Colors.incognito : (dark ? Colors.responseTextStrong : Colors.primary), borderLeftWidth: 3, paddingLeft: 10, marginVertical: 4 }, textColor && { color: textColor }], i, incognito, selColor)
+        ...renderParagraphWithImages(
+          quoteText,
+          `quote-${i}`,
+          [s.base, { borderLeftColor: incognito ? Colors.incognito : (dark ? Colors.responseTextStrong : Colors.primary), borderLeftWidth: 3, paddingLeft: 10, marginVertical: 4 }, textColor && { color: textColor }],
+          i,
+          incognito,
+          selColor,
+          dark
+        )
       );
       i++;
       continue;
@@ -1037,7 +1139,15 @@ export function renderMarkdown(md: string, incognito?: boolean, dark?: boolean):
 
     if (paraLines.length > 0) {
       elements.push(
-        wrapContent(paraLines.join("\n"), `p-${i}`, [s.base, s.paragraph, textColor && { color: textColor }], i, incognito, selColor)
+        ...renderParagraphWithImages(
+          paraLines.join("\n"),
+          `p-${i}`,
+          [s.base, s.paragraph, textColor && { color: textColor }],
+          i,
+          incognito,
+          selColor,
+          dark
+        )
       );
     } else {
       i++;

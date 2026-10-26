@@ -17,6 +17,8 @@ export const AppEvents = {
   openBugReport: 'OPEN_BUG_REPORT',
   //a chat code block was tapped
   openCodePreview: 'OPEN_CODE_PREVIEW',
+  //open full image preview
+  openImagePreview: 'OPEN_IMAGE_PREVIEW',
   //mcp server state changed
   mcpServersChanged: 'MCP_SERVERS_CHANGED',
 } as const;

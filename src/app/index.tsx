@@ -1122,6 +1122,10 @@ useEffect(() => {
       AppEvents.openCodePreview,
       setPreviewCode,
     );
+    const imagePreviewSub = DeviceEventEmitter.addListener(
+      AppEvents.openImagePreview,
+      setPreviewImage,
+    );
 
     return () => {
       if (reloadTimer) clearTimeout(reloadTimer);
@@ -1130,6 +1134,7 @@ useEffect(() => {
       settingsSub.remove();
       modelSelectorSub.remove();
       codePreviewSub.remove();
+      imagePreviewSub.remove();
     };
   }, [dbReady, loadConversations, openDrawerSafely]);
 

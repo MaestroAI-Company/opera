@@ -132,6 +132,13 @@ export const en = {
 
   "markdown.thinking": "Thinking...",
 
+  "markdown.image.external": "Remote image",
+  "markdown.image.warning":
+    "This image is hosted on an external server ({domain}). Loading it may reveal your IP address to third parties.",
+  "markdown.image.show": "Show image",
+  "markdown.image.alwaysShow": "Always show",
+  "markdown.image.failed": "Failed to load image",
+
   "nextcloud.connect": "Connect",
   "nextcloud.waiting": "Waiting for you to approve it in your browser...",
   "nextcloud.failed":
@@ -555,6 +562,9 @@ export const en = {
     "Opera needs a few permissions to work at its best. You can manage them from your browser's site settings.",
   "settings.privacy.permissionsNative":
     "Opera needs a few permissions to work at its best. You can change them in your device settings.",
+  "settings.privacy.remoteImages": "Always show remote images",
+  "settings.privacy.remoteImagesHelp":
+    "Images from external URLs load automatically. Loading remote images allows the external server to log your IP address and track your activity. Disable this to be prompted before any remote image is displayed.",
 
   "settings.data.management": "Data management",
   "settings.data.managementHelp":

@@ -134,6 +134,13 @@ export const fr: Translations = {
 
   "markdown.thinking": "Réflexion...",
 
+  "markdown.image.external": "Image distante",
+  "markdown.image.warning":
+    "Cette image provient d'un serveur externe ({domain}). Son chargement permet au serveur hébergeur de connaître ton adresse IP et de pister ton activité.",
+  "markdown.image.show": "Afficher l'image",
+  "markdown.image.alwaysShow": "Toujours afficher",
+  "markdown.image.failed": "Impossible de charger l'image",
+
   "nextcloud.connect": "Connecter",
   "nextcloud.waiting": "En attente de ta validation dans le navigateur...",
   "nextcloud.failed":
@@ -572,6 +579,9 @@ export const fr: Translations = {
     "Opera a besoin de quelques autorisations pour fonctionner au mieux. Tu peux les gérer dans les paramètres de site de ton navigateur.",
   "settings.privacy.permissionsNative":
     "Opera a besoin de quelques autorisations pour fonctionner au mieux. Tu peux les modifier dans les réglages de ton appareil.",
+  "settings.privacy.remoteImages": "Toujours afficher les images distantes",
+  "settings.privacy.remoteImagesHelp":
+    "Les images provenant d'URLs externes se chargent automatiquement. Charger une image distante permet au serveur externe de connaître ton adresse IP. Désactive cette option pour être averti avant l'affichage de chaque image.",
 
   "settings.data.management": "Gestion des données",
   "settings.data.managementHelp":

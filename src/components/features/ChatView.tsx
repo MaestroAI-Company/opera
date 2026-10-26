@@ -179,6 +179,7 @@ type ChatViewProps = {
 
 const stripMarkdown = (md: string) => {
   return md
+    .replace(/!\[([^\]]*)\]\([^\)]+\)/g, '$1')
     .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
     .replace(/[#_*~`]/g, '')
     .replace(/^> /gm, '')

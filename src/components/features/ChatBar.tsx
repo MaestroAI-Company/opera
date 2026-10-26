@@ -1402,14 +1402,20 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                     )}
                     <TextInputWrapper
                       onPaste={(payload) => {
-                        if (supportsImages && payload.type === "images") {
-                          const newFiles = payload.uris.map(uri => ({
-                            uri,
-                            type: "image",
-                            name: uri.split('/').pop() || "pasted_image.png"
-                          }));
-                          setSelectedFiles(prev => [...prev, ...newFiles]);
+                        if (payload.type !== "images") return;
+                        //same rejection flow as the pickers
+                        const error = attachmentError('image', t("chatbar.unsupportedFile"));
+                        if (error) {
+                          setModalConfig(error);
+                          setModalVisible(true);
+                          return;
                         }
+                        const newFiles: SelectedFile[] = payload.uris.map(uri => {
+                          const name = uri.split('/').pop() || "pasted_image.png";
+                          const extension = name.split('.').pop()?.toLowerCase();
+                          return { uri, type: "image", name, mimeType: `image/${extension === 'jpg' ? 'jpeg' : extension || 'png'}` };
+                        });
+                        setSelectedFiles(prev => [...prev, ...newFiles]);
                       }}
                     >
                       <TextInput

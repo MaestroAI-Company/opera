@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { createContext, useContext, useSyncExternalStore } from "react";
 import { Appearance, DeviceEventEmitter } from "react-native";
 import { DarkColors, LightColors, ThemeColors } from "../../constants/theme";
 import { AppEvents } from "../services/events";
@@ -76,8 +76,13 @@ function getServerSnapshot(): ThemeColors {
   return LightColors;
 }
 
+//a surface can pin its own palette
+export const ColorsOverride = createContext<ThemeColors | null>(null);
+
 export function useColors(): ThemeColors {
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const override = useContext(ColorsOverride);
+  const colors = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  return override ?? colors;
 }
 
 export function useIsDark(): boolean {

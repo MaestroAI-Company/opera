@@ -37,6 +37,9 @@ export type AppSettings = {
   dataWarningDismissed: boolean;
   useAppContext: boolean;
   shakeToReport: boolean;
+  dreamIncognitoButton: boolean;
+  dreamAntiBurnIn: boolean;
+  dreamWakeWord: boolean;
   assistantPromptDismissed: boolean;
   hasSeenAssistantOverlay: boolean;
   shareInstanceUrl: string;
@@ -94,6 +97,9 @@ export const BASE_DEFAULTS: AppSettings = {
   dataWarningDismissed: false,
   useAppContext: true,
   shakeToReport: true,
+  dreamIncognitoButton: true,
+  dreamAntiBurnIn: true,
+  dreamWakeWord: true,
   assistantPromptDismissed: false,
   hasSeenAssistantOverlay: false,
   //empty means the built-in privatebin instance
@@ -119,6 +125,9 @@ const BOOLEAN_KEYS = [
   'dataWarningDismissed',
   'useAppContext',
   'shakeToReport',
+  'dreamIncognitoButton',
+  'dreamAntiBurnIn',
+  'dreamWakeWord',
   'assistantPromptDismissed',
   'hasSeenAssistantOverlay',
   'litertForceLoad',

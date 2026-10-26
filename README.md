@@ -119,3 +119,5 @@ Coding conventions for this repo are in [AGENTS.md](./AGENTS.md); the visual lan
 ## License
 
 [AGPLv3](./LICENSE) - if you run a modified version of Opera as a network service, you must make your source available too.
+
+Third-party software, models, fonts and data are credited in [NOTICE](./NOTICE).

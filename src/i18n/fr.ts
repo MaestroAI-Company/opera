@@ -163,6 +163,8 @@ export const fr: Translations = {
   "messageDetails.tokens": "Tokens",
   "messageDetails.speed": "Tokens/s",
   "messageDetails.prompt": "Prompt système",
+  "messageDetails.standbyNote":
+    "Répondu en Standby : réponses courtes à l'oral et carte à l'écran. Ces règles ne valent qu'en Standby, si tu continues cette conversation dans Opera, c'est le prompt habituel qui s'applique.",
   "messageDetails.thinking": "Réflexion",
   "messageDetails.tools": "Outils",
   "messageDetails.reasoning": "Raisonnement",
@@ -200,6 +202,15 @@ export const fr: Translations = {
     "Après cette mise à jour, certaines données enregistrées peuvent être incohérentes. En cas de problème, va dans Réglages → Confidentialité pour exporter tes données ou supprimer toutes les conversations.",
   "home.dataWarning.goToSettings": "Ouvrir les réglages",
   "home.dataWarning.later": "Plus tard",
+
+  "dream.model": "Modèle",
+  "dream.incognito": "Mode incognito",
+  "dream.noModel": "Choisissez un modèle avec le bouton en bas, puis reposez votre question.",
+  "dream.voiceMissing.title": "Voix non installée",
+  "dream.voiceRequired":
+    "Téléchargez la voix de Maestro dans les réglages d'Opera pour lui parler ici.",
+  "dream.whisperRequired":
+    "Installez un modèle Whisper dans les réglages d'Opera pour parler à Maestro ici. Sans lui, la voix et « Maestro » ne fonctionnent pas.",
 
   "chat.noModel":
     "Sélectionne un modèle dans le menu du haut avant d'envoyer un message.",
@@ -291,6 +302,8 @@ export const fr: Translations = {
   "settings.nav.overlay.subtitle": "Voix, contexte de l'écran",
   "settings.nav.maestroPreferences.title": "Préférences",
   "settings.nav.maestroPreferences.subtitle": "Instructions, lecture automatique",
+  "settings.nav.screenSaver.title": "Écran de veille",
+  "settings.nav.screenSaver.subtitle": "Stand-by, anti burn-in, mot de réveil",
   "settings.nav.service.title": "Service",
   "settings.nav.service.subtitle": "Service IA, serveur Ollama",
   "settings.nav.tools.title": "Outils",
@@ -306,6 +319,19 @@ export const fr: Translations = {
   "settings.nav.support.subtitle": "Signaler un problème, contacter le support",
   "settings.nav.info.title": "Informations",
   "settings.nav.info.subtitle": "Version de l'app, Github, Instagram, TikTok",
+  "settings.screenSaver.help":
+    "Choisis ce que ton appareil affiche pendant la charge ou en veille.",
+  "settings.screenSaver.open":
+    "Ouvrir les réglages de l'écran de veille",
+  "settings.screenSaver.antiBurnIn": "Anti burn-in",
+  "settings.screenSaver.antiBurnInHelp":
+    "Déplace l'horloge et les papillons de quelques pixels chaque minute pour protéger les écrans OLED.",
+  "settings.screenSaver.incognito": "Bouton mode incognito",
+  "settings.screenSaver.incognitoHelp":
+    "Affiche le bouton mode incognito sur l'écran de veille.",
+  "settings.screenSaver.wakeWord": "Dire « Maestro »",
+  "settings.screenSaver.wakeWordHelp":
+    "Parle à Maestro sans les mains sur l'écran de veille. L'écoute reste sur l'appareil.",
 
   "settings.info.version": "Version",
   "settings.info.links": "Liens",

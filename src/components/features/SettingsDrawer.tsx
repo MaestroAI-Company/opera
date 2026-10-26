@@ -125,8 +125,9 @@ import { AppEvents } from "../../services/events";
 import { McpService } from "../../services/mcp/McpService";
 import { McpServerConfig } from "../../services/mcp/types";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
+import { openScreenSaverSettings } from "../../services/screensaver/ScreenSaver";
 import { Settings } from "../../services/settings/SettingsService";
-import { WhisperSTT } from "../../services/speech/STTService";
+import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { TTS_SPEEDS } from "../../services/speech/engines";
 import ActionButton from "../ui/ActionButton";
 import Checkbox from "../ui/Checkbox";
@@ -277,6 +278,7 @@ export type SubPage =
   | "maestro"
   | "maestropreferences"
   | "assistantoverlay"
+  | "screensaver"
   | "service"
   | "beta"
   | "litert"
@@ -303,6 +305,7 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   maestro: "main",
   maestropreferences: "maestro",
   assistantoverlay: "general",
+  screensaver: "general",
   service: "main",
   beta: "service",
   litert: "service",
@@ -947,6 +950,9 @@ export default function SettingsDrawer({
   const [confirmedName, setConfirmedName] = useState("");
   const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
   const [autoSpeak, setAutoSpeakState] = useState(true);
+  const [dreamIncognitoButton, setDreamIncognitoButtonState] = useState(true);
+  const [dreamAntiBurnIn, setDreamAntiBurnInState] = useState(true);
+  const [dreamWakeWord, setDreamWakeWordState] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetailsState] = useState(false);
   const [editAiMessages, setEditAiMessagesState] = useState(false);
   const [showDetectionBoxes, setShowDetectionBoxesState] = useState(false);
@@ -1322,6 +1328,9 @@ export default function SettingsDrawer({
         setConfirmedName(s.name || "");
         setAlwaysWhisperState(s.alwaysWhisper);
         setAutoSpeakState(s.autoSpeak);
+        setDreamIncognitoButtonState(s.dreamIncognitoButton);
+        setDreamAntiBurnInState(s.dreamAntiBurnIn);
+        setDreamWakeWordState(s.dreamWakeWord);
         setShowTechnicalDetailsState(s.showTechnicalDetails);
         setEditAiMessagesState(s.editAiMessages);
         setShowDetectionBoxesState(s.showDetectionBoxes);
@@ -2360,6 +2369,26 @@ export default function SettingsDrawer({
     Settings.set("autoSpeak", v);
   };
 
+  const setDreamIncognitoButton = (v: boolean) => {
+    setDreamIncognitoButtonState(v);
+    Settings.set("dreamIncognitoButton", v);
+  };
+
+  const setDreamAntiBurnIn = (v: boolean) => {
+    setDreamAntiBurnInState(v);
+    Settings.set("dreamAntiBurnIn", v);
+  };
+
+  const setDreamWakeWord = async (v: boolean) => {
+    setDreamWakeWordState(v);
+    //dream cannot show the mic prompt
+    if (v && !(await STT.requestPermissions())) {
+      setDreamWakeWordState(false);
+      return;
+    }
+    Settings.set("dreamWakeWord", v);
+  };
+
   const setShowTechnicalDetails = (v: boolean) => {
     setShowTechnicalDetailsState(v);
     Settings.set("showTechnicalDetails", v);
@@ -3313,6 +3342,93 @@ export default function SettingsDrawer({
             t("settings.nav.overlay.subtitle"),
           )}
       </Group>
+
+      {/* screen saver link */}
+      <Group style={styles.groupSpacing}>
+        {renderToolsNavRow(
+          "screensaver",
+          t("settings.nav.screenSaver.title"),
+          t("settings.nav.screenSaver.subtitle"),
+        )}
+      </Group>
+    </View>
+  );
+
+  // screen saver subpage
+  const renderScreenSaverSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader(t("settings.nav.screenSaver.title"))}
+
+      {/* screen saver settings card */}
+      {Platform.OS === "android" && (
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={styles.settingLabel}>
+              {t("settings.nav.screenSaver.title")}
+            </Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {t("settings.screenSaver.help")}
+            </Text>
+            <Group>
+              <ActionButton
+                icon={advancedIcon}
+                label={t("settings.screenSaver.open")}
+                onPress={openScreenSaverSettings}
+              />
+            </Group>
+          </View>
+        </View>
+      )}
+
+      {/* anti burn-in and incognito card */}
+      {Platform.OS === "android" && (
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <View style={styles.toggleGroupRow}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.screenSaver.antiBurnIn")}
+                </Text>
+                <Text style={styles.helpText}>
+                  {t("settings.screenSaver.antiBurnInHelp")}
+                </Text>
+              </View>
+              <Toggle
+                checked={dreamAntiBurnIn}
+                onToggle={setDreamAntiBurnIn}
+              />
+            </View>
+            <View style={[styles.toggleGroupRow, { marginTop: Spacing.lg }]}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.screenSaver.incognito")}
+                </Text>
+                <Text style={styles.helpText}>
+                  {t("settings.screenSaver.incognitoHelp")}
+                </Text>
+              </View>
+              <Toggle
+                checked={dreamIncognitoButton}
+                onToggle={setDreamIncognitoButton}
+              />
+            </View>
+            <View style={[styles.toggleGroupRow, { marginTop: Spacing.lg }]}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.screenSaver.wakeWord")}
+                </Text>
+                <Text style={styles.helpText}>
+                  {t("settings.screenSaver.wakeWordHelp")}
+                </Text>
+              </View>
+              <Toggle
+                checked={dreamWakeWord}
+                onToggle={setDreamWakeWord}
+              />
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 
@@ -5142,6 +5258,8 @@ export default function SettingsDrawer({
         return renderMaestroPreferencesSubPage();
       case "assistantoverlay":
         return renderAssistantOverlaySubPage();
+      case "screensaver":
+        return renderScreenSaverSubPage();
       case "service":
         return renderServiceSubPage();
       case "beta":

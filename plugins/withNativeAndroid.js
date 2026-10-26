@@ -119,6 +119,26 @@ function withNativeAndroid(config) {
       });
     }
 
+    //offer opera as a system screensaver
+    if (!application.service.some(s => s.$['android:name'] === '.OperaDreamService')) {
+      application.service.push({
+        $: {
+          'android:name': '.OperaDreamService',
+          'android:permission': 'android.permission.BIND_DREAM_SERVICE',
+          'android:exported': 'true',
+          'android:description': '@string/dream_description',
+        },
+        'intent-filter': [{
+          action: [{ $: { 'android:name': 'android.service.dreams.DreamService' } }],
+          category: [{ $: { 'android:name': 'android.intent.category.DEFAULT' } }]
+        }],
+        //preview shown in the system picker
+        'meta-data': [{
+          $: { 'android:name': 'android.service.dream', 'android:resource': '@xml/dream_info' }
+        }]
+      });
+    }
+
     //expo-sensors pedometer permission unused by app
     manifestDoc.manifest['uses-permission'] = (manifestDoc.manifest['uses-permission'] || []).filter(
       (p) => p.$['android:name'] !== 'android.permission.ACTIVITY_RECOGNITION'
@@ -162,6 +182,20 @@ function withNativeAndroid(config) {
       // copy XML resources
       copyTemplate('res/xml/voice_interaction.xml', path.join(xmlDir, 'voice_interaction.xml'), packageName);
       copyTemplate('res/xml/recognition_service.xml', path.join(xmlDir, 'recognition_service.xml'), packageName);
+      copyTemplate('res/xml/dream_info.xml', path.join(xmlDir, 'dream_info.xml'), packageName);
+      copyTemplate('res/values/dream_strings.xml', path.join(valuesDir, 'dream_strings.xml'), packageName);
+      copyTemplate('res/values-fr/dream_strings.xml', path.join(projectRoot, 'app', 'src', 'main', 'res', 'values-fr', 'dream_strings.xml'), packageName);
+      //binary file, no package substitution
+      const drawableDir = path.join(projectRoot, 'app', 'src', 'main', 'res', 'drawable-nodpi');
+      fs.mkdirSync(drawableDir, { recursive: true });
+      fs.copyFileSync(path.join(TEMPLATES_DIR, 'res/drawable-nodpi/dream_preview.png'), path.join(drawableDir, 'dream_preview.png'));
+      //same models the web serves
+      const wakeWordSrc = path.resolve(__dirname, '..', 'public', 'wakeword');
+      const wakeWordDir = path.join(projectRoot, 'app', 'src', 'main', 'assets', 'wakeword');
+      fs.mkdirSync(wakeWordDir, { recursive: true });
+      for (const file of fs.readdirSync(wakeWordSrc)) {
+        fs.copyFileSync(path.join(wakeWordSrc, file), path.join(wakeWordDir, file));
+      }
 
       // copy themes
       const themesPath = path.join(valuesDir, 'themes.xml');
@@ -183,6 +217,9 @@ function withNativeAndroid(config) {
       copyTemplate('src/MaestroOverlayPackage.kt', path.join(javaDir, 'MaestroOverlayPackage.kt'), packageName);
       copyTemplate('src/AssistantModule.kt', path.join(javaDir, 'AssistantModule.kt'), packageName);
       copyTemplate('src/PredictiveBackModule.kt', path.join(javaDir, 'PredictiveBackModule.kt'), packageName);
+      copyTemplate('src/OperaDreamService.kt', path.join(javaDir, 'OperaDreamService.kt'), packageName);
+      copyTemplate('src/WakeWordModule.kt', path.join(javaDir, 'WakeWordModule.kt'), packageName);
+      copyTemplate('src/WakeWordDetector.kt', path.join(javaDir, 'WakeWordDetector.kt'), packageName);
 
       // AICore (ML Kit GenAI) modules
       copyTemplate('src/AICorePackage.kt', path.join(javaDir, 'AICorePackage.kt'), packageName);
@@ -283,6 +320,8 @@ function withNativeAndroid(config) {
       //bundled models for ocr and qr
       'com.google.mlkit:text-recognition:16.0.1',
       'com.google.mlkit:barcode-scanning:17.3.0',
+      //same version as the js runtime
+      `com.microsoft.onnxruntime:onnxruntime-android:${require('onnxruntime-react-native/package.json').version}`,
     ];
     const missing = mlkit.filter(dep => !contents.includes(dep.split(':').slice(0, 2).join(':')));
     if (missing.length) {
@@ -318,6 +357,11 @@ function withNativeAndroid(config) {
     const jvmargs = config.modResults.find((p) => p.key === 'org.gradle.jvmargs');
     if (jvmargs) jvmargs.value = value;
     else config.modResults.push({ type: 'property', key: 'org.gradle.jvmargs', value });
+    //both onnx runtimes ship this lib
+    const pickFirsts = 'android.packagingOptions.pickFirsts';
+    if (!config.modResults.some((p) => p.key === pickFirsts)) {
+      config.modResults.push({ type: 'property', key: pickFirsts, value: '**/libonnxruntime.so' });
+    }
     return config;
   });
 

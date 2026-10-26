@@ -9,6 +9,7 @@ export interface IWidget<T = any> {
   description: string; // system prompt description
   schema: string; // json schema definition
   requires?: string[]; // tool names offered alongside on @mention
+  standbyOnly?: boolean; // offered by the standby prompt only
   component: React.ComponentType<{ data: T; title?: string; incognito?: boolean }>;
 }
 
@@ -34,7 +35,7 @@ class CentralWidgetManager {
 
   //widgets are always on
   getEnabledWidgets(): IWidget[] {
-    return this.getAllWidgets();
+    return this.getAllWidgets().filter(w => !w.standbyOnly);
   }
 
   getSystemPromptSegment(enabledWidgets: IWidget[] = this.getEnabledWidgets()): string {

@@ -506,7 +506,7 @@ export const en = {
   "settings.litert.contextHelp": "KV cache budget — lower values use less memory.",
   "settings.litert.forceLoad": "Force load",
   "settings.litert.forceLoadHelp":
-    "Bypass the memory pre-flight check. May crash if the device runs out of memory.",
+    "Bypass the memory pre-flight check and allow downloading models too big for this device. May crash if the device runs out of memory.",
   "generation.error.contextLength":
     "This conversation is too long for the model. Start a new chat, or raise the context length in the settings.",
   "generation.error.memory":

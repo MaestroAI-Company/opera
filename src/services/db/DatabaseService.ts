@@ -222,7 +222,7 @@ class DatabaseService {
       );
       await this.migrateTombstonesFromSyncState();
 
-      //images exchanged with opera hub by content hash
+      //images exchanged with sampler hub by content hash
       await this.db.runAsync(
         `CREATE TABLE IF NOT EXISTS hub_blobs (
           id TEXT PRIMARY KEY,
@@ -550,7 +550,7 @@ class DatabaseService {
     this.notifyDataChanged();
   }
 
-  //opera hub sync state, apart from the cloud keys
+  //sampler hub sync state, apart from the cloud keys
   async getHubState(key: string): Promise<string | null> {
     const row = await this.getDb().getFirstAsync<{ value: string }>('SELECT value FROM sync_state WHERE key = ?', [`hub_${key}`]);
     return row ? row.value : null;

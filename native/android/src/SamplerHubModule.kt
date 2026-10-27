@@ -16,28 +16,28 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import uniffi.opera_hub_client.HubClient
-import uniffi.opera_hub_client.HubException
-import uniffi.opera_hub_client.HubProfile
-import uniffi.opera_hub_client.HubSettings
-import uniffi.opera_hub_client.LlamaStatus
-import uniffi.opera_hub_client.ModelFile
-import uniffi.opera_hub_client.PairedHub
-import uniffi.opera_hub_client.ProfileLock
+import uniffi.sampler_hub_client.HubClient
+import uniffi.sampler_hub_client.HubException
+import uniffi.sampler_hub_client.HubProfile
+import uniffi.sampler_hub_client.HubSettings
+import uniffi.sampler_hub_client.LlamaStatus
+import uniffi.sampler_hub_client.ModelFile
+import uniffi.sampler_hub_client.PairedHub
+import uniffi.sampler_hub_client.ProfileLock
 //aliased so the bridge methods keep their js names
-import uniffi.opera_hub_client.openLockedKey as reopenLockedKey
-import uniffi.opera_hub_client.profileBackupKey as deriveBackupKey
-import uniffi.opera_hub_client.UnlockedProfile
-import uniffi.opera_hub_client.SyncRecord
+import uniffi.sampler_hub_client.openLockedKey as reopenLockedKey
+import uniffi.sampler_hub_client.profileBackupKey as deriveBackupKey
+import uniffi.sampler_hub_client.UnlockedProfile
+import uniffi.sampler_hub_client.SyncRecord
 
 //bridges the rust hub client to js
-class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
+class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
 
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private var clientKey: String? = null
   private var client: HubClient? = null
 
-  override fun getName(): String = "OperaHubModule"
+  override fun getName(): String = "SamplerHubModule"
 
   @ReactMethod
   fun deviceId(deviceKey: String, promise: Promise) =
@@ -106,7 +106,7 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
   fun nearbyHubs(deviceKey: String, waitMs: Double, promise: Promise) =
     launchPromise(promise) {
       val wifi = reactApplicationContext.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-      val lock = wifi.createMulticastLock("opera-hub").apply {
+      val lock = wifi.createMulticastLock("sampler-hub").apply {
         setReferenceCounted(false)
         acquire()
       }
@@ -184,7 +184,7 @@ class OperaHubModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
 
   @ReactMethod
   fun qrSvg(text: String, dark: String, light: String, promise: Promise) =
-    launchPromise(promise) { uniffi.opera_hub_client.qrSvg(text, dark, light) }
+    launchPromise(promise) { uniffi.sampler_hub_client.qrSvg(text, dark, light) }
 
   @ReactMethod
   fun unpair(deviceKey: String, hub: ReadableMap, promise: Promise) =

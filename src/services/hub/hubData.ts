@@ -1,7 +1,7 @@
 import type { CloudMergeTouched } from '../CloudSyncService';
 import { BackupCryptoImpl } from '../crypto/backupCrypto';
 import { Conversation, DB, Message } from '../db/DatabaseService';
-import { OperaHub, PairedHub, SyncRecord } from './OperaHubService';
+import { SamplerHub, PairedHub, SyncRecord } from './SamplerHubService';
 
 const BLOB_REF = 'opera-blob:';
 //each push stays well under the hub frame limit
@@ -20,14 +20,14 @@ async function pushBatched(hub: PairedHub, collection: DataCollection, records: 
   for (const record of records) {
     const bytes = record.payload?.length ?? 0;
     if (batch.length > 0 && size + bytes > BATCH_BYTES) {
-      await OperaHub.push(hub, collection, batch);
+      await SamplerHub.push(hub, collection, batch);
       batch = [];
       size = 0;
     }
     batch.push(record);
     size += bytes;
   }
-  if (batch.length > 0) await OperaHub.push(hub, collection, batch);
+  if (batch.length > 0) await SamplerHub.push(hub, collection, batch);
 }
 
 //inline images become shared blob refs
@@ -168,7 +168,7 @@ export async function pullRemoteChanges(hub: PairedHub): Promise<boolean> {
     let cursor = Number((await DB.getHubState(`cursor_${collection}`)) ?? 0);
     let more = true;
     while (more) {
-      const page = await OperaHub.pull(hub, collection, cursor);
+      const page = await SamplerHub.pull(hub, collection, cursor);
       for (const record of page.records) await applyRecord(collection, record);
       changed = changed || page.records.length > 0;
       cursor = page.cursor;

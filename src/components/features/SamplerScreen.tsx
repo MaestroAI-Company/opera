@@ -15,10 +15,10 @@ import {
   HubStatus,
   McpAction,
   McpServerSummary,
-  OperaHub,
+  SamplerHub,
   PairedHub,
   hubErrorCode,
-} from "../../services/hub/OperaHubService";
+} from "../../services/hub/SamplerHubService";
 import { CTX_SIZE_OPTIONS, KEEP_ALIVE_OPTIONS, PARALLEL_OPTIONS } from "../../services/hub/modelOptions";
 import { Settings } from "../../services/settings/SettingsService";
 import ActionButton from "../ui/ActionButton";
@@ -128,22 +128,22 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
   const [modal, setModal] = useState<Modal | null>(null);
 
   const refresh = useCallback(async () => {
-    const hub = await OperaHub.getPairedHub();
+    const hub = await SamplerHub.getPairedHub();
     setPairedHub(hub);
-    setProfile(await OperaHub.getProfile());
-    setHostStatus(await OperaHub.hostStatus().catch(() => null));
+    setProfile(await SamplerHub.getProfile());
+    setHostStatus(await SamplerHub.hostStatus().catch(() => null));
     setLoaded(true);
     if (!hub) return;
-    OperaHub.deviceId()
+    SamplerHub.deviceId()
       .then(setThisDeviceId)
       .catch(() => setThisDeviceId(null));
     try {
-      setStatus(await OperaHub.status(hub));
+      setStatus(await SamplerHub.status(hub));
       setHubState("online");
       const [nextDevices, nextProfiles, nextSettings] = await Promise.all([
-        OperaHub.devices(hub).catch(() => null),
-        OperaHub.profiles(hub).catch(() => null),
-        OperaHub.hubSettings(hub).catch(() => null),
+        SamplerHub.devices(hub).catch(() => null),
+        SamplerHub.profiles(hub).catch(() => null),
+        SamplerHub.hubSettings(hub).catch(() => null),
       ]);
       setDevices(nextDevices);
       setDevicesAt(Date.now() / 1000);
@@ -167,7 +167,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
   useEffect(() => {
     if (!pairedHub || hubState !== "online") return;
     const timer = setInterval(() => {
-      OperaHub.status(pairedHub)
+      SamplerHub.status(pairedHub)
         .then(setStatus)
         .catch(() => {});
     }, USAGE_POLL_MS);
@@ -181,18 +181,18 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
   //nothing until the hub first answers
   const firstCheck = hubState === "checking" && !status;
   const hostsHub = !!hostStatus?.id && pairedHub?.id === hostStatus.id;
-  const showModels = isAdmin && OperaHub.canManageModels();
+  const showModels = isAdmin && SamplerHub.canManageModels();
   //llama.cpp usage on the models page
   const { status: modelsStatus } = useHubModels(online && showModels && page === "models");
   //every profile's servers, nothing to install here
-  const showMcp = isAdmin && OperaHub.canSeeMcpServers();
+  const showMcp = isAdmin && SamplerHub.canSeeMcpServers();
 
   //read only, on home and on its page
   useEffect(() => {
     if ((page !== "home" && page !== "mcp") || !showMcp || !online || !pairedHub) return;
     let live = true;
     const load = () =>
-      OperaHub.mcpOverview(pairedHub)
+      SamplerHub.mcpOverview(pairedHub)
         .then((servers) => {
           if (!live) return;
           setOverview(servers);
@@ -209,7 +209,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
 
   useEffect(() => {
     if (page !== "preferences" || !isAdmin || !online) return;
-    OperaHub.mcp()
+    SamplerHub.mcp()
       .then((api) => api.registries())
       .then(setRegistries)
       .catch(() => setRegistries(null));
@@ -230,7 +230,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     setHostError(null);
     try {
       //a hub left running only needs pairing
-      if (!hostStatus?.running) await OperaHub.setHosting(true);
+      if (!hostStatus?.running) await SamplerHub.setHosting(true);
     } catch (e) {
       console.warn("[Sampler] hosting failed:", e);
       setHostError(t("settings.hub.hostFailed"));
@@ -238,7 +238,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
       return;
     }
     try {
-      await OperaHub.pairWithThisComputer();
+      await SamplerHub.pairWithThisComputer();
       setProfileSheet("pick");
     } catch (e) {
       setHostError(t(`hubPairing.error.${hubErrorCode(e)}`));
@@ -252,7 +252,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     setHostBusy(true);
     setHostError(null);
     try {
-      await OperaHub.setHosting(on);
+      await SamplerHub.setHosting(on);
     } catch (e) {
       console.warn("[Sampler] hosting failed:", e);
       setHostError(t("settings.hub.hostFailed"));
@@ -279,7 +279,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     const wanted = { ...settings, ...patch };
     setSettings(wanted);
     try {
-      setSettings(await OperaHub.setHubSettings(pairedHub, wanted));
+      setSettings(await SamplerHub.setHubSettings(pairedHub, wanted));
     } catch (e) {
       console.warn("[Sampler] hub settings not saved:", e);
       setSettings(settings);
@@ -289,7 +289,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
   const installUpdate = async (version: string) => {
     if (!pairedHub) return;
     try {
-      await OperaHub.updateHub(pairedHub, version);
+      await SamplerHub.updateHub(pairedHub, version);
     } catch (e) {
       setModal({
         title: t("hubUpdate.title"),
@@ -312,7 +312,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
           onPress: async () => {
             //an unreachable hub takes a few seconds
             setModal((shown) => shown && { ...shown, loading: true });
-            await OperaHub.unpair(pairedHub);
+            await SamplerHub.unpair(pairedHub);
             await HubSync.forgetHub();
             closeModal();
             setPage("home");
@@ -351,7 +351,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
         {
           text: t("sampler.profile.remove"),
           style: "danger",
-          onPress: () => runAdmin(() => OperaHub.removeProfile(pairedHub!, target.id)),
+          onPress: () => runAdmin(() => SamplerHub.removeProfile(pairedHub!, target.id)),
         },
       ],
     });
@@ -361,7 +361,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
       setProfileSheet("password");
       return;
     }
-    if (!isAdmin || !pairedHub || !OperaHub.canManageProfiles()) return;
+    if (!isAdmin || !pairedHub || !SamplerHub.canManageProfiles()) return;
     const count = devices?.filter((d) => d.profile === target.id).length ?? 0;
     const nextRole = target.role === "admin" ? "member" : "admin";
     setModal({
@@ -372,7 +372,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
         {
           text: nextRole === "admin" ? t("sampler.profile.makeAdmin") : t("sampler.profile.makeMember"),
           style: "secondary",
-          onPress: () => runAdmin(() => OperaHub.setProfileRole(pairedHub, target.id, nextRole)),
+          onPress: () => runAdmin(() => SamplerHub.setProfileRole(pairedHub, target.id, nextRole)),
         },
         { text: t("sampler.profile.remove"), style: "danger", onPress: () => confirmRemoveProfile(target) },
       ],
@@ -382,7 +382,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
   const saveRegistries = async (urls: string[]) => {
     setRegistryError(null);
     try {
-      const api = await OperaHub.mcp();
+      const api = await SamplerHub.mcp();
       setRegistries(await api.setRegistries(urls));
       setRegistryDraft("");
     } catch (e) {
@@ -633,7 +633,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     closeModal();
     if (!pairedHub) return;
     try {
-      setOverview(await OperaHub.mcpManage(pairedHub, id, action));
+      setOverview(await SamplerHub.mcpManage(pairedHub, id, action));
     } catch (e) {
       showError(e);
     }
@@ -964,7 +964,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
               ))}
             </Group>
             <Group>
-              {status?.update && isAdmin && OperaHub.canUpdateHub() && (
+              {status?.update && isAdmin && SamplerHub.canUpdateHub() && (
                 <ActionButton
                   icon={downloadIcon}
                   label={t("settings.hub.installUpdate")}
@@ -1051,7 +1051,7 @@ export default function SamplerScreen({ topBar, isLargeScreen, isDesktop, onHubC
     const needsProfile = !!pairedHub;
     if (needsProfile && firstCheck) return null;
     //a browser cannot host, it leaves the screen once unpaired
-    if (!needsProfile && !OperaHub.canHost()) return null;
+    if (!needsProfile && !SamplerHub.canHost()) return null;
     if (needsProfile && !online) {
       return renderStopped();
     }

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use opera_hub::{config, hub, service};
-use opera_hub_client::{
+use sampler_hub::{config, hub, service};
+use sampler_hub_client::{
     CatalogModel, HubClient, HubDevice, HubError, HubInvite, HubProfile, HubProvider, HubSettings,
     HubStatus, LinkJoining, LinkProgress, LlamaStatus, McpServerSummary, ModelFile, ModelRepo,
     NearbyHub, PairedHub, ProfileLock, ProxyInfo, PullPage, SyncRecord, UnlockedProfile,
@@ -153,8 +153,8 @@ pub async fn hub_install_update(version: String) -> Result<bool, String> {
     if !cfg!(windows) {
         return Ok(false);
     }
-    let http = opera_hub::secrets::http_client().map_err(host_error)?;
-    let installer = opera_hub::update::download_installer(&http, &version)
+    let http = sampler_hub::secrets::http_client().map_err(host_error)?;
+    let installer = sampler_hub::update::download_installer(&http, &version)
         .await
         .map_err(host_error)?;
     std::process::Command::new(installer)
@@ -253,7 +253,7 @@ pub async fn hub_models_status(
 
 #[tauri::command]
 pub fn hub_qr_svg(text: String, dark: String, light: String) -> Result<String, HubError> {
-    opera_hub_client::qr_svg(text, dark, light)
+    sampler_hub_client::qr_svg(text, dark, light)
 }
 
 #[tauri::command]
@@ -487,14 +487,14 @@ pub async fn hub_locked_key(
 //argon2 stays off the async runtime
 #[tauri::command]
 pub async fn hub_open_locked_key(lock: ProfileLock, password: String) -> Result<String, HubError> {
-    tokio::task::spawn_blocking(move || opera_hub_client::open_locked_key(lock, password))
+    tokio::task::spawn_blocking(move || sampler_hub_client::open_locked_key(lock, password))
         .await
         .map_err(|e| HubError::Internal(e.to_string()))?
 }
 
 #[tauri::command]
 pub fn hub_profile_backup_key(key: String) -> Result<String, HubError> {
-    opera_hub_client::profile_backup_key(key)
+    sampler_hub_client::profile_backup_key(key)
 }
 
 #[tauri::command]

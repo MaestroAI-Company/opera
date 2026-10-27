@@ -22,9 +22,9 @@ import { useT } from "../../i18n";
 import {
   hubErrorCode,
   NearbyHub,
-  OperaHub,
+  SamplerHub,
   PairedHub,
-} from "../../services/hub/OperaHubService";
+} from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import TextInputField from "../ui/TextInputField";
@@ -95,9 +95,9 @@ export default function HubPairingSheet({
   //hubs answering on this network
   const [nearby, setNearby] = useState<NearbyHub[]>([]);
   useEffect(() => {
-    if (!visible || link || !OperaHub.canDiscover()) return;
+    if (!visible || link || !SamplerHub.canDiscover()) return;
     let cancelled = false;
-    OperaHub.nearbyHubs()
+    SamplerHub.nearbyHubs()
       .then((found) => !cancelled && setNearby(found))
       .catch(() => {});
     return () => {
@@ -112,7 +112,7 @@ export default function HubPairingSheet({
 
   //the hub is already stored, so closing undoes the pairing
   const handleClose = () => {
-    if (found) OperaHub.unpair(found).catch(() => {});
+    if (found) SamplerHub.unpair(found).catch(() => {});
     onClose();
   };
 
@@ -127,7 +127,7 @@ export default function HubPairingSheet({
     setPairing(true);
     setError(null);
     try {
-      showFound(await OperaHub.pair(data));
+      showFound(await SamplerHub.pair(data));
     } catch (e) {
       setError(t(`hubPairing.error.${hubErrorCode(e)}`));
       setErrorRow("scan");
@@ -199,13 +199,13 @@ export default function HubPairingSheet({
           value={typedLink}
           onChangeText={setTypedLink}
           onSubmitEditing={() =>
-            pairTyped(typedLink, (v) => OperaHub.pairWithCode(v))
+            pairTyped(typedLink, (v) => SamplerHub.pairWithCode(v))
           }
           autoCapitalize="characters"
           autoCorrect={false}
         />
       </Group>
-      {renderPairButton(typedLink, (v) => OperaHub.pairWithCode(v))}
+      {renderPairButton(typedLink, (v) => SamplerHub.pairWithCode(v))}
     </View>
   );
 
@@ -269,7 +269,7 @@ export default function HubPairingSheet({
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
             {status("code", t("hubPairing.confirmHelp"))}
           </Text>
-          {renderPairButton(link ?? "", (v) => OperaHub.pair(v))}
+          {renderPairButton(link ?? "", (v) => SamplerHub.pair(v))}
         </>
       );
     }

@@ -1,7 +1,7 @@
 import { DeviceEventEmitter } from 'react-native';
 import { ToolManager } from '../ai/tools/ToolManager';
 import { AppEvents } from '../events';
-import { HUB_URL_SCHEME, HubProvider } from '../hub/OperaHubService';
+import { HUB_URL_SCHEME, HubProvider } from '../hub/SamplerHubService';
 import { Settings } from '../settings/SettingsService';
 import { McpAuth } from './McpAuth';
 import { parseServerInput } from './config';

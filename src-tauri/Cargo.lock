@@ -176,8 +176,8 @@ version = "0.1.0"
 dependencies = [
  "log",
  "machine-uid",
- "opera-hub",
- "opera-hub-client",
+ "sampler-hub",
+ "sampler-hub-client",
  "serde",
  "serde_json",
  "tauri",
@@ -4493,7 +4493,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
-name = "opera-hub"
+name = "sampler-hub"
 version = "0.9.0"
 dependencies = [
  "anyhow",
@@ -4509,7 +4509,7 @@ dependencies = [
  "landlock",
  "libc",
  "mdns-sd",
- "opera-hub-proto",
+ "sampler-hub-proto",
  "qr2term",
  "reqwest 0.13.4",
  "rusqlite",
@@ -4531,7 +4531,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "opera-hub-client"
+name = "sampler-hub-client"
 version = "0.9.0"
 dependencies = [
  "anyhow",
@@ -4551,7 +4551,7 @@ dependencies = [
  "js-sys",
  "mdns-sd",
  "n0-future",
- "opera-hub-proto",
+ "sampler-hub-proto",
  "qrcode",
  "serde",
  "serde-wasm-bindgen",
@@ -4566,7 +4566,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "opera-hub-proto"
+name = "sampler-hub-proto"
 version = "0.9.0"
 dependencies = [
  "anyhow",

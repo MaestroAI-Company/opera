@@ -1,11 +1,11 @@
 import { fetch as expoFetch } from 'expo/fetch';
-import { HUB_URL_SCHEME, OperaHub } from '../../hub/OperaHubService';
+import { HUB_URL_SCHEME, SamplerHub } from '../../hub/SamplerHubService';
 
 export async function universalFetch(input: string | URL | Request, init?: any): Promise<Response> {
   //hub providers use the local proxy
   if (typeof input === 'string' && input.startsWith(HUB_URL_SCHEME)) {
-    if (OperaHub.needsTunnelFetch()) return OperaHub.fetchThroughHub(input, init);
-    input = await OperaHub.resolveUrl(input);
+    if (SamplerHub.needsTunnelFetch()) return SamplerHub.fetchThroughHub(input, init);
+    input = await SamplerHub.resolveUrl(input);
   }
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
   

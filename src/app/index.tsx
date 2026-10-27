@@ -95,7 +95,7 @@ import { resolveQuickFlow } from "../services/ai/quickFlow";
 import { arrayBufferToBase64 } from "../services/ai/utils/base64";
 import { CloudSync } from "../services/CloudSyncService";
 import { HubSync } from "../services/hub/HubSync";
-import { OperaHub, PairedHub } from "../services/hub/OperaHubService";
+import { SamplerHub, PairedHub } from "../services/hub/SamplerHubService";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
 import {
   getInitialDeepLink,
@@ -377,23 +377,23 @@ export default function Index() {
   const [samplerMode, setSamplerMode] = useState(false);
   const [samplerAdmin, setSamplerAdmin] = useState(false);
   const checkSamplerAdmin = useCallback(async () => {
-    if (OperaHub.canHost() || !OperaHub.isSupported()) return;
-    const hub = await OperaHub.getPairedHub();
+    if (SamplerHub.canHost() || !SamplerHub.isSupported()) return;
+    const hub = await SamplerHub.getPairedHub();
     const profile = hub
-      ? await OperaHub.refreshProfile(hub).catch(() => OperaHub.getProfile())
+      ? await SamplerHub.refreshProfile(hub).catch(() => SamplerHub.getProfile())
       : null;
     setSamplerAdmin(profile?.role === "admin");
   }, []);
   //a hub hosted here comes back with the app
   useEffect(() => {
-    OperaHub.startHostedHub().catch((e) => console.warn("[Sampler] hub not started:", e));
+    SamplerHub.startHostedHub().catch((e) => console.warn("[Sampler] hub not started:", e));
   }, []);
   //pairing and profiles change in the settings
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the paired hub
     if (!settingsDrawerVisible) checkSamplerAdmin();
   }, [settingsDrawerVisible, checkSamplerAdmin]);
-  const showSamplerSwitch = isDesktop && (OperaHub.canHost() || samplerAdmin);
+  const showSamplerSwitch = isDesktop && (SamplerHub.canHost() || samplerAdmin);
   const inSampler = samplerMode && showSamplerSwitch;
   const samplerSwitchOptions = useMemo(
     () => [
@@ -1307,7 +1307,7 @@ useEffect(() => {
         //the drawer asks before pairing
         openDrawerSafely(() => {
           setHubPairLink(route.link);
-          setSettingsInitialSubPage("operahub");
+          setSettingsInitialSubPage("samplerhub");
           setSettingsDrawerVisible(true);
         });
       }
@@ -2605,7 +2605,7 @@ useEffect(() => {
               const update = hubUpdate;
               setHubUpdate(null);
               if (!update) return;
-              OperaHub.updateHub(update.hub, update.version).catch((e: Error) =>
+              SamplerHub.updateHub(update.hub, update.version).catch((e: Error) =>
                 setHubUpdateError(e?.message ?? String(e)),
               );
             },

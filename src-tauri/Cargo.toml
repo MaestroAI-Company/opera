@@ -30,8 +30,8 @@ tokio = { version = "1", features = ["sync", "time"] }
 
 #desktop only, the hub client is native code
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-opera-hub = { path = "../../opera-hub/crates/opera-hub", default-features = false }
-opera-hub-client = { path = "../../opera-hub/crates/opera-hub-client" }
+sampler-hub = { path = "../../Sampler-Hub/crates/sampler-hub", default-features = false }
+sampler-hub-client = { path = "../../Sampler-Hub/crates/sampler-hub-client" }
 machine-uid = "0.6"
 
 [target.'cfg(target_os = "linux")'.dependencies]

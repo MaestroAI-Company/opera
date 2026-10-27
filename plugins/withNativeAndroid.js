@@ -4,14 +4,14 @@ const fs = require('fs');
 const { spawnSync } = require('child_process');
 
 const TEMPLATES_DIR = path.resolve(__dirname, '..', 'native', 'android');
-const HUB_REPO_DIR = path.resolve(process.env.OPERA_HUB_DIR ?? path.join(__dirname, '..', '..', 'opera-hub'));
+const HUB_REPO_DIR = path.resolve(process.env.SAMPLER_HUB_DIR ?? path.join(__dirname, '..', '..', 'Sampler-Hub'));
 //pinned release or local source build
 const HAS_HUB_CLIENT = (() => {
-  if (fs.existsSync(path.resolve(__dirname, '..', 'opera-hub-client.json'))) return true;
+  if (fs.existsSync(path.resolve(__dirname, '..', 'sampler-hub-client.json'))) return true;
   const hasRepo = fs.existsSync(path.join(HUB_REPO_DIR, 'Cargo.toml'));
   const hasCargoNdk = hasRepo && spawnSync('cargo', ['ndk', '--version'], { stdio: 'ignore' }).status === 0;
   if (!hasCargoNdk) {
-    console.warn(`opera hub disabled: no pinned release and no buildable opera-hub repo at ${HUB_REPO_DIR}`);
+    console.warn(`sampler hub disabled: no pinned release and no buildable Sampler-Hub repo at ${HUB_REPO_DIR}`);
   }
   return hasCargoNdk;
 })();
@@ -201,8 +201,8 @@ function withNativeAndroid(config) {
       copyTemplate('src/AICoreModule.kt', path.join(javaDir, 'AICoreModule.kt'), packageName);
 
       if (HAS_HUB_CLIENT) {
-        copyTemplate('src/OperaHubPackage.kt', path.join(javaDir, 'OperaHubPackage.kt'), packageName);
-        copyTemplate('src/OperaHubModule.kt', path.join(javaDir, 'OperaHubModule.kt'), packageName);
+        copyTemplate('src/SamplerHubPackage.kt', path.join(javaDir, 'SamplerHubPackage.kt'), packageName);
+        copyTemplate('src/SamplerHubModule.kt', path.join(javaDir, 'SamplerHubModule.kt'), packageName);
       }
       // useless modules removed
 
@@ -233,7 +233,7 @@ function withNativeAndroid(config) {
     const isKotlin = contents.includes('.packages.apply');
 
     const packagesToRegister = ['AICorePackage', 'MaestroOverlayPackage'];
-    if (HAS_HUB_CLIENT) packagesToRegister.push('OperaHubPackage');
+    if (HAS_HUB_CLIENT) packagesToRegister.push('SamplerHubPackage');
 
     for (const pkg of packagesToRegister) {
       const importLine = `import ${packageName}.${pkg}${isKotlin ? '' : ';'}`;

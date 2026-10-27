@@ -14,9 +14,9 @@ import { useT } from "../../i18n";
 import {
   HubInvite,
   LinkJoining,
-  OperaHub,
+  SamplerHub,
   PairedHub,
-} from "../../services/hub/OperaHubService";
+} from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
@@ -65,15 +65,15 @@ export default function HubQrSheet({
       setJoining(null);
       const fresh =
         mode === "link"
-          ? await OperaHub.linkStart(hub)
-          : await OperaHub.invite(hub);
+          ? await SamplerHub.linkStart(hub)
+          : await SamplerHub.invite(hub);
       setSvg(
-        await OperaHub.qrSvg(fresh.link, colors.textPrimary, colors.surface),
+        await SamplerHub.qrSvg(fresh.link, colors.textPrimary, colors.surface),
       );
       setInvite(fresh);
       setFailed(false);
     } catch (e) {
-      console.warn("[OperaHub] no pairing code:", e);
+      console.warn("[SamplerHub] no pairing code:", e);
       setInvite(null);
       setFailed(true);
     }
@@ -102,10 +102,10 @@ export default function HubQrSheet({
     (async () => {
       while (!stopped) {
         try {
-          const found = await OperaHub.linkWatch(hub);
+          const found = await SamplerHub.linkWatch(hub);
           if (found && !stopped) return setJoining(found);
         } catch (e) {
-          console.warn("[OperaHub] link watch failed:", e);
+          console.warn("[SamplerHub] link watch failed:", e);
           if (!stopped) setFailed(true);
           return;
         }
@@ -120,11 +120,11 @@ export default function HubQrSheet({
     if (!hub || answering) return;
     setAnswering(true);
     try {
-      if (approve) await OperaHub.linkApprove(hub);
-      else await OperaHub.linkDeny(hub);
+      if (approve) await SamplerHub.linkApprove(hub);
+      else await SamplerHub.linkDeny(hub);
       onClose();
     } catch (e) {
-      console.warn("[OperaHub] link answer failed:", e);
+      console.warn("[SamplerHub] link answer failed:", e);
       setFailed(true);
     } finally {
       setAnswering(false);

@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { HubSync } from "../services/hub/HubSync";
-import { HubMcp, McpListing, McpStatus, OperaHub } from "../services/hub/OperaHubService";
+import { HubMcp, McpListing, McpStatus, SamplerHub } from "../services/hub/SamplerHubService";
 
 //fast while a server moves, idle otherwise
 const BUSY_POLL_MS = 1500;
@@ -61,7 +61,7 @@ async function load() {
   if (loading) return;
   loading = true;
   try {
-    const api = await OperaHub.mcp();
+    const api = await SamplerHub.mcp();
     const [status, catalog] = await Promise.all([api.status(), api.catalog()]);
     publish({ api, status, catalog, error: null });
   } catch (error) {

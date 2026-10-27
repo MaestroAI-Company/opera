@@ -1,4 +1,4 @@
-import { HUB_URL_SCHEME } from "./OperaHubService";
+import { HUB_URL_SCHEME } from "./SamplerHubService";
 
 //llama.cpp on the sampler, the hub provider id
 export const LLAMA_SERVER_URL = `${HUB_URL_SCHEME}llamacpp`;

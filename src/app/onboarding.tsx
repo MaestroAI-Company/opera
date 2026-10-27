@@ -52,7 +52,7 @@ import { CLOUD_PROVIDERS, getCloudProviderDefinition } from "../services/cloud/r
 import { LocationService } from "../services/location/LocationService";
 import { Settings } from "../services/settings/SettingsService";
 import { HubSync } from "../services/hub/HubSync";
-import { HubProfile, OperaHub, PairedHub } from "../services/hub/OperaHubService";
+import { HubProfile, SamplerHub, PairedHub } from "../services/hub/SamplerHubService";
 import { TTS_SPEEDS, supportedEngineIds } from "../services/speech/engines";
 import { STT } from "../services/speech/STTService";
 import { pressStyle } from "../components/ui/pressStyle";
@@ -980,7 +980,7 @@ export default function OnboardingPage() {
                     label={t("onboarding.restore.fromFiles")}
                     onPress={handleRestoreFromFile}
                   />
-                  {OperaHub.isSupported() && (
+                  {SamplerHub.isSupported() && (
                     <ActionButton
                       icon={hubIcon}
                       label={t("onboarding.restore.fromHub")}

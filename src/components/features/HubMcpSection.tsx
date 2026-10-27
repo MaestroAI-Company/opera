@@ -5,7 +5,7 @@ import { mcpAvatar, mcpSourceLabel, runHubMcp, useHubMcp } from "../../hooks/use
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
-import { HostedMcpServer, McpField } from "../../services/hub/OperaHubService";
+import { HostedMcpServer, McpField } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";

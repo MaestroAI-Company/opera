@@ -132,9 +132,9 @@ import {
   HubProfile,
   HubSettings,
   HubStatus,
-  OperaHub,
+  SamplerHub,
   PairedHub,
-} from "../../services/hub/OperaHubService";
+} from "../../services/hub/SamplerHubService";
 import { HubSync } from "../../services/hub/HubSync";
 import { SyncPrefs, SyncPrefsStore } from "../../services/SyncPrefs";
 import { AppEvents } from "../../services/events";
@@ -330,7 +330,7 @@ export type SubPage =
   | "widgets"
   | "profile"
   | "cloud"
-  | "operahub"
+  | "samplerhub"
   | "hubprovider"
   | "hubserver"
   | "hubmodels"
@@ -364,12 +364,12 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   tools: "main",
   profile: "main",
   cloud: "main",
-  operahub: "main",
+  samplerhub: "main",
   hubprovider: "service",
   hubserver: "hubprovider",
-  hubmodels: "operahub",
+  hubmodels: "samplerhub",
   hubmodel: "hubmodels",
-  hubmcp: "operahub",
+  hubmcp: "samplerhub",
   hubmcpserver: "hubmcp",
   sociallinks: "main",
   widgets: "tools",
@@ -926,7 +926,7 @@ export default function SettingsDrawer({
   //measured width, the slide's push distance
   const [litertBodyWidth, setLitertBodyWidth] = useState(320);
 
-  const hubSupported = OperaHub.isSupported();
+  const hubSupported = SamplerHub.isSupported();
   const [pairedHub, setPairedHub] = useState<PairedHub | null>(null);
   const [hubState, setHubState] = useState<
     "checking" | "online" | "offline" | "revoked" | "outdated"
@@ -960,26 +960,26 @@ export default function SettingsDrawer({
   const [hubSettings, setHubSettings] = useState<HubSettings | null>(null);
 
   const refreshHub = useCallback(async () => {
-    const hub = await OperaHub.getPairedHub();
+    const hub = await SamplerHub.getPairedHub();
     setPairedHub(hub);
-    setHubProfile(await OperaHub.getProfile());
-    if (OperaHub.canHost()) {
-      setHostStatus(await OperaHub.hostStatus().catch(() => null));
+    setHubProfile(await SamplerHub.getProfile());
+    if (SamplerHub.canHost()) {
+      setHostStatus(await SamplerHub.hostStatus().catch(() => null));
     }
     if (!hub) return;
     setHubSyncPaused(await HubSync.isPaused());
-    OperaHub.deviceId()
+    SamplerHub.deviceId()
       .then(setThisDeviceId)
       .catch(() => setThisDeviceId(null));
     setHubState("checking");
     try {
-      setHubStatus(await OperaHub.status(hub));
+      setHubStatus(await SamplerHub.status(hub));
       setHubState("online");
       //a role changed by an admin shows at once
-      const liveProfile = await OperaHub.refreshProfile(hub).catch(() => null);
+      const liveProfile = await SamplerHub.refreshProfile(hub).catch(() => null);
       if (liveProfile) setHubProfile(liveProfile);
-      setHubDevices(await OperaHub.devices(hub).catch(() => null));
-      setHubSettings(await OperaHub.hubSettings(hub).catch(() => null));
+      setHubDevices(await SamplerHub.devices(hub).catch(() => null));
+      setHubSettings(await SamplerHub.hubSettings(hub).catch(() => null));
     } catch (e) {
       const code = hubErrorCode(e);
       setHubState(
@@ -990,9 +990,9 @@ export default function SettingsDrawer({
 
   //usage stays live while the sampler page shows
   useEffect(() => {
-    if (activeSubPage !== "operahub" || !pairedHub || hubState !== "online") return;
+    if (activeSubPage !== "samplerhub" || !pairedHub || hubState !== "online") return;
     const timer = setInterval(() => {
-      OperaHub.status(pairedHub)
+      SamplerHub.status(pairedHub)
         .then(setHubStatus)
         .catch(() => {});
     }, HUB_USAGE_POLL_MS);
@@ -1550,8 +1550,8 @@ export default function SettingsDrawer({
 
       try {
         setSyncPrefs(await SyncPrefsStore.load());
-        if (OperaHub.isSupported()) {
-          setPairedHub(await OperaHub.getPairedHub());
+        if (SamplerHub.isSupported()) {
+          setPairedHub(await SamplerHub.getPairedHub());
           setHubSyncPaused(await HubSync.isPaused());
         }
         await CloudSync.init();
@@ -2865,7 +2865,7 @@ export default function SettingsDrawer({
 
   const pairWithThisComputer = async () => {
     try {
-      await OperaHub.pairWithThisComputer();
+      await SamplerHub.pairWithThisComputer();
       handleHubPaired();
     } catch (e) {
       setHostError(t(`hubPairing.error.${hubErrorCode(e)}`));
@@ -2883,11 +2883,11 @@ export default function SettingsDrawer({
     setHostBusy(true);
     setHostError(null);
     try {
-      await OperaHub.setHosting(enabled);
+      await SamplerHub.setHosting(enabled);
       //this computer joins its own hub
       if (enabled && !pairedHub) await pairWithThisComputer();
     } catch (e) {
-      console.warn("[OperaHub] hosting failed:", e);
+      console.warn("[SamplerHub] hosting failed:", e);
       setHostError(t("settings.hub.hostFailed"));
     } finally {
       setHostBusy(false);
@@ -2898,7 +2898,7 @@ export default function SettingsDrawer({
   const installHubUpdate = async (version: string) => {
     if (!pairedHub) return;
     try {
-      await OperaHub.updateHub(pairedHub, version);
+      await SamplerHub.updateHub(pairedHub, version);
     } catch (e) {
       showAlert(
         t("hubUpdate.title"),
@@ -2922,9 +2922,9 @@ export default function SettingsDrawer({
     const wanted = { ...hubSettings, ...patch };
     setHubSettings(wanted);
     try {
-      setHubSettings(await OperaHub.setHubSettings(pairedHub, wanted));
+      setHubSettings(await SamplerHub.setHubSettings(pairedHub, wanted));
     } catch (e) {
-      console.warn("[OperaHub] hub settings not saved:", e);
+      console.warn("[SamplerHub] hub settings not saved:", e);
       setHubSettings(hubSettings);
     }
   };
@@ -2940,7 +2940,7 @@ export default function SettingsDrawer({
           style: "danger",
           onPress: async () => {
             setAlertModalVisible(false);
-            await OperaHub.unpair(pairedHub);
+            await SamplerHub.unpair(pairedHub);
             await HubSync.forgetHub();
             setHubSyncPaused(false);
             setPairedHub(null);
@@ -3454,9 +3454,9 @@ export default function SettingsDrawer({
 
         {hubSupported && (
           <Pressable
-            style={navItemStyle("operahub", true)}
+            style={navItemStyle("samplerhub", true)}
             onPress={() => {
-              setActiveSubPage("operahub");
+              setActiveSubPage("samplerhub");
               refreshHub();
             }}
           >
@@ -4349,7 +4349,7 @@ export default function SettingsDrawer({
 
   //this computer runs the hub it is paired with
   const hostsPairedHub =
-    OperaHub.canHost() &&
+    SamplerHub.canHost() &&
     !!hostStatus &&
     !!pairedHub &&
     pairedHub.id === hostStatus.id;
@@ -4380,7 +4380,7 @@ export default function SettingsDrawer({
   //the profile role decides, the hub checks it again
   const isHubAdmin = () => hubProfile?.role === "admin";
 
-  const renderOperaHubSubPage = () => {
+  const renderSamplerHubSubPage = () => {
     const hubIcon = (
       <Image
         source={HUB_DEVICE_ICONS.desktop}
@@ -4399,11 +4399,11 @@ export default function SettingsDrawer({
               <Text style={styles.settingLabel}>{t("settings.hub.title")}</Text>
               <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
                 {hostError ??
-                  (OperaHub.canHost()
+                  (SamplerHub.canHost()
                     ? t("settings.hub.helpDesktop")
                     : t("settings.hub.help"))}
               </Text>
-              {OperaHub.canHost() ? (
+              {SamplerHub.canHost() ? (
                 //pair with a hub or become one
                 <Group>
                   <ActionButton
@@ -4516,16 +4516,16 @@ export default function SettingsDrawer({
         {/* hub models for admins, own mcp servers for members */}
         {hubState === "online" &&
           !!hubProfile &&
-          ((isAdmin && OperaHub.canManageModels()) || OperaHub.canManageMcp()) && (
+          ((isAdmin && SamplerHub.canManageModels()) || SamplerHub.canManageMcp()) && (
             <Group style={styles.groupSpacing}>
               {isAdmin &&
-                OperaHub.canManageModels() &&
+                SamplerHub.canManageModels() &&
                 renderToolsNavRow(
                   "hubmodels",
                   t("hubModels.pageTitle"),
                   t("hubModels.navHelp"),
                 )}
-              {OperaHub.canManageMcp() &&
+              {SamplerHub.canManageMcp() &&
                 renderToolsNavRow(
                   "hubmcp",
                   t("hubMcp.pageTitle"),
@@ -4666,7 +4666,7 @@ export default function SettingsDrawer({
               </Text>
             )}
             <Group>
-              {hubStatus?.update && isAdmin && OperaHub.canUpdateHub() && (
+              {hubStatus?.update && isAdmin && SamplerHub.canUpdateHub() && (
                 <ActionButton
                   icon={downloadIcon}
                   label={t("settings.hub.installUpdate")}
@@ -6359,8 +6359,8 @@ export default function SettingsDrawer({
         return renderProfileSubPage();
       case "cloud":
         return renderCloudSubPage();
-      case "operahub":
-        return renderOperaHubSubPage();
+      case "samplerhub":
+        return renderSamplerHubSubPage();
       case "hubprovider":
         return renderHubProviderSubPage();
       case "hubserver":

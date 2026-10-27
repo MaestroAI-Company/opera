@@ -54,7 +54,7 @@ export type SyncTombstone = {
 const DB_NAME = 'opera';
 const DB_VERSION = 2;
 const STORE = 'kv';
-//images exchanged with opera hub by content hash
+//images exchanged with sampler hub by content hash
 const BLOB_STORE = 'hubBlobs';
 
 type StoreKey = 'conversations' | 'messages' | 'tombstones' | 'hubState';
@@ -110,7 +110,7 @@ class DatabaseService {
   private conversations: Conversation[] = [];
   private messages: Message[] = [];
   private tombstones: SyncTombstone[] = [];
-  //opera hub cursors and marks
+  //sampler hub cursors and marks
   private hubState: Record<string, string> = {};
   private db: IDBDatabase | null = null;
   //keys waiting to be written
@@ -424,7 +424,7 @@ class DatabaseService {
     this.notifyDataChanged();
   }
 
-  //opera hub sync state, apart from the cloud keys
+  //sampler hub sync state, apart from the cloud keys
   async getHubState(key: string): Promise<string | null> {
     return this.hubState[key] ?? null;
   }

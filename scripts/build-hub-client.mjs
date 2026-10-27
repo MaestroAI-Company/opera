@@ -7,21 +7,21 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
-const hubDir = resolve(process.env.OPERA_HUB_DIR ?? join(root, '..', 'opera-hub'));
+const hubDir = resolve(process.env.SAMPLER_HUB_DIR ?? join(root, '..', 'Sampler-Hub'));
 const mainDir = join(root, 'android', 'app', 'src', 'main');
-const libPath = join(mainDir, 'jniLibs', 'arm64-v8a', 'libopera_hub_client.so');
-const bindingsDir = join(mainDir, 'java', 'uniffi', 'opera_hub_client');
+const libPath = join(mainDir, 'jniLibs', 'arm64-v8a', 'libsampler_hub_client.so');
+const bindingsDir = join(mainDir, 'java', 'uniffi', 'sampler_hub_client');
 //served as is next to the web bundle
-const webDir = join(root, 'public', 'opera-hub');
+const webDir = join(root, 'public', 'sampler-hub');
 //tauri sidecars carry the target triple
 const sidecarDir = join(root, 'src-tauri', 'binaries');
 const SIDECARS = {
-  'win32-x64': ['x86_64-pc-windows-msvc', 'opera-hubw-windows-x86_64.exe'],
-  'darwin-arm64': ['aarch64-apple-darwin', 'opera-hubw-macos-aarch64'],
-  'linux-x64': ['x86_64-unknown-linux-gnu', 'opera-hubw-linux-x86_64'],
-  'linux-arm64': ['aarch64-unknown-linux-gnu', 'opera-hubw-linux-aarch64'],
+  'win32-x64': ['x86_64-pc-windows-msvc', 'sampler-hubw-windows-x86_64.exe'],
+  'darwin-arm64': ['aarch64-apple-darwin', 'sampler-hubw-macos-aarch64'],
+  'linux-x64': ['x86_64-unknown-linux-gnu', 'sampler-hubw-linux-x86_64'],
+  'linux-arm64': ['aarch64-unknown-linux-gnu', 'sampler-hubw-linux-aarch64'],
 };
-const RELEASES = 'https://github.com/MaestroAI-Company/opera-hub/releases/download';
+const RELEASES = 'https://github.com/MaestroAI-Company/Sampler-Hub/releases/download';
 //ring needs clang for wasm
 const WINDOWS_CLANG = 'C:\\Program Files\\LLVM\\bin';
 
@@ -31,9 +31,9 @@ const hasHub = existsSync(join(hubDir, 'Cargo.toml'));
 
 if (target === 'desktop') {
   const sidecar = SIDECARS[`${process.platform}-${process.arch}`];
-  if (!sidecar) throw new Error(`no opera hub build for ${process.platform} ${process.arch}`);
+  if (!sidecar) throw new Error(`no sampler hub build for ${process.platform} ${process.arch}`);
   const [triple, asset] = sidecar;
-  const dest = join(sidecarDir, `opera-hubw-${triple}${process.platform === 'win32' ? '.exe' : ''}`);
+  const dest = join(sidecarDir, `sampler-hubw-${triple}${process.platform === 'win32' ? '.exe' : ''}`);
   if (hasHub) {
     buildSidecarFromSource(dest);
   } else {
@@ -44,16 +44,16 @@ if (target === 'desktop') {
     buildWebFromSource();
   } else {
     await downloadPinned([
-      ['opera-hub-client-web.js', join(webDir, 'opera-hub-client-web.js')],
-      ['opera-hub-client-web.wasm', join(webDir, 'opera-hub-client-web.wasm')],
+      ['sampler-hub-client-web.js', join(webDir, 'sampler-hub-client-web.js')],
+      ['sampler-hub-client-web.wasm', join(webDir, 'sampler-hub-client-web.wasm')],
     ]);
   }
 } else if (hasHub && works('cargo', ['ndk', '--version'])) {
   buildAndroidFromSource();
 } else {
   await downloadPinned([
-    ['opera-hub-client-arm64-v8a.so', libPath],
-    ['opera_hub_client.kt', join(bindingsDir, 'opera_hub_client.kt')],
+    ['sampler-hub-client-arm64-v8a.so', libPath],
+    ['sampler_hub_client.kt', join(bindingsDir, 'sampler_hub_client.kt')],
   ]);
 }
 
@@ -67,14 +67,14 @@ function hasClang() {
 
 function buildAndroidFromSource() {
   //arm64 only like the apk
-  cargo(['ndk', '-t', 'arm64-v8a', 'build', '--release', '-p', 'opera-hub-client']);
+  cargo(['ndk', '-t', 'arm64-v8a', 'build', '--release', '-p', 'sampler-hub-client']);
 
   //stripped lib so read host metadata
-  cargo(['build', '-p', 'opera-hub-client']);
+  cargo(['build', '-p', 'sampler-hub-client']);
   const hostLib = {
-    win32: 'opera_hub_client.dll',
-    darwin: 'libopera_hub_client.dylib',
-  }[process.platform] ?? 'libopera_hub_client.so';
+    win32: 'sampler_hub_client.dll',
+    darwin: 'libsampler_hub_client.dylib',
+  }[process.platform] ?? 'libsampler_hub_client.so';
 
   rmSync(bindingsDir, { recursive: true, force: true });
   cargo([
@@ -85,21 +85,21 @@ function buildAndroidFromSource() {
   ]);
 
   mkdirSync(dirname(libPath), { recursive: true });
-  copyFileSync(join(hubDir, 'target', 'aarch64-linux-android', 'release', 'libopera_hub_client.so'), libPath);
-  console.log(`opera hub client built from ${hubDir}`);
+  copyFileSync(join(hubDir, 'target', 'aarch64-linux-android', 'release', 'libsampler_hub_client.so'), libPath);
+  console.log(`sampler hub client built from ${hubDir}`);
 }
 
 //its own target dir, a running hub locks target/release
 function buildSidecarFromSource(dest) {
   const targetDir = join(hubDir, 'target', 'sidecar');
-  cargo(['build', '--release', '-p', 'opera-hub', '--bin', 'opera-hubw'], {
+  cargo(['build', '--release', '-p', 'sampler-hub', '--bin', 'sampler-hubw'], {
     ...process.env,
     CARGO_TARGET_DIR: targetDir,
   });
-  const exe = process.platform === 'win32' ? 'opera-hubw.exe' : 'opera-hubw';
+  const exe = process.platform === 'win32' ? 'sampler-hubw.exe' : 'sampler-hubw';
   mkdirSync(dirname(dest), { recursive: true });
   copyFileSync(join(targetDir, 'release', exe), dest);
-  console.log(`opera hub sidecar built from ${hubDir}`);
+  console.log(`sampler hub sidecar built from ${hubDir}`);
 }
 
 function buildWebFromSource() {
@@ -108,25 +108,25 @@ function buildWebFromSource() {
     env.CC_wasm32_unknown_unknown = join(WINDOWS_CLANG, 'clang.exe');
     env.AR_wasm32_unknown_unknown = join(WINDOWS_CLANG, 'llvm-ar.exe');
   }
-  cargo(['build', '--release', '--target', 'wasm32-unknown-unknown', '-p', 'opera-hub-client'], env);
+  cargo(['build', '--release', '--target', 'wasm32-unknown-unknown', '-p', 'sampler-hub-client'], env);
 
   const out = join(hubDir, 'target', 'wasm-bindgen');
   execFileSync(
     'wasm-bindgen',
-    ['--target', 'web', '--out-dir', out, join(hubDir, 'target', 'wasm32-unknown-unknown', 'release', 'opera_hub_client.wasm')],
+    ['--target', 'web', '--out-dir', out, join(hubDir, 'target', 'wasm32-unknown-unknown', 'release', 'sampler_hub_client.wasm')],
     { stdio: 'inherit' },
   );
   mkdirSync(webDir, { recursive: true });
-  copyFileSync(join(out, 'opera_hub_client.js'), join(webDir, 'opera-hub-client-web.js'));
-  copyFileSync(join(out, 'opera_hub_client_bg.wasm'), join(webDir, 'opera-hub-client-web.wasm'));
-  console.log(`opera hub web client built from ${hubDir}`);
+  copyFileSync(join(out, 'sampler_hub_client.js'), join(webDir, 'sampler-hub-client-web.js'));
+  copyFileSync(join(out, 'sampler_hub_client_bg.wasm'), join(webDir, 'sampler-hub-client-web.wasm'));
+  console.log(`sampler hub web client built from ${hubDir}`);
 }
 
 async function downloadPinned(assets) {
-  const pin = JSON.parse(readFileSync(join(root, 'opera-hub-client.json'), 'utf8'));
+  const pin = JSON.parse(readFileSync(join(root, 'sampler-hub-client.json'), 'utf8'));
   //older pins predate the web client
   if (assets.some(([asset]) => !pin.sha256[asset])) {
-    console.warn(`opera hub client ${pin.version} has no ${target} build, skipping`);
+    console.warn(`sampler hub client ${pin.version} has no ${target} build, skipping`);
     return;
   }
   for (const [asset, dest] of assets) {
@@ -141,7 +141,7 @@ async function downloadPinned(assets) {
     mkdirSync(dirname(dest), { recursive: true });
     writeFileSync(dest, bytes);
   }
-  console.log(`opera hub client ${pin.version} from the release`);
+  console.log(`sampler hub client ${pin.version} from the release`);
 }
 
 function sha256(bytes) {

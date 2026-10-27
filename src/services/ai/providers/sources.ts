@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { t } from '../../../i18n';
 import { AppSettings, Settings } from '../../settings/SettingsService';
-import { HUB_URL_SCHEME, type HubProvider } from '../../hub/OperaHubService';
+import { HUB_URL_SCHEME, type HubProvider } from '../../hub/SamplerHubService';
 import { getSecret, setSecret } from '../../mcp/mcpStorage';
 
 //provider plus its server if any
@@ -12,7 +12,7 @@ export type ModelSource = {
   url: string;
 };
 
-export const PROVIDER_IDS = ['local', 'litert', 'ollama', 'openai', 'beta', 'operahub'] as const;
+export const PROVIDER_IDS = ['local', 'litert', 'ollama', 'openai', 'beta', 'samplerhub'] as const;
 
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
@@ -28,7 +28,7 @@ const PROVIDER_PLATFORMS: Record<ProviderId, readonly ProviderPlatform[]> = {
   openai: ['android', 'ios', 'web', 'desktop'],
   beta: ['android', 'ios', 'web', 'desktop'],
   //platforms that ship the hub client
-  operahub: ['android', 'desktop', 'web'],
+  samplerhub: ['android', 'desktop', 'web'],
 };
 
 export function currentPlatform(): ProviderPlatform {
@@ -50,8 +50,8 @@ export const BETA_SERVER_URL = process.env.EXPO_PUBLIC_BETA_SERVER_URL ?? '';
 //any server speaking the openai protocol
 export const OPENAI_PROVIDER_ID = 'openai';
 
-//providers running on the paired opera hub
-export const HUB_PROVIDER_ID = 'operahub';
+//providers running on the paired sampler hub
+export const HUB_PROVIDER_ID = 'samplerhub';
 
 //filled by hub sync never cloud synced
 let hubProviders: HubProvider[] = [];

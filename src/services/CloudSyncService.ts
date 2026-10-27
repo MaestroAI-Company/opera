@@ -10,7 +10,7 @@ import { BASE_DEFAULTS } from './settings/schema';
 import { SyncPrefs, SyncPrefsStore } from './SyncPrefs';
 import { CloudProvider, CloudUserInfo } from './cloud/CloudProvider';
 import { getCloudProviderDefinition } from './cloud/registry';
-import { HubProfile, OperaHub, ProfileBackup } from './hub/OperaHubService';
+import { HubProfile, SamplerHub, ProfileBackup } from './hub/SamplerHubService';
 import { AppEvents } from './events';
 import { OverlayPresence } from './overlay/overlayPresence';
 import * as SecureStore from 'expo-secure-store';
@@ -309,7 +309,7 @@ class CloudSyncServiceImpl {
 
   //the sampler profile wins, then a restored one
   async refreshSecret(): Promise<void> {
-    const fromHub = OperaHub.isSupported() ? await OperaHub.profileBackup().catch(() => null) : null;
+    const fromHub = SamplerHub.isSupported() ? await SamplerHub.profileBackup().catch(() => null) : null;
     const stored = await this.getStorageItem(PROFILE_BACKUP_KEY);
     const backup: ProfileBackup | null = fromHub ?? (stored ? JSON.parse(stored) : null);
     if (!backup) {
@@ -341,7 +341,7 @@ class CloudSyncServiceImpl {
       if (download.status !== 'ok') return false;
       const env = JSON.parse(download.content);
       if (env?.kdf !== 'profile') return false;
-      const backupKey = await OperaHub.openBackupKey(env.profile.lock, password);
+      const backupKey = await SamplerHub.openBackupKey(env.profile.lock, password);
       const secret: ProfileSecret = { header: env.profile, keys: await this.profileKeys(backupKey) };
       const decrypted = await this.decrypt(download.content, secret);
       if (!decrypted.backup) return false;

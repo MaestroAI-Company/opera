@@ -380,8 +380,8 @@ type WebModule = {
 };
 
 //public files, built or downloaded before the web bundle
-const WEB_MODULE_URL = '/opera-hub/opera-hub-client-web.js';
-const WEB_WASM_URL = '/opera-hub/opera-hub-client-web.wasm';
+const WEB_MODULE_URL = '/sampler-hub/sampler-hub-client-web.js';
+const WEB_WASM_URL = '/sampler-hub/sampler-hub-client-web.wasm';
 //statuses a response body is not allowed for
 const BODYLESS_STATUSES = [204, 205, 304];
 
@@ -481,14 +481,14 @@ async function bodyBytes(body: BodyInit | null | undefined): Promise<Uint8Array>
 
 //absent without the rust client
 const native: NativeHub | undefined =
-  Platform.OS === 'android' ? NativeModules.OperaHubModule : isTauri ? tauriHub : isBrowser ? webHub : undefined;
+  Platform.OS === 'android' ? NativeModules.SamplerHubModule : isTauri ? tauriHub : isBrowser ? webHub : undefined;
 const host: HubHost | undefined = isTauri ? tauriHost : undefined;
 
 //per device so never cloud synced
-const DEVICE_KEY = 'opera_hub_device_key';
-const PAIRED_HUB_KEY = 'opera_hub_paired';
+const DEVICE_KEY = 'sampler_hub_device_key';
+const PAIRED_HUB_KEY = 'sampler_hub_paired';
 //never synced, it unlocks this device's sealed data
-const PROFILE_KEY = 'opera_hub_profile';
+const PROFILE_KEY = 'sampler_hub_profile';
 //every hub nearby answers within it
 const NEARBY_WAIT_MS = 2500;
 //a fresh hub publishes its address slowly
@@ -497,7 +497,7 @@ const SELF_PAIR_DELAY_MS = 2000;
 //an unreachable hub takes the whole connect timeout
 const UNPAIR_WAIT_MS = 3000;
 //providers reached through the hub tunnel
-export const HUB_URL_SCHEME = 'opera-hub://';
+export const HUB_URL_SCHEME = 'sampler-hub://';
 
 export function hubErrorCode(e: unknown): HubErrorCode {
   const code = (e as { code?: string })?.code;
@@ -513,7 +513,7 @@ export function hubErrorCode(e: unknown): HubErrorCode {
   return known.includes(code as HubErrorCode) ? (code as HubErrorCode) : 'Internal';
 }
 
-class OperaHubServiceImpl {
+class SamplerHubServiceImpl {
   //the native client forgets it on reload
   private profileLoaded = false;
 
@@ -916,7 +916,7 @@ class OperaHubServiceImpl {
     const key = await this.deviceKey();
     const told = this.native()
       .unpair(key, hub)
-      .catch((e) => console.warn('[OperaHub] hub not told about unpairing:', e));
+      .catch((e) => console.warn('[SamplerHub] hub not told about unpairing:', e));
     //the hub may still hear it later, the device does not wait
     await Promise.race([told, new Promise((resolve) => setTimeout(resolve, UNPAIR_WAIT_MS))]);
     await this.forget();
@@ -994,4 +994,4 @@ class OperaHubServiceImpl {
   }
 }
 
-export const OperaHub = new OperaHubServiceImpl();
+export const SamplerHub = new SamplerHubServiceImpl();

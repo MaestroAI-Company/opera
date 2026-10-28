@@ -3334,6 +3334,7 @@ export default function SettingsDrawer({
         </View>
       </View>
 
+      {/* overlay and screen saver links */}
       <Group style={styles.groupSpacing}>
         {!isDesktop &&
           renderToolsNavRow(
@@ -3341,10 +3342,6 @@ export default function SettingsDrawer({
             t("settings.nav.overlay.title"),
             t("settings.nav.overlay.subtitle"),
           )}
-      </Group>
-
-      {/* screen saver link */}
-      <Group style={styles.groupSpacing}>
         {renderToolsNavRow(
           "screensaver",
           t("settings.nav.screenSaver.title"),

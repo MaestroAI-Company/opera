@@ -37,6 +37,7 @@ import { speakReplyLive } from '../../services/speech/liveReply';
 import NotificationModal from '../ui/NotificationModal';
 import ToolConsentHost from './ToolConsentHost';
 import VoicePackHost from './VoicePackHost';
+import AttachmentSheet, { useAttachments } from './AttachmentSheet';
 import ChatBar, { ChatBarHandle } from './ChatBar';
 import ChatView from './ChatView';
 import { ModelSelectorDrawer, ModelSelectorTrigger } from './ModelSelector';
@@ -107,6 +108,7 @@ function AssistantOverlay() {
   //autoStartMic setting from db
   const autoStartMicSetting = useRef(false);
   const [modelCapabilities, setModelCapabilities] = useState<string[]>([]);
+  const attachments = useAttachments(modelCapabilities);
   //true once capabilities resolve
   const [capabilitiesReady, setCapabilitiesReady] = useState(false);
 
@@ -910,6 +912,7 @@ function AssistantOverlay() {
               onTranscribe={handleTranscribe}
               canTranscribeRemotely={!alwaysWhisper && modelCapabilities.includes('audio') && !!selectedModel}
               modelCapabilities={modelCapabilities}
+              picker={attachments}
               onOpenSettings={noop}
               autoStartMic={shouldAutoStartMic}
               selection={attachment}
@@ -934,6 +937,27 @@ function AssistantOverlay() {
           message={modalConfig.message}
           buttons={modalConfig.buttons}
           onClose={() => setModalVisible(false)}
+        />
+
+        <AttachmentSheet
+          visible={attachments.sheetVisible}
+          onClose={attachments.closeSheet}
+          onCamera={attachments.openCamera}
+          onPickFiles={attachments.pickFiles}
+          onPhotos={attachments.pickPhotos}
+          recentPhotos={attachments.recentPhotos}
+          selectedFiles={attachments.files}
+          onSelectRecentPhoto={attachments.toggleRecentPhoto}
+          onLongPressRecentPhoto={attachments.toggleRecentPhoto}
+          isLargeScreen={isLargeScreen}
+          bottomInset={insets.bottom}
+        />
+
+        <NotificationModal
+          visible={!!attachments.notice}
+          title={attachments.notice?.title}
+          message={attachments.notice?.message}
+          onClose={attachments.clearNotice}
         />
 
         <ToolConsentHost />

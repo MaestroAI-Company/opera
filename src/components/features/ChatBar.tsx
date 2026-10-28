@@ -1,9 +1,6 @@
 
-import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-import * as ImagePicker from 'expo-image-picker';
-import * as MediaLibrary from 'expo-media-library/legacy';
 import { TextInputWrapper } from "expo-paste-input";
 import { Fragment, forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
@@ -12,8 +9,10 @@ import {
   Easing,
   Image,
   Keyboard,
+  LayoutChangeEvent,
   NativeSyntheticEvent,
   Platform,
+  PixelRatio,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,7 +23,7 @@ import {
   Vibration,
   View
 } from "react-native";
-import Reanimated, { type SharedValue, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Reanimated, { type SharedValue, useAnimatedStyle, useFrameCallback, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
@@ -32,8 +31,6 @@ import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import {
-  DOCUMENT_MIME_TYPES,
-  classifyDocument,
   extractDocument,
   formatDocumentsForPrompt,
   type ExtractedDocument,
@@ -44,7 +41,7 @@ import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { buildWavBuffer } from "../../services/speech/wav";
 import IconButton from "../ui/IconButton";
 import NotificationModal from "../ui/NotificationModal";
-import AttachmentSheet, { SelectedFile } from "./AttachmentSheet";
+import { classifyAttachment, type AttachmentKind, type Attachments, type SelectedFile } from "./AttachmentSheet";
 import { pressStyle } from "../ui/pressStyle";
 
 const nextWhiteIcon = require("../../../assets/icons/arrow.png");
@@ -58,30 +55,8 @@ const cancelIcon = require("../../../assets/icons/cancel2.png");
 const IMAGE_MAX_WIDTH = 1280;
 const IMAGE_COMPRESS_QUALITY = 0.7;
 
-//only two audio containers accepted
-const SUPPORTED_AUDIO_EXTENSIONS = ['wav', 'mp3'];
-const AUDIO_EXTENSION_PATTERN = /\.(wav|mp3|m4a|aac|flac|ogg)$/;
-const VIDEO_EXTENSION_PATTERN = /\.(mp4|mov|webm)$/;
-const VIDEO_MIME_TYPES = ['video/mp4', 'video/quicktime', 'video/webm'];
-
 //@query typed at the text end
 const MENTION_QUERY_RE = /(^|\s)@([\w-]*)$/;
-
-type AttachmentKind = 'image' | 'audio' | 'video' | 'document' | 'unsupported';
-
-//one attach rule for all pickers
-function classifyAttachment(name: string, mimeType?: string | null): AttachmentKind {
-  if (mimeType?.startsWith('image/')) return 'image';
-
-  const lowerName = name.toLowerCase();
-  if (VIDEO_EXTENSION_PATTERN.test(lowerName) || VIDEO_MIME_TYPES.includes(mimeType ?? '')) return 'video';
-  if (mimeType?.startsWith('video/')) return 'unsupported';
-  const looksLikeAudio = mimeType?.startsWith('audio/') || AUDIO_EXTENSION_PATTERN.test(lowerName);
-  if (!looksLikeAudio) return classifyDocument(name, mimeType) ? 'document' : 'unsupported';
-
-  const extension = lowerName.split('.').pop() ?? '';
-  return SUPPORTED_AUDIO_EXTENSIONS.includes(extension) ? 'audio' : 'unsupported';
-}
 
 //compress and resize an image to a base64 data uri
 const compressImageToDataUri = async (uri: string): Promise<string> => {
@@ -116,7 +91,7 @@ type ChatInputBarProps = {
   modelCapabilities?: string[];
   canTranscribeRemotely?: boolean;
   onOpenSettings?: () => void;
-  onAttachmentSheetVisibilityChange?: (visible: boolean) => void;
+  picker: Attachments;
   autoStartMic?: boolean;
   //screen-selection attachment from overlay
   selection?: { uri: string; label: string } | null;
@@ -221,35 +196,98 @@ function MentionBoxes({ text, spans, scrollY }: { text: string; spans: MentionSp
   );
 }
 
-const VOICE_BARS = [0, 1, 2, 3, 4, 5, 6];
 const VOICE_TICK_MS = 60;
-type VoiceLevel = { vol: number; at: number };
+//caps the animated cell count on very wide bars
+const VOICE_MAX_COLS = 80;
+const VOICE_ROWS = 5;
+//history step that makes the voice spread from the center outward
+const VOICE_SHIFT_MS = 70;
+//columns over which each side fades out
+const VOICE_FADE_COLS = 8;
+const VOICE_LEVELS = Array.from({ length: VOICE_ROWS }, (_, i) => i);
 
-function VoiceBar({ index, level }: { index: number; level: SharedValue<VoiceLevel> }) {
+function VoiceCell({ col, row, cell, heights, cols }: { col: number; row: number; cell: number; heights: SharedValue<number[]>; cols: SharedValue<number> }) {
   const styles = useThemedStyles(makeStyles);
   const style = useAnimatedStyle(() => {
-    const { vol, at } = level.value;
-    const targetScale = 1 + vol * (2 + Math.sin(at / 100 + index)) + (Math.random() * vol * 1.5);
-    return { transform: [{ scaleY: withTiming(Math.max(1, Math.min(targetScale, 5)), { duration: VOICE_TICK_MS }) }] };
+    //cell opacity follows its depth under the column top: 60, 80, 100 percent
+    const d = heights.value[col] - row;
+    const alpha = d <= 0 ? 0 : d <= 1 ? 0.6 * d : Math.min(1, 0.6 + 0.2 * (d - 1));
+    //fade toward both edges so the row never ends in a hard cut
+    const edge = Math.min(1, Math.min(col + 1, cols.value - col) / VOICE_FADE_COLS);
+    return { opacity: alpha * edge };
   });
-  return <Reanimated.View style={[styles.voiceSquare, style]} />;
+  //neighbours share the same snapped edge so no hairline shows between cells
+  const snap = (n: number) => PixelRatio.roundToNearestPixel(n * cell);
+  const left = snap(col);
+  const bottom = snap(row);
+  return <Reanimated.View style={[styles.voiceCell, { left, bottom, width: snap(col + 1) - left, height: snap(row + 1) - bottom }, style]} />;
 }
 
 function VoiceIndicator() {
   const styles = useThemedStyles(makeStyles);
-  const level = useSharedValue<VoiceLevel>({ vol: 0, at: 0 });
+  const vol = useSharedValue(0);
+  const energy = useSharedValue(0);
+  const clock = useSharedValue(0);
+  const history = useSharedValue<number[]>(Array(VOICE_MAX_COLS / 2).fill(0));
+  const heights = useSharedValue<number[]>(Array(VOICE_MAX_COLS).fill(0));
+  const colsShared = useSharedValue(0);
+  const [grid, setGrid] = useState({ cols: 0, cell: 0 });
+  //cell size makes the rows span the full bar height, columns fill the width and stay even so the center sits between two
+  const handleLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    const cell = height / VOICE_ROWS;
+    const next = Math.min(VOICE_MAX_COLS, 2 * Math.floor(width / (2 * cell)));
+    colsShared.value = next;
+    setGrid({ cols: next, cell });
+  };
+
   useEffect(() => {
-    //one ui write drives every bar
     const timer = setInterval(() => {
-      level.value = { vol: Math.min(1, currentAudioVolume * 50), at: Date.now() };
+      vol.value = Math.min(1, currentAudioVolume * 50);
     }, VOICE_TICK_MS);
     return () => clearInterval(timer);
-  }, [level]);
+  }, [vol]);
+
+  //runs every frame on the ui thread so the columns glide between volume samples
+  useFrameCallback(frame => {
+    const dt = Math.min(frame.timeSincePreviousFrame ?? 16, 50);
+    const t = frame.timeSinceFirstFrame / 1000;
+    //fast attack, slow release
+    const target = vol.value;
+    energy.value += (target - energy.value) * (1 - Math.exp(-dt / (target > energy.value ? 40 : 160)));
+
+    clock.value += dt;
+    if (clock.value >= VOICE_SHIFT_MS) {
+      clock.value = 0;
+      history.value = [energy.value, ...history.value.slice(0, VOICE_MAX_COLS / 2 - 1)];
+    }
+
+    const prev = heights.value;
+    const total = colsShared.value;
+    const half = total / 2;
+    const next = new Array<number>(VOICE_MAX_COLS).fill(0);
+    for (let c = 0; c < total; c++) {
+      //distance from the center picks how old the volume sample is
+      const dist = c < half ? half - 1 - c : c - half;
+      //idle breathing keeps the row alive in silence
+      const idle = 0.5 + 0.7 * (0.5 + 0.5 * Math.sin(t * 2.2 + c * 0.8));
+      //two slow waves of different speed so no column repeats its neighbour
+      const wobble = 0.7 + 0.3 * Math.sin(t * 4.3 + c * 1.7) * Math.sin(t * 1.9 + c * 0.5);
+      const goal = Math.min(VOICE_ROWS, idle + history.value[dist] * (VOICE_ROWS - 1.2) * wobble);
+      const tau = goal > prev[c] ? 50 : 140;
+      next[c] = prev[c] + (goal - prev[c]) * (1 - Math.exp(-dt / tau));
+    }
+    heights.value = next;
+  });
+
   return (
-    <View style={styles.voiceIndicatorContainer}>
-      {VOICE_BARS.map(i => (
-        <VoiceBar key={i} index={i} level={level} />
-      ))}
+    //negative margins stretch the grid over the bar padding up to the border
+    <View onLayout={handleLayout} style={[styles.voiceIndicatorContainer, { marginVertical: -10 }]}>
+      <View style={{ width: grid.cols * grid.cell, height: VOICE_ROWS * grid.cell }}>
+        {Array.from({ length: grid.cols }, (_, col) =>
+          VOICE_LEVELS.map(row => <VoiceCell key={`${col}-${row}`} col={col} row={row} cell={grid.cell} heights={heights} cols={colsShared} />)
+        )}
+      </View>
     </View>
   );
 }
@@ -265,7 +303,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   modelCapabilities = [],
   canTranscribeRemotely = false,
   onOpenSettings,
-  onAttachmentSheetVisibilityChange,
+  picker,
   autoStartMic = false,
   selection = null,
   onSelectionRemove,
@@ -304,17 +342,23 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const [, setWhisperAvailable] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
+  const {
+    files: selectedFiles,
+    setFiles: setSelectedFiles,
+    sheetVisible: isAttachmentSheetVisible,
+    closeSheet,
+    toggleSheet: toggleAttachmentSheet,
+    pickFiles: handlePickFiles,
+    attachmentError,
+  } = picker;
   //message files load as chips
   //leaving edit empties them
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- tray follows the edit session
     setSelectedFiles(editFiles ?? []);
-  }, [editFiles]);
+  }, [editFiles, setSelectedFiles]);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState<{ title: string, message: string, buttons?: { text: string, onPress: () => void, style?: "primary" | "secondary" | "danger" }[] }>({ title: "", message: "" });
-  const [isAttachmentSheetVisible, setIsAttachmentSheetVisible] = useState(false);
-  const [recentPhotos, setRecentPhotos] = useState<any[]>([]);
   const autoStartedRef = useRef(false);
   const inputRef = useRef<TextInput>(null);
   //web mirror follows the textarea scroll
@@ -322,15 +366,6 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const transcribeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   //cache extraction so send stays instant
   const documentsRef = useRef(new Map<string, Promise<ExtractedDocument>>());
-
-  //the picker rejects the format, the model rejects what it cannot read
-  const attachmentError = (kind: AttachmentKind, formatMessage: string) => {
-    if (kind === 'unsupported') return { title: t("chatbar.unsupportedFormat"), message: formatMessage };
-    if (kind === 'image' && !supportsImages) return { title: t("chatbar.unsupportedByModel"), message: t("chatbar.modelNoImages") };
-    if (kind === 'audio' && !supportsAudio) return { title: t("chatbar.unsupportedByModel"), message: t("chatbar.modelNoAudio") };
-    if (kind === 'video' && !supportsVideo) return { title: t("chatbar.unsupportedByModel"), message: t("chatbar.modelNoVideo") };
-    return null;
-  };
 
   const readDocument = (file: SelectedFile): Promise<ExtractedDocument> => {
     let pending = documentsRef.current.get(file.uri);
@@ -356,7 +391,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         });
       });
     return () => { cancelled = true; };
-  }, [selectedFiles, t]);
+  }, [selectedFiles, setSelectedFiles, t]);
 
   useImperativeHandle(ref, () => ({
     stopRecording: () => {
@@ -367,28 +402,6 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       setSelectedFiles([]);
     }
   }));
-
-  const closeSheet = () => {
-    setIsAttachmentSheetVisible(false);
-  };
-
-  useEffect(() => {
-    onAttachmentSheetVisibilityChange?.(isAttachmentSheetVisible);
-  }, [isAttachmentSheetVisible, onAttachmentSheetVisibilityChange]);
-
-  useEffect(() => {
-    const showSubscription = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => {
-        if (isAttachmentSheetVisible) {
-          closeSheet();
-        }
-      }
-    );
-    return () => {
-      showSubscription.remove();
-    };
-  }, [isAttachmentSheetVisible]);
 
   const pcmChunksRef = useRef<ArrayBuffer[]>([]);
   const sampleRateRef = useRef<number>(16000);
@@ -629,7 +642,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     );
 
     return () => backHandler.remove();
-  }, [isAttachmentSheetVisible, isRecording, isTranscribing]);
+  }, [isAttachmentSheetVisible, closeSheet, isRecording, isTranscribing]);
 
   //cleanup pending transcribe timer on unmount
   useEffect(() => {
@@ -648,111 +661,6 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     //fires once, guarded by autoStartedRef
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStartMic]);
-
-  const toggleAttachmentSheet = async () => {
-    if (isAttachmentSheetVisible) {
-      closeSheet();
-    } else {
-      Keyboard.dismiss();
-      //no recent photos on android
-      if (Platform.OS !== 'android') {
-        const { granted, canAskAgain } = await MediaLibrary.getPermissionsAsync();
-        //a refusal sticks, only prompt while the os still allows it
-        if (!granted && canAskAgain) {
-          await MediaLibrary.requestPermissionsAsync();
-        }
-      }
-      setIsAttachmentSheetVisible(true);
-    }
-  };
-
-  useEffect(() => {
-    //play policy forbids broad media access
-    if (!isAttachmentSheetVisible || Platform.OS === 'android') return;
-
-    const getRecentPhotos = async () => {
-      const { status } = await MediaLibrary.getPermissionsAsync();
-      if (status === 'granted') {
-        const media = await MediaLibrary.getAssetsAsync({
-          mediaType: supportsVideo ? ['photo', 'video'] : 'photo',
-          first: 10,
-          sortBy: ['creationTime'],
-        });
-        setRecentPhotos(media.assets);
-      }
-    };
-    getRecentPhotos();
-  }, [isAttachmentSheetVisible, supportsVideo]);
-
-  const handleCamera = async () => {
-    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-    if (permissionResult.granted === false) {
-      setModalConfig({ title: t("chatbar.permissionDenied"), message: t("chatbar.cameraDenied") });
-      setModalVisible(true);
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: false,
-      quality: 1,
-    });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const asset = result.assets[0];
-      setSelectedFiles(prev => [...prev, {
-        uri: asset.uri,
-        type: 'image',
-        name: asset.fileName || 'camera_image.jpg'
-      }]);
-      setIsAttachmentSheetVisible(false);
-    }
-  };
-
-  const handlePhotos = async () => {
-    //android system picker needs no permission
-    if (Platform.OS !== 'android') {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (permissionResult.granted === false) {
-        setModalConfig({ title: t("chatbar.permissionDenied"), message: t("chatbar.photosDenied") });
-        setModalVisible(true);
-        return;
-      }
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: supportsVideo ? ['images', 'videos'] : ['images'],
-      allowsMultipleSelection: true,
-      quality: 1,
-    });
-    if (!result.canceled && result.assets) {
-      const newFiles = result.assets.map(asset => asset.type === 'video'
-        ? { uri: asset.uri, type: 'video', name: asset.fileName || 'video.mp4', mimeType: asset.mimeType ?? undefined }
-        : { uri: asset.uri, type: 'image', name: asset.fileName || 'photo.jpg' });
-      setSelectedFiles(prev => [...prev, ...newFiles]);
-      setIsAttachmentSheetVisible(false);
-    }
-  };
-
-  const handleSelectRecentPhoto = async (photo: any) => {
-    const isVideo = photo.mediaType === 'video';
-    //ios ph uri is not a file
-    const videoUri = isVideo && Platform.OS === 'ios'
-      ? (await MediaLibrary.getAssetInfoAsync(photo)).localUri
-      : undefined;
-    setSelectedFiles(prev => {
-      const targetUri = videoUri || photo.uri || photo.localUri;
-      const isSelected = prev.some(f => (f.id && f.id === photo.id) || f.uri === targetUri);
-      if (isSelected) {
-        return prev.filter(f => !((f.id && f.id === photo.id) || f.uri === targetUri));
-      } else {
-        return [...prev, {
-          uri: targetUri,
-          type: isVideo ? 'video' : 'image',
-          name: photo.filename || (isVideo ? 'recent_video.mp4' : 'recent_photo.jpg'),
-          id: photo.id
-        }];
-      }
-    });
-  };
-
-
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -877,42 +785,6 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       console.error("transcription failed:", e);
       setIsTranscribing(false);
       return null;
-    }
-  };
-
-  const handlePickFiles = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['image/*', 'audio/wav', 'audio/x-wav', 'audio/mpeg', 'audio/mp3', ...(supportsVideo ? VIDEO_MIME_TYPES : []), ...DOCUMENT_MIME_TYPES],
-        multiple: true,
-        copyToCacheDirectory: true
-      });
-      if (!result.canceled && result.assets) {
-        const validFiles: SelectedFile[] = [];
-        let rejection: { title: string; message: string } | null = null;
-
-        for (const a of result.assets) {
-          const kind = classifyAttachment(a.name, a.mimeType);
-          const error = attachmentError(kind, t("chatbar.unsupportedAudio"));
-          if (error) {
-            rejection = error;
-            continue;
-          }
-          validFiles.push({ uri: a.uri, type: kind, name: a.name, mimeType: a.mimeType ?? undefined });
-        }
-
-        if (rejection) {
-          setModalConfig(rejection);
-          setModalVisible(true);
-        }
-
-        if (validFiles.length > 0) {
-          setSelectedFiles(prev => [...prev, ...validFiles]);
-        }
-        setIsAttachmentSheetVisible(false);
-      }
-    } catch (e) {
-      console.error("Failed to pick files", e);
     }
   };
 
@@ -1371,7 +1243,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                   { backgroundColor: backgroundColor }
                 ]}
               >
-                {supportsFiles && (
+                {supportsFiles && !isRecording && (
                   <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} style={pressStyle(styles.plusButton, "fadeLight")}>
                     <Image source={addIcon} style={styles.plusIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
@@ -1485,21 +1357,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
         </Animated.View>
       </View>
 
-      <AttachmentSheet
-        bottomInset={insets.bottom}
-        visible={isAttachmentSheetVisible}
-        incognito={incognito}
-        onClose={closeSheet}
-        onCamera={handleCamera}
-        onPickFiles={handlePickFiles}
-        onPhotos={handlePhotos}
-        recentPhotos={recentPhotos}
-        selectedFiles={selectedFiles}
-        onSelectRecentPhoto={handleSelectRecentPhoto}
-        onLongPressRecentPhoto={handleSelectRecentPhoto}
-      />
-
-      {/* lifting sheet needs safe area below */}
+      {/* keeps the bar clear of the safe area */}
       <View style={{ width: '100%', height: insets.bottom }} />
 
       <NotificationModal
@@ -1616,17 +1474,16 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   voiceIndicatorContainer: {
     flex: 1,
-    flexDirection: "row",
+    alignSelf: "stretch",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-end",
+    overflow: "hidden",
     marginLeft: 8,
     marginRight: 8,
-    gap: 12,
   },
-  voiceSquare: {
-    width: 3,
-    height: 6,
-    //bars sit on the red/incognito composer in both themes, always white
+  voiceCell: {
+    position: "absolute",
+    //cells sit on the red/incognito composer in both themes, always white
     backgroundColor: Colors.textOnPrimary,
   },
   sendButton: {

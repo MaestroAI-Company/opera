@@ -40,6 +40,7 @@ import AssistantSheet from "../components/features/AssistantSheet";
 import BugReportSheet from "../components/features/BugReportSheet";
 import ButterflyCluster from "../components/features/ButterflyCluster";
 import ChatBar from "../components/features/ChatBar";
+import AttachmentSheet, { useAttachments } from "../components/features/AttachmentSheet";
 import ChatView from "../components/features/ChatView";
 import CodePreviewSheet, {
   PreviewCode,
@@ -420,7 +421,7 @@ export default function Index() {
   const [alwaysWhisper, setAlwaysWhisper] = useState(false);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [editAiEnabled, setEditAiEnabled] = useState(false);
-  const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
+  const attachments = useAttachments(modelCapabilities);
 
   //conversation state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -2257,7 +2258,6 @@ useEffect(() => {
                     "__TAURI_INTERNALS__" in window
                       ? 32
                       : 0),
-                  zIndex: attachmentSheetVisible ? 200 : undefined,
                 },
               ]}
               pointerEvents="box-none"
@@ -2392,7 +2392,7 @@ useEffect(() => {
                       setSettingsDrawerVisible(true);
                     });
                   }}
-                  onAttachmentSheetVisibilityChange={setAttachmentSheetVisible}
+                  picker={attachments}
                 />
               )}
             </View>
@@ -2402,6 +2402,33 @@ useEffect(() => {
 
       {isDesktop ? null : conversationsDrawer}
       {settingsDrawer}
+
+      <AttachmentSheet
+        visible={attachments.sheetVisible}
+        incognito={
+          activeConversation
+            ? activeConversation.id.startsWith("incognito_")
+            : incognitoMode
+        }
+        onClose={attachments.closeSheet}
+        onCamera={attachments.openCamera}
+        onPickFiles={attachments.pickFiles}
+        onPhotos={attachments.pickPhotos}
+        recentPhotos={attachments.recentPhotos}
+        selectedFiles={attachments.files}
+        onSelectRecentPhoto={attachments.toggleRecentPhoto}
+        onLongPressRecentPhoto={attachments.toggleRecentPhoto}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        bottomInset={insets.bottom}
+      />
+
+      <NotificationModal
+        visible={!!attachments.notice}
+        title={attachments.notice?.title}
+        message={attachments.notice?.message}
+        onClose={attachments.clearNotice}
+      />
 
       <BugReportSheet
         visible={bugReportVisible}

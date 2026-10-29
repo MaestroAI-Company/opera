@@ -700,6 +700,11 @@ export const fr: Translations = {
   "settings.ollama.noMatch": "Aucun modèle ne correspond à cette recherche.",
   "settings.ollama.showMore": "Afficher plus ({count})",
   "settings.ollama.capabilities": "Capacités",
+  "settings.model.promptSize": "Taille du prompt système",
+  "settings.model.promptAuto": "Automatique",
+  "settings.model.promptSmall": "Petit",
+  "settings.model.promptMedium": "Moyen",
+  "settings.model.promptLarge": "Grand",
   "settings.ollama.contextLength": "Longueur de contexte",
   "settings.ollama.contextHelp":
     "Nombre maximal de tokens que le modèle peut utiliser.",

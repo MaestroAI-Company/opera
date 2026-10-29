@@ -18,9 +18,9 @@ import CodeDownloadHost from "../components/features/CodeDownloadHost";
 import ToolConsentHost from "../components/features/ToolConsentHost";
 import VoicePackHost from "../components/features/VoicePackHost";
 import { IconLabelProvider } from "../components/ui/IconLabel";
-import { Radius } from "../../constants/theme";
+import { Radius, Spacing } from "../../constants/theme";
 import { initI18n } from "../i18n";
-import { initTheme, useIsDark } from "../hooks/useTheme";
+import { initTheme, useColors, useIsDark } from "../hooks/useTheme";
 import { installCrashHandler } from "../services/logging/CrashReporter";
 import { installLogger } from "../services/logging/Logger";
 import { setupQuickActions } from "../services/quickActions/QuickActionsService";
@@ -65,6 +65,7 @@ const screenLayout = ({ children }: { children: ReactNode }) => (
 
 export default function RootLayout() {
   const isDark = useIsDark();
+  const colors = useColors();
   const [showLottie, setShowLottie] = useState(Platform.OS !== "web" || (isTauri && !isSettingsWindow));
   const [fontsLoaded, fontError] = useFonts({
     Petrona: require("../../assets/fonts/Petrona-Medium.ttf"),
@@ -86,6 +87,21 @@ export default function RootLayout() {
     document.head.appendChild(style);
     return () => style.remove();
   }, []);
+
+  useEffect(() => {
+    //themed thin scrollbar over os default
+    if (Platform.OS !== "web") return;
+    const style = document.createElement('style');
+    style.textContent = `
+::-webkit-scrollbar{width:${Spacing.md}px;height:${Spacing.md}px;background:transparent}
+::-webkit-scrollbar-button{display:none}
+::-webkit-scrollbar-track,::-webkit-scrollbar-corner{background:transparent}
+::-webkit-scrollbar-thumb{background-color:${colors.surfacePressed};border:${Spacing.xs2}px solid transparent;border-radius:${Radius.pill}px;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover,::-webkit-scrollbar-thumb:active{background-color:${colors.textMuted}}
+@supports not selector(::-webkit-scrollbar){*{scrollbar-width:thin;scrollbar-color:${colors.surfacePressed} transparent}}`;
+    document.head.appendChild(style);
+    return () => style.remove();
+  }, [colors]);
 
   useEffect(() => {
     async function lockMobileOrientation() {

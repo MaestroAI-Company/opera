@@ -744,6 +744,17 @@ useEffect(() => {
     bugReportVisibleRef.current = bugReportVisible;
   }, [bugReportVisible]);
 
+  //external entry points must land on top
+  const closeOverlays = useCallback(() => {
+    setDrawerVisible(false);
+    setSamplerDrawerVisible(false);
+    setConversationSearchVisible(false);
+    setModelSelectorVisible(false);
+    setPreviewImage(null);
+    setPreviewCode(null);
+    setPreviewDetails(null);
+  }, []);
+
   const [assistantSheetVisible, setAssistantSheetVisible] = useState(false);
 
   //dbReady only comes after onboarding, flag set on open so it never returns
@@ -1452,10 +1463,17 @@ useEffect(() => {
 
   //handle deeplinks (cold + warm start, mobile + tauri)
   const pendingDeepLinkRef = useRef<DeepLinkRoute | null>(null);
-  const initialShareRef = useRef<string | null>(null);
+  const initialLinkHandledRef = useRef(false);
   useEffect(() => {
     let cancelled = false;
     const apply = (route: DeepLinkRoute) => {
+      if (route.type === "unknown") return;
+      closeOverlays();
+      //keep settings for its own routes
+      if (route.type !== "settings" && route.type !== "hub-pair") {
+        if (settingsDrawerVisibleRef.current) closeSettings();
+        setSamplerMode(false);
+      }
       if (route.type === "new-chat") {
         startNewConversation();
       } else if (route.type === "shared") {
@@ -1486,11 +1504,9 @@ useEffect(() => {
     };
     getInitialDeepLink().then((route) => {
       if (cancelled || !route) return;
-      //dedupe cold links across db re-init
-      if (route.type === "shared") {
-        if (initialShareRef.current === route.pasteId) return;
-        initialShareRef.current = route.pasteId;
-      }
+      //cold link applies once across re-runs
+      if (initialLinkHandledRef.current) return;
+      initialLinkHandledRef.current = true;
       apply(route);
     });
     const unsubscribe = subscribeToDeepLinks(apply);
@@ -1519,6 +1535,8 @@ useEffect(() => {
     startNewConversation,
     openSharedConversation,
     openDrawerSafely,
+    closeOverlays,
+    closeSettings,
   ]);
 
   //apply pending conversation deeplink once the db is ready

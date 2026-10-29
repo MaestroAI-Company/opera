@@ -47,14 +47,18 @@ function modelTier(model: string): ModelTier {
   //user choice beats detection
   const source = AIModule.getActiveSource();
   const chosen = getPromptTierOverride(source.service, source.url, model);
-  if (chosen) return chosen;
+  return chosen ?? autoPromptTier(model, source.service);
+}
+
+//tier picked when no override is set
+export function autoPromptTier(model: string, service: string): ModelTier {
   //nano full handles the medium prompt
   if (model.startsWith('aicore-nano-full')) return 'medium';
   if (isLocalModel(model)) return 'small';
   const paramsB = parseParamsB(model);
   if (paramsB === null) {
     //unknown sizes: on-device small, servers large
-    return Settings.getCached().aiService === 'litert' ? 'small' : 'large';
+    return service === 'litert' ? 'small' : 'large';
   }
   if (paramsB < 3) return 'small';
   if (paramsB <= 14) return 'medium';

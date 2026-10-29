@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useResponsive } from "../../hooks/useResponsive";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
@@ -87,6 +88,8 @@ type ChatInputBarProps = {
   incognito?: boolean;
   isGenerating?: boolean;
   modelCapabilities?: string[];
+  //desktop element placed before the input actions
+  leadingElement?: React.ReactNode;
   canTranscribeRemotely?: boolean;
   onOpenSettings?: () => void;
   picker: Attachments;
@@ -204,6 +207,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   incognito = false,
   isGenerating = false,
   modelCapabilities = [],
+  leadingElement,
   canTranscribeRemotely = false,
   onOpenSettings,
   picker,
@@ -221,6 +225,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const insets = useSafeAreaInsets();
+  const { isDesktop } = useResponsive();
   const supportsImages = modelCapabilities.includes('vision');
   const supportsAudio = modelCapabilities.includes('audio');
   const supportsVideo = modelCapabilities.includes('video');
@@ -1143,17 +1148,20 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 style={[
                   styles.container,
                   incognito && styles.containerIncognito,
+                  isDesktop && { borderRadius: Radius.window, paddingHorizontal: 8, paddingVertical: 6, minHeight: 48 },
                   { backgroundColor: backgroundColor }
                 ]}
               >
+                {leadingElement && <View style={{ marginRight: 8 }}>{leadingElement}</View>}
+
                 {supportsFiles && !isRecording && (
-                  <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} style={pressStyle(styles.plusButton, "fadeLight")}>
+                  <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={isDesktop ? 8 : undefined} style={pressStyle(styles.plusButton, "fadeLight")}>
                     <Image source={addIcon} style={styles.plusIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 )}
 
                 {(Platform.OS !== 'web' || Settings.getCached().whisperModel !== 'none' || canTranscribeRemotely) && !isGenerating && (
-                  <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={pressStyle(styles.micButton, "fadeLight")}>
+                  <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={isDesktop ? 8 : undefined} style={pressStyle(styles.micButton, "fadeLight")}>
                     <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
                       <Image source={isRecording ? stopIcon : micIcon} style={styles.micIcon} tintColor={Colors.textOnPrimary} />
                     </Animated.View>
@@ -1246,11 +1254,11 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 )}
 
                 {isGenerating ? (
-                  <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} style={pressStyle(styles.sendButton, "fadeLight")}>
+                  <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={isDesktop ? 8 : undefined} style={pressStyle(styles.sendButton, "fadeLight")}>
                     <Image source={stopIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 ) : (
-                  <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} style={pressStyle(styles.sendButton, "fadeLight")}>
+                  <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={isDesktop ? 8 : undefined} style={pressStyle(styles.sendButton, "fadeLight")}>
                     <Image source={nextWhiteIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 )}

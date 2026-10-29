@@ -3,6 +3,7 @@ import { PanResponder, StyleSheet, Vibration } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { lockTextSelection } from "./lockTextSelection";
 
 type ToggleProps = {
   checked: boolean;
@@ -39,6 +40,7 @@ export default function Toggle({ checked, onToggle, disabled = false }: TogglePr
       //keep gesture vs drawer's swipe-to-close
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
+        lockTextSelection(true);
         startXRef.current = translateX.value;
         scale.value = withTiming(1.2, { duration: 120 });
         pressed.value = withTiming(1, { duration: 120 });
@@ -47,6 +49,7 @@ export default function Toggle({ checked, onToggle, disabled = false }: TogglePr
         translateX.value = Math.min(TRAVEL, Math.max(0, startXRef.current + g.dx));
       },
       onPanResponderRelease: (_e, g) => {
+        lockTextSelection(false);
         const { checked: isChecked, onToggle: cb } = latestRef.current;
         const isTap = Math.abs(g.dx) < TAP_TOLERANCE;
         const next = isTap ? !isChecked : translateX.value >= TRAVEL / 2;
@@ -59,6 +62,7 @@ export default function Toggle({ checked, onToggle, disabled = false }: TogglePr
         }
       },
       onPanResponderTerminate: () => {
+        lockTextSelection(false);
         const { checked: isChecked } = latestRef.current;
         translateX.value = withTiming(isChecked ? TRAVEL : 0, { duration: 200 });
         scale.value = withTiming(1, { duration: 150 });

@@ -14,7 +14,7 @@ import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 const copyIcon = require("../../../assets/icons/copy2.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 
-const DESKTOP_CARD_WIDTH = 560;
+const DESKTOP_CARD_WIDTH = 840;
 
 export type PreviewCode = { code: string; language?: string; title?: string; incognito?: boolean };
 

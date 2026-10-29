@@ -30,9 +30,13 @@ function formatDate(timestamp: number): string {
 
 type ProfileCardProps = {
   name: string;
+  //a hub profile brings its own date
+  createdAt?: number;
+  //grid tile in the profile picker
+  compact?: boolean;
 };
 
-export default function ProfileCard({ name }: ProfileCardProps) {
+export default function ProfileCard({ name, createdAt: givenCreatedAt, compact = false }: ProfileCardProps) {
   const styles = useThemedStyles(makeStyles);
   const Colors = useColors();
   const t = useT();
@@ -48,6 +52,7 @@ export default function ProfileCard({ name }: ProfileCardProps) {
 
   //first render stamps the card, later renders just read it back
   useEffect(() => {
+    if (givenCreatedAt !== undefined) return;
     let cancelled = false;
     (async () => {
       try {
@@ -66,7 +71,8 @@ export default function ProfileCard({ name }: ProfileCardProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [givenCreatedAt]);
+  const shownCreatedAt = givenCreatedAt ?? createdAt;
 
   //tilting the phone slides the stripes along y
   useEffect(() => {
@@ -116,19 +122,21 @@ export default function ProfileCard({ name }: ProfileCardProps) {
       />
       <Image source={texture} style={styles.texture} resizeMode="cover" />
 
-      <View style={styles.content}>
+      <View style={[styles.content, compact && styles.contentCompact]}>
         <View style={styles.tile}>
           <Image source={butterfly.color} style={styles.tileButterfly} resizeMode="contain" />
         </View>
 
         <Text
-          style={[styles.name, { fontFamily: nameFont }, !trimmed && styles.placeholder]}
+          style={[styles.name, compact && styles.nameCompact, { fontFamily: nameFont }, !trimmed && styles.placeholder]}
           numberOfLines={2}
         >
           {trimmed || t("profileCard.placeholder")}
         </Text>
 
-        {createdAt !== null && <Text style={styles.meta}>{`Opera - ${formatDate(createdAt)}`}</Text>}
+        {shownCreatedAt !== null && !compact && (
+          <Text style={styles.meta}>{`Opera - ${formatDate(shownCreatedAt)}`}</Text>
+        )}
 
         <Image source={butterfly.icon} style={styles.logo} tintColor={`${Colors.textOnPrimary}99`} />
       </View>
@@ -154,6 +162,10 @@ const makeStyles = (Colors: ThemeColors) =>
     content: {
       padding: 15,
       gap: Spacing.xxl,
+    },
+    contentCompact: {
+      padding: Spacing.lg2,
+      gap: Spacing.lg,
     },
     tile: {
       aspectRatio: 1,
@@ -197,6 +209,10 @@ const makeStyles = (Colors: ThemeColors) =>
       fontSize: FontSizes.displayHero,
       lineHeight: 52,
       color: `${Colors.textOnPrimary}99`,
+    },
+    nameCompact: {
+      fontSize: FontSizes.displaySm,
+      lineHeight: 26,
     },
     placeholder: {
       color: `${Colors.textOnPrimary}99`,

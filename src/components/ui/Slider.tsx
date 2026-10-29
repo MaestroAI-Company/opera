@@ -4,6 +4,7 @@ import Animated, { Easing, interpolate, interpolateColor, useAnimatedStyle, useS
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { pressStyle } from "./pressStyle";
+import { lockTextSelection } from "./lockTextSelection";
 
 export type SliderOption = {
   id: string;
@@ -108,6 +109,7 @@ export default function Slider({
       //keep gesture when drawer scrolls
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
+        lockTextSelection(true);
         armedRef.current = false;
         startXRef.current = pillX.value;
         previewIndexRef.current = selectedIndexRef.current;
@@ -148,6 +150,7 @@ export default function Slider({
         pillX.value = currentAnchorX + rubberBand(d, slot);
       },
       onPanResponderRelease: () => {
+        lockTextSelection(false);
         clearLongPressTimer();
         if (armedRef.current) {
           const bw = buttonWidthRef.current;
@@ -167,6 +170,7 @@ export default function Slider({
         }
       },
       onPanResponderTerminate: () => {
+        lockTextSelection(false);
         clearLongPressTimer();
         if (armedRef.current) {
           const bw = buttonWidthRef.current;

@@ -758,8 +758,7 @@ const CodeBlock = React.memo(function CodeBlock({
             icon={fullIcon}
             label={t("common.expand")}
             onPress={handleOpen}
-            containerSize={28}
-            size={16}
+            containerSize={32}
             pressedColor={Colors.surfacePressed}
             tintColor={dark ? Colors.responseTextMuted : Colors.textSecondary}
           />
@@ -767,8 +766,7 @@ const CodeBlock = React.memo(function CodeBlock({
             icon={downloadIcon}
             label={t("common.download")}
             onPress={handleDownload}
-            containerSize={28}
-            size={16}
+            containerSize={32}
             pressedColor={Colors.surfacePressed}
             tintColor={dark ? Colors.responseTextMuted : Colors.textSecondary}
           />
@@ -776,8 +774,7 @@ const CodeBlock = React.memo(function CodeBlock({
             icon={copyIcon}
             label={t("common.copy")}
             onPress={handleCopy}
-            containerSize={28}
-            size={16}
+            containerSize={32}
             pressedColor={Colors.surfacePressed}
             tintColor={dark ? Colors.responseTextMuted : Colors.textSecondary}
           />

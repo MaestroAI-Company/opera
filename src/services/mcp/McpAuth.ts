@@ -1,7 +1,14 @@
 import * as AuthSession from 'expo-auth-session';
 import { Platform } from 'react-native';
 import { universalFetch } from '../ai/utils/universalFetch';
+import { OperaHub } from '../hub/OperaHubService';
 import { getSecret, setSecret } from './mcpStorage';
+
+//what one sign in shares with the other devices
+const SESSION_KEYS = ['access', 'refresh', 'expiry', 'client', 'meta'] as const;
+//a busy lease gets this many short waits
+const LEASE_TRIES = 5;
+const LEASE_WAIT_MS = 3000;
 
 const CLIENT_NAME = 'Opera';
 //distinct from the drive loopback port so both flows can be armed
@@ -215,8 +222,9 @@ class McpAuthService {
     const doc = await res.json();
     if (!doc?.access_token) return false;
 
+    const expiresAt = Date.now() + (doc.expires_in ?? 3600) * 1000;
     await setSecret(`${serverId}_access`, doc.access_token);
-    await setSecret(`${serverId}_expiry`, String(Date.now() + (doc.expires_in ?? 3600) * 1000));
+    await setSecret(`${serverId}_expiry`, String(expiresAt));
     if (doc.refresh_token) await setSecret(`${serverId}_refresh`, doc.refresh_token);
     await setSecret(`${serverId}_meta`, JSON.stringify(meta));
     return true;
@@ -353,13 +361,60 @@ class McpAuthService {
     return ok ? pending.serverId : null;
   }
 
-  //valid bearer token, refreshed when expired, null when the user must authorize
-  async getAccessToken(serverId: string): Promise<string | null> {
+  //the session rides the sealed providers sync
+  async exportSession(serverId: string): Promise<Record<string, string | null>> {
+    const session: Record<string, string | null> = {};
+    for (const key of SESSION_KEYS) session[key] = await getSecret(`${serverId}_${key}`);
+    return session;
+  }
+
+  async importSession(serverId: string, session: Record<string, string | null>): Promise<void> {
+    for (const key of SESSION_KEYS) await setSecret(`${serverId}_${key}`, session[key] ?? null);
+  }
+
+  //renew slightly early so a slow request does not race the expiry
+  private async validToken(serverId: string): Promise<string | null> {
     const token = await getSecret(`${serverId}_access`);
     const expiry = parseInt((await getSecret(`${serverId}_expiry`)) ?? '0', 10);
-    //renew slightly early so a slow request does not race the expiry
-    if (token && Date.now() < expiry - 60_000) return token;
+    return token && Date.now() < expiry - 60_000 ? token : null;
+  }
 
+  //valid bearer token, refreshed when expired, null when the user must authorize
+  async getAccessToken(serverId: string): Promise<string | null> {
+    const valid = await this.validToken(serverId);
+    if (valid) return valid;
+    const hub = await OperaHub.getPairedHub();
+    if (!hub || !(await OperaHub.getProfile())) return this.refresh(serverId);
+    //rotating tokens break if two devices refresh at once
+    const name = `oauth:${serverId}`;
+    const { HubSync } = await import('../hub/HubSync');
+    for (let attempt = 0; attempt < LEASE_TRIES; attempt++) {
+      //an unreachable hub cannot share, refresh alone
+      const granted = await OperaHub.lease(hub, name).catch(() => true);
+      if (granted) {
+        try {
+          //another device may have refreshed meanwhile
+          await HubSync.syncNow().catch(() => {});
+          const fresh = await this.validToken(serverId);
+          if (fresh) return fresh;
+          const token = await this.refresh(serverId);
+          //the others take the new tokens
+          if (token) await HubSync.syncNow().catch(() => {});
+          return token;
+        } finally {
+          await OperaHub.release(hub, name).catch(() => {});
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, LEASE_WAIT_MS));
+      await HubSync.syncNow().catch(() => {});
+      const fresh = await this.validToken(serverId);
+      if (fresh) return fresh;
+    }
+    return getSecret(`${serverId}_access`);
+  }
+
+  private async refresh(serverId: string): Promise<string | null> {
+    const token = await getSecret(`${serverId}_access`);
     const refresh = await getSecret(`${serverId}_refresh`);
     const rawMeta = await getSecret(`${serverId}_meta`);
     const clientId = await getSecret(`${serverId}_client`);

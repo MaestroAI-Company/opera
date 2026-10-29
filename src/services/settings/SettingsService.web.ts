@@ -1,15 +1,14 @@
 import { DeviceEventEmitter } from 'react-native';
 import { AppEvents } from '../events';
-import { DEFAULT_OLLAMA_URL } from '../ai/utils/imageToBase64';
 import { BASE_DEFAULTS, isBooleanKey, isNumberKey, type AppSettings } from './schema';
 
 export type { AppSettings } from './schema';
 
-//web talks to ollama on the same machine
-const DEFAULTS: AppSettings = { ...BASE_DEFAULTS, ollamaUrl: DEFAULT_OLLAMA_URL };
+const DEFAULTS: AppSettings = BASE_DEFAULTS;
 
 class SettingsService {
   private cache: AppSettings | null = null;
+  private watching = false;
 
   // init settings
   async init(): Promise<void> {
@@ -18,6 +17,17 @@ class SettingsService {
     } catch (e) {
       console.error('settings init failed', e);
     }
+    this.watchOtherWindows();
+  }
+
+  //a second window writes the same storage, this cache must follow
+  private watchOtherWindows(): void {
+    if (this.watching || typeof window === 'undefined') return;
+    this.watching = true;
+    window.addEventListener('storage', (e) => {
+      if (e.key !== 'opera_settings') return;
+      this.load().then(() => DeviceEventEmitter.emit(AppEvents.settingsChanged));
+    });
   }
 
   // load settings from localstorage

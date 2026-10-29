@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { t } from '../../../i18n';
 import { AppSettings, Settings } from '../../settings/SettingsService';
+import { HUB_URL_SCHEME, type HubProvider } from '../../hub/OperaHubService';
 import { getSecret, setSecret } from '../../mcp/mcpStorage';
 
 //provider plus its server if any
@@ -11,7 +12,7 @@ export type ModelSource = {
   url: string;
 };
 
-export const PROVIDER_IDS = ['local', 'litert', 'ollama', 'openai', 'beta'] as const;
+export const PROVIDER_IDS = ['local', 'litert', 'ollama', 'openai', 'beta', 'operahub'] as const;
 
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
@@ -26,6 +27,8 @@ const PROVIDER_PLATFORMS: Record<ProviderId, readonly ProviderPlatform[]> = {
   ollama: ['android', 'ios', 'web', 'desktop'],
   openai: ['android', 'ios', 'web', 'desktop'],
   beta: ['android', 'ios', 'web', 'desktop'],
+  //platforms that ship the hub client
+  operahub: ['android', 'desktop', 'web'],
 };
 
 export function currentPlatform(): ProviderPlatform {
@@ -46,6 +49,50 @@ export const BETA_SERVER_URL = process.env.EXPO_PUBLIC_BETA_SERVER_URL ?? '';
 
 //any server speaking the openai protocol
 export const OPENAI_PROVIDER_ID = 'openai';
+
+//providers running on the paired opera hub
+export const HUB_PROVIDER_ID = 'operahub';
+
+//filled by hub sync never cloud synced
+let hubProviders: HubProvider[] = [];
+let hubName = '';
+//per hub server tuning on this device
+export const HUB_PREFS_KEY = 'hubServerPrefs';
+let hubServerPrefs: Record<string, Partial<OllamaServer>> = {};
+
+export function setHubServerPrefs(prefs: Record<string, Partial<OllamaServer>>): void {
+  hubServerPrefs = prefs;
+}
+
+export async function patchHubServer(url: string, patch: Partial<OllamaServer>): Promise<void> {
+  hubServerPrefs = { ...hubServerPrefs, [url]: { ...hubServerPrefs[url], ...patch } };
+  await Settings.setLocal(HUB_PREFS_KEY, JSON.stringify(hubServerPrefs));
+}
+
+export function setHubProviders(providers: HubProvider[], name: string): void {
+  //hosted mcp servers are tools, not models
+  hubProviders = providers.filter((p) => p.kind !== 'mcp');
+  hubName = name;
+}
+
+export function getHubName(): string {
+  return hubName;
+}
+
+export function getHubServers(): (OllamaServer & { kind: HubProvider['kind'] })[] {
+  //hub name avoids clashing with local ollama
+  return hubProviders.map((p) => ({
+    ...hubServerPrefs[`${HUB_URL_SCHEME}${p.id}`],
+    url: `${HUB_URL_SCHEME}${p.id}`,
+    name: hubName ? `${p.name} · ${hubName}` : p.name,
+    id: `hub_${p.id}`,
+    kind: p.kind,
+  }));
+}
+
+export function hubProviderKind(url: string): HubProvider['kind'] {
+  return getHubServers().find((s) => s.url === url.trim())?.kind ?? 'ollama';
+}
 
 //tuning fields apply to ollama only
 export type OllamaServer = {
@@ -105,17 +152,8 @@ function parseServers(raw: string): OllamaServer[] {
 }
 
 //legacy url only seeds ollama
-function isLegacyOllamaSeed(settings: AppSettings): boolean {
-  const active = settings.ollamaUrl.trim();
-  return settings.aiService === 'ollama' && active.length > 0 && active !== BETA_SERVER_URL;
-}
-
 export function getOllamaServers(): OllamaServer[] {
-  const settings = Settings.getCached();
-  const servers = parseServers(settings.ollamaUrls);
-  //legacy single-url setting seeds the list
-  if (servers.length === 0 && isLegacyOllamaSeed(settings)) return [{ url: settings.ollamaUrl.trim(), name: '' }];
-  return servers;
+  return parseServers(Settings.getCached().ollamaUrls);
 }
 
 export function getOpenAIServers(): OllamaServer[] {
@@ -150,7 +188,14 @@ export function serializeServers(servers: OllamaServer[]): string {
 }
 
 function findServer(service: string, url: string): OllamaServer | undefined {
-  const servers = service === 'ollama' ? getOllamaServers() : service === OPENAI_PROVIDER_ID ? getOpenAIServers() : [];
+  const servers =
+    service === 'ollama'
+      ? getOllamaServers()
+      : service === OPENAI_PROVIDER_ID
+        ? getOpenAIServers()
+        : service === HUB_PROVIDER_ID
+          ? getHubServers()
+          : [];
   return servers.find((s) => s.url === url.trim());
 }
 
@@ -169,7 +214,7 @@ export function getPromptTierOverride(service: string, url: string, model: strin
 //undefined falls back to global
 export function getOllamaTuning(url: string): { contextLength: number; keepAlive: number } {
   const settings = Settings.getCached();
-  const server = getOllamaServers().find((s) => s.url === url.trim());
+  const server = [...getOllamaServers(), ...getHubServers()].find((s) => s.url === url.trim());
   return {
     contextLength: server?.contextLength ?? settings.ollamaContextLength,
     keepAlive: server?.keepAlive ?? settings.ollamaKeepAlive,
@@ -248,18 +293,16 @@ export function buildSources(localAvailable: boolean): ModelSource[] {
   if (isProviderSupported(OPENAI_PROVIDER_ID) && enabled.includes(OPENAI_PROVIDER_ID)) {
     sources.push(...serverSources(OPENAI_PROVIDER_ID, getOpenAIServers(), t('settings.service.cloudapi')));
   }
+  if (isProviderSupported(HUB_PROVIDER_ID) && enabled.includes(HUB_PROVIDER_ID)) {
+    sources.push(...serverSources(HUB_PROVIDER_ID, getHubServers(), 'Sampler Hub'));
+  }
   return sources;
 }
 
 //one-off cleanup of the settings the beta used to share with ollama
 export function migrateModelSources(settings: AppSettings): AppSettings {
   const patch: Partial<AppSettings> = {};
-  //the legacy seed only lived in the active url, keep it before beta clears it
   const legacy = settings.ollamaUrl.trim();
-  const stored = settings.ollamaUrls.trim();
-  if ((!stored || stored === '[]') && isLegacyOllamaSeed(settings)) {
-    patch.ollamaUrls = serializeServers([{ url: legacy, name: '' }]);
-  }
   if (!BETA_SERVER_URL) return applyPatch(settings, patch);
   if (settings.aiService === 'ollama' && legacy === BETA_SERVER_URL) {
     patch.aiService = BETA_PROVIDER_ID;

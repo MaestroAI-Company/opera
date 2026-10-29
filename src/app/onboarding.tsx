@@ -30,6 +30,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../constants/theme";
 import ButterflyCluster from "../components/features/ButterflyCluster";
 import DrawerSheet, { SheetScrollView } from "../components/features/DrawerSheet";
+import HubPairingSheet from "../components/features/HubPairingSheet";
+import HubProfileSheet from "../components/features/HubProfileSheet";
 import VoiceEngineCard from "../components/features/VoiceEngineCard";
 import { BUTTERFLY_OPTIONS, selectButterfly, useMaestroButterfly } from "../components/features/maestroButterfly";
 import ActionButton from "../components/ui/ActionButton";
@@ -49,6 +51,8 @@ import { CloudSync } from "../services/CloudSyncService";
 import { CLOUD_PROVIDERS, getCloudProviderDefinition } from "../services/cloud/registry";
 import { LocationService } from "../services/location/LocationService";
 import { Settings } from "../services/settings/SettingsService";
+import { HubSync } from "../services/hub/HubSync";
+import { HubProfile, OperaHub, PairedHub } from "../services/hub/OperaHubService";
 import { TTS_SPEEDS, supportedEngineIds } from "../services/speech/engines";
 import { STT } from "../services/speech/STTService";
 import { pressStyle } from "../components/ui/pressStyle";
@@ -65,11 +69,12 @@ const locationIcon = require("../../assets/icons/location.png");
 const timeIcon = require("../../assets/icons/time.png");
 const cloudIcon = require("../../assets/icons/cloud.png");
 const fileIcon = require("../../assets/icons/file.png");
+const hubIcon = require("../../assets/icons/server.png");
 
 const isWeb = Platform.OS === "web";
 
 const BACK_BUTTON_SIZE = 56;
-const DESKTOP_CARD_WIDTH = 380;
+const DESKTOP_CARD_WIDTH = 720;
 
 type IntroPhase = "logo" | "phrases";
 
@@ -346,6 +351,9 @@ export default function OnboardingPage() {
   const [saveSheetVisible, setSaveSheetVisible] = useState(false);
   const [saveSheetStep, setSaveSheetStep] = useState<"root" | "cloud" | "setup">("root");
   const [cloudSetupId, setCloudSetupId] = useState("");
+  const [hubPairingVisible, setHubPairingVisible] = useState(false);
+  //the paired sampler whose profile is picked
+  const [profileHub, setProfileHub] = useState<PairedHub | null>(null);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{
     title?: string;
@@ -434,6 +442,21 @@ export default function OnboardingPage() {
     }
   };
 
+  //the profile brings its conversations and settings back
+  const restoreFromHub = async (profile: HubProfile) => {
+    setProfileHub(null);
+    showAlert("Sampler", t("cloudSync.syncing"), undefined, { loading: true, messageAlign: "center" });
+    try {
+      await Settings.set("name", profile.name);
+      await HubSync.init();
+      await HubSync.joinedProfile();
+      await HubSync.syncNow();
+      await completeRestore();
+    } catch (e) {
+      showAlert(t("common.error"), e instanceof Error && e.message ? e.message : t("settings.cloud.unknownError"));
+    }
+  };
+
   const syncAndFinish = async (providerName: string) => {
     showCloudProgress(t("cloudSync.syncing"), providerName);
     //cloud settings must win over fresh install defaults
@@ -504,6 +527,50 @@ export default function OnboardingPage() {
     );
   };
 
+  //a profile backup opens with the profile password
+  const promptProfilePassword = (providerName: string, profileName: string) => {
+    let currentInput = "";
+    const cancel = async () => {
+      setAlertVisible(false);
+      await CloudSync.disconnect();
+    };
+    showAlert(
+      t("onboarding.restore.profileTitle", { name: profileName }),
+      t("onboarding.restore.profileMessage"),
+      [
+        { text: t("common.cancel"), onPress: cancel, style: "secondary" },
+        {
+          text: t("hubProfile.unlock"),
+          style: "primary",
+          onPress: async () => {
+            showCloudProgress(t("settings.cloud.progress.unlocking"), providerName);
+            if (await CloudSync.unlockProfileBackup(currentInput)) {
+              await syncAndFinish(providerName);
+              return;
+            }
+            showAlert(t("common.error"), t("hubProfile.wrongPassword"), [
+              {
+                text: t("settings.pin.tryAgain"),
+                onPress: () => promptProfilePassword(providerName, profileName),
+                style: "primary",
+              },
+              { text: t("common.cancel"), onPress: cancel, style: "secondary" },
+            ]);
+          },
+        },
+      ],
+      {
+        showInput: true,
+        inputPlaceholder: t("hubProfile.passwordPlaceholder"),
+        inputSecureTextEntry: true,
+        onInputChange: (text: string) => {
+          currentInput = text;
+          setAlertConfig((prev) => ({ ...prev, inputValue: text }));
+        },
+      },
+    );
+  };
+
   const connectCloudProvider = async (providerName: string) => {
     closeSaveSheet();
     await CloudSync.init();
@@ -530,6 +597,11 @@ export default function OnboardingPage() {
         getCloudProviderDefinition(providerName)?.label ?? t("settings.cloud.storage"),
         t("onboarding.restore.noCloudBackup"),
       );
+      return;
+    }
+    const profile = await CloudSync.cloudBackupProfile();
+    if (profile) {
+      promptProfilePassword(providerName, profile.name);
       return;
     }
     promptCloudPin(providerName);
@@ -908,6 +980,16 @@ export default function OnboardingPage() {
                     label={t("onboarding.restore.fromFiles")}
                     onPress={handleRestoreFromFile}
                   />
+                  {OperaHub.isSupported() && (
+                    <ActionButton
+                      icon={hubIcon}
+                      label={t("onboarding.restore.fromHub")}
+                      onPress={() => {
+                        closeSaveSheet();
+                        setHubPairingVisible(true);
+                      }}
+                    />
+                  )}
                 </Group>
               </>
             )}
@@ -934,6 +1016,26 @@ export default function OnboardingPage() {
           </View>
         </SheetScrollView>
       </DrawerSheet>
+
+      <HubPairingSheet
+        visible={hubPairingVisible}
+        onClose={() => setHubPairingVisible(false)}
+        onPaired={(hub) => {
+          setHubPairingVisible(false);
+          setProfileHub(hub);
+        }}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
+      <HubProfileSheet
+        visible={!!profileHub}
+        hub={profileHub}
+        allowCreate={false}
+        onClose={() => setProfileHub(null)}
+        onDone={restoreFromHub}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
 
       <NotificationModal
         visible={alertVisible}

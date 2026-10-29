@@ -6,6 +6,7 @@ export type DeepLinkRoute =
   | { type: "conversation"; convId: string }
   | { type: "shared"; pasteId: string; secret: string }
   | { type: "settings" }
+  | { type: "hub-pair"; link: string }
   | { type: "unknown" };
 
 const isTauri =
@@ -26,6 +27,10 @@ export function parseDeepLink(url: string): DeepLinkRoute {
     const pasteId = params.get(SHARE_QUERY_PARAM);
     if (target === "new") return { type: "new-chat" };
     if (target === "settings") return { type: "settings" };
+    //rebuilt so web urls work too
+    if (path.endsWith("hub/pair") && params.get("id") && params.get("secret")) {
+      return { type: "hub-pair", link: `opera://hub/pair?${query}` };
+    }
     if (pasteId && secret) return { type: "shared", pasteId, secret };
     if (convId) return { type: "conversation", convId };
     return { type: "unknown" };

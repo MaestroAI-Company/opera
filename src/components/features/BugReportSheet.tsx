@@ -17,7 +17,7 @@ import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
 
-const DESKTOP_CARD_WIDTH = 380;
+const DESKTOP_CARD_WIDTH = 720;
 
 type BugReportSheetProps = {
   visible: boolean;
@@ -88,27 +88,29 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
               </Group>
             </View>
 
-            <View style={styles.toggleRow}>
-              <Checkbox
-                label={t("bugReport.attachLogs")}
-                checked={report.logs !== null}
-                onToggle={report.toggleLogs}
-                labelFirst
-                style={styles.checkboxRow}
-              />
-            </View>
-
-            {screenshot && (
-              <View style={styles.toggleRow}>
+            <View style={isDesktop && screenshot ? styles.togglesRowDesktop : undefined}>
+              <View style={[styles.toggleRow, isDesktop && screenshot ? styles.toggleColDesktop : undefined]}>
                 <Checkbox
-                  label={t("bugReport.attachScreenshot")}
-                  checked={report.screenshot !== null}
-                  onToggle={(v) => report.setScreenshot(v ? screenshot : null)}
+                  label={t("bugReport.attachLogs")}
+                  checked={report.logs !== null}
+                  onToggle={report.toggleLogs}
                   labelFirst
                   style={styles.checkboxRow}
                 />
               </View>
-            )}
+
+              {screenshot && (
+                <View style={[styles.toggleRow, isDesktop && styles.toggleColDesktop]}>
+                  <Checkbox
+                    label={t("bugReport.attachScreenshot")}
+                    checked={report.screenshot !== null}
+                    onToggle={(v) => report.setScreenshot(v ? screenshot : null)}
+                    labelFirst
+                    style={styles.checkboxRow}
+                  />
+                </View>
+              )}
+            </View>
 
             <Text style={[styles.help, styles.consent]}>
               {t("bugReport.consent")}
@@ -193,6 +195,13 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   consent: {
     marginTop: Spacing.lg2,
     marginBottom: Spacing.lg2,
+  },
+  togglesRowDesktop: {
+    flexDirection: "row",
+    gap: Spacing.lg2,
+  },
+  toggleColDesktop: {
+    flex: 1,
   },
   toggleRow: {
     flexDirection: "row",

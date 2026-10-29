@@ -40,6 +40,8 @@ export type Message = {
   role: 'user' | 'assistant';
   content: string;
   createdAt: number;
+  //last local or synced change
+  updatedAt?: number;
   images?: string[];
   metrics?: MessageMetrics;
   sources?: MessageSource[];
@@ -156,6 +158,14 @@ class DatabaseService {
         //column may already exist
       }
 
+      try {
+        await this.db.runAsync('ALTER TABLE messages ADD COLUMN updatedAt INTEGER');
+      } catch {
+        //column may already exist
+      }
+      //edits are dated from now on
+      await this.db.runAsync('UPDATE messages SET updatedAt = createdAt WHERE updatedAt IS NULL');
+
       //conversation open filters on column
       await this.db.runAsync(
         'CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversationId, createdAt)'
@@ -211,6 +221,14 @@ class DatabaseService {
         )`
       );
       await this.migrateTombstonesFromSyncState();
+
+      //images exchanged with opera hub by content hash
+      await this.db.runAsync(
+        `CREATE TABLE IF NOT EXISTS hub_blobs (
+          id TEXT PRIMARY KEY,
+          uri TEXT NOT NULL
+        )`
+      );
 
     } catch (e) {
       //fail loudly on half-open db
@@ -406,8 +424,8 @@ class DatabaseService {
     const imagesJson = images ? JSON.stringify(images) : null;
     const screenContextJson = screenContext ? JSON.stringify(screenContext) : null;
     await db.runAsync(
-      'INSERT INTO messages (id, conversationId, role, content, createdAt, images, screenContext) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson, screenContextJson]
+      'INSERT INTO messages (id, conversationId, role, content, createdAt, updatedAt, images, screenContext) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, now, imagesJson, screenContextJson]
     );
     //update conversation timestamp
     await db.runAsync('UPDATE conversations SET updatedAt = ? WHERE id = ?', [now, conversationId]);
@@ -418,26 +436,26 @@ class DatabaseService {
   //patch async screen context
   async updateMessageScreenContext(id: string, screenContext: Message['screenContext']): Promise<void> {
     const db = this.getDb();
-    await db.runAsync('UPDATE messages SET screenContext = ? WHERE id = ?', [screenContext ? JSON.stringify(screenContext) : null, id]);
+    await db.runAsync('UPDATE messages SET screenContext = ?, updatedAt = ? WHERE id = ?', [screenContext ? JSON.stringify(screenContext) : null, Date.now(), id]);
   }
 
   //update last assistant message content (for streaming)
   async updateMessageContent(id: string, content: string): Promise<void> {
     const db = this.getDb();
-    await db.runAsync('UPDATE messages SET content = ? WHERE id = ?', [content, id]);
+    await db.runAsync('UPDATE messages SET content = ?, updatedAt = ? WHERE id = ?', [content, Date.now(), id]);
     this.notifyDataChanged();
   }
 
   //store generation metrics for a message
   async updateMessageMetrics(id: string, metrics: MessageMetrics): Promise<void> {
     const db = this.getDb();
-    await db.runAsync('UPDATE messages SET metrics = ? WHERE id = ?', [JSON.stringify(metrics), id]);
+    await db.runAsync('UPDATE messages SET metrics = ?, updatedAt = ? WHERE id = ?', [JSON.stringify(metrics), Date.now(), id]);
   }
 
   //store sources consulted for a message
   async updateMessageSources(id: string, sources: Message['sources']): Promise<void> {
     const db = this.getDb();
-    await db.runAsync('UPDATE messages SET sources = ? WHERE id = ?', [sources && sources.length > 0 ? JSON.stringify(sources) : null, id]);
+    await db.runAsync('UPDATE messages SET sources = ?, updatedAt = ? WHERE id = ?', [sources && sources.length > 0 ? JSON.stringify(sources) : null, Date.now(), id]);
   }
 
   //get all messages for a conversation
@@ -499,8 +517,8 @@ class DatabaseService {
         const screenContextJson = msg.screenContext ? JSON.stringify(msg.screenContext) : null;
         const sourcesJson = msg.sources ? JSON.stringify(msg.sources) : null;
         await db.runAsync(
-          'INSERT INTO messages (id, conversationId, role, content, createdAt, images, metrics, screenContext, sources) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson, metricsJson, screenContextJson, sourcesJson]
+          'INSERT INTO messages (id, conversationId, role, content, createdAt, updatedAt, images, metrics, screenContext, sources) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, msg.updatedAt ?? msg.createdAt, imagesJson, metricsJson, screenContextJson, sourcesJson]
         );
       }
     });
@@ -524,12 +542,99 @@ class DatabaseService {
         const screenContextJson = msg.screenContext ? JSON.stringify(msg.screenContext) : null;
         const sourcesJson = msg.sources ? JSON.stringify(msg.sources) : null;
         await db.runAsync(
-          'INSERT INTO messages (id, conversationId, role, content, createdAt, images, metrics, screenContext, sources) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, imagesJson, metricsJson, screenContextJson, sourcesJson]
+          'INSERT INTO messages (id, conversationId, role, content, createdAt, updatedAt, images, metrics, screenContext, sources) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, msg.updatedAt ?? msg.createdAt, imagesJson, metricsJson, screenContextJson, sourcesJson]
         );
       }
     });
     this.notifyDataChanged();
+  }
+
+  //opera hub sync state, apart from the cloud keys
+  async getHubState(key: string): Promise<string | null> {
+    const row = await this.getDb().getFirstAsync<{ value: string }>('SELECT value FROM sync_state WHERE key = ?', [`hub_${key}`]);
+    return row ? row.value : null;
+  }
+
+  async setHubState(key: string, value: string): Promise<void> {
+    await this.getDb().runAsync('INSERT OR REPLACE INTO sync_state (key, value) VALUES (?, ?)', [`hub_${key}`, value]);
+  }
+
+  async getConversationsChangedSince(since: number): Promise<Conversation[]> {
+    return this.getDb().getAllAsync<Conversation>('SELECT * FROM conversations WHERE updatedAt > ?', [since]);
+  }
+
+  async getMessagesChangedSince(since: number): Promise<Message[]> {
+    const rows = await this.getDb().getAllAsync<any>('SELECT * FROM messages WHERE updatedAt > ?', [since]);
+    return rows.map(row => ({
+      ...row,
+      images: row.images ? JSON.parse(row.images) : undefined,
+      metrics: row.metrics ? JSON.parse(row.metrics) : undefined,
+      screenContext: row.screenContext ? JSON.parse(row.screenContext) : undefined,
+      sources: row.sources ? JSON.parse(row.sources) : undefined
+    }));
+  }
+
+  async getTombstonesSince(since: number): Promise<SyncTombstone[]> {
+    return this.getDb().getAllAsync<SyncTombstone>('SELECT kind, id, deletedAt FROM tombstones WHERE deletedAt > ?', [since]);
+  }
+
+  //keeps whichever side changed last
+  async applySyncedConversation(conv: Conversation): Promise<void> {
+    const db = this.getDb();
+    const local = await db.getFirstAsync<{ updatedAt: number }>('SELECT updatedAt FROM conversations WHERE id = ?', [conv.id]);
+    if (local && local.updatedAt >= conv.updatedAt) return;
+    await db.runAsync(
+      'INSERT OR REPLACE INTO conversations (id, name, model, createdAt, updatedAt, pinned) VALUES (?, ?, ?, ?, ?, ?)',
+      [conv.id, conv.name, conv.model, conv.createdAt, conv.updatedAt, conv.pinned ?? 0]
+    );
+  }
+
+  async applySyncedMessage(msg: Message): Promise<void> {
+    const db = this.getDb();
+    const updatedAt = msg.updatedAt ?? msg.createdAt;
+    const local = await db.getFirstAsync<{ updatedAt: number }>('SELECT updatedAt FROM messages WHERE id = ?', [msg.id]);
+    if (local && local.updatedAt >= updatedAt) return;
+    await db.runAsync(
+      'INSERT OR REPLACE INTO messages (id, conversationId, role, content, createdAt, updatedAt, images, metrics, screenContext, sources) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        msg.id, msg.conversationId, msg.role, msg.content, msg.createdAt, updatedAt,
+        msg.images ? JSON.stringify(msg.images) : null,
+        msg.metrics ? JSON.stringify(msg.metrics) : null,
+        msg.screenContext ? JSON.stringify(msg.screenContext) : null,
+        msg.sources ? JSON.stringify(msg.sources) : null,
+      ]
+    );
+  }
+
+  //the tombstone also tells cloud backup
+  async applySyncedDeletion(kind: SyncTombstone['kind'], id: string, deletedAt: number): Promise<void> {
+    const db = this.getDb();
+    //a newer local edit outlives the deletion
+    const table = kind === 'conversation' ? 'conversations' : 'messages';
+    const local = await db.getFirstAsync<{ updatedAt: number }>(`SELECT updatedAt FROM ${table} WHERE id = ?`, [id]);
+    if (local && local.updatedAt > deletedAt) return;
+    await this.recordTombstones([{ kind, id, deletedAt }]);
+    if (kind === 'conversation') {
+      await db.runAsync('DELETE FROM messages WHERE conversationId = ?', [id]);
+      await db.runAsync('DELETE FROM conversations WHERE id = ?', [id]);
+    } else {
+      await db.runAsync('DELETE FROM messages WHERE id = ?', [id]);
+    }
+  }
+
+  //one refresh after a batch of synced writes
+  notifySynced(): void {
+    this.notifyDataChanged();
+  }
+
+  async getHubBlob(id: string): Promise<string | null> {
+    const row = await this.getDb().getFirstAsync<{ uri: string }>('SELECT uri FROM hub_blobs WHERE id = ?', [id]);
+    return row ? row.uri : null;
+  }
+
+  async putHubBlob(id: string, uri: string): Promise<void> {
+    await this.getDb().runAsync('INSERT OR IGNORE INTO hub_blobs (id, uri) VALUES (?, ?)', [id, uri]);
   }
 }
 

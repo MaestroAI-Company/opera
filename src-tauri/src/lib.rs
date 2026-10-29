@@ -1,4 +1,27 @@
+#[cfg(desktop)]
+mod hub;
+#[cfg(desktop)]
+mod settings_window;
 mod webview_task;
+
+//webview data sits in the company folder like the hub
+#[cfg(windows)]
+fn webview_data_dir(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    use tauri::Manager;
+    let company = app.path().local_data_dir().ok()?.join("MaestroAI-Company");
+    let dir = company.join("Opera").join("data");
+    let old = app.path().app_local_data_dir().ok()?;
+    if !dir.exists() && old.exists() {
+        let moved =
+            std::fs::create_dir_all(dir.parent()?).and_then(|_| std::fs::rename(&old, &dir));
+        //an instance still open keeps the old folder
+        if let Err(e) = moved {
+            log::warn!("app data stays in {}: {e}", old.display());
+            return Some(old);
+        }
+    }
+    Some(dir)
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -6,7 +29,9 @@ pub fn run() {
 
     #[cfg(desktop)]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}));
+        builder = builder
+            .plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}))
+            .manage(hub::HubState::default());
     }
 
     builder = builder
@@ -15,8 +40,159 @@ pub fn run() {
         .plugin(tauri_plugin_oauth::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .invoke_handler(tauri::generate_handler![webview_task::webview_task])
+        .invoke_handler(tauri::generate_handler![
+            webview_task::webview_task,
+            #[cfg(desktop)]
+            settings_window::open_settings_window,
+            #[cfg(desktop)]
+            hub::hub_device_id,
+            #[cfg(desktop)]
+            hub::hub_pair,
+            #[cfg(desktop)]
+            hub::hub_status,
+            #[cfg(desktop)]
+            hub::hub_unpair,
+            #[cfg(desktop)]
+            hub::hub_devices,
+            #[cfg(desktop)]
+            hub::hub_rename_device,
+            #[cfg(desktop)]
+            hub::hub_remove_device,
+            #[cfg(desktop)]
+            hub::hub_push,
+            #[cfg(desktop)]
+            hub::hub_pull,
+            #[cfg(desktop)]
+            hub::hub_watch,
+            #[cfg(desktop)]
+            hub::hub_set_profile,
+            #[cfg(desktop)]
+            hub::hub_clear_profile,
+            #[cfg(desktop)]
+            hub::hub_profiles,
+            #[cfg(desktop)]
+            hub::hub_remove_profile,
+            #[cfg(desktop)]
+            hub::hub_set_profile_role,
+            #[cfg(desktop)]
+            hub::hub_mcp_overview,
+            #[cfg(desktop)]
+            hub::hub_mcp_manage,
+            #[cfg(desktop)]
+            hub::hub_create_profile,
+            #[cfg(desktop)]
+            hub::hub_unlock_profile,
+            #[cfg(desktop)]
+            hub::hub_change_password,
+            #[cfg(desktop)]
+            hub::hub_locked_key,
+            #[cfg(desktop)]
+            hub::hub_open_locked_key,
+            #[cfg(desktop)]
+            hub::hub_profile_backup_key,
+            #[cfg(desktop)]
+            hub::hub_link_start,
+            #[cfg(desktop)]
+            hub::hub_link_watch,
+            #[cfg(desktop)]
+            hub::hub_link_approve,
+            #[cfg(desktop)]
+            hub::hub_link_deny,
+            #[cfg(desktop)]
+            hub::hub_link_join,
+            #[cfg(desktop)]
+            hub::hub_link_fetch,
+            #[cfg(desktop)]
+            hub::hub_lease,
+            #[cfg(desktop)]
+            hub::hub_release,
+            #[cfg(desktop)]
+            hub::hub_providers,
+            #[cfg(desktop)]
+            hub::hub_start_proxy,
+            #[cfg(desktop)]
+            hub::hub_host_status,
+            #[cfg(desktop)]
+            hub::hub_host_start,
+            #[cfg(desktop)]
+            hub::hub_host_stop,
+            #[cfg(desktop)]
+            hub::hub_host_pairing_link,
+            #[cfg(desktop)]
+            hub::hub_pair_with_code,
+            #[cfg(desktop)]
+            hub::hub_invite,
+            #[cfg(desktop)]
+            hub::hub_qr_svg,
+            #[cfg(desktop)]
+            hub::hub_models_catalog,
+            #[cfg(desktop)]
+            hub::hub_models_search,
+            #[cfg(desktop)]
+            hub::hub_models_files,
+            #[cfg(desktop)]
+            hub::hub_models_download,
+            #[cfg(desktop)]
+            hub::hub_models_cancel,
+            #[cfg(desktop)]
+            hub::hub_models_delete,
+            #[cfg(desktop)]
+            hub::hub_models_status,
+            #[cfg(desktop)]
+            hub::hub_mcp_json,
+            #[cfg(desktop)]
+            hub::hub_settings,
+            #[cfg(desktop)]
+            hub::hub_set_settings,
+            #[cfg(desktop)]
+            hub::hub_nearby,
+            #[cfg(desktop)]
+            hub::hub_update,
+            #[cfg(desktop)]
+            hub::hub_install_update,
+            #[cfg(desktop)]
+            hub::hub_computer_name,
+        ])
         .setup(|app| {
+            //built here to choose where its data lives
+            let config = app
+                .config()
+                .app
+                .windows
+                .first()
+                .cloned()
+                .expect("main window config");
+            #[allow(unused_mut)]
+            let mut main = tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?;
+            #[cfg(windows)]
+            if let Some(dir) = webview_data_dir(app.handle()) {
+                main = main.data_directory(dir);
+            }
+            #[allow(unused_variables)]
+            let main_window = main.build()?;
+
+            //settings window never outlives the main one
+            #[cfg(desktop)]
+            {
+                use tauri::Manager;
+                let handle = app.handle().clone();
+                main_window.on_window_event(move |event| {
+                    if matches!(event, tauri::WindowEvent::Destroyed) {
+                        if let Some(settings) = handle.get_webview_window("settings") {
+                            //prevent hidden window leaking on exit
+                            let _ = settings.destroy();
+                        }
+                    }
+                });
+
+                let warmup_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    //avoid competing with main window mount
+                    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+                    let _ = settings_window::warmup_settings_window(&warmup_handle);
+                });
+            }
+
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             {
                 use tauri::Manager;
@@ -65,6 +241,19 @@ pub fn run() {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
                         .level(log::LevelFilter::Info)
+                        //the hub network logs every packet
+                        .filter(|meta| {
+                            const NOISY: [&str; 6] = [
+                                "iroh",
+                                "noq",
+                                "netwatch",
+                                "portmapper",
+                                "tracing::span",
+                                "hickory",
+                            ];
+                            meta.level() <= log::Level::Warn
+                                || !NOISY.iter().any(|t| meta.target().starts_with(t))
+                        })
                         .build(),
                 )?;
             }

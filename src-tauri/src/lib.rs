@@ -85,6 +85,8 @@ pub fn run() {
             #[cfg(desktop)]
             hub::hub_change_password,
             #[cfg(desktop)]
+            hub::hub_rename_profile,
+            #[cfg(desktop)]
             hub::hub_locked_key,
             #[cfg(desktop)]
             hub::hub_open_locked_key,

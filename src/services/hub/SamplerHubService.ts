@@ -138,6 +138,7 @@ type NativeHub = {
   createProfile(deviceKey: string, hub: PairedHub, name: string, password: string): Promise<UnlockedProfile>;
   unlockProfile(deviceKey: string, hub: PairedHub, profileId: string, password: string): Promise<UnlockedProfile>;
   changePassword(deviceKey: string, hub: PairedHub, current: string, next: string): Promise<void>;
+  renameProfile(deviceKey: string, hub: PairedHub, name: string): Promise<HubProfile>;
   lockedKey(deviceKey: string, hub: PairedHub): Promise<ProfileLock>;
   openLockedKey(lock: ProfileLock, password: string): Promise<string>;
   profileBackupKey(key: string): Promise<string>;
@@ -294,6 +295,7 @@ const tauriHub: NativeHub = {
   unlockProfile: (deviceKey, hub, profileId, password) =>
     invoke('hub_unlock_profile', { deviceKey, hub, profileId, password }),
   changePassword: (deviceKey, hub, current, next) => invoke('hub_change_password', { deviceKey, hub, current, next }),
+  renameProfile: (deviceKey, hub, name) => invoke('hub_rename_profile', { deviceKey, hub, name }),
   lockedKey: (deviceKey, hub) => invoke('hub_locked_key', { deviceKey, hub }),
   openLockedKey: (lock, password) => invoke('hub_open_locked_key', { lock, password }),
   profileBackupKey: (key) => invoke('hub_profile_backup_key', { key }),
@@ -357,6 +359,7 @@ type WebClient = {
   createProfile(hub: PairedHub, name: string, password: string): Promise<UnlockedProfile>;
   unlockProfile(hub: PairedHub, profileId: string, password: string): Promise<UnlockedProfile>;
   changePassword(hub: PairedHub, current: string, next: string): Promise<void>;
+  renameProfile(hub: PairedHub, name: string): Promise<HubProfile>;
   lockedKey(hub: PairedHub): Promise<ProfileLock>;
   linkStart(hub: PairedHub): Promise<HubInvite>;
   linkWatch(hub: PairedHub): Promise<LinkJoining | null>;
@@ -457,6 +460,7 @@ const webHub: NativeHub = {
     (await loadWebClient(deviceKey)).unlockProfile(hub, profileId, password),
   changePassword: async (deviceKey, hub, current, next) =>
     (await loadWebClient(deviceKey)).changePassword(hub, current, next),
+  renameProfile: async (deviceKey, hub, name) => (await loadWebClient(deviceKey)).renameProfile(hub, name),
   lockedKey: async (deviceKey, hub) => (await loadWebClient(deviceKey)).lockedKey(hub),
   openLockedKey: async (lock, password) => (await loadWebModule()).openLockedKey(lock, password),
   profileBackupKey: async (key) => (await loadWebModule()).profileBackupKey(key),
@@ -598,6 +602,14 @@ class SamplerHubServiceImpl {
   async changePassword(hub: PairedHub, current: string, next: string): Promise<void> {
     await this.ensureProfile();
     return this.native().changePassword(await this.deviceKey(), hub, current, next);
+  }
+
+  async renameProfile(hub: PairedHub, name: string): Promise<HubProfile> {
+    await this.ensureProfile();
+    const profile = await this.native().renameProfile(await this.deviceKey(), hub, name);
+    const stored = await this.storedProfile();
+    if (stored) await setSecret(PROFILE_KEY, JSON.stringify({ ...stored, profile }));
+    return profile;
   }
 
   //null without a profile or any known lock

@@ -7336,6 +7336,7 @@ export default function SettingsDrawer({
       onClose={() => {
         setConfirmedName(name);
         setProfileEditVisible(false);
+        HubSync.renameProfile(name).catch((e) => console.warn("[HubSync] profile rename failed:", e));
       }}
       mode="overlay"
       isLargeScreen={isLargeScreen}

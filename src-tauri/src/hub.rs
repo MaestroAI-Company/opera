@@ -476,6 +476,16 @@ pub async fn hub_change_password(
 }
 
 #[tauri::command]
+pub async fn hub_rename_profile(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    name: String,
+) -> Result<HubProfile, HubError> {
+    state.client(&device_key).await?.rename_profile(hub, name).await
+}
+
+#[tauri::command]
 pub async fn hub_locked_key(
     state: State<'_, HubState>,
     device_key: String,

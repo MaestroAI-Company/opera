@@ -23,7 +23,7 @@ Plain text, no Markdown. The Play Console accepts up to 500 characters, a longer
 ## Production release
 
 1. Merge the work into `main`. A release is always tagged on `main`, so the release matches the published code and the workflows are the ones `main` carries.
-2. On `main`, bump `version` and `android.versionCode` in `app.json`. Play refuses a `versionCode` it has already received, beta included.
+2. On `main`, bump `version` in `app.json`. The `versionCode` is set by the workflow, see [versionCode](#versioncode).
 3. Write new `release-notes.md` and `whatsnew/whatsnew-en-US` texts, then commit and push `main`.
 4. Tag the `main` commit and push the tag, it must match `app.json`:
 
@@ -39,10 +39,22 @@ Plain text, no Markdown. The Play Console accepts up to 500 characters, a longer
 
 ## Beta release
 
-1. Bump `android.versionCode` in `app.json` (the beta and the next production build need different codes).
-2. Write new `release-notes.md` and `whatsnew/whatsnew-en-US` texts, then commit and push the branch. The release notes go on the GitHub `beta` release, titled `Beta <version>`, and beta testers see them in the **What's new** sheet. When that version ships, they get the production notes too.
-3. On GitHub, **Actions → Build Android APK → Run workflow**, pick the branch. A beta can come from any branch, no need to merge into `main` first.
-4. The APK replaces the GitHub `beta` pre-release, which never shows as latest, so the website keeps offering the stable build.
+A beta can come from any branch, no need to merge into `main` first.
+
+1. Set `version` in `app.json` to the version the beta leads to, `1.2.3` for the betas of `1.2.3`.
+2. Write new `release-notes.md` and `whatsnew/whatsnew-en-US` texts, then commit and push the branch. Beta testers see the release notes in the **What's new** sheet. When that version ships, they get the production notes too.
+3. Tag the commit `v<version>-beta.<n>` and push the tag, counting `n` up from 1 for each beta of the same version:
+
+   ```bash
+   git tag v1.2.3-beta.1
+   git push origin v1.2.3-beta.1
+   ```
+
+4. The workflows build Android, Windows, macOS and Linux, and attach everything to the GitHub release `v1.2.3-beta.1`, marked as a pre-release. It never shows as latest, so the website keeps offering the stable build.
 5. The bundle lands in the Play Console, **Open testing** track, as a **draft**. Send it for review: once approved, anyone who joins the open testing from the Play Store gets it.
 
 The Play uploads only run when the `PLAY_SERVICE_ACCOUNT_JSON` secret is set, and the beta one also needs the upload keystore secrets, since Play refuses a debug-signed bundle.
+
+## versionCode
+
+Play refuses a `versionCode` it has already received, beta included. On each tag, `scripts/next-version-code.mjs` asks Play for the highest code it holds and builds with the next one, so `android.versionCode` in `app.json` never needs a bump. A higher value in `app.json` still wins. Without the `PLAY_SERVICE_ACCOUNT_JSON` secret, the build keeps the `app.json` value.

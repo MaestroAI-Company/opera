@@ -41,6 +41,8 @@ jobs:
         run: |
           app_version=$(node -p "require('./app.json').expo.version")
           tag_version="${GITHUB_REF_NAME#v}"
+          # strip the beta suffix
+          tag_version="${tag_version%%-beta*}"
           if [ "$app_version" != "$tag_version" ]; then
             echo "tag $GITHUB_REF_NAME does not match app.json version $app_version" >&2
             exit 1
@@ -53,6 +55,13 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      # play refuses a reused versionCode
+      - name: Take the next versionCode from the Play Store
+        if: github.ref_type == 'tag' && env.HAS_PLAY_SA == 'true'
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: node scripts/next-version-code.mjs
 
       - name: Prebuild Android project
         run: npx expo prebuild --platform android
@@ -115,38 +124,21 @@ jobs:
           path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 7
 
-      - name: Publish beta release
-        if: github.ref_type == 'branch'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release delete beta --yes || true
-          git push origin :refs/tags/beta || true
-          # the release notes when written, a generic line otherwise
-          notes=distribution/release-notes.md
-          if ! grep -q '[^[:space:]]' "$notes"; then
-            echo "Automated beta build from the latest push." > "$RUNNER_TEMP/beta-notes.md"
-            notes="$RUNNER_TEMP/beta-notes.md"
-          fi
-          gh release create beta \
-            android/app/build/outputs/apk/release/app-release.apk \
-            --title "Beta $(node -p "require('./app.json').expo.version")" \
-            --notes-file "$notes" \
-            --target "$GITHUB_SHA" \
-            --prerelease
-
       - name: Publish versioned release
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # betas stay off the latest release
+          kind=--latest
+          if [[ "$GITHUB_REF_NAME" == *-beta* ]]; then kind=--prerelease; fi
           # the desktop workflow uploads to the same release, so a re-pushed
           # tag only swaps assets; the notes feed the in-app what's new sheet
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
             || gh release create "$GITHUB_REF_NAME" \
               --title "Opera ${GITHUB_REF_NAME#v}" \
               --notes-file distribution/release-notes.md \
-              --latest \
+              "$kind" \
               --verify-tag \
             || gh release view "$GITHUB_REF_NAME" >/dev/null
           gh release edit "$GITHUB_REF_NAME" --notes-file distribution/release-notes.md
@@ -161,12 +153,11 @@ jobs:
           if grep -q '[^[:space:]]' distribution/whatsnew/* 2>/dev/null; then
             echo "dir=distribution/whatsnew" >> "$GITHUB_OUTPUT"
           fi
-          echo "version=$(node -p "require('./app.json').expo.version")" >> "$GITHUB_OUTPUT"
 
       # requires the very first release to have been uploaded manually through
       # the Play Console; the API can't create that initial listing
       - name: Upload the bundle to the Play Store production track as a draft
-        if: github.ref_type == 'tag' && env.HAS_PLAY_SA == 'true'
+        if: github.ref_type == 'tag' && !contains(github.ref_name, '-beta') && env.HAS_PLAY_SA == 'true'
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
@@ -182,7 +173,7 @@ jobs:
       # the beta track is the public open testing anyone can join
       # play refuses a debug signed bundle, so it needs the upload key
       - name: Upload the bundle to the Play Store beta track as a draft
-        if: github.ref_type == 'branch' && env.HAS_PLAY_SA == 'true' && env.HAS_KEYSTORE == 'true'
+        if: github.ref_type == 'tag' && contains(github.ref_name, '-beta') && env.HAS_PLAY_SA == 'true' && env.HAS_KEYSTORE == 'true'
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
@@ -190,5 +181,5 @@ jobs:
           releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
           tracks: beta
           status: draft
-          releaseName: ${{ steps.whatsnew.outputs.version }} beta
+          releaseName: ${{ github.ref_name }}
           whatsNewDirectory: ${{ steps.whatsnew.outputs.dir }}

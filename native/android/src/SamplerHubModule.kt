@@ -94,6 +94,7 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
         settings.getBoolean("shareProviders"),
         settings.getBoolean("mcpServers"),
         settings.getBoolean("models"),
+        settings.getBoolean("modelsNightly"),
         settings.getInt("ctxSize").toUInt(),
         settings.getInt("keepAlive").toUInt(),
         settings.getInt("parallel").toUInt(),
@@ -517,6 +518,7 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
       putBoolean("shareProviders", settings.shareProviders)
       putBoolean("mcpServers", settings.mcpServers)
       putBoolean("models", settings.models)
+      putBoolean("modelsNightly", settings.modelsNightly)
       putDouble("ctxSize", settings.ctxSize.toDouble())
       putDouble("keepAlive", settings.keepAlive.toDouble())
       putDouble("parallel", settings.parallel.toDouble())

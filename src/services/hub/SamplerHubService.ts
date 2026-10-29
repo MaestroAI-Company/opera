@@ -57,6 +57,8 @@ export type HubSettings = {
   shareProviders: boolean;
   mcpServers: boolean;
   models: boolean;
+  //newest llama.cpp nightly instead of stable
+  modelsNightly: boolean;
   //llama.cpp options, 0 keeps its default
   ctxSize: number;
   keepAlive: number;

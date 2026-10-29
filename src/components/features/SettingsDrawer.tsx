@@ -3634,19 +3634,23 @@ export default function SettingsDrawer({
       </View>
 
       {/* overlay and screen saver links */}
-      <Group style={styles.groupSpacing}>
-        {!isDesktop &&
-          renderToolsNavRow(
-            "assistantoverlay",
-            t("settings.nav.overlay.title"),
-            t("settings.nav.overlay.subtitle"),
-          )}
-        {renderToolsNavRow(
-          "screensaver",
-          t("settings.nav.screenSaver.title"),
-          t("settings.nav.screenSaver.subtitle"),
-        )}
-      </Group>
+      {(!isDesktop || Platform.OS === "android") && (
+        <Group style={styles.groupSpacing}>
+          {!isDesktop &&
+            renderToolsNavRow(
+              "assistantoverlay",
+              t("settings.nav.overlay.title"),
+              t("settings.nav.overlay.subtitle"),
+            )}
+          {/* standby is an android dream service */}
+          {Platform.OS === "android" &&
+            renderToolsNavRow(
+              "screensaver",
+              t("settings.nav.screenSaver.title"),
+              t("settings.nav.screenSaver.subtitle"),
+            )}
+        </Group>
+      )}
     </View>
   );
 

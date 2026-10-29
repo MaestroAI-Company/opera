@@ -618,8 +618,8 @@ export const en = {
   "settings.nav.overlay.subtitle": "Voice, Screen context",
   "settings.nav.maestroPreferences.title": "Preferences",
   "settings.nav.maestroPreferences.subtitle": "Instructions, Auto-read replies",
-  "settings.nav.screenSaver.title": "Screen Saver",
-  "settings.nav.screenSaver.subtitle": "Standby, anti burn-in, wake word",
+  "settings.nav.screenSaver.title": "Standby",
+  "settings.nav.screenSaver.subtitle": "Charging clock, anti burn-in, wake word",
   "settings.nav.service.title": "Service",
   "settings.nav.service.subtitle": "AI Service, Ollama server",
   "settings.nav.tools.title": "Tools",
@@ -634,7 +634,7 @@ export const en = {
   "settings.nav.info.title": "Informations",
   "settings.nav.info.subtitle": "Version App, Github, Instagram, TikTok",
   "settings.screenSaver.help":
-    "Choose what your device shows while it charges or sits idle.",
+    "Opera turns into a clock while charging. Pick it as the screen saver in Android settings.",
   "settings.screenSaver.open": "Open screen saver settings",
   "settings.screenSaver.antiBurnIn": "Anti burn-in",
   "settings.screenSaver.antiBurnInHelp":

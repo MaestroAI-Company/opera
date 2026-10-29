@@ -10,6 +10,7 @@ const ASSETS = [
   'sampler-hub-client-web.js',
   'sampler-hub-client-web.wasm',
   'sampler-hubw-windows-x86_64.exe',
+  'sampler-hubw-windows-aarch64.exe',
   'sampler-hubw-macos-aarch64',
   'sampler-hubw-linux-x86_64',
   'sampler-hubw-linux-aarch64',

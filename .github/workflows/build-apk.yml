@@ -134,13 +134,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # a re-pushed tag rebuilds the same version, so replace the release
-          gh release delete "$GITHUB_REF_NAME" --yes || true
-          gh release create "$GITHUB_REF_NAME" \
+          # the desktop workflow uploads to the same release, and the notes
+          # feed the in-app what's new sheet, so a re-pushed tag only swaps assets
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" \
+              --title "Opera ${GITHUB_REF_NAME#v}" \
+              --generate-notes \
+              --latest \
+              --verify-tag \
+            || gh release view "$GITHUB_REF_NAME" >/dev/null
+          gh release upload "$GITHUB_REF_NAME" \
             android/app/build/outputs/apk/release/app-release.apk \
-            --title "Opera ${GITHUB_REF_NAME#v}" \
-            --generate-notes \
-            --latest
+            --clobber
 
       # requires the very first release to have been uploaded manually through
       # the Play Console; the API can't create that initial listing

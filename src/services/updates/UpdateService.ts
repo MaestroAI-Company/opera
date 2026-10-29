@@ -6,6 +6,9 @@ const LATEST_RELEASE_URL = 'https://api.github.com/repos/MaestroAI-Company/opera
 const RELEASE_TAG_URL = 'https://api.github.com/repos/MaestroAI-Company/opera/releases/tags/';
 //local so each device shows it once
 const SEEN_VERSION_KEY = 'seenReleaseNotes';
+const BETA_TAG = 'beta';
+//beta notes seen, release notes still due
+const BETA_PREFIX = 'beta:';
 
 //one network check per app session window
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -73,27 +76,42 @@ export async function getAvailableUpdate(): Promise<AppRelease | null> {
   return release;
 }
 
+async function fetchRelease(tag: string): Promise<any | null> {
+  const res = await universalFetch(`${RELEASE_TAG_URL}${tag}`, {
+    headers: { Accept: 'application/vnd.github+json' },
+  });
+  if (res.status === 404) return null;
+  //offline or rate limited retries next launch
+  if (!res.ok) throw new Error(`release ${tag} check failed: ${res.status}`);
+  return res.json();
+}
+
 //github notes of this build, once after an update
 export async function takeReleaseNotes(firstRun: boolean): Promise<ReleaseNotes | null> {
   const current = Constants.expoConfig?.version ?? '0.0.0';
+  const seenBeta = `${BETA_PREFIX}${current}`;
   const seen = await Settings.getLocal(SEEN_VERSION_KEY);
   if (seen === current) return null;
 
   //fresh installs and downgrades skip the notes
-  if (firstRun || (seen && !isNewerVersion(current, seen))) {
+  const seenVersion = seen?.replace(BETA_PREFIX, '');
+  if (firstRun || (seenVersion && seen !== seenBeta && !isNewerVersion(current, seenVersion))) {
     await Settings.setLocal(SEEN_VERSION_KEY, current);
     return null;
   }
 
-  const res = await universalFetch(`${RELEASE_TAG_URL}v${current}`, {
-    headers: { Accept: 'application/vnd.github+json' },
-  });
-  //offline or rate limited retries next launch
-  if (!res.ok && res.status !== 404) return null;
-  await Settings.setLocal(SEEN_VERSION_KEY, current);
-  if (!res.ok) return null;
+  let data = await fetchRelease(`v${current}`);
+  let mark = current;
+  if (!data) {
+    //beta testers already saw the beta notes
+    if (seen === seenBeta) return null;
+    const beta = await fetchRelease(BETA_TAG);
+    //beta release title carries its version
+    data = beta?.name === `Beta ${current}` ? beta : null;
+    mark = data ? seenBeta : current;
+  }
+  await Settings.setLocal(SEEN_VERSION_KEY, mark);
 
-  const data = await res.json();
   const notes = typeof data?.body === 'string' ? data.body.trim() : '';
   if (!notes) return null;
   return { version: current, url: data.html_url ?? LATEST_RELEASE_URL, notes };

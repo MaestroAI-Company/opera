@@ -1,0 +1,146 @@
+name: Build desktop
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      sampler_hub_ref:
+        description: Sampler-Hub ref to build against, empty for the pinned version
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, platform: windows-x86_64, bundles: nsis }
+          - { os: windows-11-arm, platform: windows-aarch64, bundles: nsis }
+          - { os: macos-latest, platform: macos-aarch64, bundles: dmg }
+          # oldest glibc the appimage still runs on
+          - { os: ubuntu-22.04, platform: linux-x86_64, bundles: 'appimage,deb' }
+          - { os: ubuntu-22.04-arm, platform: linux-aarch64, bundles: 'appimage,deb' }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: opera
+    steps:
+      # the desktop crate points at ../../Sampler-Hub
+      - uses: actions/checkout@v4
+        with:
+          path: opera
+
+      - name: Read versions
+        id: versions
+        run: |
+          echo "app=$(node -p "require('./app.json').expo.version")" >> "$GITHUB_OUTPUT"
+          echo "hub=$(node -p "require('./sampler-hub-client.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Check the tag matches app.json
+        if: github.ref_type == 'tag'
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          if [ "${{ steps.versions.outputs.app }}" != "$tag_version" ]; then
+            echo "tag $GITHUB_REF_NAME does not match app.json version ${{ steps.versions.outputs.app }}" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          repository: MaestroAI-Company/Sampler-Hub
+          ref: ${{ inputs.sampler_hub_ref || steps.versions.outputs.hub }}
+          path: Sampler-Hub
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: opera/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            opera/src-tauri -> target
+            Sampler-Hub -> target/sidecar
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      # ring needs clang for aarch64 windows
+      - name: Put clang on the path
+        if: runner.os == 'Windows' && runner.arch == 'ARM64'
+        run: |
+          if ! command -v clang >/dev/null; then
+            echo "C:\\Program Files\\LLVM\\bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Fetch the sampler hub web client
+        run: node scripts/build-hub-client.mjs web
+
+      # the sidecar builds from the checkout, prebuild:desktop runs it
+      - name: Build desktop bundle
+        env:
+          SAMPLER_HUB_DIR: ${{ github.workspace }}/Sampler-Hub
+          # baked into the js bundle, so it has to be set before the export
+          EXPO_PUBLIC_BETA_SERVER_URL: ${{ secrets.EXPO_PUBLIC_BETA_SERVER_URL }}
+        run: npm run build:desktop -- --bundles ${{ matrix.bundles }} --config '{"version":"${{ steps.versions.outputs.app }}"}'
+
+      # stable names so the website can link them
+      - name: Collect bundles
+        run: |
+          bundle=src-tauri/target/release/bundle
+          mkdir -p dist-desktop
+          case "${{ matrix.platform }}" in
+            windows-*)
+              cp "$bundle"/nsis/*-setup.exe "dist-desktop/opera-${{ matrix.platform }}-setup.exe" ;;
+            macos-*)
+              cp "$bundle"/dmg/*.dmg "dist-desktop/opera-${{ matrix.platform }}.dmg" ;;
+            linux-*)
+              cp "$bundle"/appimage/*.AppImage "dist-desktop/opera-${{ matrix.platform }}.AppImage"
+              cp "$bundle"/deb/*.deb "dist-desktop/opera-${{ matrix.platform }}.deb" ;;
+          esac
+          ls -la dist-desktop
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opera-${{ matrix.platform }}
+          path: opera/dist-desktop/
+          retention-days: 7
+
+  publish:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: opera-*
+          merge-multiple: true
+
+      # the apk workflow may have opened the release already
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --title "Opera ${GITHUB_REF_NAME#v}" --generate-notes --latest --verify-tag \
+            || gh release view "$GITHUB_REF_NAME" >/dev/null
+          gh release upload "$GITHUB_REF_NAME" dist/* --clobber

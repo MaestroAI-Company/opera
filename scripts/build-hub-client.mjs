@@ -17,6 +17,7 @@ const webDir = join(root, 'public', 'sampler-hub');
 const sidecarDir = join(root, 'src-tauri', 'binaries');
 const SIDECARS = {
   'win32-x64': ['x86_64-pc-windows-msvc', 'sampler-hubw-windows-x86_64.exe'],
+  'win32-arm64': ['aarch64-pc-windows-msvc', 'sampler-hubw-windows-aarch64.exe'],
   'darwin-arm64': ['aarch64-apple-darwin', 'sampler-hubw-macos-aarch64'],
   'linux-x64': ['x86_64-unknown-linux-gnu', 'sampler-hubw-linux-x86_64'],
   'linux-arm64': ['aarch64-unknown-linux-gnu', 'sampler-hubw-linux-aarch64'],

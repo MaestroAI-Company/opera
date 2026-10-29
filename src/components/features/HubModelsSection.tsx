@@ -72,7 +72,9 @@ export default function HubModelsSection({ onAddModel, onOpenModel, highlight = 
     : !status
       ? t("hubModels.loading")
       : status.state === "running"
-        ? t("hubModels.running", { backend: (status.backend ?? "cpu").toUpperCase() })
+        ? t(status.channel === "nightly" ? "hubModels.runningNightly" : "hubModels.running", {
+            backend: (status.backend ?? "cpu").toUpperCase(),
+          })
         : status.state === "installing"
           ? t("hubModels.installing")
           : status.state === "failed"

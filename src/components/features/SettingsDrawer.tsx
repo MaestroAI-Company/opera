@@ -997,6 +997,13 @@ export default function SettingsDrawer({
     if (visible && SamplerHub.isSupported()) refreshHub();
   }, [visible, refreshHub]);
 
+  useEffect(() => {
+    if (!windowed || !SamplerHub.isSupported()) return;
+    //stays visible while main window pairs
+    const sub = DeviceEventEmitter.addListener(AppEvents.settingsSynced, refreshHub);
+    return () => sub.remove();
+  }, [windowed, refreshHub]);
+
   //open sheets keep the back press for themselves
   const sheetOpen =
     profileEditVisible ||

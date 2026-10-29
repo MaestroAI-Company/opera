@@ -52,13 +52,25 @@ export default function SettingsWindow() {
     onSettingsNavigate((page, pair) => {
       setTarget({ page: (page as SubPage | null) ?? undefined, pair });
       //created before onboarding wrote settings
-      Settings.load()
+      Promise.all([Settings.load(), HubSync.readCached()])
         .then(() => DeviceEventEmitter.emit(AppEvents.settingsSynced))
         .catch((e) => console.warn("Settings window refresh failed:", e));
     }).then((unlisten) => {
       stop = unlisten;
     });
     return () => stop?.();
+  }, []);
+
+  useEffect(() => {
+    //hub sync runs in the main window
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key?.startsWith("opera_local_hub")) return;
+      HubSync.readCached()
+        .then(() => DeviceEventEmitter.emit(AppEvents.settingsSynced))
+        .catch((err) => console.warn("Settings window hub refresh failed:", err));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   return (

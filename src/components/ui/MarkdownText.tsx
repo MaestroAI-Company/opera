@@ -1,6 +1,6 @@
 import * as Clipboard from "expo-clipboard";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { DeviceEventEmitter, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { DeviceEventEmitter, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import AutoHeightWebView from "react-native-autoheight-webview";
 import CodeHighlighter from "react-native-code-highlighter";
 import { vs, vs2015 } from "react-syntax-highlighter/dist/esm/styles/hljs";
@@ -8,6 +8,7 @@ import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constan
 import { getColors, getThemedStyles, useColors, useIsDark, useThemedStyles } from "../../hooks/useTheme";
 import { t } from "../../i18n";
 import type { ToolCall } from "../../services/ai/tools/ITool";
+import { openExternalUrl } from "../../services/ai/utils/openExternalUrl";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { AppEvents } from "../../services/events";
 import { downloadCodeFile } from "../../services/codeDownload";
@@ -217,7 +218,7 @@ function renderTokens(tokens: Token[], keyBase: number): React.ReactNode[] {
         return <Text key={key} style={s.strike}>{renderTokens(t.children, keyBase + i)}</Text>;
       case "link":
         return (
-          <Text key={key} style={s.link} onPress={() => { Linking.openURL(t.url).catch(() => { }); }}>
+          <Text key={key} style={s.link} onPress={() => { openExternalUrl(t.url).catch(() => { }); }}>
             {renderTokens(t.children, keyBase + i)}
           </Text>
         );

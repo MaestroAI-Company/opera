@@ -47,6 +47,8 @@ jobs:
         if: github.ref_type == 'tag'
         run: |
           tag_version="${GITHUB_REF_NAME#v}"
+          # strip the beta suffix
+          tag_version="${tag_version%%-beta*}"
           if [ "${{ steps.versions.outputs.app }}" != "$tag_version" ]; then
             echo "tag $GITHUB_REF_NAME does not match app.json version ${{ steps.versions.outputs.app }}" >&2
             exit 1
@@ -150,8 +152,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
+          # betas stay off the latest release
+          kind=--latest
+          if [[ "$GITHUB_REF_NAME" == *-beta* ]]; then kind=--prerelease; fi
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
-            || gh release create "$GITHUB_REF_NAME" --title "Opera ${GITHUB_REF_NAME#v}" --notes-file distribution/release-notes.md --latest --verify-tag \
+            || gh release create "$GITHUB_REF_NAME" --title "Opera ${GITHUB_REF_NAME#v}" --notes-file distribution/release-notes.md "$kind" --verify-tag \
             || gh release view "$GITHUB_REF_NAME" >/dev/null
           gh release edit "$GITHUB_REF_NAME" --notes-file distribution/release-notes.md
           gh release upload "$GITHUB_REF_NAME" dist/* --clobber

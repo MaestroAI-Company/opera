@@ -4,9 +4,9 @@ import { Settings } from '../settings/SettingsService';
 
 const LATEST_RELEASE_URL = 'https://api.github.com/repos/MaestroAI-Company/opera/releases/latest';
 const RELEASE_TAG_URL = 'https://api.github.com/repos/MaestroAI-Company/opera/releases/tags/';
+const RELEASES_URL = 'https://api.github.com/repos/MaestroAI-Company/opera/releases';
 //local so each device shows it once
 const SEEN_VERSION_KEY = 'seenReleaseNotes';
-const BETA_TAG = 'beta';
 //beta notes seen, release notes still due
 const BETA_PREFIX = 'beta:';
 
@@ -86,6 +86,16 @@ async function fetchRelease(tag: string): Promise<any | null> {
   return res.json();
 }
 
+//newest beta prerelease of this version
+async function fetchBetaRelease(version: string): Promise<any | null> {
+  const res = await universalFetch(RELEASES_URL, {
+    headers: { Accept: 'application/vnd.github+json' },
+  });
+  if (!res.ok) throw new Error(`beta release check failed: ${res.status}`);
+  const releases: any[] = await res.json();
+  return releases.find(r => r?.prerelease && r.tag_name?.startsWith(`v${version}-beta`)) ?? null;
+}
+
 //github notes of this build, once after an update
 export async function takeReleaseNotes(firstRun: boolean): Promise<ReleaseNotes | null> {
   const current = Constants.expoConfig?.version ?? '0.0.0';
@@ -105,9 +115,7 @@ export async function takeReleaseNotes(firstRun: boolean): Promise<ReleaseNotes 
   if (!data) {
     //beta testers already saw the beta notes
     if (seen === seenBeta) return null;
-    const beta = await fetchRelease(BETA_TAG);
-    //beta release title carries its version
-    data = beta?.name === `Beta ${current}` ? beta : null;
+    data = await fetchBetaRelease(current);
     mark = data ? seenBeta : current;
   }
   await Settings.setLocal(SEEN_VERSION_KEY, mark);

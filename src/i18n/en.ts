@@ -461,6 +461,8 @@ export const en = {
   "sampler.stopTitle": "Stop Sampler Hub?",
   "sampler.stopMessage": "Your devices stop syncing with Sampler Hub and lose its models and tools until you start it again, even after a restart.",
   "sampler.stopping": "Sampler Hub is stopping...",
+  "sampler.start": "Start Sampler Hub",
+  "sampler.lastSeen": "Last seen at {time}",
   "sampler.mcpNone": "No MCP server.",
   "sampler.mcpMine": "My MCP Hub",
   "sampler.performance": "Performance",

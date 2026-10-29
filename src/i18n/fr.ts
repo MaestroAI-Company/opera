@@ -464,6 +464,8 @@ export const fr: Translations = {
   "sampler.stopTitle": "Arrêter Sampler Hub ?",
   "sampler.stopMessage": "Tes appareils arrêtent de se synchroniser avec Sampler Hub et perdent ses modèles et ses outils jusqu'à ce que tu le redémarres, même après un redémarrage de l'ordinateur.",
   "sampler.stopping": "Sampler Hub s'arrête...",
+  "sampler.start": "Démarrer Sampler Hub",
+  "sampler.lastSeen": "Vu pour la dernière fois à {time}",
   "sampler.mcpNone": "Aucun serveur MCP.",
   "sampler.mcpMine": "Mon Hub MCP",
   "sampler.performance": "Performance",

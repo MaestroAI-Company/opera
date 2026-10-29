@@ -619,7 +619,7 @@ export const en = {
   "settings.nav.maestroPreferences.title": "Preferences",
   "settings.nav.maestroPreferences.subtitle": "Instructions, Auto-read replies",
   "settings.nav.screenSaver.title": "Standby",
-  "settings.nav.screenSaver.subtitle": "Charging clock, anti burn-in, wake word",
+  "settings.nav.screenSaver.subtitle": "Docked smart display, wake word",
   "settings.nav.service.title": "Service",
   "settings.nav.service.subtitle": "AI Service, Ollama server",
   "settings.nav.tools.title": "Tools",
@@ -634,17 +634,17 @@ export const en = {
   "settings.nav.info.title": "Informations",
   "settings.nav.info.subtitle": "Version App, Github, Instagram, TikTok",
   "settings.screenSaver.help":
-    "Opera turns into a clock while charging. Pick it as the screen saver in Android settings.",
+    "Put your phone on its dock or charger: Opera turns it into a smart display, with the time and Maestro by voice. To turn it on, pick Opera as the screen saver in Android settings.",
   "settings.screenSaver.open": "Open screen saver settings",
   "settings.screenSaver.antiBurnIn": "Anti burn-in",
   "settings.screenSaver.antiBurnInHelp":
     "Shift the clock and butterflies a few pixels every minute to protect OLED screens.",
   "settings.screenSaver.incognito": "Incognito mode button",
   "settings.screenSaver.incognitoHelp":
-    "Show the incognito mode button on the screen saver.",
+    "Show the incognito mode button on the smart display.",
   "settings.screenSaver.wakeWord": "Say \"Maestro\"",
   "settings.screenSaver.wakeWordHelp":
-    "Ask Maestro hands free on the screen saver. Listening happens on this device.",
+    "Ask Maestro hands free on the smart display. Listening happens on this device.",
 
   "settings.info.version": "Version",
   "settings.info.links": "Links",

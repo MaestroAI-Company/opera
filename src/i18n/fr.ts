@@ -622,7 +622,7 @@ export const fr: Translations = {
   "settings.nav.maestroPreferences.title": "Préférences",
   "settings.nav.maestroPreferences.subtitle": "Instructions, lecture automatique",
   "settings.nav.screenSaver.title": "Standby",
-  "settings.nav.screenSaver.subtitle": "Horloge en charge, anti burn-in, mot de réveil",
+  "settings.nav.screenSaver.subtitle": "Écran connecté sur le dock, mot de réveil",
   "settings.nav.service.title": "Service",
   "settings.nav.service.subtitle": "Service IA, serveur Ollama",
   "settings.nav.tools.title": "Outils",
@@ -639,7 +639,7 @@ export const fr: Translations = {
   "settings.nav.info.title": "Informations",
   "settings.nav.info.subtitle": "Version de l'app, Github, Instagram, TikTok",
   "settings.screenSaver.help":
-    "Opera devient une horloge pendant la charge. Choisis-le comme écran de veille dans les réglages Android.",
+    "Pose ton téléphone sur son dock ou en charge : Opera le transforme en écran connecté, avec l'heure et Maestro à la voix. Pour l'activer, choisis Opera comme écran de veille dans les réglages Android.",
   "settings.screenSaver.open":
     "Ouvrir les réglages de l'écran de veille",
   "settings.screenSaver.antiBurnIn": "Anti burn-in",
@@ -647,10 +647,10 @@ export const fr: Translations = {
     "Déplace l'horloge et les papillons de quelques pixels chaque minute pour protéger les écrans OLED.",
   "settings.screenSaver.incognito": "Bouton mode incognito",
   "settings.screenSaver.incognitoHelp":
-    "Affiche le bouton mode incognito sur l'écran de veille.",
+    "Affiche le bouton mode incognito sur l'écran connecté.",
   "settings.screenSaver.wakeWord": "Dire « Maestro »",
   "settings.screenSaver.wakeWordHelp":
-    "Parle à Maestro sans les mains sur l'écran de veille. L'écoute reste sur l'appareil.",
+    "Parle à Maestro sans les mains sur l'écran connecté. L'écoute reste sur l'appareil.",
 
   "settings.info.version": "Version",
   "settings.info.links": "Liens",

@@ -43,8 +43,8 @@ example
 /ios
 /android
 
-# opera hub web client, built or downloaded
-/public/opera-hub/
+# sampler hub web client, built or downloaded
+/public/sampler-hub/
 /src-tauri/binaries/
 
 # Tauri

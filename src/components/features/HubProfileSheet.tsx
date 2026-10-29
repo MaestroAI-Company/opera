@@ -24,9 +24,9 @@ import {
   HubDevice,
   HubProfile,
   hubErrorCode,
-  OperaHub,
+  SamplerHub,
   PairedHub,
-} from "../../services/hub/OperaHubService";
+} from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
 import CardGrid, { GridCard } from "../ui/CardGrid";
 import Group from "../ui/Group";
@@ -185,7 +185,7 @@ export default function HubProfileSheet({
   //fetch profile when omitted
   useEffect(() => {
     if (!visible || profileProp) return;
-    OperaHub.getProfile().then((p) => {
+    SamplerHub.getProfile().then((p) => {
       if (p) setSelfProfile(p);
     });
   }, [visible, profileProp]);
@@ -193,13 +193,13 @@ export default function HubProfileSheet({
   //fetch devices when omitted
   useEffect(() => {
     if (!visible || !hub || devicesProp) return;
-    OperaHub.devices(hub).then(setLoadedDevices).catch(() => null);
+    SamplerHub.devices(hub).then(setLoadedDevices).catch(() => null);
   }, [visible, hub, devicesProp]);
 
   //fetch device id when omitted
   useEffect(() => {
     if (!visible || thisDeviceIdProp) return;
-    OperaHub.deviceId().then(setLoadedDeviceId).catch(() => null);
+    SamplerHub.deviceId().then(setLoadedDeviceId).catch(() => null);
   }, [visible, thisDeviceIdProp]);
 
   //a link code joins at once, an admin code lists profiles
@@ -208,10 +208,10 @@ export default function HubProfileSheet({
     let stopped = false;
     (async () => {
       try {
-        if (await OperaHub.linkJoin(hub)) {
+        if (await SamplerHub.linkJoin(hub)) {
           setPage("link");
           while (!stopped) {
-            const progress = await OperaHub.linkFetch(hub);
+            const progress = await SamplerHub.linkFetch(hub);
             if (stopped) return;
             setDigits(progress.digits);
             if (progress.profile) return onDoneRef.current(progress.profile);
@@ -219,7 +219,7 @@ export default function HubProfileSheet({
           }
           return;
         }
-        const list = await OperaHub.profiles(hub);
+        const list = await SamplerHub.profiles(hub);
         if (!stopped) setProfiles(list);
       } catch (e) {
         console.warn("[HubProfile] profiles unavailable:", e);
@@ -284,14 +284,14 @@ export default function HubProfileSheet({
       : passwordProblem();
     if (problem) return setError(problem);
     run(async () =>
-      onDone(await OperaHub.createProfile(hub!, name.trim(), password)),
+      onDone(await SamplerHub.createProfile(hub!, name.trim(), password)),
     );
   };
 
   const unlock = () => {
     if (!chosen || !password) return;
     run(async () =>
-      onDone(await OperaHub.unlockProfile(hub!, chosen.id, password)),
+      onDone(await SamplerHub.unlockProfile(hub!, chosen.id, password)),
     );
   };
 
@@ -299,7 +299,7 @@ export default function HubProfileSheet({
     const problem = passwordProblem();
     if (problem) return setError(problem);
     run(async () => {
-      await OperaHub.changePassword(hub!, current, password);
+      await SamplerHub.changePassword(hub!, current, password);
       setPassword("");
       setConfirm("");
       setCurrent("");

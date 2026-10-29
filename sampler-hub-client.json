@@ -1,0 +1,14 @@
+{
+  "version": "v0.11.0",
+  "sha256": {
+    "sampler-hub-client-arm64-v8a.so": "c0c48ca7085b8ccf9b770d939c7e0c930ccd6936e4a9750409635a769a64803d",
+    "sampler_hub_client.kt": "f2cb8766dc3d57034c0fbeae44c899e6cdcbff33a9a3622972081cc9feade2c1",
+    "sampler-hub-client-web.js": "103879d4152fb60b7041e58075d4ac73f6614b7acf9c8370d1114e538b7e7a8e",
+    "sampler-hub-client-web.wasm": "2eb5ef8a7b63ebbf229d1463e8cb81b25bf8089ed2bdf7c13651e74134241371",
+    "sampler-hubw-windows-x86_64.exe": "9f4ac9696e81ea049b05ea41d481a97320dca1a4e7e886ba9e9faf7fa106f5e4",
+    "sampler-hubw-windows-aarch64.exe": "bd81dc376bff597ee193b53525bf1bc841336211ee380505019e01f2acea6c0d",
+    "sampler-hubw-macos-aarch64": "56cd1963bb46790ff49246208a07c39654c0ebc903d8b1737f0fa91572e31625",
+    "sampler-hubw-linux-x86_64": "cf337cd766f471225d0fe93f59024201e5b9adeadbb0660e0df9033bdbf0d838",
+    "sampler-hubw-linux-aarch64": "0dc92c880c099db29ce21cac038c7795e238621a53a539f228add75da73505c2"
+  }
+}

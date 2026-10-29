@@ -10,7 +10,7 @@
   [maestroai.company](https://maestroai.company)
 
   <p>
-    <img alt="platform" src="https://img.shields.io/badge/platform-Android%20%7C%20Web-FF1A1A?style=flat-square">
+    <img alt="platform" src="https://img.shields.io/badge/platform-Android%20%7C%20Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-FF1A1A?style=flat-square">
     <img alt="Expo" src="https://img.shields.io/badge/Expo-SDK%2057-000020?style=flat-square&logo=expo&logoColor=white">
     <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white">
     <img alt="License" src="https://img.shields.io/badge/license-AGPLv3-333333?style=flat-square">
@@ -29,6 +29,7 @@ Opera is a privacy-first AI assistant. Run a model on the device itself, on your
 | Attachments | camera, photos, and documents (PDF, DOCX, plain text) |
 | Voice | dictation through the system speech recognizer, or raw audio sent to models that accept it; Whisper runs in the browser on web; replies can be read aloud |
 | Android integration | default assistant role, overlay over any app, screen capture with on-screen text selection and object detection, home-screen quick actions |
+| Desktop | Windows, macOS and Linux |
 | Rich replies | Markdown with KaTeX math and code highlighting, citations, reply suggestions; weather, maps, HTML and Mermaid widgets |
 | Sync & backup |Nextcloud/Google Drive sync encrypted with a PIN, local JSON export / import |
 | Sharing | conversations shared as encrypted [PrivateBin](https://privatebin.info) links, key kept in the URL fragment, instance configurable |
@@ -80,6 +81,10 @@ assets/                icons, images, fonts, animations, on-device models
 
 </details>
 
+## Download
+
+Android ([Play Store](https://play.google.com/store/apps/details?id=ai.maestro.opera) or APK), Windows, macOS and Linux builds are on the [releases page](https://github.com/MaestroAI-Company/opera/releases/latest).
+
 ## Getting started
 
 **Prerequisites** - Node.js & npm, [Expo CLI](https://docs.expo.dev/more/expo-cli/) (via `npx`), and for native builds: Android Studio/SDK. The desktop build also needs a Rust toolchain.
@@ -90,7 +95,9 @@ npm install
 npm start          # Expo dev server - scan the QR, or press a/w for android/web
 npm run android    # run on a connected device/emulator
 npm run web        # run in the browser
+npm run desktop    # run Opera Desktop against the dev server
 ```
+
 
 **Dev builds on Android** - debug builds install as **Opera Dev** (`ai.maestro.opera.dev`, blue icon), so they sit next to the Play Store version instead of clashing with its signature. Expo CLI doesn't see the suffix, so launch with `--app-id` (the npm scripts already pass it):
 
@@ -111,6 +118,7 @@ cp .env.example .env   # Google Drive OAuth and beta server vars — irrelevant 
 
 ```bash
 npm run build:android   # Expo prebuild + Gradle release APK
+npm run build:desktop   # web export + Tauri installer for the current machine
 npm run lint            # ESLint
 ```
 

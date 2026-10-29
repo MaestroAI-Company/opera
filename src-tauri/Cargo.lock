@@ -176,8 +176,8 @@ version = "0.1.0"
 dependencies = [
  "log",
  "machine-uid",
- "opera-hub",
- "opera-hub-client",
+ "sampler-hub",
+ "sampler-hub-client",
  "serde",
  "serde_json",
  "tauri",
@@ -4493,95 +4493,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
-name = "opera-hub"
-version = "0.10.0"
-dependencies = [
- "anyhow",
- "chacha20poly1305",
- "clap",
- "directories",
- "flate2",
- "gethostname",
- "getrandom 0.4.3",
- "iroh",
- "iroh-tickets",
- "keyring",
- "landlock",
- "libc",
- "mdns-sd",
- "opera-hub-proto",
- "qr2term",
- "reqwest 0.13.4",
- "rusqlite",
- "rustls",
- "serde",
- "serde_json",
- "service-manager",
- "sha2 0.11.1",
- "sysinfo",
- "tar",
- "tauri-winres",
- "tokio",
- "toml 1.1.8+spec-1.1.0",
- "tracing",
- "tracing-subscriber",
- "webpki-roots",
- "windows-sys 0.61.2",
- "zip",
-]
-
-[[package]]
-name = "opera-hub-client"
-version = "0.10.0"
-dependencies = [
- "anyhow",
- "argon2",
- "base64 0.22.1",
- "bytes",
- "chacha20poly1305",
- "curve25519-dalek",
- "futures-util",
- "getrandom 0.4.3",
- "hkdf",
- "hmac",
- "http-body-util",
- "hyper",
- "hyper-util",
- "iroh",
- "js-sys",
- "mdns-sd",
- "n0-future",
- "opera-hub-proto",
- "qrcode",
- "serde",
- "serde-wasm-bindgen",
- "serde_json",
- "sha2 0.11.1",
- "thiserror 2.0.18",
- "tokio",
- "tokio-util",
- "uniffi",
- "wasm-bindgen",
- "wasm-bindgen-futures",
-]
-
-[[package]]
-name = "opera-hub-proto"
-version = "0.10.0"
-dependencies = [
- "anyhow",
- "argon2",
- "getrandom 0.4.3",
- "hmac",
- "iroh",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "tokio",
- "url",
-]
-
-[[package]]
 name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5584,6 +5495,95 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "sampler-hub"
+version = "0.11.0"
+dependencies = [
+ "anyhow",
+ "chacha20poly1305",
+ "clap",
+ "directories",
+ "flate2",
+ "gethostname",
+ "getrandom 0.4.3",
+ "iroh",
+ "iroh-tickets",
+ "keyring",
+ "landlock",
+ "libc",
+ "mdns-sd",
+ "qr2term",
+ "reqwest 0.13.4",
+ "rusqlite",
+ "rustls",
+ "sampler-hub-proto",
+ "serde",
+ "serde_json",
+ "service-manager",
+ "sha2 0.11.1",
+ "sysinfo",
+ "tar",
+ "tauri-winres",
+ "tokio",
+ "toml 1.1.8+spec-1.1.0",
+ "tracing",
+ "tracing-subscriber",
+ "webpki-roots",
+ "windows-sys 0.61.2",
+ "zip",
+]
+
+[[package]]
+name = "sampler-hub-client"
+version = "0.11.0"
+dependencies = [
+ "anyhow",
+ "argon2",
+ "base64 0.22.1",
+ "bytes",
+ "chacha20poly1305",
+ "curve25519-dalek",
+ "futures-util",
+ "getrandom 0.4.3",
+ "hkdf",
+ "hmac",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "iroh",
+ "js-sys",
+ "mdns-sd",
+ "n0-future",
+ "qrcode",
+ "sampler-hub-proto",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "sha2 0.11.1",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "uniffi",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
+name = "sampler-hub-proto"
+version = "0.11.0"
+dependencies = [
+ "anyhow",
+ "argon2",
+ "getrandom 0.4.3",
+ "hmac",
+ "iroh",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tokio",
+ "url",
 ]
 
 [[package]]

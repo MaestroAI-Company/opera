@@ -130,9 +130,9 @@ import { CloudSync } from "../../services/CloudSyncService";
 import {
   HubProfile,
   HubStatus,
-  OperaHub,
+  SamplerHub,
   PairedHub,
-} from "../../services/hub/OperaHubService";
+} from "../../services/hub/SamplerHubService";
 import { HubSync } from "../../services/hub/HubSync";
 import { SyncPrefs, SyncPrefsStore } from "../../services/SyncPrefs";
 import { AppEvents } from "../../services/events";
@@ -973,7 +973,7 @@ export default function SettingsDrawer({
   //measured width, the slide's push distance
   const [litertBodyWidth, setLitertBodyWidth] = useState(320);
 
-  const hubSupported = OperaHub.isSupported();
+  const hubSupported = SamplerHub.isSupported();
   const [pairedHub, setPairedHub] = useState<PairedHub | null>(null);
   const [hubStatus, setHubStatus] = useState<HubStatus | null>(null);
   //null until this device unlocks a profile
@@ -987,17 +987,17 @@ export default function SettingsDrawer({
   const [cloudBackupPicking, setCloudBackupPicking] = useState(false);
 
   const refreshHub = useCallback(async () => {
-    const hub = await OperaHub.getPairedHub();
+    const hub = await SamplerHub.getPairedHub();
     setPairedHub(hub);
-    setHubProfile(await OperaHub.getProfile());
+    setHubProfile(await SamplerHub.getProfile());
     if (!hub) return;
     setHubSyncPaused(await HubSync.isPaused());
-    OperaHub.status(hub).then(setHubStatus).catch(() => {});
+    SamplerHub.status(hub).then(setHubStatus).catch(() => {});
   }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the paired hub
-    if (visible && OperaHub.isSupported()) refreshHub();
+    if (visible && SamplerHub.isSupported()) refreshHub();
   }, [visible, refreshHub]);
 
   //open sheets keep the back press for themselves
@@ -1544,8 +1544,8 @@ export default function SettingsDrawer({
 
       try {
         setSyncPrefs(await SyncPrefsStore.load());
-        if (OperaHub.isSupported()) {
-          setPairedHub(await OperaHub.getPairedHub());
+        if (SamplerHub.isSupported()) {
+          setPairedHub(await SamplerHub.getPairedHub());
           setHubSyncPaused(await HubSync.isPaused());
         }
         await CloudSync.init();
@@ -4939,7 +4939,7 @@ export default function SettingsDrawer({
               icon={hyperlinkIcon}
               label={t("settings.privacy.policy")}
               onPress={() =>
-                Linking.openURL("https://maestroai.company/privacy.html").catch(
+                Linking.openURL("https://maestroai.company/privacy").catch(
                   () => {},
                 )
               }
@@ -5148,7 +5148,7 @@ export default function SettingsDrawer({
               icon={supportIcon}
               label={t("settings.support.contact")}
               onPress={() =>
-                Linking.openURL("https://maestroai.company/contact.html").catch(
+                Linking.openURL("https://maestroai.company/contact").catch(
                   () => {},
                 )
               }

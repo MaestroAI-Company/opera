@@ -18,6 +18,10 @@ exemple : //load model and detect objects
 # Use updated code
 You can get updated docs with the context7 mcp
 
+# Releasing a version
+
+When asked to deploy, release or publish a version (production or beta), read `distribution/README.md` first and follow its steps.
+
 # Expo HAS CHANGED
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.

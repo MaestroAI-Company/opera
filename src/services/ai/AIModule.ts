@@ -81,7 +81,7 @@ class CentralAIModule {
     if (BETA_SERVER_URL) this.providers.set('BETA', new OllamaProvider(BETA_SERVER_URL, {}, contextLength, keepAlive));
     //openai servers have no tuning
     this.providers.set('OPENAI', new OpenAIProvider(raw));
-    this.providers.set('OPERAHUB', hubProvider(raw, contextLength, keepAlive));
+    this.providers.set('SAMPLERHUB', hubProvider(raw, contextLength, keepAlive));
     //new server can serve different models
     this.capabilitiesCache.clear();
   }
@@ -133,7 +133,7 @@ class CentralAIModule {
     const url = (serverUrl ?? '').trim();
     if (key === 'OLLAMA') return url.length > 0 ? new OllamaProvider(url) : null;
     if (key === 'OPENAI') return url.length > 0 ? new OpenAIProvider(url) : null;
-    if (key === 'OPERAHUB') return url.length > 0 ? hubProvider(url) : null;
+    if (key === 'SAMPLERHUB') return url.length > 0 ? hubProvider(url) : null;
     return this.providers.get(key) ?? null;
   }
 

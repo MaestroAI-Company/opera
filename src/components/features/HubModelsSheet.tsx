@@ -27,7 +27,7 @@ import {
   formatBytes,
   MIN_SEARCH_LENGTH,
 } from "../../services/ai/providers/huggingFaceCatalog";
-import { CatalogModel, ModelFile, ModelRepo } from "../../services/hub/OperaHubService";
+import { CatalogModel, ModelFile, ModelRepo } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";

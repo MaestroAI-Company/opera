@@ -24,10 +24,10 @@ import { BASE_DEFAULTS } from '../settings/schema';
 import { AppSettings, Settings } from '../settings/SettingsService';
 import { SyncPrefsStore } from '../SyncPrefs';
 import { pullRemoteChanges, pushLocalChanges, queueCloudMerge, resetDataSync } from './hubData';
-import { HUB_URL_SCHEME, hubErrorCode, HubProvider, OperaHub, PairedHub, SyncRecord } from './OperaHubService';
+import { HUB_URL_SCHEME, hubErrorCode, HubProvider, SamplerHub, PairedHub, SyncRecord } from './SamplerHubService';
 
 //cursor and per entry fingerprints
-const STATE_KEYS = { providers: 'opera_hub_sync_state', settings: 'opera_hub_sync_state_settings' } as const;
+const STATE_KEYS = { providers: 'sampler_hub_sync_state', settings: 'sampler_hub_sync_state_settings' } as const;
 const CHANGE_DEBOUNCE_MS = 3000;
 const WATCH_RETRY_MS = 10000;
 //survives restarts while offline
@@ -108,7 +108,7 @@ class HubSyncImpl {
 
   //cache loads before the model is picked
   async init(): Promise<void> {
-    if (this.initialized || !OperaHub.isSupported()) return;
+    if (this.initialized || !SamplerHub.isSupported()) return;
     this.initialized = true;
     await this.readCached();
     this.request(0);
@@ -120,7 +120,7 @@ class HubSyncImpl {
     DeviceEventEmitter.addListener(AppEvents.conversationsChanged, onLocalChange);
     DeviceEventEmitter.addListener(AppEvents.cloudMerged, async (touched) => {
       //a later pairing pushes everything anyway
-      if (!(await OperaHub.getPairedHub())) return;
+      if (!(await SamplerHub.getPairedHub())) return;
       queueCloudMerge(touched)
         .then(() => this.request(CHANGE_DEBOUNCE_MS))
         .catch((e) => console.warn('[HubSync] cloud merge not queued:', e));
@@ -201,19 +201,19 @@ class HubSyncImpl {
     let since = 0;
     try {
       while (AppState.currentState === 'active') {
-        const hub = await OperaHub.getPairedHub();
+        const hub = await SamplerHub.getPairedHub();
         //an unbound device reaches no data
-        if (!hub || !(await OperaHub.getProfile())) break;
+        if (!hub || !(await SamplerHub.getProfile())) break;
         try {
-          const cursor = await OperaHub.watch(hub, since);
+          const cursor = await SamplerHub.watch(hub, since);
           if (since > 0 && cursor > since) this.request(0);
           since = Math.max(since, cursor);
           //servers started elsewhere show up within a watch
           await this.refreshProviders().catch(() => {});
         } catch (e) {
           //offline networks may still reach a hub nearby
-          if (hubErrorCode(e) === 'Unreachable' && OperaHub.canDiscover()) {
-            await OperaHub.nearbyHubs().catch(() => []);
+          if (hubErrorCode(e) === 'Unreachable' && SamplerHub.canDiscover()) {
+            await SamplerHub.nearbyHubs().catch(() => []);
           }
           await new Promise((resolve) => setTimeout(resolve, WATCH_RETRY_MS));
         }
@@ -224,10 +224,10 @@ class HubSyncImpl {
   }
 
   private async run(): Promise<void> {
-    const hub = await OperaHub.getPairedHub();
-    if (!hub || !(await OperaHub.getProfile())) return;
+    const hub = await SamplerHub.getPairedHub();
+    if (!hub || !(await SamplerHub.getProfile())) return;
     await this.dropInjectedServers();
-    await this.storeProviders(await OperaHub.providers(hub), hub.name);
+    await this.storeProviders(await SamplerHub.providers(hub), hub.name);
     await this.offerUpdate(hub);
     //a cloud sync account replaces sampler, a backup does not
     if (this.paused || (CloudSync.getProviderName() !== 'none' && !CloudSync.isBackupMode())) return;
@@ -247,8 +247,8 @@ class HubSyncImpl {
 
   //once per version, admins only
   private async offerUpdate(hub: PairedHub): Promise<void> {
-    if (!OperaHub.canUpdateHub()) return;
-    const status = await OperaHub.status(hub).catch(() => null);
+    if (!SamplerHub.canUpdateHub()) return;
+    const status = await SamplerHub.status(hub).catch(() => null);
     const version = status?.update;
     if (!status || !version || version === this.offeredUpdate) return;
     if ((await Settings.getLocal(DECLINED_UPDATE_KEY)) === version) return;
@@ -262,9 +262,9 @@ class HubSyncImpl {
 
   //what the hub serves now, mcp servers included
   async refreshProviders(): Promise<void> {
-    const hub = await OperaHub.getPairedHub();
+    const hub = await SamplerHub.getPairedHub();
     if (!hub) return;
-    await this.storeProviders(await OperaHub.providers(hub), hub.name);
+    await this.storeProviders(await SamplerHub.providers(hub), hub.name);
   }
 
   private async storeProviders(providers: HubProvider[], hubName: string): Promise<void> {
@@ -307,7 +307,7 @@ class HubSyncImpl {
       const incoming: SyncRecord[] = [];
       let more = true;
       while (more) {
-        const page = await OperaHub.pull(hub, collection, state.cursor);
+        const page = await SamplerHub.pull(hub, collection, state.cursor);
         incoming.push(...page.records);
         state.cursor = page.cursor;
         more = page.more;
@@ -344,7 +344,7 @@ class HubSyncImpl {
       outgoing.push({ id, updatedAt: now, deleted: true, payload: null });
       state.entries[id] = { hash: '', updatedAt: now };
     }
-    if (outgoing.length > 0) await OperaHub.push(hub, collection, outgoing);
+    if (outgoing.length > 0) await SamplerHub.push(hub, collection, outgoing);
 
     //the hub already settled conflicts
     const winners = (await pullAll()).filter((record) => {

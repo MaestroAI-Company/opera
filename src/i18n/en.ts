@@ -176,6 +176,9 @@ export const en = {
   "messageDetails.reasoning": "Reasoning",
   "messageDetails.error": "Error",
 
+  "whatsNew.title": "What's new in Opera {version}",
+  "whatsNew.close": "Got it",
+
   "bugReport.title": "Report a bug",
   "bugReport.crashTitle": "Opera closed unexpectedly",
   "bugReport.crashHelp":

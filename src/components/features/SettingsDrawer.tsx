@@ -5686,7 +5686,7 @@ export default function SettingsDrawer({
               icon={hyperlinkIcon}
               label={t("settings.privacy.policy")}
               onPress={() =>
-                Linking.openURL("https://maestroai.company/privacy.html").catch(
+                Linking.openURL("https://maestroai.company/privacy").catch(
                   () => {},
                 )
               }
@@ -5879,7 +5879,7 @@ export default function SettingsDrawer({
               icon={supportIcon}
               label={t("settings.support.contact")}
               onPress={() =>
-                Linking.openURL("https://maestroai.company/contact.html").catch(
+                Linking.openURL("https://maestroai.company/contact").catch(
                   () => {},
                 )
               }

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { View } from "react-native";
+import { DeviceEventEmitter, View } from "react-native";
 import { useColors } from "../../hooks/useTheme";
 import { CloudSync } from "../../services/CloudSyncService";
 import { DB } from "../../services/db/DatabaseService";
+import { AppEvents } from "../../services/events";
 import { HubSync } from "../../services/hub/HubSync";
 import { McpService } from "../../services/mcp/McpService";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
@@ -48,9 +49,13 @@ export default function SettingsWindow() {
 
   useEffect(() => {
     let stop: (() => void) | undefined;
-    onSettingsNavigate((page, pair) =>
-      setTarget({ page: (page as SubPage | null) ?? undefined, pair }),
-    ).then((unlisten) => {
+    onSettingsNavigate((page, pair) => {
+      setTarget({ page: (page as SubPage | null) ?? undefined, pair });
+      //created before onboarding wrote settings
+      Settings.load()
+        .then(() => DeviceEventEmitter.emit(AppEvents.settingsSynced))
+        .catch((e) => console.warn("Settings window refresh failed:", e));
+    }).then((unlisten) => {
       stop = unlisten;
     });
     return () => stop?.();

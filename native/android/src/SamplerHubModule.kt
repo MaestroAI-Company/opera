@@ -309,6 +309,10 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
   @ReactMethod
+  fun renameProfile(deviceKey: String, hub: ReadableMap, name: String, promise: Promise) =
+    launchPromise(promise) { profileToMap(client(deviceKey).renameProfile(hubFromMap(hub), name)) }
+
+  @ReactMethod
   fun lockedKey(deviceKey: String, hub: ReadableMap, promise: Promise) =
     launchPromise(promise) {
       val lock = client(deviceKey).lockedKey(hubFromMap(hub))

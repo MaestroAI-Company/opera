@@ -182,8 +182,23 @@ class HubSyncImpl {
     await this.setPaused(false);
   }
 
+  //the hub profile follows the device name
+  async renameProfile(name: string): Promise<void> {
+    const trimmed = name.trim();
+    const hub = await SamplerHub.getPairedHub();
+    const profile = await SamplerHub.getProfile();
+    if (!hub || !profile || !trimmed || trimmed === profile.name) return;
+    await SamplerHub.renameProfile(hub, trimmed);
+  }
+
   //a profile on a fresh hub gets everything again
   async joinedProfile(): Promise<void> {
+    //one name for device and hub
+    const profile = await SamplerHub.getProfile();
+    if (profile && profile.name !== Settings.getCached().name) {
+      await Settings.set('name', profile.name);
+      DeviceEventEmitter.emit(AppEvents.settingsSynced);
+    }
     for (const key of Object.values(STATE_KEYS)) await setSecret(key, null);
     await resetDataSync();
     //an older build paused it for the cloud

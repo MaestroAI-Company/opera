@@ -374,8 +374,8 @@ function OperaDream() {
 
     const isError = run.status === "error";
     if (isFirstMessage && !isIncognito && !isError) generateTitle(conv.id, text);
-    //every dream question comes by voice
-    if (!isError && Settings.getCached().autoSpeak) {
+    //dream replies are always spoken
+    if (!isError) {
       followUpRef.current = asksBack(run.content) ? msgId : null;
       setAwaitingFollowUp(!!followUpRef.current);
       TTS.speak(run.content, {

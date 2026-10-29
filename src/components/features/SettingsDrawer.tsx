@@ -51,7 +51,10 @@ import {
   ThemeColors,
 } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
-import { contextFloorTokens } from "../../services/ai/generation/chatGeneration";
+import {
+  autoPromptTier,
+  contextFloorTokens,
+} from "../../services/ai/generation/chatGeneration";
 import {
   CatalogEntry,
   familyPublisher,
@@ -415,7 +418,10 @@ const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
     () => getPromptTierOverride(service, url, model) ?? "auto",
   );
   const promptOptions: SelectorOption[] = [
-    { id: "auto", label: t("settings.model.promptAuto") },
+    {
+      id: "auto",
+      label: `${t("settings.model.promptAuto")} (${t(PROMPT_TIER_KEYS[autoPromptTier(model, service)])})`,
+    },
     ...PROMPT_TIERS.map((tier) => ({
       id: tier,
       label: t(PROMPT_TIER_KEYS[tier]),

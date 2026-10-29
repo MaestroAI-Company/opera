@@ -73,6 +73,7 @@ import {
 import SamplerScreen from "../components/features/SamplerScreen";
 import SettingsDrawer, { SubPage } from "../components/features/SettingsDrawer";
 import TopBar from "../components/features/TopBar";
+import WhatsNewSheet from "../components/features/WhatsNewSheet";
 import ActionButton from "../components/ui/ActionButton";
 import Group from "../components/ui/Group";
 import NotificationModal from "../components/ui/NotificationModal";
@@ -101,7 +102,7 @@ import { resolveQuickFlow } from "../services/ai/quickFlow";
 import { arrayBufferToBase64 } from "../services/ai/utils/base64";
 import { CloudSync } from "../services/CloudSyncService";
 import { HubSync } from "../services/hub/HubSync";
-import { OperaHub, PairedHub } from "../services/hub/OperaHubService";
+import { SamplerHub, PairedHub } from "../services/hub/SamplerHubService";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
 import {
   getInitialDeepLink,
@@ -144,6 +145,7 @@ import {
 } from "../services/share/ShareService";
 import { speakReplyLive } from "../services/speech/liveReply";
 import { STT, WhisperSTT } from "../services/speech/STTService";
+import { ReleaseNotes, takeReleaseNotes } from "../services/updates/UpdateService";
 
 const texture2 = require("../../assets/images/texture2.png");
 const settingsIcon = require("../../assets/icons/settings.png");
@@ -394,23 +396,23 @@ export default function Index() {
   const [samplerAdmin, setSamplerAdmin] = useState(false);
   const [samplerReady, setSamplerReady] = useState(false);
   const checkSamplerAdmin = useCallback(async () => {
-    if (OperaHub.canHost() || !OperaHub.isSupported()) return;
-    const hub = await OperaHub.getPairedHub();
+    if (SamplerHub.canHost() || !SamplerHub.isSupported()) return;
+    const hub = await SamplerHub.getPairedHub();
     const profile = hub
-      ? await OperaHub.refreshProfile(hub).catch(() => OperaHub.getProfile())
+      ? await SamplerHub.refreshProfile(hub).catch(() => SamplerHub.getProfile())
       : null;
     setSamplerAdmin(profile?.role === "admin");
   }, []);
   //a hub hosted here comes back with the app
   useEffect(() => {
-    OperaHub.startHostedHub().catch((e) => console.warn("[Sampler] hub not started:", e));
+    SamplerHub.startHostedHub().catch((e) => console.warn("[Sampler] hub not started:", e));
   }, []);
   //pairing and profiles change in the settings
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the paired hub
     if (!settingsDrawerVisible) checkSamplerAdmin();
   }, [settingsDrawerVisible, checkSamplerAdmin]);
-  const showSamplerSwitch = isDesktop && (OperaHub.canHost() || samplerAdmin);
+  const showSamplerSwitch = isDesktop && (SamplerHub.canHost() || samplerAdmin);
   const inSampler = samplerMode && (!isDesktop || showSamplerSwitch);
   //slide between chat and sampler
   const samplerAnim = useAnimatedValue(inSampler ? 1 : 0);
@@ -733,6 +735,7 @@ useEffect(() => {
   const [previewDetails, setPreviewDetails] = useState<PreviewDetails | null>(
     null,
   );
+  const [releaseNotes, setReleaseNotes] = useState<ReleaseNotes | null>(null);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const rootRef = useRef<View>(null);
 
@@ -1146,6 +1149,10 @@ useEffect(() => {
         const isBrowserWeb =
           Platform.OS === "web" &&
           !(typeof window !== "undefined" && "__TAURI_INTERNALS__" in window);
+        //before onboarding so fresh installs skip it
+        takeReleaseNotes(!s.hasSeenOnboarding)
+          .then(setReleaseNotes)
+          .catch((e) => console.warn("Could not load release notes:", e));
         if (!s.hasSeenOnboarding && !isBrowserWeb) {
           router.replace("/onboarding");
           return;
@@ -2738,6 +2745,14 @@ useEffect(() => {
         bottomInset={insets.bottom}
       />
 
+      <WhatsNewSheet
+        release={releaseNotes}
+        onClose={() => setReleaseNotes(null)}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        bottomInset={insets.bottom}
+      />
+
       <ModelSelectorDrawer
         visible={modelSelectorVisible}
         onClose={() => setModelSelectorVisible(false)}
@@ -2830,7 +2845,7 @@ useEffect(() => {
               const update = hubUpdate;
               setHubUpdate(null);
               if (!update) return;
-              OperaHub.updateHub(update.hub, update.version).catch((e: Error) =>
+              SamplerHub.updateHub(update.hub, update.version).catch((e: Error) =>
                 setHubUpdateError(e?.message ?? String(e)),
               );
             },

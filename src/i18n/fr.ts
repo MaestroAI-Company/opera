@@ -178,6 +178,9 @@ export const fr: Translations = {
   "messageDetails.reasoning": "Raisonnement",
   "messageDetails.error": "Erreur",
 
+  "whatsNew.title": "Nouveautés d'Opera {version}",
+  "whatsNew.close": "C'est noté",
+
   "bugReport.title": "Signaler un bug",
   "bugReport.crashTitle": "Opera s'est fermé de manière inattendue",
   "bugReport.crashHelp":

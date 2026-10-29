@@ -16,7 +16,7 @@ import { mcpAvatar, mcpSourceLabel, runHubMcp, useHubMcp } from "../../hooks/use
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { MIN_SEARCH_LENGTH } from "../../services/ai/providers/huggingFaceCatalog";
-import { McpFolders, McpListing, McpSource } from "../../services/hub/OperaHubService";
+import { McpFolders, McpListing, McpSource } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import NotificationCard from "../ui/NotificationCard";

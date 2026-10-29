@@ -16,7 +16,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Fetch the opera hub web client
+      - name: Fetch the sampler hub web client
         run: node scripts/build-hub-client.mjs web
 
       - name: Build web export

@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { modelAvatarUrl } from "../services/ai/providers/huggingFaceCatalog";
-import { CatalogModel, HubModels, LlamaStatus, OperaHub } from "../services/hub/OperaHubService";
+import { CatalogModel, HubModels, LlamaStatus, SamplerHub } from "../services/hub/SamplerHubService";
 
 //fast while something moves, idle otherwise
 const BUSY_POLL_MS = 1500;
@@ -60,7 +60,7 @@ async function load() {
   if (loading) return;
   loading = true;
   try {
-    const api = await OperaHub.models();
+    const api = await SamplerHub.models();
     const [status, catalog] = await Promise.all([api.status(), api.catalog()]);
     publish({ api, status, catalog, error: null });
   } catch (error) {

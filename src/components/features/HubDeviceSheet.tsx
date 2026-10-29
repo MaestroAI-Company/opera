@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
-import { HubDevice, OperaHub, PairedHub } from "../../services/hub/OperaHubService";
+import { HubDevice, SamplerHub, PairedHub } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
@@ -75,14 +75,14 @@ export default function HubDeviceSheet({
 
   const rename = () => {
     if (!device || !hub || !name.trim()) return;
-    run(() => OperaHub.renameDevice(hub, device.id, name.trim()));
+    run(() => SamplerHub.renameDevice(hub, device.id, name.trim()));
   };
 
   const remove = () => {
     setConfirmRemove(false);
     if (!device || !hub) return;
     run(async () => {
-      await OperaHub.removeDevice(hub, device.id);
+      await SamplerHub.removeDevice(hub, device.id);
       onClose();
     });
   };

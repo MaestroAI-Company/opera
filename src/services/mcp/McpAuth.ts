@@ -1,7 +1,7 @@
 import * as AuthSession from 'expo-auth-session';
 import { Platform } from 'react-native';
 import { universalFetch } from '../ai/utils/universalFetch';
-import { OperaHub } from '../hub/OperaHubService';
+import { SamplerHub } from '../hub/SamplerHubService';
 import { getSecret, setSecret } from './mcpStorage';
 
 //what one sign in shares with the other devices
@@ -383,14 +383,14 @@ class McpAuthService {
   async getAccessToken(serverId: string): Promise<string | null> {
     const valid = await this.validToken(serverId);
     if (valid) return valid;
-    const hub = await OperaHub.getPairedHub();
-    if (!hub || !(await OperaHub.getProfile())) return this.refresh(serverId);
+    const hub = await SamplerHub.getPairedHub();
+    if (!hub || !(await SamplerHub.getProfile())) return this.refresh(serverId);
     //rotating tokens break if two devices refresh at once
     const name = `oauth:${serverId}`;
     const { HubSync } = await import('../hub/HubSync');
     for (let attempt = 0; attempt < LEASE_TRIES; attempt++) {
       //an unreachable hub cannot share, refresh alone
-      const granted = await OperaHub.lease(hub, name).catch(() => true);
+      const granted = await SamplerHub.lease(hub, name).catch(() => true);
       if (granted) {
         try {
           //another device may have refreshed meanwhile
@@ -402,7 +402,7 @@ class McpAuthService {
           if (token) await HubSync.syncNow().catch(() => {});
           return token;
         } finally {
-          await OperaHub.release(hub, name).catch(() => {});
+          await SamplerHub.release(hub, name).catch(() => {});
         }
       }
       await new Promise((resolve) => setTimeout(resolve, LEASE_WAIT_MS));

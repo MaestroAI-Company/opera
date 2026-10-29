@@ -20,7 +20,7 @@ import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constan
 import { useHubModels } from "../../hooks/useHubModels";
 import { useResponsive } from "../../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
-import { useT } from "../../i18n";
+import { getLocale, useT } from "../../i18n";
 import { formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
 import { HUB_PROVIDER_ID, getEnabledProviders, serializeProviders } from "../../services/ai/providers/sources";
 import { HubSync } from "../../services/hub/HubSync";
@@ -98,6 +98,16 @@ const HUB_DEVICE_ICONS: Record<string, ImageSourcePropType> = {
 };
 const HUB_INACTIVE_AFTER_S = 30 * 24 * 60 * 60;
 const USAGE_POLL_MS = 5000;
+//a connected hub answers far sooner
+const STATUS_TIMEOUT_MS = 8000;
+//show offline before client timeout
+const answerWithin = <T,>(answer: Promise<T>): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const silent = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("no answer")), STATUS_TIMEOUT_MS);
+  });
+  return Promise.race([answer, silent]).finally(() => clearTimeout(timer));
+};
 const OVERVIEW_POLL_MS = 10000;
 //same column as the chat: 840 wide with 16 on each side
 const PAGE_MAX_WIDTH = 840 - 2 * Spacing.xl2;
@@ -189,6 +199,8 @@ export default function SamplerScreen({
   const [pairedHub, setPairedHub] = useState<PairedHub | null>(null);
   const [hubState, setHubState] = useState<HubState>("checking");
   const [status, setStatus] = useState<HubStatus | null>(null);
+  //last hub answer this session
+  const [lastSeen, setLastSeen] = useState<number | null>(null);
   //last usage samples for the performance graphs
   const [usageHistory, setUsageHistory] = useState<{ cpu: number[]; memory: number[]; received: number }>({
     cpu: [],
@@ -226,6 +238,7 @@ export default function SamplerScreen({
   //every answer also feeds the graphs
   const receiveStatus = useCallback((next: HubStatus) => {
     setStatus(next);
+    setLastSeen(Date.now());
     if (next.memory == null) return;
     setUsageHistory((prev) => ({
       cpu: [...prev.cpu, next.cpu ?? 0].slice(-CHART_POINTS),
@@ -245,7 +258,7 @@ export default function SamplerScreen({
       .then(setThisDeviceId)
       .catch(() => setThisDeviceId(null));
     try {
-      receiveStatus(await SamplerHub.status(hub));
+      receiveStatus(await answerWithin(SamplerHub.status(hub)));
       setHubState("online");
       const [nextDevices, nextProfiles, nextSettings] = await Promise.all([
         SamplerHub.devices(hub).catch(() => null),
@@ -272,21 +285,39 @@ export default function SamplerScreen({
   //usage stays live while the screen shows
   useEffect(() => {
     if (!visible || !pairedHub || hubState === "checking") return;
-    const timer = setInterval(() => {
-      SamplerHub.status(pairedHub)
-        //a hub that came back reloads everything
-        .then((next) => (hubState === "online" ? receiveStatus(next) : refresh()))
-        .catch((e) => setHubState(failedState(e)));
-    }, USAGE_POLL_MS);
-    return () => clearInterval(timer);
-  }, [visible, pairedHub, hubState, refresh, receiveStatus]);
+    let live = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const check = () => {
+      //local hub may have stopped
+      if (isDesktop && SamplerHub.canHost()) {
+        SamplerHub.hostStatus()
+          .then((next) => live && setHostStatus(next))
+          .catch(() => {});
+      }
+      answerWithin(SamplerHub.status(pairedHub))
+        .then((next) => {
+          if (!live) return;
+          if (hubState === "online") return receiveStatus(next);
+          //returning hub reloads everything
+          return refresh();
+        })
+        .catch((e) => live && setHubState(failedState(e)))
+        //one check at a time
+        .finally(() => {
+          if (live) timer = setTimeout(check, USAGE_POLL_MS);
+        });
+    };
+    timer = setTimeout(check, USAGE_POLL_MS);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [visible, pairedHub, hubState, isDesktop, refresh, receiveStatus]);
 
   //the role may have changed since the profile was unlocked
   const role = profiles?.find((p) => p.id === profile?.id)?.role ?? profile?.role;
   const isAdmin = role === "admin";
   const online = hubState === "online";
-  //nothing until the hub first answers
-  const firstCheck = hubState === "checking" && !status;
   //hosting is desktop-only
   const canHost = isDesktop && SamplerHub.canHost();
   const hostsHub = canHost && !!hostStatus?.id && pairedHub?.id === hostStatus.id;
@@ -438,6 +469,7 @@ export default function SamplerScreen({
             setMyMcpDetail(null);
             setProfile(null);
             setStatus(null);
+            setLastSeen(null);
             setDevices(null);
             setProfiles(null);
             refresh();
@@ -577,12 +609,31 @@ export default function SamplerScreen({
       outdated: t("settings.hub.outdated"),
       online: "",
     }[hubState];
+    const seen =
+      hubState === "offline" && lastSeen
+        ? t("sampler.lastSeen", {
+            time: new Intl.DateTimeFormat(getLocale(), { hour: "numeric", minute: "2-digit" }).format(lastSeen),
+          })
+        : null;
     return (
       <View style={styles.welcome}>
         <Text style={styles.welcomeText}>{pairedHub?.name}</Text>
-        <Text style={styles.welcomeHelp}>{hostError ?? connection}</Text>
+        <Text style={styles.welcomeHelp}>
+          {hostError ?? (hubStopped ? t("sampler.stopped") : [connection, seen].filter(Boolean).join(" · "))}
+        </Text>
         <View style={styles.welcomeAction}>
           <Group>
+            {hubStopped && (
+              <ActionButton
+                icon={activateIcon}
+                label={t("sampler.start")}
+                disabled={hostBusy}
+                onPress={() => {
+                  setHubState("checking");
+                  setHosting(true);
+                }}
+              />
+            )}
             <ActionButton
               icon={reconnectIcon}
               label={t("settings.hub.check")}
@@ -1444,12 +1495,11 @@ export default function SamplerScreen({
 
   //not hosting yet, hub off, or no profile on this hub
   const renderWelcome = () => {
-    //a stopped hub starts over from the onboarding
-    const paired = !!pairedHub && !hubStopped;
-    if (paired && firstCheck) return null;
+    //stored pairing never shows onboarding
+    const paired = !!pairedHub;
     //a browser cannot host, it leaves the screen once unpaired
     if (!paired && isDesktop && !canHost) return null;
-    if (paired && !online) {
+    if (paired && (!online || hubStopped)) {
       return renderStopped();
     }
     if (paired && !profile) {

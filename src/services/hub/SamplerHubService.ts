@@ -75,6 +75,10 @@ export type ModelDownload = { repo: string; file: string; received: number; tota
 export type LlamaStatus = {
   state: 'idle' | 'installing' | 'running' | 'failed';
   backend?: string | null;
+  //installed and newest llama.cpp builds
+  build?: string | null;
+  latest?: string | null;
+  channel?: 'stable' | 'nightly' | null;
   message?: string | null;
   installed: InstalledModel[];
   downloads: ModelDownload[];

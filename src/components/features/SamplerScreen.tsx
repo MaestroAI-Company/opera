@@ -292,8 +292,10 @@ export default function SamplerScreen({
   const canHost = isDesktop && SamplerHub.canHost();
   const hostsHub = canHost && !!hostStatus?.id && pairedHub?.id === hostStatus.id;
   const showModels = isAdmin && SamplerHub.canManageModels();
-  //llama.cpp usage for the performance page
-  const { status: modelsStatus } = useHubModels(visible && online && showModels && page === "performance");
+  //llama.cpp usage and build for these pages
+  const { status: modelsStatus } = useHubModels(
+    visible && online && showModels && (page === "performance" || page === "models"),
+  );
   //every profile's servers on desktop, personal servers on mobile
   const showMcpOverview = isAdmin && SamplerHub.canSeeMcpServers();
   const canManageMcp = SamplerHub.canManageMcp();
@@ -1222,6 +1224,29 @@ export default function SamplerScreen({
               t("settings.hub.shareProvidersHelp"),
               settings.shareProviders,
               (value) => changeSettings({ shareProviders: value }),
+            )}
+          </View>
+        )}
+        {modelsOn && settings && (
+          <View style={styles.contentCard}>
+            {renderToggleRow(
+              t("sampler.model.nightly"),
+              t("sampler.model.nightlyHelp"),
+              settings.modelsNightly,
+              (value) => changeSettings({ modelsNightly: value }),
+              !modelsStatus?.build,
+            )}
+            {modelsStatus?.build && (
+              <Group style={styles.infoGroup}>
+                <ActionButton
+                  label={t("sampler.model.build")}
+                  rightElement={
+                    <Text style={styles.infoValue} numberOfLines={1}>
+                      {modelsStatus.build}
+                    </Text>
+                  }
+                />
+              </Group>
             )}
           </View>
         )}

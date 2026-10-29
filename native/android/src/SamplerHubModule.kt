@@ -467,6 +467,9 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
     Arguments.createMap().apply {
       putString("state", status.state)
       putString("backend", status.backend)
+      putString("build", status.build)
+      putString("latest", status.latest)
+      putString("channel", status.channel)
       putString("message", status.message)
       putArray("installed", Arguments.createArray().apply {
         for (model in status.installed) {

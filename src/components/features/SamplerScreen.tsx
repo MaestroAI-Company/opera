@@ -112,7 +112,7 @@ const CONTENT_TOP = (isTauri ? 32 : 0) + 60 + Spacing.xl2;
 
 type Page = "home" | "profiles" | "models" | "mcp" | "performance" | "preferences";
 //pages pushed from a section page
-type SubPage = Page | "profile" | "modelsList";
+type SubPage = Page | "profile";
 type Detail = { file: string; name: string };
 type HubState = "checking" | "online" | "offline" | "revoked" | "outdated";
 
@@ -145,7 +145,6 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 const PARENT: Partial<Record<SubPage, SubPage>> = {
   profile: "profiles",
-  modelsList: "models",
 };
 
 const parentOf = (page: SubPage): SubPage | null => PARENT[page] ?? null;
@@ -1015,25 +1014,13 @@ export default function SamplerScreen({
     );
   };
 
-  //opens feature list and toggles state
-  const renderFeatureRow = (label: string, help: string, on: boolean, key: "models" | "mcpServers", list: SubPage) => (
-    <Group style={styles.groupSpacing}>
-      <Pressable style={pressStyle(styles.toggleGroupRowItem, "surface")} disabled={!on} onPress={() => openPage(list)}>
-        <View style={styles.toggleGroupRow}>
-          <View style={styles.toggleGroupContent}>
-            <Text style={styles.settingLabel}>{label}</Text>
-            <Text style={styles.helpText}>{help}</Text>
-          </View>
-          {settings && (
-            <>
-              <View style={styles.toggleDivider} />
-              <Toggle checked={on} onToggle={(value) => changeSettings({ [key]: value })} />
-            </>
-          )}
-        </View>
-      </Pressable>
-    </Group>
-  );
+  //feature switch above its content
+  const renderFeatureToggle = (label: string, help: string, on: boolean, key: "models" | "mcpServers") =>
+    settings && (
+      <View style={styles.contentCard}>
+        {renderToggleRow(label, help, on, (value) => changeSettings({ [key]: value }))}
+      </View>
+    );
 
   const hostHero = (
     <>
@@ -1210,13 +1197,8 @@ export default function SamplerScreen({
   const renderModels = () => {
     return (
       <>
-        {renderFeatureRow(
-          t("sampler.feature.models"),
-          t("sampler.feature.modelsHelp"),
-          modelsOn,
-          "models",
-          "modelsList",
-        )}
+        {renderFeatureToggle(t("sampler.feature.models"), t("sampler.feature.modelsHelp"), modelsOn, "models")}
+        {modelsOn && modelsSection(true)}
         {modelsOn && settings && (
           <View style={styles.contentCard}>
             {renderToggleRow(
@@ -1257,8 +1239,9 @@ export default function SamplerScreen({
 
   const renderMcp = () => (
     <>
+      {renderFeatureToggle(t("sampler.feature.mcp"), t("sampler.feature.mcpHelp"), mcpOn, "mcpServers")}
       {canManageMcp && mcpOn && myMcpSection(true)}
-      {showMcpOverview && renderMcpServers()}
+      {showMcpOverview && mcpOn && renderMcpServers()}
     </>
   );
 
@@ -1325,7 +1308,6 @@ export default function SamplerScreen({
     performance: t("sampler.performance"),
     preferences: t("sampler.nav.preferences"),
     profile: profiles?.find((p) => p.id === profileId)?.name ?? "",
-    modelsList: t("hubModels.title"),
   };
 
   //one group per family, like the settings sidebar
@@ -1421,8 +1403,6 @@ export default function SamplerScreen({
         return renderProfile();
       case "models":
         return renderModels();
-      case "modelsList":
-        return modelsSection(true);
       case "mcp":
         return renderMcp();
       case "performance":
@@ -2137,21 +2117,6 @@ const makeStyles = (Colors: ThemeColors) =>
     toggleGroupContent: {
       flex: 1,
       marginRight: Spacing.lg2,
-    },
-    toggleGroupRowItem: {
-      paddingHorizontal: Spacing.md,
-      paddingVertical: Spacing.md,
-    },
-    toggleDivider: {
-      width: 2,
-      height: 34,
-      backgroundColor: Colors.border,
-      marginRight: Spacing.lg2,
-    },
-    groupSpacing: {
-      marginBottom: Spacing.xxl,
-      borderRadius: Radius.xxl + Spacing.md,
-      borderWidth: 0,
     },
     sliderGroup: {
       width: SLIDER_WIDTH,

@@ -25,6 +25,8 @@ export default function TextInputField({ icon, style, containerStyle, onFocus, o
     <Pressable
       style={({ hovered }) => [styles.container, (hovered || focused) && styles.containerActive, containerStyle]}
       onPress={() => inputRef.current?.focus()}
+      //skip wrapper on web tab navigation
+      tabIndex={-1}
     >
       {icon && <Image source={icon} style={styles.icon} />}
       <TextInput

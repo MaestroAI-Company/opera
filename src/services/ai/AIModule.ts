@@ -78,6 +78,11 @@ class CentralAIModule {
     this.capabilitiesCache.clear();
   }
 
+  //service and url of the active source
+  getActiveSource(): { service: string; url: string } {
+    return { service: this.activeMode.toLowerCase(), url: this.activeUrl };
+  }
+
   //get active provider
   private getActiveProvider(): IAIProvider {
     const provider = this.providers.get(this.activeMode);

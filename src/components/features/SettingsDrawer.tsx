@@ -94,11 +94,14 @@ import {
   getOllamaTuning,
   getOpenAIApiKeyById,
   getOpenAIServers,
+  getPromptTierOverride,
   isProviderSupported,
   newOpenAIServerId,
   OllamaServer,
   OPENAI_PROVIDER_ID,
   openAIServerNames,
+  PROMPT_TIERS,
+  type PromptTier,
   serializeServers,
   serializeProviders,
   setOpenAIApiKey,
@@ -163,7 +166,7 @@ import { useVoicePackInstalled } from "../../hooks/useVoicePackInstalled";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useBugReport } from "../../hooks/useBugReport";
 import { setThemeMode, useColors, useThemedStyles } from "../../hooks/useTheme";
-import { useT } from "../../i18n";
+import { useT, type TranslationKey } from "../../i18n";
 import { pressStyle } from "../ui/pressStyle";
 import {
   dragDrawer,
@@ -348,6 +351,12 @@ const MODEL_PAGE_SIZE = 50;
 const MODEL_PREVIEW_SIZE = 10;
 const NO_DISABLED_MODELS: string[] = [];
 const NO_CAPABILITY_OVERRIDES: Record<string, string[]> = {};
+const NO_PROMPT_TIERS: Record<string, PromptTier> = {};
+const PROMPT_TIER_KEYS = {
+  small: "settings.model.promptSmall",
+  medium: "settings.model.promptMedium",
+  large: "settings.model.promptLarge",
+} as const satisfies Record<PromptTier, TranslationKey>;
 const MODEL_CAPABILITY_ROWS = [
   "tools",
   "vision",
@@ -362,6 +371,7 @@ const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
   service,
   url,
   onCapabilitiesChange,
+  onPromptTierChange,
   style,
   labelStyle,
   checkboxes = false,
@@ -370,6 +380,7 @@ const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
   service: string;
   url: string;
   onCapabilitiesChange: (model: string, capabilities: string[]) => void;
+  onPromptTierChange: (model: string, tier: PromptTier | undefined) => void;
   style?: StyleProp<ViewStyle>;
   labelStyle?: StyleProp<ViewStyle>;
   checkboxes?: boolean;
@@ -378,6 +389,16 @@ const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const [capabilities, setCapabilities] = useState<string[] | null>(null);
+  const [promptTier, setPromptTier] = useState<string>(
+    () => getPromptTierOverride(service, url, model) ?? "auto",
+  );
+  const promptOptions: SelectorOption[] = [
+    { id: "auto", label: t("settings.model.promptAuto") },
+    ...PROMPT_TIERS.map((tier) => ({
+      id: tier,
+      label: t(PROMPT_TIER_KEYS[tier]),
+    })),
+  ];
 
   useEffect(() => {
     let cancelled = false;
@@ -428,6 +449,21 @@ const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
           )}
         </View>
       ))}
+      <Text style={[styles.settingLabel, styles.litertDetailSection]}>
+        {t("settings.model.promptSize")}
+      </Text>
+      <Group>
+        <Selector
+          options={promptOptions}
+          selectedValue={promptTier}
+          onSelect={(v) => {
+            setPromptTier(v);
+            onPromptTierChange(model, v === "auto" ? undefined : (v as PromptTier));
+          }}
+          title={t("settings.model.promptSize")}
+          fullWidth
+        />
+      </Group>
     </View>
   );
 });
@@ -442,6 +478,7 @@ const ModelToggleRow = memo(function ModelToggleRow({
   onToggle,
   onExpand,
   onCapabilitiesChange,
+  onPromptTierChange,
 }: {
   model: string;
   enabled: boolean;
@@ -452,6 +489,7 @@ const ModelToggleRow = memo(function ModelToggleRow({
   onToggle: (model: string, enabled: boolean) => void;
   onExpand: (model: string) => void;
   onCapabilitiesChange: (model: string, capabilities: string[]) => void;
+  onPromptTierChange: (model: string, tier: PromptTier | undefined) => void;
 }) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -480,6 +518,7 @@ const ModelToggleRow = memo(function ModelToggleRow({
           service={service}
           url={url}
           onCapabilitiesChange={onCapabilitiesChange}
+          onPromptTierChange={onPromptTierChange}
           style={styles.modelCapabilities}
         />
       )}
@@ -497,11 +536,14 @@ const ModelToggleList = memo(function ModelToggleList({
   capabilities = NO_CAPABILITY_OVERRIDES,
   onChange,
   onCapabilitiesChange,
+  promptTiers = NO_PROMPT_TIERS,
+  onPromptTiersChange,
   onShowAll,
   onOpenModel,
   showAll = false,
   autoFocusSearch = false,
   onSearchFocus,
+  initialSearch = "",
 }: {
   models: string[];
   loading: boolean;
@@ -512,13 +554,17 @@ const ModelToggleList = memo(function ModelToggleList({
   onChange: (next: string[]) => void;
   //only the inline expand edits capabilities
   onCapabilitiesChange?: (next: Record<string, string[]>) => void;
+  promptTiers?: Record<string, PromptTier>;
+  onPromptTiersChange?: (next: Record<string, PromptTier>) => void;
   //show more opens the full list instead of paging
-  onShowAll?: () => void;
+  onShowAll?: (search: string) => void;
   //rows open a model page instead of expanding
   onOpenModel?: (model: string) => void;
   showAll?: boolean;
   autoFocusSearch?: boolean;
   onSearchFocus?: () => void;
+  //carries the query into the full list
+  initialSearch?: string;
 }) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
@@ -527,7 +573,7 @@ const ModelToggleList = memo(function ModelToggleList({
     : onShowAll
       ? MODEL_PREVIEW_SIZE
       : MODEL_PAGE_SIZE;
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
   const [limit, setLimit] = useState(pageSize);
 
   const disabledSet = useMemo(() => new Set(disabled), [disabled]);
@@ -540,9 +586,23 @@ const ModelToggleList = memo(function ModelToggleList({
   const enabledCount = models.filter((m) => !disabledSet.has(m)).length;
 
   //stable handler keeps memo rows still
-  const latest = useRef({ disabled, onChange, capabilities, onCapabilitiesChange });
+  const latest = useRef({
+    disabled,
+    onChange,
+    capabilities,
+    onCapabilitiesChange,
+    promptTiers,
+    onPromptTiersChange,
+  });
   useEffect(() => {
-    latest.current = { disabled, onChange, capabilities, onCapabilitiesChange };
+    latest.current = {
+      disabled,
+      onChange,
+      capabilities,
+      onCapabilitiesChange,
+      promptTiers,
+      onPromptTiersChange,
+    };
   });
   const toggleModel = useCallback((model: string, enabled: boolean) => {
     const { disabled: current, onChange: save } = latest.current;
@@ -556,6 +616,15 @@ const ModelToggleList = memo(function ModelToggleList({
     const { capabilities: current, onCapabilitiesChange: save } = latest.current;
     save?.({ ...current, [model]: caps });
   }, []);
+  const setModelPromptTier = useCallback(
+    (model: string, tier: PromptTier | undefined) => {
+      const { promptTiers: current, onPromptTiersChange: save } = latest.current;
+      //auto removes the override
+      const { [model]: _removed, ...rest } = current;
+      save?.(tier ? { ...rest, [model]: tier } : rest);
+    },
+    [],
+  );
 
   //bulk buttons act on the filtered rows
   const setShown = (enabled: boolean) => {
@@ -631,6 +700,7 @@ const ModelToggleList = memo(function ModelToggleList({
                   onToggle={toggleModel}
                   onExpand={onOpenModel ?? toggleExpanded}
                   onCapabilitiesChange={setModelCapabilities}
+                  onPromptTierChange={setModelPromptTier}
                 />
               ))
             )}
@@ -641,7 +711,11 @@ const ModelToggleList = memo(function ModelToggleList({
                   label={t("settings.ollama.showMore", {
                     count: shown.length - limit,
                   })}
-                  onPress={onShowAll ?? (() => setLimit((l) => l + pageSize))}
+                  onPress={
+                    onShowAll
+                      ? () => onShowAll(search)
+                      : () => setLimit((l) => l + pageSize)
+                  }
                 />
               </Group>
             )}
@@ -814,6 +888,8 @@ export default function SettingsDrawer({
   //model page search hands focus to the list
   const [openaiModelsSearchHandoff, setOpenAIModelsSearchHandoff] =
     useState(false);
+  //query typed in the inline list before show more
+  const [openaiModelsSearch, setOpenAIModelsSearch] = useState("");
   const [mcpAddVisible, setMcpAddVisible] = useState(false);
   const [profileEditVisible, setProfileEditVisible] = useState(false);
   const [litertDownloadVisible, setLitertDownloadVisible] = useState(false);
@@ -4424,6 +4500,10 @@ export default function SettingsDrawer({
           onCapabilitiesChange={(next) =>
             patchOllamaServer(index, { capabilities: next })
           }
+          promptTiers={server.promptTiers}
+          onPromptTiersChange={(next) =>
+            patchOllamaServer(index, { promptTiers: next })
+          }
         />
 
         <View style={styles.contentCard}>
@@ -4619,7 +4699,10 @@ export default function SettingsDrawer({
           onChange={(next) =>
             patchOpenAIServer(index, { disabledModels: next })
           }
-          onShowAll={() => openOpenAIModels("list")}
+          onShowAll={(query) => {
+            setOpenAIModelsSearch(query);
+            openOpenAIModels("list");
+          }}
           onOpenModel={(model) => openOpenAIModels("model", model)}
         />
 
@@ -5866,7 +5949,8 @@ export default function SettingsDrawer({
         >
           {page === "list" ? (
             <ModelToggleList
-              key={url}
+              key={`${url}:${openaiModelsSearch}`}
+              initialSearch={openaiModelsSearch}
               models={openaiModels}
               loading={openaiModelsLoading}
               service={OPENAI_PROVIDER_ID}
@@ -5895,6 +5979,7 @@ export default function SettingsDrawer({
                       value=""
                       onFocus={() => {
                         setOpenAIModelsSearchHandoff(true);
+                        setOpenAIModelsSearch("");
                         showOpenAIModelsPage("list");
                       }}
                       autoCapitalize="none"
@@ -5938,6 +6023,12 @@ export default function SettingsDrawer({
                         capabilities: { ...server.capabilities, [m]: caps },
                       })
                     }
+                    onPromptTierChange={(m, tier) => {
+                      const { [m]: _removed, ...rest } = server.promptTiers ?? {};
+                      patchOpenAIServer(index, {
+                        promptTiers: tier ? { ...rest, [m]: tier } : rest,
+                      });
+                    }}
                     style={styles.cloudModelCapabilities}
                     labelStyle={styles.cloudModelCapabilityLabel}
                     checkboxes

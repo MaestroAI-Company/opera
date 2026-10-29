@@ -59,7 +59,12 @@ export type OllamaServer = {
   disabledModels?: string[];
   //user set caps win over detection
   capabilities?: Record<string, string[]>;
+  //user picked system prompt size per model
+  promptTiers?: Record<string, PromptTier>;
 };
+
+export const PROMPT_TIERS = ['small', 'medium', 'large'] as const;
+export type PromptTier = (typeof PROMPT_TIERS)[number];
 
 //legacy entries are plain url strings
 function readServer(entry: unknown): OllamaServer | null {
@@ -81,6 +86,11 @@ function readServer(entry: unknown): OllamaServer | null {
     const caps = Object.entries(raw.capabilities as Record<string, unknown>)
       .filter((e): e is [string, string[]] => Array.isArray(e[1]) && e[1].every((c) => typeof c === 'string'));
     if (caps.length > 0) server.capabilities = Object.fromEntries(caps);
+  }
+  if (raw.promptTiers && typeof raw.promptTiers === 'object') {
+    const tiers = Object.entries(raw.promptTiers as Record<string, unknown>)
+      .filter((e): e is [string, PromptTier] => PROMPT_TIERS.includes(e[1] as PromptTier));
+    if (tiers.length > 0) server.promptTiers = Object.fromEntries(tiers);
   }
   return server;
 }
@@ -150,6 +160,10 @@ export function getDisabledModels(service: string, url: string): string[] {
 
 export function getCapabilityOverride(service: string, url: string, model: string): string[] | undefined {
   return findServer(service, url)?.capabilities?.[model];
+}
+
+export function getPromptTierOverride(service: string, url: string, model: string): PromptTier | undefined {
+  return findServer(service, url)?.promptTiers?.[model];
 }
 
 //undefined falls back to global

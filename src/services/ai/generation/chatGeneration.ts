@@ -9,6 +9,7 @@ import { ToolManager } from '../tools/ToolManager';
 import { extractCitedUrls } from './citations';
 import { buildMentionSegment, resolveMentions } from '../mentions';
 import { estimateTokens } from '../tokens';
+import { getPromptTierOverride } from '../providers/sources';
 
 //marker when user stops generation
 export const INTERRUPTED_MARKER = '\n\n_The user interrupted the response_';
@@ -43,6 +44,10 @@ function parseParamsB(model: string): number | null {
 
 //small windows cannot afford full prompt
 function modelTier(model: string): ModelTier {
+  //user choice beats detection
+  const source = AIModule.getActiveSource();
+  const chosen = getPromptTierOverride(source.service, source.url, model);
+  if (chosen) return chosen;
   //nano full handles the medium prompt
   if (model.startsWith('aicore-nano-full')) return 'medium';
   if (isLocalModel(model)) return 'small';

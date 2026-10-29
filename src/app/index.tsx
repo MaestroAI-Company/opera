@@ -67,6 +67,7 @@ import {
 import SamplerScreen from "../components/features/SamplerScreen";
 import SettingsDrawer, { SubPage } from "../components/features/SettingsDrawer";
 import TopBar from "../components/features/TopBar";
+import WhatsNewSheet from "../components/features/WhatsNewSheet";
 import ActionButton from "../components/ui/ActionButton";
 import Group from "../components/ui/Group";
 import NotificationModal from "../components/ui/NotificationModal";
@@ -129,6 +130,7 @@ import {
 } from "../services/share/ShareService";
 import { speakReplyLive } from "../services/speech/liveReply";
 import { STT, WhisperSTT } from "../services/speech/STTService";
+import { ReleaseNotes, takeReleaseNotes } from "../services/updates/UpdateService";
 
 const texture2 = require("../../assets/images/texture2.png");
 const settingsIcon = require("../../assets/icons/settings.png");
@@ -655,6 +657,7 @@ useEffect(() => {
   const [previewDetails, setPreviewDetails] = useState<PreviewDetails | null>(
     null,
   );
+  const [releaseNotes, setReleaseNotes] = useState<ReleaseNotes | null>(null);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const rootRef = useRef<View>(null);
 
@@ -1029,6 +1032,10 @@ useEffect(() => {
         const isBrowserWeb =
           Platform.OS === "web" &&
           !(typeof window !== "undefined" && "__TAURI_INTERNALS__" in window);
+        //before onboarding so fresh installs skip it
+        takeReleaseNotes(!s.hasSeenOnboarding)
+          .then(setReleaseNotes)
+          .catch((e) => console.warn("Could not load release notes:", e));
         if (!s.hasSeenOnboarding && !isBrowserWeb) {
           router.replace("/onboarding");
           return;
@@ -2508,6 +2515,14 @@ useEffect(() => {
       <MessageDetailsSheet
         details={previewDetails}
         onClose={() => setPreviewDetails(null)}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        bottomInset={insets.bottom}
+      />
+
+      <WhatsNewSheet
+        release={releaseNotes}
+        onClose={() => setReleaseNotes(null)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
         bottomInset={insets.bottom}

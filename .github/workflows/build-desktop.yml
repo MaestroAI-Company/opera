@@ -104,8 +104,6 @@ jobs:
       - name: Build desktop bundle
         env:
           SAMPLER_HUB_DIR: ${{ github.workspace }}/Sampler-Hub
-          # baked into the js bundle, so it has to be set before the export
-          EXPO_PUBLIC_BETA_SERVER_URL: ${{ secrets.EXPO_PUBLIC_BETA_SERVER_URL }}
         run: npm run build:desktop -- --bundles ${{ matrix.bundles }} --config '{"version":"${{ steps.versions.outputs.app }}"}'
 
       # stable names so the website can link them

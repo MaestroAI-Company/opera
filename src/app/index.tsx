@@ -2779,7 +2779,7 @@ useEffect(() => {
             const page = (
               provider === "local"
                 ? "litert"
-                : ["beta", "litert", "ollama", "openai"].includes(provider)
+                : ["litert", "ollama", "openai"].includes(provider)
                   ? provider
                   : "service"
             ) as SubPage;

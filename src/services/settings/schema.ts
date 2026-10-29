@@ -57,7 +57,7 @@ export const BASE_DEFAULTS: AppSettings = {
   ollamaUrls: '[]',
   openaiUrls: '[]',
   mcpServers: '[]',
-  enabledProviders: 'local,litert,ollama,openai,beta',
+  enabledProviders: 'local,litert,ollama,openai',
   modelFailover: true,
   ollamaModel: '',
   ollamaContextLength: 8192,

@@ -100,8 +100,7 @@ const CENTERED_CARD_WIDTH = 840;
 //context size configured for the active source
 const contextWindowFor = (service: string, ollamaUrl: string) => {
   if (service === "litert") return Settings.getCached().litertContextLength;
-  //beta shares the ollama tuning
-  if (service === "ollama" || service === "beta") return getOllamaTuning(ollamaUrl).contextLength;
+  if (service === "ollama") return getOllamaTuning(ollamaUrl).contextLength;
   return 0;
 };
 

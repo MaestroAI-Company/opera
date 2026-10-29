@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { t } from '../../../i18n';
 import { AppSettings, Settings } from '../../settings/SettingsService';
+import { BASE_DEFAULTS } from '../../settings/schema';
 import { HUB_URL_SCHEME, type HubProvider } from '../../hub/SamplerHubService';
 import { getSecret, setSecret } from '../../mcp/mcpStorage';
 
@@ -12,7 +13,7 @@ export type ModelSource = {
   url: string;
 };
 
-export const PROVIDER_IDS = ['local', 'litert', 'ollama', 'openai', 'beta', 'samplerhub'] as const;
+export const PROVIDER_IDS = ['local', 'litert', 'ollama', 'openai', 'samplerhub'] as const;
 
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
@@ -26,7 +27,6 @@ const PROVIDER_PLATFORMS: Record<ProviderId, readonly ProviderPlatform[]> = {
   litert: ['android', 'ios'],
   ollama: ['android', 'ios', 'web', 'desktop'],
   openai: ['android', 'ios', 'web', 'desktop'],
-  beta: ['android', 'ios', 'web', 'desktop'],
   //platforms that ship the hub client
   samplerhub: ['android', 'desktop', 'web'],
 };
@@ -43,9 +43,8 @@ export function isProviderSupported(id: string): boolean {
   return !!platforms && platforms.includes(currentPlatform());
 }
 
-//hosted server offered during the beta, a provider of its own
+//retired hosted beta server
 export const BETA_PROVIDER_ID = 'beta';
-export const BETA_SERVER_URL = process.env.EXPO_PUBLIC_BETA_SERVER_URL ?? '';
 
 //any server speaking the openai protocol
 export const OPENAI_PROVIDER_ID = 'openai';
@@ -283,10 +282,6 @@ export function buildSources(localAvailable: boolean): ModelSource[] {
   if (isProviderSupported('litert') && enabled.includes('litert')) {
     sources.push({ key: 'litert', service: 'litert', label: t('settings.service.litert'), url: '' });
   }
-  if (BETA_SERVER_URL && enabled.includes(BETA_PROVIDER_ID)) {
-    //the provider owns its url, nothing to store
-    sources.push({ key: BETA_PROVIDER_ID, service: BETA_PROVIDER_ID, label: 'Opera Beta', url: '' });
-  }
   if (isProviderSupported('ollama') && enabled.includes('ollama')) {
     sources.push(...serverSources('ollama', getOllamaServers(), 'Ollama'));
   }
@@ -299,18 +294,21 @@ export function buildSources(localAvailable: boolean): ModelSource[] {
   return sources;
 }
 
-//one-off cleanup of the settings the beta used to share with ollama
+//clean beta server from old settings
 export function migrateModelSources(settings: AppSettings): AppSettings {
   const patch: Partial<AppSettings> = {};
-  const legacy = settings.ollamaUrl.trim();
-  if (!BETA_SERVER_URL) return applyPatch(settings, patch);
-  if (settings.aiService === 'ollama' && legacy === BETA_SERVER_URL) {
-    patch.aiService = BETA_PROVIDER_ID;
-    patch.ollamaUrl = '';
+  if (settings.aiService === BETA_PROVIDER_ID) {
+    patch.aiService = BASE_DEFAULTS.aiService;
+    patch.ollamaModel = '';
   }
-  if (settings.quickFlowService === 'ollama' && settings.quickFlowUrl.trim() === BETA_SERVER_URL) {
-    patch.quickFlowService = BETA_PROVIDER_ID;
+  if (settings.quickFlowService === BETA_PROVIDER_ID) {
+    patch.quickFlowService = '';
     patch.quickFlowUrl = '';
+    patch.quickFlowModel = '';
+  }
+  const providers = settings.enabledProviders.split(',').map((p) => p.trim());
+  if (providers.includes(BETA_PROVIDER_ID)) {
+    patch.enabledProviders = serializeProviders(providers.filter((p) => p && p !== BETA_PROVIDER_ID));
   }
   return applyPatch(settings, patch);
 }

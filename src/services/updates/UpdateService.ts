@@ -36,13 +36,44 @@ function versionParts(version: string): number[] {
   return parts;
 }
 
+//semver prerelease ids empty for stable
+function prereleaseIds(version: string): string[] {
+  const pre = version.trim().match(/^v?\d+(?:\.\d+)*[a-z]?-([0-9a-z.-]+)/i)?.[1];
+  return pre ? pre.toLowerCase().split('.') : [];
+}
+
+function comparePrerelease(a: string[], b: string[]): number {
+  //stable sorts after its prereleases
+  if (!a.length || !b.length) return b.length - a.length;
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    if (a[i] === b[i]) continue;
+    const na = /^\d+$/.test(a[i]);
+    const nb = /^\d+$/.test(b[i]);
+    if (na && nb) return parseInt(a[i], 10) - parseInt(b[i], 10);
+    if (na !== nb) return na ? -1 : 1;
+    return a[i] < b[i] ? -1 : 1;
+  }
+  return a.length - b.length;
+}
+
 export function isNewerVersion(candidate: string, current: string): boolean {
   const a = versionParts(candidate);
   const b = versionParts(current);
   for (let i = 0; i < a.length; i++) {
     if (a[i] !== b[i]) return a[i] > b[i];
   }
-  return false;
+  return comparePrerelease(prereleaseIds(candidate), prereleaseIds(current)) > 0;
+}
+
+function isBetaVersion(version: string): boolean {
+  return /-beta/i.test(version);
+}
+
+//ci injects tag with beta suffix
+function getBuildVersion(): string {
+  const version = Constants.expoConfig?.version ?? '0.0.0';
+  const tag = process.env.EXPO_PUBLIC_RELEASE_TAG?.trim().replace(/^v/i, '');
+  return tag && tag.startsWith(`${version}-beta`) ? tag : version;
 }
 
 async function fetchLatestRelease(): Promise<AppRelease | null> {
@@ -57,13 +88,33 @@ async function fetchLatestRelease(): Promise<AppRelease | null> {
   return { version: tag.replace(/^v/i, ''), url: data.html_url ?? LATEST_RELEASE_URL };
 }
 
+//newest stable or beta release
+async function fetchNewestRelease(): Promise<AppRelease | null> {
+  const res = await universalFetch(RELEASES_URL, {
+    headers: { Accept: 'application/vnd.github+json' },
+  });
+  if (!res.ok) return null;
+
+  const releases: any[] = await res.json();
+  let newest: AppRelease | null = null;
+  for (const r of releases) {
+    const tag: string | undefined = r?.tag_name;
+    if (!tag || r.draft || (r.prerelease && !isBetaVersion(tag))) continue;
+    const version = tag.replace(/^v/i, '');
+    if (!newest || isNewerVersion(version, newest.version)) {
+      newest = { version, url: r.html_url ?? LATEST_RELEASE_URL };
+    }
+  }
+  return newest;
+}
+
 //latest release when newer than build
 export async function getAvailableUpdate(): Promise<AppRelease | null> {
-  const current = Constants.expoConfig?.version ?? '0.0.0';
+  const current = getBuildVersion();
 
   if (Date.now() - cachedAt > CHECK_INTERVAL_MS) {
     try {
-      cachedRelease = await fetchLatestRelease();
+      cachedRelease = isBetaVersion(current) ? await fetchNewestRelease() : await fetchLatestRelease();
     } catch (e) {
       console.warn('[UpdateService] release check failed:', e);
       cachedRelease = null;

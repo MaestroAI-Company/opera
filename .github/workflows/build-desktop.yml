@@ -104,6 +104,8 @@ jobs:
       - name: Build desktop bundle
         env:
           SAMPLER_HUB_DIR: ${{ github.workspace }}/Sampler-Hub
+          # tells a beta build its beta number
+          EXPO_PUBLIC_RELEASE_TAG: ${{ github.ref_name }}
         run: npm run build:desktop -- --bundles ${{ matrix.bundles }} --config '{"version":"${{ steps.versions.outputs.app }}"}'
 
       # stable names so the website can link them

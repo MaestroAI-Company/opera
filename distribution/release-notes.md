@@ -1,27 +1,11 @@
-## Sampler Hub
-- Pair your phone, computer or browser with a Sampler Hub using a QR code or a pairing code.
-- Conversations, messages, images and settings sync between your paired devices.
-- Use the models and MCP servers running on your Sampler Hub from any device, and manage its llama.cpp models from the app.
-- One backup a day per profile, and you can restore a profile from a Sampler when you set up a new device.
+Opera 1.0 brings your assistant to all your devices.
 
-## Desktop
-- Opera now runs on Windows, macOS and Linux.
-- Settings open in their own window.
+**Sampler Hub.** Install it on a computer, pair your phone with a code or a QR scan, and your chats, images and settings follow you from one device to another. Your phone can use the models running on that computer (Ollama, LM Studio, llama.cpp) and the MCP servers installed on it. Conversations are sealed with your profile key, so Sampler Hub stores them without being able to read them. Each profile gets a daily backup, and a new phone can restore it during onboarding.
 
-## Voice
-- New offline voices, and replies can be read aloud while they are written.
-- Pick a voice for Maestro and hear a preview right away.
+**Opera on desktop.** Windows, macOS and Linux, with a layout made for big screens and settings in their own window. The desktop app can also host Sampler Hub for your other devices.
 
-## Screen saver
-- A clock screen you can talk to hands free with the **Maestro** wake word, and keep asking without saying it again.
-- Dims the screen and protects OLED screens from burn-in.
+**Standby.** Put your phone on its charger and it turns into a clock with Maestro's butterflies. Say "Maestro" and ask your question without touching it, Maestro answers out loud with a small card on screen, and you can keep talking to follow up. On OLED screens, anti burn-in moves everything a few pixels every minute.
 
-## Chat
-- Edit your messages.
-- Attach videos.
-- Images in answers only load from the web once you allow it.
-- Turn individual Ollama and cloud models on or off, and set what each model supports.
+**A real voice for Maestro.** Install the offline voice pack and Maestro speaks with a natural voice instead of the system one. Each butterfly has its own voice, tap one to hear it.
 
-## Fixes
-- The theme follows your system from the first launch.
-- Opera no longer asks for access to all your photos and videos.
+You can also edit your messages, attach videos, and pick which Ollama and cloud models show up in the list. Images from the web in answers only load once you allow them. The theme follows your system from the first launch, and Opera no longer asks for access to all your photos.

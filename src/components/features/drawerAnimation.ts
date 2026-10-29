@@ -1,10 +1,61 @@
-import { Animated, Easing, Platform } from "react-native";
+import { useSyncExternalStore } from "react";
+import { Animated, Easing, PanResponder, Platform } from "react-native";
 
 //module scope shared with screen
 export const conversationsProgress = new Animated.Value(0);
+export const samplerDrawerProgress = new Animated.Value(0);
 export const settingsProgress = new Animated.Value(0);
 
 export const DRAWER_NATIVE_DRIVER = Platform.OS !== "web";
+
+const DOCKED_WIDTH = 320;
+const DOCKED_MIN_WIDTH = 240;
+const DOCKED_MAX_WIDTH = 480;
+
+//shared between chat and sampler sidebars
+let currentDockedWidth = DOCKED_WIDTH;
+const dockedWidthListeners = new Set<() => void>();
+
+function subscribeDockedWidth(listener: () => void) {
+  dockedWidthListeners.add(listener);
+  return () => {
+    dockedWidthListeners.delete(listener);
+  };
+}
+
+function getDockedWidth() {
+  return currentDockedWidth;
+}
+
+//cursor holds outside the thin handle
+function setPageCursor(cursor: string) {
+  document.body.style.cursor = cursor;
+}
+
+//pointer x matches edge panel width
+const resizeResponder = PanResponder.create({
+  onStartShouldSetPanResponder: () => true,
+  //prevent text selection stealing the drag
+  onPanResponderTerminationRequest: () => false,
+  onPanResponderGrant: (e) => {
+    //stop mousedown from starting text selection
+    e.preventDefault();
+    setPageCursor("col-resize");
+  },
+  onPanResponderMove: (_, gestureState) => {
+    const next = Math.min(DOCKED_MAX_WIDTH, Math.max(DOCKED_MIN_WIDTH, gestureState.moveX));
+    if (next === currentDockedWidth) return;
+    currentDockedWidth = next;
+    dockedWidthListeners.forEach((fn) => fn());
+  },
+  onPanResponderRelease: () => setPageCursor(""),
+  onPanResponderTerminate: () => setPageCursor(""),
+});
+
+export function useDockedWidth() {
+  const dockedWidth = useSyncExternalStore(subscribeDockedWidth, getDockedWidth);
+  return { dockedWidth, resizeResponder };
+}
 
 //full width on mobile, capped elsewhere
 export function drawerWidthFor(windowWidth: number): number {

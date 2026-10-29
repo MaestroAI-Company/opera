@@ -6,8 +6,11 @@ import { gunzip, gzip } from './cloud/compress';
 import { BackupData } from './BackupService';
 import { DB, Conversation, Message, SyncTombstone } from './db/DatabaseService';
 import { Settings, AppSettings } from './settings/SettingsService';
+import { BASE_DEFAULTS } from './settings/schema';
+import { SyncPrefs, SyncPrefsStore } from './SyncPrefs';
 import { CloudProvider, CloudUserInfo } from './cloud/CloudProvider';
 import { getCloudProviderDefinition } from './cloud/registry';
+import { HubProfile, OperaHub, ProfileBackup } from './hub/OperaHubService';
 import { AppEvents } from './events';
 import { OverlayPresence } from './overlay/overlayPresence';
 import * as SecureStore from 'expo-secure-store';
@@ -20,11 +23,19 @@ const LAST_SYNC_TIME_KEY = 'cloud_sync_last_time';
 const LAST_SYNC_SIZE_KEY = 'cloud_sync_last_size';
 const SYNC_PAUSED_KEY = 'cloud_sync_paused';
 const REMOTE_STATE_KEY = 'cloud_sync_remote_state';
+//backup key of the profile this device backs up
+const PROFILE_BACKUP_KEY = 'cloud_profile_backup';
+//on while sampler syncs and the cloud only backs up
+const BACKUP_MODE_KEY = 'cloud_backup_mode';
 
 //a full migration flow (prompt, gating, local snapshot) lives in 78bd429
 const ENC_VERSION = 2;
 //v1 gzipped everything, images included
 const LEGACY_ENC_VERSION = 1;
+//sealed with the profile key, opened by its password
+const PROFILE_ENC_VERSION = 3;
+//sampler syncs, the cloud only backs up
+const BACKUP_EVERY_MS = 24 * 60 * 60 * 1000;
 const BLOB_REF_PREFIX = 'opera-blob:';
 const PBKDF2_ITERATIONS = 50000;
 const AES_KEY_BYTES = 32;
@@ -37,10 +48,20 @@ const MAX_RETRY_ATTEMPTS = 5;
 
 type SyncOutcome = { success: boolean; error?: string; retryable?: boolean };
 
+//rows a cloud merge wrote or deleted
+export type CloudMergeTouched = { conversations: string[]; messages: string[] };
+
 //tag and hash of last upload
 type RemoteState = { tag: string; hash: string };
 
-type DecryptOutcome = { backup: unknown; unsupportedVersion?: boolean };
+type DecryptOutcome = {
+  backup: unknown;
+  unsupportedVersion?: boolean;
+  //another profile's backup, never overwritten
+  otherProfile?: boolean;
+  //an old pin backup this device cannot open
+  replaceable?: boolean;
+};
 
 //image bytes trail the gzipped json
 type BlobEntry = { id: string; prefix: string; length: number };
@@ -51,6 +72,10 @@ type DerivedKeys = {
   encryptionKey: string;
   macKey: string;
 };
+
+//replaces the pin on a device with a profile
+type ProfileSecret = { header: ProfileBackup['header']; keys: DerivedKeys };
+type Secret = string | ProfileSecret;
 
 class CloudSyncServiceImpl {
   private provider: CloudProvider | null = null;
@@ -69,6 +94,10 @@ class CloudSyncServiceImpl {
   //pin check result, spares a second decrypt
   private verifiedDownload: { tag: string; backup: unknown } | null = null;
   private retryAttempt = 0;
+  private profileSecret: ProfileSecret | null = null;
+  private backupMode = false;
+  //daily backups only once a profile exists
+  private lastBackupAt = 0;
 
   private async setStorageItem(key: string, value: string | null) {
     if (Platform.OS === 'web') {
@@ -93,30 +122,17 @@ class CloudSyncServiceImpl {
     return await SecureStore.getItemAsync(key);
   }
 
-  async init(): Promise<void> {
+  //passive skips every background sync trigger, for a second window
+  async init(options?: { passive?: boolean }): Promise<void> {
     //init once or listeners register twice
     if (this.initialized) return;
     this.initialized = true;
 
-    this.remoteState = await this.loadRemoteState();
-    this.paused = (await this.getStorageItem(SYNC_PAUSED_KEY)) === 'true';
-
-    const providerName = await this.getStorageItem(CLOUD_PROVIDER_KEY);
-
-    if (providerName && providerName !== 'none') {
-      await this.migrateSharedPin(providerName);
-      await this.loadPinFor(providerName);
-      const def = getCloudProviderDefinition(providerName);
-      if (def) {
-        const provider = def.create();
-        if (await provider.authenticate(false)) { //silent auth
-          this.provider = provider;
-        }
-      }
-    }
+    await this.loadState();
+    if (options?.passive) return;
 
     //trigger initial sync on startup
-    if (this.provider && this.pin) {
+    if (this.provider && this.hasPin()) {
       this.requestAutoSync(0);
     }
 
@@ -137,9 +153,40 @@ class CloudSyncServiceImpl {
     DeviceEventEmitter.addListener(AppEvents.settingsChanged, onDataChanged);
   }
 
+  //reads everything init and a second window's changes depend on
+  private async loadState(): Promise<void> {
+    await SyncPrefsStore.load();
+    this.remoteState = await this.loadRemoteState();
+    this.paused = (await this.getStorageItem(SYNC_PAUSED_KEY)) === 'true';
+
+    const providerName = await this.getStorageItem(CLOUD_PROVIDER_KEY);
+    this.lastBackupAt = Number((await this.getStorageItem(LAST_SYNC_TIME_KEY)) ?? 0);
+    this.backupMode = (await this.getStorageItem(BACKUP_MODE_KEY)) === 'true';
+    await this.refreshSecret();
+
+    if (providerName && providerName !== 'none') {
+      await this.migrateSharedPin(providerName);
+      await this.loadPinFor(providerName);
+      const def = getCloudProviderDefinition(providerName);
+      if (def) {
+        const provider = def.create();
+        //silent auth
+        this.provider = (await provider.authenticate(false)) ? provider : null;
+      }
+    } else {
+      this.provider = null;
+    }
+  }
+
+  //another window may have changed the account, the pin or the pause
+  async reload(): Promise<void> {
+    if (this.initialized) await this.loadState();
+  }
+
   requestAutoSync(delay = 5000) {
-    if (this.paused || !this.provider || !this.pin) return;
-    
+    if (this.paused || !this.provider || !this.hasPin()) return;
+    if (this.backupMode && Date.now() - this.lastBackupAt < BACKUP_EVERY_MS) return;
+
     if (this.syncTimeout) clearTimeout(this.syncTimeout);
     this.syncTimeout = setTimeout(() => {
       this.sync(true).catch((e) => console.error('Auto-sync failed:', e));
@@ -198,6 +245,9 @@ class CloudSyncServiceImpl {
   //unlinks the account for good
   async disconnect(): Promise<void> {
     await this.clearPin();
+    await this.setStorageItem(PROFILE_BACKUP_KEY, null);
+    await this.setBackupMode(false);
+    await this.refreshSecret();
     if (this.provider) {
       await this.provider.logout();
     }
@@ -248,8 +298,83 @@ class CloudSyncServiceImpl {
     }
   }
 
+  //true when the cloud only backs up a profile
+  backsUpProfile(): boolean {
+    return this.backupMode && !!this.profileSecret;
+  }
+
+  isBackupMode(): boolean {
+    return this.backupMode;
+  }
+
+  //sampler syncs, the cloud keeps a daily profile backup
+  async setBackupMode(on: boolean): Promise<void> {
+    this.backupMode = on;
+    await this.setStorageItem(BACKUP_MODE_KEY, on ? 'true' : null);
+    //the other mode writes another envelope
+    await this.setRemoteState(null);
+  }
+
+  //a profile backup needs no pin
   hasPin(): boolean {
-    return !!this.pin;
+    return this.backupMode ? !!this.profileSecret : !!this.pin;
+  }
+
+  //the sampler profile wins, then a restored one
+  async refreshSecret(): Promise<void> {
+    const fromHub = OperaHub.isSupported() ? await OperaHub.profileBackup().catch(() => null) : null;
+    const stored = await this.getStorageItem(PROFILE_BACKUP_KEY);
+    const backup: ProfileBackup | null = fromHub ?? (stored ? JSON.parse(stored) : null);
+    if (!backup) {
+      this.profileSecret = null;
+      return;
+    }
+    if (fromHub) await this.setStorageItem(PROFILE_BACKUP_KEY, JSON.stringify(fromHub));
+    this.profileSecret = { header: backup.header, keys: await this.profileKeys(backup.backupKey) };
+  }
+
+  //the profile a cloud backup belongs to, null for a pin backup
+  async cloudBackupProfile(): Promise<HubProfile | null> {
+    if (!this.provider) return null;
+    const download = await this.provider.downloadFile(SYNC_FILE_NAME).catch(() => null);
+    if (download?.status !== 'ok') return null;
+    try {
+      const env = JSON.parse(download.content);
+      return env?.kdf === 'profile' ? (env.profile.profile as HubProfile) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  //the profile password reopens its backup
+  async unlockProfileBackup(password: string): Promise<boolean> {
+    if (!this.provider) return false;
+    try {
+      const download = await this.provider.downloadFile(SYNC_FILE_NAME);
+      if (download.status !== 'ok') return false;
+      const env = JSON.parse(download.content);
+      if (env?.kdf !== 'profile') return false;
+      const backupKey = await OperaHub.openBackupKey(env.profile.lock, password);
+      const secret: ProfileSecret = { header: env.profile, keys: await this.profileKeys(backupKey) };
+      const decrypted = await this.decrypt(download.content, secret);
+      if (!decrypted.backup) return false;
+      this.profileSecret = secret;
+      await this.setStorageItem(PROFILE_BACKUP_KEY, JSON.stringify({ header: env.profile, backupKey }));
+      await this.setBackupMode(true);
+      await this.setRemoteState(null);
+      if (download.tag) this.verifiedDownload = { tag: download.tag, backup: decrypted.backup };
+      return true;
+    } catch (e) {
+      console.warn('Profile backup did not open:', e);
+      return false;
+    }
+  }
+
+  private async profileKeys(backupKey: string): Promise<DerivedKeys> {
+    return {
+      encryptionKey: await BackupCryptoImpl.hmacSha256B64(backupKey, 'opera-encryption'),
+      macKey: await BackupCryptoImpl.hmacSha256B64(backupKey, 'opera-authentication'),
+    };
   }
 
   //each account encrypts its backup with its own pin
@@ -428,22 +553,25 @@ class CloudSyncServiceImpl {
     return { ...packed.backup, messages };
   }
 
-  private async encrypt(json: string, blobs: Uint8Array[], pin: string): Promise<string> {
+  private async encrypt(json: string, blobs: Uint8Array[], secret: Secret): Promise<string> {
+    const ivB64 = await BackupCryptoImpl.randomBytesB64(IV_BYTES);
+    const payload = await this.buildPayload(json, blobs);
+    if (typeof secret !== 'string') {
+      const ctB64 = await BackupCryptoImpl.aesCbcEncryptBytesB64(secret.keys.encryptionKey, ivB64, payload);
+      const header = JSON.stringify(secret.header);
+      return JSON.stringify({
+        v: PROFILE_ENC_VERSION,
+        kdf: 'profile',
+        profile: secret.header,
+        iv: ivB64,
+        ct: ctB64,
+        mac: await this.computeMac(secret.keys.macKey, PROFILE_ENC_VERSION, 0, header, ivB64, ctB64),
+      });
+    }
+    const pin = secret;
     const saltB64 = this.lastSaltB64 ?? (await BackupCryptoImpl.randomBytesB64(SALT_BYTES));
     this.lastSaltB64 = saltB64;
     const keys = await this.deriveKeys(pin, saltB64, PBKDF2_ITERATIONS);
-    const ivB64 = await BackupCryptoImpl.randomBytesB64(IV_BYTES);
-    //gzip shrinks chat json about fivefold
-    const gzipped = await gzip(strToU8(json));
-    //u32 length, gzipped json, image bytes
-    const payload = new Uint8Array(4 + gzipped.length + blobs.reduce((sum, blob) => sum + blob.length, 0));
-    new DataView(payload.buffer).setUint32(0, gzipped.length);
-    payload.set(gzipped, 4);
-    let offset = 4 + gzipped.length;
-    for (const blob of blobs) {
-      payload.set(blob, offset);
-      offset += blob.length;
-    }
     const ctB64 = await BackupCryptoImpl.aesCbcEncryptBytesB64(keys.encryptionKey, ivB64, payload);
     return JSON.stringify({
       v: ENC_VERSION,
@@ -456,9 +584,50 @@ class CloudSyncServiceImpl {
     });
   }
 
-  private async decrypt(data: string, pin: string): Promise<DecryptOutcome> {
+  //u32 length, gzipped json, image bytes
+  private async buildPayload(json: string, blobs: Uint8Array[]): Promise<Uint8Array> {
+    //gzip shrinks chat json about fivefold
+    const gzipped = await gzip(strToU8(json));
+    const payload = new Uint8Array(4 + gzipped.length + blobs.reduce((sum, blob) => sum + blob.length, 0));
+    new DataView(payload.buffer).setUint32(0, gzipped.length);
+    payload.set(gzipped, 4);
+    let offset = 4 + gzipped.length;
+    for (const blob of blobs) {
+      payload.set(blob, offset);
+      offset += blob.length;
+    }
+    return payload;
+  }
+
+  private readPayload(bytes: Uint8Array): Promise<BackupData> {
+    const jsonLength = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0);
+    return gunzip(bytes.subarray(4, 4 + jsonLength)).then((json) => {
+      const packed: PackedBackup = JSON.parse(utf8Decode(json));
+      return this.unpackBackup(packed, bytes.subarray(4 + jsonLength));
+    });
+  }
+
+  private async decrypt(data: string, secret: Secret): Promise<DecryptOutcome> {
     try {
       const env = JSON.parse(data);
+      if (env?.kdf === 'profile') {
+        if (typeof secret === 'string') return { backup: null };
+        if (env.profile?.profile?.id !== secret.header.profile.id) return { backup: null, otherProfile: true };
+        const header = JSON.stringify(env.profile);
+        const expected = await this.computeMac(secret.keys.macKey, env.v, 0, header, env.iv, env.ct);
+        if (env.mac !== expected) {
+          console.warn('Profile backup failed its integrity check, refusing to import it');
+          return { backup: null };
+        }
+        const bytes = await BackupCryptoImpl.aesCbcDecryptBytes(secret.keys.encryptionKey, env.iv, env.ct);
+        return { backup: await this.readPayload(bytes) };
+      }
+      //an old pin backup opens with the pin if this device knows it
+      if (typeof secret !== 'string') {
+        const old = this.pin ? await this.decrypt(data, this.pin) : null;
+        return old && (old.backup || old.unsupportedVersion) ? old : { backup: null, replaceable: true };
+      }
+      const pin = secret;
       if (!env || env.kdf !== 'pbkdf2-sha256') return { backup: null };
 
       if (env.v !== ENC_VERSION && env.v !== LEGACY_ENC_VERSION) {
@@ -483,9 +652,7 @@ class CloudSyncServiceImpl {
         return { backup: JSON.parse(utf8Decode(await gunzip(bytes))) };
       }
 
-      const jsonLength = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0);
-      const packed: PackedBackup = JSON.parse(utf8Decode(await gunzip(bytes.subarray(4, 4 + jsonLength))));
-      return { backup: this.unpackBackup(packed, bytes.subarray(4 + jsonLength)) };
+      return { backup: await this.readPayload(bytes) };
     } catch (e) {
       //caller decides what to report
       console.warn('Could not decrypt cloud payload:', e);
@@ -497,7 +664,12 @@ class CloudSyncServiceImpl {
     if (this.paused) {
       return { success: false, error: 'Sync is turned off' };
     }
-    if (!this.provider || !this.pin) {
+    //picks up a profile unlocked or changed since
+    await this.refreshSecret();
+    if (this.backupMode && !this.profileSecret) {
+      return { success: false, error: 'The profile backup needs the profile key. Update the Sampler, then try again.' };
+    }
+    if (!this.provider || !this.hasPin()) {
       return { success: false, error: 'Provider or PIN not configured' };
     }
 
@@ -532,19 +704,23 @@ class CloudSyncServiceImpl {
   }
 
   private async runSync(): Promise<SyncOutcome> {
-    if (!this.provider || !this.pin) {
+    //capture provider and secret once for sync
+    const provider = this.provider;
+    const secret: Secret | null = this.backupMode ? this.profileSecret : this.pin;
+    if (!provider || !secret) {
       return { success: false, error: 'Provider or PIN not configured' };
     }
-    //capture provider once for sync
-    const provider = this.provider;
-    const pin = this.pin;
+    const prefs = SyncPrefsStore.get();
+    if (!prefs.data && !prefs.settings) return { success: true };
+    //skipped parts keep the cloud copy
+    const partial = !prefs.data || !prefs.settings;
 
     try {
       //1. download unless unchanged since upload
       const knownState = this.remoteState;
       const verified = this.verifiedDownload;
       this.verifiedDownload = null;
-      const download = await provider.downloadFile(SYNC_FILE_NAME, knownState?.tag ?? verified?.tag ?? null);
+      const download = await provider.downloadFile(SYNC_FILE_NAME, partial ? null : (knownState?.tag ?? verified?.tag ?? null));
       if (download.status === 'error') {
         //blind upload would drop remote changes
         return { success: false, error: 'Could not reach the cloud.', retryable: true };
@@ -554,18 +730,26 @@ class CloudSyncServiceImpl {
       let fetched: unknown = null;
 
       if (download.status === 'ok') {
-        const decrypted = await this.decrypt(download.content, pin);
+        const decrypted = await this.decrypt(download.content, secret);
         if (decrypted.unsupportedVersion) {
           //newer build wrote it, leave untouched
           return { success: false, error: 'Cloud backup was written by a newer version of Opera.' };
         }
-        if (!decrypted.backup) {
+        if (decrypted.otherProfile) {
+          return { success: false, error: 'This cloud holds the backup of another profile.' };
+        }
+        if (typeof secret !== 'string' && !decrypted.backup && !decrypted.replaceable) {
+          return { success: false, error: 'Could not open the profile backup.' };
+        }
+        if (decrypted.replaceable) {
+          //the profile backup takes its place
+        } else if (!decrypted.backup) {
           //code no longer valid, clear stored pin
           await this.clearPin();
           DeviceEventEmitter.emit(AppEvents.syncPinInvalidated);
           return { success: false, error: 'Invalid PIN. Could not decrypt cloud backup.' };
         }
-        fetched = decrypted.backup;
+        if (decrypted.backup) fetched = decrypted.backup;
       } else if (download.status === 'unchanged' && !knownState && verified) {
         //file the pin check just decrypted
         fetched = verified.backup;
@@ -585,39 +769,40 @@ class CloudSyncServiceImpl {
         const backupToMerge = cloudBackup;
         this.isMerging = true;
         try {
-          await DB.runSilently(() => this.mergeCloudIntoLocal(backupToMerge));
+          const touched = await DB.runSilently(() => this.mergeCloudIntoLocal(backupToMerge, prefs));
           //one notification for the merge
           DeviceEventEmitter.emit(AppEvents.conversationsChanged);
+          if (touched.conversations.length > 0 || touched.messages.length > 0) {
+            DeviceEventEmitter.emit(AppEvents.cloudMerged, touched);
+          }
         } finally {
           this.isMerging = false;
         }
       }
 
       //3. create merged backup from db
-      const updatedConversations = await DB.getConversations();
-      const updatedMessages = await DB.getAllMessagesAllConversations();
-      const tombstones = await DB.getTombstones();
-
       const newBackup: BackupData = {
         version: 2,
-        settings: Settings.getCached(),
-        settingsUpdatedAt: await Settings.getSettingsUpdatedAt(),
-        conversations: updatedConversations,
-        messages: updatedMessages,
-        tombstones,
+        //defaults keep local settings private
+        settings: prefs.settings ? Settings.getCached() : (cloudBackup?.settings ?? BASE_DEFAULTS),
+        settingsUpdatedAt: prefs.settings ? await Settings.getSettingsUpdatedAt() : (cloudBackup?.settingsUpdatedAt ?? 0),
+        conversations: prefs.data ? await DB.getConversations() : (cloudBackup?.conversations ?? []),
+        messages: prefs.data ? await DB.getAllMessagesAllConversations() : (cloudBackup?.messages ?? []),
+        tombstones: prefs.data ? await DB.getTombstones() : (cloudBackup?.tombstones ?? []),
       };
 
       //4. nothing moved, no transfer needed
       const { json, blobs } = await this.packBackup(newBackup);
       const hash = await BackupCryptoImpl.sha256B64(json);
-      if (download.status === 'unchanged' && knownState?.hash === hash) {
+      const sameFile = download.status === 'unchanged' || (download.status === 'ok' && !!download.tag && download.tag === knownState?.tag);
+      if (sameFile && knownState?.hash === hash) {
         await this.setStorageItem(LAST_SYNC_TIME_KEY, Date.now().toString());
         DeviceEventEmitter.emit(AppEvents.syncCompleted);
         return { success: true };
       }
 
       //5. compress, encrypt and upload
-      const encryptedToUpload = await this.encrypt(json, blobs, pin);
+      const encryptedToUpload = await this.encrypt(json, blobs, secret);
       const upload = await provider.uploadFile(SYNC_FILE_NAME, encryptedToUpload);
 
       if (!upload.ok) {
@@ -627,7 +812,8 @@ class CloudSyncServiceImpl {
 
       //no tag means redownload next sync
       await this.setRemoteState(upload.tag ? { tag: upload.tag, hash } : null);
-      await this.setStorageItem(LAST_SYNC_TIME_KEY, Date.now().toString());
+      this.lastBackupAt = Date.now();
+      await this.setStorageItem(LAST_SYNC_TIME_KEY, this.lastBackupAt.toString());
       await this.setStorageItem(LAST_SYNC_SIZE_KEY, encryptedToUpload.length.toString());
       DeviceEventEmitter.emit(AppEvents.syncCompleted);
       return { success: true };
@@ -637,12 +823,13 @@ class CloudSyncServiceImpl {
     }
   }
 
-  private async mergeCloudIntoLocal(cloudBackup: BackupData): Promise<void> {
+  private async mergeCloudIntoLocal(cloudBackup: BackupData, prefs: SyncPrefs): Promise<CloudMergeTouched> {
+    const touched = { conversations: new Set<string>(), messages: new Set<string>() };
     //merge settings (last-write-wins, exclude device specific)
     const localSettingsUpdatedAt = await Settings.getSettingsUpdatedAt();
     const cloudSettingsUpdatedAt = cloudBackup.settingsUpdatedAt ?? 0;
     let mergedSettingsUpdatedAt = localSettingsUpdatedAt;
-    if (cloudSettingsUpdatedAt >= localSettingsUpdatedAt) {
+    if (prefs.settings && cloudSettingsUpdatedAt >= localSettingsUpdatedAt) {
       const mergedSettings: Partial<AppSettings> = {
         language: cloudBackup.settings.language,
         theme: cloudBackup.settings.theme,
@@ -658,9 +845,11 @@ class CloudSyncServiceImpl {
         mergedSettings.mcpServers = cloudBackup.settings.mcpServers;
       }
       await Settings.applyCloudSettings(mergedSettings);
+      DeviceEventEmitter.emit(AppEvents.settingsSynced);
       mergedSettingsUpdatedAt = cloudSettingsUpdatedAt;
     }
     await Settings.setSettingsUpdatedAt(mergedSettingsUpdatedAt);
+    if (!prefs.data) return { conversations: [], messages: [] };
 
     //load local state
     const localConversations = await DB.getConversations();
@@ -690,6 +879,7 @@ class CloudSyncServiceImpl {
       const t = tombByKey.get('conversation:' + conv.id);
       if (t && t.deletedAt >= conv.updatedAt) {
         await DB.deleteConversation(conv.id, { recordTombstone: false });
+        touched.conversations.add(conv.id);
         localConvsMap.delete(conv.id);
         localMsgsByConv.delete(conv.id);
       }
@@ -698,6 +888,7 @@ class CloudSyncServiceImpl {
       const t = tombByKey.get('message:' + msg.id);
       if (t && t.deletedAt >= msg.createdAt) {
         await DB.deleteMessage(msg.id, { recordTombstone: false });
+        touched.messages.add(msg.id);
       }
     }
 
@@ -716,6 +907,7 @@ class CloudSyncServiceImpl {
           return !(mt && mt.deletedAt >= m.createdAt);
         });
         await DB.replaceConversationWithMessages(cloudConv, msgs);
+        touched.conversations.add(cloudConv.id);
         continue;
       }
 
@@ -754,12 +946,14 @@ class CloudSyncServiceImpl {
 
       if (changed) {
         await DB.replaceConversationWithMessages(mergedConv, finalMsgs);
+        touched.conversations.add(mergedConv.id);
       }
     }
 
     //persist merged tombstones (keep any newer recorded during deletes above)
     const freshTombstones = await DB.getTombstones();
     await DB.setTombstones(this.unionTombstones(mergedTombstones, freshTombstones));
+    return { conversations: [...touched.conversations], messages: [...touched.messages] };
   }
 
   private unionTombstones(a: SyncTombstone[], b: SyncTombstone[]): SyncTombstone[] {

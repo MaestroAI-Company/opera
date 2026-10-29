@@ -95,7 +95,7 @@ const WINDOW_BUFFER = 20;
 const ANCHOR_GAP = 8;
 const ANCHOR_MARGIN = 8;
 const ANCHORED_CARD_WIDTH = 320;
-const CENTERED_CARD_WIDTH = 640;
+const CENTERED_CARD_WIDTH = 840;
 
 //context size configured for the active source
 const contextWindowFor = (service: string, ollamaUrl: string) => {
@@ -125,6 +125,8 @@ export type ModelSelectorTriggerProps = {
   style?: StyleProp<ViewStyle>;
   //desktop drops panel under button
   viewRef?: React.Ref<View>;
+  //actionbutton look without sticker shadow
+  flat?: boolean;
 };
 
 //button trigger in topbar
@@ -133,6 +135,7 @@ export function ModelSelectorTrigger({
   onPress,
   style,
   viewRef,
+  flat = false,
 }: ModelSelectorTriggerProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
@@ -145,12 +148,12 @@ export function ModelSelectorTrigger({
   return (
     <View style={[styles.container, style]} ref={viewRef} collapsable={false}>
       <View style={styles.shadowLayer}>
-        <View style={styles.shadowBlock} />
+        {!flat && <View style={styles.shadowBlock} />}
         <Pressable
           onPress={onPress}
-          style={pressStyle(styles.trigger, "surface")}
+          style={pressStyle([styles.trigger, flat && styles.triggerFlat], "surface")}
         >
-          <Image source={botIcon} style={styles.icon} />
+          {!flat && <Image source={botIcon} style={styles.icon} />}
           <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
             {selectedModel ? displayName(selectedModel) : t("modelSelector.placeholder")}
           </Text>
@@ -1064,6 +1067,11 @@ const makeStyles = (Colors: ThemeColors) =>
       position: "relative",
       zIndex: 1,
     },
+    triggerFlat: {
+      height: 36,
+      borderRadius: Radius.md,
+      maxWidth: 130,
+    },
     icon: {
       width: 18,
       height: 18,
@@ -1090,7 +1098,7 @@ const makeStyles = (Colors: ThemeColors) =>
       paddingHorizontal: Spacing.lg2,
     },
     tabsColumn: {
-      width: 180,
+      width: 220,
       gap: Spacing.xs,
     },
     desktopModels: {

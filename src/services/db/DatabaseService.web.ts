@@ -36,6 +36,8 @@ export type Message = {
   role: 'user' | 'assistant';
   content: string;
   createdAt: number;
+  //last local or synced change
+  updatedAt?: number;
   images?: string[];
   metrics?: MessageMetrics;
   sources?: MessageSource[];
@@ -50,13 +52,16 @@ export type SyncTombstone = {
 };
 
 const DB_NAME = 'opera';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = 'kv';
+//images exchanged with opera hub by content hash
+const BLOB_STORE = 'hubBlobs';
 
-type StoreKey = 'conversations' | 'messages' | 'tombstones';
+type StoreKey = 'conversations' | 'messages' | 'tombstones' | 'hubState';
+type LegacyKey = 'conversations' | 'messages' | 'tombstones';
 
 //legacy keys kept for migration
-const LEGACY_KEYS: Record<StoreKey, string> = {
+const LEGACY_KEYS: Record<LegacyKey, string> = {
   conversations: 'opera_conversations',
   messages: 'opera_messages',
   tombstones: 'opera_tombstones',
@@ -68,6 +73,7 @@ function openDatabase(): Promise<IDBDatabase> {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
+      if (!req.result.objectStoreNames.contains(BLOB_STORE)) req.result.createObjectStore(BLOB_STORE);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -78,6 +84,14 @@ function idbGet<T>(db: IDBDatabase, key: StoreKey): Promise<T | undefined> {
   return new Promise((resolve, reject) => {
     const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(key);
     req.onsuccess = () => resolve(req.result as T | undefined);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbRequest<T>(db: IDBDatabase, mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const req = run(db.transaction(BLOB_STORE, mode).objectStore(BLOB_STORE));
+    req.onsuccess = () => resolve(req.result as T);
     req.onerror = () => reject(req.error);
   });
 }
@@ -96,6 +110,8 @@ class DatabaseService {
   private conversations: Conversation[] = [];
   private messages: Message[] = [];
   private tombstones: SyncTombstone[] = [];
+  //opera hub cursors and marks
+  private hubState: Record<string, string> = {};
   private db: IDBDatabase | null = null;
   //keys waiting to be written
   private dirty = new Set<StoreKey>();
@@ -124,11 +140,13 @@ class DatabaseService {
   async init(): Promise<void> {
     try {
       this.db = await openDatabase();
-      const [convs, msgs, tombs] = await Promise.all([
+      const [convs, msgs, tombs, hubState] = await Promise.all([
         idbGet<Conversation[]>(this.db, 'conversations'),
         idbGet<Message[]>(this.db, 'messages'),
         idbGet<SyncTombstone[]>(this.db, 'tombstones'),
+        idbGet<Record<string, string>>(this.db, 'hubState'),
       ]);
+      this.hubState = hubState ?? {};
 
       if (convs === undefined && msgs === undefined) {
         await this.migrateFromLocalStorage();
@@ -145,7 +163,7 @@ class DatabaseService {
 
   //migrate data and free quota
   private async migrateFromLocalStorage(): Promise<void> {
-    const read = <T>(key: StoreKey): T[] => {
+    const read = <T>(key: LegacyKey): T[] => {
       try {
         const stored = localStorage.getItem(LEGACY_KEYS[key]);
         return stored ? JSON.parse(stored) : [];
@@ -169,6 +187,7 @@ class DatabaseService {
       conversations: this.conversations,
       messages: this.messages,
       tombstones: this.tombstones,
+      hubState: this.hubState,
     };
     await idbPut(this.db, keys.map(k => [k, values[k]] as [StoreKey, unknown]));
   }
@@ -318,7 +337,7 @@ class DatabaseService {
   async addMessage(conversationId: string, role: 'user' | 'assistant', content: string, images?: string[], screenContext?: Message['screenContext']): Promise<Message> {
     const now = Date.now();
     const id = `msg_${now}_${Math.random().toString(36).slice(2, 7)}`;
-    const msg: Message = { id, conversationId, role, content, createdAt: now, images, screenContext };
+    const msg: Message = { id, conversationId, role, content, createdAt: now, updatedAt: now, images, screenContext };
 
     this.messages.push(msg);
     this.conversations = this.conversations.map(c =>
@@ -333,14 +352,14 @@ class DatabaseService {
 
   //patch async screen context
   async updateMessageScreenContext(id: string, screenContext: Message['screenContext']): Promise<void> {
-    this.messages = this.messages.map(m => m.id === id ? { ...m, screenContext } : m);
+    this.messages = this.messages.map(m => m.id === id ? { ...m, screenContext, updatedAt: Date.now() } : m);
     this.saveMessages();
   }
 
   // update message content
   async updateMessageContent(id: string, content: string): Promise<void> {
     this.messages = this.messages.map(m => 
-      m.id === id ? { ...m, content } : m
+      m.id === id ? { ...m, content, updatedAt: Date.now() } : m
     );
     this.saveMessages();
     this.notifyDataChanged();
@@ -349,7 +368,7 @@ class DatabaseService {
   //store generation metrics for a message
   async updateMessageMetrics(id: string, metrics: MessageMetrics): Promise<void> {
     this.messages = this.messages.map(m => 
-      m.id === id ? { ...m, metrics } : m
+      m.id === id ? { ...m, metrics, updatedAt: Date.now() } : m
     );
     this.saveMessages();
   }
@@ -357,7 +376,7 @@ class DatabaseService {
   //store sources consulted for a message
   async updateMessageSources(id: string, sources: Message['sources']): Promise<void> {
     this.messages = this.messages.map(m =>
-      m.id === id ? { ...m, sources: sources && sources.length > 0 ? sources : undefined } : m
+      m.id === id ? { ...m, sources: sources && sources.length > 0 ? sources : undefined, updatedAt: Date.now() } : m
     );
     this.saveMessages();
   }
@@ -403,6 +422,78 @@ class DatabaseService {
     this.saveConversations();
     this.saveMessages();
     this.notifyDataChanged();
+  }
+
+  //opera hub sync state, apart from the cloud keys
+  async getHubState(key: string): Promise<string | null> {
+    return this.hubState[key] ?? null;
+  }
+
+  async setHubState(key: string, value: string): Promise<void> {
+    this.hubState = { ...this.hubState, [key]: value };
+    this.scheduleSave('hubState');
+  }
+
+  async getConversationsChangedSince(since: number): Promise<Conversation[]> {
+    return this.conversations.filter(c => c.updatedAt > since);
+  }
+
+  async getMessagesChangedSince(since: number): Promise<Message[]> {
+    return this.messages.filter(m => (m.updatedAt ?? m.createdAt) > since);
+  }
+
+  async getTombstonesSince(since: number): Promise<SyncTombstone[]> {
+    return this.tombstones.filter(t => t.deletedAt > since);
+  }
+
+  //keeps whichever side changed last
+  async applySyncedConversation(conv: Conversation): Promise<void> {
+    const local = this.conversations.find(c => c.id === conv.id);
+    if (local && local.updatedAt >= conv.updatedAt) return;
+    this.conversations = [...this.conversations.filter(c => c.id !== conv.id), conv];
+    this.saveConversations();
+  }
+
+  async applySyncedMessage(msg: Message): Promise<void> {
+    const updatedAt = msg.updatedAt ?? msg.createdAt;
+    const local = this.messages.find(m => m.id === msg.id);
+    if (local && (local.updatedAt ?? local.createdAt) >= updatedAt) return;
+    this.messages = [...this.messages.filter(m => m.id !== msg.id), { ...msg, updatedAt }];
+    this.saveMessages();
+  }
+
+  //the tombstone also tells cloud backup
+  async applySyncedDeletion(kind: SyncTombstone['kind'], id: string, deletedAt: number): Promise<void> {
+    //a newer local edit outlives the deletion
+    const message = this.messages.find(m => m.id === id);
+    const local = kind === 'conversation'
+      ? this.conversations.find(c => c.id === id)?.updatedAt
+      : message && (message.updatedAt ?? message.createdAt);
+    if (local !== undefined && local > deletedAt) return;
+    await this.recordTombstones([{ kind, id, deletedAt }]);
+    if (kind === 'conversation') {
+      this.conversations = this.conversations.filter(c => c.id !== id);
+      this.messages = this.messages.filter(m => m.conversationId !== id);
+      this.saveConversations();
+    } else {
+      this.messages = this.messages.filter(m => m.id !== id);
+    }
+    this.saveMessages();
+  }
+
+  //one refresh after a batch of synced writes
+  notifySynced(): void {
+    this.notifyDataChanged();
+  }
+
+  async getHubBlob(id: string): Promise<string | null> {
+    if (!this.db) return null;
+    return (await idbRequest<string | undefined>(this.db, 'readonly', store => store.get(id))) ?? null;
+  }
+
+  async putHubBlob(id: string, uri: string): Promise<void> {
+    if (!this.db) return;
+    await idbRequest(this.db, 'readwrite', store => store.put(uri, id));
   }
 }
 

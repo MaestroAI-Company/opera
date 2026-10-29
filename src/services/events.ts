@@ -4,7 +4,13 @@ export const AppEvents = {
   conversationsChanged: 'CONVERSATIONS_CHANGED',
   //a user setting was written
   settingsChanged: 'SETTINGS_CHANGED',
+  //another device wrote settings through sync
+  settingsSynced: 'SETTINGS_SYNCED',
   syncCompleted: 'SYNC_COMPLETED',
+  //cloud rows keep old dates, the hub must still get them
+  cloudMerged: 'CLOUD_MERGED',
+  //the paired hub can install a newer release
+  hubUpdateAvailable: 'HUB_UPDATE_AVAILABLE',
   syncPinInvalidated: 'SYNC_PIN_INVALIDATED',
   overlayReopened: 'OVERLAY_REOPENED',
   //user left the overlay via home
@@ -19,6 +25,8 @@ export const AppEvents = {
   openCodePreview: 'OPEN_CODE_PREVIEW',
   //open full image preview
   openImagePreview: 'OPEN_IMAGE_PREVIEW',
+  //a code file was saved, payload is its name
+  codeDownloaded: 'CODE_DOWNLOADED',
   //mcp server state changed
   mcpServersChanged: 'MCP_SERVERS_CHANGED',
 } as const;

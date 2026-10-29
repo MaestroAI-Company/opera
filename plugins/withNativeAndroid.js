@@ -1,8 +1,20 @@
 const { withAndroidManifest, withMainApplication, withDangerousMod, withAppBuildGradle, withProjectBuildGradle, withGradleProperties, AndroidConfig } = require('@expo/config-plugins');
 const path = require('path');
 const fs = require('fs');
+const { spawnSync } = require('child_process');
 
 const TEMPLATES_DIR = path.resolve(__dirname, '..', 'native', 'android');
+const HUB_REPO_DIR = path.resolve(process.env.OPERA_HUB_DIR ?? path.join(__dirname, '..', '..', 'opera-hub'));
+//pinned release or local source build
+const HAS_HUB_CLIENT = (() => {
+  if (fs.existsSync(path.resolve(__dirname, '..', 'opera-hub-client.json'))) return true;
+  const hasRepo = fs.existsSync(path.join(HUB_REPO_DIR, 'Cargo.toml'));
+  const hasCargoNdk = hasRepo && spawnSync('cargo', ['ndk', '--version'], { stdio: 'ignore' }).status === 0;
+  if (!hasCargoNdk) {
+    console.warn(`opera hub disabled: no pinned release and no buildable opera-hub repo at ${HUB_REPO_DIR}`);
+  }
+  return hasCargoNdk;
+})();
 
 function copyTemplate(relativeSrc, destPath, packageName) {
   const src = path.join(TEMPLATES_DIR, relativeSrc);
@@ -224,6 +236,11 @@ function withNativeAndroid(config) {
       // AICore (ML Kit GenAI) modules
       copyTemplate('src/AICorePackage.kt', path.join(javaDir, 'AICorePackage.kt'), packageName);
       copyTemplate('src/AICoreModule.kt', path.join(javaDir, 'AICoreModule.kt'), packageName);
+
+      if (HAS_HUB_CLIENT) {
+        copyTemplate('src/OperaHubPackage.kt', path.join(javaDir, 'OperaHubPackage.kt'), packageName);
+        copyTemplate('src/OperaHubModule.kt', path.join(javaDir, 'OperaHubModule.kt'), packageName);
+      }
       // useless modules removed
 
       // patch AndroidManifest: config plugin serializer drops taskAffinity=""
@@ -253,6 +270,7 @@ function withNativeAndroid(config) {
     const isKotlin = contents.includes('.packages.apply');
 
     const packagesToRegister = ['AICorePackage', 'MaestroOverlayPackage'];
+    if (HAS_HUB_CLIENT) packagesToRegister.push('OperaHubPackage');
 
     for (const pkg of packagesToRegister) {
       const importLine = `import ${packageName}.${pkg}${isKotlin ? '' : ';'}`;
@@ -322,6 +340,10 @@ function withNativeAndroid(config) {
       'com.google.mlkit:barcode-scanning:17.3.0',
       //same version as the js runtime
       `com.microsoft.onnxruntime:onnxruntime-android:${require('onnxruntime-react-native/package.json').version}`,
+      //needed by the uniffi bindings
+      ...(HAS_HUB_CLIENT
+        ? ['net.java.dev.jna:jna:5.17.0@aar', 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2']
+        : []),
     ];
     const missing = mlkit.filter(dep => !contents.includes(dep.split(':').slice(0, 2).join(':')));
     if (missing.length) {
@@ -331,6 +353,20 @@ function withNativeAndroid(config) {
       );
     }
     config.modResults.contents = contents;
+    return config;
+  });
+
+  //cheap when nothing changed
+  config = withAppBuildGradle(config, (config) => {
+    if (!HAS_HUB_CLIENT || config.modResults.contents.includes('buildHubClient')) return config;
+    config.modResults.contents +=
+      '\n\ndef buildHubClient = tasks.register("buildHubClient", Exec) {\n' +
+      '    workingDir rootProject.projectDir.parentFile\n' +
+      '    commandLine "node", "scripts/build-hub-client.mjs"\n' +
+      '    //same ndk as the app\n' +
+      '    environment "ANDROID_NDK_HOME", android.ndkDirectory.absolutePath\n' +
+      '}\n' +
+      'preBuild.dependsOn(buildHubClient)\n';
     return config;
   });
 

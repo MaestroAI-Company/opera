@@ -592,6 +592,17 @@ export const fr: Translations = {
   "settings.tts.voicePack.system": "Voix système",
   "settings.tts.voicePack.installed": "Pack de voix installé",
   "settings.tts.voicePack.failed": "Échec du téléchargement du pack de voix",
+  "settings.tts.preview.1":
+    "Salut, je suis Maestro ton assistant. Je serai là pour t'accompagner au quotidien, alors choisis la voix qui te convient le mieux.",
+  "settings.tts.preview.2":
+    "Tu préfères cette voix ? Elle est plutôt calme et posée pour te lire tes rappels ou tes notifications.",
+  "settings.tts.preview.3": "Ou peut-être celle-ci ? Le rythme est un peu plus dynamique pour lancer tes journées.",
+  "settings.tts.preview.4": "Et avec celle-là, qu'en penses-tu ? Le ton est pensé pour rester très clair et agréable à l'oreille.",
+  "settings.tts.preview.5": "Je peux aussi adopter ce timbre. L'intonation est un peu plus chaleureuse et spontanée.",
+  "settings.tts.preview.6": "Est-ce que cette tonalité te paraît plus naturelle ? C'est idéal si tu cherches une diction fluide.",
+  "settings.tts.preview.7":
+    "Ou alors, tu préfères m'écouter avec celle-ci ? Elle reste bien neutre et facile à suivre en tâche de fond.",
+  "settings.tts.preview.8": "Choisis simplement celle qui te semble la plus confortable, et on pourra commencer.",
 
   "settings.privacy.data": "Confidentialité des données",
   "settings.privacy.intro":

@@ -1,13 +1,14 @@
 {
-  "version": "v0.10.0",
+  "version": "v0.11.0",
   "sha256": {
-    "sampler-hub-client-arm64-v8a.so": "511876586fe8c6436b48824a9f4bfb91ecfd4c6e438d5712fbc372ca238b0b8b",
-    "sampler_hub_client.kt": "e2b49f3583922648dd3454d0c75ff19cbd8e294044d8e5ea405ae4ac0702e81a",
-    "sampler-hub-client-web.js": "480228009d2adad109265a34566ebdd1f9f053e5a5016d30eda0fee5ac97fbbd",
-    "sampler-hub-client-web.wasm": "c3ff3f4feba52351cd7de3e87e63056c2dfb3b015aa06972cefae53d8547f85f",
-    "sampler-hubw-windows-x86_64.exe": "5d7f2461801de33d3f961d6b2b7b999a10b3cfc940bf2e3cabeb7d3274a60bb9",
-    "sampler-hubw-macos-aarch64": "cf708c0077200b2a0f2b03dfd6a89964d334e19d5f79a1813bbb32b412134ce9",
-    "sampler-hubw-linux-x86_64": "eaaf9be5f352081e6fdefc83eb002a44ddecad96ccb90dbff46ef5f2c5496d2c",
-    "sampler-hubw-linux-aarch64": "eef8834c876e94a162fb03ac4d1e0a2c724b68fcc0a9fb8cc5a535c35feb43d5"
+    "sampler-hub-client-arm64-v8a.so": "c0c48ca7085b8ccf9b770d939c7e0c930ccd6936e4a9750409635a769a64803d",
+    "sampler_hub_client.kt": "f2cb8766dc3d57034c0fbeae44c899e6cdcbff33a9a3622972081cc9feade2c1",
+    "sampler-hub-client-web.js": "103879d4152fb60b7041e58075d4ac73f6614b7acf9c8370d1114e538b7e7a8e",
+    "sampler-hub-client-web.wasm": "2eb5ef8a7b63ebbf229d1463e8cb81b25bf8089ed2bdf7c13651e74134241371",
+    "sampler-hubw-windows-x86_64.exe": "9f4ac9696e81ea049b05ea41d481a97320dca1a4e7e886ba9e9faf7fa106f5e4",
+    "sampler-hubw-windows-aarch64.exe": "bd81dc376bff597ee193b53525bf1bc841336211ee380505019e01f2acea6c0d",
+    "sampler-hubw-macos-aarch64": "56cd1963bb46790ff49246208a07c39654c0ebc903d8b1737f0fa91572e31625",
+    "sampler-hubw-linux-x86_64": "cf337cd766f471225d0fe93f59024201e5b9adeadbb0660e0df9033bdbf0d838",
+    "sampler-hubw-linux-aarch64": "0dc92c880c099db29ce21cac038c7795e238621a53a539f228add75da73505c2"
   }
 }

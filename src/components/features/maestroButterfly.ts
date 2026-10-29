@@ -1,8 +1,10 @@
 import { useSyncExternalStore } from "react";
 import { DeviceEventEmitter, ImageSourcePropType } from "react-native";
+import { getLocale, t, type TranslationKey } from "../../i18n";
 import { AppEvents } from "../../services/events";
 import { Settings } from "../../services/settings/SettingsService";
 import { setVoice } from "../../services/speech/engines";
+import { TTS } from "../../services/speech/TTSService";
 
 export type MaestroButterfly = {
   color: ImageSourcePropType;
@@ -65,9 +67,15 @@ const BUTTERFLY_VOICES: Record<string, string> = {
   butterfly4: "M2",
 };
 
+const PREVIEW_COUNT = 8;
+let previewIndex = 0;
+
 export function selectButterfly(id: string): void {
   Settings.set("maestroButterfly", id);
   setVoice("supertonic", BUTTERFLY_VOICES[id]);
+  //cache updates before speaking
+  const key = `settings.tts.preview.${(previewIndex++ % PREVIEW_COUNT) + 1}` as TranslationKey;
+  TTS.speak(t(key), { language: getLocale() });
 }
 
 //unknown ids fall back to the default

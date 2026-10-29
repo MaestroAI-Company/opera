@@ -574,6 +574,17 @@ export const en = {
   "settings.tts.voicePack.system": "System voice",
   "settings.tts.voicePack.installed": "Voice pack installed",
   "settings.tts.voicePack.failed": "Failed to download the voice pack",
+  "settings.tts.preview.1":
+    "Hi, I'm Maestro, your assistant. I'll be here to help you every day, so pick the voice that suits you best.",
+  "settings.tts.preview.2":
+    "Do you prefer this voice? It's rather calm and steady for reading you your reminders or notifications.",
+  "settings.tts.preview.3": "Or maybe this one? The pace is a bit more upbeat to kick off your days.",
+  "settings.tts.preview.4": "And with this one, what do you think? The tone is made to stay very clear and pleasant to the ear.",
+  "settings.tts.preview.5": "I can also take on this timbre. The intonation is a little warmer and more spontaneous.",
+  "settings.tts.preview.6": "Does this tone feel more natural to you? It's ideal if you're looking for smooth delivery.",
+  "settings.tts.preview.7":
+    "Or would you rather hear me with this one? It stays nicely neutral and easy to follow in the background.",
+  "settings.tts.preview.8": "Just choose the one that feels the most comfortable, and we can get started.",
 
   "settings.privacy.data": "Data privacy",
   "settings.privacy.intro":

@@ -78,12 +78,13 @@ export function getHubName(): string {
   return hubName;
 }
 
-export function getHubServers(): (OllamaServer & { kind: HubProvider['kind'] })[] {
+export function getHubServers(): (OllamaServer & { kind: HubProvider['kind']; provider: string })[] {
   //hub name avoids clashing with local ollama
   return hubProviders.map((p) => ({
     ...hubServerPrefs[`${HUB_URL_SCHEME}${p.id}`],
     url: `${HUB_URL_SCHEME}${p.id}`,
     name: hubName ? `${p.name} · ${hubName}` : p.name,
+    provider: p.name,
     id: `hub_${p.id}`,
     kind: p.kind,
   }));

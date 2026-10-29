@@ -4485,8 +4485,12 @@ export default function SettingsDrawer({
           {renderCardGrid(
             getHubServers().map((server) => ({
               key: server.url,
-              title: server.name,
-              status: server.kind === "openai" ? "OpenAI" : "Ollama",
+              //the subtitle already names the hub
+              title: server.provider,
+              status:
+                server.url === LLAMA_SERVER_URL
+                  ? t("settings.hubProvider.hubModels")
+                  : t("settings.hubProvider.detected"),
               onPress: () => openHubServer(server),
             })),
           )}

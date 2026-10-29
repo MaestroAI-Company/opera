@@ -621,8 +621,8 @@ export const fr: Translations = {
   "settings.nav.overlay.subtitle": "Voix, contexte de l'écran",
   "settings.nav.maestroPreferences.title": "Préférences",
   "settings.nav.maestroPreferences.subtitle": "Instructions, lecture automatique",
-  "settings.nav.screenSaver.title": "Écran de veille",
-  "settings.nav.screenSaver.subtitle": "Stand-by, anti burn-in, mot de réveil",
+  "settings.nav.screenSaver.title": "Standby",
+  "settings.nav.screenSaver.subtitle": "Horloge en charge, anti burn-in, mot de réveil",
   "settings.nav.service.title": "Service",
   "settings.nav.service.subtitle": "Service IA, serveur Ollama",
   "settings.nav.tools.title": "Outils",
@@ -639,7 +639,7 @@ export const fr: Translations = {
   "settings.nav.info.title": "Informations",
   "settings.nav.info.subtitle": "Version de l'app, Github, Instagram, TikTok",
   "settings.screenSaver.help":
-    "Choisis ce que ton appareil affiche pendant la charge ou en veille.",
+    "Opera devient une horloge pendant la charge. Choisis-le comme écran de veille dans les réglages Android.",
   "settings.screenSaver.open":
     "Ouvrir les réglages de l'écran de veille",
   "settings.screenSaver.antiBurnIn": "Anti burn-in",

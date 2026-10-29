@@ -768,7 +768,7 @@ content: {
 
 - Reached from the chat and Sampler switch: a `SliderToggle` in a 220 wide top bar pill, centered between the bar sides. In the Sampler the bar keeps only this switch and the settings button (`middleOnly`).
 - Left: the desktop sidebar (see Drawers). Right: the pages, centered in the chat column (840 minus 16 on each side), below the floating top bar.
-- Pages use the Page, Section, Row and Group structure, with the same `makeStyles` values as `SettingsDrawer.tsx`. Each feature page (models, MCP) opens with a navigation row whose trailing Toggle turns the feature off for every profile, and the row pushes the feature's list.
+- Pages use the Page, Section, Row and Group structure, with the same `makeStyles` values as `SettingsDrawer.tsx`. Each feature page (models, MCP) opens with a toggle card that turns the feature off for every profile. The feature's content shows inline below it, only while the feature is on.
 - Item pages (a profile, an MCP server) pushed from a tile: info rows in an `infoGroup`, then the actions section.
 - Home gathers the cards of the other pages without their main action (the red Group stays on its own page). From 760px of page width it splits in two columns that fill independently.
 - No hub yet, no profile, hub stopped or out of reach: an empty state instead of the sidebar and pages (see Other patterns).

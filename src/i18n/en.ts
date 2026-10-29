@@ -503,6 +503,7 @@ export const en = {
   "hubModels.idle": "Download a model: Sampler Hub installs llama.cpp and shares it with your devices.",
   "hubModels.installing": "Installing llama.cpp on Sampler Hub…",
   "hubModels.running": "llama.cpp runs on Sampler Hub with {backend}.",
+  "hubModels.runningNightly": "llama.cpp nightly runs on Sampler Hub with {backend}.",
   "hubModels.startFailed": "llama.cpp could not start: {error}",
   "hubModels.downloading": "{percent}%",
   "hubModels.downloadFailed": "Failed, tap to remove",

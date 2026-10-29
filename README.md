@@ -111,7 +111,7 @@ Both share the same app slot and data, so downloaded models survive switching be
 Then, only if you need it:
 
 ```bash
-cp .env.example .env   # Google Drive OAuth and beta server vars — irrelevant for plain local dev
+cp .env.example .env   # Google Drive OAuth vars — irrelevant for plain local dev
 ```
 
 **Building for real:**

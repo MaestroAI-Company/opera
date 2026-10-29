@@ -12,7 +12,7 @@ import { LocationService } from '../location/LocationService';
 import { Settings } from '../settings/SettingsService';
 import { DEFAULT_OLLAMA_URL, imageToBase64 } from './utils/imageToBase64';
 import { resolveQuickFlow, QuickFlowTarget } from './quickFlow';
-import { activeSourceKey, BETA_SERVER_URL, buildSources, getCapabilityOverride, getDisabledModels, getOllamaTuning, hubProviderKind, OPENAI_PROVIDER_ID, ModelSource } from './providers/sources';
+import { activeSourceKey, buildSources, getCapabilityOverride, getDisabledModels, getOllamaTuning, hubProviderKind, OPENAI_PROVIDER_ID, ModelSource } from './providers/sources';
 import { OpenAIProvider } from './providers/OpenAIProvider';
 import { getCachedModels, hydrateModelCache } from './providers/modelCache';
 
@@ -58,8 +58,6 @@ class CentralAIModule {
     this.providers.set('LOCAL', new LocalProvider());
     //litert-lm runs on-device hugging face models
     this.providers.set('LITERT', new LiteRTProvider());
-    //hosted beta server, its own provider even though it speaks ollama
-    if (BETA_SERVER_URL) this.providers.set('BETA', new OllamaProvider(BETA_SERVER_URL));
     //url arrives with first configure
     this.providers.set('OPENAI', new OpenAIProvider(''));
   }
@@ -77,8 +75,6 @@ class CentralAIModule {
     const url = raw.length > 0 ? raw : DEFAULT_URL;
     this.activeUrl = raw;
     this.providers.set('OLLAMA', new OllamaProvider(url, {}, contextLength, keepAlive));
-    //beta shares the tuning, never the url
-    if (BETA_SERVER_URL) this.providers.set('BETA', new OllamaProvider(BETA_SERVER_URL, {}, contextLength, keepAlive));
     //openai servers have no tuning
     this.providers.set('OPENAI', new OpenAIProvider(raw));
     this.providers.set('SAMPLERHUB', hubProvider(raw, contextLength, keepAlive));

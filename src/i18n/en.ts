@@ -750,15 +750,6 @@ export const en = {
     "This will permanently delete your existing cloud backup so you can create a new PIN. Are you sure?",
   "settings.pin.reset.confirm": "Delete & Reset",
 
-  "settings.service.beta": "Opera Beta server",
-  "settings.service.betaHelp":
-    "A test server we host so you can try Opera without setting one up.",
-  "settings.beta.intro":
-    "A test server we host so you can try Opera without setting one up. Everything needed to answer goes through it: your messages, your attachments, whatever a tool reads for you (contacts, calendar, screen text), and your IP address.",
-  "settings.beta.privacy":
-    "We do not read any of it, we do not keep it, and we will never use it for anything. The server is shut down and wiped at the end of the Play Store beta.",
-  "settings.beta.testing":
-    "It is there for testing only. For everyday use, set up your own Ollama server and nothing leaves your network.",
   "settings.service.ollama": "Ollama",
   "settings.service.ollamaHelp":
     "Use your Ollama servers to run powerful AI models at home.",

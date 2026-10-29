@@ -760,15 +760,6 @@ export const fr: Translations = {
     "Cela supprimera définitivement ta sauvegarde cloud existante afin de créer un nouveau code PIN. Veux-tu continuer ?",
   "settings.pin.reset.confirm": "Supprimer et réinitialiser",
 
-  "settings.service.beta": "Serveur Opera Beta",
-  "settings.service.betaHelp":
-    "Un serveur de test que nous hébergeons pour essayer Opera sans en installer un.",
-  "settings.beta.intro":
-    "Un serveur de test que nous hébergeons pour essayer Opera sans en installer un. Tout ce qui sert à répondre passe par lui : tes messages, tes pièces jointes, ce qu'un outil lit pour toi (contacts, agenda, texte de l'écran) et ton adresse IP.",
-  "settings.beta.privacy":
-    "Nous n'en lisons rien, nous n'en gardons rien et nous ne l'utiliserons jamais pour quoi que ce soit. Le serveur sera arrêté et effacé à la fin de la bêta Play Store.",
-  "settings.beta.testing":
-    "Il sert uniquement aux tests. Pour un usage quotidien, installe ton propre serveur Ollama et rien ne quittera ton réseau.",
   "settings.service.ollama": "Ollama",
   "settings.service.ollamaHelp":
     "Utilise tes serveurs Ollama pour exécuter de puissants modèles d'IA chez toi.",

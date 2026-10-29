@@ -85,8 +85,6 @@ import {
 } from "../../services/ai/providers/LiteRTProvider";
 import { LocalModelSheet } from "../../services/ai/providers/LocalProvider";
 import {
-  BETA_PROVIDER_ID,
-  BETA_SERVER_URL,
   buildSources,
   getEnabledProviders,
   getOllamaServers,
@@ -310,7 +308,6 @@ export type SubPage =
   | "assistantoverlay"
   | "screensaver"
   | "service"
-  | "beta"
   | "litert"
   | "ollama"
   | "openai"
@@ -335,7 +332,6 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   assistantoverlay: "general",
   screensaver: "general",
   service: "main",
-  beta: "service",
   litert: "service",
   ollama: "service",
   openai: "service",
@@ -4314,34 +4310,8 @@ export default function SettingsDrawer({
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.service.title"))}
 
-      {/* service providers group: beta, hugging face, ollama */}
+      {/* service providers group: hugging face, ollama */}
       <Group style={styles.groupSpacing}>
-        {!!BETA_SERVER_URL && (
-          <Pressable
-            style={pressStyle(
-              styles.toggleGroupRowItem,
-              styles.toggleGroupCardPressed,
-            )}
-            onPress={() => setActiveSubPage("beta")}
-          >
-            <View style={styles.toggleGroupRow}>
-              <View style={styles.toggleGroupContent}>
-                <Text style={styles.settingLabel}>
-                  {t("settings.service.beta")}
-                </Text>
-                <Text style={styles.helpText}>
-                  {t("settings.service.betaHelp")}
-                </Text>
-              </View>
-              <View style={styles.toggleDivider} />
-              <Toggle
-                checked={enabledProviders.includes(BETA_PROVIDER_ID)}
-                onToggle={(v) => setProviderEnabled(BETA_PROVIDER_ID, v)}
-              />
-            </View>
-          </Pressable>
-        )}
-
         {onDeviceProviders.length > 0 && (
           <Pressable
             style={pressStyle(
@@ -4659,28 +4629,6 @@ export default function SettingsDrawer({
       </>
     );
   };
-
-  //beta provider info subpage
-  const renderBetaSubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Opera Beta")}
-
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{t("settings.service.beta")}</Text>
-          <Text style={[styles.helpText, { marginTop: Spacing.md }]}>
-            {t("settings.beta.intro")}
-          </Text>
-          <Text style={[styles.helpText, { marginTop: Spacing.sm }]}>
-            {t("settings.beta.privacy")}
-          </Text>
-          <Text style={[styles.helpText, { marginTop: Spacing.sm }]}>
-            {t("settings.beta.testing")}
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
 
   //on-device provider, models the browser installed
   const renderLitertSubPage = () => (
@@ -5321,8 +5269,6 @@ export default function SettingsDrawer({
         return renderScreenSaverSubPage();
       case "service":
         return renderServiceSubPage();
-      case "beta":
-        return renderBetaSubPage();
       case "litert":
         return renderLitertSubPage();
       case "ollama":

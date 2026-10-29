@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import { useCallback, useState } from 'react';
-import { Linking, Platform } from 'react-native';
+import { Platform } from 'react-native';
+import { openExternalUrl } from '../services/ai/utils/openExternalUrl';
 import { buildIssueUrl } from '../services/github/GitHubIssues';
 import type { Crash } from '../services/logging/CrashReporter';
 import { getRelevantLogs } from '../services/logging/Logger';
@@ -48,7 +49,7 @@ export function useBugReport(notify: NotifyFn) {
       crash,
       deviceInfo: `${Platform.OS} ${Platform.Version} — Opera ${Constants.expoConfig?.version ?? "?"}`,
     });
-    Linking.openURL(url).catch(() => notify(t("bugReport.githubFailed.title"), t("bugReport.githubFailed.message")));
+    openExternalUrl(url).catch(() => notify(t("bugReport.githubFailed.title"), t("bugReport.githubFailed.message")));
     reset();
     onSent?.();
   }, [text, logs, crash, screenshot, notify, reset]);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Linking } from 'react-native';
+import { openExternalUrl } from '../services/ai/utils/openExternalUrl';
 import { AppRelease, getAvailableUpdate } from '../services/updates/UpdateService';
 
 //notices atop the settings menu
@@ -11,7 +11,7 @@ export function useSettingsNotices(active: boolean) {
   }, [active]);
 
   const openUpdate = useCallback(() => {
-    if (update) Linking.openURL(update.url).catch(() => { });
+    if (update) openExternalUrl(update.url).catch(() => { });
   }, [update]);
 
   return {

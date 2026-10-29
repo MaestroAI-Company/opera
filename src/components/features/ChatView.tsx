@@ -24,6 +24,7 @@ import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { t } from "../../i18n";
 import { AIModule } from "../../services/ai/AIModule";
 import { Suggestion } from "../../services/ai/generation/suggestions";
+import { openExternalUrl } from "../../services/ai/utils/openExternalUrl";
 import { resolveMentions } from "../../services/ai/mentions";
 import type { ToolCall } from "../../services/ai/tools/ITool";
 import { Conversation, Message, MessageSource } from "../../services/db/DatabaseService";
@@ -105,7 +106,7 @@ const SourcePill = ({ source }: { source: MessageSource }) => {
 
   return (
     <Pressable
-      onPress={() => { if (canOpen) Linking.openURL(source.url).catch(() => { }); }}
+      onPress={() => { if (canOpen) openExternalUrl(source.url).catch(() => { }); }}
       disabled={!canOpen}
       style={pressStyle(styles.sourcePill, canOpen && "surface")}
     >

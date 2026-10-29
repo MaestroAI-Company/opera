@@ -135,6 +135,7 @@ import { HubSync } from "../../services/hub/HubSync";
 import { SyncPrefs, SyncPrefsStore } from "../../services/SyncPrefs";
 import { AppEvents } from "../../services/events";
 import { McpService } from "../../services/mcp/McpService";
+import { openExternalUrl } from "../../services/ai/utils/openExternalUrl";
 import { McpServerConfig } from "../../services/mcp/types";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { openScreenSaverSettings } from "../../services/screensaver/ScreenSaver";
@@ -3491,14 +3492,14 @@ export default function SettingsDrawer({
               icon={operaIcon}
               label={t("settings.info.website")}
               onPress={() =>
-                Linking.openURL("https://maestroai.company").catch(() => {})
+                openExternalUrl("https://maestroai.company").catch(() => {})
               }
             />
             <ActionButton
               icon={githubIcon}
               label="Github"
               onPress={() =>
-                Linking.openURL(
+                openExternalUrl(
                   "https://github.com/MaestroAI-Company/opera",
                 ).catch(() => {})
               }
@@ -3507,7 +3508,7 @@ export default function SettingsDrawer({
               icon={instagramIcon}
               label="Instagram"
               onPress={() =>
-                Linking.openURL(
+                openExternalUrl(
                   "https://www.instagram.com/maestroai.company?igsh=MWF4dmZvMXl1ZmdzeA==",
                 ).catch(() => {})
               }
@@ -3516,7 +3517,7 @@ export default function SettingsDrawer({
               icon={tiktokIcon}
               label="TikTok"
               onPress={() =>
-                Linking.openURL(
+                openExternalUrl(
                   "https://www.tiktok.com/@maestroai.company?_r=1&_t=ZG-99DGujxTPEn",
                 ).catch(() => {})
               }
@@ -4891,7 +4892,7 @@ export default function SettingsDrawer({
               icon={hyperlinkIcon}
               label={t("settings.privacy.policy")}
               onPress={() =>
-                Linking.openURL("https://maestroai.company/privacy").catch(
+                openExternalUrl("https://maestroai.company/privacy").catch(
                   () => {},
                 )
               }
@@ -5100,7 +5101,7 @@ export default function SettingsDrawer({
               icon={supportIcon}
               label={t("settings.support.contact")}
               onPress={() =>
-                Linking.openURL("https://maestroai.company/contact").catch(
+                openExternalUrl("https://maestroai.company/contact").catch(
                   () => {},
                 )
               }

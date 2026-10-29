@@ -9,10 +9,8 @@ import {
   Easing,
   Image,
   Keyboard,
-  LayoutChangeEvent,
   NativeSyntheticEvent,
   Platform,
-  PixelRatio,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,7 +21,6 @@ import {
   Vibration,
   View
 } from "react-native";
-import Reanimated, { type SharedValue, useAnimatedStyle, useFrameCallback, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
@@ -43,6 +40,7 @@ import IconButton from "../ui/IconButton";
 import NotificationModal from "../ui/NotificationModal";
 import { classifyAttachment, type AttachmentKind, type Attachments, type SelectedFile } from "./AttachmentSheet";
 import { pressStyle } from "../ui/pressStyle";
+import VoiceGrid from "./VoiceGrid";
 
 const nextWhiteIcon = require("../../../assets/icons/arrow.png");
 const micIcon = require("../../../assets/icons/microphone.png");
@@ -112,6 +110,7 @@ export type ChatBarHandle = {
 };
 
 let currentAudioVolume = 0;
+const getAudioVolume = () => currentAudioVolume;
 
 //vad tuning: native relies on the os's own speechstart/speechend events, web on raw pcm rms
 const VAD_SILENCE_MS = 1500;
@@ -192,102 +191,6 @@ function MentionBoxes({ text, spans, scrollY }: { text: string; spans: MentionSp
           </Fragment>
         );
       })}
-    </View>
-  );
-}
-
-const VOICE_TICK_MS = 60;
-//caps the animated cell count on very wide bars
-const VOICE_MAX_COLS = 80;
-const VOICE_ROWS = 5;
-//history step that makes the voice spread from the center outward
-const VOICE_SHIFT_MS = 70;
-//columns over which each side fades out
-const VOICE_FADE_COLS = 8;
-const VOICE_LEVELS = Array.from({ length: VOICE_ROWS }, (_, i) => i);
-
-function VoiceCell({ col, row, cell, heights, cols }: { col: number; row: number; cell: number; heights: SharedValue<number[]>; cols: SharedValue<number> }) {
-  const styles = useThemedStyles(makeStyles);
-  const style = useAnimatedStyle(() => {
-    //cell opacity follows its depth under the column top: 60, 80, 100 percent
-    const d = heights.value[col] - row;
-    const alpha = d <= 0 ? 0 : d <= 1 ? 0.6 * d : Math.min(1, 0.6 + 0.2 * (d - 1));
-    //fade toward both edges so the row never ends in a hard cut
-    const edge = Math.min(1, Math.min(col + 1, cols.value - col) / VOICE_FADE_COLS);
-    return { opacity: alpha * edge };
-  });
-  //neighbours share the same snapped edge so no hairline shows between cells
-  const snap = (n: number) => PixelRatio.roundToNearestPixel(n * cell);
-  const left = snap(col);
-  const bottom = snap(row);
-  return <Reanimated.View style={[styles.voiceCell, { left, bottom, width: snap(col + 1) - left, height: snap(row + 1) - bottom }, style]} />;
-}
-
-function VoiceIndicator() {
-  const styles = useThemedStyles(makeStyles);
-  const vol = useSharedValue(0);
-  const energy = useSharedValue(0);
-  const clock = useSharedValue(0);
-  const history = useSharedValue<number[]>(Array(VOICE_MAX_COLS / 2).fill(0));
-  const heights = useSharedValue<number[]>(Array(VOICE_MAX_COLS).fill(0));
-  const colsShared = useSharedValue(0);
-  const [grid, setGrid] = useState({ cols: 0, cell: 0 });
-  //cell size makes the rows span the full bar height, columns fill the width and stay even so the center sits between two
-  const handleLayout = (e: LayoutChangeEvent) => {
-    const { width, height } = e.nativeEvent.layout;
-    const cell = height / VOICE_ROWS;
-    const next = Math.min(VOICE_MAX_COLS, 2 * Math.floor(width / (2 * cell)));
-    colsShared.value = next;
-    setGrid({ cols: next, cell });
-  };
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      vol.value = Math.min(1, currentAudioVolume * 50);
-    }, VOICE_TICK_MS);
-    return () => clearInterval(timer);
-  }, [vol]);
-
-  //runs every frame on the ui thread so the columns glide between volume samples
-  useFrameCallback(frame => {
-    const dt = Math.min(frame.timeSincePreviousFrame ?? 16, 50);
-    const t = frame.timeSinceFirstFrame / 1000;
-    //fast attack, slow release
-    const target = vol.value;
-    energy.value += (target - energy.value) * (1 - Math.exp(-dt / (target > energy.value ? 40 : 160)));
-
-    clock.value += dt;
-    if (clock.value >= VOICE_SHIFT_MS) {
-      clock.value = 0;
-      history.value = [energy.value, ...history.value.slice(0, VOICE_MAX_COLS / 2 - 1)];
-    }
-
-    const prev = heights.value;
-    const total = colsShared.value;
-    const half = total / 2;
-    const next = new Array<number>(VOICE_MAX_COLS).fill(0);
-    for (let c = 0; c < total; c++) {
-      //distance from the center picks how old the volume sample is
-      const dist = c < half ? half - 1 - c : c - half;
-      //idle breathing keeps the row alive in silence
-      const idle = 0.5 + 0.7 * (0.5 + 0.5 * Math.sin(t * 2.2 + c * 0.8));
-      //two slow waves of different speed so no column repeats its neighbour
-      const wobble = 0.7 + 0.3 * Math.sin(t * 4.3 + c * 1.7) * Math.sin(t * 1.9 + c * 0.5);
-      const goal = Math.min(VOICE_ROWS, idle + history.value[dist] * (VOICE_ROWS - 1.2) * wobble);
-      const tau = goal > prev[c] ? 50 : 140;
-      next[c] = prev[c] + (goal - prev[c]) * (1 - Math.exp(-dt / tau));
-    }
-    heights.value = next;
-  });
-
-  return (
-    //negative margins stretch the grid over the bar padding up to the border
-    <View onLayout={handleLayout} style={[styles.voiceIndicatorContainer, { marginVertical: -10 }]}>
-      <View style={{ width: grid.cols * grid.cell, height: VOICE_ROWS * grid.cell }}>
-        {Array.from({ length: grid.cols }, (_, col) =>
-          VOICE_LEVELS.map(row => <VoiceCell key={`${col}-${row}`} col={col} row={row} cell={grid.cell} heights={heights} cols={colsShared} />)
-        )}
-      </View>
     </View>
   );
 }
@@ -1258,7 +1161,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 )}
 
                 {isRecording ? (
-                  <VoiceIndicator />
+                  //negative margin reaches the bar border
+                  <VoiceGrid getVolume={getAudioVolume} color={Colors.textOnPrimary} style={[styles.voiceIndicatorContainer, { marginVertical: -10 }]} />
                 ) : (
                   <View style={{ flex: 1, marginLeft: 8, justifyContent: 'center' }}>
                     {Platform.OS !== 'web' && !isTranscribing && mentionSpans.length > 0 && (
@@ -1480,11 +1384,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     overflow: "hidden",
     marginLeft: 8,
     marginRight: 8,
-  },
-  voiceCell: {
-    position: "absolute",
-    //cells sit on the red/incognito composer in both themes, always white
-    backgroundColor: Colors.textOnPrimary,
   },
   sendButton: {
     width: 28,

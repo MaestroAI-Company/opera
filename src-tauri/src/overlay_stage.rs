@@ -1,6 +1,5 @@
 use base64::Engine;
 use image::{imageops, RgbImage};
-use serde::Serialize;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindowBuilder};
@@ -8,20 +7,18 @@ use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Webview
 pub const LABEL: &str = "stage";
 
 //letterboxed capture like the android module
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct DetectionInput {
-    data: String,
-    offset_x: f64,
-    offset_y: f64,
-    content_width: f64,
-    content_height: f64,
+    pub tensor: Vec<f32>,
+    pub offset_x: f64,
+    pub offset_y: f64,
+    pub content_width: f64,
+    pub content_height: f64,
 }
 
-static INPUT: Mutex<Option<DetectionInput>> = Mutex::new(None);
+pub static INPUT: Mutex<Option<DetectionInput>> = Mutex::new(None);
 //full capture for selection crops
 static SHOT: Mutex<Option<image::RgbaImage>> = Mutex::new(None);
-const INPUT_SIZE: u32 = 640;
+pub const INPUT_SIZE: u32 = 640;
 //ctrl alone held enters selection
 const CTRL_HOLD_MS: u64 = 250;
 //off until settings enable it
@@ -65,16 +62,16 @@ fn letterbox(shot: &image::RgbaImage) -> DetectionInput {
     for (x, y, p) in small.enumerate_pixels() {
         square.put_pixel(x + ox, y + oy, image::Rgb([p[0], p[1], p[2]]));
     }
-    //planar chw bytes for the tensor
+    //planar chw floats for the tensor
     let plane = (INPUT_SIZE * INPUT_SIZE) as usize;
-    let mut chw = vec![0u8; plane * 3];
+    let mut chw = vec![0f32; plane * 3];
     for (i, p) in square.pixels().enumerate() {
-        chw[i] = p[0];
-        chw[plane + i] = p[1];
-        chw[plane * 2 + i] = p[2];
+        chw[i] = p[0] as f32 / 255.0;
+        chw[plane + i] = p[1] as f32 / 255.0;
+        chw[plane * 2 + i] = p[2] as f32 / 255.0;
     }
     DetectionInput {
-        data: base64::engine::general_purpose::STANDARD.encode(chw),
+        tensor: chw,
         offset_x: ox as f64,
         offset_y: oy as f64,
         content_width: cw as f64,
@@ -136,11 +133,6 @@ pub fn hide(app: &AppHandle) {
     }
 }
 
-#[tauri::command]
-pub fn stage_detection_input() -> Option<DetectionInput> {
-    INPUT.lock().unwrap().clone()
-}
-
 fn set_selecting(app: &AppHandle, active: bool) {
     let Some(window) = app.get_webview_window(LABEL) else {
         log::warn!("stage window missing");
@@ -188,16 +180,6 @@ pub fn stage_crop(app: AppHandle, x: f64, y: f64, w: f64, h: f64) -> Result<(), 
     set_selecting(&app, false);
     app.emit_to(crate::overlay_window::LABEL, "stage-selection", url)
         .map_err(|e| e.to_string())
-}
-
-//keeps the model out of web
-#[tauri::command]
-pub fn stage_model(app: AppHandle) -> Result<tauri::ipc::Response, String> {
-    let path = app
-        .path()
-        .resolve("models/deki-yolo-fp16.onnx", tauri::path::BaseDirectory::Resource)
-        .map_err(|e| e.to_string())?;
-    std::fs::read(path).map(tauri::ipc::Response::new).map_err(|e| e.to_string())
 }
 
 #[cfg(windows)]

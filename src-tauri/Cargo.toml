@@ -39,9 +39,18 @@ tauri-plugin-autostart = "2"
 xcap = "0.7"
 image = { version = "0.25", default-features = false, features = ["png"] }
 base64 = "0.22"
+#onnx runtime prebuilt and statically linked
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "download-binaries", "copy-dylibs", "tls-native", "api-24", "half"] }
+half = { version = "2", features = ["bytemuck"] }
+bytemuck = "1"
+rustfft = "6"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.59", features = ["Win32_UI_Input_KeyboardAndMouse"] }
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["directml"] }
+windows-sys = { version = "0.59", features = ["Win32_UI_Input_KeyboardAndMouse", "Win32_System_LibraryLoader"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["coreml"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }

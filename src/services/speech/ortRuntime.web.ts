@@ -1,5 +1,6 @@
 import type { InferenceSession } from 'onnxruntime-react-native';
 import type { Ort } from './ortRuntime';
+import { NativeOrt } from './ortNative';
 
 export type { Ort };
 
@@ -8,15 +9,21 @@ export const ORT_BASE = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dis
 
 const hasWebGpu = () => typeof navigator !== 'undefined' && 'gpu' in navigator;
 
-export const RUNTIME_LABEL = hasWebGpu() ? 'webgpu' : 'wasm';
+export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+//webview webgpu beats the ipc round trips
+export const nativeOrt = isTauri && !hasWebGpu();
+
+export const RUNTIME_LABEL = nativeOrt ? 'native' : hasWebGpu() ? 'webgpu' : 'wasm';
 
 export function ortAvailable(): boolean {
-  return typeof WebAssembly !== 'undefined' && typeof document !== 'undefined';
+  return nativeOrt || (typeof WebAssembly !== 'undefined' && typeof document !== 'undefined');
 }
 
 let runtime: Promise<Ort> | null = null;
 
 export function loadOrt(): Promise<Ort> {
+  if (nativeOrt) return Promise.resolve(NativeOrt as unknown as Ort);
   runtime ??= new Promise<Ort>((resolve, reject) => {
     const script = document.createElement('script');
     script.src = `${ORT_BASE}ort.min.js`;

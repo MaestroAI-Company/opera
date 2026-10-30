@@ -1,4 +1,6 @@
 #[cfg(desktop)]
+mod ai;
+#[cfg(desktop)]
 mod hub;
 #[cfg(desktop)]
 mod overlay_window;
@@ -81,13 +83,37 @@ pub fn run() {
             #[cfg(desktop)]
             overlay_window::overlay_show_main,
             #[cfg(desktop)]
-            overlay_stage::stage_detection_input,
-            #[cfg(desktop)]
             overlay_stage::stage_select,
             #[cfg(desktop)]
             overlay_stage::stage_crop,
             #[cfg(desktop)]
-            overlay_stage::stage_model,
+            ai::detector::stage_prepare_detector,
+            #[cfg(desktop)]
+            ai::detector::stage_detect,
+            #[cfg(desktop)]
+            ai::bridge::ort_load,
+            #[cfg(desktop)]
+            ai::bridge::ort_run,
+            #[cfg(desktop)]
+            ai::bridge::ort_release,
+            #[cfg(desktop)]
+            ai::files::models_download,
+            #[cfg(desktop)]
+            ai::files::models_remove,
+            #[cfg(desktop)]
+            ai::files::models_read_text,
+            #[cfg(desktop)]
+            ai::whisper::whisper_installed,
+            #[cfg(desktop)]
+            ai::whisper::whisper_download,
+            #[cfg(desktop)]
+            ai::whisper::whisper_delete,
+            #[cfg(desktop)]
+            ai::whisper::whisper_load,
+            #[cfg(desktop)]
+            ai::whisper::whisper_release,
+            #[cfg(desktop)]
+            ai::whisper::whisper_transcribe,
             #[cfg(desktop)]
             overlay_stage::stage_screen_access,
             #[cfg(desktop)]

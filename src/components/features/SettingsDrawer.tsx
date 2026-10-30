@@ -155,6 +155,9 @@ import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import ProgressBar from "../ui/ProgressBar";
 import IconSelector from "../ui/IconSelector";
 import Selector, { SelectorOption } from "../ui/Selector";
+import { OVERLAY_SHORTCUTS, pushDesktopOverlayConfig } from "../../services/overlay/desktopOverlay";
+
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 import Slider from "../ui/Slider";
 import SliderToggle from "../ui/SliderToggle";
 import TextInputField from "../ui/TextInputField";
@@ -1130,6 +1133,9 @@ export default function SettingsDrawer({
   const [advancedMode, setAdvancedModeState] = useState(false);
   const [useAppContext, setUseAppContextState] = useState(true);
   const [autoStartMic, setAutoStartMicState] = useState(true);
+  const [overlayEnabled, setOverlayEnabledState] = useState(true);
+  const [overlayShortcut, setOverlayShortcutState] = useState(OVERLAY_SHORTCUTS[0].id);
+  const [closeToTray, setCloseToTrayState] = useState(true);
   const [shareInstanceUrl, setShareInstanceUrlState] = useState("");
   const [showRemoteImages, setShowRemoteImagesState] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
@@ -1516,6 +1522,9 @@ export default function SettingsDrawer({
       setAdvancedModeState(s.advancedMode);
       setUseAppContextState(s.useAppContext);
       setAutoStartMicState(s.autoStartMic);
+      setOverlayEnabledState(s.overlayEnabled);
+      setOverlayShortcutState(s.overlayShortcut);
+      setCloseToTrayState(s.closeToTray);
       setModelFailoverState(s.modelFailover);
       setShareInstanceUrlState(s.shareInstanceUrl || "");
       setShowRemoteImagesState(s.showRemoteImages);
@@ -2669,6 +2678,16 @@ export default function SettingsDrawer({
     Settings.set("autoStartMic", v);
   };
 
+  //each change reaches the native shortcut at once
+  const setOverlayConfig = (patch: { overlayEnabled?: boolean; overlayShortcut?: string; closeToTray?: boolean }) => {
+    const next = { overlayEnabled, overlayShortcut, closeToTray, ...patch };
+    setOverlayEnabledState(next.overlayEnabled);
+    setOverlayShortcutState(next.overlayShortcut);
+    setCloseToTrayState(next.closeToTray);
+    Settings.setMany(patch);
+    pushDesktopOverlayConfig(next);
+  };
+
   const setShowRemoteImages = (v: boolean) => {
     setShowRemoteImagesState(v);
     Settings.set("showRemoteImages", v);
@@ -3643,10 +3662,29 @@ export default function SettingsDrawer({
         </View>
       </View>
 
+      {/* tray keeps the overlay shortcut alive */}
+      {isTauri && (
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <View style={styles.toggleGroupRow}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.overlay.closeToTray")}
+                </Text>
+                <Text style={styles.helpText}>
+                  {t("settings.overlay.closeToTrayHelp")}
+                </Text>
+              </View>
+              <Toggle checked={closeToTray} onToggle={v => setOverlayConfig({ closeToTray: v })} />
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* overlay and screen saver links */}
-      {(!isDesktop || Platform.OS === "android") && (
+      {(!isDesktop || isTauri || Platform.OS === "android") && (
         <Group style={styles.groupSpacing}>
-          {!isDesktop &&
+          {(!isDesktop || isTauri) &&
             renderToolsNavRow(
               "assistantoverlay",
               t("settings.nav.overlay.title"),
@@ -4019,7 +4057,44 @@ export default function SettingsDrawer({
         </View>
       )}
 
-      {/* overlay options card */}
+      {/* desktop shortcut card */}
+      {isTauri && (
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, !overlayEnabled && { marginBottom: 0 }]}>
+            <View style={styles.toggleGroupRow}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.overlay.desktopEnabled")}
+                </Text>
+                <Text style={styles.helpText}>
+                  {t("settings.overlay.desktopEnabledHelp")}
+                </Text>
+              </View>
+              <Toggle checked={overlayEnabled} onToggle={v => setOverlayConfig({ overlayEnabled: v })} />
+            </View>
+          </View>
+
+          {overlayEnabled && (
+            <View style={[styles.settingRowVertical, isDesktop && styles.toggleGroupRow, { marginBottom: 0 }]}>
+              <Text style={[styles.settingLabel, isDesktop ? styles.toggleGroupContent : { marginBottom: Spacing.md }]}>
+                {t("settings.overlay.shortcut")}
+              </Text>
+              <Group style={isDesktop && styles.sliderGroup}>
+                <Selector
+                  options={OVERLAY_SHORTCUTS}
+                  selectedValue={overlayShortcut}
+                  onSelect={v => setOverlayConfig({ overlayShortcut: v })}
+                  title={t("settings.overlay.selectShortcut")}
+                  fullWidth
+                />
+              </Group>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* mobile overlay options card */}
+      {!isTauri && (
       <View style={styles.contentCard}>
         <View
           style={[
@@ -4056,6 +4131,7 @@ export default function SettingsDrawer({
           </View>
         )}
       </View>
+      )}
     </View>
   );
 

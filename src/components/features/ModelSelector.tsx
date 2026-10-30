@@ -246,6 +246,7 @@ export type ModelSelectorDrawerProps = {
   //current conversation, fills the token window
   messages?: { content: string; images?: string[]; metrics?: MessageMetrics }[];
   onOpenProviderSettings?: (provider: string) => void;
+  hideScrim?: boolean;
 };
 
 //fluid drawer, built the same way as ConversationsDrawer/SettingsDrawer: mounted at the screen
@@ -267,6 +268,7 @@ export function ModelSelectorDrawer({
   triggerRef,
   messages = [],
   onOpenProviderSettings,
+  hideScrim,
 }: ModelSelectorDrawerProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -998,6 +1000,7 @@ export function ModelSelectorDrawer({
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
         anchored={anchored}
+        hideScrim={hideScrim}
         sheetStyle={[
           styles.mobileSheet,
           { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + insets.bottom },

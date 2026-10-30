@@ -13,6 +13,8 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import SiteHead from "../components/SiteHead";
 import SplashScreenComponent from "../components/ui/SplashScreen";
 import SettingsWindow from "../components/features/SettingsWindow";
+import DesktopOverlay from "../components/features/DesktopOverlay";
+import OverlayNoticeHost from "../components/features/OverlayNoticeHost";
 import TauriTitleBar from "../components/features/TauriTitleBar";
 import CodeDownloadHost from "../components/features/CodeDownloadHost";
 import ToolConsentHost from "../components/features/ToolConsentHost";
@@ -55,6 +57,8 @@ const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 const isLinux = isTauri && navigator.userAgent.includes("Linux") && !navigator.userAgent.includes("Android");
 //the settings os window loads the app with this flag
 const isSettingsWindow = isTauri && new URLSearchParams(window.location.search).get("window") === "settings";
+//overlay window loads with this flag
+const isOverlayWindow = isTauri && new URLSearchParams(window.location.search).get("window") === "overlay";
 
 const screenLayout = ({ children }: { children: ReactNode }) => (
   <>
@@ -66,7 +70,7 @@ const screenLayout = ({ children }: { children: ReactNode }) => (
 export default function RootLayout() {
   const isDark = useIsDark();
   const colors = useColors();
-  const [showLottie, setShowLottie] = useState(Platform.OS !== "web" || (isTauri && !isSettingsWindow));
+  const [showLottie, setShowLottie] = useState(Platform.OS !== "web" || (isTauri && !isSettingsWindow && !isOverlayWindow));
   const [fontsLoaded, fontError] = useFonts({
     Petrona: require("../../assets/fonts/Petrona-Medium.ttf"),
     Figtree: require("../../assets/fonts/Figtree-Regular.ttf"),
@@ -138,6 +142,16 @@ export default function RootLayout() {
     );
   }
 
+  if (isOverlayWindow) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <IconLabelProvider>
+          <DesktopOverlay />
+        </IconLabelProvider>
+      </GestureHandlerRootView>
+    );
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <KeyboardProvider>
@@ -151,6 +165,7 @@ export default function RootLayout() {
               <ToolConsentHost />
               <VoicePackHost />
               <CodeDownloadHost />
+              <OverlayNoticeHost />
             </>
           )}
           <StatusBar style={isDark ? "light" : "dark"} />

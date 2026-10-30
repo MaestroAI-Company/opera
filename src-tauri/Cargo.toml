@@ -18,7 +18,7 @@ tauri-build = { version = "2.6.3", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.11.3", features = [] }
+tauri = { version = "2.11.3", features = ["macos-private-api", "tray-icon"] }
 tauri-plugin-deep-link = "2"
 tauri-plugin-log = "2"
 tauri-plugin-http = { version = "2", features = ["unsafe-headers"] }
@@ -33,6 +33,7 @@ tokio = { version = "1", features = ["sync", "time"] }
 sampler-hub = { path = "../../Sampler-Hub/crates/sampler-hub", default-features = false }
 sampler-hub-client = { path = "../../Sampler-Hub/crates/sampler-hub-client" }
 machine-uid = "0.6"
+tauri-plugin-global-shortcut = "2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }

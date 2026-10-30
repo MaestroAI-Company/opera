@@ -1,7 +1,11 @@
 #[cfg(desktop)]
 mod hub;
 #[cfg(desktop)]
+mod overlay_window;
+#[cfg(desktop)]
 mod settings_window;
+#[cfg(desktop)]
+mod tray;
 mod webview_task;
 
 //webview data sits in the company folder like the hub
@@ -30,7 +34,8 @@ pub fn run() {
     #[cfg(desktop)]
     {
         builder = builder
-            .plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}))
+            .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| tray::show_main(app)))
+            .plugin(tauri_plugin_global_shortcut::Builder::new().build())
             .manage(hub::HubState::default());
     }
 
@@ -44,6 +49,22 @@ pub fn run() {
             webview_task::webview_task,
             #[cfg(desktop)]
             settings_window::open_settings_window,
+            #[cfg(desktop)]
+            overlay_window::overlay_resize,
+            #[cfg(desktop)]
+            overlay_window::overlay_hide,
+            #[cfg(desktop)]
+            overlay_window::overlay_hold,
+            #[cfg(desktop)]
+            overlay_window::overlay_configure,
+            #[cfg(desktop)]
+            overlay_window::overlay_forward_notice,
+            #[cfg(desktop)]
+            overlay_window::overlay_set_pinned,
+            #[cfg(desktop)]
+            overlay_window::overlay_drag,
+            #[cfg(desktop)]
+            overlay_window::overlay_open_conversation,
             #[cfg(desktop)]
             hub::hub_device_id,
             #[cfg(desktop)]
@@ -178,20 +199,36 @@ pub fn run() {
             {
                 use tauri::Manager;
                 let handle = app.handle().clone();
+                let guard = main_window.clone();
                 main_window.on_window_event(move |event| {
+                    //tray keeps the overlay shortcut alive
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        if overlay_window::CLOSE_TO_TRAY.load(std::sync::atomic::Ordering::SeqCst) {
+                            api.prevent_close();
+                            let _ = guard.hide();
+                        }
+                    }
                     if matches!(event, tauri::WindowEvent::Destroyed) {
-                        if let Some(settings) = handle.get_webview_window("settings") {
-                            //prevent hidden window leaking on exit
-                            let _ = settings.destroy();
+                        //prevent hidden windows leaking on exit
+                        for label in ["settings", "overlay"] {
+                            if let Some(window) = handle.get_webview_window(label) {
+                                let _ = window.destroy();
+                            }
                         }
                     }
                 });
+
+                tray::setup(app.handle())?;
 
                 let warmup_handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
                     //avoid competing with main window mount
                     tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
                     let _ = settings_window::warmup_settings_window(&warmup_handle);
+                    //shortcut may be taken by another app
+                    if let Err(e) = overlay_window::setup(&warmup_handle) {
+                        log::warn!("overlay unavailable: {e}");
+                    }
                 });
             }
 

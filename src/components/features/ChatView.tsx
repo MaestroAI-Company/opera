@@ -178,6 +178,8 @@ type ChatViewProps = {
   editAiEnabled?: boolean;
   //home butterfly frame to fly from
   butterflyFrom?: DOMRect | null;
+  //lets a host size itself to the content
+  onContentHeight?: (height: number) => void;
 };
 
 const stripMarkdown = (md: string) => {
@@ -532,7 +534,7 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   prev.editAiEnabled === next.editAiEnabled);
 MessageItem.displayName = "MessageItem";
 
-export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, queuedMessageIds, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress, onEditMessage, editAiEnabled, butterflyFrom }: ChatViewProps) {
+export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, queuedMessageIds, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress, onEditMessage, editAiEnabled, butterflyFrom, onContentHeight }: ChatViewProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const listRef = useRef<FlatList>(null);
@@ -666,6 +668,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
           if (autoScrollTimeout.current) clearTimeout(autoScrollTimeout.current);
         }}
         onContentSizeChange={(w, h) => {
+          onContentHeight?.(h);
           if (!isAtBottomRef.current) return;
           isAutoScrolling.current = true;
           if (autoScrollTimeout.current) clearTimeout(autoScrollTimeout.current);

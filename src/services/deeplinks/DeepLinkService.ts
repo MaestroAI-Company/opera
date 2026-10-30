@@ -69,13 +69,19 @@ export function subscribeToDeepLinks(
   if (isTauri) {
     let cancelled = false;
     let unlisten: (() => void) | null = null;
+    let unlistenOverlay: (() => void) | null = null;
     (async () => {
       try {
         const mod = await import("@tauri-apps/plugin-deep-link");
+        const { listen } = await import("@tauri-apps/api/event");
         if (cancelled) return;
         unlisten = await mod.onOpenUrl((urls) => {
           for (const url of urls) handler(parseDeepLink(url));
         });
+        //overlay hands over its conversation
+        unlistenOverlay = await listen<string>("overlay-open-url", (e) =>
+          handler(parseDeepLink(e.payload))
+        );
       } catch (e) {
         console.warn("Failed to listen to tauri deep links", e);
       }
@@ -83,6 +89,7 @@ export function subscribeToDeepLinks(
     return () => {
       cancelled = true;
       unlisten?.();
+      unlistenOverlay?.();
     };
   }
   if (Platform.OS === "web") return () => {};

@@ -161,6 +161,8 @@ export type DrawerSheetProps = {
   desktopStyle?: StyleProp<ViewStyle>;
   handleContainerStyle?: StyleProp<ViewStyle>;
   handleStyle?: StyleProp<ViewStyle>;
+  //transparent windows show it as grey
+  hideScrim?: boolean;
 };
 
 export default function DrawerSheet({
@@ -179,6 +181,7 @@ export default function DrawerSheet({
   desktopStyle,
   handleContainerStyle,
   handleStyle,
+  hideScrim = false,
 }: DrawerSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const isLift = mode === "lift";
@@ -321,7 +324,7 @@ export default function DrawerSheet({
 
   return (
     <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
-      <Animated.View style={[styles.overlay, { opacity: progress }]}>
+      <Animated.View style={[styles.overlay, hideScrim && styles.overlayHidden, { opacity: progress }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => dismiss()} />
       </Animated.View>
 
@@ -372,6 +375,9 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFill,
     backgroundColor: Colors.scrimDrawer,
+  },
+  overlayHidden: {
+    backgroundColor: "transparent",
   },
   desktopRootWrapper: {
     ...StyleSheet.absoluteFill,

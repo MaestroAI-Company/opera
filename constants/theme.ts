@@ -78,6 +78,9 @@ export const LightColors = {
   responseTextMuted: "rgba(255,255,255,0.62)",
   responseBorder: "rgba(255,255,255,0.14)",
 
+  //desktop overlay frosted shell
+  overlayShell: "rgba(160,160,160,0.72)",
+
   //white tint lifts a red row to primaryBright
   overlayHover: "rgba(255,255,255,0.22)",
   //snackbar stays a dark pill in both themes
@@ -129,6 +132,7 @@ export const DarkColors: ThemeColors = {
   groupedBackgroundFade: "rgba(20,19,18,0.9)",
   groupedBackgroundClear: "rgba(20,19,18,0)",
   screensaverBackground: "#000000",
+  overlayShell: "rgba(40,40,40,0.72)",
 };
 
 //light stays the module default so non-react code keeps working

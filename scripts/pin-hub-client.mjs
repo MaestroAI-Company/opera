@@ -1,4 +1,4 @@
-//pins the hub client release for android, web and desktop
+//pins the hub client release for android and web
 
 import { writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -9,11 +9,6 @@ const ASSETS = [
   'sampler_hub_client.kt',
   'sampler-hub-client-web.js',
   'sampler-hub-client-web.wasm',
-  'sampler-hubw-windows-x86_64.exe',
-  'sampler-hubw-windows-aarch64.exe',
-  'sampler-hubw-macos-aarch64',
-  'sampler-hubw-linux-x86_64',
-  'sampler-hubw-linux-aarch64',
 ];
 
 const version = process.argv[2];

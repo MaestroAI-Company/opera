@@ -52,5 +52,11 @@ windows-sys = { version = "0.59", features = ["Win32_UI_Input_KeyboardAndMouse",
 [target.'cfg(target_os = "macos")'.dependencies]
 ort = { version = "=2.0.0-rc.15", default-features = false, features = ["coreml"] }
 
+#dawn webgpu build only exists for x86_64
+[target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["webgpu"] }
+#lists vulkan devices before picking webgpu
+ash = { version = "0.38", default-features = false, features = ["loaded", "std"] }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }

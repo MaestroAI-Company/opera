@@ -42,6 +42,28 @@ fn directml_usable() -> bool {
     })
 }
 
+//dawn would pick lavapipe without one
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+fn vulkan_gpu() -> bool {
+    use ash::vk::PhysicalDeviceType;
+    static GPU: OnceLock<bool> = OnceLock::new();
+    *GPU.get_or_init(|| unsafe {
+        let Ok(entry) = ash::Entry::load() else { return false };
+        let Ok(instance) = entry.create_instance(&ash::vk::InstanceCreateInfo::default(), None) else {
+            return false;
+        };
+        let gpu = instance.enumerate_physical_devices().unwrap_or_default().into_iter().any(|device| {
+            let kind = instance.get_physical_device_properties(device).device_type;
+            kind == PhysicalDeviceType::DISCRETE_GPU || kind == PhysicalDeviceType::INTEGRATED_GPU
+        });
+        instance.destroy_instance(None);
+        if !gpu {
+            log::warn!("no vulkan gpu, onnx models run on cpu");
+        }
+        gpu
+    })
+}
+
 //falls back to cpu without a gpu
 pub fn accelerated() -> Result<SessionBuilder, String> {
     #[allow(unused_mut)]
@@ -55,6 +77,12 @@ pub fn accelerated() -> Result<SessionBuilder, String> {
             .with_memory_pattern(false)
             .map_err(err)?
             .with_parallel_execution(false)
+            .map_err(err)?;
+    }
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    if vulkan_gpu() {
+        builder = builder
+            .with_execution_providers([ort::ep::WebGPU::default().build()])
             .map_err(err)?;
     }
     #[cfg(target_os = "macos")]

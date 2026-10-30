@@ -1,4 +1,13 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "mainBinaryName": "opera"
+  "mainBinaryName": "opera",
+  "bundle": {
+    "linux": {
+      "deb": {
+        "files": {
+          "/usr/lib/Opera/libwebgpu_dawn.so": "target/release/libwebgpu_dawn.so"
+        }
+      }
+    }
+  }
 }

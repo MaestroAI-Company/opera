@@ -41,7 +41,6 @@
       "icons/icon.ico"
     ],
     "publisher": "Maestro AI",
-    "externalBin": ["binaries/sampler-hubw"],
     "copyright": "© Maestro AI",
     "windows": {
       "nsis": {

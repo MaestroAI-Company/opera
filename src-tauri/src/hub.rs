@@ -19,6 +19,13 @@ const START_POLL: std::time::Duration = std::time::Duration::from_millis(200);
 #[derive(Default)]
 pub struct HubState {
     clients: Mutex<HashMap<String, Arc<HubClient>>>,
+    hosted: Mutex<Option<Hosted>>,
+}
+
+//one tray for the app and hub
+struct Hosted {
+    stop: tokio::sync::oneshot::Sender<()>,
+    thread: std::thread::JoinHandle<()>,
 }
 
 #[derive(Serialize)]
@@ -600,7 +607,7 @@ pub async fn hub_start_proxy(
 }
 
 #[tauri::command]
-pub async fn hub_host_status() -> Result<HostStatus, String> {
+pub async fn hub_host_status(state: State<'_, HubState>) -> Result<HostStatus, String> {
     let data_dir = config::default_data_dir().map_err(host_error)?;
     //reading must not create a key
     let id = if data_dir.join(config::SECRET_KEY_FILE).exists() {
@@ -609,47 +616,96 @@ pub async fn hub_host_status() -> Result<HostStatus, String> {
     } else {
         None
     };
-    let installed = tauri::async_runtime::spawn_blocking(service::status)
+    let sidecar = tauri::async_runtime::spawn_blocking(service::status)
         .await
         .map_err(host_error)?
         .map_err(host_error)?;
     Ok(HostStatus {
         running: hub::is_running(&data_dir),
-        installed: installed != service::Status::NotInstalled,
+        installed: state.hosted.lock().await.is_some() || sidecar != service::Status::NotInstalled,
         id,
     })
 }
 
-//the sidecar runs with the session, with or without the app
-#[tauri::command]
-pub async fn hub_host_start() -> Result<(), String> {
-    let data_dir = config::default_data_dir().map_err(host_error)?;
-    if hub::is_running(&data_dir) {
-        return Ok(());
-    }
-    let exe = std::env::current_exe().map_err(host_error)?;
-    let launch = service::Launch::next_to(&exe, &data_dir).map_err(host_error)?;
-    tauri::async_runtime::spawn_blocking(move || service::install(&launch))
+//older versions ran a tray sidecar
+//todo remove before merging into main
+async fn remove_sidecar() -> Result<(), String> {
+    let installed = tauri::async_runtime::spawn_blocking(service::status)
         .await
         .map_err(host_error)?
         .map_err(host_error)?;
-    //pairing right after needs it listening
-    for _ in 0..START_POLLS {
-        if hub::is_running(&data_dir) {
-            return Ok(());
-        }
-        tokio::time::sleep(START_POLL).await;
+    if installed == service::Status::NotInstalled {
+        return Ok(());
     }
-    Err("the hub did not start".into())
-}
-
-//stops it and its login start
-#[tauri::command]
-pub async fn hub_host_stop() -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(service::uninstall)
         .await
         .map_err(host_error)?
         .map_err(host_error)
+}
+
+async fn wait_running(data_dir: &std::path::Path, running: bool) -> bool {
+    for _ in 0..START_POLLS {
+        if hub::is_running(data_dir) == running {
+            return true;
+        }
+        tokio::time::sleep(START_POLL).await;
+    }
+    false
+}
+
+//stops when the app quits
+#[tauri::command]
+pub async fn hub_host_start(state: State<'_, HubState>) -> Result<(), String> {
+    let data_dir = config::default_data_dir().map_err(host_error)?;
+    let mut hosted = state.hosted.lock().await;
+    if hosted.as_ref().is_some_and(|h| !h.thread.is_finished()) {
+        return Ok(());
+    }
+    remove_sidecar().await?;
+    //the sidecar lets go of the lock
+    wait_running(&data_dir, false).await;
+    //a hub from the cli keeps its own tray
+    if hub::is_running(&data_dir) {
+        return Ok(());
+    }
+    let (stop, stop_rx) = tokio::sync::oneshot::channel::<()>();
+    let thread = std::thread::spawn({
+        let data_dir = data_dir.clone();
+        move || {
+            let runtime = match tokio::runtime::Runtime::new() {
+                Ok(runtime) => runtime,
+                Err(e) => return log::error!("hub not started: {e}"),
+            };
+            let result = runtime.block_on(hub::run(&data_dir, async {
+                let _ = stop_rx.await;
+            }));
+            if let Err(e) = result {
+                log::error!("hub stopped: {e:#}");
+            }
+        }
+    });
+    *hosted = Some(Hosted { stop, thread });
+    //pairing right after needs it listening
+    if wait_running(&data_dir, true).await {
+        Ok(())
+    } else {
+        Err("the hub did not start".into())
+    }
+}
+
+#[tauri::command]
+pub async fn hub_host_stop(state: State<'_, HubState>) -> Result<(), String> {
+    stop_hosted(&state).await;
+    remove_sidecar().await
+}
+
+//lets the hub close its connections
+pub async fn stop_hosted(state: &HubState) {
+    let Some(hosted) = state.hosted.lock().await.take() else {
+        return;
+    };
+    let _ = hosted.stop.send(());
+    let _ = tauri::async_runtime::spawn_blocking(move || hosted.thread.join()).await;
 }
 
 //one time link for this app to pair itself

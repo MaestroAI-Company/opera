@@ -1,4 +1,4 @@
-//gradle runs it before each android build, npm before web and desktop
+//gradle runs it before each android build, npm before web
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -13,15 +13,6 @@ const libPath = join(mainDir, 'jniLibs', 'arm64-v8a', 'libsampler_hub_client.so'
 const bindingsDir = join(mainDir, 'java', 'uniffi', 'sampler_hub_client');
 //served as is next to the web bundle
 const webDir = join(root, 'public', 'sampler-hub');
-//tauri sidecars carry the target triple
-const sidecarDir = join(root, 'src-tauri', 'binaries');
-const SIDECARS = {
-  'win32-x64': ['x86_64-pc-windows-msvc', 'sampler-hubw-windows-x86_64.exe'],
-  'win32-arm64': ['aarch64-pc-windows-msvc', 'sampler-hubw-windows-aarch64.exe'],
-  'darwin-arm64': ['aarch64-apple-darwin', 'sampler-hubw-macos-aarch64'],
-  'linux-x64': ['x86_64-unknown-linux-gnu', 'sampler-hubw-linux-x86_64'],
-  'linux-arm64': ['aarch64-unknown-linux-gnu', 'sampler-hubw-linux-aarch64'],
-};
 const RELEASES = 'https://github.com/MaestroAI-Company/Sampler-Hub/releases/download';
 //ring needs clang for wasm
 const WINDOWS_CLANG = 'C:\\Program Files\\LLVM\\bin';
@@ -30,17 +21,7 @@ const target = process.argv[2] ?? 'android';
 const works = (command, args) => spawnSync(command, args, { stdio: 'ignore' }).status === 0;
 const hasHub = existsSync(join(hubDir, 'Cargo.toml'));
 
-if (target === 'desktop') {
-  const sidecar = SIDECARS[`${process.platform}-${process.arch}`];
-  if (!sidecar) throw new Error(`no sampler hub build for ${process.platform} ${process.arch}`);
-  const [triple, asset] = sidecar;
-  const dest = join(sidecarDir, `sampler-hubw-${triple}${process.platform === 'win32' ? '.exe' : ''}`);
-  if (hasHub) {
-    buildSidecarFromSource(dest);
-  } else {
-    await downloadPinned([[asset, dest]]);
-  }
-} else if (target === 'web') {
+if (target === 'web') {
   if (hasHub && works('wasm-bindgen', ['--version']) && hasClang()) {
     buildWebFromSource();
   } else {
@@ -88,19 +69,6 @@ function buildAndroidFromSource() {
   mkdirSync(dirname(libPath), { recursive: true });
   copyFileSync(join(hubDir, 'target', 'aarch64-linux-android', 'release', 'libsampler_hub_client.so'), libPath);
   console.log(`sampler hub client built from ${hubDir}`);
-}
-
-//its own target dir, a running hub locks target/release
-function buildSidecarFromSource(dest) {
-  const targetDir = join(hubDir, 'target', 'sidecar');
-  cargo(['build', '--release', '-p', 'sampler-hub', '--bin', 'sampler-hubw'], {
-    ...process.env,
-    CARGO_TARGET_DIR: targetDir,
-  });
-  const exe = process.platform === 'win32' ? 'sampler-hubw.exe' : 'sampler-hubw';
-  mkdirSync(dirname(dest), { recursive: true });
-  copyFileSync(join(targetDir, 'release', exe), dest);
-  console.log(`sampler hub sidecar built from ${hubDir}`);
 }
 
 function buildWebFromSource() {

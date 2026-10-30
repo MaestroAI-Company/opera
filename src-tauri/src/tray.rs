@@ -22,7 +22,13 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => show_main(app),
-            "quit" => app.exit(0),
+            "quit" => {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    crate::hub::stop_hosted(&app.state::<crate::hub::HubState>()).await;
+                    app.exit(0);
+                });
+            }
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {

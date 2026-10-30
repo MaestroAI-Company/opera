@@ -251,7 +251,7 @@ export default function SamplerScreen({
     const hub = await SamplerHub.getPairedHub();
     setPairedHub(hub);
     setProfile(await SamplerHub.getProfile());
-    setHostStatus(isDesktop && SamplerHub.canHost() ? await SamplerHub.hostStatus().catch(() => null) : null);
+    setHostStatus(SamplerHub.canHost() ? await SamplerHub.hostStatus().catch(() => null) : null);
     setLoaded(true);
     if (!hub) return;
     SamplerHub.deviceId()
@@ -275,7 +275,7 @@ export default function SamplerScreen({
       //the switch follows pairing and role
       onHubChanged?.();
     }
-  }, [isDesktop, onHubChanged, receiveStatus]);
+  }, [onHubChanged, receiveStatus]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the paired hub
@@ -289,7 +289,7 @@ export default function SamplerScreen({
     let timer: ReturnType<typeof setTimeout>;
     const check = () => {
       //local hub may have stopped
-      if (isDesktop && SamplerHub.canHost()) {
+      if (SamplerHub.canHost()) {
         SamplerHub.hostStatus()
           .then((next) => live && setHostStatus(next))
           .catch(() => {});
@@ -312,15 +312,17 @@ export default function SamplerScreen({
       live = false;
       clearTimeout(timer);
     };
-  }, [visible, pairedHub, hubState, isDesktop, refresh, receiveStatus]);
+  }, [visible, pairedHub, hubState, refresh, receiveStatus]);
 
   //the role may have changed since the profile was unlocked
   const role = profiles?.find((p) => p.id === profile?.id)?.role ?? profile?.role;
   const isAdmin = role === "admin";
   const online = hubState === "online";
   //hosting is desktop-only
-  const canHost = isDesktop && SamplerHub.canHost();
+  const canHost = SamplerHub.canHost();
   const hostsHub = canHost && !!hostStatus?.id && pairedHub?.id === hostStatus.id;
+  //unpair would cut its own host
+  const hostedHere = hostsHub && !!hostStatus?.running;
   const showModels = isAdmin && SamplerHub.canManageModels();
   //llama.cpp usage and build for these pages
   const { status: modelsStatus } = useHubModels(
@@ -448,7 +450,7 @@ export default function SamplerScreen({
   };
 
   const unpair = () => {
-    if (!pairedHub) return;
+    if (!pairedHub || hostedHere) return;
     setModal({
       title: t("settings.hub.unpairTitle"),
       message: t("settings.hub.unpairMessage", { name: pairedHub.name }),
@@ -1119,7 +1121,7 @@ export default function SamplerScreen({
             {hostsHub && !hubStopped && (
               <ActionButton icon={cancelIcon} label={t("settings.hub.stopHosting")} disabled={hostBusy} onPress={confirmStop} />
             )}
-            <ActionButton icon={cancelIcon} label={t("settings.hub.unpair")} onPress={unpair} />
+            {!hostedHere && <ActionButton icon={cancelIcon} label={t("settings.hub.unpair")} onPress={unpair} />}
           </Group>
         </View>
       </View>
@@ -1502,9 +1504,11 @@ export default function SamplerScreen({
                 onPress={() => setProfileSheet("pick")}
               />
             </Group>
-            <Group>
-              <ActionButton icon={cancelIcon} label={t("settings.hub.unpair")} onPress={unpair} />
-            </Group>
+            {!hostedHere && (
+              <Group>
+                <ActionButton icon={cancelIcon} label={t("settings.hub.unpair")} onPress={unpair} />
+              </Group>
+            )}
           </View>
         </View>
       );
@@ -1890,10 +1894,14 @@ export default function SamplerScreen({
         canManage={isAdmin}
         onClose={() => setSelectedDeviceId(null)}
         onChanged={refresh}
-        onUnpairSelf={() => {
-          setSelectedDeviceId(null);
-          unpair();
-        }}
+        onUnpairSelf={
+          hostedHere
+            ? undefined
+            : () => {
+                setSelectedDeviceId(null);
+                unpair();
+              }
+        }
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />

@@ -77,6 +77,8 @@ pub fn run() {
             #[cfg(desktop)]
             overlay_window::overlay_open_conversation,
             #[cfg(desktop)]
+            overlay_window::overlay_show_main,
+            #[cfg(desktop)]
             hub::hub_device_id,
             #[cfg(desktop)]
             hub::hub_pair,

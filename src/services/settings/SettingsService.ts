@@ -2,6 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import { DeviceEventEmitter } from 'react-native';
 import { AppEvents } from '../events';
 import { openSharedDatabase } from '../db/sqlite';
+import { ScreenCapture } from '../overlay/screenCapture';
 import { BASE_DEFAULTS, isBooleanKey, isNumberKey, type AppSettings } from './schema';
 
 export type { AppSettings } from './schema';
@@ -62,6 +63,7 @@ class SettingsService {
     }
 
     this.cache = settings;
+    ScreenCapture.setOnboarded(settings.hasSeenOnboarding);
     return settings;
   }
 
@@ -78,6 +80,7 @@ class SettingsService {
     if (this.cache) {
       (this.cache as any)[key] = value;
     }
+    if (key === 'hasSeenOnboarding') ScreenCapture.setOnboarded(value as boolean);
     const db = this.getDb();
     await db.runAsync(
       'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
@@ -104,6 +107,7 @@ class SettingsService {
     if (this.cache) {
       Object.assign(this.cache, partial);
     }
+    if (partial.hasSeenOnboarding !== undefined) ScreenCapture.setOnboarded(partial.hasSeenOnboarding);
     const db = this.getDb();
     //avoid nested transaction from shared db
     for (const [key, value] of Object.entries(partial)) {

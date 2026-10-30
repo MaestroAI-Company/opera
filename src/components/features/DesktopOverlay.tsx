@@ -208,7 +208,14 @@ export default function DesktopOverlay() {
       if (e.key === 'Escape') invoke('overlay_hide');
     };
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    const selection = listen<string>('stage-selection', e => {
+      pickerRef.current.setFiles(prev => [...prev, { uri: e.payload, type: 'image', name: 'selection.png', mimeType: 'image/png' }]);
+      chatBarRef.current?.focus();
+    });
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      selection.then(un => un());
+    };
   }, []);
 
   const expanded = modelSelectorVisible || attachments.sheetVisible;

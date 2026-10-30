@@ -3,6 +3,8 @@ mod hub;
 #[cfg(desktop)]
 mod overlay_window;
 #[cfg(desktop)]
+mod overlay_stage;
+#[cfg(desktop)]
 mod settings_window;
 #[cfg(desktop)]
 mod tray;
@@ -78,6 +80,18 @@ pub fn run() {
             overlay_window::overlay_open_conversation,
             #[cfg(desktop)]
             overlay_window::overlay_show_main,
+            #[cfg(desktop)]
+            overlay_stage::stage_detection_input,
+            #[cfg(desktop)]
+            overlay_stage::stage_select,
+            #[cfg(desktop)]
+            overlay_stage::stage_crop,
+            #[cfg(desktop)]
+            overlay_stage::stage_model,
+            #[cfg(desktop)]
+            overlay_stage::stage_screen_access,
+            #[cfg(desktop)]
+            overlay_stage::stage_open_screen_settings,
             #[cfg(desktop)]
             hub::hub_device_id,
             #[cfg(desktop)]

@@ -34,6 +34,8 @@ sampler-hub = { path = "../../Sampler-Hub/crates/sampler-hub", default-features 
 sampler-hub-client = { path = "../../Sampler-Hub/crates/sampler-hub-client" }
 machine-uid = "0.6"
 tauri-plugin-global-shortcut = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-autostart = "2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }

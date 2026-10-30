@@ -299,6 +299,12 @@ export const fr: Translations = {
   "settings.title": "Réglages",
   "settings.notice.update": "Opera {version} est disponible",
 
+  "update.title": "Mise à jour disponible",
+  "update.message": "Opera {version} est prête à être installée. Opera redémarre pour terminer la mise à jour.",
+  "update.installing": "Téléchargement d'Opera {version}. Opera redémarre à la fin.",
+  "update.install": "Mettre à jour",
+  "update.later": "Plus tard",
+
   "settings.nav.profile.title": "Profil",
   "settings.nav.profile.subtitle": "Nom",
   "settings.nav.cloud.title": "Sync & sauvegarde",
@@ -732,6 +738,16 @@ export const fr: Translations = {
   "settings.overlay.closeToTray": "Rester ouvert en arrière-plan",
   "settings.overlay.closeToTrayHelp":
     "Fermer la fenêtre garde Opera dans la zone de notification pour que le raccourci marche toujours.",
+  "settings.startup.launch": "Lancer au démarrage",
+  "settings.startup.launchHelp":
+    "Opera démarre avec l'ordinateur et attend dans la zone de notification.",
+  "settings.update.beta": "Versions bêta",
+  "settings.update.betaHelp":
+    "Reçois les nouvelles versions d'Opera avant tout le monde.",
+  "settings.update.betaWarning.title": "Activer les versions bêta ?",
+  "settings.update.betaWarning.message":
+    "Les versions bêta sont moins testées que les versions stables. Elles peuvent contenir des bugs, planter, perdre ou corrompre tes données, et changer sans prévenir. Sauvegarde d'abord tes conversations. Désactiver l'option plus tard ne revient pas à une version stable, tu restes sur la bêta jusqu'à la prochaine version stable.",
+  "settings.update.betaWarning.confirm": "Je comprends les risques",
 
   "settings.cloud.storage": "Stockage cloud",
   "settings.cloud.selectStorage": "Choisir le stockage cloud",

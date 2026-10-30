@@ -379,6 +379,22 @@ class ScreenCaptureModule(context: ReactApplicationContext) : ReactContextBaseJa
     OverlayActivity.finishOverlay()
   }
 
+  //deep link would reroute the app
+  @ReactMethod
+  fun openApp() {
+    val context = reactApplicationContext
+    context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
+      it.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+      context.startActivity(it)
+    }
+    OverlayActivity.finishOverlay()
+  }
+
+  @ReactMethod
+  fun setOnboarded(done: Boolean) {
+    OverlayActivity.setOnboarded(reactApplicationContext, done)
+  }
+
   private fun encode(stream: ByteArrayOutputStream): String =
     Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
 

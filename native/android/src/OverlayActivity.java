@@ -23,6 +23,19 @@ public class OverlayActivity extends ReactActivity {
         return sShown;
     }
 
+    private static final String PREFS = "maestro_overlay";
+    private static final String KEY_ONBOARDED = "onboarded";
+
+    //js mirrors it for native
+    public static void setOnboarded(Context context, boolean done) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ONBOARDED, done).apply();
+    }
+
+    //unknown defaults to done
+    public static boolean needsOnboarding(Context context) {
+        return !context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ONBOARDED, true);
+    }
+
     //sleep ends the overlay session
     private final BroadcastReceiver screenOffReceiver = new BroadcastReceiver() {
         @Override

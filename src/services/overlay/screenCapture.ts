@@ -25,6 +25,8 @@ type NativeCapture = {
   getAppContext?(): Promise<AppContext>;
   getAppIcon?(pkg: string): Promise<AppIcon>;
   closeOverlay(): void;
+  setOnboarded?(done: boolean): void;
+  openApp?(): void;
   clearTextLayer?(): void;
 };
 
@@ -127,5 +129,15 @@ export const ScreenCapture = {
     } catch (e) {
       console.warn('[ScreenCapture] close failed:', e);
     }
+  },
+
+  //open main app and close overlay
+  openApp(): void {
+    Native?.openApp?.();
+  },
+
+  //native gate before the overlay
+  setOnboarded(done: boolean): void {
+    Native?.setOnboarded?.(done);
   },
 };

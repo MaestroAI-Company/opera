@@ -95,6 +95,11 @@ export default function DesktopOverlay() {
   }, []);
 
   const applySettings = useCallback((loaded: AppSettings) => {
+    //onboarding unfinished so open the app
+    if (!loaded.hasSeenOnboarding) {
+      invoke('overlay_show_main');
+      return;
+    }
     const s = migrateModelSources(loaded);
     instructionRef.current = s.instruction;
     if (s.ollamaModel) {

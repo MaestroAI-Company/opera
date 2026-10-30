@@ -297,6 +297,11 @@ function AssistantOverlay() {
 
   //push db settings into module and local state
   const applySettings = useCallback((loaded: AppSettings) => {
+    //onboarding unfinished so open the app
+    if (!loaded.hasSeenOnboarding) {
+      ScreenCapture.openApp();
+      return;
+    }
     const s = migrateModelSources(loaded);
     setUserInstruction(s.instruction);
     if (s.ollamaModel) {
@@ -328,6 +333,8 @@ function AssistantOverlay() {
         await Promise.all([DB.init(), Settings.init()]);
         const s = await Settings.load();
         applySettings(s);
+        //app already took over
+        if (!s.hasSeenOnboarding) return;
 
         //show once, first time this overlay is opened
         if (!s.hasSeenAssistantOverlay) {

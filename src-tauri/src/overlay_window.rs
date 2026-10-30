@@ -251,6 +251,13 @@ pub fn overlay_forward_notice(app: AppHandle, title: String, message: String) ->
         .map_err(|e| e.to_string())
 }
 
+//onboarding unfinished so open the app
+#[tauri::command]
+pub fn overlay_show_main(app: AppHandle) {
+    overlay_hide(app.clone());
+    crate::tray::show_main(&app);
+}
+
 //hands the conversation to the main window
 #[tauri::command]
 pub fn overlay_open_conversation(app: AppHandle, conv_id: String) -> Result<(), String> {

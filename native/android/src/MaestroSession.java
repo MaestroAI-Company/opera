@@ -143,6 +143,10 @@ public class MaestroSession extends VoiceInteractionSession {
             hide();
             return;
         }
+        if (OverlayActivity.needsOnboarding(getContext())) {
+            startMainActivity();
+            return;
+        }
         activityStarted = false;
         //clear stale screenshot from previous session
         ScreenshotHolder.clear();
@@ -161,6 +165,23 @@ public class MaestroSession extends VoiceInteractionSession {
                     + "assistant in the android settings, otherwise selection stays empty");
             startOverlayActivity();
         }
+    }
+
+    //onboarding unfinished so open the app
+    private void startMainActivity() {
+        Intent intent = getContext().getPackageManager().getLaunchIntentForPackage(getContext().getPackageName());
+        if (intent == null) return;
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            startAssistantActivity(intent);
+        } catch (Exception e) {
+            try {
+                getContext().startActivity(intent);
+            } catch (Exception e2) {
+                Log.e(TAG, "start main failed: " + e2.getMessage());
+            }
+        }
+        hide();
     }
 
     private void startOverlayActivity() {

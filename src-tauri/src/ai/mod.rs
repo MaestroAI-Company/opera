@@ -8,9 +8,42 @@ use ort::{
     environment::Environment,
     session::{builder::SessionBuilder, Session},
 };
-use std::sync::OnceLock;
+use std::{
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Once, OnceLock,
+    },
+    time::{Duration, Instant},
+};
 
 static ENV: OnceLock<Result<Environment, String>> = OnceLock::new();
+//models unload after this long unused
+const IDLE_SECS: u64 = 300;
+static START: OnceLock<Instant> = OnceLock::new();
+
+fn now_secs() -> u64 {
+    START.get_or_init(Instant::now).elapsed().as_secs()
+}
+
+pub fn touch(last_use: &AtomicU64) {
+    last_use.store(now_secs(), Ordering::Relaxed);
+}
+
+pub fn idle(last_use: &AtomicU64) -> bool {
+    now_secs().saturating_sub(last_use.load(Ordering::Relaxed)) >= IDLE_SECS
+}
+
+//one thread checks every loaded model
+pub fn watch_idle() {
+    static WATCH: Once = Once::new();
+    WATCH.call_once(|| {
+        std::thread::spawn(|| loop {
+            std::thread::sleep(Duration::from_secs(30));
+            whisper::unload_if_idle();
+            detector::unload_if_idle();
+        });
+    });
+}
 
 fn err(e: impl std::fmt::Display) -> String {
     e.to_string()

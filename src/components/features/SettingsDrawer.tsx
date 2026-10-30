@@ -1122,7 +1122,7 @@ export default function SettingsDrawer({
   });
   const notices = useSettingsNotices(visible);
   const { prompt: promptUpdate, modalProps: updateModalProps } = useDesktopUpdate();
-  const [launchAtStartup, setLaunchAtStartupState] = useState(false);
+  const [launchAtStartup, setLaunchAtStartupState] = useState(true);
   const [betaChannel, setBetaChannelState] = useState(false);
   //not part of synced settings
   useEffect(() => {
@@ -3733,7 +3733,7 @@ export default function SettingsDrawer({
           </Group>
         </View>
 
-        <View style={[styles.settingRowVertical, !isTauri && { marginBottom: 0 }]}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>
               <Text style={styles.settingLabel}>
@@ -3746,38 +3746,6 @@ export default function SettingsDrawer({
             <Toggle checked={advancedMode} onToggle={setAdvancedMode} />
           </View>
         </View>
-
-        {isTauri && (
-          <>
-            <View style={styles.settingRowVertical}>
-              <View style={styles.toggleGroupRow}>
-                <View style={styles.toggleGroupContent}>
-                  <Text style={styles.settingLabel}>
-                    {t("settings.overlay.closeToTray")}
-                  </Text>
-                  <Text style={styles.helpText}>
-                    {t("settings.overlay.closeToTrayHelp")}
-                  </Text>
-                </View>
-                <Toggle checked={closeToTray} onToggle={v => setOverlayConfig({ closeToTray: v })} />
-              </View>
-            </View>
-
-            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <View style={styles.toggleGroupRow}>
-                <View style={styles.toggleGroupContent}>
-                  <Text style={styles.settingLabel}>
-                    {t("settings.startup.launch")}
-                  </Text>
-                  <Text style={styles.helpText}>
-                    {t("settings.startup.launchHelp")}
-                  </Text>
-                </View>
-                <Toggle checked={launchAtStartup} onToggle={setLaunchAtStartupValue} />
-              </View>
-            </View>
-          </>
-        )}
       </View>
 
       {/* overlay and screen saver links */}
@@ -3789,7 +3757,7 @@ export default function SettingsDrawer({
               t("settings.nav.overlay.title"),
               t("settings.nav.overlay.subtitle"),
             )}
-          {/* standby is an android dream service */}
+          {/* standby is android dream service */}
           {Platform.OS === "android" &&
             renderToolsNavRow(
               "screensaver",
@@ -3797,6 +3765,39 @@ export default function SettingsDrawer({
               t("settings.nav.screenSaver.subtitle"),
             )}
         </Group>
+      )}
+
+      {/* background and startup card */}
+      {isTauri && (
+        <View style={styles.contentCard}>
+          <View style={styles.settingRowVertical}>
+            <View style={styles.toggleGroupRow}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.overlay.closeToTray")}
+                </Text>
+                <Text style={styles.helpText}>
+                  {t("settings.overlay.closeToTrayHelp")}
+                </Text>
+              </View>
+              <Toggle checked={closeToTray} onToggle={v => setOverlayConfig({ closeToTray: v })} />
+            </View>
+          </View>
+
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <View style={styles.toggleGroupRow}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.startup.launch")}
+                </Text>
+                <Text style={styles.helpText}>
+                  {t("settings.startup.launchHelp")}
+                </Text>
+              </View>
+              <Toggle checked={launchAtStartup} onToggle={setLaunchAtStartupValue} />
+            </View>
+          </View>
+        </View>
       )}
     </View>
   );

@@ -26,7 +26,8 @@ type HubDeviceSheetProps = {
   canManage: boolean;
   onClose: () => void;
   onChanged: () => void;
-  onUnpairSelf: () => void;
+  //absent while hosting here
+  onUnpairSelf?: () => void;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
 };
@@ -167,7 +168,7 @@ export default function HubDeviceSheet({
         </View>
 
         {/* actions section */}
-        {(isSelf || canManage) && (
+        {(isSelf ? !!onUnpairSelf : canManage) && (
           <View style={[styles.contentCard, { marginBottom: 0 }]}>
             <Group>
               {isSelf ? (
@@ -175,7 +176,7 @@ export default function HubDeviceSheet({
                   icon={cancelIcon}
                   label={t("settings.hub.unpair")}
                   disabled={busy}
-                  onPress={onUnpairSelf}
+                  onPress={() => onUnpairSelf?.()}
                 />
               ) : (
                 <ActionButton

@@ -43,9 +43,10 @@ pub fn build(app: &AppHandle) -> Result<(), String> {
     if let Some(dir) = crate::webview_data_dir(app) {
         builder = builder.data_directory(dir);
     }
-    let window = builder.build().map_err(|e| e.to_string())?;
-    //clicks fall through to the desktop
-    window.set_ignore_cursor_events(true).map_err(|e| e.to_string())?;
+    let _window = builder.build().map_err(|e| e.to_string())?;
+    //clicks fall through but gtk waits for show
+    #[cfg(not(target_os = "linux"))]
+    _window.set_ignore_cursor_events(true).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -107,6 +108,8 @@ pub fn show(app: &AppHandle) {
     let _ = window.set_position(PhysicalPosition::new(pos.x, pos.y));
     let _ = window.set_size(PhysicalSize::new(size.width, size.height));
     let _ = window.show();
+    //gtk has no native window before show
+    let _ = window.set_ignore_cursor_events(true);
     let _ = app.emit_to(LABEL, "stage-shown", ());
     watch_ctrl(app);
 

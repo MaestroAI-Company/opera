@@ -14,6 +14,7 @@ import SiteHead from "../components/SiteHead";
 import SplashScreenComponent from "../components/ui/SplashScreen";
 import SettingsWindow from "../components/features/SettingsWindow";
 import DesktopOverlay from "../components/features/DesktopOverlay";
+import DesktopStage from "../components/features/DesktopStage";
 import OverlayNoticeHost from "../components/features/OverlayNoticeHost";
 import TauriTitleBar from "../components/features/TauriTitleBar";
 import CodeDownloadHost from "../components/features/CodeDownloadHost";
@@ -59,6 +60,8 @@ const isLinux = isTauri && navigator.userAgent.includes("Linux") && !navigator.u
 const isSettingsWindow = isTauri && new URLSearchParams(window.location.search).get("window") === "settings";
 //overlay window loads with this flag
 const isOverlayWindow = isTauri && new URLSearchParams(window.location.search).get("window") === "overlay";
+//fullscreen layer under the overlay bar
+const isStageWindow = isTauri && new URLSearchParams(window.location.search).get("window") === "stage";
 
 const screenLayout = ({ children }: { children: ReactNode }) => (
   <>
@@ -70,7 +73,7 @@ const screenLayout = ({ children }: { children: ReactNode }) => (
 export default function RootLayout() {
   const isDark = useIsDark();
   const colors = useColors();
-  const [showLottie, setShowLottie] = useState(Platform.OS !== "web" || (isTauri && !isSettingsWindow && !isOverlayWindow));
+  const [showLottie, setShowLottie] = useState(Platform.OS !== "web" || (isTauri && !isSettingsWindow && !isOverlayWindow && !isStageWindow));
   const [fontsLoaded, fontError] = useFonts({
     Petrona: require("../../assets/fonts/Petrona-Medium.ttf"),
     Figtree: require("../../assets/fonts/Figtree-Regular.ttf"),
@@ -141,6 +144,8 @@ export default function RootLayout() {
       />
     );
   }
+
+  if (isStageWindow) return <DesktopStage />;
 
   if (isOverlayWindow) {
     return (

@@ -730,6 +730,13 @@ export const fr: Translations = {
   "settings.overlay.appContext": "Utiliser le contexte de l'app",
   "settings.overlay.appContextHelp":
     "Envoie à Maestro l'app au premier plan et le texte affiché à l'écran lors de l'utilisation de l'Assistant Overlay",
+  "settings.overlay.screenSelection": "Sélection à l'écran",
+  "settings.overlay.screenSelectionHelp":
+    "Détecte les éléments à l'écran. Maintiens Ctrl dans l'overlay pour en sélectionner un.",
+  "settings.overlay.screenAccessTitle": "Autorisations requises",
+  "settings.overlay.screenAccessMessage":
+    "Autorise Opera dans Réglages Système > Confidentialité et sécurité, dans Enregistrement de l'écran et Surveillance de l'entrée, puis relance Opera. Sans ça, Maestro ne peut ni voir ton écran ni détecter Ctrl.",
+  "settings.overlay.screenAccessOpen": "Ouvrir les réglages",
   "settings.overlay.desktopEnabled": "Raccourci clavier",
   "settings.overlay.desktopEnabledHelp":
     "Ouvre Maestro par-dessus n'importe quelle app avec un raccourci clavier.",

@@ -5,9 +5,9 @@ use tauri::{
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
-const LABEL: &str = "overlay";
+pub(crate) const LABEL: &str = "overlay";
 //file dialogs steal focus
-static HELD: AtomicBool = AtomicBool::new(false);
+pub(crate) static HELD: AtomicBool = AtomicBool::new(false);
 //user pin keeps it on top
 static PINNED: AtomicBool = AtomicBool::new(false);
 //dragged away so resizes keep position
@@ -70,6 +70,7 @@ fn build_overlay_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String>
 fn hide(app: &AppHandle, window: &tauri::WebviewWindow) {
     if window.is_visible().unwrap_or(false) {
         PINNED.store(false, Ordering::SeqCst);
+        crate::overlay_stage::hide(app);
         let _ = window.hide();
         let _ = app.emit_to(LABEL, "overlay-hidden", ());
         //main list misses overlay writes
@@ -107,6 +108,7 @@ fn show(app: &AppHandle, window: &tauri::WebviewWindow) {
     //reopen returns to default spot
     MOVED.store(false, Ordering::SeqCst);
     place(app, &window, height, true);
+    crate::overlay_stage::show(app);
     let _ = window.show();
     //bypass windows focus stealing guard, macos drops focus on it
     #[cfg(windows)]
@@ -185,6 +187,7 @@ fn register(app: &AppHandle, shortcut: &str) -> Result<(), String> {
 
 pub fn setup(app: &AppHandle) -> Result<(), String> {
     build_overlay_window(app)?;
+    crate::overlay_stage::build(app)?;
     register(app, SHORTCUT)
 }
 
@@ -195,8 +198,10 @@ pub fn overlay_configure(
     enabled: bool,
     shortcut: String,
     close_to_tray: bool,
+    screen_selection: bool,
 ) -> Result<(), String> {
     CLOSE_TO_TRAY.store(close_to_tray, Ordering::SeqCst);
+    crate::overlay_stage::ENABLED.store(screen_selection, Ordering::SeqCst);
     app.global_shortcut()
         .unregister_all()
         .map_err(|e| e.to_string())?;

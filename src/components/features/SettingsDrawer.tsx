@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import * as Calendar from "expo-calendar";
 import Constants from "expo-constants";
 import * as Contacts from "expo-contacts";
@@ -1148,6 +1149,7 @@ export default function SettingsDrawer({
   const [overlayEnabled, setOverlayEnabledState] = useState(true);
   const [overlayShortcut, setOverlayShortcutState] = useState(OVERLAY_SHORTCUTS[0].id);
   const [closeToTray, setCloseToTrayState] = useState(true);
+  const [overlayScreenSelection, setOverlayScreenSelectionState] = useState(false);
   const [shareInstanceUrl, setShareInstanceUrlState] = useState("");
   const [showRemoteImages, setShowRemoteImagesState] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
@@ -1537,6 +1539,7 @@ export default function SettingsDrawer({
       setOverlayEnabledState(s.overlayEnabled);
       setOverlayShortcutState(s.overlayShortcut);
       setCloseToTrayState(s.closeToTray);
+      setOverlayScreenSelectionState(s.overlayScreenSelection);
       setModelFailoverState(s.modelFailover);
       setShareInstanceUrlState(s.shareInstanceUrl || "");
       setShowRemoteImagesState(s.showRemoteImages);
@@ -2691,13 +2694,36 @@ export default function SettingsDrawer({
   };
 
   //each change reaches the native shortcut at once
-  const setOverlayConfig = (patch: { overlayEnabled?: boolean; overlayShortcut?: string; closeToTray?: boolean }) => {
-    const next = { overlayEnabled, overlayShortcut, closeToTray, ...patch };
+  const setOverlayConfig = (patch: { overlayEnabled?: boolean; overlayShortcut?: string; closeToTray?: boolean; overlayScreenSelection?: boolean }) => {
+    const next = { overlayEnabled, overlayShortcut, closeToTray, overlayScreenSelection, ...patch };
     setOverlayEnabledState(next.overlayEnabled);
     setOverlayShortcutState(next.overlayShortcut);
     setCloseToTrayState(next.closeToTray);
+    setOverlayScreenSelectionState(next.overlayScreenSelection);
     Settings.setMany(patch);
     pushDesktopOverlayConfig(next);
+  };
+
+  //macos blanks captures without permission
+  const setScreenSelection = async (v: boolean) => {
+    setOverlayConfig({ overlayScreenSelection: v });
+    if (!v) return;
+    const granted = await invoke<boolean>("stage_screen_access", { request: true }).catch(() => true);
+    if (granted) return;
+    showAlert(t("settings.overlay.screenAccessTitle"), t("settings.overlay.screenAccessMessage"), [
+      {
+        text: t("settings.overlay.screenAccessOpen"),
+        onPress: () => {
+          setAlertModalVisible(false);
+          invoke("stage_open_screen_settings").catch(() => { });
+        },
+      },
+      {
+        text: t("common.cancel"),
+        onPress: () => setAlertModalVisible(false),
+        style: "secondary",
+      },
+    ]);
   };
 
   const setLaunchAtStartupValue = (v: boolean) => {
@@ -3909,7 +3935,7 @@ export default function SettingsDrawer({
           </View>
         </View>
 
-        {Platform.OS === "android" && (
+        {(Platform.OS === "android" || isTauri) && (
           <View style={styles.settingRowVertical}>
             <View style={styles.toggleGroupRow}>
               <View style={styles.toggleGroupContent}>
@@ -4146,6 +4172,22 @@ export default function SettingsDrawer({
               <Toggle checked={overlayEnabled} onToggle={v => setOverlayConfig({ overlayEnabled: v })} />
             </View>
           </View>
+
+          {overlayEnabled && (
+            <View style={styles.settingRowVertical}>
+              <View style={styles.toggleGroupRow}>
+                <View style={styles.toggleGroupContent}>
+                  <Text style={styles.settingLabel}>
+                    {t("settings.overlay.screenSelection")}
+                  </Text>
+                  <Text style={styles.helpText}>
+                    {t("settings.overlay.screenSelectionHelp")}
+                  </Text>
+                </View>
+                <Toggle checked={overlayScreenSelection} onToggle={setScreenSelection} />
+              </View>
+            </View>
+          )}
 
           {overlayEnabled && (
             <View style={[styles.settingRowVertical, isDesktop && styles.toggleGroupRow, { marginBottom: 0 }]}>

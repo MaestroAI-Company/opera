@@ -49,6 +49,7 @@ export type AppSettings = {
   overlayEnabled: boolean;
   overlayShortcut: string;
   closeToTray: boolean;
+  overlayScreenSelection: boolean;
 };
 
 //shared by both platforms, web overrides ollamaUrl
@@ -113,6 +114,7 @@ export const BASE_DEFAULTS: AppSettings = {
   overlayEnabled: true,
   overlayShortcut: 'CommandOrControl+Shift+Space',
   closeToTray: true,
+  overlayScreenSelection: false,
 };
 
 //text storage needs per-key readers
@@ -140,6 +142,7 @@ const BOOLEAN_KEYS = [
   'showRemoteImages',
   'overlayEnabled',
   'closeToTray',
+  'overlayScreenSelection',
 ] as const;
 
 const NUMBER_KEYS = [

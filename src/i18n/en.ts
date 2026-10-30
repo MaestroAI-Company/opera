@@ -723,6 +723,13 @@ export const en = {
   "settings.overlay.appContext": "Use app context",
   "settings.overlay.appContextHelp":
     "Send the foreground app and on-screen text to the assistant when using the overlay",
+  "settings.overlay.screenSelection": "Screen selection",
+  "settings.overlay.screenSelectionHelp":
+    "Detects elements on screen. Hold Ctrl in the overlay to select one.",
+  "settings.overlay.screenAccessTitle": "Permissions needed",
+  "settings.overlay.screenAccessMessage":
+    "Allow Opera in System Settings > Privacy & Security, under Screen Recording and Input Monitoring, then restart Opera. Without them, Maestro cannot see your screen or detect Ctrl.",
+  "settings.overlay.screenAccessOpen": "Open settings",
   "settings.overlay.desktopEnabled": "Keyboard shortcut",
   "settings.overlay.desktopEnabledHelp":
     "Open Maestro over any app with a keyboard shortcut.",

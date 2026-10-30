@@ -14,12 +14,13 @@ export const OVERLAY_SHORTCUTS = [
 ];
 
 //rust keeps no settings of its own
-export function pushDesktopOverlayConfig(s: Pick<AppSettings, 'overlayEnabled' | 'overlayShortcut' | 'closeToTray'>) {
+export function pushDesktopOverlayConfig(s: Pick<AppSettings, 'overlayEnabled' | 'overlayShortcut' | 'closeToTray' | 'overlayScreenSelection'>) {
   if (!isTauri) return;
   invoke('overlay_configure', {
     enabled: s.overlayEnabled,
     shortcut: s.overlayShortcut,
     closeToTray: s.closeToTray,
+    screenSelection: s.overlayScreenSelection,
   }).catch(e => console.warn('Failed to configure desktop overlay', e));
 }
 

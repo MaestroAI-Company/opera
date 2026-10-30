@@ -3,6 +3,7 @@ import { PanResponder, StyleSheet, View } from 'react-native';
 import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useDerivedValue, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { Colors, Radius } from '../../../constants/theme';
+import { pickRegion } from '../../services/overlay/selectionPick';
 import { FULL_SCREEN, Selection, SelectionRegion } from '../../services/overlay/useScreenSelection';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -22,10 +23,6 @@ const PATH_INFLATE = 1.15;
 const SNAP_DIST = 24;
 //lasso pulls from further out
 const LASSO_SNAP_DIST = 48;
-//lasso coverage counts as picked
-const ENCLOSED_MIN = 0.45;
-  //scribble overlap picks element
-const MAGNET_MIN = 0.55;
 //padding around detected elements
 const DETECTION_INFLATE = 1.2;
 const STROKE_WIDTH = 7;
@@ -93,52 +90,6 @@ function toPixels(region: SelectionRegion, size: Size): Rect {
     x2: (region.x + region.w) * size.w,
     y2: (region.y + region.h) * size.h,
   };
-}
-
-const areaOf = (rect: Rect) => (rect.x2 - rect.x1) * (rect.y2 - rect.y1);
-
-//scribble inside an element picks it
-function magnet(rects: Rect[], bounds: Rect): Rect | null {
-  const area = areaOf(bounds);
-  if (area <= 0) return null;
-
-  let best: Rect | null = null;
-  let bestScore = MAGNET_MIN;
-
-  for (const rect of rects) {
-    const width = Math.min(rect.x2, bounds.x2) - Math.max(rect.x1, bounds.x1);
-    const height = Math.min(rect.y2, bounds.y2) - Math.max(rect.y1, bounds.y1);
-    if (width <= 0 || height <= 0) continue;
-    const score = (width * height) / area;
-    if (score > bestScore) {
-      bestScore = score;
-      best = rect;
-    }
-  }
-
-  return best;
-}
-
-//stroke loop merged into region
-function enclosed(rects: Rect[], bounds: Rect): Rect | null {
-  let union: Rect | null = null;
-
-  for (const rect of rects) {
-    const width = Math.min(rect.x2, bounds.x2) - Math.max(rect.x1, bounds.x1);
-    const height = Math.min(rect.y2, bounds.y2) - Math.max(rect.y1, bounds.y1);
-    if (width <= 0 || height <= 0) continue;
-    //grazed neighbour not the target
-    if ((width * height) / areaOf(rect) < ENCLOSED_MIN) continue;
-
-    union = union ? {
-      x1: Math.min(union.x1, rect.x1),
-      y1: Math.min(union.y1, rect.y1),
-      x2: Math.max(union.x2, rect.x2),
-      y2: Math.max(union.y2, rect.y2),
-    } : rect;
-  }
-
-  return union;
 }
 
 //edges snap to nearest element
@@ -305,8 +256,9 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
     const state = latest.current;
     const bounds = boundsOf(points);
     //closed stroke or scribble picks element
-    const hit = enclosed(state.rects, bounds) ?? magnet(state.rects, bounds);
-    commit(clampRect(hit ?? snap(inflate(bounds, PATH_INFLATE), state.rects, LASSO_SNAP_DIST), state.size));
+    const loose = inflate(bounds, PATH_INFLATE);
+    const hit = pickRegion(state.rects, loose);
+    commit(clampRect(hit ?? snap(loose, state.rects, LASSO_SNAP_DIST), state.size));
   };
 
   const dragStart = useRef<Rect | null>(null);

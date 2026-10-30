@@ -49,6 +49,13 @@ fn build_overlay_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String>
             hide(&handle, &guard);
         }
         //click outside dismisses like android
+        WindowEvent::Focused(focused) if cfg!(debug_assertions) => {
+            //temporary focus trace
+            eprintln!("[overlay] focused={focused} held={} pinned={}", HELD.load(Ordering::SeqCst), PINNED.load(Ordering::SeqCst));
+            if !*focused && !HELD.load(Ordering::SeqCst) && !PINNED.load(Ordering::SeqCst) {
+                hide(&handle, &guard)
+            }
+        }
         WindowEvent::Focused(false)
             if !HELD.load(Ordering::SeqCst) && !PINNED.load(Ordering::SeqCst) =>
         {
@@ -101,9 +108,22 @@ fn show(app: &AppHandle, window: &tauri::WebviewWindow) {
     MOVED.store(false, Ordering::SeqCst);
     place(app, &window, height, true);
     let _ = window.show();
-    //bypass windows focus stealing guard
-    let _ = window.set_always_on_top(false);
-    let _ = window.set_always_on_top(true);
+    //bypass windows focus stealing guard, macos drops focus on it
+    #[cfg(windows)]
+    {
+        let _ = window.set_always_on_top(false);
+        let _ = window.set_always_on_top(true);
+    }
+    //show is queued on macos, focus needs the window visible
+    #[cfg(target_os = "macos")]
+    {
+        let focus = window.clone();
+        let _ = app.run_on_main_thread(move || {
+            let _ = focus.set_focus();
+            eprintln!("[overlay] after set_focus is_focused={:?}", focus.is_focused());
+        });
+    }
+    #[cfg(not(target_os = "macos"))]
     let _ = window.set_focus();
     let _ = app.emit_to(LABEL, "overlay-shown", ());
 }

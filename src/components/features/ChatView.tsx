@@ -726,7 +726,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   userBubble: {
     backgroundColor: Colors.primary,
-    borderRadius: Radius.xxl,
+    borderRadius: Radius.window,
     borderWidth: 2,
     borderColor: Colors.borderOnPrimary,
     paddingHorizontal: 14,
@@ -734,7 +734,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   userBubbleIncognito: {
     backgroundColor: Colors.incognito,
-    borderRadius: Radius.xxl,
+    borderRadius: Radius.window,
     borderWidth: 2,
     borderColor: Colors.borderOnPrimary,
     paddingHorizontal: 14,

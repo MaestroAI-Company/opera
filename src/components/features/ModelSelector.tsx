@@ -1054,7 +1054,7 @@ const makeStyles = (Colors: ThemeColors) =>
       right: 4,
       height: 44,
       backgroundColor: Colors.shadowInk,
-      borderRadius: Radius.xxl,
+      borderRadius: Radius.window,
     },
     trigger: {
       flexDirection: "row",
@@ -1063,7 +1063,7 @@ const makeStyles = (Colors: ThemeColors) =>
       height: 44,
       backgroundColor: Colors.surface,
       gap: 8,
-      borderRadius: Radius.xxl,
+      borderRadius: Radius.window,
       maxWidth: 180,
       overflow: "hidden",
       position: "relative",

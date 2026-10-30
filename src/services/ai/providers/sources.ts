@@ -46,6 +46,9 @@ export function isProviderSupported(id: string): boolean {
 //retired hosted beta server
 export const BETA_PROVIDER_ID = 'beta';
 
+//provider id before the sampler hub rename
+const LEGACY_HUB_PROVIDER_ID = 'operahub';
+
 //any server speaking the openai protocol
 export const OPENAI_PROVIDER_ID = 'openai';
 
@@ -298,7 +301,7 @@ export function buildSources(localAvailable: boolean): ModelSource[] {
 //clean beta server from old settings
 export function migrateModelSources(settings: AppSettings): AppSettings {
   const patch: Partial<AppSettings> = {};
-  if (settings.aiService === BETA_PROVIDER_ID) {
+  if (settings.aiService === BETA_PROVIDER_ID || settings.aiService === LEGACY_HUB_PROVIDER_ID) {
     patch.aiService = BASE_DEFAULTS.aiService;
     patch.ollamaModel = '';
   }

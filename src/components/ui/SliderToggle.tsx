@@ -22,6 +22,8 @@ type SliderToggleProps = {
   selectedValue: string;
   onSelect: (value: string) => void;
   options?: SliderToggleOption[];
+  //corner radius of the selection pill, to match a rounder host
+  radius?: number;
 };
 
 const THEME_ICONS = { system: autoIcon, light: lightIcon, dark: darkIcon };
@@ -42,6 +44,7 @@ export default function SliderToggle({
   selectedValue,
   onSelect,
   options: optionsProp,
+  radius,
 }: SliderToggleProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -215,13 +218,13 @@ export default function SliderToggle({
               if (option.id !== selectedValue) Vibration.vibrate(10);
               onSelect(option.id);
             }}
-            style={pressStyle(styles.optionButton, "surface")}
+            style={pressStyle([styles.optionButton, radius !== undefined && { borderRadius: radius }], "surface")}
           >
             <Text style={styles.optionText}>{option.label}</Text>
           </Pressable>
         ))}
         {buttonWidth > 0 && activeOption && (
-          <Animated.View style={[styles.pill, { width: buttonWidth }, pillAnimatedStyle]} {...panResponder.panHandlers}>
+          <Animated.View style={[styles.pill, { width: buttonWidth }, radius !== undefined && { borderRadius: radius }, pillAnimatedStyle]} {...panResponder.panHandlers}>
             <Animated.Text style={[styles.pillText, labelPulseStyle]}>{activeOption.label}</Animated.Text>
           </Animated.View>
         )}

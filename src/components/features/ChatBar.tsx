@@ -105,11 +105,17 @@ type ChatInputBarProps = {
   onEditCancel?: () => void;
   editDraft?: { id: string; text: string } | null;
   editFiles?: SelectedFile[] | null;
+  //host frame already spaces the bar
+  flush?: boolean;
 };
 
 export type ChatBarHandle = {
   stopRecording: () => void;
   clear: () => void;
+  focus: () => void;
+  //push to talk from a held shortcut
+  startVoice: () => void;
+  sendVoice: () => void;
 };
 
 let currentAudioVolume = 0;
@@ -220,6 +226,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   onEditCancel,
   editDraft = null,
   editFiles = null,
+  flush = false,
 }, ref) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -301,6 +308,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     return () => { cancelled = true; };
   }, [selectedFiles, setSelectedFiles, t]);
 
+  //voice handlers are declared below
+  const voiceRef = useRef({ start: () => { }, send: () => { } });
   useImperativeHandle(ref, () => ({
     stopRecording: () => {
       setIsRecording(false);
@@ -308,7 +317,10 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     clear: () => {
       setText("");
       setSelectedFiles([]);
-    }
+    },
+    focus: () => inputRef.current?.focus(),
+    startVoice: () => voiceRef.current.start(),
+    sendVoice: () => voiceRef.current.send(),
   }));
 
   const pcmChunksRef = useRef<ArrayBuffer[]>([]);
@@ -839,6 +851,13 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     }
   };
 
+  useEffect(() => {
+    voiceRef.current = {
+      start: () => { if (!isRecording) startSTT(); },
+      send: () => { if (isRecording) handleSend(); },
+    };
+  });
+
   const sendOnce = async (): Promise<boolean> => {
     const wasRecording = isRecording;
     let voiceText: string | null = null;
@@ -1075,7 +1094,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
               </ScrollView>
             </View>
           )}
-          <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.pressableWrapper}>
+          <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={[styles.pressableWrapper, flush && styles.pressableWrapperFlush]}>
             <Animated.View style={{ transform: [{ scale }] }}>
               {renderFiles ? (
                 <Animated.View
@@ -1289,6 +1308,10 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   pressableWrapper: {
     marginHorizontal: 16,
     marginBottom: 16,
+  },
+  pressableWrapperFlush: {
+    marginHorizontal: 0,
+    marginBottom: 0,
   },
   container: {
     zIndex: 2,

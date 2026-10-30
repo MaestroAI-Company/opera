@@ -724,6 +724,14 @@ export const fr: Translations = {
   "settings.overlay.appContext": "Utiliser le contexte de l'app",
   "settings.overlay.appContextHelp":
     "Envoie à Maestro l'app au premier plan et le texte affiché à l'écran lors de l'utilisation de l'Assistant Overlay",
+  "settings.overlay.desktopEnabled": "Raccourci clavier",
+  "settings.overlay.desktopEnabledHelp":
+    "Ouvre Maestro par-dessus n'importe quelle app avec un raccourci clavier.",
+  "settings.overlay.shortcut": "Raccourci",
+  "settings.overlay.selectShortcut": "Choisir un raccourci",
+  "settings.overlay.closeToTray": "Rester ouvert en arrière-plan",
+  "settings.overlay.closeToTrayHelp":
+    "Fermer la fenêtre garde Opera dans la zone de notification pour que le raccourci marche toujours.",
 
   "settings.cloud.storage": "Stockage cloud",
   "settings.cloud.selectStorage": "Choisir le stockage cloud",

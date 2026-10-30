@@ -717,6 +717,14 @@ export const en = {
   "settings.overlay.appContext": "Use app context",
   "settings.overlay.appContextHelp":
     "Send the foreground app and on-screen text to the assistant when using the overlay",
+  "settings.overlay.desktopEnabled": "Keyboard shortcut",
+  "settings.overlay.desktopEnabledHelp":
+    "Open Maestro over any app with a keyboard shortcut.",
+  "settings.overlay.shortcut": "Shortcut",
+  "settings.overlay.selectShortcut": "Select a shortcut",
+  "settings.overlay.closeToTray": "Keep running in the background",
+  "settings.overlay.closeToTrayHelp":
+    "Closing the window keeps Opera in the tray so the shortcut still works.",
 
   "settings.cloud.storage": "Cloud storage",
   "settings.cloud.selectStorage": "Select Cloud Storage",

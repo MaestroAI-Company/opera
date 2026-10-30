@@ -8,6 +8,8 @@ import ImageCard from "./ImageCard";
 import TextInputField from "./TextInputField";
 import ThinkingIcon from "./ThinkingIcon";
 import { pressStyle } from "./pressStyle";
+import { useEffect } from "react";
+import { forwardNoticeToMain, isOverlayWindow } from "../../services/overlay/desktopOverlay";
 
 export type ModalButton = {
   text: string;
@@ -68,6 +70,14 @@ export default function NotificationModal({
 }: NotificationModalProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+
+  //overlay dialogs open in main window
+  useEffect(() => {
+    if (!isOverlayWindow || !visible) return;
+    forwardNoticeToMain(title, message);
+    onClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   //fallback to single close button if none provided
   const activeButtons = loading

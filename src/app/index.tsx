@@ -172,6 +172,7 @@ type ShareNotice =
 
 //matches welcomeText's lineHeight, reserved upfront so the second line doesn't shift layout
 const WELCOME_LINE_HEIGHT = 40;
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 //time-of-day greeting shown on the home screen
 function getGreeting(t: TranslationFn): string {
@@ -1306,9 +1307,14 @@ useEffect(() => {
       AppEvents.hubUpdateAvailable,
       setHubUpdate,
     );
+    //overlay writes from another window
+    const overlayClosed = isTauri
+      ? import("@tauri-apps/api/event").then(({ listen }) => listen("overlay-closed", scheduleReload))
+      : null;
 
     return () => {
       if (reloadTimer) clearTimeout(reloadTimer);
+      overlayClosed?.then((un) => un());
       conversationsSub.remove();
       overlaySub.remove();
       settingsSub.remove();

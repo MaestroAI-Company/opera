@@ -25,6 +25,7 @@
         "hiddenTitle": true
       }
     ],
+    "macOSPrivateApi": true,
     "security": {
       "csp": null
     }

@@ -46,6 +46,9 @@ export type AppSettings = {
   litertForceLoad: boolean;
   litertContextLength: number;
   showRemoteImages: boolean;
+  overlayEnabled: boolean;
+  overlayShortcut: string;
+  closeToTray: boolean;
 };
 
 //shared by both platforms, web overrides ollamaUrl
@@ -107,6 +110,9 @@ export const BASE_DEFAULTS: AppSettings = {
   litertForceLoad: false,
   litertContextLength: 8192,
   showRemoteImages: false,
+  overlayEnabled: true,
+  overlayShortcut: 'CommandOrControl+Shift+Space',
+  closeToTray: true,
 };
 
 //text storage needs per-key readers
@@ -132,6 +138,8 @@ const BOOLEAN_KEYS = [
   'hasSeenAssistantOverlay',
   'litertForceLoad',
   'showRemoteImages',
+  'overlayEnabled',
+  'closeToTray',
 ] as const;
 
 const NUMBER_KEYS = [

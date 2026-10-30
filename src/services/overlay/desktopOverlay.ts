@@ -4,7 +4,7 @@ import type { AppSettings } from '../settings/schema';
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 //overlay window loads with this flag
 export const isOverlayWindow = isTauri && new URLSearchParams(window.location.search).get('window') === 'overlay';
-const isMac = typeof navigator !== 'undefined' && navigator.userAgent?.includes('Mac');
+const isMac = typeof navigator !== 'undefined' && !!navigator.userAgent?.includes('Mac');
 
 //tauri accelerator ids with readable labels
 export const OVERLAY_SHORTCUTS = [

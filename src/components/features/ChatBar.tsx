@@ -24,6 +24,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useResponsive } from "../../hooks/useResponsive";
+import { isOverlayWindow } from "../../services/overlay/desktopOverlay";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
@@ -232,7 +233,9 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const insets = useSafeAreaInsets();
-  const { isDesktop } = useResponsive();
+  const { isDesktop: wideScreen } = useResponsive();
+  //overlay window is narrow but wears the desktop bar
+  const isDesktop = wideScreen || isOverlayWindow;
   const supportsImages = modelCapabilities.includes('vision');
   const supportsAudio = modelCapabilities.includes('audio');
   const supportsVideo = modelCapabilities.includes('video');
@@ -1167,7 +1170,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 style={[
                   styles.container,
                   incognito && styles.containerIncognito,
-                  isDesktop && { borderRadius: Radius.window, paddingHorizontal: 8, paddingVertical: 6, minHeight: 48 },
+                  isDesktop && { paddingHorizontal: 8, paddingVertical: 6, minHeight: 48 },
                   { backgroundColor: backgroundColor }
                 ]}
               >
@@ -1317,7 +1320,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     zIndex: 2,
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: Radius.xxl,
+    borderRadius: Radius.window,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: 2,

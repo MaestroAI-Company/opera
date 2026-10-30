@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Animated,
@@ -13,16 +14,25 @@ import {
   Text,
   View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import {
+  FontSizes,
+  Fonts,
+  Radius,
+  Spacing,
+  ThemeColors,
+} from "../../../constants/theme";
 import { useHubModels } from "../../hooks/useHubModels";
 import { useResponsive } from "../../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { getLocale, useT } from "../../i18n";
 import { formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
-import { HUB_PROVIDER_ID, getEnabledProviders, serializeProviders } from "../../services/ai/providers/sources";
+import {
+  HUB_PROVIDER_ID,
+  getEnabledProviders,
+  serializeProviders,
+} from "../../services/ai/providers/sources";
 import { HubSync } from "../../services/hub/HubSync";
 import {
   HostStatus,
@@ -32,11 +42,15 @@ import {
   HubStatus,
   McpAction,
   McpServerSummary,
-  SamplerHub,
   PairedHub,
+  SamplerHub,
   hubErrorCode,
 } from "../../services/hub/SamplerHubService";
-import { CTX_SIZE_OPTIONS, KEEP_ALIVE_OPTIONS, PARALLEL_OPTIONS } from "../../services/hub/modelOptions";
+import {
+  CTX_SIZE_OPTIONS,
+  KEEP_ALIVE_OPTIONS,
+  PARALLEL_OPTIONS,
+} from "../../services/hub/modelOptions";
 import { Settings } from "../../services/settings/SettingsService";
 import ActionButton from "../ui/ActionButton";
 import CardGrid, { type GridCard } from "../ui/CardGrid";
@@ -52,15 +66,6 @@ import DrawerSheet, {
   SheetKeyboardAwareScrollView,
   SheetScrollView,
 } from "./DrawerSheet";
-import {
-  dragDrawer,
-  drawerWidthFor,
-  gestureVelocity,
-  releaseOpens,
-  samplerDrawerProgress,
-  settleDrawer,
-  useDockedWidth,
-} from "./drawerAnimation";
 import HubDeviceSheet from "./HubDeviceSheet";
 import HubMcpSection, { HubMcpServerPage } from "./HubMcpSection";
 import HubMcpSheet, { HubFolderSheet } from "./HubMcpSheet";
@@ -71,6 +76,15 @@ import HubProfileSheet from "./HubProfileSheet";
 import HubQrSheet from "./HubQrSheet";
 import PageStack from "./PageStack";
 import ProfileCard from "./ProfileCard";
+import {
+  dragDrawer,
+  drawerWidthFor,
+  gestureVelocity,
+  releaseOpens,
+  samplerDrawerProgress,
+  settleDrawer,
+  useDockedWidth,
+} from "./drawerAnimation";
 
 const homeIcon = require("../../../assets/icons/home.png");
 const profilIcon = require("../../../assets/icons/profil.png");
@@ -116,11 +130,18 @@ const TWO_COLUMNS_FROM = 760;
 const TILE_MIN_WIDTH = 150;
 //slider beside its text on desktop
 const SLIDER_WIDTH = 320;
-const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+const isTauri =
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 //title bar, then the top bar and its padding
 const CONTENT_TOP = (isTauri ? 32 : 0) + 60 + Spacing.xl2;
 
-type Page = "home" | "profiles" | "models" | "mcp" | "performance" | "preferences";
+type Page =
+  | "home"
+  | "profiles"
+  | "models"
+  | "mcp"
+  | "performance"
+  | "preferences";
 //pages pushed from a section page
 type SubPage = Page | "profile";
 type Detail = { file: string; name: string };
@@ -128,7 +149,11 @@ type HubState = "checking" | "online" | "offline" | "revoked" | "outdated";
 
 const failedState = (e: unknown): HubState => {
   const code = hubErrorCode(e);
-  return code === "Unauthorized" ? "revoked" : code === "Outdated" ? "outdated" : "offline";
+  return code === "Unauthorized"
+    ? "revoked"
+    : code === "Outdated"
+      ? "outdated"
+      : "offline";
 };
 type Modal = {
   title: string;
@@ -185,13 +210,19 @@ export default function SamplerScreen({
   const { width: windowWidth, height: windowHeight } = useResponsive();
   const drawerWidth = drawerWidthFor(windowWidth);
   const sheetMaxHeight = windowHeight - insets.top - Spacing.xl2;
-  const contentTop = (isDesktop ? (isTauri ? 32 : 0) : insets.top) + 60 + Spacing.xl2;
+  const contentTop =
+    (isDesktop ? (isTauri ? 32 : 0) : insets.top) + 60 + Spacing.xl2;
 
   const [page, setPage] = useState<SubPage>("home");
   const [detail, setDetail] = useState<Detail | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
-  const [selectedMcpServerId, setSelectedMcpServerId] = useState<string | null>(null);
-  const [myMcpDetail, setMyMcpDetail] = useState<{ id: string; title: string } | null>(null);
+  const [selectedMcpServerId, setSelectedMcpServerId] = useState<string | null>(
+    null,
+  );
+  const [myMcpDetail, setMyMcpDetail] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const [drawerScrolled, setDrawerScrolled] = useState(false);
   const [stackWidth, setStackWidth] = useState(0);
@@ -202,7 +233,11 @@ export default function SamplerScreen({
   //last hub answer this session
   const [lastSeen, setLastSeen] = useState<number | null>(null);
   //last usage samples for the performance graphs
-  const [usageHistory, setUsageHistory] = useState<{ cpu: number[]; memory: number[]; received: number }>({
+  const [usageHistory, setUsageHistory] = useState<{
+    cpu: number[];
+    memory: number[];
+    received: number;
+  }>({
     cpu: [],
     memory: [],
     received: 0,
@@ -225,14 +260,21 @@ export default function SamplerScreen({
   const [registryDraft, setRegistryDraft] = useState("");
   const [registryError, setRegistryError] = useState<string | null>(null);
   const [pageWidth, setPageWidth] = useState(0);
-  const [profileSheet, setProfileSheet] = useState<"pick" | "view" | "password" | null>(null);
-  const [selectedProfile, setSelectedProfile] = useState<HubProfile | null>(null);
+  const [profileSheet, setProfileSheet] = useState<
+    "pick" | "view" | "password" | null
+  >(null);
+  const [selectedProfile, setSelectedProfile] = useState<HubProfile | null>(
+    null,
+  );
   const [pairingVisible, setPairingVisible] = useState(false);
   const [qrMode, setQrMode] = useState<"invite" | "link" | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [modelsSheetVisible, setModelsSheetVisible] = useState(false);
   const [mcpSheetVisible, setMcpSheetVisible] = useState(false);
-  const [folderPick, setFolderPick] = useState<{ start?: string; done: (path: string) => void } | null>(null);
+  const [folderPick, setFolderPick] = useState<{
+    start?: string;
+    done: (path: string) => void;
+  } | null>(null);
   const [modal, setModal] = useState<Modal | null>(null);
 
   //every answer also feeds the graphs
@@ -251,7 +293,11 @@ export default function SamplerScreen({
     const hub = await SamplerHub.getPairedHub();
     setPairedHub(hub);
     setProfile(await SamplerHub.getProfile());
-    setHostStatus(SamplerHub.canHost() ? await SamplerHub.hostStatus().catch(() => null) : null);
+    setHostStatus(
+      SamplerHub.canHost()
+        ? await SamplerHub.hostStatus().catch(() => null)
+        : null,
+    );
     setLoaded(true);
     if (!hub) return;
     SamplerHub.deviceId()
@@ -315,18 +361,23 @@ export default function SamplerScreen({
   }, [visible, pairedHub, hubState, refresh, receiveStatus]);
 
   //the role may have changed since the profile was unlocked
-  const role = profiles?.find((p) => p.id === profile?.id)?.role ?? profile?.role;
+  const role =
+    profiles?.find((p) => p.id === profile?.id)?.role ?? profile?.role;
   const isAdmin = role === "admin";
   const online = hubState === "online";
   //hosting is desktop-only
   const canHost = SamplerHub.canHost();
-  const hostsHub = canHost && !!hostStatus?.id && pairedHub?.id === hostStatus.id;
+  const hostsHub =
+    canHost && !!hostStatus?.id && pairedHub?.id === hostStatus.id;
   //unpair would cut its own host
   const hostedHere = hostsHub && !!hostStatus?.running;
   const showModels = isAdmin && SamplerHub.canManageModels();
   //llama.cpp usage and build for these pages
   const { status: modelsStatus } = useHubModels(
-    visible && online && showModels && (page === "performance" || page === "models"),
+    visible &&
+      online &&
+      showModels &&
+      (page === "performance" || page === "models"),
   );
   //every profile's servers on desktop, personal servers on mobile
   const showMcpOverview = isAdmin && SamplerHub.canSeeMcpServers();
@@ -335,7 +386,16 @@ export default function SamplerScreen({
 
   //read only, on home, performance and its pages
   useEffect(() => {
-    if (!visible || (page !== "home" && page !== "performance" && sectionOf(page) !== "mcp") || !showMcpOverview || !online || !pairedHub) return;
+    if (
+      !visible ||
+      (page !== "home" &&
+        page !== "performance" &&
+        sectionOf(page) !== "mcp") ||
+      !showMcpOverview ||
+      !online ||
+      !pairedHub
+    )
+      return;
     let live = true;
     const load = () =>
       SamplerHub.mcpOverview(pairedHub)
@@ -369,7 +429,9 @@ export default function SamplerScreen({
     setModal({
       title: t("sampler.failed"),
       message: message(e),
-      buttons: [{ text: t("common.ok"), style: "secondary", onPress: closeModal }],
+      buttons: [
+        { text: t("common.ok"), style: "secondary", onPress: closeModal },
+      ],
     });
 
   //first time only, later the toggle turns it on and off
@@ -419,9 +481,14 @@ export default function SamplerScreen({
     refresh();
     const enabled = getEnabledProviders();
     if (!enabled.includes(HUB_PROVIDER_ID)) {
-      Settings.set("enabledProviders", serializeProviders([...enabled, HUB_PROVIDER_ID]));
+      Settings.set(
+        "enabledProviders",
+        serializeProviders([...enabled, HUB_PROVIDER_ID]),
+      );
     }
-    HubSync.joinedProfile().catch((e) => console.warn("[HubSync] first sync failed:", e));
+    HubSync.joinedProfile().catch((e) =>
+      console.warn("[HubSync] first sync failed:", e),
+    );
   };
 
   const changeSettings = async (patch: Partial<HubSettings>) => {
@@ -444,7 +511,9 @@ export default function SamplerScreen({
       setModal({
         title: t("hubUpdate.title"),
         message: t("hubUpdate.failed", { error: message(e) }),
-        buttons: [{ text: t("common.ok"), style: "secondary", onPress: closeModal }],
+        buttons: [
+          { text: t("common.ok"), style: "secondary", onPress: closeModal },
+        ],
       });
     }
   };
@@ -493,7 +562,9 @@ export default function SamplerScreen({
   };
 
   const roleLabel = (value: HubProfile["role"]) =>
-    value === "admin" ? t("settings.hub.roleAdmin") : t("settings.hub.roleMember");
+    value === "admin"
+      ? t("settings.hub.roleAdmin")
+      : t("settings.hub.roleMember");
 
   const confirmRemoveProfile = (target: HubProfile) =>
     setModal({
@@ -514,7 +585,11 @@ export default function SamplerScreen({
     });
 
   const openProfile = (target: HubProfile) => {
-    if (target.id !== profile?.id && (!isAdmin || !pairedHub || !SamplerHub.canManageProfiles())) return;
+    if (
+      target.id !== profile?.id &&
+      (!isAdmin || !pairedHub || !SamplerHub.canManageProfiles())
+    )
+      return;
     setProfileId(target.id);
     setSelectedProfile(target);
     setProfileSheet("view");
@@ -549,7 +624,8 @@ export default function SamplerScreen({
     });
 
   //a device paired without a profile yet has none
-  const ownerName = (id?: string | null) => profiles?.find((p) => p.id === id)?.name ?? t("sampler.noProfile");
+  const ownerName = (id?: string | null) =>
+    profiles?.find((p) => p.id === id)?.name ?? t("sampler.noProfile");
 
   //every page opens at the top
   const openPage = (next: SubPage) => {
@@ -563,18 +639,20 @@ export default function SamplerScreen({
     checked: boolean,
     onToggle: (value: boolean) => void,
     last = true,
+    lit = false,
   ) => (
     <View style={[styles.settingRowVertical, last && { marginBottom: 0 }]}>
       <View style={styles.toggleGroupRow}>
         <View style={styles.toggleGroupContent}>
-          <Text style={styles.settingLabel}>{label}</Text>
-          <Text style={styles.helpText}>{help}</Text>
+          <Text style={[styles.settingLabel, lit && styles.litText]}>
+            {label}
+          </Text>
+          <Text style={[styles.helpText, lit && styles.litText]}>{help}</Text>
         </View>
         <Toggle checked={checked} onToggle={onToggle} />
       </View>
     </View>
   );
-
 
   //stopped from preferences, started again from its page
   const hubStopped = hostsHub && !hostStatus?.running;
@@ -589,13 +667,26 @@ export default function SamplerScreen({
           text: t("sampler.stop"),
           style: "danger",
           onPress: async () => {
-            setModal((shown) => shown && { ...shown, message: t("sampler.stopping"), loading: true });
+            setModal(
+              (shown) =>
+                shown && {
+                  ...shown,
+                  message: t("sampler.stopping"),
+                  loading: true,
+                },
+            );
             await setHosting(false);
             //told once, not on every return to the screen
             setModal({
               title: t("sampler.stopped"),
               message: t("sampler.stoppedHelp"),
-              buttons: [{ text: t("common.ok"), style: "secondary", onPress: closeModal }],
+              buttons: [
+                {
+                  text: t("common.ok"),
+                  style: "secondary",
+                  onPress: closeModal,
+                },
+              ],
             });
           },
         },
@@ -614,14 +705,20 @@ export default function SamplerScreen({
     const seen =
       hubState === "offline" && lastSeen
         ? t("sampler.lastSeen", {
-            time: new Intl.DateTimeFormat(getLocale(), { hour: "numeric", minute: "2-digit" }).format(lastSeen),
+            time: new Intl.DateTimeFormat(getLocale(), {
+              hour: "numeric",
+              minute: "2-digit",
+            }).format(lastSeen),
           })
         : null;
     return (
       <View style={styles.welcome}>
         <Text style={styles.welcomeText}>{pairedHub?.name}</Text>
         <Text style={styles.welcomeHelp}>
-          {hostError ?? (hubStopped ? t("sampler.stopped") : [connection, seen].filter(Boolean).join(" · "))}
+          {hostError ??
+            (hubStopped
+              ? t("sampler.stopped")
+              : [connection, seen].filter(Boolean).join(" · "))}
         </Text>
         <View style={styles.welcomeAction}>
           <Group>
@@ -645,7 +742,11 @@ export default function SamplerScreen({
                 refresh();
               }}
             />
-            <ActionButton icon={cancelIcon} label={t("settings.hub.unpair")} onPress={unpair} />
+            <ActionButton
+              icon={cancelIcon}
+              label={t("settings.hub.unpair")}
+              onPress={unpair}
+            />
           </Group>
         </View>
       </View>
@@ -665,16 +766,28 @@ export default function SamplerScreen({
     <View style={styles.contentCard}>
       <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
         <Text style={styles.settingLabel}>{t("sampler.profiles")}</Text>
-        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("sampler.profilesHelp")}</Text>
+        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+          {t("sampler.profilesHelp")}
+        </Text>
         <View style={styles.profileTiles}>
           {profileRows.map((row) => (
             <View key={row[0].id} style={styles.profileRow}>
               {row.map((p) => (
-                <Pressable key={p.id} style={pressStyle(styles.profileTile, "fadeLight")} onPress={() => openProfile(p)}>
-                  <ProfileCard name={p.name} createdAt={p.createdAt * 1000} compact />
+                <Pressable
+                  key={p.id}
+                  style={pressStyle(styles.profileTile, "fadeLight")}
+                  onPress={() => openProfile(p)}
+                >
+                  <ProfileCard
+                    name={p.name}
+                    createdAt={p.createdAt * 1000}
+                    compact
+                  />
                 </Pressable>
               ))}
-              {row.length === 1 && <View style={styles.profileTilePlaceholder} />}
+              {row.length === 1 && (
+                <View style={styles.profileTilePlaceholder} />
+              )}
             </View>
           ))}
         </View>
@@ -703,7 +816,10 @@ export default function SamplerScreen({
       icon: HUB_DEVICE_ICONS[device.kind] ?? operaIcon,
       title: device.name,
       status: [ownerName(device.profile), seen].filter(Boolean).join(" · "),
-      onPress: isAdmin || device.id === thisDeviceId ? () => setSelectedDeviceId(device.id) : undefined,
+      onPress:
+        isAdmin || device.id === thisDeviceId
+          ? () => setSelectedDeviceId(device.id)
+          : undefined,
     };
   });
 
@@ -711,7 +827,9 @@ export default function SamplerScreen({
   const renderDevicesCard = (withActions: boolean) => (
     <View style={styles.contentCard}>
       <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-        <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.hub.devices")}</Text>
+        <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+          {t("settings.hub.devices")}
+        </Text>
         {devices ? (
           <CardGrid
             cards={deviceTiles}
@@ -719,14 +837,23 @@ export default function SamplerScreen({
             style={withActions && { marginBottom: Spacing.md }}
           />
         ) : (
-          <Text style={[styles.helpText, withActions && { marginBottom: Spacing.md }]}>
+          <Text
+            style={[
+              styles.helpText,
+              withActions && { marginBottom: Spacing.md },
+            ]}
+          >
             {t("settings.hub.devicesEmpty")}
           </Text>
         )}
         {/* same actions as the settings hub page */}
         {withActions && (
           <Group>
-            <ActionButton icon={addIcon} label={t("settings.hub.addMyDevice")} onPress={() => setQrMode("link")} />
+            <ActionButton
+              icon={addIcon}
+              label={t("settings.hub.addMyDevice")}
+              onPress={() => setQrMode("link")}
+            />
           </Group>
         )}
       </View>
@@ -774,7 +901,13 @@ export default function SamplerScreen({
     if (!pairedHub) return;
     try {
       for (const server of servers.filter((s) => s.enabled !== on)) {
-        setOverview(await SamplerHub.mcpManage(pairedHub, server.id, on ? "start" : "stop"));
+        setOverview(
+          await SamplerHub.mcpManage(
+            pairedHub,
+            server.id,
+            on ? "start" : "stop",
+          ),
+        );
       }
     } catch (e) {
       showError(e);
@@ -799,7 +932,8 @@ export default function SamplerScreen({
     });
 
   //servers from before profiles belong to admins
-  const ownerOf = (server: McpServerSummary) => server.owner ?? profiles?.find((p) => p.role === "admin")?.id;
+  const ownerOf = (server: McpServerSummary) =>
+    server.owner ?? profiles?.find((p) => p.role === "admin")?.id;
 
   //an admin runs anyone's server, its settings stay private
   const renderMcpServer = () => {
@@ -823,7 +957,9 @@ export default function SamplerScreen({
             },
           ]
         : []),
-      ...(server.memory != null ? [{ label: t("hubMcp.memory"), value: formatBytes(server.memory) }] : []),
+      ...(server.memory != null
+        ? [{ label: t("hubMcp.memory"), value: formatBytes(server.memory) }]
+        : []),
     ];
     return (
       <>
@@ -848,8 +984,12 @@ export default function SamplerScreen({
           <Group>
             <ActionButton
               icon={server.enabled ? stopIcon : activateIcon}
-              label={server.enabled ? t("sampler.mcpStop") : t("sampler.mcpStart")}
-              onPress={() => runMcp(server.id, server.enabled ? "stop" : "start")}
+              label={
+                server.enabled ? t("sampler.mcpStop") : t("sampler.mcpStart")
+              }
+              onPress={() =>
+                runMcp(server.id, server.enabled ? "stop" : "start")
+              }
             />
             {server.enabled && (
               <ActionButton
@@ -873,7 +1013,9 @@ export default function SamplerScreen({
   const renderProfile = () => {
     const target = profiles?.find((p) => p.id === profileId);
     if (!target || !pairedHub) return null;
-    const targetDevices = (devices ?? []).filter((d) => d.profile === target.id);
+    const targetDevices = (devices ?? []).filter(
+      (d) => d.profile === target.id,
+    );
     const count = targetDevices.length;
     const nextRole = target.role === "admin" ? "member" : "admin";
     const targetDeviceTiles: GridCard[] = targetDevices.map((d) => {
@@ -883,20 +1025,31 @@ export default function SamplerScreen({
           : d.lastSeen && devicesAt - d.lastSeen > HUB_INACTIVE_AFTER_S
             ? t("settings.hub.inactive")
             : null;
-      const kind = d.kind in HUB_DEVICE_ICONS ? (d.kind as "phone" | "desktop" | "web") : "other";
+      const kind =
+        d.kind in HUB_DEVICE_ICONS
+          ? (d.kind as "phone" | "desktop" | "web")
+          : "other";
       return {
         key: d.id,
         icon: HUB_DEVICE_ICONS[d.kind] ?? operaIcon,
         title: d.name,
-        status: [seen ?? t(`hubDevice.kinds.${kind}`)].filter(Boolean).join(" · "),
-        onPress: isAdmin || d.id === thisDeviceId ? () => setSelectedDeviceId(d.id) : undefined,
+        status: [seen ?? t(`hubDevice.kinds.${kind}`)]
+          .filter(Boolean)
+          .join(" · "),
+        onPress:
+          isAdmin || d.id === thisDeviceId
+            ? () => setSelectedDeviceId(d.id)
+            : undefined,
       };
     });
     return (
       <>
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <ProfileCard name={target.name} createdAt={target.createdAt * 1000} />
+            <ProfileCard
+              name={target.name}
+              createdAt={target.createdAt * 1000}
+            />
           </View>
         </View>
 
@@ -922,9 +1075,14 @@ export default function SamplerScreen({
         {/* devices section */}
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.hub.devices")}</Text>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.hub.devices")}
+            </Text>
             {targetDeviceTiles.length > 0 ? (
-              <CardGrid cards={targetDeviceTiles} minCardWidth={TILE_MIN_WIDTH} />
+              <CardGrid
+                cards={targetDeviceTiles}
+                minCardWidth={TILE_MIN_WIDTH}
+              />
             ) : (
               <Text style={styles.helpText}>{t("hubProfile.noDevices")}</Text>
             )}
@@ -936,8 +1094,16 @@ export default function SamplerScreen({
           <Group>
             <ActionButton
               icon={profilIcon}
-              label={nextRole === "admin" ? t("sampler.profile.makeAdmin") : t("sampler.profile.makeMember")}
-              onPress={() => runAdmin(() => SamplerHub.setProfileRole(pairedHub, target.id, nextRole))}
+              label={
+                nextRole === "admin"
+                  ? t("sampler.profile.makeAdmin")
+                  : t("sampler.profile.makeMember")
+              }
+              onPress={() =>
+                runAdmin(() =>
+                  SamplerHub.setProfileRole(pairedHub, target.id, nextRole),
+                )
+              }
             />
             <ActionButton
               icon={binIcon}
@@ -957,19 +1123,32 @@ export default function SamplerScreen({
       <View style={styles.contentCard}>
         {!!overviewError && (
           <View style={styles.settingRowVertical}>
-            <Text style={styles.helpText}>{t("hubMcp.failed", { error: overviewError })}</Text>
+            <Text style={styles.helpText}>
+              {t("hubMcp.failed", { error: overviewError })}
+            </Text>
           </View>
         )}
         {owners.map((owner, index) => {
-          const servers = (overview ?? []).filter((s) => ownerOf(s) === owner.id);
+          const servers = (overview ?? []).filter(
+            (s) => ownerOf(s) === owner.id,
+          );
           return (
             <View
               key={owner.id}
-              style={[styles.settingRowVertical, index === owners.length - 1 && { marginBottom: 0 }]}
+              style={[
+                styles.settingRowVertical,
+                index === owners.length - 1 && { marginBottom: 0 },
+              ]}
             >
-              <View style={[styles.toggleGroupRow, { marginBottom: Spacing.md }]}>
+              <View
+                style={[styles.toggleGroupRow, { marginBottom: Spacing.md }]}
+              >
                 <View style={styles.toggleGroupContent}>
-                  <Text style={styles.settingLabel}>{owner.id === profile?.id ? t("sampler.mcpMine") : owner.name}</Text>
+                  <Text style={styles.settingLabel}>
+                    {owner.id === profile?.id
+                      ? t("sampler.mcpMine")
+                      : owner.name}
+                  </Text>
                 </View>
                 <Toggle
                   checked={servers.some((s) => s.enabled)}
@@ -989,7 +1168,9 @@ export default function SamplerScreen({
                   }))}
                 />
               ) : (
-                <Text style={styles.helpText}>{overview ? t("sampler.mcpNone") : t("hubMcp.loading")}</Text>
+                <Text style={styles.helpText}>
+                  {overview ? t("sampler.mcpNone") : t("hubMcp.loading")}
+                </Text>
               )}
             </View>
           );
@@ -1005,7 +1186,8 @@ export default function SamplerScreen({
   //live graph of the hub processor and memory
   const renderPerformance = () => {
     if (status?.memory == null) return null;
-    const cpuText = (value: number) => t("hubMcp.cpuValue", { value: Math.round(value) });
+    const cpuText = (value: number) =>
+      t("hubMcp.cpuValue", { value: Math.round(value) });
     //the hub total holds llama.cpp and the servers, so the hub alone is what is left
     const running = overview?.filter((server) => server.state === "running");
     const parts =
@@ -1014,28 +1196,53 @@ export default function SamplerScreen({
             llamaCpu: modelsStatus.cpu ?? 0,
             llamaMemory: modelsStatus.memory ?? 0,
             mcpCpu: running.reduce((sum, server) => sum + (server.cpu ?? 0), 0),
-            mcpMemory: running.reduce((sum, server) => sum + (server.memory ?? 0), 0),
+            mcpMemory: running.reduce(
+              (sum, server) => sum + (server.memory ?? 0),
+              0,
+            ),
           }
         : null;
-    const average = (samples: number[]) => samples.reduce((sum, sample) => sum + sample, 0) / Math.max(1, samples.length);
+    const average = (samples: number[]) =>
+      samples.reduce((sum, sample) => sum + sample, 0) /
+      Math.max(1, samples.length);
     const peak = (samples: number[]) => Math.max(0, ...samples);
     const { cpu, memory } = usageHistory;
     const cpuNow = status.cpu ?? 0;
     const rows = [
-      { label: t("sampler.usageNow"), values: [cpuText(cpuNow), formatBytes(status.memory)] },
-      { label: t("sampler.usageAverage"), values: [cpuText(average(cpu)), formatBytes(average(memory))] },
-      { label: t("sampler.usagePeak"), values: [cpuText(peak(cpu)), formatBytes(peak(memory))] },
+      {
+        label: t("sampler.usageNow"),
+        values: [cpuText(cpuNow), formatBytes(status.memory)],
+      },
+      {
+        label: t("sampler.usageAverage"),
+        values: [cpuText(average(cpu)), formatBytes(average(memory))],
+      },
+      {
+        label: t("sampler.usagePeak"),
+        values: [cpuText(peak(cpu)), formatBytes(peak(memory))],
+      },
       ...(parts
         ? [
             {
               label: `- ${t("sampler.usageHub")}`,
               values: [
                 cpuText(Math.max(0, cpuNow - parts.llamaCpu - parts.mcpCpu)),
-                formatBytes(Math.max(0, status.memory - parts.llamaMemory - parts.mcpMemory)),
+                formatBytes(
+                  Math.max(
+                    0,
+                    status.memory - parts.llamaMemory - parts.mcpMemory,
+                  ),
+                ),
               ],
             },
-            { label: `- ${t("sampler.usageLlama")}`, values: [cpuText(parts.llamaCpu), formatBytes(parts.llamaMemory)] },
-            { label: `- ${t("sampler.usageMcp")}`, values: [cpuText(parts.mcpCpu), formatBytes(parts.mcpMemory)] },
+            {
+              label: `- ${t("sampler.usageLlama")}`,
+              values: [cpuText(parts.llamaCpu), formatBytes(parts.llamaMemory)],
+            },
+            {
+              label: `- ${t("sampler.usageMcp")}`,
+              values: [cpuText(parts.mcpCpu), formatBytes(parts.mcpMemory)],
+            },
           ]
         : []),
     ];
@@ -1044,26 +1251,54 @@ export default function SamplerScreen({
       <MetricChart
         title={t("sampler.usageChart")}
         series={[
-          { label: t("sampler.usageCpu"), samples: cpu, color: Colors.primary, max: 100 },
-          { label: t("sampler.usageMemory"), samples: memory, color: Colors.textPrimary },
+          {
+            label: t("sampler.usageCpu"),
+            samples: cpu,
+            color: Colors.primary,
+            max: 100,
+          },
+          {
+            label: t("sampler.usageMemory"),
+            samples: memory,
+            color: Colors.textPrimary,
+          },
         ]}
         received={usageHistory.received}
-        table={{ columns: [t("sampler.usageCpu"), t("sampler.usageMemory")], rows }}
+        table={{
+          columns: [t("sampler.usageCpu"), t("sampler.usageMemory")],
+          rows,
+        }}
       />
     );
   };
 
   //feature switch above its content
-  const renderFeatureToggle = (label: string, help: string, on: boolean, key: "models" | "mcpServers") =>
+  const renderFeatureToggle = (
+    label: string,
+    help: string,
+    on: boolean,
+    key: "models" | "mcpServers",
+  ) =>
     settings && (
-      <View style={styles.contentCard}>
-        {renderToggleRow(label, help, on, (value) => changeSettings({ [key]: value }))}
+      <View style={[styles.contentCard, on && styles.contentCardLit]}>
+        {renderToggleRow(
+          label,
+          help,
+          on,
+          (value) => changeSettings({ [key]: value }),
+          true,
+          on,
+        )}
       </View>
     );
 
   const hostHero = (
     <>
-      <Image source={HUB_DEVICE_ICONS.desktop} style={styles.hostIcon} tintColor={Colors.textPrimary} />
+      <Image
+        source={HUB_DEVICE_ICONS.desktop}
+        style={styles.hostIcon}
+        tintColor={Colors.textPrimary}
+      />
       <Text style={styles.hostName} numberOfLines={1}>
         {status?.name ?? pairedHub?.name ?? ""}
       </Text>
@@ -1077,11 +1312,15 @@ export default function SamplerScreen({
       offline: t("settings.hub.offline"),
       revoked: t("settings.hub.offline"),
       outdated: t("settings.hub.outdated"),
-      online: status?.direct ? t("settings.hub.direct") : t("settings.hub.relay"),
+      online: status?.direct
+        ? t("settings.hub.direct")
+        : t("settings.hub.relay"),
     }[hubState];
     const rows = [
       { label: t("settings.hub.connection"), value: connection },
-      ...(status ? [{ label: t("settings.hub.version"), value: status.version }] : []),
+      ...(status
+        ? [{ label: t("settings.hub.version"), value: status.version }]
+        : []),
       ...(status?.update
         ? [
             {
@@ -1103,7 +1342,11 @@ export default function SamplerScreen({
                 key={row.label}
                 label={row.label}
                 rightElement={
-                  <Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="middle">
+                  <Text
+                    style={styles.infoValue}
+                    numberOfLines={1}
+                    ellipsizeMode="middle"
+                  >
                     {row.value}
                   </Text>
                 }
@@ -1119,9 +1362,20 @@ export default function SamplerScreen({
               />
             )}
             {hostsHub && !hubStopped && (
-              <ActionButton icon={cancelIcon} label={t("settings.hub.stopHosting")} disabled={hostBusy} onPress={confirmStop} />
+              <ActionButton
+                icon={cancelIcon}
+                label={t("settings.hub.stopHosting")}
+                disabled={hostBusy}
+                onPress={confirmStop}
+              />
             )}
-            {!hostedHere && <ActionButton icon={cancelIcon} label={t("settings.hub.unpair")} onPress={unpair} />}
+            {!hostedHere && (
+              <ActionButton
+                icon={cancelIcon}
+                label={t("settings.hub.unpair")}
+                onPress={unpair}
+              />
+            )}
           </Group>
         </View>
       </View>
@@ -1147,8 +1401,12 @@ export default function SamplerScreen({
       <>
         {renderHubCard()}
         <View style={styles.columns}>
-          <View style={{ width: half }}>{cards.filter((_, i) => i % 2 === 0)}</View>
-          <View style={{ width: half }}>{cards.filter((_, i) => i % 2 === 1)}</View>
+          <View style={{ width: half }}>
+            {cards.filter((_, i) => i % 2 === 0)}
+          </View>
+          <View style={{ width: half }}>
+            {cards.filter((_, i) => i % 2 === 1)}
+          </View>
         </View>
       </>
     );
@@ -1205,7 +1463,14 @@ export default function SamplerScreen({
             {/* desktop puts the slider at the right of the text */}
             <View style={isDesktop && styles.toggleGroupContent}>
               <Text style={styles.settingLabel}>{row.label}</Text>
-              <Text style={[styles.helpText, !isDesktop && { marginBottom: Spacing.md }]}>{row.help}</Text>
+              <Text
+                style={[
+                  styles.helpText,
+                  !isDesktop && { marginBottom: Spacing.md },
+                ]}
+              >
+                {row.help}
+              </Text>
             </View>
             <Group style={isDesktop && styles.sliderGroup}>
               <Slider
@@ -1213,7 +1478,9 @@ export default function SamplerScreen({
                 options={row.options}
                 //older hubs lack these, llama.cpp keeps its defaults
                 selectedValue={String(settings[row.key] ?? 0)}
-                onSelect={(value) => changeSettings({ [row.key]: Number(value) })}
+                onSelect={(value) =>
+                  changeSettings({ [row.key]: Number(value) })
+                }
               />
             </Group>
           </View>
@@ -1236,7 +1503,12 @@ export default function SamplerScreen({
   const renderModels = () => {
     return (
       <>
-        {renderFeatureToggle(t("sampler.feature.models"), t("sampler.feature.modelsHelp"), modelsOn, "models")}
+        {renderFeatureToggle(
+          t("sampler.feature.models"),
+          t("sampler.feature.modelsHelp"),
+          modelsOn,
+          "models",
+        )}
         {modelsOn && modelsSection(true)}
         {modelsOn && settings && (
           <View style={styles.contentCard}>
@@ -1245,11 +1517,8 @@ export default function SamplerScreen({
               t("settings.hub.shareProvidersHelp"),
               settings.shareProviders,
               (value) => changeSettings({ shareProviders: value }),
+              false,
             )}
-          </View>
-        )}
-        {modelsOn && settings && (
-          <View style={styles.contentCard}>
             {renderToggleRow(
               t("sampler.model.nightly"),
               t("sampler.model.nightlyHelp"),
@@ -1278,7 +1547,12 @@ export default function SamplerScreen({
 
   const renderMcp = () => (
     <>
-      {renderFeatureToggle(t("sampler.feature.mcp"), t("sampler.feature.mcpHelp"), mcpOn, "mcpServers")}
+      {renderFeatureToggle(
+        t("sampler.feature.mcp"),
+        t("sampler.feature.mcpHelp"),
+        mcpOn,
+        "mcpServers",
+      )}
       {canManageMcp && mcpOn && myMcpSection(true)}
       {showMcpOverview && mcpOn && renderMcpServers()}
     </>
@@ -1309,7 +1583,12 @@ export default function SamplerScreen({
               {registries.length > 0 && (
                 <Group style={styles.groupSpacingTight}>
                   {registries.map((url) => (
-                    <ActionButton key={url} icon={binIcon} label={url} onPress={() => confirmRemoveRegistry(url)} />
+                    <ActionButton
+                      key={url}
+                      icon={binIcon}
+                      label={url}
+                      onPress={() => confirmRemoveRegistry(url)}
+                    />
                   ))}
                 </Group>
               )}
@@ -1319,7 +1598,10 @@ export default function SamplerScreen({
                   placeholder="https://registry.example.com"
                   value={registryDraft}
                   onChangeText={setRegistryDraft}
-                  onSubmitEditing={() => registryDraft.trim() && saveRegistries([...registries, registryDraft.trim()])}
+                  onSubmitEditing={() =>
+                    registryDraft.trim() &&
+                    saveRegistries([...registries, registryDraft.trim()])
+                  }
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
@@ -1327,7 +1609,9 @@ export default function SamplerScreen({
                   icon={addIcon}
                   label={t("sampler.addRegistry")}
                   disabled={!registryDraft.trim()}
-                  onPress={() => saveRegistries([...registries, registryDraft.trim()])}
+                  onPress={() =>
+                    saveRegistries([...registries, registryDraft.trim()])
+                  }
                 />
               </Group>
             </View>
@@ -1367,7 +1651,9 @@ export default function SamplerScreen({
   ).filter((items) => items.length > 0);
   const navItems = navGroups.flat();
   //a page the role no longer opens falls back home
-  const shownPage = navItems.some((item) => item.page === sectionOf(page)) ? page : "home";
+  const shownPage = navItems.some((item) => item.page === sectionOf(page))
+    ? page
+    : "home";
   const section = sectionOf(shownPage);
 
   //open sheets keep the back press for themselves
@@ -1383,7 +1669,10 @@ export default function SamplerScreen({
     selectedMcpServerId !== null ||
     myMcpDetail !== null;
 
-  const handleBack = useCallback(() => openPage(parentOf(shownPage) ?? "home"), [shownPage]);
+  const handleBack = useCallback(
+    () => openPage(parentOf(shownPage) ?? "home"),
+    [shownPage],
+  );
 
   //android back pops nested subpages before leaving sampler
   useEffect(() => {
@@ -1418,13 +1707,21 @@ export default function SamplerScreen({
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gestureState) =>
-          gestureState.dx < -10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+          gestureState.dx < -10 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
         onPanResponderMove: (_, gestureState) => {
           dragDrawer(samplerDrawerProgress, 1 + gestureState.dx / drawerWidth);
         },
         onPanResponderRelease: (_, gestureState) => {
-          const open = releaseOpens(1 + gestureState.dx / drawerWidth, gestureState.vx);
-          settleDrawer(samplerDrawerProgress, open, gestureVelocity(gestureState.vx, drawerWidth));
+          const open = releaseOpens(
+            1 + gestureState.dx / drawerWidth,
+            gestureState.vx,
+          );
+          settleDrawer(
+            samplerDrawerProgress,
+            open,
+            gestureVelocity(gestureState.vx, drawerWidth),
+          );
           if (!open) onCloseDrawer?.();
         },
         onPanResponderTerminate: () => {
@@ -1466,7 +1763,11 @@ export default function SamplerScreen({
       ]}
       showsVerticalScrollIndicator={false}
       scrollEventThrottle={16}
-      onScroll={active ? (e) => setScrolled(e.nativeEvent.contentOffset.y > 10) : undefined}
+      onScroll={
+        active
+          ? (e) => setScrolled(e.nativeEvent.contentOffset.y > 10)
+          : undefined
+      }
     >
       <View
         style={styles.page}
@@ -1493,8 +1794,12 @@ export default function SamplerScreen({
     if (paired && !profile) {
       return (
         <View style={styles.welcome}>
-          <Text style={styles.welcomeText}>{status?.name ?? pairedHub.name}</Text>
-          <Text style={styles.welcomeHelp}>{t("settings.hub.noProfileHelp")}</Text>
+          <Text style={styles.welcomeText}>
+            {status?.name ?? pairedHub.name}
+          </Text>
+          <Text style={styles.welcomeHelp}>
+            {t("settings.hub.noProfileHelp")}
+          </Text>
           <View style={styles.welcomeAction}>
             <Group style={[styles.highlightGroup, styles.groupSpacingTight]}>
               <ActionButton
@@ -1506,7 +1811,11 @@ export default function SamplerScreen({
             </Group>
             {!hostedHere && (
               <Group>
-                <ActionButton icon={cancelIcon} label={t("settings.hub.unpair")} onPress={unpair} />
+                <ActionButton
+                  icon={cancelIcon}
+                  label={t("settings.hub.unpair")}
+                  onPress={unpair}
+                />
               </Group>
             )}
           </View>
@@ -1519,7 +1828,10 @@ export default function SamplerScreen({
           <Text style={styles.welcomeText}>{t("sampler.welcome")}</Text>
           <Text style={styles.welcomeHelp}>{t("settings.hub.help")}</Text>
           <View style={styles.welcomeAction}>
-            <Pressable style={pressStyle(styles.welcomePill, "surface")} onPress={() => setPairingVisible(true)}>
+            <Pressable
+              style={pressStyle(styles.welcomePill, "surface")}
+              onPress={() => setPairingVisible(true)}
+            >
               <Text style={styles.welcomePillText}>{t("sampler.linkHub")}</Text>
             </Pressable>
           </View>
@@ -1531,10 +1843,19 @@ export default function SamplerScreen({
         <Text style={styles.welcomeText}>{t("sampler.welcome")}</Text>
         {!!hostError && <Text style={styles.welcomeHelp}>{hostError}</Text>}
         <View style={styles.welcomeAction}>
-          <Pressable style={pressStyle(styles.welcomePill, "surface")} disabled={hostBusy} onPress={startHosting}>
-            <Text style={styles.welcomePillText}>{t("sampler.startHosting")}</Text>
+          <Pressable
+            style={pressStyle(styles.welcomePill, "surface")}
+            disabled={hostBusy}
+            onPress={startHosting}
+          >
+            <Text style={styles.welcomePillText}>
+              {t("sampler.startHosting")}
+            </Text>
           </Pressable>
-          <Pressable style={styles.welcomeLink} onPress={() => setPairingVisible(true)}>
+          <Pressable
+            style={styles.welcomeLink}
+            onPress={() => setPairingVisible(true)}
+          >
             <Text style={styles.welcomeLinkText}>{t("sampler.linkHub")}</Text>
           </Pressable>
         </View>
@@ -1584,22 +1905,42 @@ export default function SamplerScreen({
   };
 
   const mobileDrawer = (
-    <View style={[styles.drawerRoot, { pointerEvents: drawerVisible ? "auto" : "none" }]}>
-      <Animated.View style={[styles.drawerOverlay, { opacity: samplerDrawerProgress }]}>
+    <View
+      style={[
+        styles.drawerRoot,
+        { pointerEvents: drawerVisible ? "auto" : "none" },
+      ]}
+    >
+      <Animated.View
+        style={[styles.drawerOverlay, { opacity: samplerDrawerProgress }]}
+      >
         <Pressable style={StyleSheet.absoluteFill} onPress={dismissDrawer} />
       </Animated.View>
 
       <Animated.View
-        style={[styles.drawerContent, { width: drawerWidth }, { transform: [{ translateX: drawerTranslateX }] }]}
+        style={[
+          styles.drawerContent,
+          { width: drawerWidth },
+          { transform: [{ translateX: drawerTranslateX }] },
+        ]}
         {...drawerPanResponder.panHandlers}
       >
         <View style={styles.drawerScrollContainer}>
-          <View style={[styles.fixedCloseWrapper, { top: 60 }]} pointerEvents="box-none">
-            <DrawerBackButton kind="close" onPress={dismissDrawer} scrolled={drawerScrolled} />
+          <View
+            style={[styles.fixedCloseWrapper, { top: 60 }]}
+            pointerEvents="box-none"
+          >
+            <DrawerBackButton
+              kind="close"
+              onPress={dismissDrawer}
+              scrolled={drawerScrolled}
+            />
           </View>
 
           <ScrollView
-            onScroll={(e) => setDrawerScrolled(e.nativeEvent.contentOffset.y > 10)}
+            onScroll={(e) =>
+              setDrawerScrolled(e.nativeEvent.contentOffset.y > 10)
+            }
             scrollEventThrottle={16}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingTop: 60, paddingBottom: 40 }}
@@ -1646,12 +1987,20 @@ export default function SamplerScreen({
           </ScrollView>
 
           <LinearGradient
-            colors={[Colors.groupedBackground, Colors.groupedBackgroundFade, Colors.groupedBackgroundClear]}
+            colors={[
+              Colors.groupedBackground,
+              Colors.groupedBackgroundFade,
+              Colors.groupedBackgroundClear,
+            ]}
             style={styles.screenGradientTop}
             pointerEvents="none"
           />
           <LinearGradient
-            colors={[Colors.groupedBackgroundClear, Colors.groupedBackgroundFade, Colors.groupedBackground]}
+            colors={[
+              Colors.groupedBackgroundClear,
+              Colors.groupedBackgroundFade,
+              Colors.groupedBackground,
+            ]}
             style={styles.screenGradientBottom}
             pointerEvents="none"
           />
@@ -1660,7 +2009,8 @@ export default function SamplerScreen({
     </View>
   );
 
-  const selectedMcpServer = overview?.find((s) => s.id === selectedMcpServerId) ?? null;
+  const selectedMcpServer =
+    overview?.find((s) => s.id === selectedMcpServerId) ?? null;
 
   //installed model detail sheet
   const hubModelSheet = (
@@ -1685,10 +2035,7 @@ export default function SamplerScreen({
         keyboardShouldPersistTaps="handled"
       >
         {detail && (
-          <HubModelPage
-            file={detail.file}
-            onDeleted={() => setDetail(null)}
-          />
+          <HubModelPage file={detail.file} onDeleted={() => setDetail(null)} />
         )}
       </SheetScrollView>
     </DrawerSheet>
@@ -1770,7 +2117,10 @@ export default function SamplerScreen({
               },
             ]}
           >
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.navScroll}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.navScroll}
+            >
               {navGroups.map((items, index) => (
                 <Group key={index} style={styles.navGroup}>
                   {items.map((item) => (
@@ -1779,7 +2129,10 @@ export default function SamplerScreen({
                       icon={item.icon}
                       iconBadge
                       label={pageTitles[item.page]}
-                      style={[styles.navButton, section === item.page && styles.navButtonSelected]}
+                      style={[
+                        styles.navButton,
+                        section === item.page && styles.navButtonSelected,
+                      ]}
                       onPress={() => openPage(item.page)}
                     />
                   ))}
@@ -1802,11 +2155,22 @@ export default function SamplerScreen({
         >
           {loaded &&
             (ready ? (
-              <View style={styles.stack} onLayout={(e) => setStackWidth(e.nativeEvent.layout.width)}>
+              <View
+                style={styles.stack}
+                onLayout={(e) => setStackWidth(e.nativeEvent.layout.width)}
+              >
                 {parentOf(shownPage) && (
-                  <View style={[styles.backWrapper, { top: contentTop }]} pointerEvents="box-none">
+                  <View
+                    style={[styles.backWrapper, { top: contentTop }]}
+                    pointerEvents="box-none"
+                  >
                     <View style={styles.backColumn} pointerEvents="box-none">
-                      <DrawerBackButton kind="back" onPress={handleBack} scrolled={scrolled} pulseKey={shownPage} />
+                      <DrawerBackButton
+                        kind="back"
+                        onPress={handleBack}
+                        scrolled={scrolled}
+                        pulseKey={shownPage}
+                      />
                     </View>
                   </View>
                 )}
@@ -2133,6 +2497,12 @@ const makeStyles = (Colors: ThemeColors) =>
       borderWidth: 0,
       padding: Spacing.md,
       marginBottom: Spacing.xxl2,
+    },
+    contentCardLit: {
+      backgroundColor: Colors.primary,
+    },
+    litText: {
+      color: Colors.textOnPrimary,
     },
     settingRowVertical: {
       marginBottom: Spacing.xxl,

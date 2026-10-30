@@ -93,7 +93,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: Spacing.xs,
   },
   block: {
-    borderRadius: Radius.md,
+    borderRadius: Radius.window,
     borderWidth: 2,
     paddingVertical: Spacing.xl,
     paddingHorizontal: Spacing.xl2,

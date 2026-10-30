@@ -3600,6 +3600,24 @@ export default function SettingsDrawer({
         </View>
       </View>
 
+      {isTauri && (
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <View style={styles.toggleGroupRow}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.update.beta")}
+                </Text>
+                <Text style={styles.helpText}>
+                  {t("settings.update.betaHelp")}
+                </Text>
+              </View>
+              <Toggle checked={betaChannel} onToggle={setBetaChannelValue} />
+            </View>
+          </View>
+        </View>
+      )}
+
       <View style={{ flex: 1, justifyContent: "flex-end" }}>
         <Text style={[styles.helpText, { textAlign: "center" }]}>
           Maestroai.Company
@@ -3689,7 +3707,7 @@ export default function SettingsDrawer({
           </Group>
         </View>
 
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+        <View style={[styles.settingRowVertical, !isTauri && { marginBottom: 0 }]}>
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>
               <Text style={styles.settingLabel}>
@@ -3702,58 +3720,39 @@ export default function SettingsDrawer({
             <Toggle checked={advancedMode} onToggle={setAdvancedMode} />
           </View>
         </View>
+
+        {isTauri && (
+          <>
+            <View style={styles.settingRowVertical}>
+              <View style={styles.toggleGroupRow}>
+                <View style={styles.toggleGroupContent}>
+                  <Text style={styles.settingLabel}>
+                    {t("settings.overlay.closeToTray")}
+                  </Text>
+                  <Text style={styles.helpText}>
+                    {t("settings.overlay.closeToTrayHelp")}
+                  </Text>
+                </View>
+                <Toggle checked={closeToTray} onToggle={v => setOverlayConfig({ closeToTray: v })} />
+              </View>
+            </View>
+
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <View style={styles.toggleGroupRow}>
+                <View style={styles.toggleGroupContent}>
+                  <Text style={styles.settingLabel}>
+                    {t("settings.startup.launch")}
+                  </Text>
+                  <Text style={styles.helpText}>
+                    {t("settings.startup.launchHelp")}
+                  </Text>
+                </View>
+                <Toggle checked={launchAtStartup} onToggle={setLaunchAtStartupValue} />
+              </View>
+            </View>
+          </>
+        )}
       </View>
-
-      {/* tray keeps the overlay shortcut alive */}
-      {isTauri && (
-        <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <View style={styles.toggleGroupRow}>
-              <View style={styles.toggleGroupContent}>
-                <Text style={styles.settingLabel}>
-                  {t("settings.overlay.closeToTray")}
-                </Text>
-                <Text style={styles.helpText}>
-                  {t("settings.overlay.closeToTrayHelp")}
-                </Text>
-              </View>
-              <Toggle checked={closeToTray} onToggle={v => setOverlayConfig({ closeToTray: v })} />
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* startup and updates on desktop */}
-      {isTauri && (
-        <View style={styles.contentCard}>
-          <View style={styles.settingRowVertical}>
-            <View style={styles.toggleGroupRow}>
-              <View style={styles.toggleGroupContent}>
-                <Text style={styles.settingLabel}>
-                  {t("settings.startup.launch")}
-                </Text>
-                <Text style={styles.helpText}>
-                  {t("settings.startup.launchHelp")}
-                </Text>
-              </View>
-              <Toggle checked={launchAtStartup} onToggle={setLaunchAtStartupValue} />
-            </View>
-          </View>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <View style={styles.toggleGroupRow}>
-              <View style={styles.toggleGroupContent}>
-                <Text style={styles.settingLabel}>
-                  {t("settings.update.beta")}
-                </Text>
-                <Text style={styles.helpText}>
-                  {t("settings.update.betaHelp")}
-                </Text>
-              </View>
-              <Toggle checked={betaChannel} onToggle={setBetaChannelValue} />
-            </View>
-          </View>
-        </View>
-      )}
 
       {/* overlay and screen saver links */}
       {(!isDesktop || isTauri || Platform.OS === "android") && (

@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DeviceEventEmitter, Image, Pressable, StyleSheet, View } from 'react-native';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
@@ -26,27 +27,33 @@ import ChatBar, { ChatBarHandle } from './ChatBar';
 import ChatView from './ChatView';
 import { ModelSelectorDrawer, ModelSelectorTrigger } from './ModelSelector';
 
-const pinIcon = require('../../../assets/icons/pin.png');
-const unpinIcon = require('../../../assets/icons/unpin.png');
+const closeIcon = require('../../../assets/icons/cancel.png');
+const chatIcon = require('../../../assets/icons/chat.png');
 
 //reply card never covers the screen
 const MAX_REPLY_HEIGHT = 360;
 //room for the bar glow
 const GLOW_ROOM = Spacing.xxl2;
+//floating button side
+const BUTTON_SIZE = 44;
 //room for drawers and sheets
 const EXPANDED_HEIGHT = 560;
+
+//smoothstep from the shell tint to clear
+function fadeStops(tint: string): [string, string, ...string[]] {
+  const [r, g, b, a = '1'] = tint.match(/[\d.]+/g) ?? ['0', '0', '0'];
+  return Array.from({ length: 6 }, (_, i) => {
+    const t = i / 5;
+    return `rgba(${r},${g},${b},${(Number(a) * (1 - t * t * (3 - 2 * t))).toFixed(3)})`;
+  }) as [string, string, ...string[]];
+}
 
 export default function DesktopOverlay() {
   const styles = useThemedStyles(makeStyles);
   const Colors = useColors();
+  const topFade = useMemo(() => fadeStops(Colors.overlayShell), [Colors.overlayShell]);
   //pinned stays on top and drags
   const [pinned, setPinned] = useState(false);
-  const togglePin = useCallback(() => {
-    setPinned(p => {
-      invoke('overlay_set_pinned', { pinned: !p });
-      return !p;
-    });
-  }, []);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesRef = useRef<Message[]>([]);
@@ -234,6 +241,9 @@ export default function DesktopOverlay() {
     const assistantMsg = await DB.addMessage(conv.id, 'assistant', '…');
     setMessages([...history, assistantMsg]);
     setReplyHeight(0);
+    //a reply keeps the window until closed
+    setPinned(true);
+    invoke('overlay_set_pinned', { pinned: true });
     streamingMsgIdRef.current = assistantMsg.id;
     setGeneratingMsgId(assistantMsg.id);
 
@@ -318,10 +328,6 @@ export default function DesktopOverlay() {
     return WhisperSTT.transcribeData(wavBuffer);
   }, [alwaysWhisper, modelCapabilities]);
 
-  const openInApp = useCallback((item: Message) => {
-    invoke('overlay_open_conversation', { convId: item.conversationId });
-  }, []);
-
   let lastReply: Message | null = null;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === 'assistant') { lastReply = messages[i]; break; }
@@ -336,11 +342,23 @@ export default function DesktopOverlay() {
         onResponderGrant={() => invoke('overlay_drag')}
         onLayout={e => setShellHeight(Math.ceil(e.nativeEvent.layout.height) + GLOW_ROOM * 2)}>
         {lastReply && (
-          <View style={{ height: Math.min(Math.max(replyHeight, 1), MAX_REPLY_HEIGHT) }}>
+          <View style={styles.floatingRow} pointerEvents="box-none">
+            <Pressable onPress={() => invoke('overlay_hide')} style={pressStyle(styles.floatingButton, 'surface')}>
+              <Image source={closeIcon} style={styles.floatingIcon} tintColor={Colors.textPrimary} />
+            </Pressable>
+            <Pressable
+              onPress={() => invoke('overlay_open_conversation', { convId: lastReply.conversationId })}
+              style={pressStyle(styles.floatingButton, 'surface')}>
+              <Image source={chatIcon} style={styles.floatingIcon} tintColor={Colors.textPrimary} />
+            </Pressable>
+          </View>
+        )}
+        {lastReply && (
+          <View style={[styles.reply, { height: Math.min(Math.max(replyHeight, 1), MAX_REPLY_HEIGHT) }]}>
             <ChatView
               messages={[lastReply]}
               conversation={conversation}
-              contentTopPadding={Spacing.xl2}
+              contentTopPadding={BUTTON_SIZE + Spacing.lg2}
               contentBottomPadding={0}
               hideHeader={true}
               hideGradients={true}
@@ -349,9 +367,9 @@ export default function DesktopOverlay() {
               onRegenerate={handleRegenerate}
               canThink={modelCapabilities.includes('thinking') && reflection !== 'none'}
               alignBottom={true}
-              onOpenInApp={openInApp}
               onContentHeight={setReplyHeight}
             />
+            <LinearGradient colors={topFade} style={styles.topFade} pointerEvents="none" />
           </View>
         )}
         <ChatBar
@@ -365,16 +383,11 @@ export default function DesktopOverlay() {
           picker={attachments}
           flush
           leadingElement={
-            <View style={styles.leading}>
-              <ModelSelectorTrigger
-                selectedModel={selectedModel}
-                flat
-                onPress={() => setModelSelectorVisible(v => !v)}
-              />
-              <Pressable onPress={togglePin} hitSlop={8} style={pressStyle(styles.pinButton, 'fadeLight')}>
-                <Image source={pinned ? unpinIcon : pinIcon} style={styles.pinIcon} tintColor={Colors.textOnPrimary} />
-              </Pressable>
-            </View>
+            <ModelSelectorTrigger
+              selectedModel={selectedModel}
+              flat
+              onPress={() => setModelSelectorVisible(v => !v)}
+            />
           }
         />
       </View>
@@ -429,18 +442,42 @@ export default function DesktopOverlay() {
 
 const makeStyles = (Colors: ThemeColors) =>
   StyleSheet.create({
-    leading: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: Spacing.md,
+    //text scrolls up to the frame edge
+    reply: {
+      marginTop: -Spacing.sm,
+      marginHorizontal: -Spacing.sm,
+      overflow: 'hidden',
+      borderTopLeftRadius: Radius.window + Spacing.sm,
+      borderTopRightRadius: Radius.window + Spacing.sm,
     },
-    pinButton: {
-      width: 28,
-      height: 28,
+    topFade: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: BUTTON_SIZE + Spacing.sm,
+    },
+    floatingRow: {
+      position: 'absolute',
+      top: Spacing.sm,
+      left: Spacing.sm,
+      right: Spacing.sm,
+      zIndex: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      //room for the sticker shadow
+      paddingLeft: Spacing.xs,
+    },
+    floatingButton: {
+      width: BUTTON_SIZE,
+      height: BUTTON_SIZE,
+      borderRadius: Radius.window,
+      backgroundColor: Colors.surface,
       justifyContent: 'center',
       alignItems: 'center',
-    },
-    pinIcon: {
+      boxShadow: `-4px 4px 0px ${Colors.shadowInk}`,
+    } as any,
+    floatingIcon: {
       width: 18,
       height: 18,
     },
@@ -454,7 +491,7 @@ const makeStyles = (Colors: ThemeColors) =>
       padding: Spacing.sm,
       gap: Spacing.lg,
       //concentric with the bar corners
-      borderRadius: Radius.huge,
+      borderRadius: Radius.window + Spacing.sm,
       backgroundColor: Colors.overlayShell,
       //frosted glass on the desktop
       backdropFilter: 'blur(24px)',

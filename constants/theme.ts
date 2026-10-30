@@ -79,7 +79,7 @@ export const LightColors = {
   responseBorder: "rgba(255,255,255,0.14)",
 
   //desktop overlay frosted shell
-  overlayShell: "rgba(160,160,160,0.72)",
+  overlayShell: "rgba(255,255,255,0.7)",
 
   //white tint lifts a red row to primaryBright
   overlayHover: "rgba(255,255,255,0.22)",

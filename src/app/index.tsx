@@ -472,6 +472,7 @@ export default function Index() {
       selectedValue={inSampler ? "sampler" : "chat"}
       onSelect={(value) => setSamplerMode(value === "sampler")}
       options={samplerSwitchOptions}
+      radius={Radius.lg2}
     />
   ) : undefined;
   //shared with the panResponder below so the swipe-up gesture can drag it live
@@ -3020,7 +3021,7 @@ const makeStyles = (Colors: ThemeColors) =>
       right: 4,
       height: 44,
       backgroundColor: Colors.shadowInk,
-      borderRadius: Radius.xxl,
+      borderRadius: Radius.window,
     },
     settingsButton: {
       height: 44,
@@ -3029,7 +3030,7 @@ const makeStyles = (Colors: ThemeColors) =>
       justifyContent: "center",
       alignItems: "center",
       backgroundColor: Colors.surface,
-      borderRadius: Radius.xxl,
+      borderRadius: Radius.window,
       position: "relative",
       zIndex: 1,
     },

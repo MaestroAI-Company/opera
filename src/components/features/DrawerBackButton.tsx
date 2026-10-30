@@ -101,19 +101,19 @@ const makeStyles = (Colors: ThemeColors) =>
       width: 40,
       height: 40,
       backgroundColor: Colors.shadowInk,
-      borderRadius: Radius.xxl,
+      borderRadius: Radius.window,
     },
     button: {
       width: 40,
       height: 40,
       justifyContent: "center",
       alignItems: "center",
-      borderRadius: Radius.xxl,
+      borderRadius: Radius.window,
     },
     surface: {
       ...StyleSheet.absoluteFill,
       backgroundColor: Colors.surface,
-      borderRadius: Radius.xxl,
+      borderRadius: Radius.window,
     },
     closeIcon: {
       width: 18,

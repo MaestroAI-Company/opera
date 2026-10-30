@@ -127,7 +127,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   iconTile: {
     flex: 1,
     aspectRatio: 1,
-    borderRadius: Radius.md,
+    borderRadius: Radius.window,
     borderWidth: 2,
     borderColor: Colors.borderOnPrimary,
     backgroundColor: Colors.primary,
@@ -145,7 +145,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   //outlined like the value Blocks, wraps the whole forecast strip
   forecastBox: {
-    borderRadius: Radius.md,
+    borderRadius: Radius.window,
     borderWidth: 2,
     borderColor: Colors.border,
     backgroundColor: Colors.surface,

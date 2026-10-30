@@ -26,7 +26,7 @@ export default function WidgetWrapper({ widget, children }: WidgetWrapperProps) 
 const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.xxl,
+    borderRadius: Radius.window,
     width: '100%',
     padding: 5,
   },

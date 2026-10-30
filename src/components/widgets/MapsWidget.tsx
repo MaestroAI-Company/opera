@@ -132,7 +132,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     height: 300,
     width: '100%',
     backgroundColor: Colors.surfacePressed,
-    borderRadius: Radius.md,
+    borderRadius: Radius.window,
     overflow: 'hidden',
   },
   //elongated on desktop

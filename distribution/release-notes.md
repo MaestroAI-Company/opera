@@ -1,11 +1,20 @@
-Opera 1.0 brings your assistant to all your devices.
+## Desktop assistant
 
-**Sampler Hub.** Install it on a computer, pair your phone with a code or a QR scan, and your chats, images and settings follow you from one device to another. Your phone can use the models running on that computer (Ollama, LM Studio, llama.cpp) and the MCP servers installed on it. Conversations are sealed with your profile key, so Sampler Hub stores them without being able to read them. Each profile gets a daily backup, and a new phone can restore it during onboarding.
+Opera on desktop now has an assistant overlay you can pin on screen, open from the tray icon, and talk to with push to talk. It has its own settings.
 
-**Opera on desktop.** Windows, macOS and Linux, with a layout made for big screens and settings in their own window. The desktop app can also host Sampler Hub for your other devices.
+The desktop app can host Sampler Hub itself and shares its tray icon with it. The hub charts for CPU and memory are merged into one with a table.
 
-**Standby.** Put your phone on its charger and it turns into a clock with Maestro's butterflies. Say "Maestro" and ask your question without touching it, Maestro answers out loud with a small card on screen, and you can keep talking to follow up. On OLED screens, anti burn-in moves everything a few pixels every minute.
+## Sampler Hub and models
 
-**A real voice for Maestro.** Install the offline voice pack and Maestro speaks with a natural voice instead of the system one. Each butterfly has its own voice, tap one to hear it.
+- Switch to llama.cpp nightly and see which version is installed. The hub shows when it runs nightly.
+- See which prompt size Automatic picks for each model.
+- A paired hub that is unreachable now shows as offline instead of sending you back to onboarding.
 
-You can also edit your messages, attach videos, and pick which Ollama and cloud models show up in the list. Images from the web in answers only load once you allow them. The theme follows your system from the first launch, and Opera no longer asks for access to all your photos.
+## Improvements
+
+- Beta builds get the update banner for newer betas.
+- Tab moves straight from one text field to the next on desktop.
+- A thin themed scrollbar replaces the default one on desktop.
+- External links open correctly on desktop.
+- Your profile name stays in sync between onboarding, settings and the hub.
+- Standby is now presented as a docked smart display.

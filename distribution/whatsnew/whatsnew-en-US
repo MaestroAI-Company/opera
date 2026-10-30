@@ -1,5 +1,3 @@
-Opera 1.0 runs on all your devices. Pair your phone with Sampler Hub on your computer to sync your chats and use its models and MCP servers. Opera is now on Windows, macOS and Linux too.
+Opera on desktop now has an assistant overlay: pin it on screen, open it from the tray and talk with push to talk.
 
-Put your phone on its charger for Standby, a clock where you just say "Maestro" and ask. Install the offline voice pack to give Maestro a natural voice.
-
-You can also edit your messages and attach videos.
+You can also switch Sampler Hub to llama.cpp nightly, see the prompt size Automatic picks for each model, and a paired hub that is unreachable now shows as offline. Standby is now a docked smart display.

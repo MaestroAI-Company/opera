@@ -1000,7 +1000,7 @@ export default function SamplerScreen({
   const modelsOn = settings?.models !== false;
   const mcpOn = settings?.mcpServers !== false;
 
-  //live graphs of the hub processor and memory
+  //live graph of the hub processor and memory
   const renderPerformance = () => {
     if (status?.memory == null) return null;
     const cpuText = (value: number) => t("hubMcp.cpuValue", { value: Math.round(value) });
@@ -1015,53 +1015,39 @@ export default function SamplerScreen({
             mcpMemory: running.reduce((sum, server) => sum + (server.memory ?? 0), 0),
           }
         : null;
-    const cards = [
-      <MetricChart
-        key="cpu"
-        title={t("settings.hub.cpu")}
-        samples={usageHistory.cpu}
-        received={usageHistory.received}
-        value={cpuText(status.cpu ?? 0)}
-        max={100}
-        footerLabel={t("sampler.performance")}
-        details={
-          parts
-            ? [
-                { label: t("sampler.usageHub"), value: cpuText(Math.max(0, (status.cpu ?? 0) - parts.llamaCpu - parts.mcpCpu)) },
-                { label: t("sampler.usageLlama"), value: cpuText(parts.llamaCpu) },
-                { label: t("sampler.usageMcp"), value: cpuText(parts.mcpCpu) },
-              ]
-            : undefined
-        }
-      />,
-      <MetricChart
-        key="memory"
-        title={t("settings.hub.memory")}
-        samples={usageHistory.memory}
-        received={usageHistory.received}
-        value={formatBytes(status.memory)}
-        footerLabel={t("sampler.performance")}
-        details={
-          parts
-            ? [
-                { label: t("sampler.usageHub"), value: formatBytes(Math.max(0, status.memory - parts.llamaMemory - parts.mcpMemory)) },
-                { label: t("sampler.usageLlama"), value: formatBytes(parts.llamaMemory) },
-                { label: t("sampler.usageMcp"), value: formatBytes(parts.mcpMemory) },
-              ]
-            : undefined
-        }
-      />,
+    const average = (samples: number[]) => samples.reduce((sum, sample) => sum + sample, 0) / Math.max(1, samples.length);
+    const peak = (samples: number[]) => Math.max(0, ...samples);
+    const { cpu, memory } = usageHistory;
+    const cpuNow = status.cpu ?? 0;
+    const rows = [
+      { label: t("sampler.usageNow"), values: [cpuText(cpuNow), formatBytes(status.memory)] },
+      { label: t("sampler.usageAverage"), values: [cpuText(average(cpu)), formatBytes(average(memory))] },
+      { label: t("sampler.usagePeak"), values: [cpuText(peak(cpu)), formatBytes(peak(memory))] },
+      ...(parts
+        ? [
+            {
+              label: `- ${t("sampler.usageHub")}`,
+              values: [
+                cpuText(Math.max(0, cpuNow - parts.llamaCpu - parts.mcpCpu)),
+                formatBytes(Math.max(0, status.memory - parts.llamaMemory - parts.mcpMemory)),
+              ],
+            },
+            { label: `- ${t("sampler.usageLlama")}`, values: [cpuText(parts.llamaCpu), formatBytes(parts.llamaMemory)] },
+            { label: `- ${t("sampler.usageMcp")}`, values: [cpuText(parts.mcpCpu), formatBytes(parts.mcpMemory)] },
+          ]
+        : []),
     ];
-    if (pageWidth < TWO_COLUMNS_FROM) return cards;
-    const half = Math.floor((pageWidth - Spacing.xxl2) / 2);
+    //memory scales on its own peak
     return (
-      <View style={styles.columns}>
-        {cards.map((card) => (
-          <View key={card.key} style={{ width: half }}>
-            {card}
-          </View>
-        ))}
-      </View>
+      <MetricChart
+        title={t("sampler.usageChart")}
+        series={[
+          { label: t("sampler.usageCpu"), samples: cpu, color: Colors.primary, max: 100 },
+          { label: t("sampler.usageMemory"), samples: memory, color: Colors.textPrimary },
+        ]}
+        received={usageHistory.received}
+        table={{ columns: [t("sampler.usageCpu"), t("sampler.usageMemory")], rows }}
+      />
     );
   };
 

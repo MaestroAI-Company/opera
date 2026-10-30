@@ -1,6 +1,8 @@
 import Constants from 'expo-constants';
+import { invoke } from '@tauri-apps/api/core';
 import { universalFetch } from '../ai/utils/universalFetch';
 import { Settings } from '../settings/SettingsService';
+import { isTauri } from '../platform';
 
 const LATEST_RELEASE_URL = 'https://api.github.com/repos/MaestroAI-Company/opera/releases/latest';
 const RELEASE_TAG_URL = 'https://api.github.com/repos/MaestroAI-Company/opera/releases/tags/';
@@ -9,6 +11,9 @@ const RELEASES_URL = 'https://api.github.com/repos/MaestroAI-Company/opera/relea
 const SEEN_VERSION_KEY = 'seenReleaseNotes';
 //beta notes seen, release notes still due
 const BETA_PREFIX = 'beta:';
+
+//desktop opt-in kept per computer
+const BETA_CHANNEL_KEY = 'betaChannel';
 
 //one network check per app session window
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -108,13 +113,24 @@ async function fetchNewestRelease(): Promise<AppRelease | null> {
   return newest;
 }
 
+export async function getBetaChannel(): Promise<boolean> {
+  return isTauri && (await Settings.getLocal(BETA_CHANNEL_KEY)) === 'true';
+}
+
+export async function setBetaChannel(enabled: boolean): Promise<void> {
+  await Settings.setLocal(BETA_CHANNEL_KEY, String(enabled));
+  //next check uses new channel
+  cachedAt = 0;
+}
+
 //latest release when newer than build
 export async function getAvailableUpdate(): Promise<AppRelease | null> {
   const current = getBuildVersion();
 
   if (Date.now() - cachedAt > CHECK_INTERVAL_MS) {
     try {
-      cachedRelease = isBetaVersion(current) ? await fetchNewestRelease() : await fetchLatestRelease();
+      const beta = isBetaVersion(current) || (await getBetaChannel());
+      cachedRelease = beta ? await fetchNewestRelease() : await fetchLatestRelease();
     } catch (e) {
       console.warn('[UpdateService] release check failed:', e);
       cachedRelease = null;
@@ -125,6 +141,11 @@ export async function getAvailableUpdate(): Promise<AppRelease | null> {
   const release = cachedRelease;
   if (!release || !isNewerVersion(release.version, current)) return null;
   return release;
+}
+
+//false when nothing is newer
+export async function installDesktopUpdate(release: AppRelease): Promise<boolean> {
+  return invoke<boolean>('app_update_install', { tag: `v${release.version}` });
 }
 
 async function fetchRelease(tag: string): Promise<any | null> {

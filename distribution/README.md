@@ -58,3 +58,15 @@ The Play uploads only run when the `PLAY_SERVICE_ACCOUNT_JSON` secret is set, an
 ## versionCode
 
 Play refuses a `versionCode` it has already received, beta included. On each tag, `scripts/next-version-code.mjs` asks Play for the highest code it holds and builds with the next one, so `android.versionCode` in `app.json` never needs a bump. A higher value in `app.json` still wins. Without the `PLAY_SERVICE_ACCOUNT_JSON` secret, the build keeps the `app.json` value.
+
+## Desktop updates
+
+The desktop app updates itself from the GitHub release. Each release carries a signed `latest.json` next to the installers, and the app reads the one of the newest release for its channel: stable builds follow stable releases, builds with the **Beta versions** toggle on (or a beta build) follow betas too.
+
+The bundles are signed by `build-desktop.yml`, which needs two repository secrets:
+
+- `TAURI_SIGNING_PRIVATE_KEY`: the content of the private key file
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: its password
+
+The public key sits in `src-tauri/tauri.conf.json`. Lose the private key and installed apps can no longer verify an update: they would need a manual reinstall with a new key. The desktop bundle version is the tag (`1.2.3-beta.2`), not the `app.json` version, so the updater can tell two betas apart. A `.deb` install can't replace itself, the app opens the release page instead.
+

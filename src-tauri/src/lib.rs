@@ -6,7 +6,13 @@ mod overlay_window;
 mod settings_window;
 #[cfg(desktop)]
 mod tray;
+#[cfg(desktop)]
+mod updater;
 mod webview_task;
+
+//login launch stays in tray
+#[cfg(desktop)]
+const HIDDEN_ARG: &str = "--hidden";
 
 //webview data sits in the company folder like the hub
 #[cfg(windows)]
@@ -36,6 +42,11 @@ pub fn run() {
         builder = builder
             .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| tray::show_main(app)))
             .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .plugin(tauri_plugin_autostart::init(
+                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                Some(vec![HIDDEN_ARG]),
+            ))
             .manage(hub::HubState::default());
     }
 
@@ -175,6 +186,8 @@ pub fn run() {
             hub::hub_install_update,
             #[cfg(desktop)]
             hub::hub_computer_name,
+            #[cfg(desktop)]
+            updater::app_update_install,
         ])
         .setup(|app| {
             //built here to choose where its data lives
@@ -190,6 +203,11 @@ pub fn run() {
             #[cfg(windows)]
             if let Some(dir) = webview_data_dir(app.handle()) {
                 main = main.data_directory(dir);
+            }
+            //login launch needs no window
+            #[cfg(desktop)]
+            if std::env::args().any(|a| a == HIDDEN_ARG) {
+                main = main.visible(false);
             }
             #[allow(unused_variables)]
             let main_window = main.build()?;

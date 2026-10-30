@@ -145,7 +145,9 @@ import {
 } from "../services/share/ShareService";
 import { speakReplyLive } from "../services/speech/liveReply";
 import { STT, WhisperSTT } from "../services/speech/STTService";
-import { ReleaseNotes, takeReleaseNotes } from "../services/updates/UpdateService";
+import { applyLaunchAtStartupDefault } from "../services/desktop/launchAtStartup";
+import { useDesktopUpdate } from "../hooks/useDesktopUpdate";
+import { ReleaseNotes, getAvailableUpdate, takeReleaseNotes } from "../services/updates/UpdateService";
 
 const texture2 = require("../../assets/images/texture2.png");
 const settingsIcon = require("../../assets/icons/settings.png");
@@ -737,6 +739,7 @@ useEffect(() => {
     null,
   );
   const [releaseNotes, setReleaseNotes] = useState<ReleaseNotes | null>(null);
+  const { prompt: promptUpdate, modalProps: updateModalProps } = useDesktopUpdate();
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const rootRef = useRef<View>(null);
 
@@ -1165,6 +1168,14 @@ useEffect(() => {
         takeReleaseNotes(!s.hasSeenOnboarding)
           .then(setReleaseNotes)
           .catch((e) => console.warn("Could not load release notes:", e));
+        if (isTauri) {
+          applyLaunchAtStartupDefault().catch((e) =>
+            console.warn("Could not set launch at startup:", e),
+          );
+          getAvailableUpdate()
+            .then((release) => release && promptUpdate(release))
+            .catch((e) => console.warn("Could not check for updates:", e));
+        }
         if (!s.hasSeenOnboarding && !isBrowserWeb) {
           router.replace("/onboarding");
           return;
@@ -1194,7 +1205,7 @@ useEffect(() => {
       setDbReady(true);
     };
     init();
-  }, [loadConversations, router]);
+  }, [loadConversations, router, promptUpdate]);
 
   //fetch model capabilities when selectedModel changes
   useEffect(() => {
@@ -2768,6 +2779,8 @@ useEffect(() => {
         isDesktop={isDesktop}
         bottomInset={insets.bottom}
       />
+
+      <NotificationModal {...updateModalProps} />
 
       <WhatsNewSheet
         release={releaseNotes}

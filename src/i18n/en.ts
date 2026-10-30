@@ -296,6 +296,12 @@ export const en = {
   "settings.title": "Settings",
   "settings.notice.update": "Opera {version} is available",
 
+  "update.title": "Update available",
+  "update.message": "Opera {version} is ready to install. Opera restarts to finish the update.",
+  "update.installing": "Downloading Opera {version}. Opera restarts when it is done.",
+  "update.install": "Update now",
+  "update.later": "Later",
+
   "settings.nav.profile.title": "Profile",
   "settings.nav.profile.subtitle": "Name",
   "settings.nav.cloud.title": "Sync & backup",
@@ -725,6 +731,16 @@ export const en = {
   "settings.overlay.closeToTray": "Keep running in the background",
   "settings.overlay.closeToTrayHelp":
     "Closing the window keeps Opera in the tray so the shortcut still works.",
+  "settings.startup.launch": "Launch at startup",
+  "settings.startup.launchHelp":
+    "Opera starts with your computer and waits in the tray.",
+  "settings.update.beta": "Beta versions",
+  "settings.update.betaHelp":
+    "Get new versions of Opera before they reach everyone.",
+  "settings.update.betaWarning.title": "Enable beta versions?",
+  "settings.update.betaWarning.message":
+    "Beta versions are tested less than stable ones. They can contain bugs, crash, lose or corrupt your data, and change without notice. Back up your conversations first. Turning this off later does not go back to a stable version, you stay on the beta until the next stable release.",
+  "settings.update.betaWarning.confirm": "I understand the risks",
 
   "settings.cloud.storage": "Cloud storage",
   "settings.cloud.selectStorage": "Select Cloud Storage",

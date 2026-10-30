@@ -185,6 +185,9 @@ import {
 } from "react-native-keyboard-controller";
 import { useResponsive } from "../../hooks/useResponsive";
 import { useSettingsNotices } from "../../hooks/useSettingsNotices";
+import { useDesktopUpdate } from "../../hooks/useDesktopUpdate";
+import { getLaunchAtStartup, setLaunchAtStartup } from "../../services/desktop/launchAtStartup";
+import { getBetaChannel, setBetaChannel } from "../../services/updates/UpdateService";
 import { useVoicePackInstalled } from "../../hooks/useVoicePackInstalled";
 
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
@@ -1117,6 +1120,15 @@ export default function SettingsDrawer({
     }
   });
   const notices = useSettingsNotices(visible);
+  const { prompt: promptUpdate, modalProps: updateModalProps } = useDesktopUpdate();
+  const [launchAtStartup, setLaunchAtStartupState] = useState(false);
+  const [betaChannel, setBetaChannelState] = useState(false);
+  //not part of synced settings
+  useEffect(() => {
+    if (!visible || !isTauri) return;
+    getLaunchAtStartup().then(setLaunchAtStartupState).catch(() => { });
+    getBetaChannel().then(setBetaChannelState).catch(() => { });
+  }, [visible]);
   const report = useBugReport(showAlert);
   const [instruction, setInstructionState] = useState("");
   const [name, setNameState] = useState("");
@@ -2688,6 +2700,36 @@ export default function SettingsDrawer({
     pushDesktopOverlayConfig(next);
   };
 
+  const setLaunchAtStartupValue = (v: boolean) => {
+    setLaunchAtStartupState(v);
+    setLaunchAtStartup(v).catch(() => setLaunchAtStartupState(!v));
+  };
+
+  //betas can break things
+  const setBetaChannelValue = (v: boolean) => {
+    if (!v) {
+      setBetaChannelState(false);
+      setBetaChannel(false).catch(() => { });
+      return;
+    }
+    showAlert(
+      t("settings.update.betaWarning.title"),
+      t("settings.update.betaWarning.message"),
+      [
+        { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: t("settings.update.betaWarning.confirm"),
+          style: "danger",
+          onPress: () => {
+            setAlertModalVisible(false);
+            setBetaChannelState(true);
+            setBetaChannel(true).catch(() => { });
+          },
+        },
+      ],
+    );
+  };
+
   const setShowRemoteImages = (v: boolean) => {
     setShowRemoteImagesState(v);
     Settings.set("showRemoteImages", v);
@@ -3278,7 +3320,7 @@ export default function SettingsDrawer({
           label={t("settings.notice.update", {
             version: notices.update.version,
           })}
-          onPress={notices.openUpdate}
+          onPress={() => (isTauri ? promptUpdate(notices.update!) : notices.openUpdate())}
           style={[styles.groupSpacing, styles.mainPageGroup]}
         />
       )}
@@ -3676,6 +3718,38 @@ export default function SettingsDrawer({
                 </Text>
               </View>
               <Toggle checked={closeToTray} onToggle={v => setOverlayConfig({ closeToTray: v })} />
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* startup and updates on desktop */}
+      {isTauri && (
+        <View style={styles.contentCard}>
+          <View style={styles.settingRowVertical}>
+            <View style={styles.toggleGroupRow}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.startup.launch")}
+                </Text>
+                <Text style={styles.helpText}>
+                  {t("settings.startup.launchHelp")}
+                </Text>
+              </View>
+              <Toggle checked={launchAtStartup} onToggle={setLaunchAtStartupValue} />
+            </View>
+          </View>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <View style={styles.toggleGroupRow}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.update.beta")}
+                </Text>
+                <Text style={styles.helpText}>
+                  {t("settings.update.betaHelp")}
+                </Text>
+              </View>
+              <Toggle checked={betaChannel} onToggle={setBetaChannelValue} />
             </View>
           </View>
         </View>
@@ -5453,6 +5527,7 @@ export default function SettingsDrawer({
 
   const notificationModal = (
     <>
+      <NotificationModal {...updateModalProps} />
       <NotificationModal
         visible={alertModalVisible}
         title={alertConfig.title}

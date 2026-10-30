@@ -22,7 +22,7 @@ jobs:
         include:
           - { os: windows-latest, platform: windows-x86_64, bundles: nsis }
           - { os: windows-11-arm, platform: windows-aarch64, bundles: nsis }
-          - { os: macos-latest, platform: macos-aarch64, bundles: dmg }
+          - { os: macos-latest, platform: macos-aarch64, bundles: 'dmg,app' }
           # oldest glibc the appimage still runs on
           - { os: ubuntu-22.04, platform: linux-x86_64, bundles: 'appimage,deb' }
           - { os: ubuntu-22.04-arm, platform: linux-aarch64, bundles: 'appimage,deb' }
@@ -42,6 +42,10 @@ jobs:
         run: |
           echo "app=$(node -p "require('./app.json').expo.version")" >> "$GITHUB_OUTPUT"
           echo "hub=$(node -p "require('./sampler-hub-client.json').version")" >> "$GITHUB_OUTPUT"
+          # updater tells betas apart by this
+          bundle="$(node -p "require('./app.json').expo.version")"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then bundle="${GITHUB_REF_NAME#v}"; fi
+          echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
 
       - name: Check the tag matches app.json
         if: github.ref_type == 'tag'
@@ -106,7 +110,10 @@ jobs:
           SAMPLER_HUB_DIR: ${{ github.workspace }}/Sampler-Hub
           # tells a beta build its beta number
           EXPO_PUBLIC_RELEASE_TAG: ${{ github.ref_name }}
-        run: npm run build:desktop -- --bundles ${{ matrix.bundles }} --config '{"version":"${{ steps.versions.outputs.app }}"}'
+          # signs the updater artifacts
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run build:desktop -- --bundles ${{ matrix.bundles }} --config '{"version":"${{ steps.versions.outputs.bundle }}","bundle":{"createUpdaterArtifacts":true}}'
 
       # stable names so the website can link them
       - name: Collect bundles
@@ -115,11 +122,15 @@ jobs:
           mkdir -p dist-desktop
           case "${{ matrix.platform }}" in
             windows-*)
-              cp "$bundle"/nsis/*-setup.exe "dist-desktop/opera-${{ matrix.platform }}-setup.exe" ;;
+              cp "$bundle"/nsis/*-setup.exe "dist-desktop/opera-${{ matrix.platform }}-setup.exe"
+              cp "$bundle"/nsis/*-setup.exe.sig "dist-desktop/opera-${{ matrix.platform }}-setup.exe.sig" ;;
             macos-*)
-              cp "$bundle"/dmg/*.dmg "dist-desktop/opera-${{ matrix.platform }}.dmg" ;;
+              cp "$bundle"/dmg/*.dmg "dist-desktop/opera-${{ matrix.platform }}.dmg"
+              cp "$bundle"/macos/*.app.tar.gz "dist-desktop/opera-${{ matrix.platform }}.app.tar.gz"
+              cp "$bundle"/macos/*.app.tar.gz.sig "dist-desktop/opera-${{ matrix.platform }}.app.tar.gz.sig" ;;
             linux-*)
               cp "$bundle"/appimage/*.AppImage "dist-desktop/opera-${{ matrix.platform }}.AppImage"
+              cp "$bundle"/appimage/*.AppImage.sig "dist-desktop/opera-${{ matrix.platform }}.AppImage.sig"
               cp "$bundle"/deb/*.deb "dist-desktop/opera-${{ matrix.platform }}.deb" ;;
           esac
           ls -la dist-desktop
@@ -138,13 +149,19 @@ jobs:
       # the release notes live in the repo
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: distribution
+          sparse-checkout: |
+            distribution
+            scripts/build-updater-manifest.mjs
 
       - uses: actions/download-artifact@v4
         with:
           path: dist
           pattern: opera-*
           merge-multiple: true
+
+      # each release carries its own manifest
+      - name: Write the updater manifest
+        run: node scripts/build-updater-manifest.mjs dist "$GITHUB_REF_NAME" "$GITHUB_REPOSITORY" distribution/release-notes.md
 
       # the apk workflow may have opened the release already
       - name: Upload to the release

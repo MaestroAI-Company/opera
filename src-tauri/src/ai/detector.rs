@@ -2,13 +2,14 @@ use super::err;
 use crate::overlay_stage::{INPUT, INPUT_SIZE};
 use ort::{session::Session, value::TensorRef};
 use serde::Serialize;
-use std::sync::Mutex;
+use std::sync::{atomic::AtomicU64, Mutex};
 use tauri::{AppHandle, Manager};
 
 const SCORE_MIN: f32 = 0.3;
 const MIN_SIDE: f64 = 0.005;
 
 static MODEL: Mutex<Option<Session>> = Mutex::new(None);
+static LAST_USE: AtomicU64 = AtomicU64::new(0);
 
 //normalized box over the capture
 #[derive(Serialize)]
@@ -19,7 +20,16 @@ pub struct Region {
     h: f64,
 }
 
+pub fn unload_if_idle() {
+    //a run in progress keeps it
+    let mut model = MODEL.lock().unwrap();
+    if super::idle(&LAST_USE) {
+        *model = None;
+    }
+}
+
 fn load(app: &AppHandle) -> Result<(), String> {
+    super::touch(&LAST_USE);
     let mut model = MODEL.lock().unwrap();
     if model.is_none() {
         let path = app
@@ -27,6 +37,7 @@ fn load(app: &AppHandle) -> Result<(), String> {
             .resolve("models/deki-yolo-fp16.onnx", tauri::path::BaseDirectory::Resource)
             .map_err(err)?;
         *model = Some(super::accelerated()?.commit_from_file(path).map_err(err)?);
+        super::watch_idle();
     }
     Ok(())
 }

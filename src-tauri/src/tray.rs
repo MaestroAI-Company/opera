@@ -41,6 +41,14 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
                 show_main(tray.app_handle());
             }
         });
+    //template follows the menu bar theme
+    #[cfg(target_os = "macos")]
+    {
+        tray = tray
+            .icon(tauri::include_image!("icons/tray.png"))
+            .icon_as_template(true);
+    }
+    #[cfg(not(target_os = "macos"))]
     if let Some(icon) = app.default_window_icon() {
         tray = tray.icon(icon.clone());
     }

@@ -1,4 +1,6 @@
+import { Channel, invoke } from '@tauri-apps/api/core';
 import { Settings } from '../settings/SettingsService';
+import { isTauri } from './ortRuntime.web';
 import type { SpeechToTextCallbacks, WhisperSurface } from './STTService';
 import { buildWavBuffer } from './wav';
 
@@ -22,18 +24,44 @@ type Capture = {
   noSpeechTimer: ReturnType<typeof setTimeout>;
 };
 
+//metro cannot bundle its import meta
+const TRANSFORMERS_URL = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1/dist/transformers.min.js';
+const importUrl = new Function('url', 'return import(url)') as (url: string) => Promise<any>;
+
+type ProgressCallback = (progress: number, etaSeconds: number, speedStr: string, sizeStr: string) => void;
+
+const sizeFor = (modelName: string) => (modelName === 'tiny' || modelName === 'small' ? modelName : 'base');
+const repoFor = (modelName: string) => `onnx-community/whisper-${sizeFor(modelName)}`;
+
+//same strings for both download paths
+function progressReporter(callback?: ProgressCallback) {
+  const startTime = Date.now();
+  let lastReportTime = 0;
+  return (loaded: number, total: number, final = false) => {
+    if (!callback) return;
+    const now = Date.now();
+    //throttle ui updates to avoid performance issues
+    if (!final && now - lastReportTime < 100) return;
+    lastReportTime = now;
+    const elapsedSec = (now - startTime) / 1000;
+    const speedBytesPerSec = elapsedSec > 0 ? loaded / elapsedSec : 0;
+    const etaSeconds = speedBytesPerSec > 0 ? Math.max(0, (total - loaded) / speedBytesPerSec) : 0;
+    const speedStr = `${(speedBytesPerSec / 1024 / 1024).toFixed(1)} MB/s`;
+    const sizeStr = `${(loaded / 1024 / 1024).toFixed(1)} MB / ${(total / 1024 / 1024).toFixed(1)} MB`;
+    callback(total > 0 ? loaded / total : 0, etaSeconds, speedStr, sizeStr);
+  };
+}
+
 class SpeechToTextService {
   private transcriber: any = null;
+  //desktop model loaded in rust
+  private nativeModel: string | null = null;
   private currentLang: string = 'en';
   private capture: Capture | null = null;
   private session = 0;
 
   private async getTransformers() {
-    if (typeof self === 'undefined') {
-      (globalThis as any).self = globalThis;
-    }
-    //@ts-ignore
-    const { pipeline, env } = await import('@xenova/transformers/dist/transformers.js');
+    const { pipeline, env } = await importUrl(TRANSFORMERS_URL);
     env.allowLocalModels = false;
     env.useBrowserCache = true;
     return { pipeline, env };
@@ -46,12 +74,10 @@ class SpeechToTextService {
 
   // check if model is installed
   async isModelInstalled(modelName: string): Promise<boolean> {
+    if (isTauri) return invoke<boolean>('whisper_installed', { size: sizeFor(modelName) }).catch(() => false);
     try {
       if (typeof caches === 'undefined') return false;
-      let repo = 'Xenova/whisper-base';
-      if (modelName === 'tiny') repo = 'Xenova/whisper-tiny';
-      if (modelName === 'small') repo = 'Xenova/whisper-small';
-      
+      const repo = repoFor(modelName);
       const cache = await caches.open('transformers-cache');
       const keys = await cache.keys();
       //check if cache files exist for repo
@@ -62,18 +88,26 @@ class SpeechToTextService {
   }
 
   // download the model
-  async downloadModel(modelName: string, progressCallback?: (progress: number, etaSeconds: number, speedStr: string, sizeStr: string) => void): Promise<void> {
+  async downloadModel(modelName: string, progressCallback?: ProgressCallback): Promise<void> {
+    if (isTauri) {
+      const report = progressReporter(progressCallback);
+      const onProgress = new Channel<{ loaded: number; total: number }>();
+      onProgress.onmessage = ({ loaded, total }) => report(loaded, total, loaded >= total);
+      await invoke('whisper_download', { size: sizeFor(modelName), onProgress });
+    }
     await this.init(modelName, progressCallback);
   }
 
   // delete the model
   async deleteModel(modelName: string): Promise<void> {
+    if (isTauri) {
+      if (this.nativeModel === sizeFor(modelName)) this.nativeModel = null;
+      await invoke('whisper_delete', { size: sizeFor(modelName) }).catch((e) => console.error("[SpeechToText] Failed to delete model", e));
+      return;
+    }
     try {
       if (typeof caches === 'undefined') return;
-      let repo = 'Xenova/whisper-base';
-      if (modelName === 'tiny') repo = 'Xenova/whisper-tiny';
-      if (modelName === 'small') repo = 'Xenova/whisper-small';
-      
+      const repo = repoFor(modelName);
       const cache = await caches.open('transformers-cache');
       const keys = await cache.keys();
       for (const request of keys) {
@@ -81,7 +115,7 @@ class SpeechToTextService {
           await cache.delete(request);
         }
       }
-      
+
       //release currently loaded model
       if (this.transcriber) {
         await this.release();
@@ -92,32 +126,31 @@ class SpeechToTextService {
   }
 
   // init service
-  async init(modelName: string, progressCallback?: (progress: number, etaSeconds: number, speedStr: string, sizeStr: string) => void): Promise<boolean> {
+  async init(modelName: string, progressCallback?: ProgressCallback): Promise<boolean> {
     try {
-      let repo = 'Xenova/whisper-base';
-      if (modelName === 'tiny') repo = 'Xenova/whisper-tiny';
-      if (modelName === 'small') repo = 'Xenova/whisper-small';
-      
+      if (isTauri) {
+        const startTime = Date.now();
+        await invoke('whisper_load', { size: sizeFor(modelName) });
+        this.nativeModel = sizeFor(modelName);
+        console.log(`[SpeechToText] Native whisper-${this.nativeModel} loaded in ${Date.now() - startTime}ms`);
+        return true;
+      }
+
+      const repo = repoFor(modelName);
       console.log(`[SpeechToText] Initializing model ${repo}...`);
       const { pipeline } = await this.getTransformers();
-      
+      const webgpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
       const downloadStats = new Map<string, { loaded: number, total: number }>();
-      const startTime = Date.now();
-      let lastReportTime = startTime;
+      const report = progressReporter(progressCallback);
 
       this.transcriber = await pipeline('automatic-speech-recognition', repo, {
+        device: webgpu ? 'webgpu' : 'wasm',
+        //quantized encoder hurts accuracy
+        dtype: webgpu ? { encoder_model: 'fp32', decoder_model_merged: 'q4' } : 'q8',
         progress_callback: (x: any) => {
-          if (!progressCallback) return;
-          
           if (x.status === 'initiate' || x.status === 'progress' || x.status === 'done') {
             //track per file progress
             downloadStats.set(x.file, { loaded: x.loaded || 0, total: x.total || 0 });
-            
-            //throttle ui updates to avoid performance issues
-            const now = Date.now();
-            if (now - lastReportTime < 100 && x.status === 'progress') return;
-            lastReportTime = now;
-            
             let totalLoaded = 0;
             let totalSize = 0;
             for (const stat of downloadStats.values()) {
@@ -125,22 +158,11 @@ class SpeechToTextService {
               //fallback to loaded size if total is missing
               totalSize += stat.total > 0 ? stat.total : stat.loaded;
             }
-            
-            const progress = totalSize > 0 ? totalLoaded / totalSize : 0;
-            const elapsedSec = (now - startTime) / 1000;
-            const speedBytesPerSec = elapsedSec > 0 ? totalLoaded / elapsedSec : 0;
-            const etaSeconds = speedBytesPerSec > 0 ? Math.max(0, (totalSize - totalLoaded) / speedBytesPerSec) : 0;
-            
-            const speedStr = `${(speedBytesPerSec / 1024 / 1024).toFixed(1)} MB/s`;
-            const loadedStr = `${(totalLoaded / 1024 / 1024).toFixed(1)}`;
-            const totalStr = `${(totalSize / 1024 / 1024).toFixed(1)}`;
-            const sizeStr = `${loadedStr} MB / ${totalStr} MB`;
-            
-            progressCallback(progress, etaSeconds, speedStr, sizeStr);
+            report(totalLoaded, totalSize, x.status !== 'progress');
           }
         }
       });
-      console.log(`[SpeechToText] Context initialized.`);
+      console.log(`[SpeechToText] Context initialized on ${webgpu ? 'webgpu' : 'wasm'}.`);
       return true;
     } catch (e) {
       console.error("[SpeechToText] init failed:", e);
@@ -155,20 +177,20 @@ class SpeechToTextService {
 
   // check availability
   isAvailable(): boolean {
-    return this.transcriber !== null;
+    return this.transcriber !== null || this.nativeModel !== null;
   }
 
   // transcribe file
   async transcribe(audioPath: string): Promise<string> {
-    if (!this.transcriber) throw new Error("whisper not initialized");
-    
+    if (!this.isAvailable()) throw new Error("whisper not initialized");
+
     try {
       console.log(`[SpeechToText] Transcribing file ${audioPath}...`);
       const startTime = Date.now();
       const response = await fetch(audioPath);
       const blob = await response.blob();
       const arrayBuffer = await blob.arrayBuffer();
-      
+
       const text = await this.transcribeData(arrayBuffer);
       console.log(`[SpeechToText] File transcription completed in ${Date.now() - startTime}ms: "${text.trim()}"`);
       return text;
@@ -180,35 +202,38 @@ class SpeechToTextService {
 
   // transcribe raw data
   async transcribeData(buffer: ArrayBuffer): Promise<string> {
-    if (!this.transcriber) throw new Error("whisper not initialized");
-    
+    if (!this.isAvailable()) throw new Error("whisper not initialized");
+
     console.log(`[SpeechToText] Transcribing buffer of ${buffer.byteLength} bytes...`);
     const startTime = Date.now();
-    
+
     //convert buffer to float32 at 16000hz
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-    
+
     try {
       //copy buffer to avoid detached errors
       const bufferCopy = buffer.slice(0);
       const audioBuffer = await audioContext.decodeAudioData(bufferCopy);
-      
+
       //render at 16000hz with offline audio context
       const offlineContext = new OfflineAudioContext(1, audioBuffer.length, 16000);
       const source = offlineContext.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(offlineContext.destination);
       source.start();
-      
+
       const renderedBuffer = await offlineContext.startRendering();
       const audioData = renderedBuffer.getChannelData(0); //get float32 array
-      
-      const output = await this.transcriber(audioData, {
-        language: this.currentLang && this.currentLang !== 'auto' ? this.currentLang : undefined,
-        task: 'transcribe',
-      });
-      
-      const text = output.text;
+      const language = this.currentLang && this.currentLang !== 'auto' ? this.currentLang : undefined;
+
+      let text: string;
+      if (this.nativeModel) {
+        const samples = new Uint8Array(audioData.buffer, audioData.byteOffset, audioData.byteLength);
+        text = await invoke<string>('whisper_transcribe', samples, { headers: { 'x-language': language ?? 'auto' } });
+      } else {
+        const output = await this.transcriber(audioData, { language, task: 'transcribe' });
+        text = output.text;
+      }
       console.log(`[SpeechToText] Buffer transcription completed in ${Date.now() - startTime}ms: "${text.trim()}"`);
       return text;
     } catch (e) {
@@ -315,8 +340,8 @@ class SpeechToTextService {
       } else {
         const model = Settings.getCached().whisperModel || 'base';
         //lazy load like the chat bar
-        if (!this.transcriber && model !== 'none' && (await this.isModelInstalled(model))) await this.init(model);
-        if (!this.transcriber) throw new Error('whisper not installed');
+        if (!this.isAvailable() && model !== 'none' && (await this.isModelInstalled(model))) await this.init(model);
+        if (!this.isAvailable()) throw new Error('whisper not installed');
         callbacks.onFinal?.((await this.transcribeData(wav)).trim());
       }
     } catch (e: any) {
@@ -327,6 +352,10 @@ class SpeechToTextService {
 
   // release resources
   async release(): Promise<void> {
+    if (this.nativeModel) {
+      this.nativeModel = null;
+      await invoke('whisper_release');
+    }
     if (this.transcriber) {
       if (this.transcriber.dispose) {
          await this.transcriber.dispose();

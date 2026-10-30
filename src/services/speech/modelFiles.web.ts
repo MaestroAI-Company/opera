@@ -1,6 +1,10 @@
+import { Channel, invoke } from '@tauri-apps/api/core';
+import { nativeOrt } from './ortRuntime.web';
+
 const CACHE_NAME = 'opera-models';
 //cache api has no sync lookup
-const MARKER_PREFIX = 'opera-model:';
+//old web markers must not count
+const MARKER_PREFIX = nativeOrt ? 'opera-native-model:' : 'opera-model:';
 
 function marked(source: string): boolean {
   try {
@@ -38,7 +42,7 @@ async function sizeOf(source: string): Promise<number> {
 }
 
 export function canStoreModels(): boolean {
-  return typeof caches !== 'undefined' && typeof localStorage !== 'undefined';
+  return nativeOrt || (typeof caches !== 'undefined' && typeof localStorage !== 'undefined');
 }
 
 export function isDownloaded(sources: string[]): boolean {
@@ -47,6 +51,15 @@ export function isDownloaded(sources: string[]): boolean {
 
 //cached files are skipped
 export async function downloadFiles(sources: string[], onProgress: (progress: number) => void): Promise<void> {
+  if (nativeOrt) {
+    const channel = new Channel<{ loaded: number; total: number }>();
+    channel.onmessage = ({ loaded, total }) => onProgress(total > 0 ? Math.min(1, loaded / total) : 0);
+    await invoke('models_download', { sources, onProgress: channel });
+    sources.forEach((source) => mark(source, true));
+    //drop copies kept by older versions
+    await removeCached(sources).catch(() => {});
+    return;
+  }
   const cache = await caches.open(CACHE_NAME);
   //browser may evict without it
   await navigator.storage?.persist?.().catch(() => false);
@@ -75,19 +88,24 @@ export async function downloadFiles(sources: string[], onProgress: (progress: nu
   onProgress(1);
 }
 
-export async function removeFiles(sources: string[]): Promise<void> {
+async function removeCached(sources: string[]): Promise<void> {
   const cache = await caches.open(CACHE_NAME);
-  for (const source of sources) {
-    await cache.delete(source);
-    mark(source, false);
-  }
+  for (const source of sources) await cache.delete(source);
+}
+
+export async function removeFiles(sources: string[]): Promise<void> {
+  if (nativeOrt) await invoke('models_remove', { sources });
+  else await removeCached(sources);
+  sources.forEach((source) => mark(source, false));
 }
 
 //web runtime loads models from bytes
 export async function modelInput(source: string): Promise<string | Uint8Array> {
+  if (nativeOrt) return source;
   return new Uint8Array(await (await cachedResponse(source)).arrayBuffer());
 }
 
 export async function readText(source: string): Promise<string> {
+  if (nativeOrt) return invoke<string>('models_read_text', { source });
   return (await cachedResponse(source)).text();
 }

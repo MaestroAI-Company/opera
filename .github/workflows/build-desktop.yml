@@ -113,7 +113,17 @@ jobs:
           # signs the updater artifacts
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npm run build:desktop -- --bundles ${{ matrix.bundles }} --config '{"version":"${{ steps.versions.outputs.bundle }}","bundle":{"createUpdaterArtifacts":true}}'
+        run: |
+          extra=()
+          # arm linux has no dawn build to ship
+          if [ "${{ matrix.platform }}" = linux-aarch64 ]; then
+            extra=(--config '{"bundle":{"linux":{"deb":{"files":null}}}}')
+          fi
+          # linuxdeploy must find dawn and its strip chokes on it
+          if [ "${{ matrix.platform }}" = linux-x86_64 ]; then
+            export LD_LIBRARY_PATH="$PWD/src-tauri/target/release" NO_STRIP=1
+          fi
+          npm run build:desktop -- --bundles ${{ matrix.bundles }} --config '{"version":"${{ steps.versions.outputs.bundle }}","bundle":{"createUpdaterArtifacts":true}}' "${extra[@]}"
 
       # stable names so the website can link them
       - name: Collect bundles

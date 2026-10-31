@@ -115,6 +115,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
+          # the secret was saved with a utf-8 bom
+          TAURI_SIGNING_PRIVATE_KEY="$(printf '%s' "$TAURI_SIGNING_PRIVATE_KEY" | sed '1s/^\xEF\xBB\xBF//')"
+          export TAURI_SIGNING_PRIVATE_KEY
           extra=()
           # arm linux has no dawn build to ship
           if [ "${{ matrix.platform }}" = linux-aarch64 ]; then

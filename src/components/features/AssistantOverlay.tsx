@@ -36,7 +36,6 @@ import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { speakReplyLive } from '../../services/speech/liveReply';
 import NotificationModal from '../ui/NotificationModal';
 import CodeDownloadHost from './CodeDownloadHost';
-import ToolConsentHost from './ToolConsentHost';
 import VoicePackHost from './VoicePackHost';
 import AttachmentSheet, { useAttachments } from './AttachmentSheet';
 import ChatBar, { ChatBarHandle } from './ChatBar';
@@ -968,7 +967,6 @@ function AssistantOverlay() {
           onClose={attachments.clearNotice}
         />
 
-        <ToolConsentHost />
         <VoicePackHost />
         <CodeDownloadHost inOverlay />
 

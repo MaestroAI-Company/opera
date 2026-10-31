@@ -991,6 +991,7 @@ export const en = {
 
   "tools.consent.allow": "Allow",
   "tools.consent.decline": "Decline",
+  "tools.consent.expired": "This request was interrupted. Ask again to retry.",
 
   "settings.mcp.connecting": "Connecting...",
   "settings.mcp.noTools": "No tools",

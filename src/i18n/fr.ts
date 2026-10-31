@@ -1011,6 +1011,7 @@ export const fr: Translations = {
 
   "tools.consent.allow": "Autoriser",
   "tools.consent.decline": "Refuser",
+  "tools.consent.expired": "Cette demande a été interrompue. Redemande pour réessayer.",
 
   "settings.mcp.connecting": "Connexion...",
   "settings.mcp.noTools": "Aucun outil",

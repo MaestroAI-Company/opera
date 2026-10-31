@@ -1,7 +1,8 @@
 import { IAIProvider } from './providers/IAIProvider';
 import { OllamaProvider } from './providers/OllamaProvider';
 import { ToolManager } from './tools/ToolManager';
-import { ToolSource } from './tools/ITool';
+import { ConsentAnswer, ConsentPrompt, ToolSource } from './tools/ITool';
+import { ToolConsent } from './tools/ToolConsent';
 import { sendMessageWithToolPrompt } from './tools/fallbackToolCall';
 import { describeToolCallError } from './tools/toolCallParser';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
@@ -357,12 +358,15 @@ class CentralAIModule {
 
     //check if model supports tools
     let supportsTools = false;
+    //unknown capabilities keep vision tools
+    let canSeeImages = true;
     try {
       const caps = await this.getModelCapabilities(modelName);
       supportsTools = caps.includes('tools');
+      if (caps.length > 0) canSeeImages = caps.includes('vision');
     } catch {}
 
-    const tools = ToolManager.getDefinitions(toolFilter);
+    const tools = ToolManager.getDefinitions(toolFilter, canSeeImages);
     const processedMessages = await this.processImages(messages);
     const enhancedPrompt = systemPrompt + this.buildContextBlock();
 
@@ -404,6 +408,32 @@ class CentralAIModule {
         { think: false }
       );
       return summary;
+    };
+
+    //vision call on the chat model
+    const describeImage = async (base64: string, prompt: string): Promise<string> => {
+      let description = '';
+      try {
+        await provider.sendMessage(
+          modelName,
+          SYSTEM_PROMPTS.IMAGE_DESCRIBE,
+          [{ role: 'user', content: prompt, images: [base64] }],
+          chunk => { description += chunk; },
+          signal,
+          { think: false }
+        );
+      } catch (e: any) {
+        //model and size explain a rejection
+        throw new Error(`vision call on ${modelName} failed (${Math.round(base64.length / 1024)} KB): ${e?.message || e}`);
+      }
+      return description;
+    };
+
+    //card streams where the tool waits
+    const askConsent = (prompt: ConsentPrompt): Promise<ConsentAnswer> => {
+      const { id, answer } = ToolConsent.ask(prompt, signal);
+      streamingOnChunk(ToolManager.buildConsentBlock(id));
+      return answer;
     };
 
     //outcome of a tool round
@@ -458,7 +488,9 @@ class CentralAIModule {
         this.SharedGenerationState.activeToolArgs = tc.function.arguments;
         this.SharedGenerationState.notify();
 
-        const toolResult = await ToolManager.execute(tc.function.name, tc.function.arguments, summarize, recordSource);
+        const toolResult = await ToolManager.execute(tc.function.name, tc.function.arguments, {
+          summarize, recordSource, describeImage, askConsent, signal,
+        });
 
         this.SharedGenerationState.activeToolName = null;
         this.SharedGenerationState.activeToolArgs = null;

@@ -13,11 +13,15 @@ import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constan
 import { useColors, useIsDark, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { AppEvents } from "../../services/events";
+import { BROWSER_UA } from "../../services/net/userAgent";
 import { Settings } from "../../services/settings/SettingsService";
 import { pressStyle } from "./pressStyle";
 
 const websiteIcon = require("../../../assets/icons/website.png");
 const photoIcon = require("../../../assets/icons/photo.png");
+
+//hosts reject the default agent
+const IMAGE_HEADERS = { "User-Agent": BROWSER_UA };
 
 export type MarkdownImageProps = {
   url: string;
@@ -25,6 +29,10 @@ export type MarkdownImageProps = {
   title?: string;
   incognito?: boolean;
   dark?: boolean;
+  //widget reports the user approval
+  onReveal?: (url: string) => void;
+  //widget reports the user refusal
+  onReject?: () => void;
 };
 
 export default function MarkdownImage({
@@ -33,6 +41,8 @@ export default function MarkdownImage({
   title,
   incognito,
   dark,
+  onReveal,
+  onReject,
 }: MarkdownImageProps) {
   const Colors = useColors();
   const themeDark = useIsDark();
@@ -79,25 +89,28 @@ export default function MarkdownImage({
     if (!shouldDisplay) return;
     let active = true;
 
-    Image.getSize(
-      url,
-      (width, height) => {
-        if (!active) return;
-        if (width > 0 && height > 0) {
-          setAspectRatio(width / height);
-        }
-        setLoadState({ url, isLoading: false, hasError: false });
-      },
-      () => {
-        if (!active) return;
-        setLoadState({ url, isLoading: false, hasError: true });
+    const onSize = (width: number, height: number) => {
+      if (!active) return;
+      if (width > 0 && height > 0) {
+        setAspectRatio(width / height);
       }
-    );
+      setLoadState({ url, isLoading: false, hasError: false });
+    };
+    const onFail = () => {
+      if (!active) return;
+      setLoadState({ url, isLoading: false, hasError: true });
+    };
+
+    if (isRemote) {
+      Image.getSizeWithHeaders(url, IMAGE_HEADERS, onSize, onFail);
+    } else {
+      Image.getSize(url, onSize, onFail);
+    }
 
     return () => {
       active = false;
     };
-  }, [url, shouldDisplay]);
+  }, [url, shouldDisplay, isRemote]);
 
   //derive aspect ratio on load
   const handleLoad = (e: NativeSyntheticEvent<ImageLoadEventData>) => {
@@ -114,12 +127,14 @@ export default function MarkdownImage({
 
   const handleShowOnce = () => {
     setRevealed(true);
+    onReveal?.(url);
   };
 
   //save choice to persistent settings
   const handleAlwaysShow = () => {
     Settings.set("showRemoteImages", true);
     setRevealed(true);
+    onReveal?.(url);
   };
 
   //open full image preview modal
@@ -192,6 +207,19 @@ export default function MarkdownImage({
               {t("markdown.image.alwaysShow")}
             </Text>
           </Pressable>
+          {!!onReject && (
+            <Pressable
+              onPress={onReject}
+              style={pressStyle(
+                [styles.buttonSecondary, { borderColor: Colors.error }],
+                "surface"
+              )}
+            >
+              <Text style={[styles.buttonSecondaryText, { color: Colors.error }]}>
+                {t("markdown.image.reject")}
+              </Text>
+            </Pressable>
+          )}
         </View>
       </View>
     );
@@ -219,7 +247,7 @@ export default function MarkdownImage({
           </View>
         ) : (
           <Image
-            source={{ uri: url }}
+            source={isRemote ? { uri: url, headers: IMAGE_HEADERS } : { uri: url }}
             style={[
               styles.image,
               { aspectRatio: aspectRatio ?? 16 / 9 },

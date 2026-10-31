@@ -143,6 +143,7 @@ export const en = {
     "This image is hosted on an external server ({domain}). Loading it may reveal your IP address to third parties.",
   "markdown.image.show": "Show image",
   "markdown.image.alwaysShow": "Always show",
+  "markdown.image.reject": "Reject",
   "markdown.image.failed": "Failed to load image",
 
   "nextcloud.connect": "Connect",

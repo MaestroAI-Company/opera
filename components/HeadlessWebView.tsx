@@ -20,8 +20,8 @@ export default function HeadlessWebView() {
           userAgent={task.userAgent}
           injectedJavaScript={task.injectedJavaScript}
           onMessage={(event) => WebViewRunner.deliver(id, event.nativeEvent.data)}
-          onError={() => WebViewRunner.fail(id, new Error('WebView failed to load'))}
-          onHttpError={() => WebViewRunner.fail(id, new Error('WebView failed to load'))}
+          onError={(event) => WebViewRunner.fail(id, new Error(event.nativeEvent.description || 'WebView load failed'))}
+          onHttpError={(event) => WebViewRunner.fail(id, new Error(`HTTP ${event.nativeEvent.statusCode}`))}
           javaScriptEnabled
           domStorageEnabled={false}
           thirdPartyCookiesEnabled={false}

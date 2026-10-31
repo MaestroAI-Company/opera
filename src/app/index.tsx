@@ -33,7 +33,6 @@ import Reanimated, {
   useSharedValue,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import HeadlessWebView from "../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
 import { Fonts, FontSizes, Radius, ThemeColors } from "../../constants/theme";
 import AssistantSheet from "../components/features/AssistantSheet";
@@ -1628,6 +1627,96 @@ useEffect(() => {
     [selectedModel],
   );
 
+  //one streaming path for sends
+  const runAssistantTask = useCallback(
+    async (params: {
+      conv: Conversation;
+      assistantMsg: Message;
+      prompt: string;
+      systemPrompt: string;
+      history: { role: string; content: string; images?: string[] }[];
+      isIncognito: boolean;
+      viaVoice?: boolean;
+      isFirstMessage?: boolean;
+      images?: string[];
+    }) => {
+      const { conv, assistantMsg, prompt, history, isIncognito } = params;
+      setGeneratingConvId(conv.id);
+      generatingConvIdRef.current = conv.id;
+
+      setStreamingMessageId(assistantMsg.id);
+      streamingContentRef.current = "";
+
+      //speak voice replies as they stream
+      const finishSpeech =
+        params.viaVoice && Settings.getCached().autoSpeak
+          ? speakReplyLive(assistantMsg.id)
+          : null;
+      const run = await GenerationService.start({
+        convId: conv.id,
+        msgId: assistantMsg.id,
+        prompt,
+        model: selectedModel,
+        systemPrompt: params.systemPrompt,
+        history,
+        think: selectedReflection === "none" ? false : selectedReflection,
+        persist: !isIncognito,
+        noModelMessage: t("chat.noModel"),
+      });
+      finishSpeech?.(run);
+
+      const isError = run.status === "error";
+      const isAborted = run.status === "aborted";
+      streamingContentRef.current = run.content;
+      showAssistantContent(assistantMsg.id, conv.id, run.content);
+      if (activeConversationRef.current?.id === conv.id) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMsg.id
+              ? {
+                  ...msg,
+                  sources: run.sources ?? msg.sources,
+                  metrics: run.metrics ?? msg.metrics,
+                }
+              : msg,
+          ),
+        );
+      }
+      //conversation order may have changed
+      if (!isIncognito && !isError) await loadConversations();
+
+      //generate title for new conversations
+      if (params.isFirstMessage && !isIncognito && !isError) {
+        generateTitle(conv.id, prompt, params.images);
+      }
+
+      //propose follow-ups after the reply
+      if (!isError && !isAborted && selectedModel) {
+        generateSuggestions({
+          model: selectedModel,
+          userMessage: prompt,
+          assistantMessage: streamingContentRef.current,
+          //show each pill once complete
+          onPartial: (items) =>
+            setSuggestions(conv.id, { msgId: assistantMsg.id, items }),
+        }).then((items) => {
+          if (items.length > 0)
+            setSuggestions(conv.id, { msgId: assistantMsg.id, items });
+        });
+      }
+    },
+    [
+      selectedModel,
+      selectedReflection,
+      t,
+      showAssistantContent,
+      loadConversations,
+      generateTitle,
+      setStreamingMessageId,
+      setSuggestions,
+    ],
+  );
+
   //send a message — creates conversation on first send
   const handleSend = useCallback(
     async (text: string, images?: string[], viaVoice?: boolean) => {
@@ -1694,13 +1783,11 @@ useEffect(() => {
         .map((m) => ({ role: m.role, content: m.content, images: m.images }));
       taskHistory.push({ role: "user", content: text, images });
 
-      const taskSelectedModel = selectedModel;
       const taskSystemPrompt = buildSystemPrompt(
         selectedModel,
         userInstruction,
         screenContextSegment(messagesRef.current),
       );
-      const taskReflection = selectedReflection;
       const taskConv = conv;
 
       //create empty assistant message for streaming immediately
@@ -1723,69 +1810,17 @@ useEffect(() => {
       }
 
       const task = async () => {
-        setGeneratingConvId(taskConv.id);
-        generatingConvIdRef.current = taskConv.id;
-
-        setStreamingMessageId(assistantMsg.id);
-        streamingContentRef.current = "";
-
-        //speak voice replies as they stream
-        const finishSpeech =
-          viaVoice && Settings.getCached().autoSpeak
-            ? speakReplyLive(assistantMsg.id)
-            : null;
-        const run = await GenerationService.start({
-          convId: taskConv.id,
-          msgId: assistantMsg.id,
+        await runAssistantTask({
+          conv: taskConv,
+          assistantMsg,
           prompt: text,
-          model: taskSelectedModel,
           systemPrompt: taskSystemPrompt,
           history: taskHistory,
-          think: taskReflection === "none" ? false : taskReflection,
-          persist: !isIncognitoTask,
-          noModelMessage: t("chat.noModel"),
+          isIncognito: isIncognitoTask,
+          viaVoice,
+          isFirstMessage,
+          images,
         });
-        finishSpeech?.(run);
-
-        const isError = run.status === "error";
-        const isAborted = run.status === "aborted";
-        streamingContentRef.current = run.content;
-        showAssistantContent(assistantMsg.id, taskConv.id, run.content);
-        if (activeConversationRef.current?.id === taskConv.id) {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantMsg.id
-                ? {
-                    ...msg,
-                    sources: run.sources ?? msg.sources,
-                    metrics: run.metrics ?? msg.metrics,
-                  }
-                : msg,
-            ),
-          );
-        }
-        //refresh conversation list (updatedAt changed)
-        if (!isIncognitoTask && !isError) await loadConversations();
-
-        //generate AI title for new conversations
-        if (isFirstMessage && !isIncognitoTask && !isError) {
-          generateTitle(taskConv.id, text, images);
-        }
-
-        //propose follow-ups once the reply landed whole
-        if (!isError && !isAborted && taskSelectedModel) {
-          generateSuggestions({
-            model: taskSelectedModel,
-            userMessage: text,
-            assistantMessage: streamingContentRef.current,
-            //show each pill once complete
-            onPartial: (items) =>
-              setSuggestions(taskConv.id, { msgId: assistantMsg.id, items }),
-          }).then((items) => {
-            if (items.length > 0)
-              setSuggestions(taskConv.id, { msgId: assistantMsg.id, items });
-          });
-        }
       };
 
       requestQueueRef.current.push({
@@ -1807,6 +1842,7 @@ useEffect(() => {
       selectedModel,
       selectedReflection,
       generateTitle,
+      runAssistantTask,
       userInstruction,
       aiService,
       ollamaUrl,
@@ -1814,6 +1850,85 @@ useEffect(() => {
       keyboardLift,
     ],
   );
+
+  //resumes a tool after approval
+  const resumePendingTool = useCallback(
+    async (instruction: string) => {
+      const conv = activeConversationRef.current;
+      if (!conv) return;
+      //one run per conversation
+      if (generatingConvIdRef.current === conv.id) return;
+
+      const history: { role: string; content: string; images?: string[] }[] =
+        messagesRef.current
+          .filter((m) => m.content !== "…")
+          .map((m) => ({ role: m.role, content: m.content, images: m.images }));
+      //no fake user message
+      history.push({ role: "system", content: instruction });
+
+      const isIncognitoTask = conv.id.startsWith("incognito_");
+      let assistantMsg: Message;
+      if (isIncognitoTask) {
+        assistantMsg = {
+          id:
+            "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+          conversationId: conv.id,
+          role: "assistant",
+          content: "…",
+          createdAt: Date.now(),
+        };
+      } else {
+        assistantMsg = await DB.addMessage(conv.id, "assistant", "…");
+      }
+      setMessages((prev) => [...prev, assistantMsg]);
+
+      //notification title keeps the user wording
+      const lastUser = [...messagesRef.current]
+        .reverse()
+        .find((m) => m.role === "user");
+
+      requestQueueRef.current.push({
+        convId: conv.id,
+        assistantMsgId: assistantMsg.id,
+        isIncognito: isIncognitoTask,
+        task: async () => {
+          await runAssistantTask({
+            conv,
+            assistantMsg,
+            prompt: lastUser?.content ?? "",
+            systemPrompt: buildSystemPrompt(
+              selectedModel,
+              userInstruction,
+              screenContextSegment(messagesRef.current),
+            ),
+            history,
+            isIncognito: isIncognitoTask,
+          });
+        },
+      });
+      setPendingConvIds([...requestQueueRef.current.map((i) => i.convId)]);
+      setPendingMsgIds(requestQueueRef.current.map((i) => i.assistantMsgId));
+      processQueue().catch((e) => console.error("Queue processing failed:", e));
+    },
+    //processQueue changes every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [runAssistantTask, selectedModel, userInstruction],
+  );
+
+  //widget cannot answer by itself
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      AppEvents.toolResume,
+      (instruction: string) => {
+        //overlay owns its own tool cards
+        if (OverlayPresence.isShown()) return;
+        resumePendingTool(instruction).catch((e) =>
+          console.error("Tool resume failed:", e),
+        );
+      },
+    );
+    return () => sub.remove();
+  }, [resumePendingTool]);
 
   //switch active provider or server
   const handleServiceChange = useCallback((service: string, url: string) => {
@@ -2809,8 +2924,6 @@ useEffect(() => {
           });
         }}
       />
-
-      <HeadlessWebView />
 
       <NotificationModal
         visible={!!shareNotice}

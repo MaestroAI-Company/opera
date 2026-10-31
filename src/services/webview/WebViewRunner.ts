@@ -15,17 +15,30 @@ export interface RunningTask {
 }
 
 const DEFAULT_TIMEOUT = 20000;
+//two slots keep fetch_pages parallel
+const MAX_CONCURRENT = 2;
 
 type Pending = {
+  id: string;
+  task: WebViewTask;
   resolve: (value: any) => void;
   reject: (error: Error) => void;
-  timer: ReturnType<typeof setTimeout>;
-  task: WebViewTask;
 };
+
+type Running = Pending & {
+  timer: ReturnType<typeof setTimeout>;
+};
+
+//short label for timeout messages
+function describe(task: WebViewTask): string {
+  const label = 'uri' in task.source ? task.source.uri : 'inline html';
+  return label.length > 80 ? `${label.substring(0, 80)}...` : label;
+}
 
 //runs webview jobs for any service that needs a real browser (search, page fetch, pdf parsing)
 class WebViewRunnerService {
-  private pending = new Map<string, Pending>();
+  private queue: Pending[] = [];
+  private running = new Map<string, Running>();
   private listeners = new Set<(tasks: RunningTask[]) => void>();
   private counter = 0;
 
@@ -33,9 +46,9 @@ class WebViewRunnerService {
   run<T>(task: WebViewTask): Promise<T> {
     const id = `wv-${++this.counter}`;
     return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => this.fail(id, new Error('WebView task timed out')), task.timeoutMs ?? DEFAULT_TIMEOUT);
-      this.pending.set(id, { resolve, reject, timer, task });
-      this.emit();
+      //timer starts when the task renders
+      this.queue.push({ id, task, resolve, reject });
+      this.pump();
     });
   }
 
@@ -46,7 +59,7 @@ class WebViewRunnerService {
 
   //called by the headless webview when a page posts a message
   deliver(id: string, raw: string): void {
-    const entry = this.pending.get(id);
+    const entry = this.running.get(id);
     if (!entry) return;
     let payload: any;
     try {
@@ -68,7 +81,7 @@ class WebViewRunnerService {
   }
 
   getTasks(): RunningTask[] {
-    return Array.from(this.pending.entries()).map(([id, entry]) => ({ id, task: entry.task }));
+    return Array.from(this.running.entries()).map(([id, entry]) => ({ id, task: entry.task }));
   }
 
   subscribe(listener: (tasks: RunningTask[]) => void): () => void {
@@ -77,13 +90,27 @@ class WebViewRunnerService {
     return () => this.listeners.delete(listener);
   }
 
-  private settle(id: string, apply: (entry: Pending) => void): void {
-    const entry = this.pending.get(id);
+  //starts queued tasks
+  private pump(): void {
+    while (this.running.size < MAX_CONCURRENT && this.queue.length > 0) {
+      const entry = this.queue.shift()!;
+      const timeoutMs = entry.task.timeoutMs ?? DEFAULT_TIMEOUT;
+      const timer = setTimeout(
+        () => this.fail(entry.id, new Error(`WebView task timed out after ${timeoutMs}ms (${describe(entry.task)})`)),
+        timeoutMs
+      );
+      this.running.set(entry.id, { ...entry, timer });
+    }
+    this.emit();
+  }
+
+  private settle(id: string, apply: (entry: Running) => void): void {
+    const entry = this.running.get(id);
     if (!entry) return;
     clearTimeout(entry.timer);
-    this.pending.delete(id);
+    this.running.delete(id);
     apply(entry);
-    this.emit();
+    this.pump();
   }
 
   private emit(): void {

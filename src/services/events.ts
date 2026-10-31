@@ -25,6 +25,8 @@ export const AppEvents = {
   openCodePreview: 'OPEN_CODE_PREVIEW',
   //open full image preview
   openImagePreview: 'OPEN_IMAGE_PREVIEW',
+  //a pending tool read was approved
+  toolResume: 'TOOL_RESUME',
   //a code file was saved, payload is its name
   codeDownloaded: 'CODE_DOWNLOADED',
   //mcp server state changed

@@ -10,6 +10,7 @@ import { ContactsTool } from './ContactsTool';
 import { CalendarTool } from './CalendarTool';
 import { SystemSettingsTool } from './SystemSettingsTool';
 import { AlarmTool } from './AlarmTool';
+import { ReadImageTool } from './ReadImageTool';
 import { ToolConsent } from './ToolConsent';
 import { PluginRegistry } from '../../plugins/PluginRegistry';
 import type { McpTool } from '../../mcp/McpTool';
@@ -31,6 +32,7 @@ class ToolManagerService {
     this.register(new CalendarTool());
     this.register(new SystemSettingsTool());
     this.register(new AlarmTool());
+    this.register(new ReadImageTool());
   }
 
   //register a tool
@@ -65,9 +67,11 @@ class ToolManagerService {
     return Array.from(this.tools.values());
   }
 
-  //built-in tools only
+  //built-in tools available on this platform
   getBuiltInTools(): ITool[] {
-    return this.getAllTools().filter(t => !this.mcpToolNames.has(t.definition.function.name));
+    return this.getAllTools()
+      .filter(t => !this.mcpToolNames.has(t.definition.function.name))
+      .filter(t => this.isSupportedOnPlatform(t));
   }
 
   //enabled and supported on this platform
@@ -115,7 +119,8 @@ class ToolManagerService {
     name: string,
     args: Record<string, any>,
     summarize?: (text: string) => Promise<string>,
-    recordSource?: (source: ToolSource) => void
+    recordSource?: (source: ToolSource) => void,
+    describeImage?: (base64: string, prompt: string) => Promise<string>
   ): Promise<string> {
     const tool = this.tools.get(name);
     if (!tool) {
@@ -146,10 +151,13 @@ class ToolManagerService {
       console.log(`[ToolManager] executing ${name}`);
     }
 
+    const started = Date.now();
     try {
-      return await tool.execute(args, summarize, recordSource);
+      const result = await tool.execute(args, summarize, recordSource, describeImage);
+      if (__DEV__) console.log(`[ToolManager] ${name} done in ${Date.now() - started} ms`);
+      return result;
     } catch (e: any) {
-      console.error(`[ToolManager] Tool ${name} error:`, e?.message || e);
+      console.error(`[ToolManager] Tool ${name} error after ${Date.now() - started} ms:`, e?.message || e);
       //explicit wording helps small models
       return `TOOL FAILED (${name}): ${e?.message || 'unknown error'}. The action did not happen. Tell the user it failed.`;
     }

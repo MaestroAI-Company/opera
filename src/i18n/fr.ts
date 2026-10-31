@@ -145,6 +145,7 @@ export const fr: Translations = {
     "Cette image provient d'un serveur externe ({domain}). Son chargement permet au serveur hébergeur de connaître ton adresse IP et de pister ton activité.",
   "markdown.image.show": "Afficher l'image",
   "markdown.image.alwaysShow": "Toujours afficher",
+  "markdown.image.reject": "Refuser",
   "markdown.image.failed": "Impossible de charger l'image",
 
   "nextcloud.connect": "Connecter",

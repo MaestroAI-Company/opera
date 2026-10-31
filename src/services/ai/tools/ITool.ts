@@ -1,6 +1,9 @@
 import type React from 'react';
 import type { TranslationKey } from '../../../i18n';
 
+//result that pauses the turn
+export const TOOL_PAUSED = '__TOOL_PAUSED__';
+
 // tool call returned by ollama
 export interface ToolCall {
   //pairs tool results to calls
@@ -76,6 +79,8 @@ export interface ITool {
   execute(
     args: Record<string, any>,
     summarize?: (text: string, systemPrompt?: string) => Promise<string>,
-    recordSource?: (source: ToolSource) => void
+    recordSource?: (source: ToolSource) => void,
+    //vision call on the chat model
+    describeImage?: (base64: string, prompt: string) => Promise<string>
   ): Promise<string>;
 }

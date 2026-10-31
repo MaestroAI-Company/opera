@@ -16,7 +16,6 @@ import {
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
-import HeadlessWebView from "../../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../../constants/prompts";
 import { DarkColors, FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
@@ -847,8 +846,6 @@ function OperaDream() {
         buttons={[{ text: "OK", onPress: () => setVoiceMissing(false), style: "primary" }]}
         onClose={() => setVoiceMissing(false)}
       />
-
-      <HeadlessWebView />
     </View>
   );
 }

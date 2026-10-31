@@ -1,7 +1,7 @@
 import { IAIProvider } from './providers/IAIProvider';
 import { OllamaProvider } from './providers/OllamaProvider';
 import { ToolManager } from './tools/ToolManager';
-import { ToolSource } from './tools/ITool';
+import { ToolSource, TOOL_PAUSED } from './tools/ITool';
 import { sendMessageWithToolPrompt } from './tools/fallbackToolCall';
 import { describeToolCallError } from './tools/toolCallParser';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
@@ -406,8 +406,32 @@ class CentralAIModule {
       return summary;
     };
 
+    //vision call on the chat model
+    const describeImage = async (base64: string, prompt: string): Promise<string> => {
+      const caps = await this.getModelCapabilities(modelName).catch(() => [] as string[]);
+      //empty capabilities mean unknown
+      if (caps.length > 0 && !caps.includes('vision')) {
+        throw new Error('the active model cannot read images');
+      }
+      let description = '';
+      try {
+        await provider.sendMessage(
+          modelName,
+          SYSTEM_PROMPTS.IMAGE_DESCRIBE,
+          [{ role: 'user', content: prompt, images: [base64] }],
+          chunk => { description += chunk; },
+          signal,
+          { think: false }
+        );
+      } catch (e: any) {
+        //model and size explain a rejection
+        throw new Error(`vision call on ${modelName} failed (${Math.round(base64.length / 1024)} KB): ${e?.message || e}`);
+      }
+      return description;
+    };
+
     //outcome of a tool round
-    const runToolRound = async (): Promise<'tools' | 'answered' | 'empty'> => {
+    const runToolRound = async (): Promise<'tools' | 'answered' | 'empty' | 'paused'> => {
       //native or injected tool calls
       const beforeLen = accumulated.length;
       const result = supportsTools
@@ -458,7 +482,7 @@ class CentralAIModule {
         this.SharedGenerationState.activeToolArgs = tc.function.arguments;
         this.SharedGenerationState.notify();
 
-        const toolResult = await ToolManager.execute(tc.function.name, tc.function.arguments, summarize, recordSource);
+        const toolResult = await ToolManager.execute(tc.function.name, tc.function.arguments, summarize, recordSource, describeImage);
 
         this.SharedGenerationState.activeToolName = null;
         this.SharedGenerationState.activeToolArgs = null;
@@ -467,6 +491,9 @@ class CentralAIModule {
         //widget block shows the result
         const widgetBlock = ToolManager.buildWidgetBlock(toolName, tc.function.arguments, toolResult);
         if (widgetBlock) streamingOnChunk(widgetBlock);
+
+        //turn stops until the user answers
+        if (toolResult === TOOL_PAUSED) return 'paused';
 
         currentMessages.push({ role: 'tool', content: toolResult });
       }
@@ -478,6 +505,8 @@ class CentralAIModule {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       const outcome = await runToolRound();
       if (outcome === 'answered') return;
+      //a paused tool answers later
+      if (outcome === 'paused') return;
       if (outcome === 'empty') break;
     }
 

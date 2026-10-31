@@ -53,7 +53,6 @@ import { useScreenDetections } from '../../services/overlay/useScreenDetections'
 import { useScreenSelection } from '../../services/overlay/useScreenSelection';
 import { useScreenText } from '../../services/overlay/useScreenText';
 
-import HeadlessWebView from '../../../components/HeadlessWebView';
 import { useAnimatedValue } from '../../hooks/useAnimatedValue';
 import { PluginRegistry } from '../../services/plugins/PluginRegistry';
 import { McpService } from '../../services/mcp/McpService';
@@ -660,6 +659,68 @@ function AssistantOverlay() {
     }
   }, [generateTitle, goToRespond, appContextDismissed, appIconInfo, handOffGeneration]);
 
+  //resume the turn after the widget
+  const resumeTool = useCallback(async (instruction: string) => {
+    const conv = activeConversationRef.current;
+    if (!conv) return;
+    //one run per conversation
+    if (generatingConvIdRef.current === conv.id) return;
+
+    const history: { role: string; content: string; images?: string[] }[] = messagesRef.current
+      .filter(m => m.content !== '…')
+      .map(m => ({ role: m.role, content: m.content, images: m.images }));
+    //no fake user message
+    history.push({ role: 'system', content: instruction });
+
+    const model = selectedModelRef.current;
+    const reflection = selectedReflectionRef.current;
+    const lastUser = [...messagesRef.current].reverse().find(m => m.role === 'user');
+
+    const assistantMsg = await DB.addMessage(conv.id, 'assistant', '…');
+    setMessages(prev => [...prev, assistantMsg]);
+
+    setGeneratingConvId(conv.id);
+    generatingConvIdRef.current = conv.id;
+    streamingMsgIdRef.current = assistantMsg.id;
+    streamingContentRef.current = '';
+
+    const run = await GenerationService.start({
+      convId: conv.id,
+      msgId: assistantMsg.id,
+      prompt: lastUser?.content ?? '',
+      model,
+      systemPrompt: buildSystemPrompt(model, instruction, screenContextSegment(messagesRef.current)),
+      history,
+      think: reflection === 'none' ? false : reflection,
+    });
+
+    streamingContentRef.current = run.content;
+    setMessages(prev => prev.map(m =>
+      m.id === assistantMsg.id ? { ...m, content: run.content, sources: run.sources ?? m.sources } : m
+    ));
+    if (run.status !== 'error') CloudSync.requestAutoSync(0);
+
+    //a newer run may own it
+    if (streamingMsgIdRef.current === assistantMsg.id) {
+      setGeneratingConvId(null);
+      generatingConvIdRef.current = null;
+      streamingMsgIdRef.current = null;
+    }
+  }, []);
+
+  //widget click resumes without a message
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      AppEvents.toolResume,
+      (instruction: string) => {
+        //hidden overlay must not resume
+        if (!OverlayPresence.isShown()) return;
+        resumeTool(instruction).catch(e => console.error('Tool resume failed:', e));
+      },
+    );
+    return () => sub.remove();
+  }, [resumeTool]);
+
   const handleStop = useCallback(() => {
     const convId = activeConversationRef.current?.id;
     if (convId) GenerationService.stop(convId);
@@ -1003,8 +1064,6 @@ function AssistantOverlay() {
           isLargeScreen={isLargeScreen}
           messages={messages}
         />
-
-        <HeadlessWebView />
       </KeyboardAvoidingView>
     </GestureHandlerRootView>
   );

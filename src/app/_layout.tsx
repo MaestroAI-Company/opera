@@ -18,6 +18,7 @@ import DesktopStage from "../components/features/DesktopStage";
 import OverlayNoticeHost from "../components/features/OverlayNoticeHost";
 import TauriTitleBar from "../components/features/TauriTitleBar";
 import CodeDownloadHost from "../components/features/CodeDownloadHost";
+import HeadlessWebView from "../../components/HeadlessWebView";
 import ToolConsentHost from "../components/features/ToolConsentHost";
 import VoicePackHost from "../components/features/VoicePackHost";
 import { IconLabelProvider } from "../components/ui/IconLabel";
@@ -152,6 +153,7 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <IconLabelProvider>
           <DesktopOverlay />
+          <HeadlessWebView />
         </IconLabelProvider>
       </GestureHandlerRootView>
     );
@@ -167,6 +169,7 @@ export default function RootLayout() {
           ) : (
             <>
               <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
+              <HeadlessWebView />
               <ToolConsentHost />
               <VoicePackHost />
               <CodeDownloadHost />

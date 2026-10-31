@@ -1,4 +1,4 @@
-import { ITool, ToolDefinition, ToolWidget } from './ITool';
+import { ITool, ToolContext, ToolDefinition, ToolWidget } from './ITool';
 import { ContactResult, ContactsService } from '../../contacts/ContactsService';
 import { SYSTEM_PROMPTS } from '../../../../constants/prompts';
 import { Block, BlockContainer, BlockRow, Caption } from '../../../components/toolwidgets/ToolWidgetBlocks';
@@ -90,7 +90,7 @@ export class ContactsTool implements ITool {
     ),
   };
 
-  async execute(args: Record<string, any>, summarize?: (text: string, systemPrompt?: string) => Promise<string>): Promise<string> {
+  async execute(args: Record<string, any>, { summarize }: ToolContext = {}): Promise<string> {
     this.resolved = null;
     const query = args.query;
     if (typeof query !== 'string' || query.trim().length === 0) {

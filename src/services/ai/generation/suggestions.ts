@@ -22,6 +22,7 @@ function stripToVisibleText(raw: string): string {
     //tool call payloads and widget blocks are chrome
     .replace(/\{"tool_calls":[\s\S]*?\}\]\}/g, '')
     .replace(/```widget[\s\S]*?```/g, '')
+    .replace(/```toolwidget[\s\S]*?```/g, '')
     .trim();
 }
 

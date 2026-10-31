@@ -76,6 +76,12 @@ export function buildSystemPrompt(model: string, userInstruction: string, extraS
   return promptForTier(modelTier(model), userInstruction, extraSegment);
 }
 
+//browser url lives in screen text
+const BROWSER_PACKAGE = /chrome|firefox|browser|brave|vivaldi|duckduckgo|sbrowser/i;
+const URL_IN_TEXT = /https?:\/\/[^\s"'<>]+/i;
+//address bars often drop the scheme
+const HOST_PATH_IN_TEXT = /\b(?:[a-z0-9-]+\.)+[a-z]{2,}\/[^\s"'<>]*/i;
+
 //latest capture keeps steering the conversation
 export function screenContextSegment(messages: Pick<Message, 'screenContext'>[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -84,6 +90,14 @@ export function screenContextSegment(messages: Pick<Message, 'screenContext'>[])
     const parts = ['\n\n---\n\n# Screen Context'];
     if (ctx.appPackage) parts.push(`Foreground app: ${ctx.appPackage}`);
     const text = ctx.text?.trim();
+    //url bar identifies the page
+    if (text && ctx.appPackage && BROWSER_PACKAGE.test(ctx.appPackage)) {
+      const found = text.match(URL_IN_TEXT)?.[0] ?? text.match(HOST_PATH_IN_TEXT)?.[0];
+      if (found) {
+        const url = found.replace(/[.,;:]+$/, '');
+        parts.push(`Page URL: ${/^https?:/i.test(url) ? url : `https://${url}`}`);
+      }
+    }
     if (text) parts.push(`Visible text on screen:\n"""\n${text}\n"""`);
     return parts.length > 1 ? parts.join('\n') : '';
   }

@@ -18,7 +18,6 @@ import DesktopStage from "../components/features/DesktopStage";
 import OverlayNoticeHost from "../components/features/OverlayNoticeHost";
 import TauriTitleBar from "../components/features/TauriTitleBar";
 import CodeDownloadHost from "../components/features/CodeDownloadHost";
-import ToolConsentHost from "../components/features/ToolConsentHost";
 import VoicePackHost from "../components/features/VoicePackHost";
 import { IconLabelProvider } from "../components/ui/IconLabel";
 import { Radius, Spacing } from "../../constants/theme";
@@ -167,7 +166,6 @@ export default function RootLayout() {
           ) : (
             <>
               <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
-              <ToolConsentHost />
               <VoicePackHost />
               <CodeDownloadHost />
               <OverlayNoticeHost />

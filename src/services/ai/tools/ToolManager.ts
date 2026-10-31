@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { ITool, ToolDefinition, ToolPlatform, ToolSource, ToolWidget } from './ITool';
+import { ITool, ToolContext, ToolDefinition, ToolPlatform, ToolWidget } from './ITool';
 import { SearchTool } from './SearchTool';
 import { FetchPagesTool } from './FetchPagesTool';
 import { MathTool } from './MathTool';
@@ -10,9 +10,25 @@ import { ContactsTool } from './ContactsTool';
 import { CalendarTool } from './CalendarTool';
 import { SystemSettingsTool } from './SystemSettingsTool';
 import { AlarmTool } from './AlarmTool';
-import { ToolConsent } from './ToolConsent';
+import { ReadImageTool } from './ReadImageTool';
+import { CONSENT_WIDGET_ID } from './ToolConsent';
+import ToolConsentCard from '../../../components/toolwidgets/ToolConsentCard';
 import { PluginRegistry } from '../../plugins/PluginRegistry';
 import type { McpTool } from '../../mcp/McpTool';
+
+//card streamed while a tool waits
+const consentWidget: ToolWidget<{ id: string }> = {
+  name: 'Consent',
+  //card draws its own frame
+  hasBorder: false,
+  build: () => null,
+  component: ToolConsentCard,
+};
+
+//fenced block rendered by MarkdownText
+function widgetFence(id: string, data: unknown): string {
+  return `\n\n\`\`\`toolwidget id="${id}"\n${JSON.stringify(data)}\n\`\`\`\n\n`;
+}
 
 class ToolManagerService {
   private tools: Map<string, ITool> = new Map();
@@ -31,6 +47,7 @@ class ToolManagerService {
     this.register(new CalendarTool());
     this.register(new SystemSettingsTool());
     this.register(new AlarmTool());
+    this.register(new ReadImageTool());
   }
 
   //register a tool
@@ -65,9 +82,11 @@ class ToolManagerService {
     return Array.from(this.tools.values());
   }
 
-  //built-in tools only
+  //built-in tools available on this platform
   getBuiltInTools(): ITool[] {
-    return this.getAllTools().filter(t => !this.mcpToolNames.has(t.definition.function.name));
+    return this.getAllTools()
+      .filter(t => !this.mcpToolNames.has(t.definition.function.name))
+      .filter(t => this.isSupportedOnPlatform(t));
   }
 
   //enabled and supported on this platform
@@ -82,14 +101,16 @@ class ToolManagerService {
   }
 
   //enabled tools, filtered by names
-  getDefinitions(only?: string[]): ToolDefinition[] {
+  getDefinitions(only?: string[], canSeeImages = true): ToolDefinition[] {
     return this.getEnabledTools()
       .filter(t => !only || only.includes(t.definition.function.name))
+      .filter(t => canSeeImages || !t.requiresVision)
       .map(t => t.definition);
   }
 
   //widget declared by the tool
   getWidget(name: string): ToolWidget | undefined {
+    if (name === CONSENT_WIDGET_ID) return consentWidget;
     return this.tools.get(name)?.widget;
   }
 
@@ -103,19 +124,23 @@ class ToolManagerService {
         if (__DEV__) console.log(`[ToolManager] ${name} produced no widget data`);
         return null;
       }
-      return `\n\n\`\`\`toolwidget id="${name}"\n${JSON.stringify(data)}\n\`\`\`\n\n`;
+      return widgetFence(name, data);
     } catch (e) {
       console.warn(`[ToolManager] widget data failed for ${name}:`, e);
       return null;
     }
   }
 
+  //card answering a pending consent
+  buildConsentBlock(id: string): string {
+    return widgetFence(CONSENT_WIDGET_ID, { id });
+  }
+
   //execute a tool by name
   async execute(
     name: string,
     args: Record<string, any>,
-    summarize?: (text: string) => Promise<string>,
-    recordSource?: (source: ToolSource) => void
+    context: ToolContext = {}
   ): Promise<string> {
     const tool = this.tools.get(name);
     if (!tool) {
@@ -130,11 +155,13 @@ class ToolManagerService {
     }
 
     if (tool.consent && !PluginRegistry.isEnabled('consent', name, false)) {
-      const granted = await ToolConsent.request(name, tool.consent);
-      if (granted === null) {
+      if (!context.askConsent) {
         return `Tool "${name}" needs the user's approval, which cannot be asked right now. Answer without it.`;
       }
-      if (!granted) {
+      const answer = await context.askConsent({ tool: name, ...tool.consent });
+      //stopped reply is not a refusal
+      if (context.signal?.aborted) return `Tool "${name}" was cancelled.`;
+      if (answer === 'deny') {
         await PluginRegistry.setEnabled('tool', name, false);
         return `The user declined tool "${name}" and it is now disabled. Do not call it again, answer without it.`;
       }
@@ -146,10 +173,13 @@ class ToolManagerService {
       console.log(`[ToolManager] executing ${name}`);
     }
 
+    const started = Date.now();
     try {
-      return await tool.execute(args, summarize, recordSource);
+      const result = await tool.execute(args, context);
+      if (__DEV__) console.log(`[ToolManager] ${name} done in ${Date.now() - started} ms`);
+      return result;
     } catch (e: any) {
-      console.error(`[ToolManager] Tool ${name} error:`, e?.message || e);
+      console.error(`[ToolManager] Tool ${name} error after ${Date.now() - started} ms:`, e?.message || e);
       //explicit wording helps small models
       return `TOOL FAILED (${name}): ${e?.message || 'unknown error'}. The action did not happen. Tell the user it failed.`;
     }

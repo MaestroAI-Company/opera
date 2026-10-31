@@ -1,4 +1,4 @@
-import { ITool, ToolDefinition, ToolPlatform, ToolSource } from './ITool';
+import { ITool, ToolContext, ToolDefinition, ToolPlatform } from './ITool';
 import { SearchBridge } from '../../search/SearchBridge';
 import { Platform } from 'react-native';
 import { universalFetch } from '../utils/universalFetch';
@@ -8,8 +8,8 @@ export class SearchTool implements ITool {
   displayName = 'Web Search';
   displayDescription = 'Allow the assistant to search the web for real-time information.';
   enabledByDefault = true;
-  //ios/android need the SearchWebView bridge
-  platforms: ToolPlatform[] = ['ios', 'android', 'web', 'desktop'];
+  //web excluded because of cors
+  platforms: ToolPlatform[] = ['ios', 'android', 'desktop'];
   requires = ['fetch_pages'];
 
   definition: ToolDefinition = {
@@ -30,11 +30,7 @@ export class SearchTool implements ITool {
     },
   };
 
-  async execute(
-    args: Record<string, any>,
-    summarize?: (text: string) => Promise<string>,
-    recordSource?: (source: ToolSource) => void
-  ): Promise<string> {
+  async execute(args: Record<string, any>, { recordSource }: ToolContext = {}): Promise<string> {
     const query = args.query;
     if (!query || typeof query !== 'string') {
       return 'Error: missing or invalid query parameter.';
@@ -43,7 +39,7 @@ export class SearchTool implements ITool {
     try {
       let results: any[] = [];
 
-      //desktop reuses the mobile path
+      //web hidden because of cors
       if (Platform.OS === 'web' && !isTauri) {
         const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
         const res = await universalFetch(url, {
@@ -95,7 +91,7 @@ export class SearchTool implements ITool {
         return `### Result ${i + 1}: ${r.title}\n**URL:** ${r.url}\n**Snippet:** ${r.snippet || 'No snippet available.'}`;
       });
 
-      return `Search results for "${query}":\n\n${formatted.join('\n\n---\n\n')}\n\nNow call fetch_pages on up to 2 of the most relevant URLs above to read their full contents. Prioritize official and trusted sources.`;
+      return `Search results for "${query}":\n\n${formatted.join('\n\n---\n\n')}\n\nNow call fetch_pages on up to 2 of the most relevant URLs above to read their full contents. Add a focus when you only need specific details from the page. Prioritize official and trusted sources.`;
     } catch (e: any) {
       console.error('[SearchTool] error:', e?.message || e);
       throw new Error(`search failed: ${e?.message || e}`);

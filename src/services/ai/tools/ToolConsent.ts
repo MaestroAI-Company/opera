@@ -1,39 +1,61 @@
-import type { TranslationKey } from '../../../i18n';
+import type { ConsentAnswer, ConsentPrompt } from './ITool';
 
-export interface ConsentRequest {
-  tool: string;
-  title: TranslationKey;
-  message: TranslationKey;
-  resolve: (granted: boolean) => void;
-}
+//widget id of the inline card
+export const CONSENT_WIDGET_ID = 'tool_consent';
 
-type Host = (request: ConsentRequest) => void;
+type Pending = {
+  prompt: ConsentPrompt;
+  resolve: (answer: ConsentAnswer) => void;
+};
 
-//bridges calls to mounted modal
+//reply cards answer consent requests
 class ToolConsentService {
-  private hosts: Host[] = [];
-  private pending = new Map<string, Promise<boolean>>();
+  private pending = new Map<string, Pending>();
+  private answered = new Set<string>();
+  private listeners = new Set<() => void>();
+  private counter = 0;
 
-  attach(host: Host): () => void {
-    this.hosts.push(host);
+  //id goes in the streamed card
+  ask(prompt: ConsentPrompt, signal?: AbortSignal): { id: string; answer: Promise<ConsentAnswer> } {
+    const id = `consent-${Date.now()}-${++this.counter}`;
+    const answer = new Promise<ConsentAnswer>(resolve => {
+      this.pending.set(id, { prompt, resolve });
+      //stopping the reply declines
+      signal?.addEventListener('abort', () => this.answer(id, 'deny'), { once: true });
+      if (signal?.aborted) this.answer(id, 'deny');
+    });
+    this.emit();
+    return { id, answer };
+  }
+
+  get(id: string): ConsentPrompt | undefined {
+    return this.pending.get(id)?.prompt;
+  }
+
+  //missing id indicates restart during wait
+  status(id: string): 'pending' | 'answered' | 'expired' {
+    if (this.pending.has(id)) return 'pending';
+    return this.answered.has(id) ? 'answered' : 'expired';
+  }
+
+  answer(id: string, answer: ConsentAnswer): void {
+    const entry = this.pending.get(id);
+    if (!entry) return;
+    this.pending.delete(id);
+    this.answered.add(id);
+    entry.resolve(answer);
+    this.emit();
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
     return () => {
-      this.hosts = this.hosts.filter(h => h !== host);
+      this.listeners.delete(listener);
     };
   }
 
-  //null when no screen can ask
-  request(tool: string, text: { title: TranslationKey; message: TranslationKey }): Promise<boolean> | null {
-    const existing = this.pending.get(tool);
-    if (existing) return existing;
-    //latest mounted surface is in front
-    const host = this.hosts[this.hosts.length - 1];
-    if (!host) return null;
-
-    const promise = new Promise<boolean>(resolve => {
-      host({ tool, ...text, resolve });
-    }).finally(() => this.pending.delete(tool));
-    this.pending.set(tool, promise);
-    return promise;
+  private emit(): void {
+    this.listeners.forEach(l => l());
   }
 }
 

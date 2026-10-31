@@ -223,6 +223,25 @@ export function useAttachments(modelCapabilities: string[]) {
     }
   };
 
+  const addSharedFiles = (incomingFiles: { path: string; fileName: string; mimeType?: string }[]) => {
+    const validFiles: SelectedFile[] = [];
+    let rejection: AttachmentNotice | null = null;
+    for (const a of incomingFiles) {
+      const kind = classifyAttachment(a.fileName, a.mimeType);
+      const error = attachmentError(kind, t("chatbar.unsupportedAudio"));
+      if (error) {
+        rejection = error;
+        continue;
+      }
+      validFiles.push({ uri: a.path, type: kind, name: a.fileName, mimeType: a.mimeType });
+    }
+    if (rejection) setNotice(rejection);
+    if (validFiles.length > 0) {
+      setFiles(prev => [...prev, ...validFiles]);
+    }
+    return validFiles.length;
+  };
+
   return {
     files,
     setFiles,
@@ -235,6 +254,7 @@ export function useAttachments(modelCapabilities: string[]) {
     pickPhotos,
     pickFiles,
     toggleRecentPhoto,
+    addSharedFiles,
     notice,
     clearNotice: () => setNotice(null),
   };

@@ -39,7 +39,8 @@ import { Fonts, FontSizes, Radius, ThemeColors } from "../../constants/theme";
 import AssistantSheet from "../components/features/AssistantSheet";
 import BugReportSheet from "../components/features/BugReportSheet";
 import ButterflyCluster from "../components/features/ButterflyCluster";
-import ChatBar from "../components/features/ChatBar";
+import ChatBar, { type ChatBarHandle } from "../components/features/ChatBar";
+import { useShareIntentContext } from "expo-share-intent";
 import AttachmentSheet, { useAttachments } from "../components/features/AttachmentSheet";
 import ChatView from "../components/features/ChatView";
 import CodePreviewSheet, {
@@ -530,6 +531,13 @@ export default function Index() {
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [editAiEnabled, setEditAiEnabled] = useState(false);
   const attachments = useAttachments(modelCapabilities);
+  const attachmentsRef = useRef(attachments);
+  useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
+  const chatBarRef = useRef<ChatBarHandle>(null);
+  const pendingShareTextRef = useRef<string | null>(null);
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
 
   //conversation state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -1583,6 +1591,58 @@ useEffect(() => {
     }
   });
 
+  //populate composer with incoming shared items
+  useEffect(() => {
+    if (!hasShareIntent) return;
+
+    let sharedText = "";
+    if (shareIntent.text && shareIntent.webUrl) {
+      sharedText = shareIntent.text.includes(shareIntent.webUrl)
+        ? shareIntent.text
+        : `${shareIntent.text}\n${shareIntent.webUrl}`;
+    } else if (shareIntent.text) {
+      sharedText = shareIntent.text;
+    } else if (shareIntent.webUrl) {
+      sharedText = shareIntent.webUrl;
+    }
+
+    if (sharedText.trim()) {
+      if (chatBarRef.current) {
+        chatBarRef.current.appendText(sharedText.trim());
+        chatBarRef.current.focus();
+      } else {
+        pendingShareTextRef.current = sharedText.trim();
+      }
+    }
+
+    if (shareIntent.files && shareIntent.files.length > 0) {
+      attachmentsRef.current.addSharedFiles(
+        shareIntent.files.map((f) => ({
+          path: f.path,
+          fileName: f.fileName,
+          mimeType: f.mimeType,
+        }))
+      );
+    }
+
+    //close overlay sheets on incoming share
+    setSettingsDrawerVisible(false);
+    setDrawerVisible(false);
+    setConversationSearchVisible(false);
+    setSamplerMode(false);
+
+    resetShareIntent();
+  }, [hasShareIntent, shareIntent, resetShareIntent]);
+
+  //flush pending shared text after mount
+  useEffect(() => {
+    if (pendingShareTextRef.current && chatBarRef.current) {
+      chatBarRef.current.appendText(pendingShareTextRef.current);
+      chatBarRef.current.focus();
+      pendingShareTextRef.current = null;
+    }
+  });
+
   //toggle pin conversation
   const togglePinConversation = useCallback(
     async (convId: string, pinned: boolean) => {
@@ -2607,6 +2667,7 @@ useEffect(() => {
                   </View>
                 ) : (
                   <ChatBar
+                    ref={chatBarRef}
                     onSend={(text, images, viaVoice) =>
                       editSession
                         ? confirmEdit(text, images)

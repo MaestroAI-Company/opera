@@ -19,6 +19,7 @@ import OverlayNoticeHost from "../components/features/OverlayNoticeHost";
 import TauriTitleBar from "../components/features/TauriTitleBar";
 import CodeDownloadHost from "../components/features/CodeDownloadHost";
 import VoicePackHost from "../components/features/VoicePackHost";
+import { ShareIntentProvider } from "expo-share-intent";
 import { IconLabelProvider } from "../components/ui/IconLabel";
 import { Radius, Spacing } from "../../constants/theme";
 import { initI18n } from "../i18n";
@@ -177,20 +178,22 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <KeyboardProvider>
-        <IconLabelProvider>
-          <TauriTitleBar />
-          {isSettingsWindow ? (
-            <SettingsWindow />
-          ) : (
-            <>
-              <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
-              <VoicePackHost />
-              <CodeDownloadHost />
-              {isTauri && <OverlayNoticeHost />}
-            </>
-          )}
-          <StatusBar style={isDark ? "light" : "dark"} />
-        </IconLabelProvider>
+        <ShareIntentProvider options={{ disabled: Platform.OS === "web", resetOnBackground: false }}>
+          <IconLabelProvider>
+            <TauriTitleBar />
+            {isSettingsWindow ? (
+              <SettingsWindow />
+            ) : (
+              <>
+                <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
+                <VoicePackHost />
+                <CodeDownloadHost />
+                {isTauri && <OverlayNoticeHost />}
+              </>
+            )}
+            <StatusBar style={isDark ? "light" : "dark"} />
+          </IconLabelProvider>
+        </ShareIntentProvider>
       </KeyboardProvider>
     </GestureHandlerRootView>
   );

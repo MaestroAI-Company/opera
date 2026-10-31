@@ -129,6 +129,21 @@
       ],
       "expo-sharing",
       [
+        "expo-share-intent",
+        {
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsWebURLWithMaxCount": 10,
+            "NSExtensionActivationSupportsWebPageWithMaxCount": 10,
+            "NSExtensionActivationSupportsImageWithMaxCount": 10,
+            "NSExtensionActivationSupportsMovieWithMaxCount": 10,
+            "NSExtensionActivationSupportsFileWithMaxCount": 10,
+            "NSExtensionActivationSupportsText": true
+          },
+          "androidIntentFilters": ["text/*", "image/*", "*/*"],
+          "androidMultiIntentFilters": ["image/*", "*/*"]
+        }
+      ],
+      [
         "expo-media-library",
         {
           "photosPermission": "Opera needs access to your photos to attach them.",

@@ -117,6 +117,8 @@ export type ChatBarHandle = {
   //push to talk from a held shortcut
   startVoice: () => void;
   sendVoice: () => void;
+  setText: (text: string) => void;
+  appendText: (extra: string) => void;
 };
 
 let currentAudioVolume = 0;
@@ -324,6 +326,17 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     focus: () => inputRef.current?.focus(),
     startVoice: () => voiceRef.current.start(),
     sendVoice: () => voiceRef.current.send(),
+    setText: (newText: string) => {
+      textRef.current = newText;
+      setText(newText);
+    },
+    appendText: (extra: string) => {
+      setText(prev => {
+        const next = prev ? `${prev} ${extra}` : extra;
+        textRef.current = next;
+        return next;
+      });
+    },
   }));
 
   const pcmChunksRef = useRef<ArrayBuffer[]>([]);

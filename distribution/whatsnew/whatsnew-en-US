@@ -1,3 +1,5 @@
-Opera on desktop now has an assistant overlay: pin it on screen, open it from the tray and talk with push to talk.
+Opera on desktop now has an assistant overlay: pin it on screen, open it from the tray and talk with push to talk. Hold Ctrl to send a part of your screen.
+
+Local AI is much faster on desktop, and Opera now runs properly on Linux.
 
 You can also switch Sampler Hub to llama.cpp nightly, see the prompt size Automatic picks for each model, and a paired hub that is unreachable now shows as offline. Standby is now a docked smart display.

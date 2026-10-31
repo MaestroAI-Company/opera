@@ -15,6 +15,7 @@
       "icon": "./assets/icons/opera.png",
       "supportsTablet": true,
       "bundleIdentifier": "ai.maestro.opera",
+      "deploymentTarget": "17.0",
       "entitlements": {
         "com.apple.developer.kernel.extended-virtual-addressing": true
       }
@@ -117,6 +118,9 @@
             "enableMinifyInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
             "extraProguardRules": "# nitro codegen classes are looked up by name from c++\n-keep class com.margelo.nitro.** { *; }\n\n# litert-lm jni looks up config getters by name\n-keep class com.google.ai.edge.litertlm.** { *; }\n\n# sampler hub client, jna binds uniffi classes by name\n-keep class com.sun.jna.** { *; }\n-keep class * implements com.sun.jna.** { *; }\n-keep class uniffi.** { *; }\n-dontwarn java.awt.**\n\n# onnxruntime jni looks up classes by name\n-keep class ai.onnxruntime.** { *; }\n\n# executorch jni bindings\n-keep class com.swmansion.rnexecutorch.** { *; }\n-keep class org.pytorch.executorch.** { *; }\n\n# kotlin metadata still names these supertypes\n-keep interface expo.modules.kotlin.records.Record\n-keep interface expo.modules.kotlin.types.Enumerable\n\n# optional resource classes referenced but not always present\n-dontwarn com.airbnb.lottie.R$*\n-dontwarn com.canhub.cropper.R$*\n-dontwarn com.google.android.gms.base.R$*\n-dontwarn com.google.android.gms.common.R$*\n-dontwarn com.google.android.material.R$*\n-dontwarn com.reactnativekeyboardcontroller.R$*\n-dontwarn com.swmansion.rnscreens.R$*\n-dontwarn expo.modules.imagepicker.R$*\n-dontwarn expo.modules.medialibrary.R$*\n-dontwarn expo.modules.statusbar.R$*\n-dontwarn expo.modules.systemui.R$*\n"
+          },
+          "ios": {
+            "usePrecompiledModules": false
           }
         }
       ],

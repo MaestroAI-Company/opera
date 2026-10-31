@@ -1,5 +1,5 @@
-import { useMemo, useRef } from "react";
-import { StyleSheet, View } from "react-native";
+import { useEffect, useMemo, useRef } from "react";
+import { Platform, StyleSheet, View } from "react-native";
 import LottieView from "lottie-react-native";
 import { ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
@@ -16,6 +16,14 @@ export default function SplashScreen({ onFinish }: Props) {
   const animation = useMemo(() => splashAnimation(Colors.background), [Colors.background]);
 
   const isDesktop = typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || window.innerWidth > 1024);
+
+  useEffect(() => {
+    //ios can report the finish as cancelled
+    if (Platform.OS !== "ios") return;
+    const duration = ((animation.op - animation.ip) / animation.fr) * 1000;
+    const timer = setTimeout(onFinish, duration + 500);
+    return () => clearTimeout(timer);
+  }, [animation, onFinish]);
 
   return (
     <View style={styles.container}>

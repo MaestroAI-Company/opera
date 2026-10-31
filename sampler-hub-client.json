@@ -1,9 +1,12 @@
 {
-  "version": "v0.11.0",
+  "version": "v0.11.1",
   "sha256": {
-    "sampler-hub-client-arm64-v8a.so": "c0c48ca7085b8ccf9b770d939c7e0c930ccd6936e4a9750409635a769a64803d",
+    "sampler-hub-client-arm64-v8a.so": "835b2d1db0c3a89d9913199d1a469e0b88842d4c54d0b6ebb4684699c0ee69e3",
     "sampler_hub_client.kt": "f2cb8766dc3d57034c0fbeae44c899e6cdcbff33a9a3622972081cc9feade2c1",
-    "sampler-hub-client-web.js": "103879d4152fb60b7041e58075d4ac73f6614b7acf9c8370d1114e538b7e7a8e",
-    "sampler-hub-client-web.wasm": "2eb5ef8a7b63ebbf229d1463e8cb81b25bf8089ed2bdf7c13651e74134241371"
+    "sampler-hub-client-web.js": "12df3e797bf8b8a99404923f2829fcfbeca826234e2e9c9ff2e10ae5e58623b0",
+    "sampler-hub-client-web.wasm": "dc32dfbcdcf6e4ee09adace78880a16f9ca13e535aa6d4b6352ea19f64dfca89",
+    "sampler-hub-client-ios.xcframework.zip": "2856e7feada3cb3f9510852da59b5268485f10081143bff552e1d143492079ef",
+    "sampler_hub_client.swift": "cd9c2eaf14dcd142895b866dfda3c2ae055ea0fe495c8bf9100ec744de03945b",
+    "sampler_hub_clientFFI.h": "34a65cdee77d217b051107e6d6134da6afc5744090a1fdccc964d5d00c8a0bdf"
   }
 }

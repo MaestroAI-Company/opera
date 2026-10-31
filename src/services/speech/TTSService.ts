@@ -1,4 +1,6 @@
 import * as Speech from 'expo-speech';
+import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
+import { Platform } from 'react-native';
 import { deriveChatDisplay } from '../../components/ui/MarkdownText';
 import { INTERRUPTED_MARKER } from '../ai/generation/chatGeneration';
 import { Settings } from '../settings/SettingsService';
@@ -177,6 +179,7 @@ class TextToSpeechService {
   }
 
   private async speakSystem(queue: SentenceQueue, locale: string, rate: number, gen: number): Promise<void> {
+    await this.prepareSystemAudio();
     while (gen === this.generation) {
       const chunks = this.mergeSentences(await queue.drain(), CHUNK_MAX);
       if (chunks.length === 0) break;
@@ -198,6 +201,19 @@ class TextToSpeechService {
           }
         });
       }
+    }
+  }
+
+  //ios voice obeys the mute switch and the dictation session
+  private async prepareSystemAudio(): Promise<void> {
+    if (Platform.OS !== 'ios') return;
+    try {
+      //never cut a dictation in progress
+      if ((await ExpoSpeechRecognitionModule.getStateAsync()) !== 'inactive') return;
+      ExpoSpeechRecognitionModule.setCategoryIOS({ category: 'playback', categoryOptions: [], mode: 'spokenAudio' });
+      ExpoSpeechRecognitionModule.setAudioSessionActiveIOS(true);
+    } catch (e) {
+      console.warn('TTS audio session error:', e);
     }
   }
 

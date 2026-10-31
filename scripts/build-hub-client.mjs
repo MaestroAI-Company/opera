@@ -1,4 +1,4 @@
-//gradle runs it before each android build, npm before web
+//gradle runs it before each android build, npm before web, the podfile before ios
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -13,6 +13,9 @@ const libPath = join(mainDir, 'jniLibs', 'arm64-v8a', 'libsampler_hub_client.so'
 const bindingsDir = join(mainDir, 'java', 'uniffi', 'sampler_hub_client');
 //served as is next to the web bundle
 const webDir = join(root, 'public', 'sampler-hub');
+//read by native/ios/SamplerHubClient.podspec
+const iosDir = join(root, 'native', 'ios', 'vendor');
+const IOS_TARGETS = ['aarch64-apple-ios', 'aarch64-apple-ios-sim', 'x86_64-apple-ios'];
 const RELEASES = 'https://github.com/MaestroAI-Company/Sampler-Hub/releases/download';
 //ring needs clang for wasm
 const WINDOWS_CLANG = 'C:\\Program Files\\LLVM\\bin';
@@ -29,6 +32,21 @@ if (target === 'web') {
       ['sampler-hub-client-web.js', join(webDir, 'sampler-hub-client-web.js')],
       ['sampler-hub-client-web.wasm', join(webDir, 'sampler-hub-client-web.wasm')],
     ]);
+  }
+} else if (target === 'ios') {
+  if (hasHub && works('xcodebuild', ['-version']) && hasIosTargets()) {
+    buildIosFromSource();
+  } else {
+    const zip = join(iosDir, 'sampler-hub-client-ios.xcframework.zip');
+    const pinned = await downloadPinned([
+      ['sampler-hub-client-ios.xcframework.zip', zip],
+      ['sampler_hub_client.swift', join(iosDir, 'sampler_hub_client.swift')],
+      ['sampler_hub_clientFFI.h', join(iosDir, 'sampler_hub_clientFFI.h')],
+    ]);
+    if (pinned) {
+      rmSync(join(iosDir, 'SamplerHubClient.xcframework'), { recursive: true, force: true });
+      execFileSync('ditto', ['-x', '-k', zip, iosDir], { stdio: 'inherit' });
+    }
   }
 } else if (hasHub && works('cargo', ['ndk', '--version'])) {
   buildAndroidFromSource();
@@ -71,6 +89,46 @@ function buildAndroidFromSource() {
   console.log(`sampler hub client built from ${hubDir}`);
 }
 
+function hasIosTargets() {
+  const installed = spawnSync('rustup', ['target', 'list', '--installed'], { encoding: 'utf8' }).stdout ?? '';
+  return IOS_TARGETS.every((triple) => installed.includes(triple));
+}
+
+function buildIosFromSource() {
+  //matches the app deployment target
+  const env = { ...process.env, IPHONEOS_DEPLOYMENT_TARGET: '17.0' };
+  for (const triple of IOS_TARGETS) {
+    cargo(['build', '--release', '--target', triple, '-p', 'sampler-hub-client'], env);
+  }
+
+  //stripped lib so read host metadata
+  cargo(['build', '-p', 'sampler-hub-client']);
+  const bindings = join(hubDir, 'target', 'swift-bindings');
+  rmSync(bindings, { recursive: true, force: true });
+  cargo([
+    'run', '-q', '-p', 'uniffi-bindgen', '--',
+    'generate', '--library', join(hubDir, 'target', 'debug', 'libsampler_hub_client.dylib'),
+    '--language', 'swift', '--out-dir', bindings,
+  ]);
+
+  const lib = (triple) => join(hubDir, 'target', triple, 'release', 'libsampler_hub_client.a');
+  //one simulator slice holds both archs
+  const simLib = join(hubDir, 'target', 'ios-sim', 'libsampler_hub_client.a');
+  mkdirSync(dirname(simLib), { recursive: true });
+  execFileSync('lipo', ['-create', lib('aarch64-apple-ios-sim'), lib('x86_64-apple-ios'), '-output', simLib], { stdio: 'inherit' });
+
+  rmSync(iosDir, { recursive: true, force: true });
+  mkdirSync(iosDir, { recursive: true });
+  execFileSync(
+    'xcodebuild',
+    ['-create-xcframework', '-library', lib('aarch64-apple-ios'), '-library', simLib, '-output', join(iosDir, 'SamplerHubClient.xcframework')],
+    { stdio: 'inherit' },
+  );
+  copyFileSync(join(bindings, 'sampler_hub_client.swift'), join(iosDir, 'sampler_hub_client.swift'));
+  copyFileSync(join(bindings, 'sampler_hub_clientFFI.h'), join(iosDir, 'sampler_hub_clientFFI.h'));
+  console.log(`sampler hub ios client built from ${hubDir}`);
+}
+
 function buildWebFromSource() {
   const env = { ...process.env };
   if (!works('clang', ['--version'])) {
@@ -96,7 +154,7 @@ async function downloadPinned(assets) {
   //older pins predate the web client
   if (assets.some(([asset]) => !pin.sha256[asset])) {
     console.warn(`sampler hub client ${pin.version} has no ${target} build, skipping`);
-    return;
+    return false;
   }
   for (const [asset, dest] of assets) {
     const expected = pin.sha256[asset];
@@ -111,6 +169,7 @@ async function downloadPinned(assets) {
     writeFileSync(dest, bytes);
   }
   console.log(`sampler hub client ${pin.version} from the release`);
+  return true;
 }
 
 function sha256(bytes) {

@@ -12,10 +12,13 @@
     ],
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/icons/opera.png",
+      "icon": "./assets/images/icon.png",
       "supportsTablet": true,
       "bundleIdentifier": "ai.maestro.opera",
       "deploymentTarget": "17.0",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "Opera connects to your Sampler on this network."
+      },
       "entitlements": {
         "com.apple.developer.kernel.extended-virtual-addressing": true
       }
@@ -191,6 +194,7 @@
       "./plugins/withNotifeeRepo.js",
       "./plugins/withNativeAndroid",
       "./plugins/withDebugVariant",
+      "./plugins/withNativeIOS",
       "expo-speech-recognition",
       [
         "expo-quick-actions",

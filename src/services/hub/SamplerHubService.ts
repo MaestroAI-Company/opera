@@ -491,7 +491,7 @@ async function bodyBytes(body: BodyInit | null | undefined): Promise<Uint8Array>
 
 //absent without the rust client
 const native: NativeHub | undefined =
-  Platform.OS === 'android' ? NativeModules.SamplerHubModule : isTauri ? tauriHub : isBrowser ? webHub : undefined;
+  Platform.OS === 'android' || Platform.OS === 'ios' ? NativeModules.SamplerHubModule : isTauri ? tauriHub : isBrowser ? webHub : undefined;
 const host: HubHost | undefined = isTauri ? tauriHost : undefined;
 
 //per device so never cloud synced

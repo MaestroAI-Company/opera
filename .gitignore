@@ -45,6 +45,7 @@ example
 
 # sampler hub web client, built or downloaded
 /public/sampler-hub/
+/native/ios/vendor/
 /src-tauri/binaries/
 
 # Tauri

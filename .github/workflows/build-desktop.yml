@@ -24,8 +24,8 @@ jobs:
           - { os: windows-11-arm, platform: windows-aarch64, bundles: nsis }
           - { os: macos-latest, platform: macos-aarch64, bundles: 'dmg,app' }
           # oldest glibc the appimage still runs on
-          - { os: ubuntu-22.04, platform: linux-x86_64, bundles: 'appimage,deb' }
-          - { os: ubuntu-22.04-arm, platform: linux-aarch64, bundles: 'appimage,deb' }
+          - { os: ubuntu-24.04, platform: linux-x86_64, bundles: 'appimage,deb' }
+          - { os: ubuntu-24.04-arm, platform: linux-aarch64, bundles: 'appimage,deb' }
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -118,6 +118,8 @@ jobs:
           # the secret was saved with a utf-8 bom
           TAURI_SIGNING_PRIVATE_KEY="$(printf '%s' "$TAURI_SIGNING_PRIVATE_KEY" | sed '1s/^\xEF\xBB\xBF//')"
           export TAURI_SIGNING_PRIVATE_KEY
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$(printf '%s' "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" | sed '1s/^\xEF\xBB\xBF//' | tr -d '\r\n')"
+          export TAURI_SIGNING_PRIVATE_KEY_PASSWORD
           extra=()
           # arm linux has no dawn build to ship
           if [ "${{ matrix.platform }}" = linux-aarch64 ]; then

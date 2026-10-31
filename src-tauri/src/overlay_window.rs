@@ -174,7 +174,167 @@ fn on_release(app: &AppHandle) {
 //close hides the main window
 pub static CLOSE_TO_TRAY: AtomicBool = AtomicBool::new(true);
 
+//wayland shortcuts only come via portal
+#[cfg(target_os = "linux")]
+mod portal {
+    use ashpd::desktop::global_shortcuts::{GlobalShortcuts, NewShortcut};
+    use futures_util::StreamExt;
+    use std::sync::Mutex;
+    use tauri::AppHandle;
+
+    //bound trigger and its stop switch
+    static CURRENT: Mutex<Option<(String, tokio::sync::oneshot::Sender<()>)>> = Mutex::new(None);
+
+    pub fn wanted() -> bool {
+        std::env::var_os("WAYLAND_DISPLAY").is_some()
+    }
+
+    //tauri accelerator to xdg shortcut syntax
+    fn trigger(shortcut: &str) -> String {
+        shortcut
+            .split('+')
+            .map(|part| match part.to_ascii_lowercase().as_str() {
+                "commandorcontrol" | "cmdorctrl" | "control" | "ctrl" => "CTRL".to_string(),
+                "shift" => "SHIFT".to_string(),
+                "alt" | "option" => "ALT".to_string(),
+                "super" | "meta" | "command" | "cmd" => "LOGO".to_string(),
+                "enter" | "return" => "Return".to_string(),
+                "space" => "space".to_string(),
+                key if key.len() == 1 => key.to_string(),
+                _ => part.to_string(),
+            })
+            .collect::<Vec<_>>()
+            .join("+")
+    }
+
+    pub fn unbind() {
+        if let Some((_, stop)) = CURRENT.lock().unwrap().take() {
+            let _ = stop.send(());
+        }
+    }
+
+    pub fn bind(app: &AppHandle, shortcut: &str) {
+        let trigger = trigger(shortcut);
+        let mut current = CURRENT.lock().unwrap();
+        //each rebind asks the user again
+        if current.as_ref().is_some_and(|(bound, stop)| *bound == trigger && !stop.is_closed()) {
+            return;
+        }
+        if let Some((_, stop)) = current.take() {
+            let _ = stop.send(());
+        }
+        let (stop, stopped) = tokio::sync::oneshot::channel();
+        *current = Some((trigger.clone(), stop));
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            //release builds have no logger
+            if let Err(e) = listen(&app, &trigger, stopped).await {
+                eprintln!("global shortcut portal failed: {e}");
+            }
+        });
+    }
+
+    const APP_ID: &str = "ai.maestro.opera";
+
+    //portal needs a desktop file for the id
+    fn ensure_desktop_file() -> std::io::Result<()> {
+        let Some(data) = std::env::var_os("XDG_DATA_HOME")
+            .map(std::path::PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|h| std::path::Path::new(&h).join(".local/share")))
+        else {
+            return Ok(());
+        };
+        //deb already ships a menu entry
+        let appimage = std::env::var_os("APPIMAGE");
+        let exec = match &appimage {
+            Some(path) => std::path::PathBuf::from(path),
+            None => std::env::current_exe()?,
+        };
+        //absolute path skips icon cache
+        let mut icon = String::from("opera");
+        if let (Some(dir), Some(home)) = (std::env::var_os("APPDIR"), std::env::var_os("HOME")) {
+            let dir = std::path::Path::new(&dir).join("usr/share/icons/hicolor");
+            let largest = ["256x256@2", "256x256", "128x128", "64x64", "32x32"]
+                .iter()
+                .map(|size| dir.join(size).join("apps/opera.png"))
+                .find(|path| path.exists());
+            if let Some(source) = largest {
+                let target = std::path::Path::new(&home).join(".local/share/MaestroAI-Company/Opera/icon.png");
+                std::fs::create_dir_all(target.parent().unwrap_or(&target))?;
+                std::fs::copy(source, &target)?;
+                icon = target.display().to_string();
+            }
+        }
+        let entry = format!(
+            "[Desktop Entry]
+Type=Application
+Name=Opera
+Comment=Maestro assistant
+Exec=\"{}\" %u
+Icon={}
+StartupWMClass=opera
+Terminal=false
+Categories=Utility;
+MimeType=x-scheme-handler/opera;
+NoDisplay={}
+",
+            exec.display(),
+            icon,
+            appimage.is_none()
+        );
+        let apps = data.join("applications");
+        std::fs::create_dir_all(&apps)?;
+        let file = apps.join(format!("{APP_ID}.desktop"));
+        if std::fs::read_to_string(&file).ok().as_deref() != Some(entry.as_str()) {
+            std::fs::write(file, entry)?;
+        }
+        Ok(())
+    }
+
+    async fn listen(app: &AppHandle, trigger: &str, mut stopped: tokio::sync::oneshot::Receiver<()>) -> ashpd::Result<()> {
+        if let Err(e) = ensure_desktop_file() {
+            eprintln!("desktop entry not written: {e}");
+        }
+        //host apps need an app id
+        if let Ok(id) = ashpd::AppID::try_from(APP_ID) {
+            let _ = ashpd::register_host_app(id).await;
+        }
+        let portal = GlobalShortcuts::new().await?;
+        let session = portal.create_session(Default::default()).await?;
+        let shortcut = NewShortcut::new("overlay", "Open Maestro").preferred_trigger(trigger);
+        portal
+            .bind_shortcuts(&session, &[shortcut], None, Default::default())
+            .await?
+            .response()?;
+        eprintln!("global shortcut portal bound {trigger}");
+        let mut activated = portal.receive_activated().await?;
+        let mut deactivated = portal.receive_deactivated().await?;
+        loop {
+            tokio::select! {
+                //window calls need the main thread
+                Some(_) = activated.next() => {
+                    let handle = app.clone();
+                    let _ = app.run_on_main_thread(move || super::on_press(&handle));
+                }
+                Some(_) = deactivated.next() => {
+                    let handle = app.clone();
+                    let _ = app.run_on_main_thread(move || super::on_release(&handle));
+                }
+                //open sessions keep the key
+                _ = &mut stopped => break,
+                else => break,
+            }
+        }
+        session.close().await
+    }
+}
+
 fn register(app: &AppHandle, shortcut: &str) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    if portal::wanted() {
+        portal::bind(app, shortcut);
+        return Ok(());
+    }
     app.global_shortcut()
         .on_shortcut(shortcut, |app, _shortcut, event| {
             match event.state {
@@ -206,6 +366,8 @@ pub fn overlay_configure(
         .unregister_all()
         .map_err(|e| e.to_string())?;
     if !enabled {
+        #[cfg(target_os = "linux")]
+        portal::unbind();
         overlay_hide(app);
         return Ok(());
     }

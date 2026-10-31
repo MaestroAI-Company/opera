@@ -394,28 +394,14 @@ export default function Index() {
   const [conversationSearchVisible, setConversationSearchVisible] = useState(false);
   const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
   const [modelSelectorVisible, setModelSelectorVisible] = useState(false);
-  //the desktop app always gets the sampler screen, browsers only for admins
+  //sampler holds the hub settings for everyone
   const [samplerMode, setSamplerMode] = useState(false);
-  const [samplerAdmin, setSamplerAdmin] = useState(false);
   const [samplerReady, setSamplerReady] = useState(false);
-  const checkSamplerAdmin = useCallback(async () => {
-    if (SamplerHub.canHost() || !SamplerHub.isSupported()) return;
-    const hub = await SamplerHub.getPairedHub();
-    const profile = hub
-      ? await SamplerHub.refreshProfile(hub).catch(() => SamplerHub.getProfile())
-      : null;
-    setSamplerAdmin(profile?.role === "admin");
-  }, []);
   //a hub hosted here comes back with the app
   useEffect(() => {
     SamplerHub.startHostedHub().catch((e) => console.warn("[Sampler] hub not started:", e));
   }, []);
-  //pairing and profiles change in the settings
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the paired hub
-    if (!settingsDrawerVisible) checkSamplerAdmin();
-  }, [settingsDrawerVisible, checkSamplerAdmin]);
-  const showSamplerSwitch = isDesktop && (SamplerHub.canHost() || samplerAdmin);
+  const showSamplerSwitch = isDesktop && (SamplerHub.canHost() || SamplerHub.isSupported());
   const inSampler = samplerMode && (!isDesktop || showSamplerSwitch);
   //slide between chat and sampler
   const samplerAnim = useAnimatedValue(inSampler ? 1 : 0);
@@ -1386,8 +1372,6 @@ useEffect(() => {
       () => {
         settingsWindowOpenRef.current = false;
         closeSettings();
-        //pairing may have changed in the window
-        checkSamplerAdmin();
       },
       () => {
         loadConversations();
@@ -1401,7 +1385,7 @@ useEffect(() => {
       cancelled = true;
       stop?.();
     };
-  }, [closeSettings, loadConversations, startNewConversation, checkSamplerAdmin]);
+  }, [closeSettings, loadConversations, startNewConversation]);
 
   //stable ref keeps drawer rows memoized
   const closeConversationsDrawer = useCallback(
@@ -2652,7 +2636,6 @@ useEffect(() => {
               drawerVisible={samplerDrawerVisible}
               onCloseDrawer={() => setSamplerDrawerVisible(false)}
               onOpenChat={() => setSamplerMode(false)}
-              onHubChanged={checkSamplerAdmin}
               onReadyChange={setSamplerReady}
             />
           )}

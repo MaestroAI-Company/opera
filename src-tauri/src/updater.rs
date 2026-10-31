@@ -34,3 +34,29 @@ pub async fn app_update_install(app: AppHandle, tag: String) -> Result<bool, Str
     update.install(bytes).map_err(|e| e.to_string())?;
     app.restart();
 }
+
+//updater replaces this stable copy
+#[cfg(target_os = "linux")]
+pub fn install_appimage() -> Option<()> {
+    let current = std::path::PathBuf::from(std::env::var_os("APPIMAGE")?);
+    let home = std::path::PathBuf::from(std::env::var_os("HOME")?);
+    let target = home.join(".local/share/MaestroAI-Company/Opera/Opera.AppImage");
+    if current == target {
+        return None;
+    }
+    std::fs::create_dir_all(target.parent()?).ok()?;
+    let part = target.with_extension("part");
+    std::fs::copy(&current, &part).ok()?;
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&part, std::fs::Permissions::from_mode(0o755)).ok()?;
+    std::fs::rename(&part, &target).ok()?;
+    //old mount vanishes once we exit
+    std::process::Command::new(&target)
+        .args(std::env::args_os().skip(1))
+        .env_remove("LD_LIBRARY_PATH")
+        .env_remove("APPDIR")
+        .env_remove("APPIMAGE")
+        .spawn()
+        .ok()?;
+    Some(())
+}

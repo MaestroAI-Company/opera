@@ -845,6 +845,7 @@ export default function OnboardingPage() {
         style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
         imageStyle={styles.backgroundTexture}
         resizeMode="cover"
+        resizeMethod="resize"
       />
       <LinearGradient
         colors={[

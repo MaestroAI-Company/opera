@@ -110,6 +110,8 @@ public class OverlayActivity extends ReactActivity {
     protected void onDestroy() {
         unregisterReceiver(screenOffReceiver);
         TextSelectionLayer.INSTANCE.hide();
+        //release fullscreen capture bitmap on close
+        ScreenshotHolder.clear();
         if (sInstance == this) sInstance = null;
         super.onDestroy();
     }

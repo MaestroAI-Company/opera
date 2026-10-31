@@ -3,6 +3,10 @@
   "compilerOptions": {
     "strict": true,
     "moduleResolution": "bundler",
+    "customConditions": [
+      "react-native-legacy-deep-imports",
+      "react-native"
+    ],
     "paths": {
       "@/*": [
         "./src/*"

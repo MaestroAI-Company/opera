@@ -508,7 +508,19 @@ const MathView = React.memo(function MathView({ latex, displayMode, width, incog
   );
 });
 
+const COMPLEX_LATEX = /\\(frac|dfrac|tfrac|sqrt|sum|prod|int|oint|lim|begin|matrix|pmatrix|bmatrix|cases|overline|underline|hat|vec|binom)|[_^]\{[^}]{2,}\}/;
+
 function renderMathBlock(content: string, key: string, incognito?: boolean): React.ReactNode {
+  const trimmed = content.trim();
+  //render simple variables without webview
+  if (!COMPLEX_LATEX.test(trimmed) && !trimmed.includes("\\")) {
+    const s = getThemedStyles(makeS);
+    return (
+      <Text key={key} style={[s.base, s.italic]}>
+        {trimmed}
+      </Text>
+    );
+  }
   const estWidth = Math.min(400, Math.max(70, content.length * 10));
   return <MathView key={key} latex={content} displayMode={false} width={estWidth} incognito={incognito} />;
 }

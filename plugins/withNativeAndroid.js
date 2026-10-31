@@ -176,6 +176,14 @@ function withNativeAndroid(config) {
       });
     }
 
+    //preload mlkit models via play services
+    application['meta-data'] = application['meta-data'] || [];
+    if (!application['meta-data'].some(m => m.$['android:name'] === 'com.google.mlkit.vision.DEPENDENCIES')) {
+      application['meta-data'].push({
+        $: { 'android:name': 'com.google.mlkit.vision.DEPENDENCIES', 'android:value': 'ocr,barcode,barcode_ui', 'tools:replace': 'android:value' },
+      });
+    }
+
     return config;
   });
 
@@ -309,9 +317,18 @@ function withNativeAndroid(config) {
     //litert-lm pins kotlin 2.3, reification errors
     //breaking expo modules on older rules
     config.modResults.contents +=
-      '\n\nsubprojects {\n' +
+      '\n\nsubprojects { proj ->\n' +
       '    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {\n' +
       `        compilerOptions.freeCompilerArgs.add("-XXLanguage:-${marker}")\n` +
+      '    }\n' +
+      '    if (!proj.state.executed && org.apache.tools.ant.taskdefs.condition.Os.isFamily(org.apache.tools.ant.taskdefs.condition.Os.FAMILY_WINDOWS)) {\n' +
+      '        proj.afterEvaluate {\n' +
+      '            def androidExt = proj.extensions.findByName("android")\n' +
+      '            if (androidExt != null && androidExt.hasProperty("externalNativeBuild") && androidExt.externalNativeBuild.cmake.path != null) {\n' +
+      '                androidExt.externalNativeBuild.cmake.buildStagingDirectory = file("C:/tmp/cxx/${proj.name}")\n' +
+      '                androidExt.defaultConfig.externalNativeBuild.cmake.arguments "-DCMAKE_OBJECT_PATH_MAX=100"\n' +
+      '            }\n' +
+      '        }\n' +
       '    }\n' +
       '}\n';
     return config;
@@ -329,15 +346,29 @@ function withNativeAndroid(config) {
         '    //mlkit compiled with newer kotlin, skip version check\n' +
         '    kotlinOptions {\n' +
         '        freeCompilerArgs += "-Xskip-metadata-version-check"\n' +
+        '    }\n' +
+        '    if (org.apache.tools.ant.taskdefs.condition.Os.isFamily(org.apache.tools.ant.taskdefs.condition.Os.FAMILY_WINDOWS)) {\n' +
+        '        externalNativeBuild {\n' +
+        '            cmake {\n' +
+        '                buildStagingDirectory file("C:/tmp/cxx/app")\n' +
+        '            }\n' +
+        '        }\n' +
+        '        defaultConfig {\n' +
+        '            externalNativeBuild {\n' +
+        '                cmake {\n' +
+        '                    arguments "-DCMAKE_OBJECT_PATH_MAX=100"\n' +
+        '                }\n' +
+        '            }\n' +
+        '        }\n' +
         '    }'
       );
     }
     const mlkit = [
       'com.google.mlkit:genai-prompt:1.0.0-beta4',
       'com.google.mlkit:genai-speech-recognition:1.0.0-alpha1',
-      //bundled models for ocr and qr
-      'com.google.mlkit:text-recognition:16.0.1',
-      'com.google.mlkit:barcode-scanning:17.3.0',
+      //play services models reduce apk size
+      'com.google.android.gms:play-services-mlkit-text-recognition:19.0.1',
+      'com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1',
       //same version as the js runtime
       `com.microsoft.onnxruntime:onnxruntime-android:${require('onnxruntime-react-native/package.json').version}`,
       //needed by the uniffi bindings
@@ -358,6 +389,34 @@ function withNativeAndroid(config) {
 
   //cheap when nothing changed
   config = withAppBuildGradle(config, (config) => {
+    if (!config.modResults.contents.includes('downscaleMobileAssets')) {
+      config.modResults.contents +=
+        '\n//downscale desktop assets for mobile\n' +
+        'tasks.configureEach { task ->\n' +
+        '    if (task.name == "createBundleReleaseJsAndAssets") {\n' +
+        '        task.doLast {\n' +
+        '            def resDir = file("${buildDir}/generated/res/createBundleReleaseJsAndAssets")\n' +
+        '            if (!resDir.exists()) return\n' +
+        '            def maxDim = 1024\n' +
+        '            resDir.eachFileRecurse { f ->\n' +
+        '                if (!f.name.startsWith("assets_images_") || !f.name.endsWith(".png")) return\n' +
+        '                def img = javax.imageio.ImageIO.read(f)\n' +
+        '                if (img == null || (img.width <= maxDim && img.height <= maxDim)) return\n' +
+        '                def scale = Math.min((double) maxDim / img.width, (double) maxDim / img.height)\n' +
+        '                int w = Math.max(1, (int) Math.round(img.width * scale))\n' +
+        '                int h = Math.max(1, (int) Math.round(img.height * scale))\n' +
+        '                int type = img.colorModel.hasAlpha() ? java.awt.image.BufferedImage.TYPE_INT_ARGB : java.awt.image.BufferedImage.TYPE_INT_RGB\n' +
+        '                def out = new java.awt.image.BufferedImage(w, h, type)\n' +
+        '                def g = out.createGraphics()\n' +
+        '                g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)\n' +
+        '                g.drawImage(img, 0, 0, w, h, null)\n' +
+        '                g.dispose()\n' +
+        '                javax.imageio.ImageIO.write(out, "png", f)\n' +
+        '            }\n' +
+        '        }\n' +
+        '    }\n' +
+        '}\n';
+    }
     if (!HAS_HUB_CLIENT || config.modResults.contents.includes('buildHubClient')) return config;
     config.modResults.contents +=
       '\n\ndef buildHubClient = tasks.register("buildHubClient", Exec) {\n' +

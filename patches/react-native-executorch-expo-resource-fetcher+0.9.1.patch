@@ -1,9 +1,16 @@
 diff --git a/node_modules/react-native-executorch-expo-resource-fetcher/lib/handlers.js b/node_modules/react-native-executorch-expo-resource-fetcher/lib/handlers.js
-index 54edf7a..0543011 100644
+index 54edf7a..c5361b2 100644
 --- a/node_modules/react-native-executorch-expo-resource-fetcher/lib/handlers.js
 +++ b/node_modules/react-native-executorch-expo-resource-fetcher/lib/handlers.js
-@@ -32,8 +32,8 @@ export async function handleAsset(source, progressCallback, downloads) {
-     const fileUri = `${RNEDirectory}${filename}`;
+@@ -27,15 +27,14 @@ export async function handleAsset(source, progressCallback, downloads) {
+         // user holds, so it must be used as the downloads map key for pause/cancel to work.
+         return (await handleRemote(uri, source, progressCallback, downloads)).path;
+     }
+-    // Release mode: asset bundled locally, copy to RNEDirectory
++    // Release mode: asset bundled locally, copy to cacheDirectory
+     const filename = ResourceFetcherUtils.getFilenameFromUri(uri);
+-    const fileUri = `${RNEDirectory}${filename}`;
++    const fileUri = `${cacheDirectory}${filename}`;
      // On Android, the bundled URI has no extension, so we append it manually
      const fileUriWithType = Platform.OS === 'android' ? `${fileUri}.${asset.type}` : fileUri;
 -    if (await ResourceFetcherUtils.checkFileExists(fileUri)) {
@@ -11,5 +18,7 @@ index 54edf7a..0543011 100644
 +    if (await ResourceFetcherUtils.checkFileExists(fileUriWithType)) {
 +        return ResourceFetcherUtils.removeFilePrefix(fileUriWithType);
      }
-     await ResourceFetcherUtils.createDirectoryIfNoExists();
+-    await ResourceFetcherUtils.createDirectoryIfNoExists();
      await copyAsync({ from: uri, to: fileUriWithType });
+     return ResourceFetcherUtils.removeFilePrefix(fileUriWithType);
+ }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AppState, InteractionManager } from 'react-native';
+import { AppState } from 'react-native';
 import { ObjectDetector } from './objectDetector';
 import { CaptureRegion, ScreenCapture } from './screenCapture';
 
@@ -21,7 +21,7 @@ export function useScreenDetections(session: number, enabled: boolean): CaptureR
       cancelled = state !== 'active';
     });
 
-    const task = InteractionManager.runAfterInteractions(async () => {
+    const idleId = requestIdleCallback(async () => {
       //one analysis after capture lands
       const size = await ScreenCapture.waitForSize(() => cancelled);
       if (!size || cancelled) return;
@@ -32,7 +32,7 @@ export function useScreenDetections(session: number, enabled: boolean): CaptureR
     return () => {
       cancelled = true;
       appState.remove();
-      task.cancel();
+      cancelIdleCallback(idleId);
     };
   }, [session, enabled]);
 

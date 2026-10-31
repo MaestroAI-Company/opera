@@ -29,6 +29,7 @@ const LATENT_CHANNELS = 24 * 6;
 //few steps trade quality for speed
 const TOTAL_STEPS = 5;
 const BASE_SPEED = 1.05;
+const IDLE_UNLOAD_MS = 5 * 60 * 1000;
 
 const LANGS = new Set([
   'en', 'ko', 'ja', 'ar', 'bg', 'cs', 'da', 'de', 'el', 'es', 'et', 'fi', 'fr', 'hi', 'hr', 'hu',
@@ -83,6 +84,14 @@ class SupertonicEngine implements NeuralTTSEngine {
 
   private loaded: Loaded | null = null;
   private queue = new SerialQueue();
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private touchIdleTimer(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => {
+      this.release().catch(() => {});
+    }, IDLE_UNLOAD_MS);
+  }
 
   isSupported(): boolean {
     return ortAvailable() && canStoreModels();
@@ -111,20 +120,37 @@ class SupertonicEngine implements NeuralTTSEngine {
   }
 
   preload(_lang: string, voice: string): Promise<void> {
+    this.touchIdleTimer();
     return this.queue.run(async () => {
       await this.style(await this.load(), voice);
+      this.touchIdleTimer();
     });
   }
 
   synthesize(text: string, lang: string, { voice, speed }: SynthesisOptions): Promise<Float32Array> {
-    return this.queue.run(async () => this.infer(await this.load(), text, lang, voice, BASE_SPEED * speed));
+    this.touchIdleTimer();
+    return this.queue.run(async () => {
+      try {
+        return await this.infer(await this.load(), text, lang, voice, BASE_SPEED * speed);
+      } finally {
+        this.touchIdleTimer();
+      }
+    });
   }
 
   release(): Promise<void> {
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
     return this.queue.run(() => this.unload());
   }
 
   private async unload(): Promise<void> {
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
     const loaded = this.loaded;
     this.loaded = null;
     if (!loaded) return;

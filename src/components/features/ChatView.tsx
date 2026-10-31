@@ -310,11 +310,26 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   const hasReasoning = disp.thinkingText.length > 0;
   const reasoningOpen = thinkingOpen && hasReasoning;
 
-  //reparse keyed on text and theme colors
-  const markdownNodes = useMemo(
-    () => (disp.showMarkdown ? renderMarkdown(disp.finalContent, incognito, dark) : null),
-    [disp.showMarkdown, disp.finalContent, incognito, dark, Colors]
+  //split settled blocks from streaming tail
+  const [settledMd, tailMd] = useMemo(() => {
+    if (!disp.showMarkdown) return ["", ""];
+    if (!isGenerating) return [disp.finalContent, ""];
+    const fenceCount = (disp.finalContent.match(/```/g) ?? []).length;
+    if (fenceCount % 2 !== 0) return ["", disp.finalContent];
+    const splitAt = disp.finalContent.lastIndexOf("\n\n");
+    if (splitAt <= 0) return ["", disp.finalContent];
+    return [disp.finalContent.slice(0, splitAt), disp.finalContent.slice(splitAt + 2)];
+  }, [disp.showMarkdown, disp.finalContent, isGenerating]);
+
+  const settledNodes = useMemo(
+    () => (settledMd ? renderMarkdown(settledMd, incognito, dark) : null),
+    [settledMd, incognito, dark]
   );
+  const tailNodes = useMemo(
+    () => (tailMd ? renderMarkdown(tailMd, incognito, dark) : null),
+    [tailMd, incognito, dark]
+  );
+  const markdownNodes = settledNodes || tailNodes ? <>{settledNodes}{tailNodes}</> : null;
 
   //copy only what is displayed
   const copyToClipboard = async (isMarkdown: boolean) => {

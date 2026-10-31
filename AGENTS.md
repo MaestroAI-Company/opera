@@ -24,7 +24,7 @@ When asked to deploy, release or publish a version (production or beta), read `d
 
 # Expo HAS CHANGED
 
-Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
+Read the exact versioned docs at https://docs.expo.dev/versions/v58.0.0/ before writing any code.
 
 
 ## 1. Think Before Coding

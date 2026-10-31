@@ -1067,6 +1067,8 @@ useEffect(() => {
     [],
   );
 
+  const streamRafRef = useRef<number | null>(null);
+
   //follow any run, whichever surface started it
   useEffect(() => {
     return GenerationService.subscribe((run) => {
@@ -1081,16 +1083,29 @@ useEffect(() => {
         if (streamingMsgIdRef.current !== run.msgId)
           setStreamingMessageId(run.msgId);
         streamingContentRef.current = run.content;
-        setMessages((prev) =>
-          prev.some((m) => m.id === run.msgId)
-            ? prev.map((m) =>
-                m.id === run.msgId ? { ...m, content: run.content } : m,
-              )
-            : prev,
-        );
+
+        //coalesce tokens into one frame update
+        if (streamRafRef.current === null) {
+          const msgId = run.msgId;
+          streamRafRef.current = requestAnimationFrame(() => {
+            streamRafRef.current = null;
+            const latest = streamingContentRef.current;
+            setMessages((prev) =>
+              prev.some((m) => m.id === msgId)
+                ? prev.map((m) =>
+                    m.id === msgId ? { ...m, content: latest } : m,
+                  )
+                : prev,
+            );
+          });
+        }
         return;
       }
 
+      if (streamRafRef.current !== null) {
+        cancelAnimationFrame(streamRafRef.current);
+        streamRafRef.current = null;
+      }
       //the queue clears its own state once it drains
       if (isProcessingRef.current) return;
       setGeneratingConvId(null);
@@ -1130,8 +1145,15 @@ useEffect(() => {
       try {
         await Settings.init();
         const s = migrateModelSources(await Settings.load());
-        if ((await DB.detectDataIssues()) && !s.dataWarningDismissed) {
-          setShowDataWarning(true);
+        //defer heavy integrity scan after startup
+        if (!s.dataWarningDismissed) {
+          setTimeout(() => {
+            DB.detectDataIssues()
+              .then((hasIssues) => {
+                if (hasIssues) setShowDataWarning(true);
+              })
+              .catch(() => {});
+          }, 3000);
         }
         //arms background sync at launch
         CloudSync.init().catch((e) =>
@@ -2426,6 +2448,7 @@ useEffect(() => {
         style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
         imageStyle={styles.backgroundTexture}
         resizeMode="cover"
+        resizeMethod="resize"
       />
       <LinearGradient
         colors={[

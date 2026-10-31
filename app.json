@@ -64,7 +64,10 @@
               {
                 "fontFamily": "Petrona",
                 "fontDefinitions": [
-                  { "path": "./assets/fonts/Petrona-Medium.ttf", "weight": 400 }
+                  {
+                    "path": "./assets/fonts/Petrona-Medium.ttf",
+                    "weight": 400
+                  }
                 ]
               },
               {
@@ -202,7 +205,11 @@
           "androidForegroundService": false,
           "disableFFmpeg": true
         }
-      ]
+      ],
+      "expo-image",
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,

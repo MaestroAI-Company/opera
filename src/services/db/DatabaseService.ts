@@ -104,8 +104,14 @@ class DatabaseService {
   }
 
   private async doInit(): Promise<void> {
+    const SCHEMA_VERSION = 3;
     try {
       this.db = await openSharedDatabase();
+      //wal allows concurrent reads while streaming
+      await this.db.execAsync('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;');
+      const versionRow = await this.db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+      if ((versionRow?.user_version ?? 0) >= SCHEMA_VERSION) return;
+
       await this.db.runAsync(
         `CREATE TABLE IF NOT EXISTS conversations (
           id TEXT PRIMARY KEY,
@@ -229,6 +235,7 @@ class DatabaseService {
           uri TEXT NOT NULL
         )`
       );
+      await this.db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 
     } catch (e) {
       //fail loudly on half-open db

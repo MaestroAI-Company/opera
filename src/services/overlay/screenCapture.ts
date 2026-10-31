@@ -6,9 +6,10 @@ export type CaptureRegion = { x: number; y: number; w: number; h: number };
 export type AppContext = { appPackage: string | null; screenText: string | null };
 export type AppIcon = { icon: string; label: string };
 export type ScreenCode = CaptureRegion & { value: string };
-//square letterboxed rgb bytes
+//letterboxed rgb bytes or tensor file
 export type DetectionInput = {
-  data: string;
+  uri?: string;
+  data?: string;
   offsetX: number;
   offsetY: number;
   contentWidth: number;

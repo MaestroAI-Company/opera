@@ -34,9 +34,11 @@ type ProfileCardProps = {
   createdAt?: number;
   //grid tile in the profile picker
   compact?: boolean;
+  //pause sensor when offscreen
+  active?: boolean;
 };
 
-export default function ProfileCard({ name, createdAt: givenCreatedAt, compact = false }: ProfileCardProps) {
+export default function ProfileCard({ name, createdAt: givenCreatedAt, compact = false, active = true }: ProfileCardProps) {
   const styles = useThemedStyles(makeStyles);
   const Colors = useColors();
   const t = useT();
@@ -76,10 +78,11 @@ export default function ProfileCard({ name, createdAt: givenCreatedAt, compact =
 
   //tilting the phone slides the stripes along y
   useEffect(() => {
-    if (Platform.OS === "web") return;
+    if (Platform.OS === "web" || !active) return;
     let isMounted = true;
     let sub: { remove: () => void } | null = null;
     let offset = 0;
+    let wasAtRest = true;
 
     const subscribe = () => {
       if (sub) return;
@@ -87,6 +90,17 @@ export default function ProfileCard({ name, createdAt: givenCreatedAt, compact =
         if (!available || !isMounted || sub) return;
         Gyroscope.setUpdateInterval(50);
         sub = Gyroscope.addListener(({ x }) => {
+          //skip updates when resting immobile
+          const isInputZero = Math.abs(x) < 0.02;
+          const isMotionZero = Math.abs(offset) < 0.08;
+          if (isInputZero && isMotionZero) {
+            if (wasAtRest) return;
+            wasAtRest = true;
+            offset = 0;
+            Animated.spring(shift, { toValue: 0, tension: 26, friction: 9, useNativeDriver: true }).start();
+            return;
+          }
+          wasAtRest = false;
           //accumulate rotation with decay so it settles back
           offset = Math.max(-MAX_SHIFT, Math.min(MAX_SHIFT, offset * DECAY + x * GYRO_SPEED));
           Animated.spring(shift, { toValue: offset, tension: 26, friction: 9, useNativeDriver: true }).start();
@@ -109,7 +123,7 @@ export default function ProfileCard({ name, createdAt: givenCreatedAt, compact =
       unsubscribe();
       appStateSub.remove();
     };
-  }, [shift]);
+  }, [shift, active]);
 
   return (
     <View style={styles.card}>
@@ -120,7 +134,7 @@ export default function ProfileCard({ name, createdAt: givenCreatedAt, compact =
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <Image source={texture} style={styles.texture} resizeMode="cover" />
+      <Image source={texture} style={styles.texture} resizeMode="cover" resizeMethod="resize" />
 
       {compact ? (
         <View style={styles.contentCompact}>
@@ -133,12 +147,12 @@ export default function ProfileCard({ name, createdAt: givenCreatedAt, compact =
             </Text>
             <Image source={butterfly.icon} style={styles.logoCompact} tintColor={`${Colors.textOnPrimary}99`} />
           </View>
-          <Image source={butterfly.color} style={styles.butterflyCompact} resizeMode="contain" />
+          <Image source={butterfly.color} style={styles.butterflyCompact} resizeMode="contain" resizeMethod="resize" />
         </View>
       ) : (
         <View style={styles.content}>
           <View style={styles.tile}>
-            <Image source={butterfly.color} style={styles.tileButterfly} resizeMode="contain" />
+            <Image source={butterfly.color} style={styles.tileButterfly} resizeMode="contain" resizeMethod="resize" />
           </View>
 
           <Text

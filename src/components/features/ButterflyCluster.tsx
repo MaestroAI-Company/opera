@@ -282,6 +282,7 @@ function ButterflyCluster({
           source={incognito ? butterfly.grey : butterfly.color}
           style={[styles.imageFill, { transform: gyroTransform }]}
           resizeMode="contain"
+          resizeMethod="resize"
         />
       </Animated.View>
     </Reanimated.View>

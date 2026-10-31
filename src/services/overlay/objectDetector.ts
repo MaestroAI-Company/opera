@@ -1,3 +1,4 @@
+import { File } from 'expo-file-system';
 import { CaptureRegion, DetectionInput, ScreenCapture } from './screenCapture';
 
 //graph fixed at 640 input
@@ -21,8 +22,17 @@ type Model = InstanceType<Executorch['ExecutorchModule']>;
 type Box = { x1: number; y1: number; x2: number; y2: number };
 type Candidate = Box & { score: number; label: number };
 
+const IDLE_UNLOAD_MS = 5 * 60 * 1000;
 let runtime: Executorch | null | undefined;
 let loading: Promise<Model | null> | null = null;
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+function touchIdleTimer() {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    ObjectDetector.dispose().catch(() => {});
+  }, IDLE_UNLOAD_MS);
+}
 
 //missing runtime must not crash overlay
 function executorch(): Executorch | null {
@@ -82,6 +92,18 @@ function toInputTensor(data: string): Float32Array {
     floats[out++] = (((c & 3) << 6) | d) / 255;
   }
   return floats;
+}
+
+//read binary tensor or decode base64
+async function resolveInputTensor(input: DetectionInput): Promise<Float32Array | null> {
+  if (input.uri) {
+    const bytes = await new File(input.uri).bytes();
+    return new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
+  }
+  if (input.data) {
+    return toInputTensor(input.data);
+  }
+  return null;
 }
 
 function toFloats(buffer: unknown): Float32Array {
@@ -150,14 +172,34 @@ function suppress(candidates: Candidate[]): Candidate[] {
 }
 
 export const ObjectDetector = {
-  //load once keep for whole launch
+  //load on demand and unload idle
   prepare(): Promise<Model | null> {
+    touchIdleTimer();
     if (!loading) loading = load();
     return loading;
   },
 
+  //free native xnnpack workspace when idle
+  async dispose(): Promise<void> {
+    if (idleTimer) {
+      clearTimeout(idleTimer);
+      idleTimer = null;
+    }
+    const pending = loading;
+    loading = null;
+    const model = await pending;
+    if (model) {
+      try {
+        model.delete();
+      } catch (e) {
+        console.warn('[Detector] failed to delete model:', e);
+      }
+    }
+  },
+
   //current capture boxes or null
   async detect(): Promise<CaptureRegion[] | null> {
+    touchIdleTimer();
     const lib = executorch();
     const model = await ObjectDetector.prepare();
     if (!lib || !model) return null;
@@ -170,8 +212,10 @@ export const ObjectDetector = {
 
     try {
       const startedAt = Date.now();
+      const tensor = await resolveInputTensor(input);
+      if (!tensor) return null;
       const output = await model.forward([{
-        dataPtr: toInputTensor(input.data),
+        dataPtr: tensor,
         sizes: [1, 3, INPUT_SIZE, INPUT_SIZE],
         scalarType: lib.ScalarType.FLOAT,
       }]);

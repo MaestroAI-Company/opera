@@ -518,9 +518,17 @@ export class LiteRTProvider implements IAIProvider {
           forceLoad,
         });
 
-        //log os memory pressure warnings
+        //unload model before os kills process
         llm.setMemoryWarningCallback((level, usage) => {
           console.warn(`[LiteRT] memory warning: level=${level} avail=${formatBytes(usage.availableMemoryBytes)} rss=${formatBytes(usage.residentBytes)}`);
+          if (level === 'critical' && this.loadedModel) {
+            this.enqueue(async () => {
+              if (!this.loadedModel) return;
+              this.loadedModel = null;
+              this.loadedMultimodal = false;
+              await llm.unload();
+            }).catch(() => {});
+          }
         });
 
         this.loadedModel = modelName;

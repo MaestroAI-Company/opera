@@ -16,6 +16,7 @@ export default function ThinkingIcon({ incognito }: { incognito?: boolean }) {
       source={loadingAnimation}
       autoPlay
       loop
+      renderMode="HARDWARE"
       style={size}
       colorFilters={incognito ? incognitoColorFilters : undefined}
     />

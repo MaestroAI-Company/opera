@@ -54,13 +54,29 @@ if (typeof window !== "undefined") {
 installLogger();
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-const isLinux = isTauri && navigator.userAgent.includes("Linux") && !navigator.userAgent.includes("Android");
+
+function WebFontLoader({ onLoaded }: { onLoaded: () => void }) {
+  const [loaded, error] = useFonts({
+    Petrona: require("../../assets/fonts/Petrona-Medium.ttf"),
+    Figtree: require("../../assets/fonts/Figtree-Regular.ttf"),
+    FragmentMono: require("../../assets/fonts/FragmentMono-Regular.ttf"),
+  });
+  useEffect(() => {
+    if (loaded || error) onLoaded();
+  }, [loaded, error, onLoaded]);
+  return null;
+}
+const userAgent = typeof navigator !== "undefined" ? navigator.userAgent ?? "" : "";
+const isLinux = isTauri && userAgent.includes("Linux") && !userAgent.includes("Android");
+const searchParams = isTauri && typeof window.location?.search === "string"
+  ? new URLSearchParams(window.location.search)
+  : null;
 //the settings os window loads the app with this flag
-const isSettingsWindow = isTauri && new URLSearchParams(window.location.search).get("window") === "settings";
+const isSettingsWindow = searchParams?.get("window") === "settings";
 //overlay window loads with this flag
-const isOverlayWindow = isTauri && new URLSearchParams(window.location.search).get("window") === "overlay";
+const isOverlayWindow = searchParams?.get("window") === "overlay";
 //fullscreen layer under the overlay bar
-const isStageWindow = isTauri && new URLSearchParams(window.location.search).get("window") === "stage";
+const isStageWindow = searchParams?.get("window") === "stage";
 
 const screenLayout = ({ children }: { children: ReactNode }) => (
   <>
@@ -73,17 +89,14 @@ export default function RootLayout() {
   const isDark = useIsDark();
   const colors = useColors();
   const [showLottie, setShowLottie] = useState(Platform.OS !== "web" || (isTauri && !isSettingsWindow && !isOverlayWindow && !isStageWindow));
-  const [fontsLoaded, fontError] = useFonts({
-    Petrona: require("../../assets/fonts/Petrona-Medium.ttf"),
-    Figtree: require("../../assets/fonts/Figtree-Regular.ttf"),
-    FragmentMono: require("../../assets/fonts/FragmentMono-Regular.ttf"),
-  });
+  //android links fonts natively via app.json
+  const [fontsLoaded, setFontsLoaded] = useState(Platform.OS === "android");
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
+    if (fontsLoaded) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded]);
 
   useEffect(() => {
     //rounds the window during splash, before TauriTitleBar mounts
@@ -136,11 +149,16 @@ export default function RootLayout() {
     setupQuickActions();
   }, []);
 
-  if (showLottie || (!fontsLoaded && !fontError)) {
+  if (showLottie || !fontsLoaded) {
     return (
-      <SplashScreenComponent
-        onFinish={() => setShowLottie(false)}
-      />
+      <>
+        {Platform.OS !== "android" && !fontsLoaded && (
+          <WebFontLoader onLoaded={() => setFontsLoaded(true)} />
+        )}
+        <SplashScreenComponent
+          onFinish={() => setShowLottie(false)}
+        />
+      </>
     );
   }
 
@@ -168,7 +186,7 @@ export default function RootLayout() {
               <Stack screenOptions={{ headerShown: false }} screenLayout={screenLayout} />
               <VoicePackHost />
               <CodeDownloadHost />
-              <OverlayNoticeHost />
+              {isTauri && <OverlayNoticeHost />}
             </>
           )}
           <StatusBar style={isDark ? "light" : "dark"} />

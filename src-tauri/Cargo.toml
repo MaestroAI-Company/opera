@@ -26,7 +26,7 @@ tauri-plugin-oauth = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
-tokio = { version = "1", features = ["sync", "time", "rt-multi-thread"] }
+tokio = { version = "1", features = ["sync", "time", "rt-multi-thread", "macros"] }
 
 #desktop only, the hub client is native code
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
@@ -59,4 +59,9 @@ ort = { version = "=2.0.0-rc.15", default-features = false, features = ["webgpu"
 ash = { version = "0.38", default-features = false, features = ["loaded", "std"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
+#keeps gl compositing on nvidia wayland
+tauri-plugin-wayland-nvidia-quirk = "0.1"
+#key grabs never see wayland input
+ashpd = { version = "0.13", default-features = false, features = ["tokio", "global_shortcuts"] }
+futures-util = "0.3"
 webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }

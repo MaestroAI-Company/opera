@@ -5,7 +5,7 @@ import { mcpAvatar, mcpSourceLabel, runHubMcp, useHubMcp } from "../../hooks/use
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
-import { HostedMcpServer, McpField } from "../../services/hub/SamplerHubService";
+import { HostedMcpServer, McpField, hubErrorText } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
 import CardGrid from "../ui/CardGrid";
 import Group from "../ui/Group";
@@ -25,7 +25,7 @@ const toolIcon = require("../../../assets/icons/tool.png");
 //lines of the log shown on the page
 const LOG_LINES = 20;
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const message = hubErrorText;
 
 //state words shared by the grid and the server page
 export function useMcpStateLabel() {

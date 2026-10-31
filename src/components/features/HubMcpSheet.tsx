@@ -16,7 +16,7 @@ import { mcpAvatar, mcpSourceLabel, runHubMcp, useHubMcp } from "../../hooks/use
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { MIN_SEARCH_LENGTH } from "../../services/ai/providers/huggingFaceCatalog";
-import { McpFolders, McpListing, McpSource } from "../../services/hub/SamplerHubService";
+import { McpFolders, McpListing, McpSource, hubErrorText } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import NotificationCard from "../ui/NotificationCard";
@@ -46,7 +46,7 @@ const DESKTOP_FOLDER_CARD_WIDTH = 720;
 type Page = "browse" | "search" | "server" | "configure" | "folders" | "manual";
 type SourceType = McpSource["type"];
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const message = hubErrorText;
 
 type FolderListProps = {
   folders: McpFolders | null;

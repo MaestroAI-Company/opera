@@ -37,9 +37,18 @@ fn webview_data_dir(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
     Some(dir)
 }
 
+#[cfg(all(desktop, target_os = "linux"))]
+pub use updater::install_appimage;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
+
+    //must arm windows before they are built
+    #[cfg(target_os = "linux")]
+    {
+        builder = builder.plugin(tauri_plugin_wayland_nvidia_quirk::init());
+    }
 
     #[cfg(desktop)]
     {

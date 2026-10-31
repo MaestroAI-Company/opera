@@ -34,6 +34,14 @@ fn build_settings_window(
         .visible(visible)
         .background_color(tauri::window::Color(253, 248, 241, 255));
 
+    //page rounds its own corners
+    #[cfg(target_os = "linux")]
+    {
+        builder = builder
+            .transparent(true)
+            .background_color(tauri::window::Color(0, 0, 0, 0));
+    }
+
     #[cfg(target_os = "macos")]
     {
         builder = builder

@@ -45,6 +45,7 @@ import {
   PairedHub,
   SamplerHub,
   hubErrorCode,
+  hubErrorText,
 } from "../../services/hub/SamplerHubService";
 import {
   CTX_SIZE_OPTIONS,
@@ -176,7 +177,7 @@ type SamplerScreenProps = {
   onReadyChange?: (ready: boolean) => void;
 };
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const message = hubErrorText;
 
 const PARENT: Partial<Record<SubPage, SubPage>> = {
   profile: "profiles",

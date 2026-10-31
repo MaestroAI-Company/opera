@@ -1013,3 +1013,11 @@ class SamplerHubServiceImpl {
 }
 
 export const SamplerHub = new SamplerHubServiceImpl();
+
+//desktop errors are code and message
+export const hubErrorText = (e: unknown): string =>
+  e instanceof Error
+    ? e.message
+    : typeof (e as { message?: unknown })?.message === "string"
+      ? (e as { message: string }).message
+      : String(e);

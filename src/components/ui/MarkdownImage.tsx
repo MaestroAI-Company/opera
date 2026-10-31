@@ -1,14 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   DeviceEventEmitter,
-  Image,
-  NativeSyntheticEvent,
-  ImageLoadEventData,
+  Image as RNImage,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { Image, ImageLoadEventData } from "expo-image";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useIsDark, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
@@ -80,45 +79,17 @@ export default function MarkdownImage({
     }
   }, [url, isRemote]);
 
-  //calculate aspect ratio before render
-  useEffect(() => {
-    if (!shouldDisplay) return;
-    let active = true;
-
-    const onSize = (width: number, height: number) => {
-      if (!active) return;
-      if (width > 0 && height > 0) {
-        setAspectRatio(width / height);
-      }
-      setLoadState({ url, isLoading: false, hasError: false });
-    };
-    const onFail = () => {
-      if (!active) return;
-      setLoadState({ url, isLoading: false, hasError: true });
-    };
-
-    if (isRemote) {
-      Image.getSizeWithHeaders(url, IMAGE_HEADERS, onSize, onFail);
-    } else {
-      Image.getSize(url, onSize, onFail);
-    }
-
-    return () => {
-      active = false;
-    };
-  }, [url, shouldDisplay, isRemote]);
-
-  //derive aspect ratio on load
-  const handleLoad = (e: NativeSyntheticEvent<ImageLoadEventData>) => {
-    setLoadState((prev) => ({ ...prev, isLoading: false }));
-    const src = e.nativeEvent?.source;
-    if (src?.width && src?.height && !aspectRatio) {
+  //derive aspect ratio from image metadata
+  const handleLoad = (e: ImageLoadEventData) => {
+    setLoadState({ url, isLoading: false, hasError: false });
+    const src = e.source;
+    if (src?.width && src?.height) {
       setAspectRatio(src.width / src.height);
     }
   };
 
   const handleError = () => {
-    setLoadState((prev) => ({ ...prev, isLoading: false, hasError: true }));
+    setLoadState({ url, isLoading: false, hasError: true });
   };
 
   const handleShowOnce = () => {
@@ -153,7 +124,7 @@ export default function MarkdownImage({
       <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
         <View style={styles.warningHeader}>
           <View style={styles.warningTitleRow}>
-            <Image
+            <RNImage
               source={websiteIcon}
               style={styles.warningIcon}
               tintColor={incognito ? Colors.incognito : Colors.primary}
@@ -217,12 +188,12 @@ export default function MarkdownImage({
               { backgroundColor: badgeBg, aspectRatio: aspectRatio ?? 16 / 9 },
             ]}
           >
-            <Image source={photoIcon} style={styles.placeholderIcon} tintColor={mutedColor} />
+            <RNImage source={photoIcon} style={styles.placeholderIcon} tintColor={mutedColor} />
           </View>
         )}
         {hasError ? (
           <View style={[styles.errorBox, { aspectRatio: 16 / 9 }]}>
-            <Image source={photoIcon} style={styles.placeholderIcon} tintColor={Colors.error} />
+            <RNImage source={photoIcon} style={styles.placeholderIcon} tintColor={Colors.error} />
             <Text style={[styles.errorText, { color: mutedColor }]}>
               {t("markdown.image.failed")}
             </Text>
@@ -235,7 +206,9 @@ export default function MarkdownImage({
               { aspectRatio: aspectRatio ?? 16 / 9 },
               isLoading && styles.hiddenImage,
             ]}
-            resizeMode="contain"
+            contentFit="contain"
+            cachePolicy="memory-disk"
+            allowDownscaling
             onLoad={handleLoad}
             onError={handleError}
             alt={alt || title || "Image"}

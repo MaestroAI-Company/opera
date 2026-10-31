@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, BackHandler, Image, Keyboard, NativeScrollEvent, NativeSyntheticEvent, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, BackHandler, Image, Keyboard, NativeScrollEvent, NativeSyntheticEvent, PanResponder, Pressable, ScrollView, SectionList, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
@@ -403,71 +403,76 @@ export default function ConversationsDrawer({
         </View>
       )}
 
-      <ScrollView
+      <SectionList
+        sections={[
+          ...(pinnedConversations.length > 0
+            ? [{ title: t("conversations.pins"), data: pinnedConversations }]
+            : []),
+          ...groups,
+        ]}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => renderConversationRow(item)}
+        renderSectionHeader={({ section }) => (
+          <Text style={styles.sectionTitle}>{section.title}</Text>
+        )}
+        renderSectionFooter={() => <View style={styles.section} />}
+        ListHeaderComponent={
+          <>
+            {/*docked desktop panel has no title*/}
+            {!isDesktop && (
+              <View style={styles.header}>
+                <View style={styles.headerSpacer} />
+                <Text style={styles.title} numberOfLines={1}>{t("conversations.title")}</Text>
+                <View style={styles.headerSpacer} />
+              </View>
+            )}
+
+            <Group style={styles.quickActionsSpacing}>
+              <ActionButton
+                icon={newIcon}
+                iconBadge
+                label={t("conversations.new")}
+                style={isDesktop && styles.desktopButton}
+                onPress={() => {
+                  onNewConversation();
+                  if (!isDesktop) onClose();
+                }}
+              />
+              <ActionButton
+                icon={searchIcon}
+                iconBadge
+                label={t("conversations.search.action")}
+                style={isDesktop && styles.desktopButton}
+                onPress={isDesktop && onOpenSearch ? onOpenSearch : enterSearch}
+              />
+              {!isDesktop && onOpenSampler && (
+                <ActionButton
+                  icon={samplerIcon}
+                  iconBadge
+                  label={t("sampler.switch.sampler")}
+                  onPress={() => {
+                    onClose();
+                    onOpenSampler();
+                  }}
+                />
+              )}
+            </Group>
+
+            {conversations.length === 0 && (
+              <Text style={styles.emptyText}>{t("conversations.empty")}</Text>
+            )}
+          </>
+        }
         onScroll={handleScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
+        stickySectionHeadersEnabled={false}
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={5}
         //desktop title level with the top bar buttons
         contentContainerStyle={{ paddingTop: isDesktop ? Spacing.lg : 60, paddingBottom: 40 }}
-      >
-        {/* docked desktop panel has no title */}
-        {!isDesktop && (
-          <View style={styles.header}>
-            <View style={styles.headerSpacer} />
-            <Text style={styles.title} numberOfLines={1}>{t("conversations.title")}</Text>
-            <View style={styles.headerSpacer} />
-          </View>
-        )}
-
-        <Group style={styles.quickActionsSpacing}>
-          <ActionButton
-            icon={newIcon}
-            iconBadge
-            label={t("conversations.new")}
-            style={isDesktop && styles.desktopButton}
-            onPress={() => {
-              onNewConversation();
-              if (!isDesktop) onClose();
-            }}
-          />
-          <ActionButton
-            icon={searchIcon}
-            iconBadge
-            label={t("conversations.search.action")}
-            style={isDesktop && styles.desktopButton}
-            onPress={isDesktop && onOpenSearch ? onOpenSearch : enterSearch}
-          />
-          {!isDesktop && onOpenSampler && (
-            <ActionButton
-              icon={samplerIcon}
-              iconBadge
-              label={t("sampler.switch.sampler")}
-              onPress={() => {
-                onClose();
-                onOpenSampler();
-              }}
-            />
-          )}
-        </Group>
-
-        {conversations.length === 0 && (
-          <Text style={styles.emptyText}>{t("conversations.empty")}</Text>
-        )}
-
-        {pinnedConversations.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t("conversations.pins")}</Text>
-            {pinnedConversations.map(renderConversationRow)}
-          </View>
-        )}
-
-        {groups.map((group) => (
-          <View key={group.title} style={styles.section}>
-            <Text style={styles.sectionTitle}>{group.title}</Text>
-            {group.data.map(renderConversationRow)}
-          </View>
-        ))}
-      </ScrollView>
+      />
       {!isDesktop && (
         <>
           <LinearGradient

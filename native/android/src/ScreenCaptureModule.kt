@@ -26,6 +26,10 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -175,18 +179,26 @@ class ScreenCaptureModule(context: ReactApplicationContext) : ReactContextBaseJa
       square.getPixels(pixels, 0, size, 0, 0, size, size)
       square.recycle()
 
-      //model reads channels in nchw order
+      //normalize nchw tensor in background
       val plane = size * size
-      val planes = ByteArray(3 * plane)
+      val inv255 = 1.0f / 255.0f
+      val floats = FloatArray(3 * plane)
       for (i in 0 until plane) {
         val pixel = pixels[i]
-        planes[i] = ((pixel shr 16) and 0xFF).toByte()
-        planes[plane + i] = ((pixel shr 8) and 0xFF).toByte()
-        planes[2 * plane + i] = (pixel and 0xFF).toByte()
+        floats[i] = ((pixel shr 16) and 0xFF) * inv255
+        floats[plane + i] = ((pixel shr 8) and 0xFF) * inv255
+        floats[2 * plane + i] = (pixel and 0xFF) * inv255
+      }
+
+      val tensorFile = File(reactApplicationContext.cacheDir, "detection_input.bin")
+      val byteBuf = ByteBuffer.allocate(floats.size * 4).order(ByteOrder.nativeOrder())
+      byteBuf.asFloatBuffer().put(floats)
+      FileOutputStream(tensorFile).use { out ->
+        out.write(byteBuf.array())
       }
 
       promise.resolve(Arguments.createMap().apply {
-        putString("data", Base64.encodeToString(planes, Base64.NO_WRAP))
+        putString("uri", "file://" + tensorFile.absolutePath)
         putInt("offsetX", offsetX)
         putInt("offsetY", offsetY)
         putInt("contentWidth", contentWidth)

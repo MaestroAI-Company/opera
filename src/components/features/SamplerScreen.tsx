@@ -807,6 +807,7 @@ export default function SamplerScreen({
                     name={p.name}
                     createdAt={p.createdAt * 1000}
                     compact
+                    active={visible}
                   />
                 </Pressable>
               ))}
@@ -1070,6 +1071,7 @@ export default function SamplerScreen({
             <ProfileCard
               name={target.name}
               createdAt={target.createdAt * 1000}
+              active={visible}
             />
           </View>
         </View>

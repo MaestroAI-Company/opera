@@ -6,7 +6,6 @@ import {
   BackHandler,
   DeviceEventEmitter,
   ImageSourcePropType,
-  InteractionManager,
   Keyboard,
   Linking,
   Platform,
@@ -260,7 +259,7 @@ function AssistantOverlay() {
     if (closed) return;
     let cancelled = false;
     appContextRef.current = null;
-    const handle = InteractionManager.runAfterInteractions(() => {
+    const idleId = requestIdleCallback(() => {
       if (cancelled) return;
       setAppIconInfo(null);
       setAppContextDismissed(false);
@@ -275,7 +274,7 @@ function AssistantOverlay() {
         })
         .catch(() => { });
     });
-    return () => { cancelled = true; handle.cancel(); };
+    return () => { cancelled = true; cancelIdleCallback(idleId); };
   }, [session, closed]);
 
 
@@ -349,7 +348,7 @@ function AssistantOverlay() {
 
         //defer model preload past animation
         if (s.ollamaModel) {
-          InteractionManager.runAfterInteractions(() => {
+          requestIdleCallback(() => {
             AIModule.preloadModel(s.ollamaModel!).catch(() => { });
           });
         }
@@ -357,7 +356,7 @@ function AssistantOverlay() {
         console.warn('Failed to load settings in AssistantOverlay', e);
       }
       //only needed once tools are used
-      InteractionManager.runAfterInteractions(() => {
+      requestIdleCallback(() => {
         if (toolsBooted) return;
         toolsBooted = true;
         PluginRegistry.init().then(() => PluginRegistry.loadAll()).catch(() => { });

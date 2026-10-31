@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AppState, InteractionManager } from 'react-native';
+import { AppState } from 'react-native';
 import { ScreenCapture, ScreenCode } from './screenCapture';
 
 const NO_CODES: ScreenCode[] = [];
@@ -19,7 +19,7 @@ export function useScreenText(session: number, enabled: boolean) {
       cancelled = state !== 'active';
     });
 
-    const task = InteractionManager.runAfterInteractions(async () => {
+    const idleId = requestIdleCallback(async () => {
       const size = await ScreenCapture.waitForSize(() => cancelled);
       if (!size || cancelled) return;
 
@@ -37,7 +37,7 @@ export function useScreenText(session: number, enabled: boolean) {
     return () => {
       cancelled = true;
       appState.remove();
-      task.cancel();
+      cancelIdleCallback(idleId);
     };
   }, [session, enabled]);
 

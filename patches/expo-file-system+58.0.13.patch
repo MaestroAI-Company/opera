@@ -1,8 +1,8 @@
 diff --git a/node_modules/expo-file-system/android/src/main/java/expo/modules/filesystem/FileSystemDownloadTask.kt b/node_modules/expo-file-system/android/src/main/java/expo/modules/filesystem/FileSystemDownloadTask.kt
-index 44dd86d..96548b5 100644
+index bbf9712..29da87e 100644
 --- a/node_modules/expo-file-system/android/src/main/java/expo/modules/filesystem/FileSystemDownloadTask.kt
 +++ b/node_modules/expo-file-system/android/src/main/java/expo/modules/filesystem/FileSystemDownloadTask.kt
-@@ -176,7 +176,11 @@ class FileSystemDownloadTask : SharedObject() {
+@@ -177,7 +177,11 @@ class FileSystemDownloadTask : SharedObject() {
                  safeResumeWithException(UnableToDownloadException(e.message ?: "Download failed"))
                }
              } catch (e: Exception) {
@@ -15,7 +15,7 @@ index 44dd86d..96548b5 100644
              }
            }
          }
-@@ -222,7 +226,7 @@ class FileSystemDownloadTask : SharedObject() {
+@@ -227,7 +231,7 @@ class FileSystemDownloadTask : SharedObject() {
  
          while (input.read(buffer).also { bytesRead = it } != -1) {
            if (isCancelling) {

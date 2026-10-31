@@ -3,11 +3,23 @@ const { getDefaultConfig } = require("expo/metro-config");
 
 const config = getDefaultConfig(__dirname);
 
-//disable package exports resolution (whisper.rn missing "." entry)
-config.resolver.unstable_enablePackageExports = false;
+//defer module evaluation until first use
+config.transformer.getTransformOptions = async () => ({
+  transform: {
+    experimentalImportSupport: false,
+    inlineRequires: true,
+  },
+});
 
 //shim react-native-webview to iframe on web (no web support in v13)
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  //strip desktop modules from mobile bundles
+  if (
+    platform !== "web" &&
+    (moduleName.startsWith("@tauri-apps/") || moduleName === "@fabianlars/tauri-plugin-oauth")
+  ) {
+    return { type: "empty" };
+  }
   if (moduleName === "react-native-webview" && platform === "web") {
     return {
       filePath: path.resolve(__dirname, "src/components/ui/WebView.web.tsx"),

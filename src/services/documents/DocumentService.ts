@@ -1,6 +1,4 @@
 import { File } from 'expo-file-system';
-import { extractDocxText } from './docx';
-import { parsePdf } from './pdfExtraction';
 
 //reject oversized documents before parsing
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
@@ -100,6 +98,9 @@ function truncate(text: string): { text: string; note?: string } {
 }
 
 async function extractPdf(uri: string): Promise<{ text: string; images: string[]; note?: string }> {
+  //keep heavy pdfjs off startup
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { parsePdf } = require('./pdfExtraction') as typeof import('./pdfExtraction');
   const base64 = await readBase64(uri);
   const result = await parsePdf(base64, MAX_PDF_PAGES, MAX_PDF_IMAGES);
 
@@ -143,7 +144,8 @@ export async function extractDocument(doc: PickedDocument): Promise<ExtractedDoc
   }
 
   const raw = kind === 'docx'
-    ? extractDocxText(await readBytes(doc.uri))
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    ? (require('./docx') as typeof import('./docx')).extractDocxText(await readBytes(doc.uri))
     : await readText(doc.uri);
 
   if (!raw.trim()) throw new Error('this document is empty');

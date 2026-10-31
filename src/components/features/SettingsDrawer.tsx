@@ -3788,7 +3788,7 @@ export default function SettingsDrawer({
       {/* android needs a real view */}
       <View ref={profileCardRef} collapsable={false} style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <ProfileCard name={confirmedName} />
+          <ProfileCard name={confirmedName} active={visible} />
         </View>
       </View>
 

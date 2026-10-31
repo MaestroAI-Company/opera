@@ -24,6 +24,7 @@ export default function SplashScreen({ onFinish }: Props) {
         source={animation}
         autoPlay
         loop={false}
+        renderMode="HARDWARE"
         resizeMode={isDesktop ? "contain" : "cover"}
         style={styles.animation}
         onAnimationFinish={(isCancelled) => {

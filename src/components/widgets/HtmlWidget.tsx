@@ -58,7 +58,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: {
     width: '100%',
     backgroundColor: Colors.surface,
-    borderRadius: Radius.window,
+    borderRadius: Radius.xxl,
     overflow: 'hidden',
   }
 });

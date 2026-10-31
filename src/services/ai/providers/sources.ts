@@ -83,14 +83,17 @@ export function getHubName(): string {
 
 export function getHubServers(): (OllamaServer & { kind: HubProvider['kind']; provider: string })[] {
   //hub name avoids clashing with local ollama
-  return hubProviders.map((p) => ({
-    ...hubServerPrefs[`${HUB_URL_SCHEME}${p.id}`],
-    url: `${HUB_URL_SCHEME}${p.id}`,
-    name: hubName ? `${p.name} · ${hubName}` : p.name,
-    provider: p.name,
-    id: `hub_${p.id}`,
-    kind: p.kind,
-  }));
+  return hubProviders.map((p) => {
+    const providerName = p.id === 'llamacpp' ? 'Sampler Hub' : p.name;
+    return {
+      ...hubServerPrefs[`${HUB_URL_SCHEME}${p.id}`],
+      url: `${HUB_URL_SCHEME}${p.id}`,
+      name: hubName ? `${providerName} · ${hubName}` : providerName,
+      provider: providerName,
+      id: `hub_${p.id}`,
+      kind: p.kind,
+    };
+  });
 }
 
 export function hubProviderKind(url: string): HubProvider['kind'] {
@@ -105,6 +108,8 @@ export type OllamaServer = {
   keepAlive?: number;
   //names the stored openai api key
   id?: string;
+  //turned off server stays configured but leaves the pickers
+  disabled?: boolean;
   //disabled ones hidden from pickers
   disabledModels?: string[];
   //user set caps win over detection
@@ -128,6 +133,7 @@ function readServer(entry: unknown): OllamaServer | null {
   if (typeof raw.contextLength === 'number') server.contextLength = raw.contextLength;
   if (typeof raw.keepAlive === 'number') server.keepAlive = raw.keepAlive;
   if (typeof raw.id === 'string' && raw.id.length > 0) server.id = raw.id;
+  if (raw.disabled === true) server.disabled = true;
   if (Array.isArray(raw.disabledModels)) {
     const disabled = raw.disabledModels.filter((m): m is string => typeof m === 'string');
     if (disabled.length > 0) server.disabledModels = disabled;
@@ -267,13 +273,20 @@ export function openAIServerNames(servers: OllamaServer[]): (string | null)[] {
 function serverSources(service: string, servers: OllamaServer[], fallback: string): ModelSource[] {
   const kept = servers.filter((s) => s.url.length > 0);
   const names = service === OPENAI_PROVIDER_ID ? openAIServerNames(kept) : kept.map((s) => s.name || null);
-  return kept.map((server, i) => ({
-    key: `${service}:${server.url}`,
-    service,
-    //name wins over host then provider
-    label: names[i] || (kept.length > 1 ? serverLabel(server.url) : fallback),
-    url: server.url,
-  }));
+  //numbering and labels follow every server, off ones included
+  return kept
+    .map((server, i) => ({
+      server,
+      source: {
+        key: `${service}:${server.url}`,
+        service,
+        //name wins over host then provider
+        label: names[i] || (kept.length > 1 ? serverLabel(server.url) : fallback),
+        url: server.url,
+      },
+    }))
+    .filter(({ server }) => !server.disabled)
+    .map(({ source }) => source);
 }
 
 //one entry per provider and server

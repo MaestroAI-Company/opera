@@ -127,7 +127,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   image: {
     minHeight: 0,
     minWidth: 0,
-    borderRadius: Radius.window,
+    borderRadius: Radius.xxl,
     borderWidth: 2,
     borderColor: Colors.border,
   },
@@ -136,7 +136,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   block: {
     borderWidth: 0,
-    borderRadius: Radius.window,
+    borderRadius: Radius.xxl,
   },
   row: {
     flex: 1,
@@ -147,7 +147,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flex: 1.4,
   },
   list: {
-    borderRadius: Radius.window,
+    borderRadius: Radius.xxl,
     backgroundColor: Colors.surface,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.xl2,

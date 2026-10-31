@@ -215,7 +215,7 @@ Depth comes from **2px sticker outlines and hard-offset shadows**, not heavy blu
 The shape language is **sticker-like**: 2px outlines on nearly every interactive element, with a **10px default radius** for cards, inputs and buttons.
 
 - `sm` 4px — checkboxes, inline code; `lg` 6px — code blocks; `xl` 8px — message images, dropdown options.
-- `window` 15px — confirmation/info modal windows, the chat composer, sent message bubbles and widgets (container and tiles). Buttons and inputs inside a modal stay at the 10px default.
+- `window` 15px — confirmation/info modal windows, the chat composer, sent message bubbles, markdown tables and widget cards (`WidgetWrapper`). Nested tiles inside widgets adapt to 10px (`Radius.xxl`) to match the 5px card padding. Buttons and inputs inside a modal stay at the 10px default.
 - `huge` 16px — 32×32 icon buttons and audio bubbles; `pill` 20px — toggles, snackbars, avatars.
 - Don't mix sharp and rounded corners in the same view.
 
@@ -775,11 +775,11 @@ content: {
 
 ## Widgets
 
-Structured results (weather, contact lookup, calendar events, timers, math) share one primitive set from `src/components/toolwidgets/ToolWidgetBlocks.tsx`, rather than each widget inventing its own layout. The widget card (`WidgetWrapper`) and every tile inside it use the 15px `Radius.window`, like the chat composer and sent bubbles.
+Structured results (weather, contact lookup, calendar events, timers, math) share one primitive set from `src/components/toolwidgets/ToolWidgetBlocks.tsx`, rather than each widget inventing its own layout. The widget card (`WidgetWrapper`) uses the 15px `Radius.window`, like the chat composer and sent bubbles, while tiles inside use an adapted 10px radius (`Radius.xxl`) to match the 5px padding.
 
 - **`Caption`:** a muted single line above the blocks (Figtree, 18px, `text-muted`), describing what's below — the searched expression, the resolved contact's label, the event title.
 - **`BlockRow` / `BlockContainer`:** lay out one or more blocks in a row, stacked in a vertical container with no extra padding — blocks run edge to edge inside the widget's own 5px card padding.
-- **`Block`:** a rounded tile (15px radius, 2px border). `outlined` (default) is a white tile with an ink border for secondary values (a date, a phone number, a temperature). `filled` is a solid Opera Red tile with a translucent white border for the single headline value (a contact's name, an event's day, a timer's duration, a math result).
+- **`Block`:** a rounded tile (10px radius, 2px border). `outlined` (default) is a white tile with an ink border for secondary values (a date, a phone number, a temperature). `filled` is a solid Opera Red tile with a translucent white border for the single headline value (a contact's name, an event's day, a timer's duration, a math result).
 - **`BlockSymbol`:** a bare glyph between two blocks (`=`, `→`) — no border, no fill, tight horizontal padding. Use this instead of an outlined `Block` for connectors/operators.
 
 **Rule:** any text inside a `filled` (Opera Red) block MUST use the Petrona serif font (`serif` prop on `Block`), never Fragment Mono or Figtree — regardless of whether the value is a name, a day, a duration, or a number. This is what makes the single most important value in a widget read as a headline rather than UI chrome.
@@ -795,5 +795,5 @@ Structured results (weather, contact lookup, calendar events, timers, math) shar
 - Don't darken the main color for a pressed state.
 - Don't add heavy drop shadows; prefer sticker shadows and 2px outlines.
 - Don't mix serif display and monospace in the same heading.
-- Don't exceed the 10px default radius on data-dense cards, except widgets and their tiles (15px).
+- Don't exceed the 10px default radius on data-dense cards, except widget cards, markdown tables and modal windows (15px).
 - Do keep body text at WCAG AA contrast. Note: white text on Opera Red is ~3.9:1, so use red surfaces for large or bold text and chrome, not small body copy. A pressed red surface drops to ~3.3:1, which is acceptable for the brief feedback of chrome and bold labels.

@@ -16,21 +16,17 @@ import CardGrid, { type GridCard } from "../ui/CardGrid";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 
-const addIcon = require("../../../assets/icons/add.png");
 const binIcon = require("../../../assets/icons/bin.png");
 
 type HubModelsSectionProps = {
-  onAddModel: () => void;
   onOpenModel: (file: string, name: string) => void;
-  //off where another action is the main one
-  highlight?: boolean;
 };
 
 //llama.cpp models the hub runs, admins only
-export default function HubModelsSection({ onAddModel, onOpenModel, highlight = true }: HubModelsSectionProps) {
+export default function HubModelsSection({ onOpenModel }: HubModelsSectionProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
-  const { api, status, catalog, error } = useHubModels();
+  const { status, catalog } = useHubModels();
   const [actionError, setActionError] = useState<string | null>(null);
   const [cancelFile, setCancelFile] = useState<string | null>(null);
 
@@ -67,41 +63,14 @@ export default function HubModelsSection({ onAddModel, onOpenModel, highlight = 
     })),
   ];
 
-  const runtime = error
-    ? message(error)
-    : !status
-      ? t("hubModels.loading")
-      : status.state === "running"
-        ? t(status.channel === "nightly" ? "hubModels.runningNightly" : "hubModels.running", {
-            backend: (status.backend ?? "cpu").toUpperCase(),
-          })
-        : status.state === "installing"
-          ? t("hubModels.installing")
-          : status.state === "failed"
-            ? t("hubModels.startFailed", { error: status.message ?? "" })
-            : t("hubModels.idle");
-
   return (
     <>
-      {/* runtime and models on the hub */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{t("hubModels.title")}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{actionError ?? runtime}</Text>
-
-          <Group style={[highlight && styles.highlightGroup, !api && styles.highlightGroupDisabled]}>
-            <ActionButton
-              icon={addIcon}
-              label={t("settings.litert.addModel")}
-              variant={highlight ? "highlight" : "default"}
-              disabled={!api}
-              onPress={onAddModel}
-            />
-          </Group>
-
-          {cards.length > 0 && <CardGrid cards={cards} style={{ marginTop: Spacing.md }} />}
+      {/* models on the hub */}
+      {cards.length > 0 && (
+        <View style={styles.contentCard}>
+          <CardGrid cards={cards} />
         </View>
-      </View>
+      )}
 
       <NotificationModal
         visible={!!cancelFile}

@@ -13,7 +13,6 @@ import NotificationModal from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 
-const addIcon = require("../../../assets/icons/add.png");
 const binIcon = require("../../../assets/icons/bin.png");
 const fileIcon = require("../../../assets/icons/file.png");
 const keyIcon = require("../../../assets/icons/key.png");
@@ -115,44 +114,23 @@ export function McpFieldRows({ fields, drafts, secretsSet = [], onChange, onPick
 }
 
 type HubMcpSectionProps = {
-  highlight?: boolean;
-  onAddServer: () => void;
   onOpenServer: (id: string, title: string) => void;
 };
 
 //mcp servers the sampler runs, admins only
-export default function HubMcpSection({ highlight = true, onAddServer, onOpenServer }: HubMcpSectionProps) {
+export default function HubMcpSection({ onOpenServer }: HubMcpSectionProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const stateLabel = useMcpStateLabel();
-  const { api, status, error } = useHubMcp();
+  const { status } = useHubMcp();
   const servers = status?.servers ?? [];
 
-  const help = error
-    ? t("hubMcp.failed", { error: message(error) })
-    : !status
-      ? t("hubMcp.loading")
-      : t(status.isolation === "full" ? "hubMcp.helpFull" : "hubMcp.helpPartial");
-
   return (
-    <View style={styles.contentCard}>
-      <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-        <Text style={styles.settingLabel}>{t("hubMcp.title")}</Text>
-        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{help}</Text>
-
-        <Group style={[highlight && styles.highlightGroup, !api && styles.highlightGroupDisabled]}>
-          <ActionButton
-            icon={addIcon}
-            label={t("hubMcp.add")}
-            variant={highlight ? "highlight" : "default"}
-            disabled={!api}
-            onPress={onAddServer}
-          />
-        </Group>
-
-        {servers.length > 0 && (
+    <>
+      {/* servers on the sampler */}
+      {servers.length > 0 && (
+        <View style={styles.contentCard}>
           <CardGrid
-            style={{ marginTop: Spacing.md }}
             cards={servers.map((server) => ({
               key: server.id,
               title: server.listing.title,
@@ -161,9 +139,9 @@ export default function HubMcpSection({ highlight = true, onAddServer, onOpenSer
               onPress: () => onOpenServer(server.id, server.listing.title),
             }))}
           />
-        )}
-      </View>
-    </View>
+        </View>
+      )}
+    </>
   );
 }
 

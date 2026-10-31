@@ -36,7 +36,7 @@ const makeS = (Colors: ThemeColors) => StyleSheet.create({
   },
   codeCard: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.xxl,
+    borderRadius: Radius.window,
     overflow: "hidden",
     width: "100%",
     padding: 5,
@@ -63,10 +63,10 @@ const makeS = (Colors: ThemeColors) => StyleSheet.create({
     gap: Spacing.xs,
   },
   codeContent: {
-    backgroundColor: Colors.codeBlockBg,
-    borderRadius: Radius.md,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl,
     borderWidth: 2,
-    borderColor: Colors.responseBorder,
+    borderColor: Colors.border,
     overflow: "hidden",
   },
   h1: { fontSize: FontSizes.displaySm, fontWeight: "bold", marginTop: 8, marginBottom: 4, color: Colors.textPrimary },
@@ -671,12 +671,12 @@ export function CodeContent({ code, language, incognito, maxHeight, radius, back
   const s = useThemedStyles(makeS);
   const lang = language ? LANG_ALIASES[language] ?? language : undefined;
   const textStyle = { fontFamily: Fonts.mono, fontSize: FontSizes.code, lineHeight: 18 } as const;
-  const codeBorderColor = incognito ? Colors.incognito : Colors.responseBorder;
   //light text only reads on a dark surface
   const onDark = dark ?? themeDark;
+  const codeBorderColor = incognito ? Colors.incognito : (onDark ? Colors.responseBorder : Colors.border);
 
   return (
-    <View style={[s.codeContent, { maxHeight, borderColor: codeBorderColor, backgroundColor: background ?? Colors.surface, borderRadius: radius ?? s.codeContent.borderRadius }]}>
+    <View style={[s.codeContent, { maxHeight, borderColor: codeBorderColor, backgroundColor: background ?? (onDark ? Colors.responseSurface : Colors.surface), borderRadius: radius ?? s.codeContent.borderRadius }]}>
       {lang ? (
         <CodeHighlighter
           language={lang}
@@ -743,10 +743,11 @@ const CodeBlock = React.memo(function CodeBlock({
     DeviceEventEmitter.emit(AppEvents.openCodePreview, { code, language, title, incognito });
   }, [code, language, title, incognito]);
 
+  const isDark = dark ?? themeDark;
   const displayTitle = title || codeLanguageName(language) || "Code";
 
-  const cardBg = dark ? Colors.responseSurface : Colors.surface;
-  const titleColor = dark ? Colors.responseTextStrong : Colors.textPrimary;
+  const cardBg = isDark ? Colors.responseSurface : Colors.surface;
+  const titleColor = isDark ? Colors.responseTextStrong : Colors.textPrimary;
 
   return (
     <Pressable onPress={handleOpen} style={[s.codeCard, { backgroundColor: cardBg }]}>
@@ -760,28 +761,28 @@ const CodeBlock = React.memo(function CodeBlock({
             label={t("common.expand")}
             onPress={handleOpen}
             containerSize={32}
-            pressedColor={Colors.surfacePressed}
-            tintColor={dark ? Colors.responseTextMuted : Colors.textSecondary}
+            pressedColor={isDark ? Colors.overlayHover : Colors.surfacePressed}
+            tintColor={isDark ? Colors.responseTextMuted : Colors.textSecondary}
           />
           <IconButton
             icon={downloadIcon}
             label={t("common.download")}
             onPress={handleDownload}
             containerSize={32}
-            pressedColor={Colors.surfacePressed}
-            tintColor={dark ? Colors.responseTextMuted : Colors.textSecondary}
+            pressedColor={isDark ? Colors.overlayHover : Colors.surfacePressed}
+            tintColor={isDark ? Colors.responseTextMuted : Colors.textSecondary}
           />
           <IconButton
             icon={copyIcon}
             label={t("common.copy")}
             onPress={handleCopy}
             containerSize={32}
-            pressedColor={Colors.surfacePressed}
-            tintColor={dark ? Colors.responseTextMuted : Colors.textSecondary}
+            pressedColor={isDark ? Colors.overlayHover : Colors.surfacePressed}
+            tintColor={isDark ? Colors.responseTextMuted : Colors.textSecondary}
           />
         </View>
       </View>
-      <CodeContent code={code} language={language} incognito={incognito} maxHeight={CODE_BLOCK_MAX_HEIGHT} background={cardBg} dark={dark || themeDark} />
+      <CodeContent code={code} language={language} incognito={incognito} maxHeight={CODE_BLOCK_MAX_HEIGHT} background={cardBg} dark={isDark} />
     </Pressable>
   );
 });
@@ -979,22 +980,13 @@ export function renderMarkdown(md: string, incognito?: boolean, dark?: boolean):
       const headerBg = incognito ? Colors.incognito : (dark ? Colors.whiteFaint : Colors.primary);
       const headerTextColor = incognito ? Colors.textOnPrimary : (dark ? textColor : Colors.textOnPrimary);
       const headerBorderColor = dark ? borderColor : Colors.borderOnPrimary;
-      const cardStyle = incognito || dark
-        ? undefined
-        : {
-          backgroundColor: Colors.surface,
-          shadowColor: Colors.shadowInk,
-          shadowOffset: { width: -3, height: 3 },
-          shadowOpacity: 1,
-          shadowRadius: 0,
-          elevation: 2,
-        };
+      const cardStyle = incognito || dark ? undefined : { backgroundColor: Colors.surface };
 
       elements.push(
-        <View key={`table-${i}`} style={[{ borderRadius: Radius.xxl, overflow: "hidden", marginVertical: Spacing.lg }, cardStyle]}>
+        <View key={`table-${i}`} style={[{ borderRadius: Radius.window, overflow: "hidden", marginVertical: Spacing.lg }, cardStyle]}>
           {headerCells && (
             <View style={{ padding: Spacing.sm }}>
-              <View style={{ flexDirection: "row", backgroundColor: headerBg, borderRadius: Radius.md, borderWidth: 2, borderColor: headerBorderColor, overflow: "hidden" }}>
+              <View style={{ flexDirection: "row", backgroundColor: headerBg, borderRadius: Radius.xxl, borderWidth: 2, borderColor: headerBorderColor, overflow: "hidden" }}>
                 {padCell(headerCells).map((c, ci) => (
                   <View key={`h-${ci}`} style={s.tableCellBox}>
                     {wrapContent(c, `hc-${ci}`, [s.tableHeaderCell, headerTextColor && { color: headerTextColor }], ci, incognito, selColor)}

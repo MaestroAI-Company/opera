@@ -11,7 +11,7 @@
 
   <p>
     <img alt="platform" src="https://img.shields.io/badge/platform-Android%20%7C%20Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-FF1A1A?style=flat-square">
-    <img alt="Expo" src="https://img.shields.io/badge/Expo-SDK%2057-000020?style=flat-square&logo=expo&logoColor=white">
+    <img alt="Expo" src="https://img.shields.io/badge/Expo-SDK%2058-000020?style=flat-square&logo=expo&logoColor=white">
     <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white">
     <img alt="License" src="https://img.shields.io/badge/license-AGPLv3-333333?style=flat-square">
   </p>
@@ -40,7 +40,7 @@ Opera is a privacy-first AI assistant. Run a model on the device itself, on your
 
 | Layer | Technology |
 |---|---|
-| Mobile / Web UI | Expo (SDK 57), React Native, `expo-router`, React 19 |
+| Mobile / Web UI | Expo (SDK 58), React Native, `expo-router`, React 19 |
 | Local database | SQLite (`expo-sqlite`) |
 | On-device AI | LiteRT-LM (`react-native-litert-lm`), Android AICore (Gemini Nano), ExecuTorch (on-screen object detection), Whisper via `@xenova/transformers` (web) |
 | Native Android | Kotlin / Java (voice interaction service, overlay, screen capture, text selection, AICore bridge) |
@@ -107,6 +107,22 @@ npm run android:preview   # release build (R8, bundled JS, no Metro) for testing
 ```
 
 Both share the same app slot and data, so downloaded models survive switching between them. Once installed, JS-only changes just need `npm start` and opening Opera Dev; rebuild only after native changes (plugins, `app.json`, Kotlin modules, native deps).
+
+**Dev builds on iOS** - needs a Mac with Xcode. iOS 17 or newer is required.
+
+```bash
+npx expo prebuild --platform ios --clean
+npm run ios
+```
+
+Opera asks for the `extended-virtual-addressing` entitlement so larger on-device models can load, and its share extension needs an App Group. Free Apple accounts (Personal Team) can't sign either, so set `IOS_PERSONAL_TEAM=1` when you prebuild and `app.config.js` drops both:
+
+```bash
+IOS_PERSONAL_TEAM=1 npx expo prebuild --platform ios --clean
+npm run ios
+```
+
+The app runs without them, but the largest on-device models may run out of memory and sharing to Opera from other apps is off. A paid Apple developer account keeps the entitlement and avoids the 7-day expiry of free signing.
 
 Then, only if you need it:
 

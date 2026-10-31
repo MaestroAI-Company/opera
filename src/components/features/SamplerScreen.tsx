@@ -55,6 +55,7 @@ import {
 import { Settings } from "../../services/settings/SettingsService";
 import ActionButton from "../ui/ActionButton";
 import CardGrid, { type GridCard } from "../ui/CardGrid";
+import FloatingButton from "../ui/FloatingButton";
 import Group from "../ui/Group";
 import MetricChart, { CHART_POINTS } from "../ui/MetricChart";
 import NotificationModal, { type ModalButton } from "../ui/NotificationModal";
@@ -68,6 +69,8 @@ import DrawerSheet, {
   SheetScrollView,
 } from "./DrawerSheet";
 import HubDeviceSheet from "./HubDeviceSheet";
+import HubOrbit, { type OrbitNode } from "./HubOrbit";
+import HubSheet from "./HubSheet";
 import HubMcpSection, { HubMcpServerPage } from "./HubMcpSection";
 import HubMcpSheet, { HubFolderSheet } from "./HubMcpSheet";
 import HubModelsSection, { HubModelPage } from "./HubModelsSection";
@@ -112,6 +115,8 @@ const HUB_DEVICE_ICONS: Record<string, ImageSourcePropType> = {
   web: require("../../../assets/icons/website.png"),
 };
 const HUB_INACTIVE_AFTER_S = 30 * 24 * 60 * 60;
+//a device seen this recently counts as connected
+const HUB_CONNECTED_WITHIN_S = 120;
 const USAGE_POLL_MS = 5000;
 //a connected hub answers far sooner
 const STATUS_TIMEOUT_MS = 8000;
@@ -126,8 +131,6 @@ const answerWithin = <T,>(answer: Promise<T>): Promise<T> => {
 const OVERVIEW_POLL_MS = 10000;
 //same column as the chat: 840 wide with 16 on each side
 const PAGE_MAX_WIDTH = 840 - 2 * Spacing.xl2;
-//two home columns from this page width
-const TWO_COLUMNS_FROM = 760;
 const TILE_MIN_WIDTH = 150;
 //slider beside its text on desktop
 const SLIDER_WIDTH = 320;
@@ -269,9 +272,11 @@ export default function SamplerScreen({
   );
   const [pairingVisible, setPairingVisible] = useState(false);
   const [qrMode, setQrMode] = useState<"invite" | "link" | null>(null);
+  const [hubSheetVisible, setHubSheetVisible] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [modelsSheetVisible, setModelsSheetVisible] = useState(false);
   const [mcpSheetVisible, setMcpSheetVisible] = useState(false);
+  const [modelSettingsVisible, setModelSettingsVisible] = useState(false);
   const [folderPick, setFolderPick] = useState<{
     start?: string;
     done: (path: string) => void;
@@ -384,6 +389,25 @@ export default function SamplerScreen({
   const showMcpOverview = isAdmin && SamplerHub.canSeeMcpServers();
   const canManageMcp = SamplerHub.canManageMcp();
   const showMcp = showMcpOverview || canManageMcp;
+
+  //the home orbit shows who is connected now
+  useEffect(() => {
+    if (!visible || page !== "home" || !online || !pairedHub) return;
+    let live = true;
+    const timer = setInterval(() => {
+      SamplerHub.devices(pairedHub)
+        .then((next) => {
+          if (!live) return;
+          setDevices(next);
+          setDevicesAt(Date.now() / 1000);
+        })
+        .catch(() => {});
+    }, OVERVIEW_POLL_MS);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [visible, page, online, pairedHub]);
 
   //read only, on home, performance and its pages
   useEffect(() => {
@@ -861,18 +885,14 @@ export default function SamplerScreen({
     </View>
   );
 
-  const modelsSection = (highlight: boolean) => (
+  const modelsSection = () => (
     <HubModelsSection
-      highlight={highlight}
-      onAddModel={() => setModelsSheetVisible(true)}
       onOpenModel={(file, name) => setDetail({ file, name })}
     />
   );
 
-  const myMcpSection = (highlight: boolean) => (
+  const myMcpSection = () => (
     <HubMcpSection
-      highlight={highlight}
-      onAddServer={() => setMcpSheetVisible(true)}
       onOpenServer={(id, title) => setMyMcpDetail({ id, title })}
     />
   );
@@ -1307,7 +1327,7 @@ export default function SamplerScreen({
   );
 
   //hub info, then its actions
-  const renderHubCard = () => {
+  const hubRows = () => {
     const connection = {
       checking: t("settings.hub.checking"),
       offline: t("settings.hub.offline"),
@@ -1333,6 +1353,11 @@ export default function SamplerScreen({
           ]
         : []),
     ];
+    return rows;
+  };
+
+  const renderHubCard = () => {
+    const rows = hubRows();
     return (
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -1383,35 +1408,39 @@ export default function SamplerScreen({
     );
   };
 
-  const renderHome = () => {
-    const cards = [
-      <View key="profiles">{renderProfilesCard(false)}</View>,
-      <View key="devices">{renderDevicesCard(false)}</View>,
-    ];
-    if (pageWidth < TWO_COLUMNS_FROM) {
-      return (
-        <>
-          {renderHubCard()}
-          {cards}
-        </>
-      );
-    }
-    //two columns that fill independently
-    const half = Math.floor((pageWidth - Spacing.xxl2) / 2);
+  //the hub with its devices turning around it
+  const renderHubOrbit = () => {
+    const nodes: OrbitNode[] = (devices ?? []).map((device) => ({
+      key: device.id,
+      name: device.name,
+      icon: HUB_DEVICE_ICONS[device.kind] ?? operaIcon,
+      connected:
+        device.id === thisDeviceId ||
+        (!!device.lastSeen &&
+          devicesAt - device.lastSeen <= HUB_CONNECTED_WITHIN_S),
+      onPress:
+        isAdmin || device.id === thisDeviceId
+          ? () => setSelectedDeviceId(device.id)
+          : undefined,
+    }));
     return (
-      <>
-        {renderHubCard()}
-        <View style={styles.columns}>
-          <View style={{ width: half }}>
-            {cards.filter((_, i) => i % 2 === 0)}
-          </View>
-          <View style={{ width: half }}>
-            {cards.filter((_, i) => i % 2 === 1)}
-          </View>
-        </View>
-      </>
+      <View style={styles.contentCard}>
+        <HubOrbit
+          hubIcon={HUB_DEVICE_ICONS.desktop}
+          nodes={nodes}
+          onHubPress={() => setHubSheetVisible(true)}
+          active={visible && page === "home"}
+        />
+      </View>
     );
   };
+
+  const renderHome = () => (
+    <>
+      {renderHubOrbit()}
+      {renderProfilesCard(false)}
+    </>
+  );
 
   const renderProfiles = () => (
     <>
@@ -1501,16 +1530,9 @@ export default function SamplerScreen({
     </View>
   );
 
-  const renderModels = () => {
-    return (
-      <>
-        {renderFeatureToggle(
-          t("sampler.feature.models"),
-          t("sampler.feature.modelsHelp"),
-          modelsOn,
-          "models",
-        )}
-        {modelsOn && modelsSection(true)}
+  //share, nightly build and llama.cpp options
+  const renderModelSettings = () => (
+    <>
         {modelsOn && settings && (
           <View style={styles.contentCard}>
             {renderToggleRow(
@@ -1542,6 +1564,19 @@ export default function SamplerScreen({
           </View>
         )}
         {modelsOn && renderModelOptions()}
+    </>
+  );
+
+  const renderModels = () => {
+    return (
+      <>
+        {renderFeatureToggle(
+          t("sampler.feature.models"),
+          t("sampler.feature.modelsHelp"),
+          modelsOn,
+          "models",
+        )}
+        {modelsOn && modelsSection()}
       </>
     );
   };
@@ -1554,7 +1589,7 @@ export default function SamplerScreen({
         mcpOn,
         "mcpServers",
       )}
-      {canManageMcp && mcpOn && myMcpSection(true)}
+      {canManageMcp && mcpOn && myMcpSection()}
       {showMcpOverview && mcpOn && renderMcpServers()}
     </>
   );
@@ -1664,6 +1699,7 @@ export default function SamplerScreen({
     qrMode !== null ||
     selectedDeviceId !== null ||
     modelsSheetVisible ||
+    modelSettingsVisible ||
     mcpSheetVisible ||
     folderPick !== null ||
     detail !== null ||
@@ -2013,6 +2049,36 @@ export default function SamplerScreen({
   const selectedMcpServer =
     overview?.find((s) => s.id === selectedMcpServerId) ?? null;
 
+  //share, nightly build and llama.cpp options
+  const modelSettingsSheet = (
+    <DrawerSheet
+      visible={modelSettingsVisible}
+      onClose={() => setModelSettingsVisible(false)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      sheetStyle={[
+        styles.sheet,
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.desktopCard}
+    >
+      <SheetScrollView
+        contentContainerStyle={styles.sheetContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* cancels the margin of the last card */}
+        <View style={{ marginBottom: -Spacing.xxl2 }}>
+          {renderModelSettings()}
+        </View>
+      </SheetScrollView>
+    </DrawerSheet>
+  );
+
   //installed model detail sheet
   const hubModelSheet = (
     <DrawerSheet
@@ -2175,6 +2241,42 @@ export default function SamplerScreen({
                     </View>
                   </View>
                 )}
+                {shownPage === "models" && modelsOn && settings && (
+                  <View
+                    style={[styles.backWrapper, { top: contentTop }]}
+                    pointerEvents="box-none"
+                  >
+                    <View
+                      style={[styles.backColumn, { alignItems: "flex-end" }]}
+                      pointerEvents="box-none"
+                    >
+                      <DrawerBackButton
+                        kind="more"
+                        onPress={() => setModelSettingsVisible(true)}
+                        scrolled={scrolled}
+                      />
+                    </View>
+                  </View>
+                )}
+                {((shownPage === "models" && modelsOn) ||
+                  (shownPage === "mcp" && canManageMcp && mcpOn)) && (
+                  <View
+                    style={[
+                      styles.addModelWrapper,
+                      { bottom: Spacing.xl2 + (isDesktop ? 0 : insets.bottom) },
+                    ]}
+                    pointerEvents="box-none"
+                  >
+                    <FloatingButton
+                      icon={addIcon}
+                      onPress={() =>
+                        shownPage === "mcp"
+                          ? setMcpSheetVisible(true)
+                          : setModelsSheetVisible(true)
+                      }
+                    />
+                  </View>
+                )}
                 {/* switching section swaps pages, only nested pages push */}
                 <PageStack
                   key={section}
@@ -2252,6 +2354,25 @@ export default function SamplerScreen({
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />
+      <HubSheet
+        visible={hubSheetVisible}
+        rows={[
+          {
+            label: t("settings.hub.name"),
+            value: status?.name ?? pairedHub?.name ?? "",
+          },
+          ...hubRows(),
+        ]}
+        canStop={hostsHub && !hubStopped}
+        busy={hostBusy}
+        onStop={() => {
+          setHubSheetVisible(false);
+          confirmStop();
+        }}
+        onClose={() => setHubSheetVisible(false)}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
       <HubDeviceSheet
         device={devices?.find((d) => d.id === selectedDeviceId) ?? null}
         hub={pairedHub}
@@ -2277,6 +2398,7 @@ export default function SamplerScreen({
         isDesktop={isDesktop}
       />
       {hubModelSheet}
+      {modelSettingsSheet}
       <HubMcpSheet
         visible={mcpSheetVisible}
         onClose={() => setMcpSheetVisible(false)}
@@ -2404,6 +2526,15 @@ const makeStyles = (Colors: ThemeColors) =>
       elevation: 10,
       paddingHorizontal: Spacing.xl2,
     },
+    addModelWrapper: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      alignItems: "flex-end",
+      zIndex: 100,
+      elevation: 10,
+      paddingHorizontal: Spacing.xl2,
+    },
     backColumn: {
       width: "100%",
       maxWidth: PAGE_MAX_WIDTH,
@@ -2418,10 +2549,6 @@ const makeStyles = (Colors: ThemeColors) =>
       width: "100%",
       maxWidth: PAGE_MAX_WIDTH,
       alignSelf: "center",
-    },
-    columns: {
-      flexDirection: "row",
-      gap: Spacing.xxl2,
     },
     welcome: {
       flex: 1,

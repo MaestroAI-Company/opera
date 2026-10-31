@@ -801,6 +801,8 @@ export const fr: Translations = {
   "settings.pin.reset.confirm": "Supprimer et réinitialiser",
 
   "settings.service.ollama": "Ollama",
+  "settings.service.on": "Activé",
+  "settings.service.off": "Désactivé",
   "settings.service.ollamaHelp":
     "Utilise tes serveurs Ollama pour exécuter de puissants modèles d'IA chez toi.",
   "settings.service.cloudapi": "API Cloud",
@@ -1008,6 +1010,8 @@ export const fr: Translations = {
   "settings.tools.mcp.title": "Serveurs MCP",
   "settings.tools.mcp.help":
     "Connecte Opera à des serveurs MCP externes pour que l'assistant puisse utiliser leurs outils.",
+  "settings.tools.mcp.empty":
+    "Aucun serveur MCP pour l'instant. Appuie sur le bouton + pour en connecter un et donner de nouveaux outils à l'assistant.",
 
   "tools.consent.allow": "Autoriser",
   "tools.consent.decline": "Refuser",
@@ -1040,9 +1044,7 @@ export const fr: Translations = {
     "Retirer {name} ? Ses outils et sa connexion enregistrée seront supprimés.",
   "settings.server.link": "Lien",
   "settings.server.add": "Ajouter un serveur",
-  "settings.server.name": "Nom",
-  "settings.server.nameHelp":
-    "Facultatif. Le nom du serveur lui-même est utilisé si tu le laisses vide.",
+  "settings.server.name": "Nom (optionnel)",
   "settings.server.namePlaceholder": "nom du serveur",
   "settings.server.checking": "Vérification...",
   "settings.server.addFailed": "Impossible d'ajouter le serveur",

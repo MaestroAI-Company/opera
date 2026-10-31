@@ -8,14 +8,7 @@ import * as Location from "expo-location";
 import * as MediaLibrary from "expo-media-library/legacy";
 import * as Sharing from "expo-sharing";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   AppState,
@@ -88,36 +81,37 @@ import {
   subscribeLiteRTDownload,
 } from "../../services/ai/providers/LiteRTProvider";
 import { LocalModelSheet } from "../../services/ai/providers/LocalProvider";
+import { OpenAIProvider } from "../../services/ai/providers/OpenAIProvider";
 import {
   buildSources,
   getEnabledProviders,
+  getHubName,
+  getHubServers,
   getOllamaServers,
   getOllamaTuning,
   getOpenAIApiKeyById,
-  getHubName,
-  getHubServers,
   getOpenAIServers,
   getPromptTierOverride,
   HUB_PROVIDER_ID,
-  patchHubServer,
   isProviderSupported,
   newOpenAIServerId,
   OllamaServer,
   OPENAI_PROVIDER_ID,
   openAIServerNames,
+  patchHubServer,
   PROMPT_TIERS,
-  type PromptTier,
-  serializeServers,
   serializeProviders,
+  serializeServers,
   setOpenAIApiKey,
+  type PromptTier,
 } from "../../services/ai/providers/sources";
-import { OpenAIProvider } from "../../services/ai/providers/OpenAIProvider";
 import {
   parseQuickFlowOptionId,
   quickFlowOptionId,
 } from "../../services/ai/quickFlow";
 import { ITool } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
+import { openExternalUrl } from "../../services/ai/utils/openExternalUrl";
 import {
   isDefaultAssistant,
   openAssistantSettings,
@@ -129,36 +123,44 @@ import {
   getCloudProviderDefinition,
 } from "../../services/cloud/registry";
 import { CloudSync } from "../../services/CloudSyncService";
+import { AppEvents } from "../../services/events";
+import { HubSync } from "../../services/hub/HubSync";
+import {
+  CTX_SIZE_OPTIONS,
+  KEEP_ALIVE_OPTIONS,
+  LLAMA_SERVER_URL,
+  optionLabel,
+  PARALLEL_OPTIONS,
+} from "../../services/hub/modelOptions";
 import {
   HubProfile,
   HubStatus,
-  SamplerHub,
   PairedHub,
+  SamplerHub,
 } from "../../services/hub/SamplerHubService";
-import { HubSync } from "../../services/hub/HubSync";
-import { SyncPrefs, SyncPrefsStore } from "../../services/SyncPrefs";
-import { AppEvents } from "../../services/events";
 import { McpService } from "../../services/mcp/McpService";
-import { openExternalUrl } from "../../services/ai/utils/openExternalUrl";
 import { McpServerConfig } from "../../services/mcp/types";
+import {
+  OVERLAY_SHORTCUTS,
+  pushDesktopOverlayConfig,
+} from "../../services/overlay/desktopOverlay";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import { openScreenSaverSettings } from "../../services/screensaver/ScreenSaver";
 import { AppSettings, Settings } from "../../services/settings/SettingsService";
-import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { TTS_SPEEDS } from "../../services/speech/engines";
+import { STT, WhisperSTT } from "../../services/speech/STTService";
+import { SyncPrefs, SyncPrefsStore } from "../../services/SyncPrefs";
 import ActionButton from "../ui/ActionButton";
 import CardGrid, { type GridCard } from "../ui/CardGrid";
 import Checkbox from "../ui/Checkbox";
 import DownloadProgress, { throttleProgress } from "../ui/DownloadProgress";
+import FloatingButton from "../ui/FloatingButton";
 import Group from "../ui/Group";
+import IconSelector from "../ui/IconSelector";
 import NotificationBanner from "../ui/NotificationBanner";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import ProgressBar from "../ui/ProgressBar";
-import IconSelector from "../ui/IconSelector";
 import Selector, { SelectorOption } from "../ui/Selector";
-import { OVERLAY_SHORTCUTS, pushDesktopOverlayConfig } from "../../services/overlay/desktopOverlay";
-
-const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 import Slider from "../ui/Slider";
 import SliderToggle from "../ui/SliderToggle";
 import TextInputField from "../ui/TextInputField";
@@ -169,27 +171,33 @@ import DrawerSheet, {
   SheetScrollView,
 } from "./DrawerSheet";
 import {
-  CTX_SIZE_OPTIONS,
-  KEEP_ALIVE_OPTIONS,
-  LLAMA_SERVER_URL,
-  PARALLEL_OPTIONS,
-  optionLabel,
-} from "../../services/hub/modelOptions";
+  BUTTERFLY_OPTIONS,
+  selectButterfly,
+  useMaestroButterfly,
+} from "./maestroButterfly";
 import MaestroCard from "./MaestroCard";
-import { BUTTERFLY_OPTIONS, selectButterfly, useMaestroButterfly } from "./maestroButterfly";
-import VoiceEngineCard from "./VoiceEngineCard";
 import ProfileCard from "./ProfileCard";
+import VoiceEngineCard from "./VoiceEngineCard";
+
+const isTauri =
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 import {
   KeyboardAwareScrollView,
   type KeyboardAwareScrollViewRef,
 } from "react-native-keyboard-controller";
+import { useDesktopUpdate } from "../../hooks/useDesktopUpdate";
 import { useResponsive } from "../../hooks/useResponsive";
 import { useSettingsNotices } from "../../hooks/useSettingsNotices";
-import { useDesktopUpdate } from "../../hooks/useDesktopUpdate";
-import { getLaunchAtStartup, setLaunchAtStartup } from "../../services/desktop/launchAtStartup";
-import { getBetaChannel, setBetaChannel } from "../../services/updates/UpdateService";
 import { useVoicePackInstalled } from "../../hooks/useVoicePackInstalled";
+import {
+  getLaunchAtStartup,
+  setLaunchAtStartup,
+} from "../../services/desktop/launchAtStartup";
+import {
+  getBetaChannel,
+  setBetaChannel,
+} from "../../services/updates/UpdateService";
 
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useBugReport } from "../../hooks/useBugReport";
@@ -221,9 +229,12 @@ const LITERT_CAPABILITY_IDS: readonly ModelCapabilityId[] = [
   "audio",
   "thinking",
 ];
-const searchIcon =require("../../../assets/icons/search.png");
+const searchIcon = require("../../../assets/icons/search.png");
 const profilIcon = require("../../../assets/icons/profil.png");
 const cloudIcon = require("../../../assets/icons/cloud.png");
+const ollamaIcon = require("../../../assets/icons/ollama.png");
+const phoneIcon = require("../../../assets/icons/phone.png");
+const sampler2Icon = require("../../../assets/icons/sampler2.png");
 const cloudUploadIcon = require("../../../assets/icons/cloudupload.png");
 const cloudDownloadIcon = require("../../../assets/icons/clouddownload.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
@@ -319,7 +330,6 @@ export type SubPage =
   | "assistantoverlay"
   | "screensaver"
   | "service"
-  | "litert"
   | "ollama"
   | "openai"
   | "confidentiality"
@@ -343,7 +353,6 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   assistantoverlay: "general",
   screensaver: "general",
   service: "main",
-  litert: "service",
   ollama: "service",
   openai: "service",
   confidentiality: "main",
@@ -374,6 +383,8 @@ const DESKTOP_ENTRY_PAGE: SubPage = "general";
 const DESKTOP_WINDOW_MAX_WIDTH = 960;
 //slider beside its text on desktop
 const SLIDER_WIDTH = 320;
+//switch to vertical when narrow
+const WIDE_SETTINGS_WIDTH = 580;
 
 type LitertPage = "browse" | "search" | "model";
 type CloudModelsPage = "server" | "list" | "model";
@@ -493,7 +504,10 @@ const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
           selectedValue={promptTier}
           onSelect={(v) => {
             setPromptTier(v);
-            onPromptTierChange(model, v === "auto" ? undefined : (v as PromptTier));
+            onPromptTierChange(
+              model,
+              v === "auto" ? undefined : (v as PromptTier),
+            );
           }}
           title={t("settings.model.promptSize")}
           fullWidth
@@ -536,12 +550,18 @@ const ModelToggleRow = memo(function ModelToggleRow({
           style={pressStyle(styles.modelToggleName, "fadeLight")}
           onPress={() => onExpand(model)}
         >
-          <Text style={[styles.settingLabel, styles.modelToggleLabel]} numberOfLines={1}>
+          <Text
+            style={[styles.settingLabel, styles.modelToggleLabel]}
+            numberOfLines={1}
+          >
             {model}
           </Text>
           <Image
             source={rightArrowIcon}
-            style={[styles.litertCapabilityIcon, expanded && styles.modelToggleArrowOpen]}
+            style={[
+              styles.litertCapabilityIcon,
+              expanded && styles.modelToggleArrowOpen,
+            ]}
             tintColor={Colors.textMuted}
           />
         </Pressable>
@@ -581,6 +601,7 @@ const ModelToggleList = memo(function ModelToggleList({
   onSearchFocus,
   hideSearch = false,
   searchQuery,
+  style,
 }: {
   models: string[];
   loading: boolean;
@@ -605,6 +626,7 @@ const ModelToggleList = memo(function ModelToggleList({
   //search input moved outside the card
   hideSearch?: boolean;
   searchQuery?: string;
+  style?: StyleProp<ViewStyle>;
 }) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
@@ -654,12 +676,14 @@ const ModelToggleList = memo(function ModelToggleList({
     setExpanded((current) => (current === model ? null : model));
   }, []);
   const setModelCapabilities = useCallback((model: string, caps: string[]) => {
-    const { capabilities: current, onCapabilitiesChange: save } = latest.current;
+    const { capabilities: current, onCapabilitiesChange: save } =
+      latest.current;
     save?.({ ...current, [model]: caps });
   }, []);
   const setModelPromptTier = useCallback(
     (model: string, tier: PromptTier | undefined) => {
-      const { promptTiers: current, onPromptTiersChange: save } = latest.current;
+      const { promptTiers: current, onPromptTiersChange: save } =
+        latest.current;
       //auto removes the override
       const { [model]: _removed, ...rest } = current;
       save?.(tier ? { ...rest, [model]: tier } : rest);
@@ -680,7 +704,7 @@ const ModelToggleList = memo(function ModelToggleList({
   const visible = shown.slice(0, limit);
 
   return (
-    <View style={styles.contentCard}>
+    <View style={[styles.contentCard, style]}>
       <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
         <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
           {models.length > 0
@@ -737,7 +761,9 @@ const ModelToggleList = memo(function ModelToggleList({
               />
             </Group>
             {shown.length === 0 ? (
-              <Text style={styles.helpText}>{t("settings.ollama.noMatch")}</Text>
+              <Text style={styles.helpText}>
+                {t("settings.ollama.noMatch")}
+              </Text>
             ) : (
               visible.map((model, index) => (
                 <ModelToggleRow
@@ -908,6 +934,8 @@ export default function SettingsDrawer({
   const [ollamaDetailIndex, setOllamaDetailIndex] = useState<number | null>(
     null,
   );
+  const [sheetWidth, setSheetWidth] = useState(0);
+  const isSheetWide = isDesktop && sheetWidth >= WIDE_SETTINGS_WIDTH;
   //raw text of the tuning fields
   const [ollamaContextDraft, setOllamaContextDraft] = useState("");
   const [ollamaKeepAliveDraft, setOllamaKeepAliveDraft] = useState("");
@@ -936,6 +964,7 @@ export default function SettingsDrawer({
   const [lastSyncSize, setLastSyncSize] = useState<number | null>(null);
 
   const [addModelSheetVisible, setAddModelSheetVisible] = useState(false);
+  const [litertSheetVisible, setLitertSheetVisible] = useState(false);
   const [ollamaAddVisible, setOllamaAddVisible] = useState(false);
   const [openaiAddVisible, setOpenAIAddVisible] = useState(false);
   const [openaiModelsPage, setOpenAIModelsPage] =
@@ -1002,7 +1031,9 @@ export default function SettingsDrawer({
     setHubProfile(await SamplerHub.getProfile());
     if (!hub) return;
     setHubSyncPaused(await HubSync.isPaused());
-    SamplerHub.status(hub).then(setHubStatus).catch(() => {});
+    SamplerHub.status(hub)
+      .then(setHubStatus)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -1013,7 +1044,10 @@ export default function SettingsDrawer({
   useEffect(() => {
     if (!windowed || !SamplerHub.isSupported()) return;
     //stays visible while main window pairs
-    const sub = DeviceEventEmitter.addListener(AppEvents.settingsSynced, refreshHub);
+    const sub = DeviceEventEmitter.addListener(
+      AppEvents.settingsSynced,
+      refreshHub,
+    );
     return () => sub.remove();
   }, [windowed, refreshHub]);
 
@@ -1021,6 +1055,7 @@ export default function SettingsDrawer({
   const sheetOpen =
     profileEditVisible ||
     addModelSheetVisible ||
+    litertSheetVisible ||
     ollamaAddVisible ||
     ollamaDetailIndex !== null ||
     hubDetailUrl !== null ||
@@ -1031,7 +1066,6 @@ export default function SettingsDrawer({
     cloudSetupVisible ||
     selectedLocalModel !== null ||
     installedModel !== null;
-
 
   const [hfModelInput, setHfModelInput] = useState("");
   //entry fields hand their focus to the search page
@@ -1094,7 +1128,9 @@ export default function SettingsDrawer({
   //empty id means chores follow the main model
   const [quickFlowId, setQuickFlowIdState] = useState("");
   const maestroButterfly = useMaestroButterfly();
-  const [ttsSpeed, setTtsSpeedState] = useState(() => Settings.getCached().ttsSpeed);
+  const [ttsSpeed, setTtsSpeedState] = useState(
+    () => Settings.getCached().ttsSpeed,
+  );
   const voicePackInstalled = useVoicePackInstalled();
   const [quickFlowOptions, setQuickFlowOptions] = useState<SelectorOption[]>(
     [],
@@ -1121,14 +1157,19 @@ export default function SettingsDrawer({
     }
   });
   const notices = useSettingsNotices(visible);
-  const { prompt: promptUpdate, modalProps: updateModalProps } = useDesktopUpdate();
+  const { prompt: promptUpdate, modalProps: updateModalProps } =
+    useDesktopUpdate();
   const [launchAtStartup, setLaunchAtStartupState] = useState(true);
   const [betaChannel, setBetaChannelState] = useState(false);
   //not part of synced settings
   useEffect(() => {
     if (!visible || !isTauri) return;
-    getLaunchAtStartup().then(setLaunchAtStartupState).catch(() => { });
-    getBetaChannel().then(setBetaChannelState).catch(() => { });
+    getLaunchAtStartup()
+      .then(setLaunchAtStartupState)
+      .catch(() => {});
+    getBetaChannel()
+      .then(setBetaChannelState)
+      .catch(() => {});
   }, [visible]);
   const report = useBugReport(showAlert);
   const [instruction, setInstructionState] = useState("");
@@ -1147,9 +1188,12 @@ export default function SettingsDrawer({
   const [useAppContext, setUseAppContextState] = useState(true);
   const [autoStartMic, setAutoStartMicState] = useState(true);
   const [overlayEnabled, setOverlayEnabledState] = useState(true);
-  const [overlayShortcut, setOverlayShortcutState] = useState(OVERLAY_SHORTCUTS[0].id);
+  const [overlayShortcut, setOverlayShortcutState] = useState(
+    OVERLAY_SHORTCUTS[0].id,
+  );
   const [closeToTray, setCloseToTrayState] = useState(true);
-  const [overlayScreenSelection, setOverlayScreenSelectionState] = useState(false);
+  const [overlayScreenSelection, setOverlayScreenSelectionState] =
+    useState(false);
   const [shareInstanceUrl, setShareInstanceUrlState] = useState("");
   const [showRemoteImages, setShowRemoteImagesState] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
@@ -1640,7 +1684,7 @@ export default function SettingsDrawer({
 
   //built-in facts, read on page open
   useEffect(() => {
-    if (activeSubPage !== "litert" || !localAvailable) return;
+    if (!litertSheetVisible || !localAvailable) return;
     let cancelled = false;
     AIModule.getLocalModelSheet()
       .then((sheet) => {
@@ -1650,7 +1694,7 @@ export default function SettingsDrawer({
     return () => {
       cancelled = true;
     };
-  }, [activeSubPage, localAvailable]);
+  }, [litertSheetVisible, localAvailable]);
 
   //browsers need a user gesture
   const handleDownloadLocal = async (modelId: string) => {
@@ -1685,11 +1729,7 @@ export default function SettingsDrawer({
 
   //load plugin states when settings tab opens
   useEffect(() => {
-    if (
-      activeSubPage !== "tools" &&
-      mcpDetailId === null
-    )
-      return;
+    if (activeSubPage !== "tools" && mcpDetailId === null) return;
     const states: Record<string, boolean> = {};
     for (const tool of ToolManager.getAllTools()) {
       const name = tool.definition.function.name;
@@ -2542,7 +2582,7 @@ export default function SettingsDrawer({
 
   //dead downloads resume from disk
   useEffect(() => {
-    if (activeSubPage !== "litert" || downloadingLitert) return;
+    if (!litertSheetVisible || downloadingLitert) return;
     let dropped = false;
     getPendingLiteRTDownload().then((pending) => {
       if (dropped || !pending) return;
@@ -2553,7 +2593,7 @@ export default function SettingsDrawer({
       dropped = true;
     };
     //eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSubPage]);
+  }, [litertSheetVisible]);
 
   //typing settles before a round trip
   useEffect(() => {
@@ -2694,8 +2734,19 @@ export default function SettingsDrawer({
   };
 
   //each change reaches the native shortcut at once
-  const setOverlayConfig = (patch: { overlayEnabled?: boolean; overlayShortcut?: string; closeToTray?: boolean; overlayScreenSelection?: boolean }) => {
-    const next = { overlayEnabled, overlayShortcut, closeToTray, overlayScreenSelection, ...patch };
+  const setOverlayConfig = (patch: {
+    overlayEnabled?: boolean;
+    overlayShortcut?: string;
+    closeToTray?: boolean;
+    overlayScreenSelection?: boolean;
+  }) => {
+    const next = {
+      overlayEnabled,
+      overlayShortcut,
+      closeToTray,
+      overlayScreenSelection,
+      ...patch,
+    };
     setOverlayEnabledState(next.overlayEnabled);
     setOverlayShortcutState(next.overlayShortcut);
     setCloseToTrayState(next.closeToTray);
@@ -2708,22 +2759,28 @@ export default function SettingsDrawer({
   const setScreenSelection = async (v: boolean) => {
     setOverlayConfig({ overlayScreenSelection: v });
     if (!v) return;
-    const granted = await invoke<boolean>("stage_screen_access", { request: true }).catch(() => true);
+    const granted = await invoke<boolean>("stage_screen_access", {
+      request: true,
+    }).catch(() => true);
     if (granted) return;
-    showAlert(t("settings.overlay.screenAccessTitle"), t("settings.overlay.screenAccessMessage"), [
-      {
-        text: t("settings.overlay.screenAccessOpen"),
-        onPress: () => {
-          setAlertModalVisible(false);
-          invoke("stage_open_screen_settings").catch(() => { });
+    showAlert(
+      t("settings.overlay.screenAccessTitle"),
+      t("settings.overlay.screenAccessMessage"),
+      [
+        {
+          text: t("settings.overlay.screenAccessOpen"),
+          onPress: () => {
+            setAlertModalVisible(false);
+            invoke("stage_open_screen_settings").catch(() => {});
+          },
         },
-      },
-      {
-        text: t("common.cancel"),
-        onPress: () => setAlertModalVisible(false),
-        style: "secondary",
-      },
-    ]);
+        {
+          text: t("common.cancel"),
+          onPress: () => setAlertModalVisible(false),
+          style: "secondary",
+        },
+      ],
+    );
   };
 
   const setLaunchAtStartupValue = (v: boolean) => {
@@ -2735,21 +2792,25 @@ export default function SettingsDrawer({
   const setBetaChannelValue = (v: boolean) => {
     if (!v) {
       setBetaChannelState(false);
-      setBetaChannel(false).catch(() => { });
+      setBetaChannel(false).catch(() => {});
       return;
     }
     showAlert(
       t("settings.update.betaWarning.title"),
       t("settings.update.betaWarning.message"),
       [
-        { text: t("common.cancel"), onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: t("common.cancel"),
+          onPress: () => setAlertModalVisible(false),
+          style: "secondary",
+        },
         {
           text: t("settings.update.betaWarning.confirm"),
           style: "danger",
           onPress: () => {
             setAlertModalVisible(false);
             setBetaChannelState(true);
-            setBetaChannel(true).catch(() => { });
+            setBetaChannel(true).catch(() => {});
           },
         },
       ],
@@ -3216,7 +3277,17 @@ export default function SettingsDrawer({
   if (visible && !desktopMounted) setDesktopMounted(true);
   const [navScrolled, setNavScrolled] = useState(false);
   const [desktopPageWidth, setDesktopPageWidth] = useState(0);
-  const desktopPage = activeSubPage === "main" ? DESKTOP_ENTRY_PAGE : activeSubPage;
+  //initial page width before layout
+  const initialDesktopPageWidth = isDesktop
+    ? windowed
+      ? width - 320
+      : Math.min(width - Spacing.xxl2 * 2, DESKTOP_WINDOW_MAX_WIDTH) - 320
+    : 0;
+  const isWide =
+    isDesktop &&
+    (desktopPageWidth || initialDesktopPageWidth) >= WIDE_SETTINGS_WIDTH;
+  const desktopPage =
+    activeSubPage === "main" ? DESKTOP_ENTRY_PAGE : activeSubPage;
   const desktopSection = sectionOf(desktopPage);
 
   useEffect(() => {
@@ -3279,20 +3350,57 @@ export default function SettingsDrawer({
   const renderSidebar = () => {
     const groups = [
       [
-        { page: "profile", icon: profilIcon, label: name || t("settings.nav.profile.title") },
-        { page: "cloud", icon: cloudIcon, label: t("settings.nav.cloud.title") },
-        { page: "maestro", icon: operaIcon, label: t("settings.nav.maestro.title") },
+        {
+          page: "profile",
+          icon: profilIcon,
+          label: name || t("settings.nav.profile.title"),
+        },
+        {
+          page: "cloud",
+          icon: cloudIcon,
+          label: t("settings.nav.cloud.title"),
+        },
+        {
+          page: "maestro",
+          icon: operaIcon,
+          label: t("settings.nav.maestro.title"),
+        },
       ],
       [
-        { page: "general", icon: generalIcon, label: t("settings.nav.general.title") },
-        { page: "service", icon: linkIcon, label: t("settings.nav.service.title") },
+        {
+          page: "general",
+          icon: generalIcon,
+          label: t("settings.nav.general.title"),
+        },
+        {
+          page: "service",
+          icon: linkIcon,
+          label: t("settings.nav.service.title"),
+        },
         { page: "tools", icon: toolIcon, label: t("settings.nav.tools.title") },
-        { page: "advanced", icon: advancedIcon, label: t("settings.nav.advanced.title"), show: advancedMode },
+        {
+          page: "advanced",
+          icon: advancedIcon,
+          label: t("settings.nav.advanced.title"),
+          show: advancedMode,
+        },
       ],
       [
-        { page: "confidentiality", icon: confidentialityIcon, label: t("settings.nav.privacy.title") },
-        { page: "reports", icon: reportsIcon, label: t("settings.nav.support.title") },
-        { page: "sociallinks", icon: informationIcon, label: t("settings.nav.info.title") },
+        {
+          page: "confidentiality",
+          icon: confidentialityIcon,
+          label: t("settings.nav.privacy.title"),
+        },
+        {
+          page: "reports",
+          icon: reportsIcon,
+          label: t("settings.nav.support.title"),
+        },
+        {
+          page: "sociallinks",
+          icon: informationIcon,
+          label: t("settings.nav.info.title"),
+        },
       ],
     ];
 
@@ -3346,7 +3454,9 @@ export default function SettingsDrawer({
           label={t("settings.notice.update", {
             version: notices.update.version,
           })}
-          onPress={() => (isTauri ? promptUpdate(notices.update!) : notices.openUpdate())}
+          onPress={() =>
+            isTauri ? promptUpdate(notices.update!) : notices.openUpdate()
+          }
           style={[styles.groupSpacing, styles.mainPageGroup]}
         />
       )}
@@ -3657,7 +3767,10 @@ export default function SettingsDrawer({
     try {
       uri = await captureRef(profileCardRef, { format: "png", quality: 1 });
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: "image/png", UTI: "public.png" });
+        await Sharing.shareAsync(uri, {
+          mimeType: "image/png",
+          UTI: "public.png",
+        });
       }
     } catch (e) {
       console.warn("[Profile] card export failed:", e);
@@ -3708,11 +3821,18 @@ export default function SettingsDrawer({
 
       {/* language, appearance and modes card */}
       <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, isDesktop && styles.toggleGroupRow]}>
-          <Text style={[styles.settingLabel, isDesktop ? styles.toggleGroupContent : { marginBottom: Spacing.md }]}>
+        <View
+          style={[styles.settingRowVertical, isWide && styles.toggleGroupRow]}
+        >
+          <Text
+            style={[
+              styles.settingLabel,
+              isWide ? styles.toggleGroupContent : { marginBottom: Spacing.md },
+            ]}
+          >
             {t("settings.general.language")}
           </Text>
-          <Group style={isDesktop && styles.sliderGroup}>
+          <Group style={isWide && styles.sliderGroup}>
             <Selector
               options={languageOptions}
               selectedValue={language}
@@ -3723,17 +3843,26 @@ export default function SettingsDrawer({
           </Group>
         </View>
 
-        <View style={[styles.settingRowVertical, isDesktop && styles.toggleGroupRow]}>
+        <View
+          style={[styles.settingRowVertical, isWide && styles.toggleGroupRow]}
+        >
           {/* desktop puts the slider at the right of the label */}
-          <Text style={[styles.settingLabel, isDesktop ? styles.toggleGroupContent : { marginBottom: Spacing.md }]}>
+          <Text
+            style={[
+              styles.settingLabel,
+              isWide ? styles.toggleGroupContent : { marginBottom: Spacing.md },
+            ]}
+          >
             {t("settings.general.theme")}
           </Text>
-          <Group style={isDesktop && styles.sliderGroup}>
+          <Group style={isWide && styles.sliderGroup}>
             <SliderToggle selectedValue={theme} onSelect={setTheme} />
           </Group>
         </View>
 
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+        <View
+          style={[styles.settingRowVertical, !isTauri && { marginBottom: 0 }]}
+        >
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>
               <Text style={styles.settingLabel}>
@@ -3746,6 +3875,44 @@ export default function SettingsDrawer({
             <Toggle checked={advancedMode} onToggle={setAdvancedMode} />
           </View>
         </View>
+
+        {isTauri && (
+          <>
+            <View style={styles.settingRowVertical}>
+              <View style={styles.toggleGroupRow}>
+                <View style={styles.toggleGroupContent}>
+                  <Text style={styles.settingLabel}>
+                    {t("settings.overlay.closeToTray")}
+                  </Text>
+                  <Text style={styles.helpText}>
+                    {t("settings.overlay.closeToTrayHelp")}
+                  </Text>
+                </View>
+                <Toggle
+                  checked={closeToTray}
+                  onToggle={(v) => setOverlayConfig({ closeToTray: v })}
+                />
+              </View>
+            </View>
+
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <View style={styles.toggleGroupRow}>
+                <View style={styles.toggleGroupContent}>
+                  <Text style={styles.settingLabel}>
+                    {t("settings.startup.launch")}
+                  </Text>
+                  <Text style={styles.helpText}>
+                    {t("settings.startup.launchHelp")}
+                  </Text>
+                </View>
+                <Toggle
+                  checked={launchAtStartup}
+                  onToggle={setLaunchAtStartupValue}
+                />
+              </View>
+            </View>
+          </>
+        )}
       </View>
 
       {/* overlay and screen saver links */}
@@ -3765,39 +3932,6 @@ export default function SettingsDrawer({
               t("settings.nav.screenSaver.subtitle"),
             )}
         </Group>
-      )}
-
-      {/* background and startup card */}
-      {isTauri && (
-        <View style={styles.contentCard}>
-          <View style={styles.settingRowVertical}>
-            <View style={styles.toggleGroupRow}>
-              <View style={styles.toggleGroupContent}>
-                <Text style={styles.settingLabel}>
-                  {t("settings.overlay.closeToTray")}
-                </Text>
-                <Text style={styles.helpText}>
-                  {t("settings.overlay.closeToTrayHelp")}
-                </Text>
-              </View>
-              <Toggle checked={closeToTray} onToggle={v => setOverlayConfig({ closeToTray: v })} />
-            </View>
-          </View>
-
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <View style={styles.toggleGroupRow}>
-              <View style={styles.toggleGroupContent}>
-                <Text style={styles.settingLabel}>
-                  {t("settings.startup.launch")}
-                </Text>
-                <Text style={styles.helpText}>
-                  {t("settings.startup.launchHelp")}
-                </Text>
-              </View>
-              <Toggle checked={launchAtStartup} onToggle={setLaunchAtStartupValue} />
-            </View>
-          </View>
-        </View>
       )}
     </View>
   );
@@ -3841,10 +3975,7 @@ export default function SettingsDrawer({
                   {t("settings.screenSaver.antiBurnInHelp")}
                 </Text>
               </View>
-              <Toggle
-                checked={dreamAntiBurnIn}
-                onToggle={setDreamAntiBurnIn}
-              />
+              <Toggle checked={dreamAntiBurnIn} onToggle={setDreamAntiBurnIn} />
             </View>
             <View style={[styles.toggleGroupRow, { marginTop: Spacing.lg }]}>
               <View style={styles.toggleGroupContent}>
@@ -3869,10 +4000,7 @@ export default function SettingsDrawer({
                   {t("settings.screenSaver.wakeWordHelp")}
                 </Text>
               </View>
-              <Toggle
-                checked={dreamWakeWord}
-                onToggle={setDreamWakeWord}
-              />
+              <Toggle checked={dreamWakeWord} onToggle={setDreamWakeWord} />
             </View>
           </View>
         </View>
@@ -3929,10 +4057,7 @@ export default function SettingsDrawer({
                 {t("settings.general.editAiMessagesHelp")}
               </Text>
             </View>
-            <Toggle
-              checked={editAiMessages}
-              onToggle={setEditAiMessages}
-            />
+            <Toggle checked={editAiMessages} onToggle={setEditAiMessages} />
           </View>
         </View>
 
@@ -3997,16 +4122,24 @@ export default function SettingsDrawer({
 
       {/* quick flow card */}
       <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }, isDesktop && styles.toggleGroupRow]}>
-          <View style={isDesktop && styles.toggleGroupContent}>
+        <View
+          style={[
+            styles.settingRowVertical,
+            { marginBottom: 0 },
+            isWide && styles.toggleGroupRow,
+          ]}
+        >
+          <View style={isWide && styles.toggleGroupContent}>
             <Text style={styles.settingLabel}>
               {t("settings.quickFlow.label")}
             </Text>
-            <Text style={[styles.helpText, !isDesktop && { marginBottom: Spacing.md }]}>
+            <Text
+              style={[styles.helpText, !isWide && { marginBottom: Spacing.md }]}
+            >
               {t("settings.quickFlow.help")}
             </Text>
           </View>
-          <Group style={isDesktop && styles.sliderGroup}>
+          <Group style={isWide && styles.sliderGroup}>
             <Selector
               options={quickFlowOptions}
               selectedValue={quickFlowId}
@@ -4025,7 +4158,9 @@ export default function SettingsDrawer({
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.maestro.title"))}
 
-      <View style={{ paddingVertical: Spacing.xxl2, marginBottom: Spacing.xxl2 }}>
+      <View
+        style={{ paddingVertical: Spacing.xxl2, marginBottom: Spacing.xxl2 }}
+      >
         <MaestroCard />
       </View>
 
@@ -4042,11 +4177,23 @@ export default function SettingsDrawer({
               onSelect={selectButterfly}
             />
             {/* desktop puts the slider at the right of the label */}
-            <View style={[{ marginTop: Spacing.xxl }, isDesktop && styles.toggleGroupRow]}>
-              <Text style={[styles.settingLabel, isDesktop ? styles.toggleGroupContent : { marginBottom: Spacing.md }]}>
+            <View
+              style={[
+                { marginTop: Spacing.xxl },
+                isWide && styles.toggleGroupRow,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.settingLabel,
+                  isWide
+                    ? styles.toggleGroupContent
+                    : { marginBottom: Spacing.md },
+                ]}
+              >
                 {t("settings.tts.speed")}
               </Text>
-              <Group style={isDesktop && styles.sliderGroup}>
+              <Group style={isWide && styles.sliderGroup}>
                 <Slider
                   icon={timeIcon}
                   options={TTS_SPEEDS.map((id) => ({ id, label: `${id}×` }))}
@@ -4160,7 +4307,12 @@ export default function SettingsDrawer({
       {/* desktop shortcut card */}
       {isTauri && (
         <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, !overlayEnabled && { marginBottom: 0 }]}>
+          <View
+            style={[
+              styles.settingRowVertical,
+              !overlayEnabled && { marginBottom: 0 },
+            ]}
+          >
             <View style={styles.toggleGroupRow}>
               <View style={styles.toggleGroupContent}>
                 <Text style={styles.settingLabel}>
@@ -4170,7 +4322,10 @@ export default function SettingsDrawer({
                   {t("settings.overlay.desktopEnabledHelp")}
                 </Text>
               </View>
-              <Toggle checked={overlayEnabled} onToggle={v => setOverlayConfig({ overlayEnabled: v })} />
+              <Toggle
+                checked={overlayEnabled}
+                onToggle={(v) => setOverlayConfig({ overlayEnabled: v })}
+              />
             </View>
           </View>
 
@@ -4185,21 +4340,37 @@ export default function SettingsDrawer({
                     {t("settings.overlay.screenSelectionHelp")}
                   </Text>
                 </View>
-                <Toggle checked={overlayScreenSelection} onToggle={setScreenSelection} />
+                <Toggle
+                  checked={overlayScreenSelection}
+                  onToggle={setScreenSelection}
+                />
               </View>
             </View>
           )}
 
           {overlayEnabled && (
-            <View style={[styles.settingRowVertical, isDesktop && styles.toggleGroupRow, { marginBottom: 0 }]}>
-              <Text style={[styles.settingLabel, isDesktop ? styles.toggleGroupContent : { marginBottom: Spacing.md }]}>
+            <View
+              style={[
+                styles.settingRowVertical,
+                isWide && styles.toggleGroupRow,
+                { marginBottom: 0 },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.settingLabel,
+                  isWide
+                    ? styles.toggleGroupContent
+                    : { marginBottom: Spacing.md },
+                ]}
+              >
                 {t("settings.overlay.shortcut")}
               </Text>
-              <Group style={isDesktop && styles.sliderGroup}>
+              <Group style={isWide && styles.sliderGroup}>
                 <Selector
                   options={OVERLAY_SHORTCUTS}
                   selectedValue={overlayShortcut}
-                  onSelect={v => setOverlayConfig({ overlayShortcut: v })}
+                  onSelect={(v) => setOverlayConfig({ overlayShortcut: v })}
                   title={t("settings.overlay.selectShortcut")}
                   fullWidth
                 />
@@ -4211,42 +4382,42 @@ export default function SettingsDrawer({
 
       {/* mobile overlay options card */}
       {!isTauri && (
-      <View style={styles.contentCard}>
-        <View
-          style={[
-            styles.settingRowVertical,
-            Platform.OS !== "android" && { marginBottom: 0 },
-          ]}
-        >
-          <View style={styles.toggleGroupRow}>
-            <View style={styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>
-                {t("settings.overlay.autoMic")}
-              </Text>
-              <Text style={styles.helpText}>
-                {t("settings.overlay.autoMicHelp")}
-              </Text>
-            </View>
-            <Toggle checked={autoStartMic} onToggle={setAutoStartMic} />
-          </View>
-        </View>
-
-        {Platform.OS === "android" && (
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+        <View style={styles.contentCard}>
+          <View
+            style={[
+              styles.settingRowVertical,
+              Platform.OS !== "android" && { marginBottom: 0 },
+            ]}
+          >
             <View style={styles.toggleGroupRow}>
               <View style={styles.toggleGroupContent}>
                 <Text style={styles.settingLabel}>
-                  {t("settings.overlay.appContext")}
+                  {t("settings.overlay.autoMic")}
                 </Text>
                 <Text style={styles.helpText}>
-                  {t("settings.overlay.appContextHelp")}
+                  {t("settings.overlay.autoMicHelp")}
                 </Text>
               </View>
-              <Toggle checked={useAppContext} onToggle={setUseAppContext} />
+              <Toggle checked={autoStartMic} onToggle={setAutoStartMic} />
             </View>
           </View>
-        )}
-      </View>
+
+          {Platform.OS === "android" && (
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <View style={styles.toggleGroupRow}>
+                <View style={styles.toggleGroupContent}>
+                  <Text style={styles.settingLabel}>
+                    {t("settings.overlay.appContext")}
+                  </Text>
+                  <Text style={styles.helpText}>
+                    {t("settings.overlay.appContextHelp")}
+                  </Text>
+                </View>
+                <Toggle checked={useAppContext} onToggle={setUseAppContext} />
+              </View>
+            </View>
+          )}
+        </View>
       )}
     </View>
   );
@@ -4259,7 +4430,9 @@ export default function SettingsDrawer({
       hasSyncPin && lastSyncTime
         ? [
             {
-              label: cloudBackupMode ? t("cloudSync.lastBackup") : t("cloudSync.lastSynced"),
+              label: cloudBackupMode
+                ? t("cloudSync.lastBackup")
+                : t("cloudSync.lastSynced"),
               value: new Date(lastSyncTime).toLocaleString(),
             },
             ...(lastSyncSize != null
@@ -4414,11 +4587,24 @@ export default function SettingsDrawer({
 
         {/* sync account card */}
         <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }, isDesktop && styles.toggleGroupRow]}>
-            <Text style={[styles.settingLabel, isDesktop ? styles.toggleGroupContent : { marginBottom: Spacing.md }]}>
+          <View
+            style={[
+              styles.settingRowVertical,
+              { marginBottom: 0 },
+              isWide && styles.toggleGroupRow,
+            ]}
+          >
+            <Text
+              style={[
+                styles.settingLabel,
+                isWide
+                  ? styles.toggleGroupContent
+                  : { marginBottom: Spacing.md },
+              ]}
+            >
               {t("settings.cloud.syncAccount")}
             </Text>
-            <Group style={isDesktop && styles.sliderGroup}>
+            <Group style={isWide && styles.sliderGroup}>
               <Selector
                 options={cloudStorageOptions}
                 selectedValue={syncAccount}
@@ -4454,7 +4640,9 @@ export default function SettingsDrawer({
           <View style={styles.contentCard}>
             {renderHubToggle(
               t("settings.cloud.backup"),
-              hubProfile ? t("settings.cloud.backupHelp") : t("settings.cloud.backupNeedsProfile"),
+              hubProfile
+                ? t("settings.cloud.backupHelp")
+                : t("settings.cloud.backupNeedsProfile"),
               cloudBackupMode && cloudProvider !== "none",
               setCloudBackup,
               !cloudBackupPicking,
@@ -4462,7 +4650,9 @@ export default function SettingsDrawer({
             )}
             {cloudBackupPicking && (
               <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-                <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+                <Text
+                  style={[styles.settingLabel, { marginBottom: Spacing.md }]}
+                >
                   {t("settings.cloud.backupAccount")}
                 </Text>
                 <Group>
@@ -4512,118 +4702,138 @@ export default function SettingsDrawer({
   const showHubProvider =
     isProviderSupported(HUB_PROVIDER_ID) && getHubServers().length > 0;
 
+  //turning a server on also brings its provider back
+  const serverSwitch = (
+    provider: string,
+    server: OllamaServer,
+    patch: (disabled: true | undefined) => void,
+  ) => ({
+    checked: enabledProviders.includes(provider) && !server.disabled,
+    onToggle: (v: boolean) => {
+      if (v && !enabledProviders.includes(provider))
+        setProviderEnabled(provider, true);
+      patch(v ? undefined : true);
+    },
+  });
+
+  //off wins over the connection state
+  const serverCardStatus = (provider: string, server: OllamaServer) =>
+    enabledProviders.includes(provider) && !server.disabled
+      ? ollamaStatusLabel(server)
+      : t("settings.service.off");
+
+  //enable switch of a provider, shown in its own detail
+  const renderProviderToggle = (
+    ids: string | string[],
+    label: string,
+    help: string,
+    //one server of the provider instead of all of it
+    server?: { checked: boolean; onToggle: (v: boolean) => void },
+  ) => {
+    const list = typeof ids === "string" ? [ids] : ids;
+    return (
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>{label}</Text>
+              <Text style={styles.helpText}>{help}</Text>
+            </View>
+            <Toggle
+              checked={
+                server?.checked ??
+                list.some((id) => enabledProviders.includes(id))
+              }
+              onToggle={(v) =>
+                server ? server.onToggle(v) : setProviderEnabled(ids, v)
+              }
+            />
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   const renderServiceSubPage = () => (
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.nav.service.title"))}
 
-      {/* service providers group: hugging face, ollama */}
-      <Group style={styles.groupSpacing}>
-        {onDeviceProviders.length > 0 && (
-          <Pressable
-            style={pressStyle(
-              styles.toggleGroupRowItem,
-              styles.toggleGroupCardPressed,
-            )}
-            onPress={() => setActiveSubPage("litert")}
-          >
-            <View style={styles.toggleGroupRow}>
-              <View style={styles.toggleGroupContent}>
-                <Text style={styles.settingLabel}>
-                  {t("settings.service.litert")}
-                </Text>
-                <Text style={styles.helpText}>
-                  {t(
-                    litertSupported
-                      ? "settings.service.litertHelp"
-                      : "settings.service.localHelp",
-                  )}
-                </Text>
-              </View>
-              <View style={styles.toggleDivider} />
-              <Toggle
-                checked={onDeviceProviders.some((id) =>
-                  enabledProviders.includes(id),
-                )}
-                onToggle={(v) => setProviderEnabled(onDeviceProviders, v)}
-              />
-            </View>
-          </Pressable>
-        )}
+      {/* every provider as a tile, the icon tells where it comes from */}
+      {(onDeviceProviders.length > 0 ||
+        ollamaServers.length > 0 ||
+        openaiServers.length > 0 ||
+        showHubProvider) && (
+        <View style={styles.contentCard}>
+          <CardGrid
+            cards={[
+              ...(onDeviceProviders.length > 0
+                ? [
+                    {
+                      key: "ondevice",
+                      icon: phoneIcon,
+                      title: t("settings.service.litert"),
+                      status: t(
+                        onDeviceProviders.some((id) =>
+                          enabledProviders.includes(id),
+                        )
+                          ? "settings.service.on"
+                          : "settings.service.off",
+                      ),
+                      onPress: () => setLitertSheetVisible(true),
+                    },
+                  ]
+                : []),
+              ...ollamaServers.map((server, index) => ({
+                key: `ollama-${index}`,
+                icon: ollamaIcon,
+                title: ollamaServerLabel(server),
+                status: serverCardStatus("ollama", server),
+                error: serverErrors[server.url.trim()] === true,
+                onPress: () => openOllamaServer(index),
+              })),
+              ...openaiServers.map((server, index) => ({
+                key: `cloud-${index}`,
+                icon: cloudIcon,
+                title: openAIServerLabel(index),
+                status: serverCardStatus(OPENAI_PROVIDER_ID, server),
+                error: serverErrors[server.url.trim()] === true,
+                onPress: () => openOpenAIServer(index),
+              })),
+              ...(showHubProvider
+                ? getHubServers().map((server) => ({
+                    key: `hub-${server.url}`,
+                    icon: sampler2Icon,
+                    title: server.provider,
+                    status: t(
+                      enabledProviders.includes(HUB_PROVIDER_ID) &&
+                        !server.disabled
+                        ? "settings.service.on"
+                        : "settings.service.off",
+                    ),
+                    onPress: () => openHubServer(server),
+                  }))
+                : []),
+            ]}
+          />
+        </View>
+      )}
 
-        <Pressable
-          style={pressStyle(
-            styles.toggleGroupRowItem,
-            styles.toggleGroupCardPressed,
-          )}
-          onPress={() => setActiveSubPage("ollama")}
-        >
+      {/* model failover card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>
               <Text style={styles.settingLabel}>
-                {t("settings.service.ollama")}
+                {t("settings.service.failover")}
               </Text>
               <Text style={styles.helpText}>
-                {t("settings.service.ollamaHelp")}
+                {t("settings.service.failoverHelp")}
               </Text>
             </View>
-            <View style={styles.toggleDivider} />
-            <Toggle
-              checked={enabledProviders.includes("ollama")}
-              onToggle={(v) => setProviderEnabled("ollama", v)}
-            />
+            <Toggle checked={modelFailover} onToggle={setModelFailover} />
           </View>
-        </Pressable>
-
-        <Pressable
-          style={pressStyle(
-            [styles.toggleGroupRowItem, !showHubProvider && styles.navItemLast],
-            styles.toggleGroupCardPressed,
-          )}
-          onPress={() => setActiveSubPage("openai")}
-        >
-          <View style={styles.toggleGroupRow}>
-            <View style={styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>
-                {t("settings.service.cloudapi")}
-              </Text>
-              <Text style={styles.helpText}>
-                {t("settings.service.cloudapiHelp")}
-              </Text>
-            </View>
-            <View style={styles.toggleDivider} />
-            <Toggle
-              checked={enabledProviders.includes(OPENAI_PROVIDER_ID)}
-              onToggle={(v) => setProviderEnabled(OPENAI_PROVIDER_ID, v)}
-            />
-          </View>
-        </Pressable>
-
-        {showHubProvider && (
-          <Pressable
-            style={pressStyle(
-              [styles.toggleGroupRowItem, styles.navItemLast],
-              styles.toggleGroupCardPressed,
-            )}
-            onPress={() => setActiveSubPage("hubprovider")}
-          >
-            <View style={styles.toggleGroupRow}>
-              <View style={styles.toggleGroupContent}>
-                <Text style={styles.settingLabel}>
-                  {t("settings.service.hub")}
-                </Text>
-                <Text style={styles.helpText}>
-                  {t("settings.service.hubHelp")}
-                </Text>
-              </View>
-              <View style={styles.toggleDivider} />
-              <Toggle
-                checked={enabledProviders.includes(HUB_PROVIDER_ID)}
-                onToggle={(v) => setProviderEnabled(HUB_PROVIDER_ID, v)}
-              />
-            </View>
-          </Pressable>
-        )}
-      </Group>
+        </View>
+      </View>
 
       {/* local whisper transcription for web */}
       {Platform.OS === "web" && (
@@ -4631,16 +4841,21 @@ export default function SettingsDrawer({
           <View
             style={[styles.settingRowVertical, { zIndex: 9, marginBottom: 0 }]}
           >
-            <View style={isDesktop && styles.toggleGroupRow}>
-              <View style={isDesktop && styles.toggleGroupContent}>
+            <View style={isWide && styles.toggleGroupRow}>
+              <View style={isWide && styles.toggleGroupContent}>
                 <Text style={styles.settingLabel}>
                   {t("settings.whisper.label")}
                 </Text>
-                <Text style={[styles.helpText, !isDesktop && { marginBottom: Spacing.md }]}>
+                <Text
+                  style={[
+                    styles.helpText,
+                    !isWide && { marginBottom: Spacing.md },
+                  ]}
+                >
                   {t("settings.whisper.help")}
                 </Text>
               </View>
-              <Group style={isDesktop && styles.sliderGroup}>
+              <Group style={isWide && styles.sliderGroup}>
                 <Selector
                   options={whisperModelOptions}
                   selectedValue={whisperModel}
@@ -4705,12 +4920,22 @@ export default function SettingsDrawer({
 
     return (
       <>
+        {renderProviderToggle(
+          HUB_PROVIDER_ID,
+          server.provider,
+          t("settings.service.hubHelp"),
+          serverSwitch(HUB_PROVIDER_ID, server, (disabled) =>
+            patchHubServerPrefs(url, { disabled }),
+          ),
+        )}
 
         {/* llama.cpp options, set in the sampler screen */}
         {url === LLAMA_SERVER_URL && hubStatus?.ctxSize != null && (
           <View style={styles.contentCard}>
             <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <Text style={styles.settingLabel}>{t("sampler.model.title")}</Text>
+              <Text style={styles.settingLabel}>
+                {t("sampler.model.title")}
+              </Text>
               <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
                 {t("sampler.model.readOnly")}
               </Text>
@@ -4722,11 +4947,17 @@ export default function SettingsDrawer({
                   },
                   {
                     label: t("sampler.model.keepAlive"),
-                    value: optionLabel(KEEP_ALIVE_OPTIONS, hubStatus.keepAlive ?? 0),
+                    value: optionLabel(
+                      KEEP_ALIVE_OPTIONS,
+                      hubStatus.keepAlive ?? 0,
+                    ),
                   },
                   {
                     label: t("sampler.model.parallel"),
-                    value: optionLabel(PARALLEL_OPTIONS, hubStatus.parallel ?? 0),
+                    value: optionLabel(
+                      PARALLEL_OPTIONS,
+                      hubStatus.parallel ?? 0,
+                    ),
                   },
                 ].map((row) => (
                   <ActionButton
@@ -4747,17 +4978,27 @@ export default function SettingsDrawer({
         {/* tuning card for ollama only */}
         {server.kind === "ollama" && (
           <View style={styles.contentCard}>
-            <View style={[styles.settingRowVertical, isDesktop && styles.toggleGroupRow]}>
+            <View
+              style={[
+                styles.settingRowVertical,
+                isSheetWide && styles.toggleGroupRow,
+              ]}
+            >
               {/* desktop puts the slider at the right of the text */}
-              <View style={isDesktop && styles.toggleGroupContent}>
+              <View style={isSheetWide && styles.toggleGroupContent}>
                 <Text style={styles.settingLabel}>
                   {t("settings.ollama.contextLength")}
                 </Text>
-                <Text style={[styles.helpText, !isDesktop && { marginBottom: Spacing.md }]}>
+                <Text
+                  style={[
+                    styles.helpText,
+                    !isSheetWide && { marginBottom: Spacing.md },
+                  ]}
+                >
                   {t("settings.ollama.contextHelp")}
                 </Text>
               </View>
-              <Group style={isDesktop && styles.sliderGroup}>
+              <Group style={isSheetWide && styles.sliderGroup}>
                 {advancedMode ? (
                   <TextInputField
                     icon={messageIcon}
@@ -4777,18 +5018,29 @@ export default function SettingsDrawer({
               </Group>
             </View>
 
-            <View style={[styles.settingRowVertical, { marginBottom: 0 }, isDesktop && styles.toggleGroupRow]}>
-              <View style={isDesktop && styles.toggleGroupContent}>
+            <View
+              style={[
+                styles.settingRowVertical,
+                { marginBottom: 0 },
+                isSheetWide && styles.toggleGroupRow,
+              ]}
+            >
+              <View style={isSheetWide && styles.toggleGroupContent}>
                 <Text style={styles.settingLabel}>
                   {t("settings.ollama.keepAlive")}
                 </Text>
-                <Text style={[styles.helpText, !isDesktop && { marginBottom: Spacing.md }]}>
+                <Text
+                  style={[
+                    styles.helpText,
+                    !isSheetWide && { marginBottom: Spacing.md },
+                  ]}
+                >
                   {advancedMode
                     ? t("settings.ollama.keepAliveHelpAdvanced")
                     : t("settings.ollama.keepAliveHelp")}
                 </Text>
               </View>
-              <Group style={isDesktop && styles.sliderGroup}>
+              <Group style={isSheetWide && styles.sliderGroup}>
                 {advancedMode ? (
                   <TextInputField
                     icon={timeIcon}
@@ -4818,15 +5070,22 @@ export default function SettingsDrawer({
           url={url}
           disabled={server.disabledModels}
           capabilities={server.capabilities}
-          onChange={(next) => patchHubServerPrefs(url, { disabledModels: next })}
+          onChange={(next) =>
+            patchHubServerPrefs(url, { disabledModels: next })
+          }
           onCapabilitiesChange={(next) =>
             patchHubServerPrefs(url, { capabilities: next })
+          }
+          style={
+            ollamaModelsLoading || ollamaModels.length > 0
+              ? { marginBottom: 0 }
+              : undefined
           }
         />
 
         {/* actions section */}
         {!ollamaModelsLoading && ollamaModels.length === 0 && (
-          <View style={styles.contentCard}>
+          <View style={[styles.contentCard, { marginBottom: 0 }]}>
             <Group>
               <ActionButton
                 icon={reconnectIcon}
@@ -4841,9 +5100,17 @@ export default function SettingsDrawer({
   };
 
   //on-device provider, models the browser installed
-  const renderLitertSubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.litert.title"))}
+  const renderLitertContent = () => (
+    <>
+      {renderProviderToggle(
+        onDeviceProviders,
+        t("settings.service.litert"),
+        t(
+          litertSupported
+            ? "settings.service.litertHelp"
+            : "settings.service.localHelp",
+        ),
+      )}
 
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -4913,16 +5180,27 @@ export default function SettingsDrawer({
 
       {litertSupported && (
         <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }, isDesktop && styles.toggleGroupRow]}>
-            <View style={isDesktop && styles.toggleGroupContent}>
+          <View
+            style={[
+              styles.settingRowVertical,
+              { marginBottom: 0 },
+              isWide && styles.toggleGroupRow,
+            ]}
+          >
+            <View style={isWide && styles.toggleGroupContent}>
               <Text style={styles.settingLabel}>
                 {t("settings.litert.contextTitle")}
               </Text>
-              <Text style={[styles.helpText, !isDesktop && { marginBottom: Spacing.md }]}>
+              <Text
+                style={[
+                  styles.helpText,
+                  !isWide && { marginBottom: Spacing.md },
+                ]}
+              >
                 {t("settings.litert.contextHelp")}
               </Text>
             </View>
-            <Group style={isDesktop && styles.sliderGroup}>
+            <Group style={isWide && styles.sliderGroup}>
               <Slider
                 icon={messageIcon}
                 options={litertContextLengthOptions}
@@ -4933,9 +5211,8 @@ export default function SettingsDrawer({
           </View>
         </View>
       )}
-    </View>
+    </>
   );
-
 
   //ollama server list subpage
   const renderOllamaSubPage = () => (
@@ -4999,7 +5276,9 @@ export default function SettingsDrawer({
       {/* openai servers card */}
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{t("settings.cloudapi.title")}</Text>
+          <Text style={styles.settingLabel}>
+            {t("settings.cloudapi.title")}
+          </Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
             {t("settings.cloudapi.help")}
           </Text>
@@ -5361,7 +5640,9 @@ export default function SettingsDrawer({
         >
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>{tool.displayName ?? name}</Text>
+              <Text style={styles.settingLabel}>
+                {tool.displayName ?? name}
+              </Text>
               {tool.displayDescription ? (
                 <Text style={styles.helpText}>
                   {shortDescription(tool.displayDescription)}
@@ -5395,15 +5676,11 @@ export default function SettingsDrawer({
       </Group>
 
       {/* built-in tools card */}
-      <View style={styles.contentCard}>
-        {renderToolToggles(generalTools)}
-      </View>
+      <View style={styles.contentCard}>{renderToolToggles(generalTools)}</View>
 
       {/* mobile actions card, phone only */}
       {!isDesktop && (
-        <View style={styles.contentCard}>
-          {renderToolToggles(mobileTools)}
-        </View>
+        <View style={styles.contentCard}>{renderToolToggles(mobileTools)}</View>
       )}
     </View>
   );
@@ -5413,26 +5690,13 @@ export default function SettingsDrawer({
     <View style={styles.subPageContainer}>
       {renderSubPageHeader(t("settings.tools.mcp.title"))}
 
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>
-            {t("settings.tools.mcp.title")}
-          </Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.tools.mcp.help")}
-          </Text>
-
-          <Group style={styles.highlightGroup}>
-            <ActionButton
-              icon={addIcon}
-              label={t("settings.server.add")}
-              variant="highlight"
-              onPress={openMcpAddSheet}
-            />
-          </Group>
-
-          {(mcpServers.length > 0 || McpService.getHubServers().length > 0) &&
-            renderCardGrid([
+      {mcpServers.length === 0 && McpService.getHubServers().length === 0 && (
+        <Text style={styles.helpText}>{t("settings.tools.mcp.empty")}</Text>
+      )}
+      {(mcpServers.length > 0 || McpService.getHubServers().length > 0) && (
+        <View style={styles.contentCard}>
+          <CardGrid
+            cards={[
               ...mcpServers.map((server) => ({
                 key: server.id,
                 title: server.name,
@@ -5453,9 +5717,10 @@ export default function SettingsDrawer({
                   setMcpDetailId(server.id);
                 },
               })),
-            ])}
+            ]}
+          />
         </View>
-      </View>
+      )}
     </View>
   );
 
@@ -5479,8 +5744,6 @@ export default function SettingsDrawer({
         return renderScreenSaverSubPage();
       case "service":
         return renderServiceSubPage();
-      case "litert":
-        return renderLitertSubPage();
       case "ollama":
         return renderOllamaSubPage();
       case "openai":
@@ -5519,6 +5782,23 @@ export default function SettingsDrawer({
     >
       <View style={{ flex: 1 }}>{getSubPageContent(page)}</View>
     </KeyboardAwareScrollView>
+  );
+
+  //add action of the page on screen, desktop shows two pages
+  const addPage = isDesktop ? desktopPage : activeSubPage;
+  const addButton = (addPage === "mcpservers" || addPage === "service") && (
+    <View
+      style={[
+        styles.addButtonWrapper,
+        { bottom: Spacing.xl2 + (isDesktop ? 0 : insets.bottom) },
+      ]}
+      pointerEvents="box-none"
+    >
+      <FloatingButton
+        icon={addIcon}
+        onPress={addPage === "service" ? openOpenAIAddSheet : openMcpAddSheet}
+      />
+    </View>
   );
 
   const innerContent = (
@@ -5564,6 +5844,8 @@ export default function SettingsDrawer({
         style={styles.gradientBottom}
         pointerEvents="none"
       />
+
+      {addButton}
     </View>
   );
 
@@ -5924,6 +6206,33 @@ export default function SettingsDrawer({
     </>
   );
 
+  //on-device models and options
+  const litertSheet = (
+    <DrawerSheet
+      visible={litertSheetVisible}
+      onClose={() => setLitertSheetVisible(false)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          paddingBottom: Platform.OS === "ios" ? 34 : 20,
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.addModelSheetDesktop}
+    >
+      <SheetScrollView
+        contentContainerStyle={styles.addModelSheetContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {renderLitertContent()}
+      </SheetScrollView>
+    </DrawerSheet>
+  );
+
   const addModelSheet = (
     <DrawerSheet
       visible={addModelSheetVisible}
@@ -5986,11 +6295,10 @@ export default function SettingsDrawer({
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.contentCard}>
+        <View style={[styles.contentCard, { marginBottom: 0 }]}>
           <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>{t("settings.server.name")}</Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.server.nameHelp")}
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.server.name")}
             </Text>
             <Group>
               <TextInputField
@@ -6093,204 +6401,213 @@ export default function SettingsDrawer({
         bottomOffset={Spacing.xl2}
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
+        onLayout={(e) => setSheetWidth(e.nativeEvent.layout.width)}
       >
-          {ollamaDetailServer && shownOllamaIndex !== null && (
-            <>
-              <View style={styles.contentCard}>
-                <View style={styles.settingRowVertical}>
-                  <Text
-                    style={[styles.settingLabel, { marginBottom: Spacing.md }]}
-                  >
-                    {t("settings.server.name")}
-                  </Text>
-                  <Group>
-                    <TextInputField
-                      icon={penPlaceholderIcon}
-                      placeholder={t("settings.server.namePlaceholder")}
-                      value={ollamaDetailServer.name}
-                      onChangeText={(v) =>
-                        patchOllamaServer(shownOllamaIndex, { name: v })
-                      }
-                    />
-                  </Group>
-                </View>
-
-                <View style={styles.settingRowVertical}>
-                  <Text
-                    style={[styles.settingLabel, { marginBottom: Spacing.md }]}
-                  >
-                    {t("settings.server.link")}
-                  </Text>
-                  <Group>
-                    <TextInputField
-                      icon={linkIcon}
-                      placeholder={t("settings.service.serverLink")}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="url"
-                      value={ollamaDetailServer.url}
-                      onChangeText={(v) =>
-                        patchOllamaServer(shownOllamaIndex, { url: v })
-                      }
-                      onBlur={() => handleOllamaUrlBlur(shownOllamaIndex)}
-                      rightIcon={
-                        serverErrors[ollamaDetailUrl] ? errorIcon : undefined
-                      }
-                      rightIconLabel={t("common.error")}
-                      onRightIconPress={() =>
-                        showAlert(
-                          t("settings.ollama.unreachableTitle"),
-                          t("settings.ollama.unreachableInfo"),
-                          undefined,
-                          { image: errorImage, messageAlign: "left" },
-                        )
-                      }
-                    />
-                  </Group>
-                </View>
-
-                <View
-                  style={[
-                    styles.settingRowVertical,
-                    isDesktop && styles.toggleGroupRow,
-                  ]}
+        {ollamaDetailServer && shownOllamaIndex !== null && (
+          <>
+            {renderProviderToggle(
+              "ollama",
+              ollamaServerLabel(ollamaDetailServer),
+              t("settings.service.ollamaHelp"),
+              serverSwitch("ollama", ollamaDetailServer, (disabled) =>
+                patchOllamaServer(shownOllamaIndex, { disabled }),
+              ),
+            )}
+            <View style={styles.contentCard}>
+              <View style={styles.settingRowVertical}>
+                <Text
+                  style={[styles.settingLabel, { marginBottom: Spacing.md }]}
                 >
-                  <View style={isDesktop && styles.toggleGroupContent}>
-                    <Text style={styles.settingLabel}>
-                      {t("settings.ollama.contextLength")}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.helpText,
-                        !isDesktop && { marginBottom: Spacing.md },
-                      ]}
-                    >
-                      {t("settings.ollama.contextHelp")}
-                    </Text>
-                  </View>
-                  <Group style={isDesktop && styles.sliderGroup}>
-                    {advancedMode ? (
-                      <TextInputField
-                        icon={messageIcon}
-                        placeholder="8192"
-                        value={ollamaContextDraft}
-                        onChangeText={(v) =>
-                          setOllamaServerContext(shownOllamaIndex, v)
-                        }
-                        keyboardType="numeric"
-                      />
-                    ) : (
-                      <Slider
-                        icon={messageIcon}
-                        options={ollamaContextLengthOptions}
-                        selectedValue={String(
-                          serverContextLength(ollamaDetailServer),
-                        )}
-                        onSelect={(v) =>
-                          setOllamaServerContext(shownOllamaIndex, v)
-                        }
-                      />
-                    )}
-                  </Group>
-                </View>
-
-                <View
-                  style={[
-                    styles.settingRowVertical,
-                    { marginBottom: 0 },
-                    isDesktop && styles.toggleGroupRow,
-                  ]}
-                >
-                  <View style={isDesktop && styles.toggleGroupContent}>
-                    <Text style={styles.settingLabel}>
-                      {t("settings.ollama.keepAlive")}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.helpText,
-                        !isDesktop && { marginBottom: Spacing.md },
-                      ]}
-                    >
-                      {advancedMode
-                        ? t("settings.ollama.keepAliveHelpAdvanced")
-                        : t("settings.ollama.keepAliveHelp")}
-                    </Text>
-                  </View>
-                  <Group style={isDesktop && styles.sliderGroup}>
-                    {advancedMode ? (
-                      <TextInputField
-                        icon={timeIcon}
-                        placeholder="300"
-                        value={ollamaKeepAliveDraft}
-                        onChangeText={(v) =>
-                          setOllamaServerKeepAlive(shownOllamaIndex, v)
-                        }
-                        keyboardType="numeric"
-                      />
-                    ) : (
-                      <Slider
-                        icon={timeIcon}
-                        options={ollamaKeepAliveOptions}
-                        selectedValue={String(
-                          serverKeepAlive(ollamaDetailServer),
-                        )}
-                        onSelect={(v) =>
-                          setOllamaServerKeepAlive(shownOllamaIndex, v)
-                        }
-                      />
-                    )}
-                  </Group>
-                </View>
+                  {t("settings.server.name")}
+                </Text>
+                <Group>
+                  <TextInputField
+                    icon={penPlaceholderIcon}
+                    placeholder={t("settings.server.namePlaceholder")}
+                    value={ollamaDetailServer.name}
+                    onChangeText={(v) =>
+                      patchOllamaServer(shownOllamaIndex, { name: v })
+                    }
+                  />
+                </Group>
               </View>
 
-              <ModelToggleList
-                key={ollamaDetailUrl}
-                models={ollamaModels}
-                loading={ollamaModelsLoading}
-                service="ollama"
-                url={ollamaDetailUrl}
-                disabled={ollamaDetailServer.disabledModels}
-                capabilities={ollamaDetailServer.capabilities}
-                onChange={(next) =>
-                  patchOllamaServer(shownOllamaIndex, { disabledModels: next })
-                }
-                onCapabilitiesChange={(next) =>
-                  patchOllamaServer(shownOllamaIndex, { capabilities: next })
-                }
-                promptTiers={ollamaDetailServer.promptTiers}
-                onPromptTiersChange={(next) =>
-                  patchOllamaServer(shownOllamaIndex, { promptTiers: next })
-                }
-              />
+              <View style={styles.settingRowVertical}>
+                <Text
+                  style={[styles.settingLabel, { marginBottom: Spacing.md }]}
+                >
+                  {t("settings.server.link")}
+                </Text>
+                <Group>
+                  <TextInputField
+                    icon={linkIcon}
+                    placeholder={t("settings.service.serverLink")}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                    value={ollamaDetailServer.url}
+                    onChangeText={(v) =>
+                      patchOllamaServer(shownOllamaIndex, { url: v })
+                    }
+                    onBlur={() => handleOllamaUrlBlur(shownOllamaIndex)}
+                    rightIcon={
+                      serverErrors[ollamaDetailUrl] ? errorIcon : undefined
+                    }
+                    rightIconLabel={t("common.error")}
+                    onRightIconPress={() =>
+                      showAlert(
+                        t("settings.ollama.unreachableTitle"),
+                        t("settings.ollama.unreachableInfo"),
+                        undefined,
+                        { image: errorImage, messageAlign: "left" },
+                      )
+                    }
+                  />
+                </Group>
+              </View>
 
-              <View style={[styles.contentCard, { marginBottom: 0 }]}>
-                <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-                  <Group>
-                    {!ollamaDetailConnected && (
-                      <ActionButton
-                        icon={reconnectIcon}
-                        label={
-                          ollamaModelsLoading
-                            ? t("settings.ollama.connecting")
-                            : t("settings.ollama.reconnect")
-                        }
-                        disabled={
-                          ollamaModelsLoading || ollamaDetailUrl.length === 0
-                        }
-                        onPress={() => reconnectOllamaServer(shownOllamaIndex)}
-                      />
-                    )}
+              <View
+                style={[
+                  styles.settingRowVertical,
+                  isSheetWide && styles.toggleGroupRow,
+                ]}
+              >
+                <View style={isSheetWide && styles.toggleGroupContent}>
+                  <Text style={styles.settingLabel}>
+                    {t("settings.ollama.contextLength")}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.helpText,
+                      !isSheetWide && { marginBottom: Spacing.md },
+                    ]}
+                  >
+                    {t("settings.ollama.contextHelp")}
+                  </Text>
+                </View>
+                <Group style={isSheetWide && styles.sliderGroup}>
+                  {advancedMode ? (
+                    <TextInputField
+                      icon={messageIcon}
+                      placeholder="8192"
+                      value={ollamaContextDraft}
+                      onChangeText={(v) =>
+                        setOllamaServerContext(shownOllamaIndex, v)
+                      }
+                      keyboardType="numeric"
+                    />
+                  ) : (
+                    <Slider
+                      icon={messageIcon}
+                      options={ollamaContextLengthOptions}
+                      selectedValue={String(
+                        serverContextLength(ollamaDetailServer),
+                      )}
+                      onSelect={(v) =>
+                        setOllamaServerContext(shownOllamaIndex, v)
+                      }
+                    />
+                  )}
+                </Group>
+              </View>
+
+              <View
+                style={[
+                  styles.settingRowVertical,
+                  { marginBottom: 0 },
+                  isSheetWide && styles.toggleGroupRow,
+                ]}
+              >
+                <View style={isSheetWide && styles.toggleGroupContent}>
+                  <Text style={styles.settingLabel}>
+                    {t("settings.ollama.keepAlive")}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.helpText,
+                      !isSheetWide && { marginBottom: Spacing.md },
+                    ]}
+                  >
+                    {advancedMode
+                      ? t("settings.ollama.keepAliveHelpAdvanced")
+                      : t("settings.ollama.keepAliveHelp")}
+                  </Text>
+                </View>
+                <Group style={isSheetWide && styles.sliderGroup}>
+                  {advancedMode ? (
+                    <TextInputField
+                      icon={timeIcon}
+                      placeholder="300"
+                      value={ollamaKeepAliveDraft}
+                      onChangeText={(v) =>
+                        setOllamaServerKeepAlive(shownOllamaIndex, v)
+                      }
+                      keyboardType="numeric"
+                    />
+                  ) : (
+                    <Slider
+                      icon={timeIcon}
+                      options={ollamaKeepAliveOptions}
+                      selectedValue={String(
+                        serverKeepAlive(ollamaDetailServer),
+                      )}
+                      onSelect={(v) =>
+                        setOllamaServerKeepAlive(shownOllamaIndex, v)
+                      }
+                    />
+                  )}
+                </Group>
+              </View>
+            </View>
+
+            <ModelToggleList
+              key={ollamaDetailUrl}
+              models={ollamaModels}
+              loading={ollamaModelsLoading}
+              service="ollama"
+              url={ollamaDetailUrl}
+              disabled={ollamaDetailServer.disabledModels}
+              capabilities={ollamaDetailServer.capabilities}
+              onChange={(next) =>
+                patchOllamaServer(shownOllamaIndex, { disabledModels: next })
+              }
+              onCapabilitiesChange={(next) =>
+                patchOllamaServer(shownOllamaIndex, { capabilities: next })
+              }
+              promptTiers={ollamaDetailServer.promptTiers}
+              onPromptTiersChange={(next) =>
+                patchOllamaServer(shownOllamaIndex, { promptTiers: next })
+              }
+            />
+
+            <View style={[styles.contentCard, { marginBottom: 0 }]}>
+              <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+                <Group>
+                  {!ollamaDetailConnected && (
                     <ActionButton
-                      icon={binIcon}
-                      label={t("settings.ollama.remove.action")}
-                      onPress={() => removeOllamaServer(shownOllamaIndex)}
+                      icon={reconnectIcon}
+                      label={
+                        ollamaModelsLoading
+                          ? t("settings.ollama.connecting")
+                          : t("settings.ollama.reconnect")
+                      }
+                      disabled={
+                        ollamaModelsLoading || ollamaDetailUrl.length === 0
+                      }
+                      onPress={() => reconnectOllamaServer(shownOllamaIndex)}
                     />
-                  </Group>
-                </View>
+                  )}
+                  <ActionButton
+                    icon={binIcon}
+                    label={t("settings.ollama.remove.action")}
+                    onPress={() => removeOllamaServer(shownOllamaIndex)}
+                  />
+                </Group>
               </View>
-            </>
-          )}
-        </SheetKeyboardAwareScrollView>
+            </View>
+          </>
+        )}
+      </SheetKeyboardAwareScrollView>
     </DrawerSheet>
   );
 
@@ -6319,6 +6636,7 @@ export default function SettingsDrawer({
         bottomOffset={Spacing.xl2}
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
+        onLayout={(e) => setSheetWidth(e.nativeEvent.layout.width)}
       >
         {shownHubServer && renderHubServerContent(shownHubServer)}
       </SheetKeyboardAwareScrollView>
@@ -6378,6 +6696,14 @@ export default function SettingsDrawer({
             }
             scrollEventThrottle={16}
           >
+            {renderProviderToggle(
+              OPENAI_PROVIDER_ID,
+              openAIServerLabel(index),
+              t("settings.service.cloudapiHelp"),
+              serverSwitch(OPENAI_PROVIDER_ID, server, (disabled) =>
+                patchOpenAIServer(index, { disabled }),
+              ),
+            )}
             <View style={styles.contentCard}>
               <View style={styles.settingRowVertical}>
                 <Text
@@ -6390,9 +6716,7 @@ export default function SettingsDrawer({
                     icon={penPlaceholderIcon}
                     placeholder={t("settings.server.namePlaceholder")}
                     value={server.name}
-                    onChangeText={(v) =>
-                      patchOpenAIServer(index, { name: v })
-                    }
+                    onChangeText={(v) => patchOpenAIServer(index, { name: v })}
                   />
                 </Group>
               </View>
@@ -6411,13 +6735,9 @@ export default function SettingsDrawer({
                     autoCorrect={false}
                     keyboardType="url"
                     value={server.url}
-                    onChangeText={(v) =>
-                      patchOpenAIServer(index, { url: v })
-                    }
+                    onChangeText={(v) => patchOpenAIServer(index, { url: v })}
                     onBlur={() => handleOpenAIUrlBlur(index)}
-                    rightIcon={
-                      serverErrors[url] ? errorIcon : undefined
-                    }
+                    rightIcon={serverErrors[url] ? errorIcon : undefined}
                     rightIconLabel={t("common.error")}
                     onRightIconPress={() =>
                       showAlert(
@@ -6483,9 +6803,7 @@ export default function SettingsDrawer({
                           ? t("settings.ollama.connecting")
                           : t("settings.ollama.reconnect")
                       }
-                      disabled={
-                        openaiModelsLoading || url.length === 0
-                      }
+                      disabled={openaiModelsLoading || url.length === 0}
                       onPress={() => reconnectOpenAIServer(index)}
                     />
                   )}
@@ -6568,7 +6886,8 @@ export default function SettingsDrawer({
                       })
                     }
                     onPromptTierChange={(m, tier) => {
-                      const { [m]: _removed, ...rest } = server.promptTiers ?? {};
+                      const { [m]: _removed, ...rest } =
+                        server.promptTiers ?? {};
                       patchOpenAIServer(index, {
                         promptTiers: tier ? { ...rest, [m]: tier } : rest,
                       });
@@ -6659,11 +6978,10 @@ export default function SettingsDrawer({
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.contentCard}>
+        <View style={[styles.contentCard, { marginBottom: 0 }]}>
           <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>{t("settings.server.name")}</Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.server.nameHelp")}
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.server.name")}
             </Text>
             <Group>
               <TextInputField
@@ -6765,11 +7083,10 @@ export default function SettingsDrawer({
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.contentCard}>
+        <View style={[styles.contentCard, { marginBottom: 0 }]}>
           <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>{t("settings.server.name")}</Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.server.nameHelp")}
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.server.name")}
             </Text>
             <Group>
               <TextInputField
@@ -6908,228 +7225,255 @@ export default function SettingsDrawer({
       ]}
       desktopStyle={styles.addModelSheetDesktop}
     >
-      {mcpServerDetail && (() => {
-        const server = mcpServerDetail;
-        const hosted = mcpServerHosted;
-        const status = McpService.getStatus(server.id);
-        const tools = McpService.getTools(server.id);
-        const busy = mcpConnecting[server.id];
+      {mcpServerDetail &&
+        (() => {
+          const server = mcpServerDetail;
+          const hosted = mcpServerHosted;
+          const status = McpService.getStatus(server.id);
+          const tools = McpService.getTools(server.id);
+          const busy = mcpConnecting[server.id];
 
-        return (
-          <SheetKeyboardAwareScrollView
-            bottomOffset={Spacing.xl2}
-            contentContainerStyle={styles.addModelSheetContent}
-            keyboardShouldPersistTaps="handled"
-          >
-            <View style={styles.contentCard}>
-              <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-                <Text style={styles.settingLabel}>{server.name}</Text>
-                <Text
-                  style={[
-                    styles.helpText,
-                    status.error ? { color: Colors.error } : undefined,
-                  ]}
-                >
-                  {status.error ?? mcpStatusLabel(server.id)}
-                </Text>
-              </View>
-            </View>
-
-            {tools.length > 0 && (
+          return (
+            <SheetKeyboardAwareScrollView
+              bottomOffset={Spacing.xl2}
+              contentContainerStyle={styles.addModelSheetContent}
+              keyboardShouldPersistTaps="handled"
+            >
               <View style={styles.contentCard}>
                 <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+                  <Text style={styles.settingLabel}>{server.name}</Text>
                   <Text
-                    style={[styles.settingLabel, { marginBottom: Spacing.md }]}
+                    style={[
+                      styles.helpText,
+                      status.error ? { color: Colors.error } : undefined,
+                    ]}
                   >
-                    {t("settings.mcp.tools", { count: tools.length })}
+                    {status.error ?? mcpStatusLabel(server.id)}
                   </Text>
-                  {tools.map((tool, index) => {
-                    const name = tool.definition.function.name;
-                    const key = `tool:${name}`;
-                    const enabled =
-                      pluginStates[key] ?? tool.enabledByDefault ?? false;
-                    return (
-                      <View
-                        key={name}
-                        style={
-                          index < tools.length - 1 && {
-                            marginBottom: Spacing.xxl,
+                </View>
+              </View>
+
+              {tools.length > 0 && (
+                <View style={styles.contentCard}>
+                  <View
+                    style={[styles.settingRowVertical, { marginBottom: 0 }]}
+                  >
+                    <Text
+                      style={[
+                        styles.settingLabel,
+                        { marginBottom: Spacing.md },
+                      ]}
+                    >
+                      {t("settings.mcp.tools", { count: tools.length })}
+                    </Text>
+                    {tools.map((tool, index) => {
+                      const name = tool.definition.function.name;
+                      const key = `tool:${name}`;
+                      const enabled =
+                        pluginStates[key] ?? tool.enabledByDefault ?? false;
+                      return (
+                        <View
+                          key={name}
+                          style={
+                            index < tools.length - 1 && {
+                              marginBottom: Spacing.xxl,
+                            }
                           }
-                        }
-                      >
-                        <View style={styles.toggleGroupRow}>
-                          <View style={styles.toggleGroupContent}>
-                            <Text style={styles.settingLabel}>
-                              {tool.displayName ?? name}
-                            </Text>
-                            {tool.displayDescription ? (
-                              <Text style={styles.helpText}>
-                                {shortDescription(tool.displayDescription)}
+                        >
+                          <View style={styles.toggleGroupRow}>
+                            <View style={styles.toggleGroupContent}>
+                              <Text style={styles.settingLabel}>
+                                {tool.displayName ?? name}
                               </Text>
-                            ) : null}
+                              {tool.displayDescription ? (
+                                <Text style={styles.helpText}>
+                                  {shortDescription(tool.displayDescription)}
+                                </Text>
+                              ) : null}
+                            </View>
+                            <Toggle
+                              checked={enabled}
+                              onToggle={async (v) => {
+                                setPluginStates((prev) => ({
+                                  ...prev,
+                                  [key]: v,
+                                }));
+                                await PluginRegistry.setEnabled(
+                                  "tool",
+                                  name,
+                                  v,
+                                );
+                              }}
+                            />
                           </View>
-                          <Toggle
-                            checked={enabled}
-                            onToggle={async (v) => {
-                              setPluginStates((prev) => ({
-                                ...prev,
-                                [key]: v,
-                              }));
-                              await PluginRegistry.setEnabled("tool", name, v);
-                            }}
-                          />
                         </View>
-                      </View>
-                    );
-                  })}
+                      );
+                    })}
+                  </View>
                 </View>
-              </View>
-            )}
+              )}
 
-            {!hosted && (
-              <View style={styles.contentCard}>
-                <View style={styles.settingRowVertical}>
-                  <Text
-                    style={[styles.settingLabel, { marginBottom: Spacing.md }]}
-                  >
-                    {t("settings.server.link")}
-                  </Text>
-                  <Group>
-                    <TextInputField
-                      icon={linkIcon}
-                      placeholder={t("settings.service.serverLink")}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="url"
-                      value={server.url}
-                      onChangeText={(v) =>
-                        setMcpServers((prev) =>
-                          prev.map((s) =>
-                            s.id === server.id ? { ...s, url: v } : s,
-                          ),
-                        )
-                      }
-                      onBlur={() => handleMcpUrlBlur(server.id, server.url)}
-                      rightIcon={mcpNeedsAuth(server.id) ? infoIcon : undefined}
-                      rightIconTint={Colors.textMuted}
-                      rightIconLabel={t("common.info")}
-                      onRightIconPress={() => showMcpAuthInfo(server.id)}
-                    />
-                  </Group>
-                </View>
-
-                <View style={styles.settingRowVertical}>
-                  <Text style={styles.settingLabel}>
-                    {t("settings.mcp.headerLabel")}
-                  </Text>
-                  <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-                    {t("settings.mcp.headerHelp")}
-                  </Text>
-                  <Group>
-                    <TextInputField
-                      icon={penPlaceholderIcon}
-                      placeholder={t("settings.mcp.headerName")}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      value={server.headerName}
-                      onChangeText={(v) =>
-                        setMcpServers((prev) =>
-                          prev.map((s) =>
-                            s.id === server.id ? { ...s, headerName: v } : s,
-                          ),
-                        )
-                      }
-                      onBlur={() =>
-                        saveMcpServer(server.id, {
-                          headerName: server.headerName,
-                        })
-                      }
-                    />
-                    <TextInputField
-                      icon={penPlaceholderIcon}
-                      placeholder={t("settings.mcp.headerValue")}
-                      autoCapitalize="none"
-                      secureTextEntry
-                      value={mcpHeaderValues[server.id] ?? ""}
-                      onChangeText={(v) =>
-                        setMcpHeaderValues((prev) => ({
-                          ...prev,
-                          [server.id]: v,
-                        }))
-                      }
-                      onBlur={() =>
-                        McpService.setHeaderValue(
-                          server.id,
-                          mcpHeaderValues[server.id] ?? "",
-                        )
-                      }
-                    />
-                  </Group>
-                </View>
-
-                <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-                  <Text style={styles.settingLabel}>
-                    {t("settings.mcp.clientIdLabel")}
-                  </Text>
-                  <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-                    {t("settings.mcp.clientIdHelp")}
-                  </Text>
-                  <Group>
-                    <TextInputField
-                      icon={penPlaceholderIcon}
-                      placeholder={t("settings.mcp.clientId")}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      value={server.clientId ?? ""}
-                      onChangeText={(v) =>
-                        setMcpServers((prev) =>
-                          prev.map((s) =>
-                            s.id === server.id ? { ...s, clientId: v } : s,
-                          ),
-                        )
-                      }
-                      onBlur={() =>
-                        saveMcpServer(server.id, {
-                          clientId: server.clientId ?? "",
-                        })
-                      }
-                    />
-                  </Group>
-                </View>
-              </View>
-            )}
-
-            {(!hosted || status.state !== "connected") && (
-              <View style={[styles.contentCard, { marginBottom: 0 }]}>
-                <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-                  <Group>
-                    {//reconnect only while offline
-                    status.state !== "connected" && (
-                      <ActionButton
-                        icon={reconnectIcon}
-                        label={
-                          busy
-                            ? t("settings.mcp.connecting")
-                            : t("settings.mcp.reconnect")
+              {!hosted && (
+                <View style={styles.contentCard}>
+                  <View style={styles.settingRowVertical}>
+                    <Text
+                      style={[
+                        styles.settingLabel,
+                        { marginBottom: Spacing.md },
+                      ]}
+                    >
+                      {t("settings.server.link")}
+                    </Text>
+                    <Group>
+                      <TextInputField
+                        icon={linkIcon}
+                        placeholder={t("settings.service.serverLink")}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="url"
+                        value={server.url}
+                        onChangeText={(v) =>
+                          setMcpServers((prev) =>
+                            prev.map((s) =>
+                              s.id === server.id ? { ...s, url: v } : s,
+                            ),
+                          )
                         }
-                        disabled={busy || !server.url.trim()}
-                        onPress={() => connectMcpServer(server.id)}
+                        onBlur={() => handleMcpUrlBlur(server.id, server.url)}
+                        rightIcon={
+                          mcpNeedsAuth(server.id) ? infoIcon : undefined
+                        }
+                        rightIconTint={Colors.textMuted}
+                        rightIconLabel={t("common.info")}
+                        onRightIconPress={() => showMcpAuthInfo(server.id)}
                       />
-                    )}
-                    {!hosted && (
-                      <ActionButton
-                        icon={binIcon}
-                        label={t("settings.mcp.remove.action")}
-                        onPress={() => removeMcpServer(server.id, server.name)}
+                    </Group>
+                  </View>
+
+                  <View style={styles.settingRowVertical}>
+                    <Text style={styles.settingLabel}>
+                      {t("settings.mcp.headerLabel")}
+                    </Text>
+                    <Text
+                      style={[styles.helpText, { marginBottom: Spacing.md }]}
+                    >
+                      {t("settings.mcp.headerHelp")}
+                    </Text>
+                    <Group>
+                      <TextInputField
+                        icon={penPlaceholderIcon}
+                        placeholder={t("settings.mcp.headerName")}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        value={server.headerName}
+                        onChangeText={(v) =>
+                          setMcpServers((prev) =>
+                            prev.map((s) =>
+                              s.id === server.id ? { ...s, headerName: v } : s,
+                            ),
+                          )
+                        }
+                        onBlur={() =>
+                          saveMcpServer(server.id, {
+                            headerName: server.headerName,
+                          })
+                        }
                       />
-                    )}
-                  </Group>
+                      <TextInputField
+                        icon={penPlaceholderIcon}
+                        placeholder={t("settings.mcp.headerValue")}
+                        autoCapitalize="none"
+                        secureTextEntry
+                        value={mcpHeaderValues[server.id] ?? ""}
+                        onChangeText={(v) =>
+                          setMcpHeaderValues((prev) => ({
+                            ...prev,
+                            [server.id]: v,
+                          }))
+                        }
+                        onBlur={() =>
+                          McpService.setHeaderValue(
+                            server.id,
+                            mcpHeaderValues[server.id] ?? "",
+                          )
+                        }
+                      />
+                    </Group>
+                  </View>
+
+                  <View
+                    style={[styles.settingRowVertical, { marginBottom: 0 }]}
+                  >
+                    <Text style={styles.settingLabel}>
+                      {t("settings.mcp.clientIdLabel")}
+                    </Text>
+                    <Text
+                      style={[styles.helpText, { marginBottom: Spacing.md }]}
+                    >
+                      {t("settings.mcp.clientIdHelp")}
+                    </Text>
+                    <Group>
+                      <TextInputField
+                        icon={penPlaceholderIcon}
+                        placeholder={t("settings.mcp.clientId")}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        value={server.clientId ?? ""}
+                        onChangeText={(v) =>
+                          setMcpServers((prev) =>
+                            prev.map((s) =>
+                              s.id === server.id ? { ...s, clientId: v } : s,
+                            ),
+                          )
+                        }
+                        onBlur={() =>
+                          saveMcpServer(server.id, {
+                            clientId: server.clientId ?? "",
+                          })
+                        }
+                      />
+                    </Group>
+                  </View>
                 </View>
-              </View>
-            )}
-          </SheetKeyboardAwareScrollView>
-        );
-      })()}
+              )}
+
+              {(!hosted || status.state !== "connected") && (
+                <View style={[styles.contentCard, { marginBottom: 0 }]}>
+                  <View
+                    style={[styles.settingRowVertical, { marginBottom: 0 }]}
+                  >
+                    <Group>
+                      {
+                        //reconnect only while offline
+                        status.state !== "connected" && (
+                          <ActionButton
+                            icon={reconnectIcon}
+                            label={
+                              busy
+                                ? t("settings.mcp.connecting")
+                                : t("settings.mcp.reconnect")
+                            }
+                            disabled={busy || !server.url.trim()}
+                            onPress={() => connectMcpServer(server.id)}
+                          />
+                        )
+                      }
+                      {!hosted && (
+                        <ActionButton
+                          icon={binIcon}
+                          label={t("settings.mcp.remove.action")}
+                          onPress={() =>
+                            removeMcpServer(server.id, server.name)
+                          }
+                        />
+                      )}
+                    </Group>
+                  </View>
+                </View>
+              )}
+            </SheetKeyboardAwareScrollView>
+          );
+        })()}
     </DrawerSheet>
   );
 
@@ -7206,7 +7550,9 @@ export default function SettingsDrawer({
                         style={styles.localModelFactValue}
                         numberOfLines={1}
                       >
-                        {t(`settings.local.status.${selectedLocalModel.status}`)}
+                        {t(
+                          `settings.local.status.${selectedLocalModel.status}`,
+                        )}
                       </Text>
                     )
                   }
@@ -7493,7 +7839,9 @@ export default function SettingsDrawer({
       onClose={() => {
         setConfirmedName(name);
         setProfileEditVisible(false);
-        HubSync.renameProfile(name).catch((e) => console.warn("[HubSync] profile rename failed:", e));
+        HubSync.renameProfile(name).catch((e) =>
+          console.warn("[HubSync] profile rename failed:", e),
+        );
       }}
       mode="overlay"
       isLargeScreen={isLargeScreen}
@@ -7549,7 +7897,10 @@ export default function SettingsDrawer({
         )}
 
         <View
-          style={[styles.desktopWindowWrapper, windowed && styles.windowedWrapper]}
+          style={[
+            styles.desktopWindowWrapper,
+            windowed && styles.windowedWrapper,
+          ]}
           pointerEvents="box-none"
         >
           <Animated.View
@@ -7562,38 +7913,40 @@ export default function SettingsDrawer({
               },
             ]}
           >
-            <View style={[styles.desktopNav, windowed && styles.windowedColumn]}>
+            <View
+              style={[styles.desktopNav, windowed && styles.windowedColumn]}
+            >
               {windowed ? (
                 renderSidebar()
               ) : (
-              <View style={styles.innerContainer}>
-                {/* the os window already has its own close button */}
-                {!windowed && (
-                  <View
-                    style={[styles.fixedBackWrapper, { top: Spacing.xxl2 }]}
-                    pointerEvents="box-none"
+                <View style={styles.innerContainer}>
+                  {/* the os window already has its own close button */}
+                  {!windowed && (
+                    <View
+                      style={[styles.fixedBackWrapper, { top: Spacing.xxl2 }]}
+                      pointerEvents="box-none"
+                    >
+                      <DrawerBackButton
+                        kind="close"
+                        onPress={onClose}
+                        scrolled={navScrolled}
+                      />
+                    </View>
+                  )}
+                  <ScrollView
+                    onScroll={(e) =>
+                      setNavScrolled(e.nativeEvent.contentOffset.y > 10)
+                    }
+                    scrollEventThrottle={16}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{
+                      paddingTop: Spacing.xxl2,
+                      paddingBottom: 40,
+                    }}
                   >
-                    <DrawerBackButton
-                      kind="close"
-                      onPress={onClose}
-                      scrolled={navScrolled}
-                    />
-                  </View>
-                )}
-                <ScrollView
-                  onScroll={(e) =>
-                    setNavScrolled(e.nativeEvent.contentOffset.y > 10)
-                  }
-                  scrollEventThrottle={16}
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{
-                    paddingTop: Spacing.xxl2,
-                    paddingBottom: 40,
-                  }}
-                >
-                  {renderMainPage()}
-                </ScrollView>
-              </View>
+                    {renderMainPage()}
+                  </ScrollView>
+                </View>
               )}
             </View>
 
@@ -7626,9 +7979,11 @@ export default function SettingsDrawer({
                   onBack={handleBack}
                   renderPage={renderScrollPage}
                 />
+                {addButton}
               </View>
             </View>
 
+            {litertSheet}
             {addModelSheet}
             {ollamaAddServerSheet}
             {ollamaServerSheet}
@@ -7678,6 +8033,7 @@ export default function SettingsDrawer({
       </Animated.View>
 
       {notificationModal}
+      {litertSheet}
       {addModelSheet}
       {ollamaAddServerSheet}
       {ollamaServerSheet}
@@ -7775,6 +8131,12 @@ const makeStyles = (Colors: ThemeColors) =>
     innerContainer: {
       flex: 1,
       position: "relative",
+    },
+    addButtonWrapper: {
+      position: "absolute",
+      right: 0,
+      zIndex: 100,
+      elevation: 10,
     },
     fixedBackWrapper: {
       position: "absolute",

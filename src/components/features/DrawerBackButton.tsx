@@ -8,9 +8,10 @@ import { DRAWER_NATIVE_DRIVER } from "./drawerAnimation";
 
 const arrowIcon = require("../../../assets/icons/arrow.png");
 const cancelIcon = require("../../../assets/icons/cancel.png");
+const informationIcon = require("../../../assets/icons/information.png");
 
 type DrawerBackButtonProps = {
-  kind: "back" | "close";
+  kind: "back" | "close" | "more";
   onPress: () => void;
   //surface and ink shadow once content scrolls under it
   scrolled?: boolean;
@@ -78,8 +79,18 @@ export default function DrawerBackButton({
           style={pressStyle(styles.button, scrolled ? "surface" : "fade")}
         >
           <Image
-            source={kind === "close" ? cancelIcon : arrowIcon}
-            style={kind === "close" ? styles.closeIcon : styles.backIcon}
+            source={
+              kind === "close"
+                ? cancelIcon
+                : kind === "more"
+                  ? informationIcon
+                  : arrowIcon
+            }
+            style={
+              kind === "back"
+                ? styles.backIcon
+                : styles.closeIcon
+            }
             tintColor={Colors.textPrimary}
           />
         </Pressable>

@@ -101,6 +101,7 @@ export default function HubDeviceSheet({
         },
       ]
     : [];
+  const hasActions = isSelf ? !!onUnpairSelf : canManage;
   const unchanged = !device || !name.trim() || name.trim() === device.name;
 
   return (
@@ -151,7 +152,7 @@ export default function HubDeviceSheet({
         </View>
 
         {/* details */}
-        <View style={styles.contentCard}>
+        <View style={[styles.contentCard, !hasActions && { marginBottom: 0 }]}>
           <Group style={styles.infoGroup}>
             {rows.map((row) => (
               <ActionButton
@@ -168,7 +169,7 @@ export default function HubDeviceSheet({
         </View>
 
         {/* actions section */}
-        {(isSelf ? !!onUnpairSelf : canManage) && (
+        {hasActions && (
           <View style={[styles.contentCard, { marginBottom: 0 }]}>
             <Group>
               {isSelf ? (

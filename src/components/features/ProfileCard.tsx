@@ -122,24 +122,39 @@ export default function ProfileCard({ name, createdAt: givenCreatedAt, compact =
       />
       <Image source={texture} style={styles.texture} resizeMode="cover" />
 
-      <View style={[styles.content, compact && styles.contentCompact]}>
-        <View style={styles.tile}>
-          <Image source={butterfly.color} style={styles.tileButterfly} resizeMode="contain" />
+      {compact ? (
+        <View style={styles.contentCompact}>
+          <View style={styles.compactText}>
+            <Text
+              style={[styles.name, styles.nameCompact, { fontFamily: nameFont }, !trimmed && styles.placeholder]}
+              numberOfLines={2}
+            >
+              {trimmed || t("profileCard.placeholder")}
+            </Text>
+            <Image source={butterfly.icon} style={styles.logoCompact} tintColor={`${Colors.textOnPrimary}99`} />
+          </View>
+          <Image source={butterfly.color} style={styles.butterflyCompact} resizeMode="contain" />
         </View>
+      ) : (
+        <View style={styles.content}>
+          <View style={styles.tile}>
+            <Image source={butterfly.color} style={styles.tileButterfly} resizeMode="contain" />
+          </View>
 
-        <Text
-          style={[styles.name, compact && styles.nameCompact, { fontFamily: nameFont }, !trimmed && styles.placeholder]}
-          numberOfLines={2}
-        >
-          {trimmed || t("profileCard.placeholder")}
-        </Text>
+          <Text
+            style={[styles.name, { fontFamily: nameFont }, !trimmed && styles.placeholder]}
+            numberOfLines={2}
+          >
+            {trimmed || t("profileCard.placeholder")}
+          </Text>
 
-        {shownCreatedAt !== null && !compact && (
-          <Text style={styles.meta}>{`Opera - ${formatDate(shownCreatedAt)}`}</Text>
-        )}
+          {shownCreatedAt !== null && (
+            <Text style={styles.meta}>{`Opera - ${formatDate(shownCreatedAt)}`}</Text>
+          )}
 
-        <Image source={butterfly.icon} style={styles.logo} tintColor={`${Colors.textOnPrimary}99`} />
-      </View>
+          <Image source={butterfly.icon} style={styles.logo} tintColor={`${Colors.textOnPrimary}99`} />
+        </View>
+      )}
       {/* a hairline above the thick stripe, a thinner one below */}
       <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateY: shift }] }]} pointerEvents="none">
         <View style={[styles.stripe, styles.stripeHair]} />
@@ -163,9 +178,27 @@ const makeStyles = (Colors: ThemeColors) =>
       padding: 15,
       gap: Spacing.xxl,
     },
+    //name and icon on the left, butterfly centered on the right
     contentCompact: {
+      flexDirection: "row",
+      alignItems: "center",
       padding: Spacing.lg2,
       gap: Spacing.lg,
+    },
+    compactText: {
+      flex: 1,
+      alignSelf: "stretch",
+      justifyContent: "space-between",
+      gap: Spacing.lg,
+    },
+    butterflyCompact: {
+      width: 64,
+      height: 64,
+    },
+    logoCompact: {
+      width: Spacing.xxl,
+      height: Spacing.xxl,
+      alignSelf: "flex-start",
     },
     tile: {
       aspectRatio: 1,

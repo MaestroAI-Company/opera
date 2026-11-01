@@ -1,4 +1,7 @@
-import { ScrollViewStyleReset } from "expo-router/html";
+import {
+    ScrollViewStyleReset,
+    useServerDocumentContext,
+} from "expo-router/html";
 import { type PropsWithChildren } from "react";
 
 const rootStyle = `
@@ -11,8 +14,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
 `;
 
 export default function Root({ children }: PropsWithChildren) {
+  const { bodyAttributes, bodyNodes, htmlAttributes, headNodes } =
+    useServerDocumentContext();
+
   return (
-    <html lang="en">
+    <html lang="en" {...htmlAttributes}>
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
@@ -21,9 +27,13 @@ export default function Root({ children }: PropsWithChildren) {
           content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
         />
         <ScrollViewStyleReset />
+        {headNodes}
         <style dangerouslySetInnerHTML={{ __html: rootStyle }} />
       </head>
-      <body>{children}</body>
+      <body {...bodyAttributes}>
+        {children}
+        {bodyNodes}
+      </body>
     </html>
   );
 }

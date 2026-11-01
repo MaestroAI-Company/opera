@@ -3478,9 +3478,6 @@ export default function SettingsDrawer({
             <Text style={styles.navTitle}>
               {name || t("settings.nav.profile.title")}
             </Text>
-            <Text style={styles.navSubtitle}>
-              {t("settings.nav.profile.subtitle")}
-            </Text>
           </View>
         </Pressable>
 
@@ -3497,9 +3494,6 @@ export default function SettingsDrawer({
           </View>
           <View style={styles.navTextContainer}>
             <Text style={styles.navTitle}>{t("settings.nav.cloud.title")}</Text>
-            <Text style={styles.navSubtitle}>
-              {t("settings.nav.cloud.subtitle")}
-            </Text>
           </View>
         </Pressable>
 
@@ -3517,11 +3511,6 @@ export default function SettingsDrawer({
           <View style={styles.navTextContainer}>
             <Text style={styles.navTitle}>
               {t("settings.nav.maestro.title")}
-            </Text>
-            <Text style={styles.navSubtitle}>
-              {isDesktop
-                ? t("settings.nav.maestro.subtitleDesktop")
-                : t("settings.nav.maestro.subtitle")}
             </Text>
           </View>
         </Pressable>
@@ -3543,9 +3532,6 @@ export default function SettingsDrawer({
             <Text style={styles.navTitle}>
               {t("settings.nav.general.title")}
             </Text>
-            <Text style={styles.navSubtitle}>
-              {t("settings.nav.general.subtitle")}
-            </Text>
           </View>
         </Pressable>
 
@@ -3564,9 +3550,6 @@ export default function SettingsDrawer({
             <Text style={styles.navTitle}>
               {t("settings.nav.service.title")}
             </Text>
-            <Text style={styles.navSubtitle}>
-              {t("settings.nav.service.subtitle")}
-            </Text>
           </View>
         </Pressable>
 
@@ -3583,11 +3566,6 @@ export default function SettingsDrawer({
           </View>
           <View style={styles.navTextContainer}>
             <Text style={styles.navTitle}>{t("settings.nav.tools.title")}</Text>
-            <Text style={styles.navSubtitle}>
-              {isDesktop
-                ? t("settings.nav.tools.subtitleDesktop")
-                : t("settings.nav.tools.subtitle")}
-            </Text>
           </View>
         </Pressable>
 
@@ -3606,9 +3584,6 @@ export default function SettingsDrawer({
             <View style={styles.navTextContainer}>
               <Text style={styles.navTitle}>
                 {t("settings.nav.advanced.title")}
-              </Text>
-              <Text style={styles.navSubtitle}>
-                {t("settings.nav.advanced.subtitle")}
               </Text>
             </View>
           </Pressable>
@@ -3631,9 +3606,6 @@ export default function SettingsDrawer({
             <Text style={styles.navTitle}>
               {t("settings.nav.privacy.title")}
             </Text>
-            <Text style={styles.navSubtitle}>
-              {t("settings.nav.privacy.subtitle")}
-            </Text>
           </View>
         </Pressable>
 
@@ -3652,9 +3624,6 @@ export default function SettingsDrawer({
             <Text style={styles.navTitle}>
               {t("settings.nav.support.title")}
             </Text>
-            <Text style={styles.navSubtitle}>
-              {t("settings.nav.support.subtitle")}
-            </Text>
           </View>
         </Pressable>
 
@@ -3671,9 +3640,6 @@ export default function SettingsDrawer({
           </View>
           <View style={styles.navTextContainer}>
             <Text style={styles.navTitle}>{t("settings.nav.info.title")}</Text>
-            <Text style={styles.navSubtitle}>
-              {t("settings.nav.info.subtitle")}
-            </Text>
           </View>
         </Pressable>
       </Group>
@@ -5766,40 +5732,59 @@ export default function SettingsDrawer({
     }
   };
 
-  const renderScrollPage = (page: SubPage, active: boolean) => (
-    //focused field scrolls just above the keyboard
-    <KeyboardAwareScrollView
-      ref={active ? scrollRef : undefined}
-      bottomOffset={Spacing.xl2}
-      onScroll={active ? handleScroll : undefined}
-      scrollEventThrottle={16}
-      contentContainerStyle={{
-        paddingTop: isDesktop ? Spacing.xxl2 : 60,
-        paddingBottom: 40,
-        flexGrow: 1,
-      }}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={{ flex: 1 }}>{getSubPageContent(page)}</View>
-    </KeyboardAwareScrollView>
-  );
+  //add action of the page, lives inside it so it slides with it
+  const pageAddAction = (page: SubPage) =>
+    page === "service"
+      ? openOpenAIAddSheet
+      : page === "mcpservers"
+        ? openMcpAddSheet
+        : null;
 
-  //add action of the page on screen, desktop shows two pages
-  const addPage = isDesktop ? desktopPage : activeSubPage;
-  const addButton = (addPage === "mcpservers" || addPage === "service") && (
-    <View
-      style={[
-        styles.addButtonWrapper,
-        { bottom: Spacing.xl2 + (isDesktop ? 0 : insets.bottom) },
-      ]}
-      pointerEvents="box-none"
-    >
-      <FloatingButton
-        icon={addIcon}
-        onPress={addPage === "service" ? openOpenAIAddSheet : openMcpAddSheet}
-      />
-    </View>
-  );
+  const renderScrollPage = (page: SubPage, active: boolean) => {
+    const onAdd = pageAddAction(page);
+    return (
+      <View style={{ flex: 1 }}>
+        {/* focused field scrolls just above the keyboard */}
+        <KeyboardAwareScrollView
+          ref={active ? scrollRef : undefined}
+          bottomOffset={Spacing.xl2}
+          onScroll={active ? handleScroll : undefined}
+          scrollEventThrottle={16}
+          contentContainerStyle={{
+            paddingTop: isDesktop ? Spacing.xxl2 : 60,
+            paddingBottom: 40,
+            flexGrow: 1,
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={{ flex: 1 }}>{getSubPageContent(page)}</View>
+        </KeyboardAwareScrollView>
+        {/* in the page so the add button sits above it */}
+        {!isDesktop && (
+          <LinearGradient
+            colors={[
+              Colors.groupedBackgroundClear,
+              Colors.groupedBackgroundFade,
+              Colors.groupedBackground,
+            ]}
+            style={styles.gradientBottom}
+            pointerEvents="none"
+          />
+        )}
+        {onAdd && (
+          <View
+            style={[
+              styles.addButtonWrapper,
+              { bottom: Spacing.xl2 + (isDesktop ? 0 : insets.bottom) },
+            ]}
+            pointerEvents="box-none"
+          >
+            <FloatingButton icon={addIcon} onPress={onAdd} />
+          </View>
+        )}
+      </View>
+    );
+  };
 
   const innerContent = (
     <View style={styles.innerContainer}>
@@ -5835,17 +5820,7 @@ export default function SettingsDrawer({
         style={styles.gradientTop}
         pointerEvents="none"
       />
-      <LinearGradient
-        colors={[
-          Colors.groupedBackgroundClear,
-          Colors.groupedBackgroundFade,
-          Colors.groupedBackground,
-        ]}
-        style={styles.gradientBottom}
-        pointerEvents="none"
-      />
 
-      {addButton}
     </View>
   );
 
@@ -7979,7 +7954,6 @@ export default function SettingsDrawer({
                   onBack={handleBack}
                   renderPage={renderScrollPage}
                 />
-                {addButton}
               </View>
             </View>
 
@@ -8485,12 +8459,6 @@ const makeStyles = (Colors: ThemeColors) =>
       fontSize: FontSizes.lg,
       fontFamily: Fonts.mono,
       color: Colors.textPrimary,
-      marginBottom: Spacing.xs2,
-    },
-    navSubtitle: {
-      fontSize: FontSizes.bodyMd,
-      fontFamily: Fonts.body,
-      color: Colors.textMuted,
     },
     permissionBadge: {
       paddingVertical: 3,

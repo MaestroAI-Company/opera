@@ -2,6 +2,7 @@ import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
 import { useQuickActionCallback } from "expo-quick-actions/hooks";
 import { useRouter } from "expo-router";
+import { useShareIntentContext } from "expo-share-intent";
 import {
   useCallback,
   useEffect,
@@ -35,13 +36,20 @@ import Reanimated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import HeadlessWebView from "../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
-import { Fonts, FontSizes, Radius, ThemeColors } from "../../constants/theme";
+import {
+  Fonts,
+  FontSizes,
+  Radius,
+  Spacing,
+  ThemeColors,
+} from "../../constants/theme";
 import AssistantSheet from "../components/features/AssistantSheet";
+import AttachmentSheet, {
+  useAttachments,
+} from "../components/features/AttachmentSheet";
 import BugReportSheet from "../components/features/BugReportSheet";
 import ButterflyCluster from "../components/features/ButterflyCluster";
 import ChatBar, { type ChatBarHandle } from "../components/features/ChatBar";
-import { useShareIntentContext } from "expo-share-intent";
-import AttachmentSheet, { useAttachments } from "../components/features/AttachmentSheet";
 import ChatView from "../components/features/ChatView";
 import CodePreviewSheet, {
   PreviewCode,
@@ -68,6 +76,7 @@ import MessageDetailsSheet, {
   PreviewDetails,
 } from "../components/features/MessageDetailsSheet";
 import {
+  displayName,
   ModelSelectorDrawer,
   ModelSelectorTrigger,
 } from "../components/features/ModelSelector";
@@ -78,17 +87,21 @@ import WhatsNewSheet from "../components/features/WhatsNewSheet";
 import ActionButton from "../components/ui/ActionButton";
 import Group from "../components/ui/Group";
 import NotificationModal from "../components/ui/NotificationModal";
-import SliderToggle from "../components/ui/SliderToggle";
 import { pressStyle } from "../components/ui/pressStyle";
+import SliderToggle from "../components/ui/SliderToggle";
 import { isWidgetTouchActive } from "../components/widgets/WidgetTouchArea";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
 import { useBugReportTrigger } from "../hooks/useBugReportTrigger";
+import { useDesktopUpdate } from "../hooks/useDesktopUpdate";
 import { useKeyboardLift } from "../hooks/useKeyboardLift";
 import { useResponsive } from "../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
 import { t, useT, type TranslationFn } from "../i18n";
 import { AIModule } from "../services/ai/AIModule";
-import { buildSystemPrompt, screenContextSegment } from "../services/ai/generation/chatGeneration";
+import {
+  buildSystemPrompt,
+  screenContextSegment,
+} from "../services/ai/generation/chatGeneration";
 import { GenerationService } from "../services/ai/generation/GenerationService";
 import {
   generateSuggestions,
@@ -101,22 +114,22 @@ import {
 } from "../services/ai/providers/sources";
 import { resolveQuickFlow } from "../services/ai/quickFlow";
 import { arrayBufferToBase64 } from "../services/ai/utils/base64";
+import {
+  dismissAssistantPrompt,
+  shouldOfferAssistantRole,
+} from "../services/assistant/DefaultAssistant";
 import { CloudSync } from "../services/CloudSyncService";
-import { HubSync } from "../services/hub/HubSync";
-import { SamplerHub, PairedHub } from "../services/hub/SamplerHubService";
 import { Conversation, DB, Message } from "../services/db/DatabaseService";
 import {
   getInitialDeepLink,
   subscribeToDeepLinks,
   type DeepLinkRoute,
 } from "../services/deeplinks/DeepLinkService";
-import {
-  dismissAssistantPrompt,
-  shouldOfferAssistantRole,
-} from "../services/assistant/DefaultAssistant";
+import { applyLaunchAtStartupDefault } from "../services/desktop/launchAtStartup";
 import { splitDocumentBlocks } from "../services/documents/DocumentService";
 import { AppEvents } from "../services/events";
-import { OverlayPresence } from "../services/overlay/overlayPresence";
+import { HubSync } from "../services/hub/HubSync";
+import { PairedHub, SamplerHub } from "../services/hub/SamplerHubService";
 import { LocationService } from "../services/location/LocationService";
 import {
   takePendingCrash,
@@ -128,6 +141,7 @@ import {
   subscribeToNotificationPress,
   takePendingNotificationConvId,
 } from "../services/notifications/NotificationService";
+import { OverlayPresence } from "../services/overlay/overlayPresence";
 import { PluginRegistry } from "../services/plugins/PluginRegistry";
 import { NEW_CHAT_ACTION_ID } from "../services/quickActions/QuickActionsService";
 import { Settings } from "../services/settings/SettingsService";
@@ -146,13 +160,18 @@ import {
 } from "../services/share/ShareService";
 import { speakReplyLive } from "../services/speech/liveReply";
 import { STT, WhisperSTT } from "../services/speech/STTService";
-import { applyLaunchAtStartupDefault } from "../services/desktop/launchAtStartup";
-import { useDesktopUpdate } from "../hooks/useDesktopUpdate";
-import { ReleaseNotes, getAvailableUpdate, takeReleaseNotes } from "../services/updates/UpdateService";
+import {
+  getAvailableUpdate,
+  ReleaseNotes,
+  takeReleaseNotes,
+} from "../services/updates/UpdateService";
 
 const texture2 = require("../../assets/images/texture2.png");
 const settingsIcon = require("../../assets/icons/settings.png");
 const addIcon = require("../../assets/icons/add.png");
+const chatIcon = require("../../assets/icons/message.png");
+const nextIcon = require("../../assets/icons/right.png");
+const samplerIcon = require("../../assets/icons/sampler.png");
 
 function shareConsentMessage(): string {
   const host = resolvePasteHost()
@@ -175,7 +194,8 @@ type ShareNotice =
 
 //matches welcomeText's lineHeight, reserved upfront so the second line doesn't shift layout
 const WELCOME_LINE_HEIGHT = 40;
-const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+const isTauri =
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 //time-of-day greeting shown on the home screen
 function getGreeting(t: TranslationFn): string {
@@ -185,8 +205,8 @@ function getGreeting(t: TranslationFn): string {
   return t("home.greeting.evening");
 }
 
-//fades in then types out text character by character, like a typewriter
-function TypewriterWelcome({
+//fades up the welcome text, same motion as the onboarding reveal
+function WelcomeText({
   text,
   style,
   reserveLines = 1,
@@ -195,47 +215,39 @@ function TypewriterWelcome({
   style: any;
   reserveLines?: number;
 }) {
-  const [displayedText, setDisplayedText] = useState("");
-  const opacity = useRef(new Animated.Value(0)).current;
+  const progress = useAnimatedValue(0);
 
   useEffect(() => {
-    setDisplayedText("");
-    opacity.setValue(0);
-    let timer: ReturnType<typeof setInterval> | undefined;
+    progress.setValue(0);
+    //let the butterfly intro land first
+    const anim = Animated.timing(progress, {
+      toValue: 1,
+      duration: 420,
+      delay: 1500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    anim.start();
+    return () => anim.stop();
+  }, [text, progress]);
 
-    //wait a beat after launch before the reveal starts
-    const startDelay = setTimeout(() => {
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }).start();
-
-      let currentIndex = 0;
-      timer = setInterval(() => {
-        if (currentIndex < text.length) {
-          currentIndex++;
-          setDisplayedText(text.slice(0, currentIndex));
-        } else {
-          clearInterval(timer);
-        }
-      }, 70);
-    }, 1000);
-
-    return () => {
-      clearTimeout(startDelay);
-      if (timer) clearInterval(timer);
-    };
-  }, [text, opacity]);
+  const translateY = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [14, 0],
+  });
 
   return (
     <Animated.Text
       style={[
         style,
-        { opacity, minHeight: WELCOME_LINE_HEIGHT * reserveLines },
+        {
+          opacity: progress,
+          transform: [{ translateY }],
+          minHeight: WELCOME_LINE_HEIGHT * reserveLines,
+        },
       ]}
     >
-      {displayedText}
+      {text}
     </Animated.Text>
   );
 }
@@ -355,9 +367,7 @@ function IncognitoToggle({
           onPress={onPress}
           style={pressStyle(
             [styles.incognitoBox, incognito && styles.incognitoBoxActive],
-            incognito
-              ? { backgroundColor: Colors.incognitoBright }
-              : "surface",
+            incognito ? { backgroundColor: Colors.incognitoBright } : "surface",
           )}
         >
           <Animated.Text
@@ -392,7 +402,8 @@ export default function Index() {
   const [selectedReflection, setSelectedReflection] = useState("none");
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [samplerDrawerVisible, setSamplerDrawerVisible] = useState(false);
-  const [conversationSearchVisible, setConversationSearchVisible] = useState(false);
+  const [conversationSearchVisible, setConversationSearchVisible] =
+    useState(false);
   const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
   const [modelSelectorVisible, setModelSelectorVisible] = useState(false);
   //sampler holds the hub settings for everyone
@@ -400,9 +411,12 @@ export default function Index() {
   const [samplerReady, setSamplerReady] = useState(false);
   //a hub hosted here comes back with the app
   useEffect(() => {
-    SamplerHub.startHostedHub().catch((e) => console.warn("[Sampler] hub not started:", e));
+    SamplerHub.startHostedHub().catch((e) =>
+      console.warn("[Sampler] hub not started:", e),
+    );
   }, []);
-  const showSamplerSwitch = isDesktop && (SamplerHub.canHost() || SamplerHub.isSupported());
+  const showSamplerSwitch =
+    !isDesktop || SamplerHub.canHost() || SamplerHub.isSupported();
   const inSampler = samplerMode && (!isDesktop || showSamplerSwitch);
   //slide between chat and sampler
   const samplerAnim = useAnimatedValue(inSampler ? 1 : 0);
@@ -449,8 +463,8 @@ export default function Index() {
   );
   const samplerSwitchOptions = useMemo(
     () => [
-      { id: "chat", label: t("sampler.switch.chat") },
-      { id: "sampler", label: t("sampler.switch.sampler") },
+      { id: "chat", label: t("sampler.switch.chat"), icon: chatIcon },
+      { id: "sampler", label: t("sampler.switch.sampler"), icon: samplerIcon },
     ],
     [t],
   );
@@ -460,6 +474,8 @@ export default function Index() {
       onSelect={(value) => setSamplerMode(value === "sampler")}
       options={samplerSwitchOptions}
       radius={Radius.lg2}
+      iconOnly
+      withLabel={isDesktop}
     />
   ) : undefined;
   //shared with the panResponder below so the swipe-up gesture can drag it live
@@ -537,7 +553,8 @@ export default function Index() {
   }, [attachments]);
   const chatBarRef = useRef<ChatBarHandle>(null);
   const pendingShareTextRef = useRef<string | null>(null);
-  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
+  const { hasShareIntent, shareIntent, resetShareIntent } =
+    useShareIntentContext();
 
   //conversation state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -545,17 +562,17 @@ export default function Index() {
     useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   //held in the chatbar until confirmed
-const [editSession, setEditSession] = useState<{
-  messageId: string;
-  role: "user" | "assistant";
-  text: string;
-  images?: string[];
-} | null>(null);
+  const [editSession, setEditSession] = useState<{
+    messageId: string;
+    role: "user" | "assistant";
+    text: string;
+    images?: string[];
+  } | null>(null);
 
-const editSessionRef = useRef(editSession);
-useEffect(() => {
-  editSessionRef.current = editSession;
-}, [editSession]);
+  const editSessionRef = useRef(editSession);
+  useEffect(() => {
+    editSessionRef.current = editSession;
+  }, [editSession]);
   //home butterfly flies to the chat header
   const homeButterflyRef = useRef<View>(null);
   const [butterflyFrom, setButterflyFrom] = useState<DOMRect | null>(null);
@@ -665,7 +682,7 @@ useEffect(() => {
 
   useEffect(() => {
     const handleBackButton = () => {
-      //cancel edit mode 
+      //cancel edit mode
       if (editSessionRef.current) {
         setEditSession(null);
         return true;
@@ -734,7 +751,8 @@ useEffect(() => {
     null,
   );
   const [releaseNotes, setReleaseNotes] = useState<ReleaseNotes | null>(null);
-  const { prompt: promptUpdate, modalProps: updateModalProps } = useDesktopUpdate();
+  const { prompt: promptUpdate, modalProps: updateModalProps } =
+    useDesktopUpdate();
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const rootRef = useRef<View>(null);
 
@@ -1337,7 +1355,9 @@ useEffect(() => {
     );
     //overlay writes from another window
     const overlayClosed = isTauri
-      ? import("@tauri-apps/api/event").then(({ listen }) => listen("overlay-closed", scheduleReload))
+      ? import("@tauri-apps/api/event").then(({ listen }) =>
+          listen("overlay-closed", scheduleReload),
+        )
       : null;
 
     return () => {
@@ -1418,12 +1438,9 @@ useEffect(() => {
   }, [closeSettings, loadConversations, startNewConversation]);
 
   //stable ref keeps drawer rows memoized
-  const closeConversationsDrawer = useCallback(
-    () => {
-      if (!isDesktop) setDrawerVisible(false);
-    },
-    [isDesktop],
-  );
+  const closeConversationsDrawer = useCallback(() => {
+    if (!isDesktop) setDrawerVisible(false);
+  }, [isDesktop]);
 
   //defer upload until accepted
   const askToShareConversation = useCallback((conv: Conversation) => {
@@ -1621,7 +1638,7 @@ useEffect(() => {
           path: f.path,
           fileName: f.fileName,
           mimeType: f.mimeType,
-        }))
+        })),
       );
     }
 
@@ -2453,15 +2470,10 @@ useEffect(() => {
       >
         <Image
           source={settingsIcon}
-          style={[
-            styles.settingsIcon,
-            !isDesktop && { marginRight: 0 },
-          ]}
+          style={[styles.settingsIcon, !isDesktop && { marginRight: 0 }]}
         />
         {isDesktop && (
-          <Text style={styles.settingsButtonText}>
-            {t("home.settings")}
-          </Text>
+          <Text style={styles.settingsButtonText}>{t("home.settings")}</Text>
         )}
       </Pressable>
     </View>
@@ -2513,11 +2525,11 @@ useEffect(() => {
       <LinearGradient
         colors={[
           Colors.background,
-          `${Colors.background}D9`,
-          `${Colors.background}BF`,
-          `${Colors.background}A6`,
-          `${Colors.background}4D`,
-          `${Colors.background}1A`,
+          `${Colors.background}EB`,
+          `${Colors.background}D6`,
+          `${Colors.background}C2`,
+          `${Colors.background}66`,
+          `${Colors.background}2E`,
           "transparent",
         ]}
         locations={[0.1, 0.4, 0.5, 0.75, 0.8, 0.9, 0.95]}
@@ -2553,27 +2565,67 @@ useEffect(() => {
               }}
               pointerEvents="box-none"
             >
+              {!isDesktop && (
+                <Pressable
+                  style={[
+                    styles.modelInfoRow,
+                    {
+                      top:
+                        insets.top +
+                        (typeof window !== "undefined" &&
+                        "__TAURI_INTERNALS__" in window
+                          ? 32
+                          : 0) +
+                        44 +
+                        Spacing.md * 2 +
+                        Spacing.lg2,
+                    },
+                  ]}
+                  onPress={() => {
+                    if (drawerVisible || settingsDrawerVisible) return;
+                    openDrawerSafely(() =>
+                      setModelSelectorVisible((prev) => !prev),
+                    );
+                  }}
+                >
+                  <Text style={styles.modelInfoText} numberOfLines={1}>
+                    {selectedModel
+                      ? displayName(selectedModel)
+                      : t("modelSelector.none")}
+                  </Text>
+                  <Image
+                    source={nextIcon}
+                    style={styles.modelInfoArrow}
+                    resizeMode="contain"
+                    tintColor={Colors.textMuted}
+                  />
+                </Pressable>
+              )}
               {!activeConversation && (
-                <Reanimated.View style={[styles.centerContent, homeFreezeStyle]}>
+                <Reanimated.View
+                  style={[styles.centerContent, homeFreezeStyle]}
+                >
                   <ButterflyCluster
                     ref={homeButterflyRef}
                     incognito={incognitoMode}
                     style={styles.butterfly}
                   />
-                  <TypewriterWelcome
+                  <WelcomeText
                     text={userName ? `${greeting}\n${userName}` : greeting}
                     style={styles.welcomeText}
                     reserveLines={userName ? 2 : 1}
                   />
-                  <DissolveIn delay={2200}>
-                    <IncognitoToggle
-                      incognito={incognitoMode}
-                      onPress={() => {
-                        Vibration.vibrate(10);
-                        setIncognitoMode((prev) => !prev);
-                      }}
-                    />
-                  </DissolveIn>
+                  {isDesktop && (
+                    <DissolveIn delay={2200}>
+                      <IncognitoToggle
+                        incognito={incognitoMode}
+                        onPress={() => {
+                          Vibration.vibrate(10);
+                          setIncognitoMode((prev) => !prev);
+                        }}
+                      />
+                    </DissolveIn>
+                  )}
                   <Animated.Text
                     style={[
                       styles.incognitoDescription,
@@ -2590,9 +2642,9 @@ useEffect(() => {
                       },
                     ]}
                   >
-                    Welcome to incognito mode. You can ask quick questions without
-                    leaving a trace. Once you close the window, your conversation
-                    disappears forever.
+                    Welcome to incognito mode. You can ask quick questions
+                    without leaving a trace. Once you close the window, your
+                    conversation disappears forever.
                   </Animated.Text>
                 </Reanimated.View>
               )}
@@ -2749,11 +2801,16 @@ useEffect(() => {
                 });
               }}
               onNewPress={startNewConversation}
-              showNewButton={!inSampler}
+              showNewButton={!inSampler && !!activeConversation}
               isDesktop={isDesktop}
               middleElement={samplerSwitch}
-              centerElement={isDesktop || inSampler ? undefined : modelTrigger}
               rightElement={settingsButton}
+              showIncognitoButton={!isDesktop && !inSampler && !activeConversation}
+              incognito={incognitoMode}
+              onIncognitoPress={() => {
+                Vibration.vibrate(10);
+                setIncognitoMode((prev) => !prev);
+              }}
             />
           </Animated.View>
         </View>
@@ -2794,7 +2851,11 @@ useEffect(() => {
         onClose={() => setConversationSearchVisible(false)}
         conversations={conversations}
         selectedConversationId={activeConversation?.id ?? null}
-        onSelectConversation={selectConversation}
+        onSelectConversation={(conv) => {
+          selectConversation(conv);
+          //mobile drawer sits behind the sheet
+          closeConversationsDrawer();
+        }}
         onDeleteConversation={deleteConversation}
         onTogglePinConversation={togglePinConversation}
         onShareConversation={askToShareConversation}
@@ -2950,8 +3011,8 @@ useEffect(() => {
               const update = hubUpdate;
               setHubUpdate(null);
               if (!update) return;
-              SamplerHub.updateHub(update.hub, update.version).catch((e: Error) =>
-                setHubUpdateError(e?.message ?? String(e)),
+              SamplerHub.updateHub(update.hub, update.version).catch(
+                (e: Error) => setHubUpdateError(e?.message ?? String(e)),
               );
             },
           },
@@ -3030,6 +3091,26 @@ const makeStyles = (Colors: ThemeColors) =>
       left: 0,
       right: 0,
       zIndex: 100,
+    },
+    modelInfoRow: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      zIndex: 5,
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 6,
+    },
+    modelInfoText: {
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.bodyMd,
+      color: Colors.textMuted,
+    },
+    modelInfoArrow: {
+      width: 14,
+      height: 14,
+      transform: [{ rotate: "90deg" }],
     },
     centerContent: {
       flex: 1,

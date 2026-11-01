@@ -108,6 +108,7 @@ const tilesIcon = require("../../../assets/icons/tiles.png");
 const quickIcon = require("../../../assets/icons/Quick.png");
 const stopIcon = require("../../../assets/icons/stop.png");
 const activateIcon = require("../../../assets/icons/activate.png");
+const rightArrowIcon = require("../../../assets/icons/right.png");
 
 const HUB_DEVICE_ICONS: Record<string, ImageSourcePropType> = {
   phone: require("../../../assets/icons/phone.png"),
@@ -147,7 +148,7 @@ type Page =
   | "performance"
   | "preferences";
 //pages pushed from a section page
-type SubPage = Page | "profile";
+type SubPage = Page | "profile" | "modelPreferences";
 type Detail = { file: string; name: string };
 type HubState = "checking" | "online" | "offline" | "revoked" | "outdated";
 
@@ -184,6 +185,7 @@ const message = hubErrorText;
 
 const PARENT: Partial<Record<SubPage, SubPage>> = {
   profile: "profiles",
+  modelPreferences: "models",
 };
 
 const parentOf = (page: SubPage): SubPage | null => PARENT[page] ?? null;
@@ -276,7 +278,6 @@ export default function SamplerScreen({
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [modelsSheetVisible, setModelsSheetVisible] = useState(false);
   const [mcpSheetVisible, setMcpSheetVisible] = useState(false);
-  const [modelSettingsVisible, setModelSettingsVisible] = useState(false);
   const [folderPick, setFolderPick] = useState<{
     start?: string;
     done: (path: string) => void;
@@ -1579,6 +1580,33 @@ export default function SamplerScreen({
           "models",
         )}
         {modelsOn && modelsSection()}
+        {modelsOn && settings && (
+          <Group style={styles.groupSpacing}>
+            <Pressable
+              style={pressStyle(
+                styles.toggleGroupRowItem,
+                styles.toggleGroupCardPressed,
+              )}
+              onPress={() => openPage("modelPreferences")}
+            >
+              <View style={styles.toggleGroupRow}>
+                <View style={styles.toggleGroupContent}>
+                  <Text style={styles.settingLabel}>
+                    {t("sampler.nav.preferences")}
+                  </Text>
+                  <Text style={styles.helpText}>
+                    {t("sampler.model.preferencesHelp")}
+                  </Text>
+                </View>
+                <Image
+                  source={rightArrowIcon}
+                  style={[styles.menuIcon, { marginRight: Spacing.md }]}
+                  tintColor={Colors.textMuted}
+                />
+              </View>
+            </Pressable>
+          </Group>
+        )}
       </>
     );
   };
@@ -1668,6 +1696,7 @@ export default function SamplerScreen({
     mcp: t("hubMcp.pageTitle"),
     performance: t("sampler.performance"),
     preferences: t("sampler.nav.preferences"),
+    modelPreferences: t("sampler.nav.preferences"),
     profile: profiles?.find((p) => p.id === profileId)?.name ?? "",
   };
 
@@ -1701,7 +1730,6 @@ export default function SamplerScreen({
     qrMode !== null ||
     selectedDeviceId !== null ||
     modelsSheetVisible ||
-    modelSettingsVisible ||
     mcpSheetVisible ||
     folderPick !== null ||
     detail !== null ||
@@ -1784,41 +1812,65 @@ export default function SamplerScreen({
         return renderPerformance();
       case "preferences":
         return renderPreferences();
+      case "modelPreferences":
+        return renderModelSettings();
       default:
         return renderHome();
     }
   };
 
   const renderScrollPage = (shown: SubPage, active: boolean) => (
-    //focused field scrolls just above the keyboard
-    <KeyboardAwareScrollView
-      bottomOffset={Spacing.xl2}
-      contentContainerStyle={[
-        styles.scroll,
-        {
-          paddingTop: contentTop,
-          paddingBottom: 40 + (isDesktop ? 0 : insets.bottom),
-        },
-      ]}
-      showsVerticalScrollIndicator={false}
-      scrollEventThrottle={16}
-      onScroll={
-        active
-          ? (e) => setScrolled(e.nativeEvent.contentOffset.y > 10)
-          : undefined
-      }
-    >
-      <View
-        style={styles.page}
-        onLayout={(e) => {
-          const width = e.nativeEvent.layout.width;
-          if (width > 0 && width !== pageWidth) setPageWidth(width);
-        }}
+    //add button lives in the page so it slides with it
+    <View style={{ flex: 1 }}>
+      {/* focused field scrolls just above the keyboard */}
+      <KeyboardAwareScrollView
+        bottomOffset={Spacing.xl2}
+        contentContainerStyle={[
+          styles.scroll,
+          {
+            paddingTop: contentTop,
+            paddingBottom: 40 + (isDesktop ? 0 : insets.bottom),
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={
+          active
+            ? (e) => setScrolled(e.nativeEvent.contentOffset.y > 10)
+            : undefined
+        }
       >
-        {renderPageHeader(pageTitles[shown])}
-        {renderPageContent(shown)}
-      </View>
-    </KeyboardAwareScrollView>
+        <View
+          style={styles.page}
+          onLayout={(e) => {
+            const width = e.nativeEvent.layout.width;
+            if (width > 0 && width !== pageWidth) setPageWidth(width);
+          }}
+        >
+          {renderPageHeader(pageTitles[shown])}
+          {renderPageContent(shown)}
+        </View>
+      </KeyboardAwareScrollView>
+      {((shown === "models" && modelsOn) ||
+        (shown === "mcp" && canManageMcp && mcpOn)) && (
+        <View
+          style={[
+            styles.addModelWrapper,
+            { bottom: Spacing.xl2 + (isDesktop ? 0 : insets.bottom) },
+          ]}
+          pointerEvents="box-none"
+        >
+          <FloatingButton
+            icon={addIcon}
+            onPress={() =>
+              shown === "mcp"
+                ? setMcpSheetVisible(true)
+                : setModelsSheetVisible(true)
+            }
+          />
+        </View>
+      )}
+    </View>
   );
 
   //not hosting yet, hub off, or no profile on this hub
@@ -1992,20 +2044,6 @@ export default function SamplerScreen({
               <View style={styles.headerSpacer} />
             </View>
 
-            {onOpenChat && (
-              <Group style={styles.navGroup}>
-                <ActionButton
-                  icon={messageIcon}
-                  iconBadge
-                  label={t("sampler.switch.chat")}
-                  onPress={() => {
-                    dismissDrawer();
-                    onOpenChat();
-                  }}
-                />
-              </Group>
-            )}
-
             {ready &&
               navGroups.map((items, index) => (
                 <Group key={index} style={styles.navGroup}>
@@ -2050,36 +2088,6 @@ export default function SamplerScreen({
 
   const selectedMcpServer =
     overview?.find((s) => s.id === selectedMcpServerId) ?? null;
-
-  //share, nightly build and llama.cpp options
-  const modelSettingsSheet = (
-    <DrawerSheet
-      visible={modelSettingsVisible}
-      onClose={() => setModelSettingsVisible(false)}
-      mode="overlay"
-      isLargeScreen={isLargeScreen}
-      isDesktop={isDesktop}
-      handleContainerStyle={styles.sheetHandleContainer}
-      sheetStyle={[
-        styles.sheet,
-        {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
-          maxHeight: sheetMaxHeight,
-        },
-      ]}
-      desktopStyle={styles.desktopCard}
-    >
-      <SheetScrollView
-        contentContainerStyle={styles.sheetContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* cancels the margin of the last card */}
-        <View style={{ marginBottom: -Spacing.xxl2 }}>
-          {renderModelSettings()}
-        </View>
-      </SheetScrollView>
-    </DrawerSheet>
-  );
 
   //installed model detail sheet
   const hubModelSheet = (
@@ -2243,42 +2251,6 @@ export default function SamplerScreen({
                     </View>
                   </View>
                 )}
-                {shownPage === "models" && modelsOn && settings && (
-                  <View
-                    style={[styles.backWrapper, { top: contentTop }]}
-                    pointerEvents="box-none"
-                  >
-                    <View
-                      style={[styles.backColumn, { alignItems: "flex-end" }]}
-                      pointerEvents="box-none"
-                    >
-                      <DrawerBackButton
-                        kind="more"
-                        onPress={() => setModelSettingsVisible(true)}
-                        scrolled={scrolled}
-                      />
-                    </View>
-                  </View>
-                )}
-                {((shownPage === "models" && modelsOn) ||
-                  (shownPage === "mcp" && canManageMcp && mcpOn)) && (
-                  <View
-                    style={[
-                      styles.addModelWrapper,
-                      { bottom: Spacing.xl2 + (isDesktop ? 0 : insets.bottom) },
-                    ]}
-                    pointerEvents="box-none"
-                  >
-                    <FloatingButton
-                      icon={addIcon}
-                      onPress={() =>
-                        shownPage === "mcp"
-                          ? setMcpSheetVisible(true)
-                          : setModelsSheetVisible(true)
-                      }
-                    />
-                  </View>
-                )}
                 {/* switching section swaps pages, only nested pages push */}
                 <PageStack
                   key={section}
@@ -2400,7 +2372,6 @@ export default function SamplerScreen({
         isDesktop={isDesktop}
       />
       {hubModelSheet}
-      {modelSettingsSheet}
       <HubMcpSheet
         visible={mcpSheetVisible}
         onClose={() => setMcpSheetVisible(false)}
@@ -2661,6 +2632,22 @@ const makeStyles = (Colors: ThemeColors) =>
     toggleGroupContent: {
       flex: 1,
       marginRight: Spacing.lg2,
+    },
+    toggleGroupRowItem: {
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.md,
+    },
+    toggleGroupCardPressed: {
+      backgroundColor: Colors.surfacePressed,
+    },
+    menuIcon: {
+      width: 18,
+      height: 18,
+    },
+    groupSpacing: {
+      marginBottom: Spacing.xxl,
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
     },
     sliderGroup: {
       width: SLIDER_WIDTH,

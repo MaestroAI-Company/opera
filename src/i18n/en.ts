@@ -126,6 +126,7 @@ export const en = {
   "modelSelector.download.confirm": "Download",
   "modelSelector.tokenWindow": "Token window",
   "modelSelector.placeholder": "Model",
+  "modelSelector.none": "No model",
   "modelSelector.noProvider":
     "No provider enabled, turn one on in Settings → Service",
 
@@ -449,6 +450,7 @@ export const en = {
   "sampler.nav.mcpHelp": "Tools for Maestro",
   "sampler.nav.preferences": "Preferences",
   "sampler.nav.preferencesHelp": "Network, updates and hosting",
+  "sampler.model.preferencesHelp": "Sharing, nightly build, context",
   "sampler.profiles": "Profiles",
   "sampler.profilesHelp": "Each person has their own profile, sealed with their password. Sampler Hub cannot read their conversations.",
   "sampler.profile.devices": "{count} devices",

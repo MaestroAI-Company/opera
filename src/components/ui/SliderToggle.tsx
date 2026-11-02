@@ -24,6 +24,10 @@ type SliderToggleProps = {
   options?: SliderToggleOption[];
   //corner radius of the selection pill, to match a rounder host
   radius?: number;
+  //draw each option icon instead of its label
+  iconOnly?: boolean;
+  //draw the label next to the icon, with iconOnly
+  withLabel?: boolean;
 };
 
 const THEME_ICONS = { system: autoIcon, light: lightIcon, dark: darkIcon };
@@ -45,6 +49,8 @@ export default function SliderToggle({
   onSelect,
   options: optionsProp,
   radius,
+  iconOnly = false,
+  withLabel = false,
 }: SliderToggleProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -194,7 +200,7 @@ export default function SliderToggle({
 
   const activeIndex = previewIndex ?? selectedIndex;
   const activeOption = options[activeIndex] ?? options[0];
-  const iconSource = activeOption?.icon;
+  const iconSource = iconOnly ? undefined : activeOption?.icon;
 
   //pulse the pill label when it switches option
   const shownIndexRef = useRef(activeIndex);
@@ -220,12 +226,26 @@ export default function SliderToggle({
             }}
             style={pressStyle([styles.optionButton, radius !== undefined && { borderRadius: radius }], "surface")}
           >
+            {iconOnly ? (
+              <View style={styles.iconLabel}>
+                <Image source={option.icon} style={styles.optionIcon} resizeMode="contain" tintColor={Colors.textPrimary} />
+                {withLabel && <Text style={styles.optionText}>{option.label}</Text>}
+              </View>
+            ) : (
             <Text style={styles.optionText}>{option.label}</Text>
+            )}
           </Pressable>
         ))}
         {buttonWidth > 0 && activeOption && (
           <Animated.View style={[styles.pill, { width: buttonWidth }, radius !== undefined && { borderRadius: radius }, pillAnimatedStyle]} {...panResponder.panHandlers}>
+            {iconOnly ? (
+              <Animated.View style={[styles.iconLabel, labelPulseStyle]}>
+                <Image source={activeOption.icon} style={styles.optionIcon} resizeMode="contain" tintColor={Colors.textOnPrimary} />
+                {withLabel && <Text style={styles.pillText}>{activeOption.label}</Text>}
+              </Animated.View>
+            ) : (
             <Animated.Text style={[styles.pillText, labelPulseStyle]}>{activeOption.label}</Animated.Text>
+            )}
           </Animated.View>
         )}
       </View>
@@ -280,6 +300,15 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     borderWidth: 2,
     borderColor: Colors.borderOnPrimary,
     paddingHorizontal: 6,
+  },
+  iconLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  optionIcon: {
+    width: 18,
+    height: 18,
   },
   optionText: {
     fontFamily: Fonts.mono,

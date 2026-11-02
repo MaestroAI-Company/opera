@@ -128,6 +128,11 @@ export type ModelSelectorTriggerProps = {
   flat?: boolean;
 };
 
+export const displayName = (model: string) =>
+  isLocalModel(model) ? getLocalModelLabel(model, true)
+    : isLiteRTModel(model) ? getLiteRTModelLabel(model)
+      : model;
+
 //button trigger in topbar
 export function ModelSelectorTrigger({
   selectedModel,
@@ -138,11 +143,6 @@ export function ModelSelectorTrigger({
 }: ModelSelectorTriggerProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
-
-  const displayName = (model: string) =>
-    isLocalModel(model) ? getLocalModelLabel(model, true)
-      : isLiteRTModel(model) ? getLiteRTModelLabel(model)
-        : model;
 
   return (
     <View style={[styles.container, style]} ref={viewRef} collapsable={false}>

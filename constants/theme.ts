@@ -100,12 +100,12 @@ export const DarkColors: ThemeColors = {
   ...LightColors,
 
   //canvas & surfaces
-  background: "#171715",
-  surface: "#252525",
-  surfaceMuted: "#2A2A2A",
-  surfaceSubtle: "#2F2F2F",
-  surfacePressed: "#383838",
-  surfaceCode: "#2F2F2F",
+  background: "#0F0F0E",
+  surface: "#1A1A1A",
+  surfaceMuted: "#1F1F1F",
+  surfaceSubtle: "#242424",
+  surfacePressed: "#2C2C2C",
+  surfaceCode: "#242424",
 
   //outlines stay invisible, surface contrast carries the separation
   border: "rgba(255,255,255,0.07)",
@@ -117,22 +117,22 @@ export const DarkColors: ThemeColors = {
   textMuted: "#8A8A8A",
 
   //code blocks must stay recessed against the dark canvas
-  codeBlockBg: "#101010",
+  codeBlockBg: "#0A0A0A",
   codeInlineText: "#FF7AB6",
 
   //tints flip to white, scrims stay black
   overlayFaint: "rgba(255,255,255,0.03)",
   overlaySubtle: "rgba(255,255,255,0.06)",
-  snackbarBg: "#3A3A3A",
+  snackbarBg: "#2E2E2E",
   scrimDrawer: "rgba(0,0,0,0.5)",
   scrimModal: "rgba(0,0,0,0.6)",
-  backgroundFade: "rgba(23,23,21,0.9)",
-  backgroundClear: "rgba(23,23,21,0)",
-  groupedBackground: "#141312",
-  groupedBackgroundFade: "rgba(20,19,18,0.9)",
-  groupedBackgroundClear: "rgba(20,19,18,0)",
+  backgroundFade: "rgba(15,15,14,0.9)",
+  backgroundClear: "rgba(15,15,14,0)",
+  groupedBackground: "#0B0B0A",
+  groupedBackgroundFade: "rgba(11,11,10,0.9)",
+  groupedBackgroundClear: "rgba(11,11,10,0)",
   screensaverBackground: "#000000",
-  overlayShell: "rgba(40,40,40,0.72)",
+  overlayShell: "rgba(28,28,28,0.72)",
 };
 
 //light stays the module default so non-react code keeps working

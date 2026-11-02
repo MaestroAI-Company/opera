@@ -128,6 +128,7 @@ export const fr: Translations = {
   "modelSelector.download.confirm": "Télécharger",
   "modelSelector.tokenWindow": "Fenêtre de token",
   "modelSelector.placeholder": "Modèle",
+  "modelSelector.none": "Aucun modèle",
   "modelSelector.noProvider":
     "Aucun service activé, active-en un dans Réglages → Service",
 
@@ -452,6 +453,7 @@ export const fr: Translations = {
   "sampler.nav.mcpHelp": "Des outils pour Maestro",
   "sampler.nav.preferences": "Préférences",
   "sampler.nav.preferencesHelp": "Réseau, mises à jour et hébergement",
+  "sampler.model.preferencesHelp": "Partage, version nightly, contexte",
   "sampler.profiles": "Profils",
   "sampler.profilesHelp": "Chaque personne a son profil, scellé par son mot de passe. Sampler Hub ne peut pas lire ses conversations.",
   "sampler.profile.devices": "{count} appareils",

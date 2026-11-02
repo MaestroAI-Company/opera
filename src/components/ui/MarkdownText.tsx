@@ -688,7 +688,7 @@ export function CodeContent({ code, language, incognito, maxHeight, radius, back
   const codeBorderColor = incognito ? Colors.incognito : (onDark ? Colors.responseBorder : Colors.border);
 
   return (
-    <View style={[s.codeContent, { maxHeight, borderColor: codeBorderColor, backgroundColor: background ?? (onDark ? Colors.responseSurface : Colors.surface), borderRadius: radius ?? s.codeContent.borderRadius }]}>
+    <View style={[s.codeContent, { maxHeight, borderColor: codeBorderColor, backgroundColor: background ?? Colors.surface, borderRadius: radius ?? s.codeContent.borderRadius }]}>
       {lang ? (
         <CodeHighlighter
           language={lang}
@@ -758,7 +758,7 @@ const CodeBlock = React.memo(function CodeBlock({
   const isDark = dark ?? themeDark;
   const displayTitle = title || codeLanguageName(language) || "Code";
 
-  const cardBg = isDark ? Colors.responseSurface : Colors.surface;
+  const cardBg = Colors.surface;
   const titleColor = isDark ? Colors.responseTextStrong : Colors.textPrimary;
 
   return (

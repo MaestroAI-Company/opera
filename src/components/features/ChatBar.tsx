@@ -18,7 +18,6 @@ import {
   TextInput,
   TextLayoutEventData,
   TextLayoutLine,
-  Vibration,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -43,6 +42,7 @@ import NotificationModal from "../ui/NotificationModal";
 import { classifyAttachment, type AttachmentKind, type Attachments, type SelectedFile } from "./AttachmentSheet";
 import { pressStyle } from "../ui/pressStyle";
 import VoiceGrid from "./VoiceGrid";
+import { vibrate } from "@/services/haptics";
 
 const nextWhiteIcon = require("../../../assets/icons/arrow.png");
 const micIcon = require("../../../assets/icons/microphone.png");
@@ -637,7 +637,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   }, [isRecording, pulseAnim]);
 
   const handlePressIn = () => {
-    Vibration.vibrate(10);
+    vibrate(10);
     Animated.timing(pressAnim, { toValue: 1, duration: 150, useNativeDriver: false }).start();
   };
 

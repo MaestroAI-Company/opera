@@ -25,7 +25,6 @@ import {
   Share,
   StyleSheet,
   Text,
-  Vibration,
   View,
 } from "react-native";
 import { KeyboardController } from "react-native-keyboard-controller";
@@ -165,6 +164,7 @@ import {
   ReleaseNotes,
   takeReleaseNotes,
 } from "../services/updates/UpdateService";
+import { vibrate } from "@/services/haptics";
 
 const texture2 = require("../../assets/images/texture2.png");
 const settingsIcon = require("../../assets/icons/settings.png");
@@ -813,7 +813,7 @@ export default function Index() {
     //shakes ignored while sheet is open
     if (bugReportVisibleRef.current) return;
     if (!Settings.getCached().shakeToReport) return;
-    Vibration.vibrate(30);
+    vibrate(30);
     //capture first or sheet shoots itself
     setScreenshot(await captureScreen(rootRef));
     openDrawerSafely(() => setBugReportVisible(true));
@@ -2620,7 +2620,7 @@ export default function Index() {
                       <IncognitoToggle
                         incognito={incognitoMode}
                         onPress={() => {
-                          Vibration.vibrate(10);
+                          vibrate(10);
                           setIncognitoMode((prev) => !prev);
                         }}
                       />
@@ -2808,7 +2808,7 @@ export default function Index() {
               showIncognitoButton={!isDesktop && !inSampler && !activeConversation}
               incognito={incognitoMode}
               onIncognitoPress={() => {
-                Vibration.vibrate(10);
+                vibrate(10);
                 setIncognitoMode((prev) => !prev);
               }}
             />

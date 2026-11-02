@@ -8,13 +8,13 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  Vibration,
   View,
 } from "react-native";
 import { FontSizes, Fonts, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { pressStyle } from "../ui/pressStyle";
+import { vibrate } from "@/services/haptics";
 
 //side of one square of the path
 const PIXEL = 3;
@@ -127,7 +127,7 @@ export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true }: 
                     node.connected ? "primary" : "surface",
                   )}
                   onPress={() => {
-                    Vibration.vibrate(8);
+                    vibrate(8);
                     node.onPress?.();
                   }}
                 >
@@ -152,7 +152,7 @@ export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true }: 
           disabled={!onHubPress}
           style={pressStyle([styles.circle, styles.hub, { width: hubSize, height: hubSize, borderRadius: hubSize / 2 }], "primary")}
           onPress={() => {
-            Vibration.vibrate(8);
+            vibrate(8);
             onHubPress?.();
           }}
         >

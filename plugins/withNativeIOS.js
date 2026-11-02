@@ -1,4 +1,4 @@
-const { withPodfile } = require('@expo/config-plugins');
+const { withPodfile, withAppDelegate } = require('@expo/config-plugins');
 const path = require('path');
 const fs = require('fs');
 const { spawnSync } = require('child_process');
@@ -19,6 +19,24 @@ const HAS_HUB_CLIENT = (() => {
   return canBuild;
 })();
 
+//ios only runs animations above 60hz when a display link asks for it
+const HIGH_REFRESH_SWIFT = `
+final class HighRefreshRate: NSObject {
+  static let shared = HighRefreshRate()
+  private var link: CADisplayLink?
+
+  func start() {
+    guard link == nil else { return }
+    let link = CADisplayLink(target: self, selector: #selector(tick))
+    link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)
+    link.add(to: .main, forMode: .common)
+    self.link = link
+  }
+
+  @objc private func tick() {}
+}
+`;
+
 function withNativeIOS(config) {
   //pod install fetches the client like the android prebuild task
   config = withPodfile(config, (config) => {
@@ -29,6 +47,14 @@ function withNativeIOS(config) {
       "$1  system('node', File.join(__dir__, '..', 'scripts', 'build-hub-client.mjs'), 'ios', exception: true)\n" +
         "  pod 'SamplerHubClient', :path => '../native/ios'\n"
     );
+    return config;
+  });
+
+  config = withAppDelegate(config, (config) => {
+    let contents = config.modResults.contents;
+    if (contents.includes('HighRefreshRate')) return config;
+    contents = contents.replace(/^(\s*reactNativeFactory = factory\n)/m, '$1    HighRefreshRate.shared.start()\n');
+    config.modResults.contents = 'import UIKit\n' + contents + HIGH_REFRESH_SWIFT;
     return config;
   });
 

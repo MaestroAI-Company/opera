@@ -15,7 +15,6 @@ import {
   StyleSheet,
   Text,
   useWindowDimensions,
-  Vibration,
   View,
   ViewStyle,
 } from "react-native";
@@ -53,6 +52,7 @@ import ProgressBar from "../ui/ProgressBar";
 import SliderToggle, { SliderToggleOption } from "../ui/SliderToggle";
 import DrawerSheet from "./DrawerSheet";
 import { pressStyle } from "../ui/pressStyle";
+import { vibrate } from "@/services/haptics";
 
 const botIcon = require("../../../assets/icons/bot.png");
 const downloadIcon = require("../../../assets/icons/download.png");
@@ -206,7 +206,7 @@ const ModelRow = memo(function ModelRow({
     <Pressable
       onLayout={onRowLayout}
       onPress={() => {
-        Vibration.vibrate(10);
+        vibrate(10);
         onSelect(model);
       }}
       style={pressStyle(
@@ -728,7 +728,7 @@ export function ModelSelectorDrawer({
 
   const previewCrossed = (index: number) => {
     setPreviewIndex(index);
-    Vibration.vibrate(10);
+    vibrate(10);
   };
 
   const commitDrag = (index: number) => {
@@ -832,6 +832,7 @@ export function ModelSelectorDrawer({
       <View style={styles.contentCard}>
         <View style={styles.modelsBox}>
           <ScrollView
+            bounces={false}
             ref={modelsScrollRef}
             onLayout={(e) => setListViewport(e.nativeEvent.layout.height)}
             onScroll={handleModelsScroll}

@@ -1,7 +1,8 @@
-import { Pressable, StyleProp, StyleSheet, Text, Vibration, View, ViewStyle } from "react-native";
+import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { pressStyle } from "./pressStyle";
+import { vibrate } from "@/services/haptics";
 
 type CheckboxProps = {
   label?: string;
@@ -22,7 +23,7 @@ export default function Checkbox({ label, checked, onToggle, disabled = false, l
       )}
       onPress={() => {
         if (!disabled) {
-          Vibration.vibrate(10);
+          vibrate(10);
           onToggle(!checked);
         }
       }}

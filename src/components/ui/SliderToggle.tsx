@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Image, ImageSourcePropType, LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Image, ImageSourcePropType, LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { Easing, interpolate, interpolateColor, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { pressStyle } from "./pressStyle";
 import { lockTextSelection } from "./lockTextSelection";
+import { vibrate } from "@/services/haptics";
 
 //load theme icons
 const autoIcon = require("../../../assets/icons/auto.png");
@@ -151,7 +152,7 @@ export default function SliderToggle({
         if (anchor !== previewIndexRef.current) {
           previewIndexRef.current = anchor;
           setPreviewIndex(anchor);
-          Vibration.vibrate(10);
+          vibrate(10);
         }
         pillX.value = anchor * slot + rubberBand(d, slot);
       },
@@ -221,7 +222,7 @@ export default function SliderToggle({
           <Pressable
             key={option.id}
             onPress={() => {
-              if (option.id !== selectedValue) Vibration.vibrate(10);
+              if (option.id !== selectedValue) vibrate(10);
               onSelect(option.id);
             }}
             style={pressStyle([styles.optionButton, radius !== undefined && { borderRadius: radius }], "surface")}

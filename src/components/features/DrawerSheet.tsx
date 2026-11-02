@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { createContext, forwardRef, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, forwardRef, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   BackHandler,
@@ -53,6 +53,9 @@ function fadeStops(clear: string): [string, string, ...string[]] {
 type SheetInsets = { bottom: number; fade: number; bled: boolean };
 const SheetInsetsContext = createContext<SheetInsets>({ bottom: 0, fade: 0, bled: false });
 
+//scroll offset of the sheet body, a pull down only closes from the top
+const SheetScrollContext = createContext<{ y: number }>({ y: 0 });
+
 const fadeBottomStyle = StyleSheet.create({
   fade: { position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 1 },
 });
@@ -105,14 +108,27 @@ export function SheetBody({ style, ...props }: ViewProps) {
   );
 }
 
+//no ios rubber band, it exposes the sheet edge
 //drop-in ScrollView for a sheet body
 export const SheetScrollView = forwardRef<ScrollView, ScrollViewProps>(function SheetScrollView(props, ref) {
   const { wrapStyle, contentContainerStyle } = useSheetScroll(props.style, props.contentContainerStyle);
   const { bled } = useContext(SheetInsetsContext);
+  const scroll = useContext(SheetScrollContext);
   return (
     <>
       <View style={wrapStyle}>
-        <ScrollView {...props} ref={ref} style={scrollFill} contentContainerStyle={contentContainerStyle} />
+        <ScrollView
+          bounces={false}
+          scrollEventThrottle={16}
+          {...props}
+          onScroll={(e) => {
+            scroll.y = e.nativeEvent.contentOffset.y;
+            props.onScroll?.(e);
+          }}
+          ref={ref}
+          style={scrollFill}
+          contentContainerStyle={contentContainerStyle}
+        />
       </View>
       {!bled && <SheetFade />}
     </>
@@ -123,10 +139,22 @@ export const SheetKeyboardAwareScrollView = forwardRef<KeyboardAwareScrollViewRe
   function SheetKeyboardAwareScrollView(props, ref) {
     const { wrapStyle, contentContainerStyle } = useSheetScroll(props.style, props.contentContainerStyle);
     const { bled } = useContext(SheetInsetsContext);
+    const scroll = useContext(SheetScrollContext);
     return (
       <>
         <View style={wrapStyle}>
-          <KeyboardAwareScrollView {...props} ref={ref} style={scrollFill} contentContainerStyle={contentContainerStyle} />
+          <KeyboardAwareScrollView
+            bounces={false}
+            scrollEventThrottle={16}
+            {...props}
+            onScroll={(e) => {
+              scroll.y = e.nativeEvent.contentOffset.y;
+              props.onScroll?.(e);
+            }}
+            ref={ref}
+            style={scrollFill}
+            contentContainerStyle={contentContainerStyle}
+          />
         </View>
         {!bled && <SheetFade />}
       </>
@@ -236,12 +264,19 @@ export default function DrawerSheet({
     onClose();
   }, [settle, onClose]);
 
+  const scroll = useRef({ y: 0 }).current;
+  //decided on touch down, a mid gesture handoff would make the sheet jump
+  const startedAtTop = useRef(true);
+  const onTouchStart = useCallback(() => {
+    startedAtTop.current = scroll.y <= 0;
+  }, [scroll]);
+
   //pull down moves the sheet with the finger
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gestureState) =>
-          gestureState.dy > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+          startedAtTop.current && gestureState.dy > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
         onPanResponderMove: (_, gestureState) => {
           dragDrawer(progress, 1 - gestureState.dy / travel);
         },
@@ -257,6 +292,10 @@ export default function DrawerSheet({
       }),
     [dismiss, settle, progress, travel]
   );
+
+  useEffect(() => {
+    if (!visible) scroll.y = 0;
+  }, [visible, scroll]);
 
   //android back gesture pulls the sheet down, release closes it
   //unless onBackPress claims it to navigate inside the sheet instead
@@ -309,9 +348,9 @@ export default function DrawerSheet({
             }
         }
       >
-        <View style={sheetStyle} {...panResponder.panHandlers}>
+        <View style={sheetStyle} onTouchStart={onTouchStart} {...panResponder.panHandlers}>
           {handle}
-          {children}
+          <SheetScrollContext.Provider value={scroll}>{children}</SheetScrollContext.Provider>
         </View>
       </Animated.View>
     );
@@ -348,10 +387,13 @@ export default function DrawerSheet({
           pointerEvents={visible ? "auto" : "none"}
           onLayout={(e: LayoutChangeEvent) => setContentHeight(e.nativeEvent.layout.height)}
           style={[sheetStyle, { transform: [{ translateY: translateYMobile }] }, !measured && styles.hidden]}
+          onTouchStart={onTouchStart}
           {...panResponder.panHandlers}
         >
           {handle}
-          <SheetInsetsContext.Provider value={insets}>{children}</SheetInsetsContext.Provider>
+          <SheetScrollContext.Provider value={scroll}>
+            <SheetInsetsContext.Provider value={insets}>{children}</SheetInsetsContext.Provider>
+          </SheetScrollContext.Provider>
           {avoidKeyboard && <KeyboardSpacer />}
         </Animated.View>
       )}

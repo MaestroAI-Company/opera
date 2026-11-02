@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Text,
   useWindowDimensions,
-  Vibration,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,6 +28,7 @@ import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import TextInputField from "../ui/TextInputField";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
+import { vibrate } from "@/services/haptics";
 
 const cameraIcon = require("../../../assets/icons/camera.png");
 const addIcon = require("../../../assets/icons/add.png");
@@ -106,7 +106,7 @@ export default function HubPairingSheet({
   }, [visible, link]);
 
   const showFound = (hub: PairedHub) => {
-    Vibration.vibrate(40);
+    vibrate(40);
     setFound(hub);
   };
 

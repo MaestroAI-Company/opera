@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { LayoutChangeEvent, LayoutRectangle, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, Vibration, View } from "react-native";
+import { LayoutChangeEvent, LayoutRectangle, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import Animated, { Easing, interpolate, interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { pressStyle } from "./pressStyle";
 import { lockTextSelection } from "./lockTextSelection";
+import { vibrate } from "@/services/haptics";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const arrowDownIcon = require("../../../assets/icons/down_arrow.png");
@@ -170,7 +171,7 @@ export default function Selector({
         if (anchor !== previewIndexRef.current) {
           previewIndexRef.current = anchor;
           setPreviewIndex(anchor);
-          Vibration.vibrate(10);
+          vibrate(10);
         }
 
         pillY.value = layouts[anchor]!.y + rubberBand(d, slot);
@@ -348,7 +349,7 @@ export default function Selector({
                       key={option.id}
                       onLayout={handleRowLayout(index)}
                       onPress={() => {
-                        Vibration.vibrate(10);
+                        vibrate(10);
                         handleClose(() => onSelect(option.id));
                       }}
                       style={pressStyle(
@@ -373,7 +374,7 @@ export default function Selector({
                           <Pressable
                             onPress={(e) => {
                               e.stopPropagation();
-                              Vibration.vibrate(10);
+                              vibrate(10);
                               handleClose(() => option.onRightIconPress?.());
                             }}
                             hitSlop={8}

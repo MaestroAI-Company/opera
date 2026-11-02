@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Image, ImageSourcePropType, Pressable, StyleProp, StyleSheet, Text, Vibration, View, ViewStyle } from "react-native";
+import { Image, ImageSourcePropType, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { pressStyle } from "./pressStyle";
+import { vibrate } from "@/services/haptics";
 
 export type GridCard = {
   key: string;
@@ -50,7 +51,7 @@ export default function CardGrid({ cards, minCardWidth, style }: CardGridProps) 
             disabled={card.disabled || !card.onPress}
             style={pressStyle([styles.card, { width: cardWidth, flexGrow: 1 }, lone && styles.cardWide], "surface")}
             onPress={() => {
-              Vibration.vibrate(8);
+              vibrate(8);
               card.onPress?.();
             }}
           >

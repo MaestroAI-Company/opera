@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import LottieView from "lottie-react-native";
+import * as ExpoSplashScreen from "expo-splash-screen";
 import { ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { splashAnimation } from "./splashAnimation";
@@ -18,6 +19,12 @@ export default function SplashScreen({ onFinish }: Props) {
   const isDesktop = typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || window.innerWidth > 1024);
 
   useEffect(() => {
+    if (Platform.OS !== "ios") return;
+    //native splash stays up while fonts load, so hide it and start the animation together
+    ExpoSplashScreen.hideAsync().finally(() => animationRef.current?.play());
+  }, []);
+
+  useEffect(() => {
     //ios can report the finish as cancelled
     if (Platform.OS !== "ios") return;
     const duration = ((animation.op - animation.ip) / animation.fr) * 1000;
@@ -30,7 +37,7 @@ export default function SplashScreen({ onFinish }: Props) {
       <LottieView
         ref={animationRef}
         source={animation}
-        autoPlay
+        autoPlay={Platform.OS !== "ios"}
         loop={false}
         renderMode="HARDWARE"
         resizeMode={isDesktop ? "contain" : "cover"}

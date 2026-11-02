@@ -10,7 +10,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  Vibration,
   View,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -49,6 +48,7 @@ import ThinkingIcon from "../ui/ThinkingIcon";
 import ButterflyCluster from "./ButterflyCluster";
 import { FlashingText } from "./ChatView";
 import { ModelSelectorDrawer } from "./ModelSelector";
+import { vibrate } from "@/services/haptics";
 
 const micIcon = require("../../../assets/icons/microphone.png");
 const stopIcon = require("../../../assets/icons/stop.png");
@@ -522,7 +522,7 @@ function OperaDream() {
   };
 
   const handleMicPress = () => {
-    Vibration.vibrate(10);
+    vibrate(10);
     if (generatingConvId) GenerationService.stop(generatingConvId);
     else if (voice === "listening") stopListening();
     else if (voice === "idle") startListening();
@@ -541,7 +541,7 @@ function OperaDream() {
   const startListeningRef = useRef(startListening);
   useEffect(() => { startListeningRef.current = startListening; });
   useEffect(() => onWakeWord(() => {
-    Vibration.vibrate(10);
+    vibrate(10);
     setSleeping(false);
     setLastTouch(Date.now());
     startListeningRef.current();
@@ -669,7 +669,7 @@ function OperaDream() {
   const incognitoButton = (
     <Pressable
       onPress={() => {
-        Vibration.vibrate(10);
+        vibrate(10);
         setIncognito((v) => !v);
       }}
       style={pressStyle(

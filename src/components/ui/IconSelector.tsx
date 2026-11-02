@@ -1,7 +1,8 @@
-import { ImageSourcePropType, Image, Pressable, StyleSheet, Vibration, View } from "react-native";
+import { ImageSourcePropType, Image, Pressable, StyleSheet, View } from "react-native";
 import { Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { pressStyle } from "./pressStyle";
+import { vibrate } from "@/services/haptics";
 
 export type IconSelectorOption = {
   id: string;
@@ -26,7 +27,7 @@ export default function IconSelector({ options, selectedValue, onSelect }: IconS
           <Pressable
             key={option.id}
             onPress={() => {
-              Vibration.vibrate(10);
+              vibrate(10);
               onSelect(option.id);
             }}
             style={pressStyle(

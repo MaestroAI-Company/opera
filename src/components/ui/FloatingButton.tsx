@@ -1,8 +1,9 @@
-import { Image, ImageSourcePropType, Pressable, StyleSheet, Vibration, View } from "react-native";
+import { Image, ImageSourcePropType, Pressable, StyleSheet, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { pressStyle } from "./pressStyle";
+import { vibrate } from "@/services/haptics";
 
 type FloatingButtonProps = {
   icon: ImageSourcePropType;
@@ -29,7 +30,7 @@ export default function FloatingButton({ icon, onPress }: FloatingButtonProps) {
           scale.value = withTiming(1, { duration: 150 });
         }}
         onPress={() => {
-          Vibration.vibrate(10);
+          vibrate(10);
           onPress();
         }}
         style={pressStyle(styles.button, "primary")}>

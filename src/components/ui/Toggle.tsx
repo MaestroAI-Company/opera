@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
-import { PanResponder, StyleSheet, Vibration } from "react-native";
+import { PanResponder, StyleSheet } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { lockTextSelection } from "./lockTextSelection";
+import { vibrate } from "@/services/haptics";
 
 type ToggleProps = {
   checked: boolean;
@@ -57,7 +58,7 @@ export default function Toggle({ checked, onToggle, disabled = false }: TogglePr
         scale.value = withTiming(1, { duration: 150 });
         pressed.value = withTiming(0, { duration: 150 });
         if (next !== isChecked) {
-          Vibration.vibrate(10);
+          vibrate(10);
           cb(next);
         }
       },

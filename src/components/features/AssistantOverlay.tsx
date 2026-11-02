@@ -11,7 +11,6 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Vibration,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardAvoidingView, KeyboardProvider, useGenericKeyboardHandler } from 'react-native-keyboard-controller';
@@ -57,6 +56,7 @@ import { PluginRegistry } from '../../services/plugins/PluginRegistry';
 import { McpService } from '../../services/mcp/McpService';
 import { BackgroundGeneration } from '../../services/notifications/BackgroundGeneration';
 import '../../services/widgets/registerWidgets';
+import { vibrate } from "@/services/haptics";
 
 //how far bars start offscreen
 const BAR_ENTRY = 120;
@@ -848,7 +848,7 @@ function AssistantOverlay() {
                 <SelectionLayer
                   selection={selection}
                   onChange={select}
-                  onVibrate={() => Vibration.vibrate(10)}
+                  onVibrate={() => vibrate(10)}
                   onDrawingChange={setIsDrawingSelection}
                   onDismiss={closeOverlay}
                   detections={detections}
@@ -856,7 +856,7 @@ function AssistantOverlay() {
                 />
                 <TextLayer
                   codes={screenText.codes}
-                  onVibrate={() => Vibration.vibrate(10)}
+                  onVibrate={() => vibrate(10)}
                 />
               </>
             ) : (

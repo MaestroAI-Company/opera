@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Image, ImageSourcePropType, LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Vibration, View } from "react-native";
+import { Image, ImageSourcePropType, LayoutChangeEvent, PanResponder, Pressable, StyleSheet, View } from "react-native";
 import Animated, { Easing, interpolate, interpolateColor, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { pressStyle } from "./pressStyle";
 import { lockTextSelection } from "./lockTextSelection";
+import { vibrate } from "@/services/haptics";
 
 export type SliderOption = {
   id: string;
@@ -144,7 +145,7 @@ export default function Slider({
         if (anchor !== previewIndexRef.current) {
           previewIndexRef.current = anchor;
           setPreviewIndex(anchor);
-          Vibration.vibrate(10);
+          vibrate(10);
         }
         const currentAnchorX = getPillX(anchor, bw, pw, tw, currentOptions.length);
         pillX.value = currentAnchorX + rubberBand(d, slot);
@@ -221,7 +222,7 @@ export default function Slider({
           <Pressable
             key={option.id}
             onPress={() => {
-              if (option.id !== selectedValue) Vibration.vibrate(10);
+              if (option.id !== selectedValue) vibrate(10);
               onSelect(option.id);
             }}
             style={pressStyle(styles.slot, "surface")}

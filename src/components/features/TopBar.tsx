@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import {
+  Animated,
   Image,
   ImageSourcePropType,
   Pressable,
@@ -9,6 +10,7 @@ import {
   ViewStyle,
 } from "react-native";
 import { Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import { useShadowShift } from "../../hooks/useShadowShift";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { pressStyle } from "../ui/pressStyle";
 
@@ -47,6 +49,7 @@ export default function TopBar({
   onIncognitoPress,
 }: TopBarProps) {
   const styles = useThemedStyles(makeStyles);
+  const shadowShift = useShadowShift();
 
   const menuButton = <BarButton icon={moreIcon} onPress={onMenuPress} />;
   const newButton = <BarButton icon={addIcon} onPress={onNewPress} />;
@@ -63,7 +66,7 @@ export default function TopBar({
       <View style={styles.leftSection}>
         {middleOnly || isDesktop ? null : (
           //mobile shares one segmented pill
-          <Pill>
+          <Pill shift={shadowShift}>
             {menuButton}
             {showNewButton && newButton}
             {incognitoButton}
@@ -72,7 +75,10 @@ export default function TopBar({
       </View>
 
       {middleElement && (
-        <Pill style={[styles.middle, isDesktop && styles.middleDesktop]}>
+        <Pill
+          shift={shadowShift}
+          style={[styles.middle, isDesktop && styles.middleDesktop]}
+        >
           {middleElement}
         </Pill>
       )}
@@ -92,15 +98,22 @@ export default function TopBar({
 //surface with the offset sticker shadow
 function Pill({
   children,
+  shift,
   style,
 }: {
   children: ReactNode;
+  shift: Animated.ValueXY;
   style?: StyleProp<ViewStyle>;
 }) {
   const styles = useThemedStyles(makeStyles);
   return (
     <View style={[styles.shadowLayer, style]}>
-      <View style={styles.shadowBlock} />
+      <Animated.View
+        style={[
+          styles.shadowBlock,
+          { transform: shift.getTranslateTransform() },
+        ]}
+      />
       <View style={styles.pill}>{children}</View>
     </View>
   );

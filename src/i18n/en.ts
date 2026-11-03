@@ -308,12 +308,7 @@ export const en = {
   "settings.nav.cloud.title": "Sync & backup",
   "settings.nav.cloud.subtitle": "Sampler, cloud storage, backup",
   "settings.nav.hub.title": "Sampler Hub",
-  "settings.service.hub": "Sampler Hub",
   "settings.service.hubHelp":"Models running on your hub, from any network",
-  "settings.hubProvider.title": "Hub servers",
-  "settings.hubProvider.help": "On {name} and reachable from any network.",
-  "settings.hubProvider.hubModels": "Provided by the hub",
-  "settings.hubProvider.detected": "Detected",
   "settings.nav.hub.subtitle": "Sampler device",
   "settings.hub.title": "Sampler device",
   "settings.hub.help": "Add a device compatible with Sampler to improve the Opera experience.",
@@ -834,7 +829,7 @@ export const en = {
   "settings.service.litertHelp":
     "Download open models from Hugging Face and run them on this device.",
   "settings.litert.title": "On-Device",
-  "settings.litert.modelTitle": "AI Model",
+  "settings.litert.modelTitle": "Models",
   "settings.litert.help": "Add and manage your AI models from Hugging Face.",
   "settings.litert.addModel": "Add ai model",
   "settings.litert.addModelPlaceholder": "search models",
@@ -1026,9 +1021,6 @@ export const en = {
   "settings.mcp.remove.message":
     "Remove {name}? Its tools and its saved connection will be deleted.",
   "settings.server.link": "Link",
-  "settings.server.compatible": "Compatible servers",
-  "settings.server.compatibleHelp": "The type is detected from the link when you add it.",
-  "settings.server.compatibleLocal": "Local or remote",
   "settings.server.add": "Add server",
   "settings.server.name": "Name (optional)",
   "settings.server.namePlaceholder": "server name",
@@ -1074,7 +1066,7 @@ export const en = {
   "settings.cloudapi.title": "OpenAI-compatible servers",
   "settings.cloudapi.help":
     "Add the API link of your service or server, for example https://api.mistral.ai/v1 for Mistral or http://localhost:1234/v1 for LM Studio.",
-  "settings.cloudapi.apiKey": "API key",
+  "settings.cloudapi.apiKey": "API key (optional)",
   "settings.cloudapi.apiKeyHelp":
     "Required by cloud services like Mistral. Leave empty for a local server like LM Studio.",
   "settings.cloudapi.apiKeyPlaceholder": "api key",

@@ -85,7 +85,6 @@ import { OpenAIProvider } from "../../services/ai/providers/OpenAIProvider";
 import {
   buildSources,
   getEnabledProviders,
-  getHubName,
   getHubServers,
   hubModelKeyOf,
   hubProviderKind,
@@ -115,10 +114,7 @@ import {
 import { ITool } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { openExternalUrl } from "../../services/ai/utils/openExternalUrl";
-import {
-  isDefaultAssistant,
-  openAssistantSettings,
-} from "../../services/assistant/DefaultAssistant";
+import { openAssistantSettings } from "../../services/assistant/DefaultAssistant";
 import { BackupService } from "../../services/BackupService";
 import { CloudUserInfo } from "../../services/cloud/CloudProvider";
 import {
@@ -148,10 +144,7 @@ import {
   pushDesktopOverlayConfig,
 } from "../../services/overlay/desktopOverlay";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
-import {
-  isScreenSaverActive,
-  openScreenSaverSettings,
-} from "../../services/screensaver/ScreenSaver";
+import { openScreenSaverSettings } from "../../services/screensaver/ScreenSaver";
 import { AppSettings, Settings } from "../../services/settings/SettingsService";
 import { TTS_SPEEDS } from "../../services/speech/engines";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
@@ -337,8 +330,6 @@ export type SubPage =
   | "assistantoverlay"
   | "screensaver"
   | "service"
-  | "ollama"
-  | "openai"
   | "confidentiality"
   | "reports"
   | "tools"
@@ -346,7 +337,6 @@ export type SubPage =
   | "cloud"
   | "syncchoices"
   | "datamanagement"
-  | "hubprovider"
   | "mcpservers"
   | "mcpserver"
   | "mcpserversettings"
@@ -362,8 +352,6 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   assistantoverlay: "general",
   screensaver: "general",
   service: "main",
-  ollama: "service",
-  openai: "service",
   confidentiality: "main",
   reports: "main",
   tools: "main",
@@ -371,7 +359,6 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   cloud: "main",
   syncchoices: "cloud",
   datamanagement: "cloud",
-  hubprovider: "service",
   sociallinks: "main",
   mcpservers: "tools",
   mcpserver: "mcpservers",
@@ -1013,7 +1000,6 @@ export default function SettingsDrawer({
 
   const [addModelSheetVisible, setAddModelSheetVisible] = useState(false);
   const [litertSheetVisible, setLitertSheetVisible] = useState(false);
-  const [ollamaAddVisible, setOllamaAddVisible] = useState(false);
   const [openaiAddVisible, setOpenAIAddVisible] = useState(false);
   const [openaiModelsPage, setOpenAIModelsPage] =
     useState<CloudModelsPage>("server");
@@ -1104,7 +1090,6 @@ export default function SettingsDrawer({
     profileEditVisible ||
     addModelSheetVisible ||
     litertSheetVisible ||
-    ollamaAddVisible ||
     ollamaDetailIndex !== null ||
     hubDetailUrl !== null ||
     hubModelKey !== null ||
@@ -1398,42 +1383,6 @@ export default function SettingsDrawer({
     });
     return () => sub.remove();
   }, [visible, activeSubPage, refreshPermissionStatuses]);
-
-  //null means no assistant role here
-  const [assistantStatus, setAssistantStatus] = useState<boolean | null>(null);
-
-  const refreshAssistantStatus = useCallback(() => {
-    isDefaultAssistant()
-      .then(setAssistantStatus)
-      .catch(() => {});
-  }, []);
-
-  //recheck after returning from system settings
-  useEffect(() => {
-    if (!visible || activeSubPage !== "assistantoverlay") return;
-    refreshAssistantStatus();
-    const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") refreshAssistantStatus();
-    });
-    return () => sub.remove();
-  }, [visible, activeSubPage, refreshAssistantStatus]);
-
-  //hides the open settings card once opera is the screen saver
-  const [screenSaverActive, setScreenSaverActive] = useState(false);
-
-  const refreshScreenSaverStatus = useCallback(() => {
-    isScreenSaverActive().then(setScreenSaverActive);
-  }, []);
-
-  //recheck after returning from system settings
-  useEffect(() => {
-    if (!visible || activeSubPage !== "screensaver") return;
-    refreshScreenSaverStatus();
-    const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") refreshScreenSaverStatus();
-    });
-    return () => sub.remove();
-  }, [visible, activeSubPage, refreshScreenSaverStatus]);
 
   const renderPermissionBadge = (status: PermissionState) => (
     <View
@@ -1934,18 +1883,6 @@ export default function SettingsDrawer({
     setMcpAddVisible(true);
   };
 
-  const openOllamaAddSheet = () => {
-    setServerDraft({
-      name: "",
-      url: "",
-      headerName: "",
-      headerValue: "",
-      clientId: "",
-    });
-    setServerDraftBusy(false);
-    setOllamaAddVisible(true);
-  };
-
   const submitMcpDraft = async () => {
     const url = serverDraft.url.trim();
     if (mcpServers.some((s) => s.url.trim() === url)) {
@@ -1965,35 +1902,6 @@ export default function SettingsDrawer({
         undefined,
         { messageAlign: "left" },
       );
-    } finally {
-      setServerDraftBusy(false);
-    }
-  };
-
-  const submitOllamaDraft = async () => {
-    const url = serverDraft.url.trim();
-    if (ollamaServers.some((s) => s.url.trim() === url)) {
-      showAlert(t("settings.server.addFailed"), t("settings.server.duplicate"));
-      return;
-    }
-    setServerDraftBusy(true);
-    try {
-      if (!(await AIModule.isSourceAvailable("ollama", url))) {
-        showAlert(
-          t("settings.ollama.unreachableTitle"),
-          t("settings.ollama.unreachableInfo"),
-          undefined,
-          { image: errorImage, messageAlign: "left" },
-        );
-        return;
-      }
-      saveOllamaServers([
-        ...ollamaServers,
-        { url, name: serverDraft.name.trim() },
-      ]);
-      //skip waiting for the next sweep
-      setServerErrors((prev) => ({ ...prev, [url]: false }));
-      setOllamaAddVisible(false);
     } finally {
       setServerDraftBusy(false);
     }
@@ -4003,7 +3911,7 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.nav.screenSaver.title"))}
 
       {/* screen saver settings card */}
-      {Platform.OS === "android" && !screenSaverActive && (
+      {Platform.OS === "android" && (
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>
@@ -4331,36 +4239,22 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.nav.overlay.title"))}
 
       {/* default assistant card */}
-      {assistantStatus === false && (
+      {Platform.OS === "android" && (
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>
               {t("settings.overlay.default")}
             </Text>
-            <Text style={styles.helpText}>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
               {t("settings.overlay.defaultHelp")}
             </Text>
-            <Text
-              style={[
-                styles.assistantStatusText,
-                assistantStatus
-                  ? styles.assistantStatusOn
-                  : styles.assistantStatusOff,
-              ]}
-            >
-              {assistantStatus
-                ? t("settings.overlay.isDefault")
-                : t("settings.overlay.isNotDefault")}
-            </Text>
-            {!assistantStatus && (
-              <Group>
-                <ActionButton
-                  icon={hyperlinkIcon}
-                  label={t("settings.overlay.setDefault")}
-                  onPress={openAssistantSettings}
-                />
-              </Group>
-            )}
+            <Group>
+              <ActionButton
+                icon={hyperlinkIcon}
+                label={t("settings.overlay.setDefault")}
+                onPress={openAssistantSettings}
+              />
+            </Group>
           </View>
         </View>
       )}
@@ -4893,22 +4787,12 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.nav.service.title"))}
 
       {/* every provider as a tile, the icon tells where it comes from */}
-      <View style={styles.contentCard}>
-        <Group style={styles.highlightGroup}>
-          <ActionButton
-            icon={addIcon}
-            label={t("settings.server.add")}
-            variant="highlight"
-            onPress={openOpenAIAddSheet}
-          />
-        </Group>
-
-        {(onDeviceProviders.length > 0 ||
-          ollamaServers.length > 0 ||
-          openaiServers.length > 0 ||
-          showHubProvider) && (
+      {(onDeviceProviders.length > 0 ||
+        ollamaServers.length > 0 ||
+        openaiServers.length > 0 ||
+        showHubProvider) && (
+        <View style={styles.contentCard}>
           <CardGrid
-            style={{ marginTop: Spacing.md }}
             cards={[
               ...(onDeviceProviders.length > 0
                 ? [
@@ -4962,8 +4846,8 @@ export default function SettingsDrawer({
                 : []),
             ]}
           />
-        )}
-      </View>
+        </View>
+      )}
 
       {/* model failover card */}
       <View style={styles.contentCard}>
@@ -5025,37 +4909,6 @@ export default function SettingsDrawer({
           </View>
         </View>
       )}
-    </View>
-  );
-
-  //servers the paired hub shares
-  const renderHubProviderSubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.service.hub"))}
-
-      {/* hub servers card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>
-            {t("settings.hubProvider.title")}
-          </Text>
-          <Text style={styles.helpText}>
-            {t("settings.hubProvider.help", { name: getHubName() })}
-          </Text>
-          {renderCardGrid(
-            getHubServers().map((server) => ({
-              key: server.url,
-              //the subtitle already names the hub
-              title: server.provider,
-              status:
-                server.url === LLAMA_SERVER_URL
-                  ? t("settings.hubProvider.hubModels")
-                  : t("settings.hubProvider.detected"),
-              onPress: () => openHubServer(server),
-            })),
-          )}
-        </View>
-      </View>
     </View>
   );
 
@@ -5272,116 +5125,6 @@ export default function SettingsDrawer({
         </View>
       )}
     </>
-  );
-
-  //ollama server list subpage
-  const renderOllamaSubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Ollama")}
-
-      {/* ollama servers card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{t("settings.ollama.title")}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.ollama.help")}
-          </Text>
-
-          <Group style={styles.highlightGroup}>
-            <ActionButton
-              icon={addIcon}
-              label={t("settings.server.add")}
-              variant="highlight"
-              onPress={openOllamaAddSheet}
-            />
-          </Group>
-
-          {ollamaServers.length > 0 &&
-            renderCardGrid(
-              ollamaServers.map((server, index) => ({
-                key: String(index),
-                title: ollamaServerLabel(server),
-                status: ollamaStatusLabel(server),
-                error: serverErrors[server.url.trim()] === true,
-                onPress: () => openOllamaServer(index),
-              })),
-            )}
-        </View>
-      </View>
-
-      {/* model failover card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <View style={styles.toggleGroupRow}>
-            <View style={styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>
-                {t("settings.service.failover")}
-              </Text>
-              <Text style={styles.helpText}>
-                {t("settings.service.failoverHelp")}
-              </Text>
-            </View>
-            <Toggle checked={modelFailover} onToggle={setModelFailover} />
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-
-  //openai server list subpage
-  const renderOpenAISubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.service.cloudapi"))}
-
-      {/* openai servers card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>
-            {t("settings.cloudapi.title")}
-          </Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.cloudapi.help")}
-          </Text>
-
-          <Group style={styles.highlightGroup}>
-            <ActionButton
-              icon={addIcon}
-              label={t("settings.server.add")}
-              variant="highlight"
-              onPress={openOpenAIAddSheet}
-            />
-          </Group>
-
-          {openaiServers.length > 0 &&
-            renderCardGrid(
-              openaiServers.map((server, index) => ({
-                key: String(index),
-                title: openAIServerLabel(index),
-                status: ollamaStatusLabel(server),
-                error: serverErrors[server.url.trim()] === true,
-                onPress: () => openOpenAIServer(index),
-              })),
-            )}
-        </View>
-      </View>
-
-      {/* model failover card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <View style={styles.toggleGroupRow}>
-            <View style={styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>
-                {t("settings.service.failover")}
-              </Text>
-              <Text style={styles.helpText}>
-                {t("settings.service.failoverHelp")}
-              </Text>
-            </View>
-            <Toggle checked={modelFailover} onToggle={setModelFailover} />
-          </View>
-        </View>
-      </View>
-    </View>
   );
 
   //each page opens at the top
@@ -5744,8 +5487,6 @@ export default function SettingsDrawer({
         return renderProfileSubPage();
       case "cloud":
         return renderCloudSubPage();
-      case "hubprovider":
-        return renderHubProviderSubPage();
       case "general":
         return renderGeneralSubPage();
       case "maestro":
@@ -5758,10 +5499,6 @@ export default function SettingsDrawer({
         return renderScreenSaverSubPage();
       case "service":
         return renderServiceSubPage();
-      case "ollama":
-        return renderOllamaSubPage();
-      case "openai":
-        return renderOpenAISubPage();
       case "confidentiality":
         return renderConfidentialitySubPage();
       case "syncchoices":
@@ -6295,89 +6032,6 @@ export default function SettingsDrawer({
           renderPage={renderLitertPage}
         />
       </SheetBody>
-    </DrawerSheet>
-  );
-
-  const ollamaAddServerSheet = (
-    <DrawerSheet
-      visible={ollamaAddVisible}
-      onClose={() => setOllamaAddVisible(false)}
-      mode="overlay"
-      isLargeScreen={isLargeScreen}
-      isDesktop={isDesktop}
-      handleContainerStyle={styles.sheetHandleContainer}
-      avoidKeyboard
-      sheetStyle={[
-        styles.addModelSheet,
-        {
-          maxHeight: sheetMaxHeight,
-        },
-      ]}
-      desktopStyle={styles.addModelSheetDesktop}
-    >
-      <SheetScrollView
-        contentContainerStyle={styles.addModelSheetContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.sheetCard}>
-          <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {t("settings.server.name")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={penPlaceholderIcon}
-                placeholder={t("settings.server.namePlaceholder")}
-                value={serverDraft.name}
-                onChangeText={(v) =>
-                  setServerDraft((prev) => ({ ...prev, name: v }))
-                }
-              />
-            </Group>
-          </View>
-
-          <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {t("settings.server.link")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={linkIcon}
-                placeholder={t("settings.service.serverLink")}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-                value={serverDraft.url}
-                onChangeText={(v) =>
-                  setServerDraft((prev) => ({ ...prev, url: v }))
-                }
-              />
-            </Group>
-          </View>
-
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Group
-              style={[
-                styles.highlightGroup,
-                (serverDraftBusy || !serverDraft.url.trim()) &&
-                  styles.highlightGroupDisabled,
-              ]}
-            >
-              <ActionButton
-                icon={addIcon}
-                label={
-                  serverDraftBusy
-                    ? t("settings.server.checking")
-                    : t("settings.server.add")
-                }
-                variant="highlight"
-                disabled={serverDraftBusy || !serverDraft.url.trim()}
-                onPress={submitOllamaDraft}
-              />
-            </Group>
-          </View>
-        </View>
-      </SheetScrollView>
     </DrawerSheet>
   );
 
@@ -7099,36 +6753,6 @@ export default function SettingsDrawer({
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.sheetCard}>
-          {/* providers the link can point to */}
-          <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>
-              {t("settings.server.compatible")}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.server.compatibleHelp")}
-            </Text>
-            <Group style={styles.infoGroup}>
-              <ActionButton
-                icon={ollamaIcon}
-                label="Ollama"
-                rightElement={
-                  <Text style={styles.infoValue} numberOfLines={1}>
-                    {t("settings.server.compatibleLocal")}
-                  </Text>
-                }
-              />
-              <ActionButton
-                icon={cloudIcon}
-                label={t("settings.service.cloudapi")}
-                rightElement={
-                  <Text style={styles.infoValue} numberOfLines={1}>
-                    LM Studio, vLLM, Mistral
-                  </Text>
-                }
-              />
-            </Group>
-          </View>
-
           <View style={styles.settingRowVertical}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
               {t("settings.server.name")}
@@ -8127,7 +7751,6 @@ export default function SettingsDrawer({
 
             {litertSheet}
             {addModelSheet}
-            {ollamaAddServerSheet}
             {ollamaServerSheet}
             {hubServerSheet}
             {hubModelSheet}
@@ -8178,7 +7801,6 @@ export default function SettingsDrawer({
       {notificationModal}
       {litertSheet}
       {addModelSheet}
-      {ollamaAddServerSheet}
       {ollamaServerSheet}
       {hubServerSheet}
       {hubModelSheet}
@@ -8714,20 +8336,6 @@ const makeStyles = (Colors: ThemeColors) =>
       marginTop: Spacing.xs,
       lineHeight: 20,
       paddingHorizontal: Spacing.md,
-    },
-    assistantStatusText: {
-      fontSize: FontSizes.bodyMd,
-      fontFamily: Fonts.body,
-      marginTop: Spacing.sm,
-      marginBottom: Spacing.md,
-      lineHeight: 20,
-      paddingHorizontal: Spacing.md,
-    },
-    assistantStatusOn: {
-      color: Colors.primary,
-    },
-    assistantStatusOff: {
-      color: Colors.textMuted,
     },
     highlightGroup: {
       backgroundColor: Colors.primary,

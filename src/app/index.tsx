@@ -92,6 +92,7 @@ import { pressStyle } from "../components/ui/pressStyle";
 import SliderToggle from "../components/ui/SliderToggle";
 import { isWidgetTouchActive } from "../components/widgets/WidgetTouchArea";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
+import { useShadowShift } from "../hooks/useShadowShift";
 import { useBugReportTrigger } from "../hooks/useBugReportTrigger";
 import { useDesktopUpdate } from "../hooks/useDesktopUpdate";
 import { useKeyboardLift } from "../hooks/useKeyboardLift";
@@ -395,6 +396,7 @@ export default function Index() {
   const router = useRouter();
   const { width, isLargeScreen, isDesktop } = useResponsive();
   const { dockedWidth } = useDockedWidth();
+  const settingsShadowShift = useShadowShift();
   //edge drag maps to drawer progress
   const dragWidth = drawerWidthFor(width);
   //computed once per mount so it doesn't shift mid-session
@@ -2455,7 +2457,12 @@ export default function Index() {
   //opens the settings, in the chat and sampler bars
   const settingsButton = (
     <View style={styles.settingsShadowLayer}>
-      <View style={styles.settingsShadowBlock} />
+      <Animated.View
+        style={[
+          styles.settingsShadowBlock,
+          { transform: settingsShadowShift.getTranslateTransform() },
+        ]}
+      />
       <Pressable
         style={pressStyle(
           [
@@ -2945,11 +2952,9 @@ export default function Index() {
           openDrawerSafely(() => {
             //built-in models live under on-device
             const page = (
-              provider === "local"
+              provider === "local" || provider === "litert"
                 ? "litert"
-                : ["litert", "ollama", "openai"].includes(provider)
-                  ? provider
-                  : "service"
+                : "service"
             ) as SubPage;
             setSettingsInitialSubPage(page);
             setSettingsDrawerVisible(true);

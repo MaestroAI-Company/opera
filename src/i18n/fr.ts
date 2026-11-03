@@ -311,12 +311,7 @@ export const fr: Translations = {
   "settings.nav.cloud.title": "Sync & sauvegarde",
   "settings.nav.cloud.subtitle": "Sampler, stockage cloud, sauvegarde",
   "settings.nav.hub.title": "Sampler Hub",
-  "settings.service.hub": "Sampler Hub",
   "settings.service.hubHelp": "Les modèles de votre hub, depuis n'importe quel réseau",
-  "settings.hubProvider.title": "Serveurs du hub",
-  "settings.hubProvider.help": "Sur {name} et joignables depuis n'importe quel réseau.",
-  "settings.hubProvider.hubModels": "Fourni par le hub",
-  "settings.hubProvider.detected": "Détecté",
   "settings.nav.hub.subtitle": "Appareil Sampler",
   "settings.hub.title": "Sampler device",
   "settings.hub.help": "Ajoutez un appareil compatible avec Sampler pour améliorer l'expérience Opera.",
@@ -843,7 +838,7 @@ export const fr: Translations = {
   "settings.service.litertHelp":
     "Télécharge des modèles ouverts depuis Hugging Face et exécute-les sur cet appareil.",
   "settings.litert.title": "Sur l'appareil",
-  "settings.litert.modelTitle": "Modèle d'IA",
+  "settings.litert.modelTitle": "Modèles",
   "settings.litert.help":
     "Ajoute et gère tes modèles d'IA depuis Hugging Face.",
   "settings.litert.addModel": "Ajouter un modèle d'IA",
@@ -1045,9 +1040,6 @@ export const fr: Translations = {
   "settings.mcp.remove.message":
     "Retirer {name} ? Ses outils et sa connexion enregistrée seront supprimés.",
   "settings.server.link": "Lien",
-  "settings.server.compatible": "Serveurs compatibles",
-  "settings.server.compatibleHelp": "Le type est détecté depuis le lien à l'ajout.",
-  "settings.server.compatibleLocal": "Local ou distant",
   "settings.server.add": "Ajouter un serveur",
   "settings.server.name": "Nom (optionnel)",
   "settings.server.namePlaceholder": "nom du serveur",
@@ -1094,7 +1086,7 @@ export const fr: Translations = {
   "settings.cloudapi.title": "Serveurs compatibles OpenAI",
   "settings.cloudapi.help":
     "Ajoute le lien API de ton service ou serveur, par exemple https://api.mistral.ai/v1 pour Mistral ou http://localhost:1234/v1 pour LM Studio.",
-  "settings.cloudapi.apiKey": "Clé API",
+  "settings.cloudapi.apiKey": "Clé API (optionnelle)",
   "settings.cloudapi.apiKeyHelp":
     "Nécessaire pour les services cloud comme Mistral. Laisse vide pour un serveur local comme LM Studio.",
   "settings.cloudapi.apiKeyPlaceholder": "clé api",

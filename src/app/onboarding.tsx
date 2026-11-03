@@ -25,7 +25,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { KeyboardAvoidingView, useKeyboardState } from "react-native-keyboard-controller";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../constants/theme";
 import ButterflyCluster from "../components/features/ButterflyCluster";
@@ -328,7 +328,6 @@ export default function OnboardingPage() {
   const insets = useSafeAreaInsets();
   const { isLargeScreen, isDesktop } = useResponsive();
   const { height: windowHeight } = useWindowDimensions();
-  const isKeyboardOpen = useKeyboardState((state) => state.isVisible);
 
   const [step, setStep] = useState(0);
   //no neural engine on this platform, nothing to pick
@@ -957,7 +956,6 @@ export default function OnboardingPage() {
         sheetStyle={[
           styles.sheet,
           {
-            paddingBottom: (Platform.OS === "ios" ? 20 : 10) + (isKeyboardOpen ? 0 : insets.bottom),
             maxHeight: windowHeight - insets.top - Spacing.xl2,
           },
         ]}

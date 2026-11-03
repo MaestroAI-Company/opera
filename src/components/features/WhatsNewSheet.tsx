@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
@@ -19,11 +19,10 @@ type WhatsNewSheetProps = {
   onClose: () => void;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
-  bottomInset?: number;
 };
 
 //release notes after an update
-export default function WhatsNewSheet({ release, onClose, isLargeScreen = false, isDesktop = false, bottomInset = 0 }: WhatsNewSheetProps) {
+export default function WhatsNewSheet({ release, onClose, isLargeScreen = false, isDesktop = false }: WhatsNewSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const { height: windowHeight } = useWindowDimensions();
@@ -43,7 +42,7 @@ export default function WhatsNewSheet({ release, onClose, isLargeScreen = false,
       isDesktop={isDesktop}
       handleContainerStyle={styles.sheetHandleContainer}
       //sheet may grow up to just under the status bar
-      sheetStyle={[styles.sheet, { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + bottomInset, maxHeight: windowHeight - insets.top - Spacing.xl2 }]}
+      sheetStyle={[styles.sheet, { maxHeight: windowHeight - insets.top - Spacing.xl2 }]}
       desktopStyle={styles.desktopCard}
     >
       <SheetScrollView contentContainerStyle={styles.content}>

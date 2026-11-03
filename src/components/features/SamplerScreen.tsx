@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   BackHandler,
@@ -7,7 +7,6 @@ import {
   ImageSourcePropType,
   Keyboard,
   PanResponder,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -42,6 +41,7 @@ import {
   HubStatus,
   McpAction,
   McpServerSummary,
+  NearbyHub,
   PairedHub,
   SamplerHub,
   hubErrorCode,
@@ -75,6 +75,7 @@ import HubMcpSection, { HubMcpServerPage } from "./HubMcpSection";
 import HubMcpSheet, { HubFolderSheet } from "./HubMcpSheet";
 import HubModelsSection, { HubModelPage } from "./HubModelsSection";
 import HubModelsSheet from "./HubModelsSheet";
+import HubDetectedSheet from "./HubDetectedSheet";
 import HubPairingSheet from "./HubPairingSheet";
 import HubProfileSheet from "./HubProfileSheet";
 import HubQrSheet from "./HubQrSheet";
@@ -273,6 +274,8 @@ export default function SamplerScreen({
     null,
   );
   const [pairingVisible, setPairingVisible] = useState(false);
+  const [detectedHub, setDetectedHub] = useState<NearbyHub | null>(null);
+  const [detectedVisible, setDetectedVisible] = useState(false);
   const [qrMode, setQrMode] = useState<"invite" | "link" | null>(null);
   const [hubSheetVisible, setHubSheetVisible] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
@@ -334,6 +337,34 @@ export default function SamplerScreen({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the paired hub
     refresh();
   }, [refresh]);
+
+  //one scan per arrival on the unpaired welcome
+  const scannedNearby = useRef(false);
+  useEffect(() => {
+    if (!visible) {
+      scannedNearby.current = false;
+      return;
+    }
+    if (
+      !loaded ||
+      pairedHub ||
+      scannedNearby.current ||
+      !SamplerHub.canDiscover()
+    )
+      return;
+    scannedNearby.current = true;
+    let cancelled = false;
+    SamplerHub.nearbyHubs()
+      .then((found) => {
+        if (cancelled || found.length === 0) return;
+        setDetectedHub(found[0]);
+        setDetectedVisible(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, loaded, pairedHub]);
 
   //usage stays live while the screen shows
   useEffect(() => {
@@ -861,6 +892,7 @@ export default function SamplerScreen({
           <CardGrid
             cards={deviceTiles}
             minCardWidth={TILE_MIN_WIDTH}
+            singleLineTitle
             style={withActions && { marginBottom: Spacing.md }}
           />
         ) : (
@@ -986,7 +1018,7 @@ export default function SamplerScreen({
     ];
     return (
       <>
-        <View style={styles.contentCard}>
+        <View style={styles.sheetCard}>
           <Group style={styles.infoGroup}>
             {rows.map((row) => (
               <ActionButton
@@ -1003,7 +1035,7 @@ export default function SamplerScreen({
         </View>
 
         {/* actions section */}
-        <View style={[styles.contentCard, { marginBottom: 0 }]}>
+        <View style={styles.sheetCard}>
           <Group>
             <ActionButton
               icon={server.enabled ? stopIcon : activateIcon}
@@ -1726,6 +1758,7 @@ export default function SamplerScreen({
   //open sheets keep the back press for themselves
   const sheetOpen =
     pairingVisible ||
+    detectedVisible ||
     profileSheet !== null ||
     qrMode !== null ||
     selectedDeviceId !== null ||
@@ -2101,7 +2134,6 @@ export default function SamplerScreen({
       sheetStyle={[
         styles.sheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -2130,7 +2162,6 @@ export default function SamplerScreen({
       sheetStyle={[
         styles.sheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -2158,7 +2189,6 @@ export default function SamplerScreen({
       sheetStyle={[
         styles.sheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -2271,6 +2301,17 @@ export default function SamplerScreen({
 
       {!isDesktop && mobileDrawer}
 
+      <HubDetectedSheet
+        visible={detectedVisible}
+        hub={detectedHub}
+        onClose={() => setDetectedVisible(false)}
+        onLink={() => {
+          setDetectedVisible(false);
+          setPairingVisible(true);
+        }}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
       <HubPairingSheet
         visible={pairingVisible}
         onClose={() => setPairingVisible(false)}
@@ -2599,6 +2640,12 @@ const makeStyles = (Colors: ThemeColors) =>
       padding: Spacing.md,
       marginBottom: Spacing.xxl2,
     },
+    sheetCard: {
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
+      padding: Spacing.md,
+    },
     contentCardLit: {
       backgroundColor: Colors.primary,
     },
@@ -2725,5 +2772,6 @@ const makeStyles = (Colors: ThemeColors) =>
     sheetContent: {
       paddingHorizontal: Spacing.lg2,
       paddingBottom: Spacing.lg,
+      gap: Spacing.xxl2,
     },
   });

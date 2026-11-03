@@ -28,7 +28,7 @@ import ChatView from './ChatView';
 import { ModelSelectorDrawer, ModelSelectorTrigger } from './ModelSelector';
 
 const closeIcon = require('../../../assets/icons/cancel.png');
-const chatIcon = require('../../../assets/icons/chat.png');
+const chatIcon = require('../../../assets/icons/message.png');
 
 //reply card never covers the screen
 const MAX_REPLY_HEIGHT = 360;
@@ -410,7 +410,6 @@ export default function DesktopOverlay() {
         onSelectRecentPhoto={attachments.toggleRecentPhoto}
         onLongPressRecentPhoto={attachments.toggleRecentPhoto}
         isLargeScreen={false}
-        bottomInset={0}
       />
 
       <ModelSelectorDrawer

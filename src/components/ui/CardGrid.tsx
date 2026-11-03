@@ -18,11 +18,13 @@ type CardGridProps = {
   cards: GridCard[];
   //more than two columns on wide pages
   minCardWidth?: number;
+  //one-line title cut with an ellipsis
+  singleLineTitle?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
 //framed tiles of the items a user added or installed
-export default function CardGrid({ cards, minCardWidth, style }: CardGridProps) {
+export default function CardGrid({ cards, minCardWidth, singleLineTitle, style }: CardGridProps) {
   const styles = useThemedStyles(makeStyles);
   const Colors = useColors();
   const [width, setWidth] = useState(0);
@@ -55,7 +57,7 @@ export default function CardGrid({ cards, minCardWidth, style }: CardGridProps) 
             }}
           >
             {card.icon && <Image source={card.icon} style={styles.icon} tintColor={Colors.textPrimary} />}
-            <Text style={styles.title} numberOfLines={2}>
+            <Text style={styles.title} numberOfLines={singleLineTitle ? 1 : 2}>
               {card.title}
             </Text>
             <Text style={[styles.status, card.error && styles.error]} numberOfLines={1}>

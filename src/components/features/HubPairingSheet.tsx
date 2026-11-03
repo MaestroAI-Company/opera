@@ -21,12 +21,12 @@ import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import {
   hubErrorCode,
-  NearbyHub,
   SamplerHub,
   PairedHub,
 } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
+import NotificationModal from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
@@ -35,7 +35,6 @@ const addIcon = require("../../../assets/icons/add.png");
 const linkIcon = require("../../../assets/icons/link.png");
 const keyIcon = require("../../../assets/icons/key.png");
 const laptopIcon = require("../../../assets/icons/laptop.png");
-const serverIcon = require("../../../assets/icons/server.png");
 
 const DESKTOP_CARD_WIDTH = 720;
 //delay before rescanning a failed code
@@ -70,8 +69,6 @@ export default function HubPairingSheet({
   const insets = useSafeAreaInsets();
   const [pairing, setPairing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  //which row the last failure belongs to
-  const [errorRow, setErrorRow] = useState<"scan" | "code">("code");
   const [typedLink, setTypedLink] = useState("");
   //paired hub waiting for the user to confirm the link
   const [found, setFound] = useState<PairedHub | null>(null);
@@ -91,19 +88,6 @@ export default function HubPairingSheet({
   useEffect(() => {
     if (visible) lastScan.current = null;
   }, [visible]);
-
-  //hubs answering on this network
-  const [nearby, setNearby] = useState<NearbyHub[]>([]);
-  useEffect(() => {
-    if (!visible || link || !SamplerHub.canDiscover()) return;
-    let cancelled = false;
-    SamplerHub.nearbyHubs()
-      .then((found) => !cancelled && setNearby(found))
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [visible, link]);
 
   const showFound = (hub: PairedHub) => {
     Vibration.vibrate(40);
@@ -130,7 +114,6 @@ export default function HubPairingSheet({
       showFound(await SamplerHub.pair(data));
     } catch (e) {
       setError(t(`hubPairing.error.${hubErrorCode(e)}`));
-      setErrorRow("scan");
       //delay counts from the attempt end
       lastScan.current = { data, at: Date.now() };
     } finally {
@@ -151,18 +134,11 @@ export default function HubPairingSheet({
     } catch (e) {
       console.warn("[HubPairing] pairing failed:", e);
       setError(t(`hubPairing.error.${hubErrorCode(e)}`));
-      setErrorRow("code");
     } finally {
       setPairing(false);
     }
   };
 
-  const status = (row: "scan" | "code", idle: string) =>
-    pairing
-      ? t("hubPairing.pairing")
-      : error && errorRow === row
-        ? error
-        : idle;
   //desktop and web have no camera to scan with
   const mode = link ? "confirm" : Platform.OS === "web" ? "code" : "scan";
 
@@ -190,7 +166,7 @@ export default function HubPairingSheet({
     <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
       <Text style={styles.settingLabel}>{t("hubPairing.code")}</Text>
       <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-        {status("code", t("hubPairing.codeHelp"))}
+        {t("hubPairing.codeHelp")}
       </Text>
       <Group style={styles.groupSpacingTight}>
         <TextInputField
@@ -208,22 +184,6 @@ export default function HubPairingSheet({
       {renderPairButton(typedLink, (v) => SamplerHub.pairWithCode(v))}
     </View>
   );
-
-  //found hubs still ask for their code
-  const renderNearbyRow = () =>
-    nearby.length > 0 && (
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("hubPairing.nearby")}</Text>
-        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-          {t("hubPairing.nearbyHelp")}
-        </Text>
-        <Group style={styles.infoGroup}>
-          {nearby.map((hub) => (
-            <ActionButton key={hub.id} icon={serverIcon} label={hub.name} />
-          ))}
-        </Group>
-      </View>
-    );
 
   const renderFound = (hub: PairedHub) => (
     <>
@@ -267,7 +227,7 @@ export default function HubPairingSheet({
         <>
           <Text style={styles.settingLabel}>{t("hubPairing.confirm")}</Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {status("code", t("hubPairing.confirmHelp"))}
+            {t("hubPairing.confirmHelp")}
           </Text>
           {renderPairButton(link ?? "", (v) => SamplerHub.pair(v))}
         </>
@@ -276,20 +236,15 @@ export default function HubPairingSheet({
     if (mode === "code") {
       return (
         <>
-          {renderNearbyRow()}
           {renderCodeRow()}
         </>
       );
     }
     return (
       <>
-        {renderNearbyRow()}
         <View style={styles.settingRowVertical}>
-          <Text style={styles.settingLabel}>{t("hubPairing.scan")}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {permission?.granted
-              ? status("scan", t("hubPairing.help"))
-              : t("hubPairing.cameraHelp")}
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+            {t("hubPairing.scan")}
           </Text>
           <Group>
             {permission?.granted ? (
@@ -317,30 +272,39 @@ export default function HubPairingSheet({
   };
 
   return (
-    <DrawerSheet
-      visible={visible}
-      onClose={handleClose}
-      mode="overlay"
-      isLargeScreen={isLargeScreen}
-      isDesktop={isDesktop}
-      handleContainerStyle={styles.sheetHandleContainer}
-      avoidKeyboard={mode !== "confirm" && !found}
-      sheetStyle={[
-        styles.sheet,
-        {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
-          maxHeight: windowHeight - insets.top - Spacing.xl2,
-        },
-      ]}
-      desktopStyle={styles.desktopCard}
-    >
-      <SheetScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
+    <>
+      <DrawerSheet
+        visible={visible}
+        onClose={handleClose}
+        mode="overlay"
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        handleContainerStyle={styles.sheetHandleContainer}
+        avoidKeyboard={mode !== "confirm" && !found}
+        sheetStyle={[
+          styles.sheet,
+          {
+            maxHeight: windowHeight - insets.top - Spacing.xl2,
+          },
+        ]}
+        desktopStyle={styles.desktopCard}
       >
-        <View style={styles.contentCard}>{renderContent()}</View>
-      </SheetScrollView>
-    </DrawerSheet>
+        <SheetScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.contentCard}>{renderContent()}</View>
+        </SheetScrollView>
+      </DrawerSheet>
+      <NotificationModal
+        visible={visible && (pairing || !!error)}
+        message={pairing ? t("hubPairing.pairing") : (error ?? undefined)}
+        messageAlign="center"
+        loading={pairing}
+        buttons={[{ text: t("common.ok"), onPress: () => setError(null) }]}
+        onClose={() => !pairing && setError(null)}
+      />
+    </>
   );
 }
 
@@ -397,10 +361,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     settingRowVertical: {
       marginBottom: Spacing.xxl,
-    },
-    //static rows on the white card
-    infoGroup: {
-      borderWidth: 0,
     },
     foundTitle: {
       fontSize: FontSizes.displayMd,

@@ -79,6 +79,7 @@ import {
   displayName,
   ModelSelectorDrawer,
   ModelSelectorTrigger,
+  truncateModel,
 } from "../components/features/ModelSelector";
 import SamplerScreen from "../components/features/SamplerScreen";
 import SettingsDrawer, { SubPage } from "../components/features/SettingsDrawer";
@@ -2589,9 +2590,11 @@ export default function Index() {
                   }}
                 >
                   <Text style={styles.modelInfoText} numberOfLines={1}>
-                    {selectedModel
-                      ? displayName(selectedModel)
-                      : t("modelSelector.none")}
+                    {truncateModel(
+                      selectedModel
+                        ? displayName(selectedModel)
+                        : t("modelSelector.none"),
+                    )}
                   </Text>
                   <Image
                     source={nextIcon}
@@ -2836,7 +2839,6 @@ export default function Index() {
         onLongPressRecentPhoto={attachments.toggleRecentPhoto}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
-        bottomInset={insets.bottom}
       />
 
       <NotificationModal
@@ -2874,7 +2876,6 @@ export default function Index() {
         }}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
-        bottomInset={insets.bottom}
       />
 
       <AssistantSheet
@@ -2882,7 +2883,6 @@ export default function Index() {
         onClose={() => setAssistantSheetVisible(false)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
-        bottomInset={insets.bottom}
       />
 
       <ImagePreviewSheet
@@ -2890,7 +2890,6 @@ export default function Index() {
         onClose={() => setPreviewImage(null)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
-        bottomInset={insets.bottom}
       />
 
       <CodePreviewSheet
@@ -2898,7 +2897,6 @@ export default function Index() {
         onClose={() => setPreviewCode(null)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
-        bottomInset={insets.bottom}
       />
 
       <MessageDetailsSheet
@@ -2906,7 +2904,6 @@ export default function Index() {
         onClose={() => setPreviewDetails(null)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
-        bottomInset={insets.bottom}
       />
 
       <NotificationModal {...updateModalProps} />
@@ -2916,7 +2913,6 @@ export default function Index() {
         onClose={() => setReleaseNotes(null)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
-        bottomInset={insets.bottom}
       />
 
       <ModelSelectorDrawer

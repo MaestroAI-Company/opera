@@ -9,7 +9,6 @@ import {
     PanResponder,
     Pressable,
     SectionList,
-    Platform,
     StyleSheet,
     Text,
     useWindowDimensions,
@@ -568,7 +567,6 @@ export function ConversationSearchSheet({
       sheetStyle={[
         styles.sheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           //fixed so typing never resizes the sheet
           height: windowHeight - insets.top - Spacing.xl2,
         },
@@ -591,7 +589,7 @@ export function ConversationSearchSheet({
           </Group>
         </View>
 
-        <View style={[styles.contentCard, { marginBottom: 0 }]}>
+        <View style={styles.contentCard}>
           <Text style={styles.sectionTitle}>
             {t("conversations.search.results")}
           </Text>
@@ -797,7 +795,6 @@ const makeStyles = (Colors: ThemeColors) =>
     borderRadius: Radius.xxl + Spacing.md,
     borderWidth: 0,
     padding: Spacing.md,
-    marginBottom: Spacing.xxl,
   },
   quickActionsSpacing: {
     marginBottom: Spacing.xxl,
@@ -920,6 +917,7 @@ const makeStyles = (Colors: ThemeColors) =>
   searchSheetContent: {
     paddingHorizontal: Spacing.lg2,
     paddingBottom: Spacing.lg,
+    gap: Spacing.xxl2,
   },
   searchDateText: {
     fontSize: FontSizes.label,

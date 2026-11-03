@@ -334,9 +334,7 @@ export const en = {
   "settings.hub.unpairTitle": "Unpair this device?",
   "settings.hub.unpairMessage": "Opera stops syncing with {name}.",
   "hubPairing.scan": "Scan the QR code",
-  "hubPairing.help": "On your Sampler device, scan the QR code.",
   "hubPairing.pairing": "Pairing...",
-  "hubPairing.cameraHelp": "Opera needs the camera to scan the pairing code.",
   "hubPairing.allowCamera": "Allow camera",
   "hubPairing.error.InvalidLink": "This QR code is not a Sampler pairing code.",
   "hubPairing.error.PairingRejected": "This code was already used or replaced. Show a new one on Sampler Hub.",
@@ -635,9 +633,12 @@ export const en = {
   "settings.nav.overlay.subtitle": "Voice, Screen context",
   "settings.nav.maestroPreferences.title": "Preferences",
   "settings.nav.maestroPreferences.subtitle": "Instructions, Auto-read replies",
+  "settings.nav.syncChoices.title": "Sync choices",
+  "settings.nav.syncChoices.subtitle": "Conversations, settings and providers",
+  "settings.nav.dataManagement.subtitle": "Export, import and delete conversations",
   "settings.nav.screenSaver.title": "Standby",
   "settings.nav.screenSaver.subtitle": "Docked smart display, wake word",
-  "settings.nav.service.title": "Service",
+  "settings.nav.service.title": "Providers",
   "settings.nav.service.subtitle": "AI Service, Ollama server",
   "settings.nav.tools.title": "Tools",
   "settings.nav.tools.subtitle": "Assistant Tools, Mobile actions",
@@ -652,7 +653,7 @@ export const en = {
   "settings.nav.info.subtitle": "Version App, Github, Instagram, TikTok",
   "settings.screenSaver.help":
     "Put your phone on its dock or charger: Opera turns it into a smart display, with the time and Maestro by voice. To turn it on, pick Opera as the screen saver in Android settings.",
-  "settings.screenSaver.open": "Open screen saver settings",
+  "settings.screenSaver.open": "Open settings",
   "settings.screenSaver.antiBurnIn": "Anti burn-in",
   "settings.screenSaver.antiBurnInHelp":
     "Shift the clock and butterflies a few pixels every minute to protect OLED screens.",
@@ -957,9 +958,9 @@ export const en = {
     "Opera needs a few permissions to work at its best. You can manage them from your browser's site settings.",
   "settings.privacy.permissionsNative":
     "Opera needs a few permissions to work at its best. You can change them in your device settings.",
-  "settings.privacy.remoteImages": "Always show remote images",
+  "settings.privacy.remoteImages": "Load remote images",
   "settings.privacy.remoteImagesHelp":
-    "Images from external URLs load automatically. Loading remote images allows the external server to log your IP address and track your activity. Disable this to be prompted before any remote image is displayed.",
+    "Images from external servers load automatically. The server can see your IP address.",
 
   "settings.data.management": "Data management",
   "settings.data.managementHelp":

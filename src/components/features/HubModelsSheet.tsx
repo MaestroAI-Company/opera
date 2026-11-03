@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   Image,
   Keyboard,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -457,7 +456,6 @@ export default function HubModelsSheet({
       sheetStyle={[
         styles.sheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           //stacked pages cannot size the sheet
           height: windowHeight - insets.top - Spacing.xl2,
         },
@@ -528,6 +526,7 @@ const makeStyles = (Colors: ThemeColors) =>
     content: {
       paddingHorizontal: Spacing.lg2,
       paddingBottom: Spacing.lg,
+      gap: Spacing.xxl2,
     },
     backWrapper: {
       position: "absolute",
@@ -546,7 +545,6 @@ const makeStyles = (Colors: ThemeColors) =>
       borderRadius: Radius.xxl + Spacing.md,
       borderWidth: 0,
       padding: Spacing.md,
-      marginBottom: Spacing.xxl2,
     },
     settingRowVertical: {
       marginBottom: Spacing.xxl,

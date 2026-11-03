@@ -273,7 +273,6 @@ type AttachmentSheetProps = {
   selectedFiles: SelectedFile[];
   onSelectRecentPhoto: (photo: any) => void;
   onLongPressRecentPhoto: (photo: any) => void;
-  bottomInset?: number;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
 };
@@ -289,7 +288,6 @@ export default function AttachmentSheet({
   selectedFiles,
   onSelectRecentPhoto,
   onLongPressRecentPhoto,
-  bottomInset = 0,
   isLargeScreen = false,
   isDesktop = false,
 }: AttachmentSheetProps) {
@@ -310,7 +308,6 @@ export default function AttachmentSheet({
       sheetStyle={[
         styles.sheet,
         incognito && styles.inlineSheetIncognito,
-        { paddingBottom: (Platform.OS === 'ios' ? 20 : 10) + bottomInset },
       ]}
     >
       <View style={styles.sheetButtonsWrapper}>

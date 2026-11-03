@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
@@ -116,7 +116,6 @@ export default function HubDeviceSheet({
       sheetStyle={[
         styles.sheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: windowHeight - insets.top - Spacing.xl2,
         },
       ]}
@@ -152,7 +151,7 @@ export default function HubDeviceSheet({
         </View>
 
         {/* details */}
-        <View style={[styles.contentCard, !hasActions && { marginBottom: 0 }]}>
+        <View style={styles.contentCard}>
           <Group style={styles.infoGroup}>
             {rows.map((row) => (
               <ActionButton
@@ -170,7 +169,7 @@ export default function HubDeviceSheet({
 
         {/* actions section */}
         {hasActions && (
-          <View style={[styles.contentCard, { marginBottom: 0 }]}>
+          <View style={styles.contentCard}>
             <Group>
               {isSelf ? (
                 <ActionButton
@@ -239,13 +238,13 @@ const makeStyles = (Colors: ThemeColors) =>
     content: {
       paddingHorizontal: Spacing.lg2,
       paddingBottom: Spacing.lg,
+      gap: Spacing.xxl2,
     },
     contentCard: {
       backgroundColor: Colors.surface,
       borderRadius: Radius.xxl + Spacing.md,
       borderWidth: 0,
       padding: Spacing.md,
-      marginBottom: Spacing.xxl2,
     },
     settingRowVertical: {
       marginBottom: Spacing.xxl,

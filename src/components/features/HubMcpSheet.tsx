@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   Image,
   Keyboard,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -622,7 +621,6 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
       sheetStyle={[
         styles.sheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           //stacked pages cannot size the sheet
           height: windowHeight - insets.top - Spacing.xl2,
         },
@@ -714,14 +712,13 @@ export function HubFolderSheet({ start, visible, onPick, onClose, isLargeScreen 
       sheetStyle={[
         styles.sheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: windowHeight - insets.top - Spacing.xl2,
         },
       ]}
       desktopStyle={styles.desktopFolderCard}
     >
       <SheetScrollView contentContainerStyle={styles.content}>
-        <View style={[styles.contentCard, { marginBottom: 0 }]}>
+        <View style={styles.contentCard}>
           <McpFolderList folders={folders} onOpen={open} onUse={onPick} />
         </View>
       </SheetScrollView>
@@ -764,6 +761,7 @@ const makeStyles = (Colors: ThemeColors) =>
     content: {
       paddingHorizontal: Spacing.lg2,
       paddingBottom: Spacing.lg,
+      gap: Spacing.xxl2,
     },
     backWrapper: {
       position: "absolute",
@@ -782,7 +780,6 @@ const makeStyles = (Colors: ThemeColors) =>
       height: 40 + Spacing.md,
     },
     notice: {
-      marginBottom: Spacing.xxl,
       borderRadius: Radius.xxl + Spacing.md,
       borderWidth: 0,
     },
@@ -791,7 +788,6 @@ const makeStyles = (Colors: ThemeColors) =>
       borderRadius: Radius.xxl + Spacing.md,
       borderWidth: 0,
       padding: Spacing.md,
-      marginBottom: Spacing.xxl2,
     },
     settingRowVertical: {
       marginBottom: Spacing.xxl,
@@ -820,7 +816,6 @@ const makeStyles = (Colors: ThemeColors) =>
       paddingHorizontal: Spacing.md,
     },
     groupSpacing: {
-      marginBottom: Spacing.xxl,
       borderRadius: Radius.xxl + Spacing.md,
       borderWidth: 0,
     },

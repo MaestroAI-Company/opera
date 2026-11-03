@@ -8,7 +8,6 @@ import {
   LayoutChangeEvent,
   NativeScrollEvent,
   NativeSyntheticEvent,
-  Platform,
   Pressable,
   ScrollView,
   StyleProp,
@@ -21,13 +20,15 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Reanimated, {
+  Easing,
+  interpolate,
   interpolateColor,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { type ModelCapabilityId } from "../../../constants/modelCapabilities";
 import {
   Fonts,
@@ -51,7 +52,7 @@ import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 import ProgressBar from "../ui/ProgressBar";
 import SliderToggle, { SliderToggleOption } from "../ui/SliderToggle";
-import DrawerSheet from "./DrawerSheet";
+import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 import { pressStyle } from "../ui/pressStyle";
 
 const botIcon = require("../../../assets/icons/bot.png");
@@ -132,6 +133,11 @@ export const displayName = (model: string) =>
   isLocalModel(model) ? getLocalModelLabel(model, true)
     : isLiteRTModel(model) ? getLiteRTModelLabel(model)
       : model;
+
+//keeps the model pill narrow
+const MODEL_MAX_CHARS = 16;
+export const truncateModel = (name: string) =>
+  name.length > MODEL_MAX_CHARS ? `${name.slice(0, MODEL_MAX_CHARS - 1)}…` : name;
 
 //button trigger in topbar
 export function ModelSelectorTrigger({
@@ -273,7 +279,6 @@ export function ModelSelectorDrawer({
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const t = useT();
-  const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
 
   //reflection labels follow the locale
@@ -582,6 +587,7 @@ export function ModelSelectorDrawer({
   const pillLit = useSharedValue(0);
   const dragStartY = useSharedValue(0);
   const dragIndex = useSharedValue(0);
+  const labelPulse = useSharedValue(0);
 
   const activeIndex = previewIndex ?? (selectedIndex >= 0 ? selectedIndex : 0);
   const hasPill = isBrowsingActive && selectedIndex >= 0;
@@ -649,6 +655,15 @@ export function ModelSelectorDrawer({
 
   //pill parked on this list
   const parkedKey = useRef<string | null>(null);
+
+  //pulse the pill label on each drag swap
+  useEffect(() => {
+    if (previewIndex === null) return;
+    labelPulse.set(withSequence(
+      withTiming(1, { duration: 120, easing: Easing.out(Easing.quad) }),
+      withTiming(0, { duration: 160, easing: Easing.in(Easing.quad) }),
+    ));
+  }, [previewIndex, labelPulse]);
 
   //parks pill on selected before paint
   useLayoutEffect(() => {
@@ -804,6 +819,11 @@ export function ModelSelectorDrawer({
     ),
   }));
 
+  const labelPulseStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(labelPulse.value, [0, 1], [1, 0.6]),
+    transform: [{ scale: interpolate(labelPulse.value, [0, 1], [1, 1.1]) }],
+  }));
+
   const tabs = sources.map((source) => {
     const active = source.key === browsedSource?.key;
     return (
@@ -887,7 +907,8 @@ export function ModelSelectorDrawer({
               <View
                 style={[
                   styles.optionsList,
-                  rowHeight > 0 && { height: displayModels.length * rowStride },
+                  //last row gap is not space
+                  rowHeight > 0 && { height: displayModels.length * rowStride - ROW_GAP },
                 ]}
               >
                 <View style={{ height: firstRow * rowStride }} />
@@ -906,13 +927,15 @@ export function ModelSelectorDrawer({
                 {pillShown && (
                   <GestureDetector gesture={pillPan}>
                     <Reanimated.View style={[styles.pill, pillAnimatedStyle]}>
-                      <Text
-                        style={[styles.optionText, styles.optionTextSelected]}
-                        numberOfLines={1}
-                      >
-                        {displayName(displayModels[activeIndex])}
-                      </Text>
-                      <Capabilities caps={capsOf(displayModels[activeIndex])} onPrimary />
+                      <Reanimated.View style={[styles.pillContent, labelPulseStyle]}>
+                        <Text
+                          style={[styles.optionText, styles.optionTextSelected]}
+                          numberOfLines={1}
+                        >
+                          {displayName(displayModels[activeIndex])}
+                        </Text>
+                        <Capabilities caps={capsOf(displayModels[activeIndex])} onPrimary />
+                      </Reanimated.View>
                     </Reanimated.View>
                   </GestureDetector>
                 )}
@@ -952,7 +975,7 @@ export function ModelSelectorDrawer({
       <View style={styles.desktopModels}>{modelsContent}</View>
     </View>
   ) : (
-    <View style={styles.sheetInner}>
+    <SheetScrollView contentContainerStyle={styles.sheetInner} nestedScrollEnabled keyboardShouldPersistTaps="handled">
       <ScrollView
         ref={tabsScrollRef}
         onLayout={(e) => {
@@ -972,7 +995,7 @@ export function ModelSelectorDrawer({
         {tabs}
       </ScrollView>
       {modelsContent}
-    </View>
+    </SheetScrollView>
   );
 
   //card hangs under its trigger
@@ -1003,7 +1026,6 @@ export function ModelSelectorDrawer({
         hideScrim={hideScrim}
         sheetStyle={[
           styles.mobileSheet,
-          { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + insets.bottom },
         ]}
         desktopStyle={
           isDesktop ? styles.centeredCard : [styles.anchoredCard, anchoredStyle]
@@ -1105,6 +1127,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     desktopModels: {
       flex: 1,
+      gap: Spacing.lg2,
     },
     mobileSheet: {
       position: "absolute",
@@ -1131,11 +1154,11 @@ const makeStyles = (Colors: ThemeColors) =>
       backgroundColor: Colors.textMuted,
     },
     sheetInner: {
-      width: "100%",
+      paddingBottom: Spacing.lg,
+      gap: Spacing.lg2,
     },
     tabsScroll: {
       flexGrow: 0,
-      marginBottom: Spacing.lg2,
     },
     tabsRow: {
       flexDirection: "row",
@@ -1162,7 +1185,6 @@ const makeStyles = (Colors: ThemeColors) =>
       borderRadius: Radius.xxl + Spacing.md,
       borderWidth: 0,
       padding: Spacing.md,
-      marginBottom: Spacing.lg2,
     },
     modelsBox: {
       borderWidth: 2,
@@ -1208,6 +1230,11 @@ const makeStyles = (Colors: ThemeColors) =>
       borderRadius: Radius.md,
       borderWidth: 2,
       borderColor: Colors.borderOnPrimary,
+    },
+    pillContent: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
     },
     option: {
       flexDirection: "row",
@@ -1255,7 +1282,6 @@ const makeStyles = (Colors: ThemeColors) =>
     downloadProgressRow: {
       padding: 0,
       paddingVertical: Spacing.xs,
-      marginBottom: 0,
     },
     tokenMaxLabel: {
       fontFamily: Fonts.mono,

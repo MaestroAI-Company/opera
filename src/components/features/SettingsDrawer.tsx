@@ -145,7 +145,10 @@ import {
   pushDesktopOverlayConfig,
 } from "../../services/overlay/desktopOverlay";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
-import { openScreenSaverSettings } from "../../services/screensaver/ScreenSaver";
+import {
+  isScreenSaverActive,
+  openScreenSaverSettings,
+} from "../../services/screensaver/ScreenSaver";
 import { AppSettings, Settings } from "../../services/settings/SettingsService";
 import { TTS_SPEEDS } from "../../services/speech/engines";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
@@ -235,6 +238,7 @@ const cloudIcon = require("../../../assets/icons/cloud.png");
 const ollamaIcon = require("../../../assets/icons/ollama.png");
 const phoneIcon = require("../../../assets/icons/phone.png");
 const sampler2Icon = require("../../../assets/icons/sampler2.png");
+const samplerNavIcon = require("../../../assets/icons/sampler.png");
 const cloudUploadIcon = require("../../../assets/icons/cloudupload.png");
 const cloudDownloadIcon = require("../../../assets/icons/clouddownload.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
@@ -337,6 +341,8 @@ export type SubPage =
   | "tools"
   | "profile"
   | "cloud"
+  | "syncchoices"
+  | "datamanagement"
   | "hubprovider"
   | "mcpservers"
   | "mcpserver"
@@ -360,6 +366,8 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   tools: "main",
   profile: "main",
   cloud: "main",
+  syncchoices: "cloud",
+  datamanagement: "cloud",
   hubprovider: "service",
   sociallinks: "main",
   mcpservers: "tools",
@@ -704,7 +712,7 @@ const ModelToggleList = memo(function ModelToggleList({
   const visible = shown.slice(0, limit);
 
   return (
-    <View style={[styles.contentCard, style]}>
+    <View style={[styles.sheetCard, style]}>
       <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
         <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
           {models.length > 0
@@ -1368,6 +1376,23 @@ export default function SettingsDrawer({
     });
     return () => sub.remove();
   }, [visible, activeSubPage, refreshAssistantStatus]);
+
+  //hides the open settings card once opera is the screen saver
+  const [screenSaverActive, setScreenSaverActive] = useState(false);
+
+  const refreshScreenSaverStatus = useCallback(() => {
+    isScreenSaverActive().then(setScreenSaverActive);
+  }, []);
+
+  //recheck after returning from system settings
+  useEffect(() => {
+    if (!visible || activeSubPage !== "screensaver") return;
+    refreshScreenSaverStatus();
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") refreshScreenSaverStatus();
+    });
+    return () => sub.remove();
+  }, [visible, activeSubPage, refreshScreenSaverStatus]);
 
   const renderPermissionBadge = (status: PermissionState) => (
     <View
@@ -3374,7 +3399,7 @@ export default function SettingsDrawer({
         },
         {
           page: "service",
-          icon: linkIcon,
+          icon: samplerNavIcon,
           label: t("settings.nav.service.title"),
         },
         { page: "tools", icon: toolIcon, label: t("settings.nav.tools.title") },
@@ -3541,7 +3566,7 @@ export default function SettingsDrawer({
         >
           <View style={styles.menuIconWrap}>
             <Image
-              source={linkIcon}
+              source={samplerNavIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
             />
@@ -3826,6 +3851,20 @@ export default function SettingsDrawer({
           </Group>
         </View>
 
+        <View style={styles.settingRowVertical}>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.privacy.remoteImages")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.privacy.remoteImagesHelp")}
+              </Text>
+            </View>
+            <Toggle checked={showRemoteImages} onToggle={setShowRemoteImages} />
+          </View>
+        </View>
+
         <View
           style={[styles.settingRowVertical, !isTauri && { marginBottom: 0 }]}
         >
@@ -3908,7 +3947,7 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.nav.screenSaver.title"))}
 
       {/* screen saver settings card */}
-      {Platform.OS === "android" && (
+      {Platform.OS === "android" && !screenSaverActive && (
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>
@@ -3919,7 +3958,7 @@ export default function SettingsDrawer({
             </Text>
             <Group>
               <ActionButton
-                icon={advancedIcon}
+                icon={hyperlinkIcon}
                 label={t("settings.screenSaver.open")}
                 onPress={openScreenSaverSettings}
               />
@@ -4236,7 +4275,7 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.nav.overlay.title"))}
 
       {/* default assistant card */}
-      {assistantStatus !== null && (
+      {assistantStatus === false && (
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>
@@ -4260,7 +4299,7 @@ export default function SettingsDrawer({
             {!assistantStatus && (
               <Group>
                 <ActionButton
-                  icon={operaIcon}
+                  icon={hyperlinkIcon}
                   label={t("settings.overlay.setDefault")}
                   onPress={openAssistantSettings}
                 />
@@ -4389,28 +4428,8 @@ export default function SettingsDrawer({
   );
 
   // cloud subpage
-  const renderCloudSubPage = () => {
-    const cloudDef = getCloudProviderDefinition(cloudProvider);
-    //details only once a backup went up
-    const cloudRows =
-      hasSyncPin && lastSyncTime
-        ? [
-            {
-              label: cloudBackupMode
-                ? t("cloudSync.lastBackup")
-                : t("cloudSync.lastSynced"),
-              value: new Date(lastSyncTime).toLocaleString(),
-            },
-            ...(lastSyncSize != null
-              ? [
-                  {
-                    label: t("cloudSync.backupSize"),
-                    value: formatBytes(lastSyncSize),
-                  },
-                ]
-              : []),
-          ]
-        : [];
+  //sync choices subpage content
+  const renderSyncChoicesSubPage = () => {
     const viaHub = syncAccount === HUB_SYNC_ID;
     //providers only travel through the hub
     const syncRows = [
@@ -4438,6 +4457,89 @@ export default function SettingsDrawer({
       },
     ] as const;
 
+    return (
+      <View style={styles.subPageContainer}>
+        {renderSubPageHeader(t("settings.nav.syncChoices.title"))}
+
+        {/* sync choices card */}
+        {syncAccount !== "none" && syncPrefs && (
+          <View style={styles.contentCard}>
+            {syncRows.map((row, index) => {
+              const locked = row.hubOnly && !viaHub;
+              return renderHubToggle(
+                row.label,
+                row.help,
+                !locked && syncPrefs[row.key],
+                (value) => setSyncPref(row.key, value),
+                index === syncRows.length - 1,
+                locked,
+              );
+            })}
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  //data management subpage content
+  const renderDataManagementSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader(t("settings.data.management"))}
+
+      {/* data management card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>
+            {t("settings.data.management")}
+          </Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.data.managementHelp")}
+          </Text>
+
+          <Group>
+            <ActionButton
+              icon={exportIcon}
+              label={t("settings.data.exportAction")}
+              onPress={handleExportData}
+            />
+            <ActionButton
+              icon={downloadIcon}
+              label={t("settings.data.importAction")}
+              onPress={handleImportData}
+            />
+            <ActionButton
+              icon={binIcon}
+              label={t("settings.data.deleteAllAction")}
+              onPress={handleDeleteAllConversations}
+            />
+          </Group>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderCloudSubPage = () => {
+    const cloudDef = getCloudProviderDefinition(cloudProvider);
+    //details only once a backup went up
+    const cloudRows =
+      hasSyncPin && lastSyncTime
+        ? [
+            {
+              label: cloudBackupMode
+                ? t("cloudSync.lastBackup")
+                : t("cloudSync.lastSynced"),
+              value: new Date(lastSyncTime).toLocaleString(),
+            },
+            ...(lastSyncSize != null
+              ? [
+                  {
+                    label: t("cloudSync.backupSize"),
+                    value: formatBytes(lastSyncSize),
+                  },
+                ]
+              : []),
+          ]
+        : [];
     //the linked cloud, for sync or backup
     const accountCard = cloudDef && cloudUserInfo && (
       <View style={styles.contentCard}>
@@ -4551,8 +4653,13 @@ export default function SettingsDrawer({
       <View style={styles.subPageContainer}>
         {renderSubPageHeader(t("settings.nav.cloud.title"))}
 
-        {/* sync account card */}
-        <View style={styles.contentCard}>
+        {/* sync account card, red while a sync account is active */}
+        <View
+          style={[
+            styles.contentCard,
+            syncAccount !== "none" && styles.activeCard,
+          ]}
+        >
           <View
             style={[
               styles.settingRowVertical,
@@ -4563,6 +4670,7 @@ export default function SettingsDrawer({
             <Text
               style={[
                 styles.settingLabel,
+                syncAccount !== "none" && styles.activeLabel,
                 isWide
                   ? styles.toggleGroupContent
                   : { marginBottom: Spacing.md },
@@ -4583,23 +4691,6 @@ export default function SettingsDrawer({
         </View>
 
         {!cloudBackupMode && accountCard}
-
-        {/* sync choices card */}
-        {syncAccount !== "none" && syncPrefs && (
-          <View style={styles.contentCard}>
-            {syncRows.map((row, index) => {
-              const locked = row.hubOnly && !viaHub;
-              return renderHubToggle(
-                row.label,
-                row.help,
-                !locked && syncPrefs[row.key],
-                (value) => setSyncPref(row.key, value),
-                index === syncRows.length - 1,
-                locked,
-              );
-            })}
-          </View>
-        )}
 
         {/* daily profile backup while sampler syncs */}
         {syncAccount === HUB_SYNC_ID && (
@@ -4636,6 +4727,22 @@ export default function SettingsDrawer({
           </View>
         )}
         {cloudBackupMode && accountCard}
+
+        {/* navigation to sync choices and data management */}
+        <Group style={styles.groupSpacing}>
+          {syncAccount !== "none" &&
+            syncPrefs &&
+            renderToolsNavRow(
+              "syncchoices",
+              t("settings.nav.syncChoices.title"),
+              t("settings.nav.syncChoices.subtitle"),
+            )}
+          {renderToolsNavRow(
+            "datamanagement",
+            t("settings.data.management"),
+            t("settings.nav.dataManagement.subtitle"),
+          )}
+        </Group>
       </View>
     );
   };
@@ -4695,10 +4802,12 @@ export default function SettingsDrawer({
     help: string,
     //one server of the provider instead of all of it
     server?: { checked: boolean; onToggle: (v: boolean) => void },
+    //sheets pass the card without margin
+    card: StyleProp<ViewStyle> = styles.contentCard,
   ) => {
     const list = typeof ids === "string" ? [ids] : ids;
     return (
-      <View style={styles.contentCard}>
+      <View style={card}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>
@@ -4893,11 +5002,12 @@ export default function SettingsDrawer({
           serverSwitch(HUB_PROVIDER_ID, server, (disabled) =>
             patchHubServerPrefs(url, { disabled }),
           ),
+          styles.sheetCard,
         )}
 
         {/* llama.cpp options, set in the sampler screen */}
         {url === LLAMA_SERVER_URL && hubStatus?.ctxSize != null && (
-          <View style={styles.contentCard}>
+          <View style={styles.sheetCard}>
             <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
               <Text style={styles.settingLabel}>
                 {t("sampler.model.title")}
@@ -4943,7 +5053,7 @@ export default function SettingsDrawer({
 
         {/* tuning card for ollama only */}
         {server.kind === "ollama" && (
-          <View style={styles.contentCard}>
+          <View style={styles.sheetCard}>
             <View
               style={[
                 styles.settingRowVertical,
@@ -5042,16 +5152,11 @@ export default function SettingsDrawer({
           onCapabilitiesChange={(next) =>
             patchHubServerPrefs(url, { capabilities: next })
           }
-          style={
-            ollamaModelsLoading || ollamaModels.length > 0
-              ? { marginBottom: 0 }
-              : undefined
-          }
         />
 
         {/* actions section */}
         {!ollamaModelsLoading && ollamaModels.length === 0 && (
-          <View style={[styles.contentCard, { marginBottom: 0 }]}>
+          <View style={styles.sheetCard}>
             <Group>
               <ActionButton
                 icon={reconnectIcon}
@@ -5076,9 +5181,11 @@ export default function SettingsDrawer({
             ? "settings.service.litertHelp"
             : "settings.service.localHelp",
         ),
+        undefined,
+        styles.sheetCard,
       )}
 
-      <View style={styles.contentCard}>
+      <View style={styles.sheetCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={styles.settingLabel}>
             {t("settings.litert.modelTitle")}
@@ -5145,7 +5252,7 @@ export default function SettingsDrawer({
       </View>
 
       {litertSupported && (
-        <View style={styles.contentCard}>
+        <View style={styles.sheetCard}>
           <View
             style={[
               styles.settingRowVertical,
@@ -5436,52 +5543,6 @@ export default function SettingsDrawer({
           </Group>
         </View>
       </View>
-
-      <View style={styles.contentCard}>
-        <View style={styles.settingRowVertical}>
-          <View style={styles.toggleGroupRow}>
-            <View style={styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>
-                {t("settings.privacy.remoteImages")}
-              </Text>
-              <Text style={styles.helpText}>
-                {t("settings.privacy.remoteImagesHelp")}
-              </Text>
-            </View>
-            <Toggle checked={showRemoteImages} onToggle={setShowRemoteImages} />
-          </View>
-        </View>
-      </View>
-
-      {/* data management card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>
-            {t("settings.data.management")}
-          </Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.data.managementHelp")}
-          </Text>
-
-          <Group>
-            <ActionButton
-              icon={exportIcon}
-              label={t("settings.data.exportAction")}
-              onPress={handleExportData}
-            />
-            <ActionButton
-              icon={downloadIcon}
-              label={t("settings.data.importAction")}
-              onPress={handleImportData}
-            />
-            <ActionButton
-              icon={binIcon}
-              label={t("settings.data.deleteAllAction")}
-              onPress={handleDeleteAllConversations}
-            />
-          </Group>
-        </View>
-      </View>
     </View>
   );
 
@@ -5716,6 +5777,10 @@ export default function SettingsDrawer({
         return renderOpenAISubPage();
       case "confidentiality":
         return renderConfidentialitySubPage();
+      case "syncchoices":
+        return renderSyncChoicesSubPage();
+      case "datamanagement":
+        return renderDataManagementSubPage();
       case "advanced":
         return renderAdvancedSubPage();
       case "reports":
@@ -5987,7 +6052,7 @@ export default function SettingsDrawer({
 
     return (
       <>
-        <View style={styles.contentCard}>
+        <View style={styles.sheetCard}>
           <View style={styles.litertDetailHeader}>
             <View style={styles.litertDetailTile}>
               <Image
@@ -6055,7 +6120,7 @@ export default function SettingsDrawer({
         </View>
 
         {sections.length > 0 && (
-          <View style={[styles.contentCard, styles.litertFamilies]}>
+          <View style={[styles.sheetCard, styles.litertFamilies]}>
             {sections.map((section) => (
               <View key={section.title}>
                 <Text style={[styles.settingLabel, styles.litertFamilyTitle]}>
@@ -6147,7 +6212,7 @@ export default function SettingsDrawer({
         scrollEventThrottle={16}
       >
         {page === "browse" ? (
-          <View style={styles.contentCard}>
+          <View style={styles.sheetCard}>
             <View style={styles.settingRowVertical}>
               {renderLitertSearchField(page)}
             </View>
@@ -6155,13 +6220,13 @@ export default function SettingsDrawer({
           </View>
         ) : (
           <>
-            <View style={[styles.contentCard, styles.litertSearchWithBack]}>
+            <View style={[styles.sheetCard, styles.litertSearchWithBack]}>
               {renderLitertSearchField(page)}
             </View>
             {page === "model"
               ? renderLitertDetail()
               : litertSearchList && (
-                  <View style={styles.contentCard}>{litertSearchList}</View>
+                  <View style={styles.sheetCard}>{litertSearchList}</View>
                 )}
           </>
         )}
@@ -6193,7 +6258,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -6221,7 +6285,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           //stacked pages cannot size the sheet
           height: sheetMaxHeight,
         },
@@ -6260,7 +6323,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -6270,7 +6332,7 @@ export default function SettingsDrawer({
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={[styles.contentCard, { marginBottom: 0 }]}>
+        <View style={styles.sheetCard}>
           <View style={styles.settingRowVertical}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
               {t("settings.server.name")}
@@ -6366,7 +6428,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -6387,8 +6448,9 @@ export default function SettingsDrawer({
               serverSwitch("ollama", ollamaDetailServer, (disabled) =>
                 patchOllamaServer(shownOllamaIndex, { disabled }),
               ),
+              styles.sheetCard,
             )}
-            <View style={styles.contentCard}>
+            <View style={styles.sheetCard}>
               <View style={styles.settingRowVertical}>
                 <Text
                   style={[styles.settingLabel, { marginBottom: Spacing.md }]}
@@ -6555,7 +6617,7 @@ export default function SettingsDrawer({
               }
             />
 
-            <View style={[styles.contentCard, { marginBottom: 0 }]}>
+            <View style={styles.sheetCard}>
               <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
                 <Group>
                   {!ollamaDetailConnected && (
@@ -6601,7 +6663,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -6678,8 +6739,9 @@ export default function SettingsDrawer({
               serverSwitch(OPENAI_PROVIDER_ID, server, (disabled) =>
                 patchOpenAIServer(index, { disabled }),
               ),
+              styles.sheetCard,
             )}
-            <View style={styles.contentCard}>
+            <View style={styles.sheetCard}>
               <View style={styles.settingRowVertical}>
                 <Text
                   style={[styles.settingLabel, { marginBottom: Spacing.md }]}
@@ -6767,7 +6829,7 @@ export default function SettingsDrawer({
               onOpenSearch={openOpenAISearch}
             />
 
-            <View style={[styles.contentCard, { marginBottom: 0 }]}>
+            <View style={styles.sheetCard}>
               <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
                 <Group>
                   {!openaiDetailConnected && (
@@ -6803,7 +6865,7 @@ export default function SettingsDrawer({
             }
             scrollEventThrottle={16}
           >
-            <View style={[styles.contentCard, styles.litertSearchWithBack]}>
+            <View style={[styles.sheetCard, styles.litertSearchWithBack]}>
               {renderOpenAISearchField(page)}
             </View>
             {page === "list" ? (
@@ -6824,7 +6886,7 @@ export default function SettingsDrawer({
               />
             ) : (
               model && (
-                <View style={styles.contentCard}>
+                <View style={styles.sheetCard}>
                   <View style={styles.toggleGroupRow}>
                     <View
                       style={[styles.toggleGroupContent, styles.cloudModelText]}
@@ -6906,7 +6968,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           height: sheetMaxHeight,
         },
       ]}
@@ -6943,7 +7004,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -6953,7 +7013,7 @@ export default function SettingsDrawer({
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={[styles.contentCard, { marginBottom: 0 }]}>
+        <View style={styles.sheetCard}>
           <View style={styles.settingRowVertical}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
               {t("settings.server.name")}
@@ -7046,7 +7106,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -7058,7 +7117,7 @@ export default function SettingsDrawer({
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={[styles.contentCard, { marginBottom: 0 }]}>
+        <View style={styles.sheetCard}>
           <View style={styles.settingRowVertical}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
               {t("settings.server.name")}
@@ -7194,7 +7253,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -7214,7 +7272,7 @@ export default function SettingsDrawer({
               contentContainerStyle={styles.addModelSheetContent}
               keyboardShouldPersistTaps="handled"
             >
-              <View style={styles.contentCard}>
+              <View style={styles.sheetCard}>
                 <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
                   <Text style={styles.settingLabel}>{server.name}</Text>
                   <Text
@@ -7229,7 +7287,7 @@ export default function SettingsDrawer({
               </View>
 
               {tools.length > 0 && (
-                <View style={styles.contentCard}>
+                <View style={styles.sheetCard}>
                   <View
                     style={[styles.settingRowVertical, { marginBottom: 0 }]}
                   >
@@ -7289,7 +7347,7 @@ export default function SettingsDrawer({
               )}
 
               {!hosted && (
-                <View style={styles.contentCard}>
+                <View style={styles.sheetCard}>
                   <View style={styles.settingRowVertical}>
                     <Text
                       style={[
@@ -7413,7 +7471,7 @@ export default function SettingsDrawer({
               )}
 
               {(!hosted || status.state !== "connected") && (
-                <View style={[styles.contentCard, { marginBottom: 0 }]}>
+                <View style={styles.sheetCard}>
                   <View
                     style={[styles.settingRowVertical, { marginBottom: 0 }]}
                   >
@@ -7467,7 +7525,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -7477,7 +7534,7 @@ export default function SettingsDrawer({
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.contentCard}>
+        <View style={styles.sheetCard}>
           {CloudSetup && (
             <CloudSetup
               onDone={() => {
@@ -7503,7 +7560,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -7515,7 +7571,7 @@ export default function SettingsDrawer({
             contentContainerStyle={styles.addModelSheetContent}
             keyboardShouldPersistTaps="handled"
           >
-            <View style={styles.contentCard}>
+            <View style={styles.sheetCard}>
               <Group style={styles.infoGroup}>
                 <ActionButton
                   label={selectedLocalModel.label}
@@ -7625,7 +7681,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -7634,7 +7689,7 @@ export default function SettingsDrawer({
       {!!downloadingLitert && (
         <SheetBody style={styles.addModelSheetBody}>
           <SheetScrollView contentContainerStyle={styles.addModelSheetContent}>
-            <View style={styles.contentCard}>
+            <View style={styles.sheetCard}>
               <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
                 <Text
                   style={[styles.settingLabel, { marginBottom: Spacing.md }]}
@@ -7722,7 +7777,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -7734,7 +7788,7 @@ export default function SettingsDrawer({
             contentContainerStyle={styles.addModelSheetContent}
             keyboardShouldPersistTaps="handled"
           >
-            <View style={styles.contentCard}>
+            <View style={styles.sheetCard}>
               <View style={styles.litertDetailHeader}>
                 <View style={styles.litertDetailTile}>
                   <Image
@@ -7785,7 +7839,7 @@ export default function SettingsDrawer({
               </Text>
             </View>
 
-            <View style={styles.contentCard}>
+            <View style={styles.sheetCard}>
               <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
                 <Group>
                   <ActionButton
@@ -7826,7 +7880,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -7836,7 +7889,7 @@ export default function SettingsDrawer({
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.contentCard}>
+        <View style={styles.sheetCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
               {t("settings.profile.name")}
@@ -8149,6 +8202,13 @@ const makeStyles = (Colors: ThemeColors) =>
       padding: Spacing.md,
       marginBottom: Spacing.xxl2,
     },
+    //sheet sections, the sheet content spaces them
+    sheetCard: {
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
+      padding: Spacing.md,
+    },
     gradientTop: {
       position: "absolute",
       top: 0,
@@ -8368,6 +8428,7 @@ const makeStyles = (Colors: ThemeColors) =>
     addModelSheetContent: {
       paddingHorizontal: Spacing.lg2,
       paddingBottom: Spacing.lg,
+      gap: Spacing.xxl2,
     },
     groupSpacing: {
       marginBottom: Spacing.xxl,
@@ -8554,5 +8615,11 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     highlightGroupDisabled: {
       opacity: 0.5,
+    },
+    activeCard: {
+      backgroundColor: Colors.primary,
+    },
+    activeLabel: {
+      color: Colors.textOnPrimary,
     },
   });

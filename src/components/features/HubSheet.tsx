@@ -1,4 +1,4 @@
-import { Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
@@ -50,14 +50,13 @@ export default function HubSheet({
       sheetStyle={[
         styles.sheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: windowHeight - insets.top - Spacing.xl2,
         },
       ]}
       desktopStyle={styles.desktopCard}
     >
       <SheetScrollView contentContainerStyle={styles.content}>
-        <View style={[styles.contentCard, !canStop && { marginBottom: 0 }]}>
+        <View style={styles.contentCard}>
           <Group style={styles.infoGroup}>
             {rows.map((row) => (
               <ActionButton
@@ -74,7 +73,7 @@ export default function HubSheet({
         </View>
 
         {canStop && (
-          <View style={[styles.contentCard, { marginBottom: 0 }]}>
+          <View style={styles.contentCard}>
             <Group>
               <ActionButton
                 icon={cancelIcon}
@@ -118,13 +117,13 @@ const makeStyles = (Colors: ThemeColors) =>
     content: {
       paddingHorizontal: Spacing.lg2,
       paddingBottom: Spacing.lg,
+      gap: Spacing.xxl2,
     },
     contentCard: {
       backgroundColor: Colors.surface,
       borderRadius: Radius.xxl + Spacing.md,
       borderWidth: 0,
       padding: Spacing.md,
-      marginBottom: Spacing.xxl2,
     },
     infoGroup: {
       borderWidth: 0,

@@ -125,7 +125,7 @@ export function HubModelPage({ file, onDeleted }: { file: string; onDeleted: () 
 
   return (
     <>
-      <View style={styles.contentCard}>
+      <View style={styles.sheetCard}>
         <View style={styles.detailHeader}>
           <View style={styles.detailTile}>
             <Image source={{ uri: hubModelAvatar(name, repo) }} style={styles.tileImage} />
@@ -153,7 +153,7 @@ export function HubModelPage({ file, onDeleted }: { file: string; onDeleted: () 
       </View>
 
       {/* actions section */}
-      <View style={[styles.contentCard, { marginBottom: 0 }]}>
+      <View style={styles.sheetCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           {!!error && <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{error}</Text>}
           <Group>
@@ -190,6 +190,12 @@ const makeStyles = (Colors: ThemeColors) =>
       borderWidth: 0,
       padding: Spacing.md,
       marginBottom: Spacing.xxl2,
+    },
+    sheetCard: {
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
+      padding: Spacing.md,
     },
     settingRowVertical: {
       marginBottom: Spacing.xxl,

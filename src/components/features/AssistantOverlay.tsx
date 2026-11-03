@@ -5,12 +5,14 @@ import {
   AppState,
   BackHandler,
   DeviceEventEmitter,
+  Image,
   ImageSourcePropType,
   Keyboard,
   Linking,
   Platform,
   Pressable,
   StyleSheet,
+  Text,
   Vibration,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -18,7 +20,9 @@ import { KeyboardAvoidingView, KeyboardProvider, useGenericKeyboardHandler } fro
 import Reanimated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
-import { Colors } from '../../../constants/theme';
+import { Colors, DarkColors, Fonts, FontSizes, Radius, Spacing } from '../../../constants/theme';
+import { useColors } from '../../hooks/useTheme';
+import { pressStyle } from '../ui/pressStyle';
 import { AIModule } from '../../services/ai/AIModule';
 import { getOllamaTuning, migrateModelSources } from '../../services/ai/providers/sources';
 import { buildSystemPrompt, screenContextSegment } from '../../services/ai/generation/chatGeneration';
@@ -39,7 +43,7 @@ import VoicePackHost from './VoicePackHost';
 import AttachmentSheet, { useAttachments } from './AttachmentSheet';
 import ChatBar, { ChatBarHandle } from './ChatBar';
 import ChatView from './ChatView';
-import { ModelSelectorDrawer, ModelSelectorTrigger } from './ModelSelector';
+import { displayName, ModelSelectorDrawer, truncateModel } from './ModelSelector';
 import SelectionLayer from './SelectionLayer';
 import TextLayer from './TextLayer';
 
@@ -62,6 +66,8 @@ import '../../services/widgets/registerWidgets';
 const BAR_ENTRY = 120;
 //thickness of the activation rim
 const HALO_SIZE = 88;
+const nextIcon = require('../../../assets/icons/right.png');
+const chatIcon = require('../../../assets/icons/message.png');
 const assistantInfoImage = require('../../../assets/images/ImageCard/AssistantInfo.png');
 
 //the router layout never mounts here
@@ -86,6 +92,7 @@ export default function AssistantOverlayWrapper() {
 function AssistantOverlay() {
   const t = useT();
   const insets = useSafeAreaInsets();
+  const themeColors = useColors();
   const { isLargeScreen } = useResponsive();
 
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
@@ -883,11 +890,21 @@ function AssistantOverlay() {
                   canThink={modelCapabilities.includes('thinking') && selectedReflection !== 'none'}
                   dark={true}
                   alignBottom={true}
-                  onOpenInApp={(item) => openConversationInApp(item.conversationId)}
                   suggestions={suggestions && lastMsg && suggestions.msgId === lastMsg.id ? suggestions.items : undefined}
                   onSuggestionPress={handleSend}
                 />
               </LinearGradient>
+              {lastMsg && (
+                <Pressable
+                  onPress={() => openConversationInApp(lastMsg.conversationId)}
+                  style={pressStyle([styles.floatingButton, {
+                    top: insets.top + 16,
+                    backgroundColor: themeColors.surface,
+                    boxShadow: `-4px 4px 0px ${themeColors.shadowInk}, 0px 8px 20px rgba(0,0,0,0.35)`,
+                  }], 'surface')}>
+                  <Image source={chatIcon} style={styles.floatingIcon} tintColor={themeColors.textPrimary} />
+                </Pressable>
+              )}
             </Animated.View>
           )}
 
@@ -896,13 +913,17 @@ function AssistantOverlay() {
             style={[styles.topBar, { paddingTop: insets.top + 16, transform: [{ translateY: topBarEntry }] }, isDrawingSelection && styles.hiddenBar]}
             pointerEvents={isDrawingSelection ? 'none' : 'box-none'}
           >
-            <ModelSelectorTrigger
-              selectedModel={selectedModel}
+            <Pressable
+              style={styles.modelInfoRow}
               onPress={() => {
                 Keyboard.dismiss();
                 setModelSelectorVisible(v => !v);
-              }}
-            />
+              }}>
+              <Text style={styles.modelInfoText} numberOfLines={1}>
+                {truncateModel(selectedModel ? displayName(selectedModel) : t('modelSelector.none'))}
+              </Text>
+              <Image source={nextIcon} style={styles.modelInfoArrow} resizeMode="contain" tintColor={DarkColors.textSecondary} />
+            </Pressable>
           </Animated.View>
 
           <Reanimated.View
@@ -956,7 +977,6 @@ function AssistantOverlay() {
           onSelectRecentPhoto={attachments.toggleRecentPhoto}
           onLongPressRecentPhoto={attachments.toggleRecentPhoto}
           isLargeScreen={isLargeScreen}
-          bottomInset={insets.bottom}
         />
 
         <NotificationModal
@@ -1061,6 +1081,39 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
     zIndex: 10,
+  },
+  //same as the home screen, fixed light for the dark scrim
+  modelInfoRow: {
+    //same height as the open chat button
+    height: 44,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+  },
+  modelInfoText: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.bodyMd,
+    color: DarkColors.textSecondary,
+  },
+  modelInfoArrow: {
+    width: 14,
+    height: 14,
+    transform: [{ rotate: '90deg' }],
+  },
+  floatingButton: {
+    position: 'absolute',
+    right: Spacing.lg2,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: Radius.window,
+    justifyContent: 'center',
+    alignItems: 'center',
+  } as any,
+  floatingIcon: {
+    width: 18,
+    height: 18,
   },
   bottomBarOverlay: {
     position: 'absolute',

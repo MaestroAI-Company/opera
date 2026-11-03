@@ -337,9 +337,7 @@ export const fr: Translations = {
   "settings.hub.unpairTitle": "Désappairer cet appareil ?",
   "settings.hub.unpairMessage": "Opera arrête de se synchroniser avec {name}.",
   "hubPairing.scan": "Scanner le QR code",
-  "hubPairing.help": "Sur votre appareil Sampler, scannez le QR code.",
   "hubPairing.pairing": "Appairage...",
-  "hubPairing.cameraHelp": "Opera a besoin de la caméra pour scanner le code d'appairage.",
   "hubPairing.allowCamera": "Autoriser la caméra",
   "hubPairing.error.InvalidLink": "Ce QR code n'est pas un code d'appairage Sampler.",
   "hubPairing.error.PairingRejected": "Ce code a déjà servi ou a été remplacé. Affichez-en un nouveau sur Sampler Hub.",
@@ -638,9 +636,12 @@ export const fr: Translations = {
   "settings.nav.overlay.subtitle": "Voix, contexte de l'écran",
   "settings.nav.maestroPreferences.title": "Préférences",
   "settings.nav.maestroPreferences.subtitle": "Instructions, lecture automatique",
+  "settings.nav.syncChoices.title": "Choix de sync",
+  "settings.nav.syncChoices.subtitle": "Discussions, réglages et providers",
+  "settings.nav.dataManagement.subtitle": "Exporter, importer et supprimer les discussions",
   "settings.nav.screenSaver.title": "Standby",
   "settings.nav.screenSaver.subtitle": "Écran connecté sur le dock, mot de réveil",
-  "settings.nav.service.title": "Service",
+  "settings.nav.service.title": "Providers",
   "settings.nav.service.subtitle": "Service IA, serveur Ollama",
   "settings.nav.tools.title": "Outils",
   "settings.nav.tools.subtitle":
@@ -657,8 +658,7 @@ export const fr: Translations = {
   "settings.nav.info.subtitle": "Version de l'app, Github, Instagram, TikTok",
   "settings.screenSaver.help":
     "Pose ton téléphone sur son dock ou en charge : Opera le transforme en écran connecté, avec l'heure et Maestro à la voix. Pour l'activer, choisis Opera comme écran de veille dans les réglages Android.",
-  "settings.screenSaver.open":
-    "Ouvrir les réglages de l'écran de veille",
+  "settings.screenSaver.open": "Ouvrir les réglages",
   "settings.screenSaver.antiBurnIn": "Anti burn-in",
   "settings.screenSaver.antiBurnInHelp":
     "Déplace l'horloge et les papillons de quelques pixels chaque minute pour protéger les écrans OLED.",
@@ -975,9 +975,9 @@ export const fr: Translations = {
     "Opera a besoin de quelques autorisations pour fonctionner au mieux. Tu peux les gérer dans les paramètres de site de ton navigateur.",
   "settings.privacy.permissionsNative":
     "Opera a besoin de quelques autorisations pour fonctionner au mieux. Tu peux les modifier dans les réglages de ton appareil.",
-  "settings.privacy.remoteImages": "Toujours afficher les images distantes",
+  "settings.privacy.remoteImages": "Charger les images distantes",
   "settings.privacy.remoteImagesHelp":
-    "Les images provenant d'URLs externes se chargent automatiquement. Charger une image distante permet au serveur externe de connaître ton adresse IP. Désactive cette option pour être averti avant l'affichage de chaque image.",
+    "Les images de serveurs externes se chargent automatiquement. Le serveur peut voir ton adresse IP.",
 
   "settings.data.management": "Gestion des données",
   "settings.data.managementHelp":

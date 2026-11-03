@@ -1,6 +1,6 @@
 import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useState } from "react";
-import { Platform, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { SvgXml } from "react-native-svg";
 import {
   Fonts,
@@ -148,7 +148,6 @@ export default function HubQrSheet({
       handleContainerStyle={styles.sheetHandleContainer}
       sheetStyle={[
         styles.sheet,
-        { paddingBottom: Platform.OS === "ios" ? 34 : 20 },
       ]}
       desktopStyle={styles.desktopCard}
     >

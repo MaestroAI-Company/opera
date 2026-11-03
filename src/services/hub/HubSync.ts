@@ -12,6 +12,7 @@ import {
   serializeServers,
   setHubProviders,
   setHubServerPrefs,
+  setHubTuning,
   setOpenAIApiKey,
 } from '../ai/providers/sources';
 import { DB } from '../db/DatabaseService';
@@ -258,6 +259,7 @@ class HubSyncImpl {
     if (!hub || !(await SamplerHub.getProfile())) return;
     await this.dropInjectedServers();
     await this.storeProviders(await SamplerHub.providers(hub), hub.name);
+    await this.refreshTuning(hub);
     await this.offerUpdate(hub);
     await this.matchProfile(hub);
     //a cloud sync account replaces sampler, a backup does not
@@ -296,6 +298,19 @@ class HubSyncImpl {
     const hub = await SamplerHub.getPairedHub();
     if (!hub) return;
     await this.storeProviders(await SamplerHub.providers(hub), hub.name);
+    await this.refreshTuning(hub);
+  }
+
+  //sync hub engine tuning
+  private async refreshTuning(hub: PairedHub): Promise<void> {
+    const status = await SamplerHub.status(hub).catch(() => null);
+    if (!status) return;
+    setHubTuning({ ctxSize: status.ctxSize ?? 0, keepAlive: status.keepAlive ?? 0 });
+    const { ollamaUrl } = Settings.getCached();
+    if (isHubUrl(ollamaUrl)) {
+      const tuning = getOllamaTuning(ollamaUrl);
+      AIModule.configure(ollamaUrl, tuning.contextLength, tuning.keepAlive);
+    }
   }
 
   private async storeProviders(providers: HubProvider[], hubName: string): Promise<void> {

@@ -43,7 +43,7 @@ import { AIModule } from "../../services/ai/AIModule";
 import { getLocalModelLabel, isLocalModel } from "../../services/ai/providers/LocalProvider";
 import { getLiteRTModelLabel, isLiteRTModel, subscribeLiteRTDownload } from "../../services/ai/providers/LiteRTProvider";
 import { getCachedModels, getLastModel, hydrateModelCache, setCachedModels, setLastModel } from "../../services/ai/providers/modelCache";
-import { buildSources, getOllamaTuning, ModelSource } from "../../services/ai/providers/sources";
+import { buildSources, getOllamaTuning, HUB_PROVIDER_ID, hubModelKeyOf, ModelSource, splitHubModelKey } from "../../services/ai/providers/sources";
 import { estimateContextTokens } from "../../services/ai/generation/chatGeneration";
 import { MessageMetrics } from "../../services/db/DatabaseService";
 import { AppEvents } from "../../services/events";
@@ -339,11 +339,24 @@ export function ModelSelectorDrawer({
     if (visible) setSourcesRevision((r) => r + 1);
   }, [visible]);
 
-  const sources = useMemo(
-    () => buildSources(localAvailable),
+  //group hub servers in single tab
+  const { sources, hubUrls } = useMemo(() => {
+    const all = buildSources(localAvailable);
+    const hub = all.filter((s) => s.service === HUB_PROVIDER_ID);
+    if (hub.length === 0) return { sources: all, hubUrls: [] };
+    const merged: ModelSource = { key: HUB_PROVIDER_ID, service: HUB_PROVIDER_ID, label: "Sampler Hub", url: "" };
+    return {
+      sources: [...all.filter((s) => s.service !== HUB_PROVIDER_ID), merged],
+      hubUrls: hub.map((s) => s.url),
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- revision tracks the settings behind buildSources
-    [localAvailable, sourcesRevision],
-  );
+  }, [localAvailable, sourcesRevision]);
+  const isHub = (source?: ModelSource) => source?.service === HUB_PROVIDER_ID;
+  //fetch callback stays stable
+  const hubUrlsRef = useRef(hubUrls);
+  useEffect(() => {
+    hubUrlsRef.current = hubUrls;
+  });
 
   //the source the app currently generates with, falls back to the first tab
   const matchesActive = (source?: ModelSource) =>
@@ -358,6 +371,20 @@ export function ModelSelectorDrawer({
   const browsedSource =
     sources.find((s) => s.key === browsedKey) ?? activeSource;
   const isBrowsingActive = matchesActive(browsedSource);
+  //match composite hub row key
+  const selectedRow =
+    isHub(browsedSource) && selectedModel ? hubModelKeyOf(ollamaUrl, selectedModel) : selectedModel;
+  //switch server when picking hub row
+  const pickRow = (source: ModelSource, row: string) => {
+    if (!isHub(source) || !row) {
+      if (!matchesActive(source)) onServiceChange(source.service, source.url);
+      onModelChange(row);
+      return;
+    }
+    const { url, model } = splitHubModelKey(row);
+    if (aiService !== source.service || url !== ollamaUrl) onServiceChange(source.service, url);
+    onModelChange(model);
+  };
 
   useEffect(() => {
     //active source changed under us, stop browsing an old tab
@@ -403,15 +430,27 @@ export function ModelSelectorDrawer({
     if (pendingKey.current !== key) return;
     applyModels(getCachedModels(key), key);
     try {
-      const available = await AIModule.isSourceAvailable(
-        source.service,
-        source.url,
+      const urls = isHub(source) ? hubUrlsRef.current : [source.url];
+      const lists = await Promise.all(
+        urls.map(async (url) => {
+          if (!isHub(source)) {
+            if (!(await AIModule.isSourceAvailable(source.service, url))) return null;
+            return AIModule.getModelsFor(source.service, url);
+          }
+          //isolate individual hub server failures
+          try {
+            if (!(await AIModule.isSourceAvailable(source.service, url))) return null;
+            const list = await AIModule.getModelsFor(source.service, url);
+            return list.map((m) => hubModelKeyOf(url, m));
+          } catch {
+            return null;
+          }
+        }),
       );
       if (pendingKey.current !== key) return;
+      const available = lists.some((list) => list !== null);
       setIsAvailable(available);
-      const fetched = available
-        ? await AIModule.getModelsFor(source.service, source.url)
-        : [];
+      const fetched = lists.flatMap((list) => list ?? []);
       if (pendingKey.current !== key) return;
       applyModels(fetched, key);
       //offline rows must not be cached
@@ -445,11 +484,11 @@ export function ModelSelectorDrawer({
     //rows stay with the browsed source
     if (shownKey.current !== browsedSource.key) return;
     if (models.length > 0) {
-      if (!selectedModel || !models.includes(selectedModel)) {
+      if (!selectedRow || !models.includes(selectedRow)) {
         const last = getLastModel(browsedSource.key);
-        onModelChange(models.includes(last) ? last : models[0]);
+        pickRow(browsedSource, models.includes(last) ? last : models[0]);
       } else {
-        setLastModel(browsedSource.key, selectedModel);
+        setLastModel(browsedSource.key, selectedRow);
       }
     } else if (selectedModel) {
       onModelChange("");
@@ -458,6 +497,7 @@ export function ModelSelectorDrawer({
   }, [
     models,
     selectedModel,
+    selectedRow,
     loading,
     hasFetched,
     isBrowsingActive,
@@ -490,10 +530,9 @@ export function ModelSelectorDrawer({
 
   const handleSelectModel = (model: string) => {
     const source = browsedSource;
-    if (source && !isBrowsingActive)
-      onServiceChange(source.service, source.url);
-    if (source) setLastModel(source.key, model);
-    onModelChange(model);
+    if (!source) return onModelChange(model);
+    setLastModel(source.key, model);
+    pickRow(source, model);
   };
 
   //ref keeps callback stable for memo
@@ -519,16 +558,23 @@ export function ModelSelectorDrawer({
     }
     setBrowsedKey(source.key);
     if (matchesActive(source)) return;
-    onServiceChange(source.service, source.url);
     const last = getLastModel(source.key);
+    if (isHub(source)) {
+      //default to first hub server
+      if (last) pickRow(source, last);
+      else onServiceChange(source.service, hubUrls[0]);
+      return;
+    }
+    onServiceChange(source.service, source.url);
     if (last) onModelChange(last);
   };
 
   //friendly label for local variants
   const displayName = (model: string) =>
-    isLocalModel(model) ? getLocalModelLabel(model, true)
-      : isLiteRTModel(model) ? getLiteRTModelLabel(model)
-        : model;
+    isHub(browsedSource) ? splitHubModelKey(model).model
+      : isLocalModel(model) ? getLocalModelLabel(model, true)
+        : isLiteRTModel(model) ? getLiteRTModelLabel(model)
+          : model;
 
   const displayModels = useMemo(() => {
     return [...models].sort((a, b) => a.localeCompare(b));
@@ -543,11 +589,12 @@ export function ModelSelectorDrawer({
     if (shownKey.current !== browsedSource.key) return;
     const source = browsedSource;
     Promise.all(
-      models.map((model) =>
-        AIModule.getModelCapabilitiesFor(source.service, source.url, model)
+      models.map((model) => {
+        const row = isHub(source) ? splitHubModelKey(model) : { url: source.url, model };
+        return AIModule.getModelCapabilitiesFor(source.service, row.url, row.model)
           .then((caps) => [`${source.key}:${model}`, caps] as const)
-          .catch(() => [`${source.key}:${model}`, [] as string[]] as const),
-      ),
+          .catch(() => [`${source.key}:${model}`, [] as string[]] as const);
+      }),
     ).then((entries) =>
       setCapabilities((prev) => ({ ...prev, ...Object.fromEntries(entries) })),
     );
@@ -576,7 +623,7 @@ export function ModelSelectorDrawer({
   const showTokenWindow = messages.length > 0 && contextWindow > 0;
 
   const selectedIndex = isBrowsingActive
-    ? displayModels.findIndex((m) => m === selectedModel)
+    ? displayModels.findIndex((m) => m === selectedRow)
     : -1;
 
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -918,7 +965,7 @@ export function ModelSelectorDrawer({
                     model={model}
                     label={displayName(model)}
                     caps={capsOf(model)}
-                    highlighted={!pillShown && isBrowsingActive && model === selectedModel}
+                    highlighted={!pillShown && isBrowsingActive && model === selectedRow}
                     height={rowHeight}
                     onSelect={handleRowSelect}
                     onRowLayout={handleRowLayout}

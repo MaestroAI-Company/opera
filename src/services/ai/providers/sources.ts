@@ -96,6 +96,20 @@ export function getHubServers(): (OllamaServer & { kind: HubProvider['kind']; pr
   });
 }
 
+//cached remote hub tuning options
+let hubTuning: { ctxSize: number; keepAlive: number } | null = null;
+
+export function setHubTuning(tuning: { ctxSize: number; keepAlive: number } | null): void {
+  hubTuning = tuning;
+}
+
+//composite key for hub models
+export const hubModelKeyOf = (url: string, model: string) => `${url}|${model}`;
+export const splitHubModelKey = (key: string) => {
+  const at = key.indexOf('|');
+  return { url: key.slice(0, at), model: key.slice(at + 1) };
+};
+
 export function hubProviderKind(url: string): HubProvider['kind'] {
   return getHubServers().find((s) => s.url === url.trim())?.kind ?? 'ollama';
 }
@@ -230,7 +244,15 @@ export function getPromptTierOverride(service: string, url: string, model: strin
 //undefined falls back to global
 export function getOllamaTuning(url: string): { contextLength: number; keepAlive: number } {
   const settings = Settings.getCached();
-  const server = [...getOllamaServers(), ...getHubServers()].find((s) => s.url === url.trim());
+  //hub servers follow shared tuning
+  if (getHubServers().some((s) => s.url === url.trim())) {
+    return {
+      contextLength: hubTuning?.ctxSize || settings.ollamaContextLength,
+      //hub zero keeps alive indefinitely
+      keepAlive: hubTuning ? hubTuning.keepAlive || -1 : settings.ollamaKeepAlive,
+    };
+  }
+  const server = getOllamaServers().find((s) => s.url === url.trim());
   return {
     contextLength: server?.contextLength ?? settings.ollamaContextLength,
     keepAlive: server?.keepAlive ?? settings.ollamaKeepAlive,

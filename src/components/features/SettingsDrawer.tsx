@@ -87,6 +87,7 @@ import {
   getEnabledProviders,
   getHubName,
   getHubServers,
+  hubModelKeyOf,
   hubProviderKind,
   getOllamaServers,
   getOllamaTuning,
@@ -102,6 +103,7 @@ import {
   patchHubServer,
   PROMPT_TIERS,
   serializeProviders,
+  splitHubModelKey,
   serializeServers,
   setOpenAIApiKey,
   type PromptTier,
@@ -526,12 +528,6 @@ const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
   );
 });
 
-//hub sheet mixes models of every hub server
-const hubModelKeyOf = (url: string, model: string) => `${url}|${model}`;
-const splitHubModelKey = (key: string) => {
-  const at = key.indexOf("|");
-  return { url: key.slice(0, at), model: key.slice(at + 1) };
-};
 const hubModelLabel = (key: string) => splitHubModelKey(key).model;
 //llama.cpp is the hub itself, no badge
 const hubModelIcon = (key: string) => {
@@ -2247,14 +2243,6 @@ export default function SettingsDrawer({
     setHubDetailUrl(server.url);
     //the llama.cpp options ride the hub status
     if (server.url === LLAMA_SERVER_URL) refreshHub();
-    //tuning drafts follow the hub ollama
-    const tuned = getHubServers().find((s) => s.kind === "ollama");
-    setOllamaContextDraft(
-      tuned?.contextLength != null ? String(tuned.contextLength) : "",
-    );
-    setOllamaKeepAliveDraft(
-      tuned?.keepAlive != null ? String(tuned.keepAlive) : "",
-    );
     setOllamaModels([]);
     loadHubModels();
   };
@@ -2282,13 +2270,9 @@ export default function SettingsDrawer({
   ) => {
     await patchHubServer(url, patch);
     setHubPrefsTick((tick) => tick + 1);
-    const server = getHubServers().find((s) => s.url === url);
-    if (server && url === ollamaUrl.trim()) {
-      AIModule.configure(
-        url,
-        serverContextLength(server),
-        serverKeepAlive(server),
-      );
+    if (url === ollamaUrl.trim()) {
+      const tuning = getOllamaTuning(url);
+      AIModule.configure(url, tuning.contextLength, tuning.keepAlive);
     }
   };
 
@@ -2301,25 +2285,6 @@ export default function SettingsDrawer({
         .map((k) => k.model);
       await patchHubServerPrefs(s.url, { disabledModels });
     }
-  };
-
-  const setHubServerContext = (url: string, v: string) => {
-    const next = v.replace(/[^0-9]/g, "");
-    setOllamaContextDraft(next);
-    const parsed = parseInt(next, 10);
-    patchHubServerPrefs(url, {
-      contextLength: isNaN(parsed) ? undefined : parsed,
-    });
-  };
-
-  //leading minus keeps -1 typable
-  const setHubServerKeepAlive = (url: string, v: string) => {
-    const next = (v.startsWith("-") ? "-" : "") + v.replace(/[^0-9]/g, "");
-    setOllamaKeepAliveDraft(next);
-    const parsed = parseInt(next, 10);
-    patchHubServerPrefs(url, {
-      keepAlive: isNaN(parsed) ? undefined : parsed,
-    });
   };
 
   const removeOllamaServer = (index: number) => {
@@ -5100,7 +5065,6 @@ export default function SettingsDrawer({
   ) => {
     const url = server.url;
     const hubServers = getHubServers();
-    const ollamaServer = hubServers.find((s) => s.kind === "ollama");
     //per server prefs merged under url keys
     const disabledKeys = hubServers.flatMap((s) =>
       (s.disabledModels ?? []).map((m) => hubModelKeyOf(s.url, m)),
@@ -5185,106 +5149,6 @@ export default function SettingsDrawer({
                     }
                   />
                 ))}
-              </Group>
-            </View>
-          </View>
-        )}
-
-        {/* tuning card for the hub ollama */}
-        {ollamaServer && (
-          <View style={styles.sheetCard}>
-            {/* tells these apply to ollama models only */}
-            <View style={[styles.litertCapability, styles.hubOllamaHeader]}>
-              <Image
-                source={ollamaIcon}
-                style={styles.hubOllamaIcon}
-                tintColor={Colors.textPrimary}
-              />
-              <Text style={styles.settingLabel}>{ollamaServer.provider}</Text>
-            </View>
-            <View
-              style={[
-                styles.settingRowVertical,
-                isSheetWide && styles.toggleGroupRow,
-              ]}
-            >
-              {/* desktop puts the slider at the right of the text */}
-              <View style={isSheetWide && styles.toggleGroupContent}>
-                <Text style={styles.settingLabel}>
-                  {t("settings.ollama.contextLength")}
-                </Text>
-                <Text
-                  style={[
-                    styles.helpText,
-                    !isSheetWide && { marginBottom: Spacing.md },
-                  ]}
-                >
-                  {t("settings.ollama.contextHelp")}
-                </Text>
-              </View>
-              <Group style={isSheetWide && styles.sliderGroup}>
-                {advancedMode ? (
-                  <TextInputField
-                    icon={messageIcon}
-                    placeholder="8192"
-                    value={ollamaContextDraft}
-                    onChangeText={(v) =>
-                      setHubServerContext(ollamaServer.url, v)
-                    }
-                    keyboardType="numeric"
-                  />
-                ) : (
-                  <Slider
-                    icon={messageIcon}
-                    options={ollamaContextLengthOptions}
-                    selectedValue={String(serverContextLength(ollamaServer))}
-                    onSelect={(v) => setHubServerContext(ollamaServer.url, v)}
-                  />
-                )}
-              </Group>
-            </View>
-
-            <View
-              style={[
-                styles.settingRowVertical,
-                { marginBottom: 0 },
-                isSheetWide && styles.toggleGroupRow,
-              ]}
-            >
-              <View style={isSheetWide && styles.toggleGroupContent}>
-                <Text style={styles.settingLabel}>
-                  {t("settings.ollama.keepAlive")}
-                </Text>
-                <Text
-                  style={[
-                    styles.helpText,
-                    !isSheetWide && { marginBottom: Spacing.md },
-                  ]}
-                >
-                  {advancedMode
-                    ? t("settings.ollama.keepAliveHelpAdvanced")
-                    : t("settings.ollama.keepAliveHelp")}
-                </Text>
-              </View>
-              <Group style={isSheetWide && styles.sliderGroup}>
-                {advancedMode ? (
-                  <TextInputField
-                    icon={timeIcon}
-                    placeholder="300"
-                    value={ollamaKeepAliveDraft}
-                    onChangeText={(v) =>
-                      setHubServerKeepAlive(ollamaServer.url, v)
-                    }
-                    keyboardType="numeric"
-                  />
-                ) : (
-                  <Slider
-                    icon={timeIcon}
-                    options={ollamaKeepAliveOptions}
-                    selectedValue={String(serverKeepAlive(ollamaServer))}
-                    onSelect={(v) => setHubServerKeepAlive(ollamaServer.url, v)}
-                  />
-                )}
               </Group>
             </View>
           </View>
@@ -8569,14 +8433,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     modelToggleIcon: {
       marginRight: Spacing.sm,
-    },
-    hubOllamaHeader: {
-      gap: Spacing.sm,
-      marginBottom: Spacing.xxl,
-    },
-    hubOllamaIcon: {
-      width: 18,
-      height: 18,
     },
     modelToggleArrowOpen: {
       transform: [{ rotate: "90deg" }],

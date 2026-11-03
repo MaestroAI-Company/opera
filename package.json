@@ -68,7 +68,7 @@
     "react-native-gesture-handler": "~3.3.0",
     "react-native-get-random-values": "~1.11.0",
     "react-native-keyboard-controller": "1.22.7",
-    "react-native-litert-lm": "^0.8.1",
+    "react-native-litert-lm": "^0.8.2",
     "react-native-nitro-modules": "^0.37.1",
     "react-native-quick-base64": "^3.0.1",
     "react-native-quick-crypto": "^1.1.6",

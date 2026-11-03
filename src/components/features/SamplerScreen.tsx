@@ -2,6 +2,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
+  AppState,
   BackHandler,
   Image,
   ImageSourcePropType,
@@ -276,6 +277,8 @@ export default function SamplerScreen({
   const [pairingVisible, setPairingVisible] = useState(false);
   const [detectedHub, setDetectedHub] = useState<NearbyHub | null>(null);
   const [detectedVisible, setDetectedVisible] = useState(false);
+  //nearby hub the profile sheet signs into
+  const [signInHub, setSignInHub] = useState<NearbyHub | null>(null);
   const [qrMode, setQrMode] = useState<"invite" | "link" | null>(null);
   const [hubSheetVisible, setHubSheetVisible] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
@@ -314,7 +317,12 @@ export default function SamplerScreen({
       .then(setThisDeviceId)
       .catch(() => setThisDeviceId(null));
     try {
-      receiveStatus(await answerWithin(SamplerHub.status(hub)));
+      //cold first connect keeps warming
+      const first = await answerWithin(SamplerHub.status(hub)).catch((e) => {
+        if (failedState(e) !== "offline") throw e;
+        return answerWithin(SamplerHub.status(hub));
+      });
+      receiveStatus(first);
       setHubState("online");
       const [nextDevices, nextProfiles, nextSettings] = await Promise.all([
         SamplerHub.devices(hub).catch(() => null),
@@ -337,6 +345,15 @@ export default function SamplerScreen({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the paired hub
     refresh();
   }, [refresh]);
+
+  //connections go stale in the background
+  useEffect(() => {
+    if (!visible) return;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") refresh();
+    });
+    return () => subscription.remove();
+  }, [visible, refresh]);
 
   //one scan per arrival on the unpaired welcome
   const scannedNearby = useRef(false);
@@ -576,7 +593,8 @@ export default function SamplerScreen({
   };
 
   const unpair = () => {
-    if (!pairedHub || hostedHere) return;
+    //revoked device is cut already
+    if (!pairedHub || (hostedHere && hubState !== "revoked")) return;
     setModal({
       title: t("settings.hub.unpairTitle"),
       message: t("settings.hub.unpairMessage", { name: pairedHub.name }),
@@ -810,7 +828,11 @@ export default function SamplerScreen({
     );
   };
 
-  const shownProfiles = profiles ?? (profile ? [profile] : []);
+  //members only see their own profile
+  const shownProfiles = useMemo(() => {
+    const all = profiles ?? (profile ? [profile] : []);
+    return isAdmin ? all : all.filter((p) => p.id === profile?.id);
+  }, [profiles, profile, isAdmin]);
   //two cards per row
   const profileRows = useMemo(() => {
     const rows: HubProfile[][] = [];
@@ -837,6 +859,7 @@ export default function SamplerScreen({
                 >
                   <ProfileCard
                     name={p.name}
+                    butterfly={p.butterfly}
                     createdAt={p.createdAt * 1000}
                     compact
                     active={visible}
@@ -1103,6 +1126,7 @@ export default function SamplerScreen({
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <ProfileCard
               name={target.name}
+              butterfly={target.butterfly}
               createdAt={target.createdAt * 1000}
               active={visible}
             />
@@ -1739,7 +1763,7 @@ export default function SamplerScreen({
       [
         { page: "home", icon: homeIcon },
         { page: "profiles", icon: profilIcon },
-        { page: "performance", icon: quickIcon },
+        ...(isAdmin ? [{ page: "performance" as const, icon: quickIcon }] : []),
       ],
       [
         ...(showModels ? [{ page: "models" as const, icon: botIcon }] : []),
@@ -2305,9 +2329,12 @@ export default function SamplerScreen({
         visible={detectedVisible}
         hub={detectedHub}
         onClose={() => setDetectedVisible(false)}
-        onLink={() => {
+        onLink={(hub) => {
           setDetectedVisible(false);
-          setPairingVisible(true);
+          //older clients still pair with a code
+          if (!SamplerHub.canSignIn()) return setPairingVisible(true);
+          setSignInHub(hub);
+          setProfileSheet("pick");
         }}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
@@ -2327,6 +2354,11 @@ export default function SamplerScreen({
       <HubProfileSheet
         visible={profileSheet !== null}
         hub={pairedHub}
+        nearby={pairedHub ? null : signInHub}
+        onCreateWithCode={() => {
+          setProfileSheet(null);
+          setPairingVisible(true);
+        }}
         profile={selectedProfile ?? profile}
         devices={devices}
         thisDeviceId={thisDeviceId}

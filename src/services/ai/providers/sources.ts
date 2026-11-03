@@ -162,7 +162,14 @@ function parseServers(raw: string): OllamaServer[] {
 
 //legacy url only seeds ollama
 export function getOllamaServers(): OllamaServer[] {
-  return parseServers(Settings.getCached().ollamaUrls);
+  const seen = new Set<string>();
+  //drop urls duplicated by old sync bug
+  return parseServers(Settings.getCached().ollamaUrls).filter((s) => {
+    const url = s.url.trim();
+    if (url && seen.has(url)) return false;
+    seen.add(url);
+    return true;
+  });
 }
 
 export function getOpenAIServers(): OllamaServer[] {

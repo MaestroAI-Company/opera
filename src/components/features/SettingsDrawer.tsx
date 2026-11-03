@@ -87,6 +87,7 @@ import {
   getEnabledProviders,
   getHubName,
   getHubServers,
+  hubProviderKind,
   getOllamaServers,
   getOllamaTuning,
   getOpenAIApiKeyById,
@@ -525,6 +526,20 @@ const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
   );
 });
 
+//hub sheet mixes models of every hub server
+const hubModelKeyOf = (url: string, model: string) => `${url}|${model}`;
+const splitHubModelKey = (key: string) => {
+  const at = key.indexOf("|");
+  return { url: key.slice(0, at), model: key.slice(at + 1) };
+};
+const hubModelLabel = (key: string) => splitHubModelKey(key).model;
+//llama.cpp is the hub itself, no badge
+const hubModelIcon = (key: string) => {
+  const { url } = splitHubModelKey(key);
+  if (url === LLAMA_SERVER_URL) return undefined;
+  return hubProviderKind(url) === "openai" ? cloudIcon : ollamaIcon;
+};
+
 const ModelToggleRow = memo(function ModelToggleRow({
   model,
   enabled,
@@ -536,8 +551,13 @@ const ModelToggleRow = memo(function ModelToggleRow({
   onExpand,
   onCapabilitiesChange,
   onPromptTierChange,
+  label,
+  icon,
 }: {
   model: string;
+  label?: string;
+  //server the model comes from
+  icon?: ImageSourcePropType;
   enabled: boolean;
   last: boolean;
   expanded: boolean;
@@ -558,11 +578,18 @@ const ModelToggleRow = memo(function ModelToggleRow({
           style={pressStyle(styles.modelToggleName, "fadeLight")}
           onPress={() => onExpand(model)}
         >
+          {icon && (
+            <Image
+              source={icon}
+              style={[styles.litertCapabilityIcon, styles.modelToggleIcon]}
+              tintColor={Colors.textSecondary}
+            />
+          )}
           <Text
             style={[styles.settingLabel, styles.modelToggleLabel]}
             numberOfLines={1}
           >
-            {model}
+            {label ?? model}
           </Text>
           <Image
             source={rightArrowIcon}
@@ -610,8 +637,13 @@ const ModelToggleList = memo(function ModelToggleList({
   hideSearch = false,
   searchQuery,
   style,
+  labelOf,
+  iconOf,
 }: {
   models: string[];
+  //models are keys here, these show them
+  labelOf?: (model: string) => string;
+  iconOf?: (model: string) => ImageSourcePropType | undefined;
   loading: boolean;
   service: string;
   url: string;
@@ -651,9 +683,11 @@ const ModelToggleList = memo(function ModelToggleList({
   const shown = useMemo(() => {
     const query = search.trim().toLowerCase();
     return query
-      ? models.filter((m) => m.toLowerCase().includes(query))
+      ? models.filter((m) =>
+          (labelOf?.(m) ?? m).toLowerCase().includes(query),
+        )
       : models;
-  }, [models, search]);
+  }, [models, search, labelOf]);
   const enabledCount = models.filter((m) => !disabledSet.has(m)).length;
 
   //stable handler keeps memo rows still
@@ -777,6 +811,8 @@ const ModelToggleList = memo(function ModelToggleList({
                 <ModelToggleRow
                   key={model}
                   model={model}
+                  label={labelOf?.(model)}
+                  icon={iconOf?.(model)}
                   enabled={!disabledSet.has(model)}
                   last={index === visible.length - 1}
                   expanded={expanded === model}
@@ -955,6 +991,14 @@ export default function SettingsDrawer({
   if (hubDetailUrl !== null && hubDetailUrl !== shownHubUrl) {
     setShownHubUrl(hubDetailUrl);
   }
+  //hub model opened in its info sheet
+  const [hubModelKey, setHubModelKey] = useState<string | null>(null);
+  const [shownHubModelKey, setShownHubModelKey] = useState<string | null>(
+    null,
+  );
+  if (hubModelKey !== null && hubModelKey !== shownHubModelKey) {
+    setShownHubModelKey(hubModelKey);
+  }
   //hub server prefs live outside react state
   const [, setHubPrefsTick] = useState(0);
   //ignore stale server answers
@@ -1067,6 +1111,7 @@ export default function SettingsDrawer({
     ollamaAddVisible ||
     ollamaDetailIndex !== null ||
     hubDetailUrl !== null ||
+    hubModelKey !== null ||
     openaiAddVisible ||
     openaiDetailIndex !== null ||
     mcpAddVisible ||
@@ -1971,14 +2016,25 @@ export default function SettingsDrawer({
     setOpenAIAddVisible(true);
   };
 
-  const submitOpenAIDraft = async () => {
+  //answering protocol picks the provider
+  const submitServerDraft = async () => {
     const url = serverDraft.url.trim();
-    if (openaiServers.some((s) => s.url.trim() === url)) {
+    if ([...ollamaServers, ...openaiServers].some((s) => s.url.trim() === url)) {
       showAlert(t("settings.server.addFailed"), t("settings.server.duplicate"));
       return;
     }
     setServerDraftBusy(true);
     try {
+      //ollama first, it also answers the openai route
+      if (await AIModule.isSourceAvailable("ollama", url)) {
+        saveOllamaServers([
+          ...ollamaServers,
+          { url, name: serverDraft.name.trim() },
+        ]);
+        setServerErrors((prev) => ({ ...prev, [url]: false }));
+        setOpenAIAddVisible(false);
+        return;
+      }
       //unsaved key probes with the draft
       if (!(await new OpenAIProvider(url, openaiKeyDraft).isAvailable())) {
         showAlert(
@@ -2191,14 +2247,32 @@ export default function SettingsDrawer({
     setHubDetailUrl(server.url);
     //the llama.cpp options ride the hub status
     if (server.url === LLAMA_SERVER_URL) refreshHub();
+    //tuning drafts follow the hub ollama
+    const tuned = getHubServers().find((s) => s.kind === "ollama");
     setOllamaContextDraft(
-      server.contextLength != null ? String(server.contextLength) : "",
+      tuned?.contextLength != null ? String(tuned.contextLength) : "",
     );
     setOllamaKeepAliveDraft(
-      server.keepAlive != null ? String(server.keepAlive) : "",
+      tuned?.keepAlive != null ? String(tuned.keepAlive) : "",
     );
     setOllamaModels([]);
-    loadOllamaModels(server.url, HUB_PROVIDER_ID);
+    loadHubModels();
+  };
+
+  //hub servers in one list
+  const loadHubModels = async () => {
+    const request = ++ollamaModelsRequest.current;
+    setOllamaModelsLoading(true);
+    const lists = await Promise.all(
+      getHubServers().map((s) =>
+        AIModule.getModelsFor(HUB_PROVIDER_ID, s.url, true)
+          .catch(() => [] as string[])
+          .then((models) => models.map((m) => hubModelKeyOf(s.url, m))),
+      ),
+    );
+    if (ollamaModelsRequest.current !== request) return;
+    setOllamaModels(lists.flat());
+    setOllamaModelsLoading(false);
   };
 
   //active server picks up new tuning
@@ -2215,6 +2289,17 @@ export default function SettingsDrawer({
         serverContextLength(server),
         serverKeepAlive(server),
       );
+    }
+  };
+
+  //merged list hands back keys, split per server
+  const setHubDisabledKeys = async (keys: string[]) => {
+    for (const s of getHubServers()) {
+      const disabledModels = keys
+        .map(splitHubModelKey)
+        .filter((k) => k.url === s.url)
+        .map((k) => k.model);
+      await patchHubServerPrefs(s.url, { disabledModels });
     }
   };
 
@@ -3330,6 +3415,7 @@ export default function SettingsDrawer({
         setInstalledModel(null);
         setOllamaDetailIndex(null);
         setHubDetailUrl(null);
+        setHubModelKey(null);
         setOpenAIDetailIndex(null);
       };
       if (isDesktop) {
@@ -3779,7 +3865,12 @@ export default function SettingsDrawer({
       {/* android needs a real view */}
       <View ref={profileCardRef} collapsable={false} style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <ProfileCard name={confirmedName} active={visible} />
+          <ProfileCard
+            name={confirmedName}
+            //same date as the card on the hub
+            createdAt={hubProfile ? hubProfile.createdAt * 1000 : undefined}
+            active={visible}
+          />
         </View>
       </View>
 
@@ -4774,6 +4865,9 @@ export default function SettingsDrawer({
   //the hub row shows once a provider is detected
   const showHubProvider =
     isProviderSupported(HUB_PROVIDER_ID) && getHubServers().length > 0;
+  const hubMainServer =
+    getHubServers().find((s) => s.url === LLAMA_SERVER_URL) ??
+    getHubServers()[0];
 
   //turning a server on also brings its provider back
   const serverSwitch = (
@@ -4834,12 +4928,22 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.nav.service.title"))}
 
       {/* every provider as a tile, the icon tells where it comes from */}
-      {(onDeviceProviders.length > 0 ||
-        ollamaServers.length > 0 ||
-        openaiServers.length > 0 ||
-        showHubProvider) && (
-        <View style={styles.contentCard}>
+      <View style={styles.contentCard}>
+        <Group style={styles.highlightGroup}>
+          <ActionButton
+            icon={addIcon}
+            label={t("settings.server.add")}
+            variant="highlight"
+            onPress={openOpenAIAddSheet}
+          />
+        </Group>
+
+        {(onDeviceProviders.length > 0 ||
+          ollamaServers.length > 0 ||
+          openaiServers.length > 0 ||
+          showHubProvider) && (
           <CardGrid
+            style={{ marginTop: Spacing.md }}
             cards={[
               ...(onDeviceProviders.length > 0
                 ? [
@@ -4874,24 +4978,27 @@ export default function SettingsDrawer({
                 error: serverErrors[server.url.trim()] === true,
                 onPress: () => openOpenAIServer(index),
               })),
-              ...(showHubProvider
-                ? getHubServers().map((server) => ({
-                    key: `hub-${server.url}`,
-                    icon: sampler2Icon,
-                    title: server.provider,
-                    status: t(
-                      enabledProviders.includes(HUB_PROVIDER_ID) &&
-                        !server.disabled
-                        ? "settings.service.on"
-                        : "settings.service.off",
-                    ),
-                    onPress: () => openHubServer(server),
-                  }))
+              ...(showHubProvider && hubMainServer
+                ? [
+                    {
+                      key: "hub",
+                      //local servers live inside the hub sheet
+                      icon: sampler2Icon,
+                      title: hubMainServer.provider,
+                      status: t(
+                        enabledProviders.includes(HUB_PROVIDER_ID) &&
+                          !hubMainServer.disabled
+                          ? "settings.service.on"
+                          : "settings.service.off",
+                      ),
+                      onPress: () => openHubServer(hubMainServer),
+                    },
+                  ]
                 : []),
             ]}
           />
-        </View>
-      )}
+        )}
+      </View>
 
       {/* model failover card */}
       <View style={styles.contentCard}>
@@ -4992,6 +5099,12 @@ export default function SettingsDrawer({
     server: ReturnType<typeof getHubServers>[number],
   ) => {
     const url = server.url;
+    const hubServers = getHubServers();
+    const ollamaServer = hubServers.find((s) => s.kind === "ollama");
+    //per server prefs merged under url keys
+    const disabledKeys = hubServers.flatMap((s) =>
+      (s.disabledModels ?? []).map((m) => hubModelKeyOf(s.url, m)),
+    );
 
     return (
       <>
@@ -5003,6 +5116,32 @@ export default function SettingsDrawer({
             patchHubServerPrefs(url, { disabled }),
           ),
           styles.sheetCard,
+        )}
+
+        <ModelToggleList
+          key={url}
+          models={ollamaModels}
+          loading={ollamaModelsLoading}
+          service={HUB_PROVIDER_ID}
+          url={url}
+          disabled={disabledKeys}
+          labelOf={hubModelLabel}
+          iconOf={hubModelIcon}
+          onChange={setHubDisabledKeys}
+          onOpenModel={setHubModelKey}
+        />
+
+        {/* actions section */}
+        {!ollamaModelsLoading && ollamaModels.length === 0 && (
+          <View style={styles.sheetCard}>
+            <Group>
+              <ActionButton
+                icon={reconnectIcon}
+                label={t("settings.ollama.reconnect")}
+                onPress={loadHubModels}
+              />
+            </Group>
+          </View>
         )}
 
         {/* llama.cpp options, set in the sampler screen */}
@@ -5051,9 +5190,18 @@ export default function SettingsDrawer({
           </View>
         )}
 
-        {/* tuning card for ollama only */}
-        {server.kind === "ollama" && (
+        {/* tuning card for the hub ollama */}
+        {ollamaServer && (
           <View style={styles.sheetCard}>
+            {/* tells these apply to ollama models only */}
+            <View style={[styles.litertCapability, styles.hubOllamaHeader]}>
+              <Image
+                source={ollamaIcon}
+                style={styles.hubOllamaIcon}
+                tintColor={Colors.textPrimary}
+              />
+              <Text style={styles.settingLabel}>{ollamaServer.provider}</Text>
+            </View>
             <View
               style={[
                 styles.settingRowVertical,
@@ -5080,15 +5228,17 @@ export default function SettingsDrawer({
                     icon={messageIcon}
                     placeholder="8192"
                     value={ollamaContextDraft}
-                    onChangeText={(v) => setHubServerContext(url, v)}
+                    onChangeText={(v) =>
+                      setHubServerContext(ollamaServer.url, v)
+                    }
                     keyboardType="numeric"
                   />
                 ) : (
                   <Slider
                     icon={messageIcon}
                     options={ollamaContextLengthOptions}
-                    selectedValue={String(serverContextLength(server))}
-                    onSelect={(v) => setHubServerContext(url, v)}
+                    selectedValue={String(serverContextLength(ollamaServer))}
+                    onSelect={(v) => setHubServerContext(ollamaServer.url, v)}
                   />
                 )}
               </Group>
@@ -5122,48 +5272,21 @@ export default function SettingsDrawer({
                     icon={timeIcon}
                     placeholder="300"
                     value={ollamaKeepAliveDraft}
-                    onChangeText={(v) => setHubServerKeepAlive(url, v)}
+                    onChangeText={(v) =>
+                      setHubServerKeepAlive(ollamaServer.url, v)
+                    }
                     keyboardType="numeric"
                   />
                 ) : (
                   <Slider
                     icon={timeIcon}
                     options={ollamaKeepAliveOptions}
-                    selectedValue={String(serverKeepAlive(server))}
-                    onSelect={(v) => setHubServerKeepAlive(url, v)}
+                    selectedValue={String(serverKeepAlive(ollamaServer))}
+                    onSelect={(v) => setHubServerKeepAlive(ollamaServer.url, v)}
                   />
                 )}
               </Group>
             </View>
-          </View>
-        )}
-
-        <ModelToggleList
-          key={url}
-          models={ollamaModels}
-          loading={ollamaModelsLoading}
-          service={HUB_PROVIDER_ID}
-          url={url}
-          disabled={server.disabledModels}
-          capabilities={server.capabilities}
-          onChange={(next) =>
-            patchHubServerPrefs(url, { disabledModels: next })
-          }
-          onCapabilitiesChange={(next) =>
-            patchHubServerPrefs(url, { capabilities: next })
-          }
-        />
-
-        {/* actions section */}
-        {!ollamaModelsLoading && ollamaModels.length === 0 && (
-          <View style={styles.sheetCard}>
-            <Group>
-              <ActionButton
-                icon={reconnectIcon}
-                label={t("settings.ollama.reconnect")}
-                onPress={() => loadOllamaModels(url, HUB_PROVIDER_ID)}
-              />
-            </Group>
           </View>
         )}
       </>
@@ -6679,6 +6802,104 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
+  const shownHubModel = shownHubModelKey
+    ? splitHubModelKey(shownHubModelKey)
+    : null;
+  const shownHubModelServer = getHubServers().find(
+    (s) => s.url === shownHubModel?.url,
+  );
+
+  const renderHubModelContent = (
+    server: ReturnType<typeof getHubServers>[number],
+    model: string,
+  ) => {
+    const disabled = server.disabledModels ?? NO_DISABLED_MODELS;
+    const icon = hubModelIcon(hubModelKeyOf(server.url, model));
+    return (
+      <View style={styles.sheetCard}>
+        <View style={styles.toggleGroupRow}>
+          <View style={[styles.toggleGroupContent, styles.cloudModelText]}>
+            <Text style={styles.litertDetailName}>{model}</Text>
+            <View style={styles.litertCapability}>
+              {icon && (
+                <Image
+                  source={icon}
+                  style={styles.litertCapabilityIcon}
+                  tintColor={Colors.textSecondary}
+                />
+              )}
+              <Text style={styles.litertDetailMeta}>{server.name}</Text>
+            </View>
+          </View>
+          <Toggle
+            checked={!disabled.includes(model)}
+            onToggle={(on) =>
+              patchHubServerPrefs(server.url, {
+                disabledModels: on
+                  ? disabled.filter((m) => m !== model)
+                  : [...disabled, model],
+              })
+            }
+          />
+        </View>
+        <Text style={[styles.settingLabel, styles.litertDetailSection]}>
+          {t("settings.ollama.capabilities")}
+        </Text>
+        <ModelCapabilityToggles
+          key={`${server.url}|${model}`}
+          model={model}
+          service={HUB_PROVIDER_ID}
+          url={server.url}
+          onCapabilitiesChange={(m, caps) =>
+            patchHubServerPrefs(server.url, {
+              capabilities: { ...server.capabilities, [m]: caps },
+            })
+          }
+          onPromptTierChange={(m, tier) => {
+            const { [m]: _removed, ...rest } = server.promptTiers ?? {};
+            patchHubServerPrefs(server.url, {
+              promptTiers: tier ? { ...rest, [m]: tier } : rest,
+            });
+          }}
+          style={styles.cloudModelCapabilities}
+          labelStyle={styles.cloudModelCapabilityLabel}
+          checkboxes
+        />
+      </View>
+    );
+  };
+
+  //hub model info over the hub sheet
+  const hubModelSheet = (
+    <DrawerSheet
+      visible={hubModelKey !== null && !!shownHubModelServer}
+      onClose={() => setHubModelKey(null)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      avoidKeyboard
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.addModelSheetDesktop}
+    >
+      <SheetKeyboardAwareScrollView
+        bottomOffset={Spacing.xl2}
+        contentContainerStyle={styles.addModelSheetContent}
+        keyboardShouldPersistTaps="handled"
+        onLayout={(e) => setSheetWidth(e.nativeEvent.layout.width)}
+      >
+        {shownHubModelServer &&
+          shownHubModel &&
+          renderHubModelContent(shownHubModelServer, shownHubModel.model)}
+      </SheetKeyboardAwareScrollView>
+    </DrawerSheet>
+  );
+
   const openaiModelsServer =
     openaiDetailIndex !== null ? openaiServers[openaiDetailIndex] : undefined;
   const openaiDetailUrl = openaiModelsServer?.url.trim() ?? "";
@@ -7014,6 +7235,36 @@ export default function SettingsDrawer({
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.sheetCard}>
+          {/* providers the link can point to */}
+          <View style={styles.settingRowVertical}>
+            <Text style={styles.settingLabel}>
+              {t("settings.server.compatible")}
+            </Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {t("settings.server.compatibleHelp")}
+            </Text>
+            <Group style={styles.infoGroup}>
+              <ActionButton
+                icon={ollamaIcon}
+                label="Ollama"
+                rightElement={
+                  <Text style={styles.infoValue} numberOfLines={1}>
+                    {t("settings.server.compatibleLocal")}
+                  </Text>
+                }
+              />
+              <ActionButton
+                icon={cloudIcon}
+                label={t("settings.service.cloudapi")}
+                rightElement={
+                  <Text style={styles.infoValue} numberOfLines={1}>
+                    LM Studio, vLLM, Mistral
+                  </Text>
+                }
+              />
+            </Group>
+          </View>
+
           <View style={styles.settingRowVertical}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
               {t("settings.server.name")}
@@ -7086,7 +7337,7 @@ export default function SettingsDrawer({
                 }
                 variant="highlight"
                 disabled={serverDraftBusy || !serverDraft.url.trim()}
-                onPress={submitOpenAIDraft}
+                onPress={submitServerDraft}
               />
             </Group>
           </View>
@@ -8015,6 +8266,7 @@ export default function SettingsDrawer({
             {ollamaAddServerSheet}
             {ollamaServerSheet}
             {hubServerSheet}
+            {hubModelSheet}
             {openaiAddServerSheet}
             {openaiServerSheet}
             {mcpAddServerSheet}
@@ -8065,6 +8317,7 @@ export default function SettingsDrawer({
       {ollamaAddServerSheet}
       {ollamaServerSheet}
       {hubServerSheet}
+      {hubModelSheet}
       {openaiAddServerSheet}
       {openaiServerSheet}
       {mcpAddServerSheet}
@@ -8313,6 +8566,17 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     modelToggleLabel: {
       flexShrink: 1,
+    },
+    modelToggleIcon: {
+      marginRight: Spacing.sm,
+    },
+    hubOllamaHeader: {
+      gap: Spacing.sm,
+      marginBottom: Spacing.xxl,
+    },
+    hubOllamaIcon: {
+      width: 18,
+      height: 18,
     },
     modelToggleArrowOpen: {
       transform: [{ rotate: "90deg" }],

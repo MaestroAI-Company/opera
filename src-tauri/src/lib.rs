@@ -169,6 +169,7 @@ pub fn run() {
             hub::hub_change_password,
             #[cfg(desktop)]
             hub::hub_rename_profile,
+            hub::hub_set_profile_butterfly,
             #[cfg(desktop)]
             hub::hub_locked_key,
             #[cfg(desktop)]
@@ -231,6 +232,8 @@ pub fn run() {
             hub::hub_set_settings,
             #[cfg(desktop)]
             hub::hub_nearby,
+            hub::hub_nearby_profiles,
+            hub::hub_sign_in,
             #[cfg(desktop)]
             hub::hub_update,
             #[cfg(desktop)]

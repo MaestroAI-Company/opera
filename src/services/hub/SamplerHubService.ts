@@ -28,7 +28,8 @@ export type HubDevice = {
   profile?: string | null;
 };
 //one person on the hub
-export type HubProfile = { id: string; name: string; role: 'admin' | 'member'; createdAt: number };
+//butterfly stays empty on hubs before 0.12
+export type HubProfile = { id: string; name: string; role: 'admin' | 'member'; createdAt: number; butterfly?: string | null };
 //the key only lives in this device's secure store
 export type UnlockedProfile = { profile: HubProfile; key: string; lock?: ProfileLock | null };
 //what reopens a profile key with its password
@@ -108,6 +109,16 @@ type NativeHub = {
   setHubSettings?(deviceKey: string, hub: PairedHub, settings: HubSettings): Promise<HubSettings>;
   //browsers cannot use multicast
   nearbyHubs?(deviceKey: string, waitMs: number): Promise<NearbyHub[]>;
+  //hub 0.11.1 and later, desktop for now
+  nearbyProfiles?(deviceKey: string, hub: NearbyHub): Promise<HubProfile[]>;
+  signIn?(
+    deviceKey: string,
+    hub: NearbyHub,
+    profileId: string,
+    password: string,
+    deviceName: string,
+    kind: string,
+  ): Promise<{ hub: PairedHub; profile: UnlockedProfile }>;
   updateHub?(deviceKey: string, hub: PairedHub): Promise<string>;
   //admin profiles only, older clients lack it
   modelsCatalog?(deviceKey: string, hub: PairedHub): Promise<CatalogModel[]>;
@@ -139,6 +150,8 @@ type NativeHub = {
   unlockProfile(deviceKey: string, hub: PairedHub, profileId: string, password: string): Promise<UnlockedProfile>;
   changePassword(deviceKey: string, hub: PairedHub, current: string, next: string): Promise<void>;
   renameProfile(deviceKey: string, hub: PairedHub, name: string): Promise<HubProfile>;
+  //hub client 0.12 and later
+  setProfileButterfly?(deviceKey: string, hub: PairedHub, butterfly: string): Promise<HubProfile>;
   lockedKey(deviceKey: string, hub: PairedHub): Promise<ProfileLock>;
   openLockedKey(lock: ProfileLock, password: string): Promise<string>;
   profileBackupKey(key: string): Promise<string>;
@@ -267,6 +280,9 @@ const tauriHub: NativeHub = {
   hubSettings: (deviceKey, hub) => invoke('hub_settings', { deviceKey, hub }),
   setHubSettings: (deviceKey, hub, settings) => invoke('hub_set_settings', { deviceKey, hub, settings }),
   nearbyHubs: (deviceKey, waitMs) => invoke('hub_nearby', { deviceKey, waitMs }),
+  nearbyProfiles: (deviceKey, hub) => invoke('hub_nearby_profiles', { deviceKey, hub }),
+  signIn: (deviceKey, hub, profileId, password, deviceName, kind) =>
+    invoke('hub_sign_in', { deviceKey, hub, profileId, password, deviceName, kind }),
   updateHub: (deviceKey, hub) => invoke('hub_update', { deviceKey, hub }),
   modelsCatalog: (deviceKey, hub) => invoke('hub_models_catalog', { deviceKey, hub }),
   modelsSearch: (deviceKey, hub, query) => invoke('hub_models_search', { deviceKey, hub, query }),
@@ -296,6 +312,8 @@ const tauriHub: NativeHub = {
     invoke('hub_unlock_profile', { deviceKey, hub, profileId, password }),
   changePassword: (deviceKey, hub, current, next) => invoke('hub_change_password', { deviceKey, hub, current, next }),
   renameProfile: (deviceKey, hub, name) => invoke('hub_rename_profile', { deviceKey, hub, name }),
+  setProfileButterfly: (deviceKey, hub, butterfly) =>
+    invoke('hub_set_profile_butterfly', { deviceKey, hub, butterfly }),
   lockedKey: (deviceKey, hub) => invoke('hub_locked_key', { deviceKey, hub }),
   openLockedKey: (lock, password) => invoke('hub_open_locked_key', { lock, password }),
   profileBackupKey: (key) => invoke('hub_profile_backup_key', { key }),
@@ -360,6 +378,7 @@ type WebClient = {
   unlockProfile(hub: PairedHub, profileId: string, password: string): Promise<UnlockedProfile>;
   changePassword(hub: PairedHub, current: string, next: string): Promise<void>;
   renameProfile(hub: PairedHub, name: string): Promise<HubProfile>;
+  setProfileButterfly?(hub: PairedHub, butterfly: string): Promise<HubProfile>;
   lockedKey(hub: PairedHub): Promise<ProfileLock>;
   linkStart(hub: PairedHub): Promise<HubInvite>;
   linkWatch(hub: PairedHub): Promise<LinkJoining | null>;
@@ -461,6 +480,11 @@ const webHub: NativeHub = {
   changePassword: async (deviceKey, hub, current, next) =>
     (await loadWebClient(deviceKey)).changePassword(hub, current, next),
   renameProfile: async (deviceKey, hub, name) => (await loadWebClient(deviceKey)).renameProfile(hub, name),
+  setProfileButterfly: async (deviceKey, hub, butterfly) => {
+    const client = await loadWebClient(deviceKey);
+    if (!client.setProfileButterfly) throw Object.assign(new Error('Hub client too old'), { code: 'Outdated' });
+    return client.setProfileButterfly(hub, butterfly);
+  },
   lockedKey: async (deviceKey, hub) => (await loadWebClient(deviceKey)).lockedKey(hub),
   openLockedKey: async (lock, password) => (await loadWebModule()).openLockedKey(lock, password),
   profileBackupKey: async (key) => (await loadWebModule()).profileBackupKey(key),
@@ -612,6 +636,17 @@ class SamplerHubServiceImpl {
     return profile;
   }
 
+  //older clients keep the card look local
+  async setProfileButterfly(hub: PairedHub, butterfly: string): Promise<HubProfile | null> {
+    const set = this.native().setProfileButterfly;
+    if (!set) return null;
+    await this.ensureProfile();
+    const profile = await set(await this.deviceKey(), hub, butterfly);
+    const stored = await this.storedProfile();
+    if (stored) await setSecret(PROFILE_KEY, JSON.stringify({ ...stored, profile }));
+    return profile;
+  }
+
   //null without a profile or any known lock
   async profileBackup(): Promise<ProfileBackup | null> {
     const stored = await this.storedProfile();
@@ -715,6 +750,28 @@ class SamplerHubServiceImpl {
   async nearbyHubs(waitMs = NEARBY_WAIT_MS): Promise<NearbyHub[]> {
     const nearby = this.native().nearbyHubs;
     return nearby ? nearby(await this.deviceKey(), waitMs) : [];
+  }
+
+  canSignIn(): boolean {
+    return !!native?.signIn;
+  }
+
+  //profiles a nearby hub offers
+  async nearbyProfiles(hub: NearbyHub): Promise<HubProfile[]> {
+    const list = this.native().nearbyProfiles;
+    if (!list) throw Object.assign(new Error('Needs the app'), { code: 'Outdated' });
+    return list(await this.deviceKey(), hub);
+  }
+
+  //pairs and unlocks with the profile password
+  async signIn(hub: NearbyHub, profileId: string, password: string): Promise<HubProfile> {
+    const signIn = this.native().signIn;
+    if (!signIn) throw Object.assign(new Error('Needs the app'), { code: 'Outdated' });
+    await this.forgetProfile();
+    const { name, kind } = await this.identity();
+    const signed = await signIn(await this.deviceKey(), hub, profileId, password, name, kind);
+    await setSecret(PAIRED_HUB_KEY, JSON.stringify(signed.hub));
+    return this.keepProfile(signed.hub, signed.profile);
   }
 
   canManageModels(): boolean {

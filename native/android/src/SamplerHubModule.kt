@@ -22,6 +22,7 @@ import uniffi.sampler_hub_client.HubProfile
 import uniffi.sampler_hub_client.HubSettings
 import uniffi.sampler_hub_client.LlamaStatus
 import uniffi.sampler_hub_client.ModelFile
+import uniffi.sampler_hub_client.NearbyHub
 import uniffi.sampler_hub_client.PairedHub
 import uniffi.sampler_hub_client.ProfileLock
 //aliased so the bridge methods keep their js names
@@ -294,6 +295,32 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
   @ReactMethod
+  fun nearbyProfiles(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) {
+      Arguments.createArray().apply {
+        for (profile in client(deviceKey).nearbyProfiles(nearbyFromMap(hub))) pushMap(profileToMap(profile))
+      }
+    }
+
+  @ReactMethod
+  fun signIn(
+    deviceKey: String,
+    hub: ReadableMap,
+    profileId: String,
+    password: String,
+    deviceName: String,
+    kind: String,
+    promise: Promise,
+  ) =
+    launchPromise(promise) {
+      val signed = client(deviceKey).signIn(nearbyFromMap(hub), profileId, password, deviceName, kind, machineId())
+      Arguments.createMap().apply {
+        putMap("hub", hubToMap(signed.hub))
+        putMap("profile", unlockedToMap(signed.profile))
+      }
+    }
+
+  @ReactMethod
   fun createProfile(deviceKey: String, hub: ReadableMap, name: String, password: String, promise: Promise) =
     launchPromise(promise) { unlockedToMap(client(deviceKey).createProfile(hubFromMap(hub), name, password)) }
 
@@ -311,6 +338,10 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
   @ReactMethod
   fun renameProfile(deviceKey: String, hub: ReadableMap, name: String, promise: Promise) =
     launchPromise(promise) { profileToMap(client(deviceKey).renameProfile(hubFromMap(hub), name)) }
+
+  @ReactMethod
+  fun setProfileButterfly(deviceKey: String, hub: ReadableMap, butterfly: String, promise: Promise) =
+    launchPromise(promise) { profileToMap(client(deviceKey).setProfileButterfly(hubFromMap(hub), butterfly)) }
 
   @ReactMethod
   fun lockedKey(deviceKey: String, hub: ReadableMap, promise: Promise) =
@@ -503,6 +534,7 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
       putString("name", profile.name)
       putString("role", profile.role)
       putDouble("createdAt", profile.createdAt.toDouble())
+      putString("butterfly", profile.butterfly)
     }
 
   private fun unlockedToMap(unlocked: UnlockedProfile): WritableMap =
@@ -541,6 +573,11 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
   private fun hubFromMap(map: ReadableMap): PairedHub {
     val relays = map.getArray("relays")?.toArrayList()?.map { it.toString() } ?: emptyList()
     return PairedHub(map.getString("id") ?: "", map.getString("name") ?: "", relays)
+  }
+
+  private fun nearbyFromMap(map: ReadableMap): NearbyHub {
+    val addrs = map.getArray("addrs")?.toArrayList()?.map { it.toString() } ?: emptyList()
+    return NearbyHub(map.getString("id") ?: "", map.getString("name") ?: "", addrs)
   }
 
   override fun invalidate() {

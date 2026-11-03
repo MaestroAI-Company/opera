@@ -23,6 +23,7 @@ import {
   HubDevice,
   HubProfile,
   hubErrorCode,
+  NearbyHub,
   SamplerHub,
   PairedHub,
 } from "../../services/hub/SamplerHubService";
@@ -66,6 +67,10 @@ type Page = "pick" | "create" | "unlock" | "profile" | "password";
 type HubProfileSheetProps = {
   visible: boolean;
   hub: PairedHub | null;
+  //unpaired hub signs in by password
+  nearby?: NearbyHub | null;
+  //new profiles need a code
+  onCreateWithCode?: () => void;
   //onboarding restores, settings may also create
   allowCreate?: boolean;
   //prefilled name of a new profile
@@ -102,6 +107,8 @@ const parentOf = (page: Page): Page | null => {
 export default function HubProfileSheet({
   visible,
   hub,
+  nearby = null,
+  onCreateWithCode,
   allowCreate = true,
   defaultName = "",
   changePassword = false,
@@ -205,6 +212,21 @@ export default function HubProfileSheet({
     SamplerHub.deviceId().then(setLoadedDeviceId).catch(() => null);
   }, [visible, thisDeviceIdProp]);
 
+  //a nearby hub lists its profiles before pairing
+  useEffect(() => {
+    if (!visible || hub || !nearby) return;
+    let stopped = false;
+    SamplerHub.nearbyProfiles(nearby)
+      .then((list) => !stopped && setProfiles(list))
+      .catch((e) => {
+        console.warn("[HubProfile] nearby profiles unavailable:", e);
+        if (!stopped) setError(t(`hubPairing.error.${hubErrorCode(e)}`));
+      });
+    return () => {
+      stopped = true;
+    };
+  }, [visible, hub, nearby, t]);
+
   //a link code joins at once, an admin code lists profiles
   useEffect(() => {
     if (!visible || !hub || changePassword || profileProp) return;
@@ -294,7 +316,11 @@ export default function HubProfileSheet({
   const unlock = () => {
     if (!chosen || !password) return;
     run(async () =>
-      onDone(await SamplerHub.unlockProfile(hub!, chosen.id, password)),
+      onDone(
+        hub
+          ? await SamplerHub.unlockProfile(hub, chosen.id, password)
+          : await SamplerHub.signIn(nearby!, chosen.id, password),
+      ),
     );
   };
 
@@ -360,6 +386,7 @@ export default function HubProfileSheet({
               >
                 <ProfileCard
                   name={profile.name}
+                  butterfly={profile.butterfly}
                   createdAt={profile.createdAt * 1000}
                   compact
                 />
@@ -372,7 +399,9 @@ export default function HubProfileSheet({
             <ActionButton
               icon={newIcon}
               label={t("hubProfile.create")}
-              onPress={() => showPage("create")}
+              onPress={() =>
+                !hub && onCreateWithCode ? onCreateWithCode() : showPage("create")
+              }
             />
           </Group>
         )}
@@ -384,7 +413,11 @@ export default function HubProfileSheet({
     chosen && (
       <View style={styles.contentCard}>
         <View style={styles.settingRowVertical}>
-          <ProfileCard name={chosen.name} createdAt={chosen.createdAt * 1000} />
+          <ProfileCard
+            name={chosen.name}
+            createdAt={chosen.createdAt * 1000}
+            butterfly={chosen.butterfly}
+          />
         </View>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={styles.settingLabel}>{t("hubProfile.password")}</Text>
@@ -526,7 +559,11 @@ export default function HubProfileSheet({
         {/* profile card */}
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <ProfileCard name={target.name} createdAt={target.createdAt ? target.createdAt * 1000 : undefined} />
+            <ProfileCard
+              name={target.name}
+              createdAt={target.createdAt ? target.createdAt * 1000 : undefined}
+              butterfly={target.butterfly}
+            />
           </View>
         </View>
 

@@ -5,7 +5,7 @@ use sampler_hub::{config, hub, service};
 use sampler_hub_client::{
     CatalogModel, HubClient, HubDevice, HubError, HubInvite, HubProfile, HubProvider, HubSettings,
     HubStatus, LinkJoining, LinkProgress, LlamaStatus, McpServerSummary, ModelFile, ModelRepo,
-    NearbyHub, PairedHub, ProfileLock, ProxyInfo, PullPage, SyncRecord, UnlockedProfile,
+    NearbyHub, PairedHub, ProfileLock, ProxyInfo, PullPage, SignedIn, SyncRecord, UnlockedProfile,
 };
 use serde::Serialize;
 use tauri::State;
@@ -143,6 +143,31 @@ pub async fn hub_nearby(
     wait_ms: u64,
 ) -> Result<Vec<NearbyHub>, HubError> {
     state.client(&device_key).await?.nearby_hubs(wait_ms).await
+}
+
+#[tauri::command]
+pub async fn hub_nearby_profiles(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: NearbyHub,
+) -> Result<Vec<HubProfile>, HubError> {
+    state.client(&device_key).await?.nearby_profiles(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_sign_in(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: NearbyHub,
+    profile_id: String,
+    password: String,
+    device_name: String,
+    kind: String,
+) -> Result<SignedIn, HubError> {
+    let client = state.client(&device_key).await?;
+    client
+        .sign_in(hub, profile_id, password, device_name, kind, machine_id())
+        .await
 }
 
 #[tauri::command]
@@ -490,6 +515,17 @@ pub async fn hub_rename_profile(
     name: String,
 ) -> Result<HubProfile, HubError> {
     state.client(&device_key).await?.rename_profile(hub, name).await
+}
+
+#[tauri::command]
+pub async fn hub_set_profile_butterfly(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    butterfly: String,
+) -> Result<HubProfile, HubError> {
+    let client = state.client(&device_key).await?;
+    client.set_profile_butterfly(hub, butterfly).await
 }
 
 #[tauri::command]

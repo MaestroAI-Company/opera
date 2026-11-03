@@ -191,7 +191,22 @@ class HubSyncImpl {
     await SamplerHub.renameProfile(hub, trimmed);
   }
 
-  //a profile on a fresh hub gets everything again
+  //offline name and look reach hub later
+  private async matchProfile(hub: PairedHub): Promise<void> {
+    const live = await SamplerHub.refreshProfile(hub).catch(() => null);
+    if (!live) return;
+    const { name, maestroButterfly } = Settings.getCached();
+    if (name.trim() && name.trim() !== live.name) {
+      await SamplerHub.renameProfile(hub, name.trim()).catch((e) => console.warn('[HubSync] profile rename failed:', e));
+    }
+    if (maestroButterfly && maestroButterfly !== live.butterfly) {
+      await SamplerHub.setProfileButterfly(hub, maestroButterfly).catch((e) =>
+        console.warn('[HubSync] profile butterfly failed:', e),
+      );
+    }
+  }
+
+    //fresh hub gets everything again
   async joinedProfile(): Promise<void> {
     //one name for device and hub
     const profile = await SamplerHub.getProfile();
@@ -244,6 +259,7 @@ class HubSyncImpl {
     await this.dropInjectedServers();
     await this.storeProviders(await SamplerHub.providers(hub), hub.name);
     await this.offerUpdate(hub);
+    await this.matchProfile(hub);
     //a cloud sync account replaces sampler, a backup does not
     if (this.paused || (CloudSync.getProviderName() !== 'none' && !CloudSync.isBackupMode())) return;
     const prefs = SyncPrefsStore.get();
@@ -469,8 +485,16 @@ class HubSyncImpl {
       }
       const entry = JSON.parse(record.payload) as ProviderEntry;
       if (entry.kind === 'ollama') {
+        //keep shared copy of same server
+        for (const twin of ollama.filter((s) => s.url.trim() === entry.server.url.trim())) drop(ollama, twin.id!);
         upsert(ollama, entry.server);
       } else if (entry.kind === 'openai') {
+        for (const twin of openai.filter((s) => s.url.trim() === entry.server.url.trim())) {
+          //same url with another key is another account
+          if ((await getOpenAIApiKeyById(twin.id!)) !== entry.apiKey) continue;
+          drop(openai, twin.id!);
+          await setOpenAIApiKey(twin.id!, '');
+        }
         upsert(openai, entry.server);
         await setOpenAIApiKey(record.id, entry.apiKey);
       } else {

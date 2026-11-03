@@ -9,6 +9,8 @@ export type GridCard = {
   title: string;
   status: string;
   icon?: ImageSourcePropType;
+  //small mark left of the title
+  badge?: ImageSourcePropType;
   error?: boolean;
   disabled?: boolean;
   onPress?: () => void;
@@ -57,9 +59,12 @@ export default function CardGrid({ cards, minCardWidth, singleLineTitle, style }
             }}
           >
             {card.icon && <Image source={card.icon} style={styles.icon} tintColor={Colors.textPrimary} />}
-            <Text style={styles.title} numberOfLines={singleLineTitle ? 1 : 2}>
-              {card.title}
-            </Text>
+            <View style={styles.titleRow}>
+              {card.badge && <Image source={card.badge} style={styles.badge} tintColor={Colors.textMuted} />}
+              <Text style={styles.title} numberOfLines={singleLineTitle ? 1 : 2}>
+                {card.title}
+              </Text>
+            </View>
             <Text style={[styles.status, card.error && styles.error]} numberOfLines={1}>
               {card.status}
             </Text>
@@ -96,13 +101,25 @@ const makeStyles = (Colors: ThemeColors) =>
       height: 32,
       marginBottom: Spacing.md,
     },
+    titleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: Spacing.sm,
+      marginBottom: Spacing.xs,
+      maxWidth: "100%",
+    },
+    badge: {
+      width: 14,
+      height: 14,
+    },
     title: {
+      flexShrink: 1,
       fontFamily: Fonts.mono,
       fontSize: FontSizes.body,
       lineHeight: 18,
       color: Colors.textPrimary,
       textAlign: "center",
-      marginBottom: Spacing.xs,
     },
     status: {
       fontFamily: Fonts.body,

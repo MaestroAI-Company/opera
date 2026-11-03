@@ -1379,6 +1379,12 @@ export default function Index() {
     setActiveConversation(conv);
     const msgs = await DB.getMessages(conv.id);
 
+    //back to the level of the last reply
+    const lastThinking = [...msgs].reverse().find((m) => m.metrics?.thinking)?.metrics?.thinking;
+    if (lastThinking === "none" || lastThinking === "low" || lastThinking === "high") {
+      setSelectedReflection(lastThinking);
+    }
+
     if (generatingConvIdRef.current === conv.id && streamingMsgIdRef.current) {
       const patched = msgs.map((m) =>
         m.id === streamingMsgIdRef.current

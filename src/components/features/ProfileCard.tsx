@@ -6,7 +6,7 @@ import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constan
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { getLocale, useT } from "../../i18n";
 import { Settings } from "../../services/settings/SettingsService";
-import { MAESTRO_BUTTERFLIES, useMaestroButterfly } from "./maestroButterfly";
+import { MAESTRO_BUTTERFLIES, MaestroButterflyId, useMaestroButterfly } from "./maestroButterfly";
 
 const CARD_CREATED_AT_KEY = "profileCardCreatedAt";
 const TEXTURES = [
@@ -36,13 +36,28 @@ type ProfileCardProps = {
   compact?: boolean;
   //pause sensor when offscreen
   active?: boolean;
+  //a hub profile shows its own look
+  butterfly?: string | null;
 };
 
-export default function ProfileCard({ name, createdAt: givenCreatedAt, compact = false, active = true }: ProfileCardProps) {
+export default function ProfileCard({
+  name,
+  createdAt: givenCreatedAt,
+  compact = false,
+  active = true,
+  butterfly: givenButterfly,
+}: ProfileCardProps) {
   const styles = useThemedStyles(makeStyles);
   const Colors = useColors();
   const t = useT();
-  const butterfly = MAESTRO_BUTTERFLIES[useMaestroButterfly()];
+  const ownButterfly = useMaestroButterfly();
+  //unknown or missing ids keep this device's look
+  const butterfly =
+    MAESTRO_BUTTERFLIES[
+      givenButterfly && givenButterfly in MAESTRO_BUTTERFLIES
+        ? (givenButterfly as MaestroButterflyId)
+        : ownButterfly
+    ];
   const trimmed = name.trim();
   //length picks the texture, first letter picks the font
   const texture = TEXTURES[trimmed.length % TEXTURES.length];

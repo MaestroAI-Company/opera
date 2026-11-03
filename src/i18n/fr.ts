@@ -381,7 +381,7 @@ export const fr: Translations = {
   "settings.hub.syncProvidersHelp": "Serveurs Ollama, OpenAI et MCP. Les clés API et tokens des providers cloud API sont synchronisés avec Sampler Hub.",
   "settings.hub.syncHubOnly": "Réservé à Sampler Hub. Les clés API et tokens des providers cloud API sont synchronisés avec Sampler Hub.",
   "settings.hub.lanDiscovery": "Visible sur le réseau local",
-  "settings.hub.lanDiscoveryHelp": "Les appareils du même réseau trouvent Sampler Hub et s'y connectent même sans internet. L'appairage demande toujours un code.",
+  "settings.hub.lanDiscoveryHelp": "Les appareils du même réseau trouvent Sampler Hub et s'y connectent même sans internet. Ils se connectent à un profil existant avec son mot de passe, un nouveau profil demande un code.",
   "settings.hub.shareProviders": "Partager les providers de Sampler Hub",
   "settings.hub.shareProvidersHelp": "Les appareils appairés utilisent Ollama et LM Studio de la machine de Sampler Hub.",
   "hubQr.title": "Appairer un appareil",
@@ -1045,6 +1045,9 @@ export const fr: Translations = {
   "settings.mcp.remove.message":
     "Retirer {name} ? Ses outils et sa connexion enregistrée seront supprimés.",
   "settings.server.link": "Lien",
+  "settings.server.compatible": "Serveurs compatibles",
+  "settings.server.compatibleHelp": "Le type est détecté depuis le lien à l'ajout.",
+  "settings.server.compatibleLocal": "Local ou distant",
   "settings.server.add": "Ajouter un serveur",
   "settings.server.name": "Nom (optionnel)",
   "settings.server.namePlaceholder": "nom du serveur",

@@ -19,9 +19,10 @@ import { Settings } from "../../services/settings/SettingsService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import { pressStyle } from "../ui/pressStyle";
+import { butterflyForPersonality } from "./maestroButterfly";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
-const validIcon = require("../../../assets/icons/valid.png");
+const activateIcon = require("../../../assets/icons/activate.png");
 
 const DESKTOP_CARD_WIDTH = 560;
 
@@ -123,7 +124,8 @@ function PersonalityEditor({
   };
 
   const save = () => {
-    Settings.setMany(draft);
+    //answers pick the butterfly, which also clears the easter egg
+    Settings.setMany({ ...draft, maestroButterfly: butterflyForPersonality(draft) });
     onSaved(draft);
     onClose();
   };
@@ -174,7 +176,7 @@ function PersonalityEditor({
 
       <Group style={styles.highlightGroup}>
         <ActionButton
-          icon={validIcon}
+          icon={activateIcon}
           label={t("settings.personality.save")}
           onPress={save}
           variant="highlight"

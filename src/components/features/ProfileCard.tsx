@@ -2,20 +2,21 @@ import { useEffect, useRef, useState } from "react";
 import { LinearGradient } from "expo-linear-gradient";
 import { Gyroscope } from "expo-sensors";
 import { Animated, AppState, Image, Platform, StyleSheet, Text, View } from "react-native";
-import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, Spacing, ThemeColors, VoiceColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { getLocale, useT } from "../../i18n";
 import { Settings } from "../../services/settings/SettingsService";
-import { MAESTRO_BUTTERFLIES, MaestroButterflyId, useMaestroButterfly } from "./maestroButterfly";
+import { MAESTRO_BUTTERFLIES, MaestroButterflyId, useMaestroButterfly, usePersonalityCode, useVoiceColor, DEFAULT_PERSONALITY_CODE } from "./maestroButterfly";
 
 const CARD_CREATED_AT_KEY = "profileCardCreatedAt";
 const TEXTURES = [
-  require("../../../assets/images/texture1.png"),
-  require("../../../assets/images/texture2.png"),
-  require("../../../assets/images/texture3.png"),
-  require("../../../assets/images/texture4.png"),
+  require("../../../assets/images/texture/texture1.png"),
+  require("../../../assets/images/texture/texture2.png"),
+  require("../../../assets/images/texture/texture3.png"),
+  require("../../../assets/images/texture/texture4.png"),
 ];
-const NAME_FONTS = [Fonts.display, Fonts.body, Fonts.mono];
+//indexed by style: informal, common, formal
+const STYLE_FONTS = [Fonts.mono, Fonts.body, Fonts.display];
 const MAX_SHIFT = 28;
 const DECAY = 0.92;
 const GYRO_SPEED = 7;
@@ -51,6 +52,7 @@ export default function ProfileCard({
   const Colors = useColors();
   const t = useT();
   const ownButterfly = useMaestroButterfly();
+  const ownColor = useVoiceColor();
   //unknown or missing ids keep this device's look
   const butterfly =
     MAESTRO_BUTTERFLIES[
@@ -58,12 +60,14 @@ export default function ProfileCard({
         ? (givenButterfly as MaestroButterflyId)
         : ownButterfly
     ];
+  //a hub voice never reaches here, so its card stays red
+  const accentColor = givenButterfly ? VoiceColors.red : ownColor;
   const trimmed = name.trim();
-  //length picks the texture, first letter picks the font
-  const texture = TEXTURES[trimmed.length % TEXTURES.length];
-  const nameFont = trimmed
-    ? NAME_FONTS[trimmed.toLowerCase().charCodeAt(0) % NAME_FONTS.length]
-    : Fonts.display;
+  //personality picks the look, a hub profile keeps the defaults
+  const ownCode = usePersonalityCode();
+  const code = givenButterfly ? DEFAULT_PERSONALITY_CODE : ownCode;
+  const texture = TEXTURES[(Math.floor(code / 3) + (code % 3)) % TEXTURES.length];
+  const nameFont = STYLE_FONTS[Math.floor(code / 3) % 3];
   const [createdAt, setCreatedAt] = useState<number | null>(null);
   const shift = useRef(new Animated.Value(0)).current;
 
@@ -141,7 +145,7 @@ export default function ProfileCard({
   }, [shift, active]);
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: accentColor }]}>
       {/* white fade gives the red its gradient */}
       <LinearGradient
         colors={[`${Colors.textOnPrimary}59`, `${Colors.textOnPrimary}00`]}
@@ -162,12 +166,18 @@ export default function ProfileCard({
             </Text>
             <Image source={butterfly.icon} style={styles.logoCompact} tintColor={`${Colors.textOnPrimary}99`} />
           </View>
-          <Image source={butterfly.color} style={styles.butterflyCompact} resizeMode="contain" resizeMethod="resize" />
+          <View style={styles.butterflyCompact}>
+            <Image source={butterfly.base} style={styles.stackFill} resizeMode="contain" resizeMethod="resize" />
+            <Image source={butterfly.accent} tintColor={accentColor} style={styles.stackFill} resizeMode="contain" resizeMethod="resize" />
+          </View>
         </View>
       ) : (
         <View style={styles.content}>
           <View style={styles.tile}>
-            <Image source={butterfly.color} style={styles.tileButterfly} resizeMode="contain" resizeMethod="resize" />
+            <View style={styles.tileButterfly}>
+              <Image source={butterfly.base} style={styles.stackFill} resizeMode="contain" resizeMethod="resize" />
+              <Image source={butterfly.accent} tintColor={accentColor} style={styles.stackFill} resizeMode="contain" resizeMethod="resize" />
+            </View>
           </View>
 
           <Text
@@ -265,6 +275,14 @@ const makeStyles = (Colors: ThemeColors) =>
     tileButterfly: {
       width: "75%",
       height: "75%",
+    },
+    //accent layer sits exactly over the base layer
+    stackFill: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
     },
     name: {
       fontFamily: Fonts.display,

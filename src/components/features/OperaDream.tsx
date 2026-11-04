@@ -48,6 +48,7 @@ import { pressStyle } from "../ui/pressStyle";
 import ThinkingIcon from "../ui/ThinkingIcon";
 import ButterflyCluster from "./ButterflyCluster";
 import { FlashingText } from "./ChatView";
+import VoiceGrid from "./VoiceGrid";
 import { ModelSelectorDrawer } from "./ModelSelector";
 
 const micIcon = require("../../../assets/icons/microphone.png");
@@ -200,6 +201,9 @@ function OperaDream() {
   const [answer, setAnswer] = useState<{ msgId: string; content: string } | null>(null);
   const [generatingConvId, setGeneratingConvId] = useState<string | null>(null);
   const [voice, setVoice] = useState<VoiceState>("idle");
+  //mic level read by the voice wave
+  const volumeRef = useRef(0);
+  const getVolume = useCallback(() => volumeRef.current, []);
   const [sleeping, setSleeping] = useState(false);
   const [lastTouch, setLastTouch] = useState(0);
   const actionsOpacity = useAnimatedValue(1);
@@ -503,6 +507,7 @@ function OperaDream() {
           clearTimeout(silenceTimerRef.current);
         },
         onFinal: (text) => { if (text) liveTextRef.current = text; },
+        onVolume: (v) => { volumeRef.current = v > 0 ? v / 10 : 0; },
         onSpeechStart: () => {
           clearTimeout(vadTimerRef.current);
           clearTimeout(silenceTimerRef.current);
@@ -647,7 +652,7 @@ function OperaDream() {
     <Pressable
       onPress={handleMicPress}
       style={pressStyle(
-        [styles.button, styles.micButton, incognito && styles.micButtonIncognito, conversing && styles.wideButton],
+        [styles.button, styles.micButton, incognito && styles.micButtonIncognito, busy ? styles.stopButton : conversing && styles.wideButton],
         incognito ? { backgroundColor: Colors.incognitoPressed } : "primary"
       )}
     >
@@ -687,7 +692,7 @@ function OperaDream() {
   const actions = (withIncognito: boolean) => (
     <Animated.View style={actionsStyle}>
       {micButton}
-      {modelButton}
+      {voice === "idle" && modelButton}
       {withIncognito && incognitoButton}
     </Animated.View>
   );
@@ -780,6 +785,14 @@ function OperaDream() {
         setLandscape(width > height);
       }}
     >
+      {/* under the content so the buttons stay tappable */}
+      {voice === "listening" && (
+        <VoiceGrid
+          getVolume={getVolume}
+          color={incognito ? Colors.incognito : Colors.primary}
+          style={styles.voiceBand}
+        />
+      )}
       <Animated.View
         style={[
           styles.content,
@@ -977,6 +990,11 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   wideButton: {
     flex: 2,
   },
+  //square stop button while busy
+  stopButton: {
+    flex: 0,
+    width: BUTTON_HEIGHT,
+  },
   micIcon: {
     width: 18,
     height: 18,
@@ -996,6 +1014,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   buttonLabelActive: {
     color: Colors.textOnPrimary,
+  },
+  //full width band along the bottom edge
+  voiceBand: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 120,
   },
 });
 

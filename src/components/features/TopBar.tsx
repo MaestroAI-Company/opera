@@ -17,7 +17,7 @@ import { pressStyle } from "../ui/pressStyle";
 const moreIcon = require("../../../assets/icons/More.png");
 const addIcon = require("../../../assets/icons/add.png");
 const incognitoOffIcon = require("../../../assets/icons/operaicon.png");
-const incognitoOnIcon = require("../../../assets/icons/operaicon5.png");
+const incognitoOnIcon = require("../../../assets/icons/operaiconEgg.png");
 
 type TopBarProps = {
   onMenuPress: () => void;

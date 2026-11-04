@@ -138,6 +138,14 @@ export const DarkColors: ThemeColors = {
 //light stays the module default so non-react code keeps working
 export const Colors = LightColors;
 
+//one accent per maestro voice, same in both themes
+export const VoiceColors = {
+  red: "#FF1A1A",
+  pink: "#EE8695",
+  amber: "#E49D22",
+  blue: "#1A6DD2",
+} as const;
+
 export const Fonts = {
   display: "Petrona",
   body: "Figtree",

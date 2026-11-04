@@ -28,6 +28,8 @@ type SliderToggleProps = {
   iconOnly?: boolean;
   //draw the label next to the icon, with iconOnly
   withLabel?: boolean;
+  //purple pill instead of red, for incognito
+  incognito?: boolean;
 };
 
 const THEME_ICONS = { system: autoIcon, light: lightIcon, dark: darkIcon };
@@ -51,8 +53,11 @@ export default function SliderToggle({
   radius,
   iconOnly = false,
   withLabel = false,
+  incognito = false,
 }: SliderToggleProps) {
   const Colors = useColors();
+  const pillColor = incognito ? Colors.incognito : Colors.primary;
+  const pillColorBright = incognito ? Colors.incognitoBright : Colors.primaryBright;
   const styles = useThemedStyles(makeStyles);
   const t = useT();
 
@@ -190,7 +195,7 @@ export default function SliderToggle({
 
   const pillAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: pillX.value }, { scale: scale.value }],
-    backgroundColor: interpolateColor(pillLit.value, [0, 1], [Colors.primary, Colors.primaryBright]),
+    backgroundColor: interpolateColor(pillLit.value, [0, 1], [pillColor, pillColorBright]),
   }));
 
   const labelPulseStyle = useAnimatedStyle(() => ({

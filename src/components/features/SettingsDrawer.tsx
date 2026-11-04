@@ -144,7 +144,10 @@ import {
   pushDesktopOverlayConfig,
 } from "../../services/overlay/desktopOverlay";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
-import { openScreenSaverSettings } from "../../services/screensaver/ScreenSaver";
+import {
+  isScreenSaverActive,
+  openScreenSaverSettings,
+} from "../../services/screensaver/ScreenSaver";
 import { AppSettings, Settings } from "../../services/settings/SettingsService";
 import { TTS_SPEEDS } from "../../services/speech/engines";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
@@ -170,9 +173,9 @@ import DrawerSheet, {
   SheetScrollView,
 } from "./DrawerSheet";
 import {
-  BUTTERFLY_OPTIONS,
-  selectButterfly,
-  useMaestroButterfly,
+  VOICE_OPTIONS,
+  selectVoice,
+  useVoice,
 } from "./maestroButterfly";
 import MaestroCard from "./MaestroCard";
 import PersonalitySheet, {
@@ -225,7 +228,6 @@ const addIcon = require("../../../assets/icons/add.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 const deleteIcon = require("../../../assets/icons/delete.png");
 const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
-const editIcon = require("../../../assets/icons/edit.png");
 const keyIcon = require("../../../assets/icons/key.png");
 
 //tools and video stay hidden here
@@ -258,7 +260,7 @@ const supportIcon = require("../../../assets/icons/support.png");
 const informationIcon = require("../../../assets/icons/information.png");
 const githubIcon = require("../../../assets/icons/github.png");
 const operaIcon = require("../../../assets/icons/operaicon.png");
-const samplerIcon = require("../../../assets/icons/operaicon5.png");
+const samplerIcon = require("../../../assets/icons/operaiconEgg.png");
 const instagramIcon = require("../../../assets/icons/instagram.png");
 const tiktokIcon = require("../../../assets/icons/tiktok.png");
 const micIcon = require("../../../assets/icons/microphone.png");
@@ -1171,7 +1173,7 @@ export default function SettingsDrawer({
   };
   //empty id means chores follow the main model
   const [quickFlowId, setQuickFlowIdState] = useState("");
-  const maestroButterfly = useMaestroButterfly();
+  const voice = useVoice();
   const [ttsSpeed, setTtsSpeedState] = useState(
     () => Settings.getCached().ttsSpeed,
   );
@@ -1393,6 +1395,23 @@ export default function SettingsDrawer({
     });
     return () => sub.remove();
   }, [visible, activeSubPage, refreshPermissionStatuses]);
+
+  //hides the open settings card once opera is the screen saver
+  const [screenSaverActive, setScreenSaverActive] = useState(false);
+
+  const refreshScreenSaverStatus = useCallback(() => {
+    isScreenSaverActive().then(setScreenSaverActive);
+  }, []);
+
+  //recheck after returning from system settings
+  useEffect(() => {
+    if (!visible || activeSubPage !== "screensaver") return;
+    refreshScreenSaverStatus();
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") refreshScreenSaverStatus();
+    });
+    return () => sub.remove();
+  }, [visible, activeSubPage, refreshScreenSaverStatus]);
 
   const renderPermissionBadge = (status: PermissionState) => (
     <View
@@ -3926,7 +3945,7 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.nav.screenSaver.title"))}
 
       {/* screen saver settings card */}
-      {Platform.OS === "android" && (
+      {Platform.OS === "android" && !screenSaverActive && (
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>
@@ -4169,7 +4188,7 @@ export default function SettingsDrawer({
           </Text>
           <Group>
             <ActionButton
-              icon={editIcon}
+              icon={penPlaceholderIcon}
               label={t("settings.personality.edit")}
               onPress={() => setPersonalitySheetVisible(true)}
             />
@@ -4185,9 +4204,9 @@ export default function SettingsDrawer({
               {t("settings.maestro.voice")}
             </Text>
             <IconSelector
-              options={BUTTERFLY_OPTIONS}
-              selectedValue={maestroButterfly}
-              onSelect={selectButterfly}
+              options={VOICE_OPTIONS}
+              selectedValue={voice}
+              onSelect={selectVoice}
             />
             {/* desktop puts the slider at the right of the label */}
             <View
@@ -8045,8 +8064,8 @@ const makeStyles = (Colors: ThemeColors) =>
       paddingVertical: Spacing.md,
     },
     personalitySentence: {
-      fontSize: FontSizes.body,
-      lineHeight: 21,
+      fontSize: FontSizes.lg,
+      lineHeight: 26,
       color: Colors.textPrimary,
       fontFamily: Fonts.body,
       textAlign: "center",

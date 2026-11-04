@@ -169,7 +169,7 @@ import {
   takeReleaseNotes,
 } from "../services/updates/UpdateService";
 
-const texture2 = require("../../assets/images/texture2.png");
+const texture2 = require("../../assets/images/texture/texture2.png");
 const settingsIcon = require("../../assets/icons/settings.png");
 const addIcon = require("../../assets/icons/add.png");
 const chatIcon = require("../../assets/icons/message.png");
@@ -465,6 +465,7 @@ export default function Index() {
             : 0,
     [isDesktop, samplerAnim, dockedWidth, samplerReady, inSampler],
   );
+  const [incognitoMode, setIncognitoMode] = useState(false);
   const samplerSwitchOptions = useMemo(
     () => [
       { id: "chat", label: t("sampler.switch.chat"), icon: chatIcon },
@@ -480,6 +481,7 @@ export default function Index() {
       radius={Radius.lg2}
       iconOnly
       withLabel={isDesktop}
+      incognito={incognitoMode}
     />
   ) : undefined;
   //shared with the panResponder below so the swipe-up gesture can drag it live
@@ -528,7 +530,6 @@ export default function Index() {
     }
   }, [drawerVisible, settingsDrawerVisible, isDesktop]);
 
-  const [incognitoMode, setIncognitoMode] = useState(false);
   //fades the incognito blurb in and out instead of snapping it
   const incognitoProgress = useAnimatedValue(0);
   useEffect(() => {
@@ -2740,7 +2741,7 @@ export default function Index() {
                   <View style={styles.addSharedContainer}>
                     <View style={styles.addSharedInner}>
                       <View style={styles.addSharedWrapper}>
-                        <Group>
+                        <Group style={styles.addSharedGroup}>
                           <ActionButton
                             icon={addIcon}
                             label={t("share.preview.add")}
@@ -3158,6 +3159,17 @@ const makeStyles = (Colors: ThemeColors) =>
     addSharedWrapper: {
       marginHorizontal: 16,
       marginBottom: 16,
+      borderRadius: Radius.window,
+      backgroundColor: Colors.surface,
+      shadowColor: Colors.shadowInk,
+      shadowOffset: { width: -6, height: 6 },
+      shadowOpacity: 1,
+      shadowRadius: 0,
+      elevation: 2,
+    },
+    addSharedGroup: {
+      borderWidth: 0,
+      borderRadius: Radius.window,
     },
     addSharedButton: {
       height: 56,

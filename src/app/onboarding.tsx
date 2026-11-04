@@ -33,7 +33,7 @@ import DrawerSheet, { SheetScrollView } from "../components/features/DrawerSheet
 import HubPairingSheet from "../components/features/HubPairingSheet";
 import HubProfileSheet from "../components/features/HubProfileSheet";
 import VoiceEngineCard from "../components/features/VoiceEngineCard";
-import { BUTTERFLY_OPTIONS, selectButterfly, useMaestroButterfly } from "../components/features/maestroButterfly";
+import { VOICE_OPTIONS, selectVoice, useVoice } from "../components/features/maestroButterfly";
 import ActionButton from "../components/ui/ActionButton";
 import Group from "../components/ui/Group";
 import IconSelector from "../components/ui/IconSelector";
@@ -57,7 +57,7 @@ import { TTS_SPEEDS, supportedEngineIds } from "../services/speech/engines";
 import { STT } from "../services/speech/STTService";
 import { pressStyle } from "../components/ui/pressStyle";
 
-const texture2 = require("../../assets/images/texture2.png");
+const texture2 = require("../../assets/images/texture/texture2.png");
 const wordmarkAnimation = require("../../assets/animations/wordmark.json");
 const startupSound = require("../../assets/sounds/startup.m4a");
 const arrowIcon = require("../../assets/icons/arrow.png");
@@ -335,7 +335,7 @@ export default function OnboardingPage() {
   const [name, setName] = useState(() => Settings.getCached().name);
   const [ttsSpeed, setTtsSpeedState] = useState(() => Settings.getCached().ttsSpeed);
   const voicePackInstalled = useVoicePackInstalled();
-  const maestroButterfly = useMaestroButterfly();
+  const voice = useVoice();
   const [statuses, setStatuses] = useState<Partial<Record<PermissionId, PermissionStatus>>>({});
   const contentOpacity = useAnimatedValue(1);
   const backButtonProgress = useAnimatedValue(0);
@@ -757,7 +757,7 @@ export default function OnboardingPage() {
         {voicePackInstalled && (
           <View style={styles.contentCard}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.maestro.voice")}</Text>
-            <IconSelector options={BUTTERFLY_OPTIONS} selectedValue={maestroButterfly} onSelect={selectButterfly} />
+            <IconSelector options={VOICE_OPTIONS} selectedValue={voice} onSelect={selectVoice} />
             <Text style={[styles.settingLabel, { marginTop: Spacing.xxl, marginBottom: Spacing.md }]}>
               {t("settings.tts.speed")}
             </Text>

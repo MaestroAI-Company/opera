@@ -28,10 +28,11 @@ import Reanimated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { Colors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { AppEvents } from "../../services/events";
 import { OverlayPresence } from "../../services/overlay/overlayPresence";
-import { MAESTRO_BUTTERFLIES, useMaestroButterfly } from "./maestroButterfly";
+import { MAESTRO_BUTTERFLIES, useMaestroButterfly, useVoiceColor } from "./maestroButterfly";
 
 const MAX_SHIFT = 16;
 const DECAY = 0.92;
@@ -56,6 +57,8 @@ export type ButterflyClusterProps = {
   ref?: Ref<View>;
   parallax?: boolean;
   intro?: boolean;
+  //accent takes the voice color
+  voiceColor?: boolean;
 };
 
 //maestro butterfly with gyro parallax
@@ -67,8 +70,10 @@ function ButterflyCluster({
   ref,
   parallax = true,
   intro = true,
+  voiceColor = false,
 }: ButterflyClusterProps) {
   const butterfly = MAESTRO_BUTTERFLIES[useMaestroButterfly()];
+  const color = useVoiceColor();
   //flight or no intro starts fully shown
   const introAnim = useAnimatedValue(from || !intro ? 1 : 0);
   const gyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -279,8 +284,15 @@ function ButterflyCluster({
         style={[styles.imageFill, { opacity: introOpacity, transform: introTransform }]}
       >
         <Animated.Image
-          source={incognito ? butterfly.grey : butterfly.color}
+          source={butterfly.base}
           style={[styles.imageFill, { transform: gyroTransform }]}
+          resizeMode="contain"
+          resizeMethod="resize"
+        />
+        <Animated.Image
+          source={butterfly.accent}
+          tintColor={incognito ? Colors.incognito : voiceColor ? color : undefined}
+          style={[styles.imageFill, styles.imageOverlay, { transform: gyroTransform }]}
           resizeMode="contain"
           resizeMethod="resize"
         />
@@ -293,6 +305,12 @@ const styles = StyleSheet.create({
   imageFill: {
     width: "100%",
     height: "100%",
+  },
+  //stacks the accent layer exactly over the base layer
+  imageOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
   },
   hidden: {
     opacity: 0,

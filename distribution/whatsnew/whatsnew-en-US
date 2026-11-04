@@ -1,7 +1,3 @@
-Opera 1.0 is here.
+Fixes for Opera 1.0.
 
-Opera Desktop arrives on Windows, macOS and Linux with an assistant overlay, push to talk and much faster local AI.
-
-Sampler Hub, your own sync server: encrypted sync, profiles, shared models and MCP tools, and password sign-in on your home network.
-
-Also: Stand-by smart display with a wake word, Maestro's personality and neural voices, message editing, image reading and sharing into Opera.
+The macOS installer no longer says it is damaged, and the Sampler page no longer shows up empty on a wide window when no hub is linked.

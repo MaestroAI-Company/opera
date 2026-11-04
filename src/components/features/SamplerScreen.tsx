@@ -1934,8 +1934,6 @@ export default function SamplerScreen({
   const renderWelcome = () => {
     //stored pairing never shows onboarding
     const paired = !!pairedHub;
-    //a browser cannot host, it leaves the screen once unpaired
-    if (!paired && isDesktop && !canHost) return null;
     if (paired && (!online || hubStopped)) {
       return renderStopped();
     }

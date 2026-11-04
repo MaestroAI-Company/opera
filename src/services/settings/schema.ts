@@ -22,6 +22,9 @@ export type AppSettings = {
   speaker: boolean;
   autoSpeak: boolean;
   maestroButterfly: string;
+  maestroMood: string;
+  maestroStyle: string;
+  maestroDepth: string;
   ttsEngine: string;
   ttsVoices: string;
   ttsSpeed: string;
@@ -83,6 +86,9 @@ export const BASE_DEFAULTS: AppSettings = {
   autoSpeak: true,
   //empty means the first butterfly
   maestroButterfly: '',
+  maestroMood: 'neutral',
+  maestroStyle: 'common',
+  maestroDepth: 'balanced',
   //supertonic until the user picks system
   ttsEngine: 'supertonic',
   //engine id to voice json

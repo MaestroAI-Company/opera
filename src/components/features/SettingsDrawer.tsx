@@ -175,6 +175,11 @@ import {
   useMaestroButterfly,
 } from "./maestroButterfly";
 import MaestroCard from "./MaestroCard";
+import PersonalitySheet, {
+  personalityParts,
+  readPersonality,
+  slotWord,
+} from "./PersonalitySheet";
 import ProfileCard from "./ProfileCard";
 import VoiceEngineCard from "./VoiceEngineCard";
 
@@ -220,6 +225,7 @@ const addIcon = require("../../../assets/icons/add.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 const deleteIcon = require("../../../assets/icons/delete.png");
 const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
+const editIcon = require("../../../assets/icons/edit.png");
 const keyIcon = require("../../../assets/icons/key.png");
 
 //tools and video stay hidden here
@@ -1085,8 +1091,12 @@ export default function SettingsDrawer({
     return () => sub.remove();
   }, [windowed, refreshHub]);
 
+  const [personality, setPersonality] = useState(readPersonality);
+  const [personalitySheetVisible, setPersonalitySheetVisible] =
+    useState(false);
   //open sheets keep the back press for themselves
   const sheetOpen =
+    personalitySheetVisible ||
     profileEditVisible ||
     addModelSheetVisible ||
     litertSheetVisible ||
@@ -1582,6 +1592,11 @@ export default function SettingsDrawer({
       setWhisperModelState(s.whisperModel);
       setWhisperLanguageState(s.whisperLanguage);
       setInstructionState(s.instruction);
+      setPersonality({
+        maestroMood: s.maestroMood,
+        maestroStyle: s.maestroStyle,
+        maestroDepth: s.maestroDepth,
+      });
       setNameState(s.name || "");
       setConfirmedName(s.name || "");
       setAlwaysWhisperState(s.alwaysWhisper);
@@ -4133,6 +4148,35 @@ export default function SettingsDrawer({
         <MaestroCard />
       </View>
 
+      {/* personality card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+            {t("settings.personality.title")}
+          </Text>
+          <Text style={styles.personalitySentence}>
+            {personalityParts(t("settings.personality.sentence"))
+              .map((part) =>
+                part === "mood"
+                  ? slotWord(t, part, personality.maestroMood)
+                  : part === "style"
+                    ? slotWord(t, part, personality.maestroStyle)
+                    : part === "depth"
+                      ? slotWord(t, part, personality.maestroDepth)
+                      : part,
+              )
+              .join("")}
+          </Text>
+          <Group>
+            <ActionButton
+              icon={editIcon}
+              label={t("settings.personality.edit")}
+              onPress={() => setPersonalitySheetVisible(true)}
+            />
+          </Group>
+        </View>
+      </View>
+
       {/* butterfly selector card */}
       {voicePackInstalled && (
         <View style={styles.contentCard}>
@@ -6291,6 +6335,16 @@ export default function SettingsDrawer({
 
   const shownHubServer = getHubServers().find((s) => s.url === shownHubUrl);
 
+  const personalitySheet = (
+    <PersonalitySheet
+      visible={personalitySheetVisible}
+      onClose={() => setPersonalitySheetVisible(false)}
+      onSaved={setPersonality}
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+    />
+  );
+
   //hub server detail sheet
   const hubServerSheet = (
     <DrawerSheet
@@ -7753,6 +7807,7 @@ export default function SettingsDrawer({
             {addModelSheet}
             {ollamaServerSheet}
             {hubServerSheet}
+            {personalitySheet}
             {hubModelSheet}
             {openaiAddServerSheet}
             {openaiServerSheet}
@@ -7803,6 +7858,7 @@ export default function SettingsDrawer({
       {addModelSheet}
       {ollamaServerSheet}
       {hubServerSheet}
+      {personalitySheet}
       {hubModelSheet}
       {openaiAddServerSheet}
       {openaiServerSheet}
@@ -7987,6 +8043,15 @@ const makeStyles = (Colors: ThemeColors) =>
       right: 0,
       alignItems: "center",
       paddingVertical: Spacing.md,
+    },
+    personalitySentence: {
+      fontSize: FontSizes.body,
+      lineHeight: 21,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.body,
+      textAlign: "center",
+      marginBottom: Spacing.md,
+      paddingHorizontal: Spacing.md,
     },
     addModelSheetDesktop: {
       width: 560,

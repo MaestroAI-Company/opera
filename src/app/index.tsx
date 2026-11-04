@@ -161,6 +161,7 @@ import {
   usesDefaultPasteHost,
 } from "../services/share/ShareService";
 import { speakReplyLive } from "../services/speech/liveReply";
+import { TTS } from "../services/speech/TTSService";
 import { STT, WhisperSTT } from "../services/speech/STTService";
 import {
   getAvailableUpdate,
@@ -1257,6 +1258,25 @@ export default function Index() {
     };
     fetchCapabilities();
   }, [selectedModel, aiService, ollamaUrl, capsRevision]);
+
+  //leaving the app silences the voice
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") TTS.stop();
+    });
+    return () => {
+      sub.remove();
+      TTS.stop();
+    };
+  }, []);
+
+  //switching chats silences the voice
+  const prevConvIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = activeConversation?.id ?? null;
+    if (prevConvIdRef.current && prevConvIdRef.current !== id) TTS.stop();
+    prevConvIdRef.current = id;
+  }, [activeConversation?.id]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextAppState) => {

@@ -36,6 +36,7 @@ import { AppEvents } from '../../services/events';
 import { initI18n, useT } from '../../i18n';
 import { AppSettings, Settings } from '../../services/settings/SettingsService';
 import { STT, WhisperSTT } from "../../services/speech/STTService";
+import { TTS } from "../../services/speech/TTSService";
 import { speakReplyLive } from '../../services/speech/liveReply';
 import NotificationModal from '../ui/NotificationModal';
 import CodeDownloadHost from './CodeDownloadHost';
@@ -381,6 +382,7 @@ function AssistantOverlay() {
 
   //full overlay reset on close/reopen
   const resetOverlay = useCallback(() => {
+    TTS.stop();
     chatBarRef.current?.stopRecording();
     chatBarRef.current?.clear();
     ScreenCapture.clearText();

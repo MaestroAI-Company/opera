@@ -37,6 +37,7 @@ import {
 import { findMentionSpans, listMentionables, MentionSpan } from "../../services/ai/mentions";
 import { Settings } from "../../services/settings/SettingsService";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
+import { TTS } from "../../services/speech/TTSService";
 import { buildWavBuffer } from "../../services/speech/wav";
 import IconButton from "../ui/IconButton";
 import NotificationModal from "../ui/NotificationModal";
@@ -479,6 +480,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       let locale = Settings.getCached().whisperLanguage || "en-US";
       if (locale === "auto" || locale.length > 5) locale = "en-US";
       const recordAudio = canTranscribeRemotely && STT.supportsRecording();
+      TTS.stop();
       STT.start(locale, {
         onPartial: (t) => { if (t) { liveTextRef.current = t; setText(t); } },
         onFinal: (t) => { if (t) liveTextRef.current = t; },

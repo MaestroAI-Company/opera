@@ -1,4 +1,5 @@
 import type { ToolDefinition } from '../ai/tools/ITool';
+import { HUB_URL_SCHEME, SamplerHub } from '../hub/SamplerHubService';
 
 export type LiveToolCall = { id: string; name: string; args: Record<string, any> };
 export type LiveToolResult = { call: LiveToolCall; output: string };
@@ -19,7 +20,12 @@ export type ProtocolEvents = {
 export type LiveProtocol = {
   inputRate: number;
   outputRate: number;
+  //server detects the end of turns
+  serverVad: boolean;
+  transcribesUser: boolean;
   appendAudio(pcm16Base64: string): void;
+  //client vad decided the user finished
+  endTurn(): void;
   sendFrame(jpegBase64: string): void;
   //results then the model goes on
   sendToolResults(results: LiveToolResult[]): void;
@@ -61,6 +67,7 @@ export async function frameText(data: unknown): Promise<string> {
 
 //rn websocket takes headers as a third argument
 export function openSocket(url: string, protocols?: string[], headers?: Record<string, string>): WebSocket {
+  if (url.startsWith(HUB_URL_SCHEME)) return SamplerHub.realtimeSocket(url);
   const Socket = WebSocket as unknown as new (u: string, p?: string[], o?: { headers?: Record<string, string> }) => WebSocket;
   const ws = headers ? new Socket(url, protocols, { headers }) : new Socket(url, protocols);
   ws.binaryType = 'arraybuffer';

@@ -681,16 +681,31 @@ export default function Index() {
   //turns saved in order so one conversation is created
   const liveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const currentLiveBackend = useMemo(
-    () => liveBackend(aiService, ollamaUrl, selectedModel),
-    [aiService, ollamaUrl, selectedModel],
+    () => liveBackend(aiService, ollamaUrl, selectedModel, modelCapabilities),
+    [aiService, ollamaUrl, selectedModel, modelCapabilities],
   );
   const liveInstructions = useMemo(
     () => buildSystemPrompt(selectedModel, userInstruction, LIVE_PROMPT_SEGMENT),
     [selectedModel, userInstruction],
   );
 
+  const [liveAskVisible, setLiveAskVisible] = useState(false);
+  const [liveTranscribe, setLiveTranscribe] = useState(false);
   const openLive = useCallback(() => {
     liveConvRef.current = activeConversationRef.current;
+    const choice = Settings.getCached().liveTranscription;
+    //transcription costs extra
+    if (currentLiveBackend && currentLiveBackend.kind !== "gemini" && choice === "ask") {
+      setLiveAskVisible(true);
+      return;
+    }
+    setLiveTranscribe(choice === "on");
+    setLiveOpen(true);
+  }, [currentLiveBackend]);
+  const answerLiveAsk = useCallback((transcribe: boolean) => {
+    Settings.set("liveTranscription", transcribe ? "on" : "off");
+    setLiveAskVisible(false);
+    setLiveTranscribe(transcribe);
     setLiveOpen(true);
   }, []);
 
@@ -2881,10 +2896,22 @@ export default function Index() {
                   ? activeConversation.id.startsWith("incognito_")
                   : incognitoMode
               }
+              transcribe={liveTranscribe}
               onTurn={handleLiveTurn}
               onClose={() => setLiveOpen(false)}
             />
           )}
+
+          <NotificationModal
+            visible={liveAskVisible}
+            title={t("live.transcribe.title")}
+            message={t("live.transcribe.message")}
+            buttons={[
+              { text: t("live.transcribe.skip"), style: "secondary", onPress: () => answerLiveAsk(false) },
+              { text: t("live.transcribe.enable"), style: "primary", onPress: () => answerLiveAsk(true) },
+            ]}
+            onClose={() => setLiveAskVisible(false)}
+          />
 
           {(showSamplerSwitch || !isDesktop) && (
             <SamplerScreen

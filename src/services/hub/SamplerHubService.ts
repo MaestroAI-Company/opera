@@ -397,7 +397,72 @@ type WebClient = {
     headers: [string, string][],
     body: Uint8Array,
   ): Promise<WebResponse>;
+  realtime(hub: PairedHub, provider: string, path: string): Promise<WebRealtime>;
 };
+
+//text frames of a realtime session
+type WebRealtime = {
+  send(text: string): Promise<void>;
+  read(): Promise<string | undefined>;
+  close(): void;
+};
+
+//websocket look alike over the wasm tunnel
+class HubRealtimeSocket extends EventTarget {
+  readyState = 0;
+  binaryType = 'arraybuffer';
+  onopen: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  private session: WebRealtime | null = null;
+
+  constructor(open: Promise<WebRealtime>) {
+    super();
+    open.then(
+      (session) => {
+        if (this.readyState > 1) return session.close();
+        this.session = session;
+        this.readyState = 1;
+        this.emit(new Event('open'));
+        this.pump();
+      },
+      () => this.fail(),
+    );
+  }
+
+  send(text: string): void {
+    this.session?.send(text).catch(() => this.fail());
+  }
+
+  close(): void {
+    if (this.readyState > 1) return;
+    this.readyState = 3;
+    this.session?.close();
+    this.dispatchEvent(new CloseEvent('close'));
+  }
+
+  private emit(event: Event): void {
+    if (event.type === 'open') this.onopen?.();
+    if (event.type === 'error') this.onerror?.();
+    this.dispatchEvent(event);
+  }
+
+  private async pump(): Promise<void> {
+    try {
+      for (let text = await this.session!.read(); text !== undefined; text = await this.session!.read()) {
+        this.dispatchEvent(new MessageEvent('message', { data: text }));
+      }
+      this.close();
+    } catch {
+      this.fail();
+    }
+  }
+
+  private fail(): void {
+    if (this.readyState > 1) return;
+    this.emit(new Event('error'));
+    this.close();
+  }
+}
 
 type WebModule = {
   default(options: { module_or_path: string }): Promise<unknown>;
@@ -976,6 +1041,18 @@ class SamplerHubServiceImpl {
           cancel: () => response.cancel(),
         });
     return new Response(body, { status: response.status, headers: response.headers });
+  }
+
+  //browsers need the tunnel
+  realtimeSocket(url: string): WebSocket {
+    const open = (async () => {
+      const hub = await this.getPairedHub();
+      if (!hub) throw Object.assign(new Error('No Sampler paired'), { code: 'Unauthorized' });
+      const client = await loadWebClient(await this.deviceKey());
+      const [provider, ...rest] = url.slice(HUB_URL_SCHEME.length).split('/');
+      return client.realtime(hub, provider, `/${rest.join('/')}`);
+    })();
+    return new HubRealtimeSocket(open) as unknown as WebSocket;
   }
 
   //maps hub urls to the local proxy

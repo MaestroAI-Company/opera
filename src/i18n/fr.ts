@@ -295,6 +295,12 @@ export const fr: Translations = {
   "live.camera": "Caméra",
   "live.selectCamera": "Choisir une caméra",
   "live.hangUp": "Raccrocher",
+  "live.voiceMessage": "Message vocal",
+  "live.transcribe.title": "Écrire ce que tu dis ?",
+  "live.transcribe.message":
+    "Écrire tes paroles dans le chat demande un traitement en plus : une deuxième session sur ton serveur avec les modèles locaux, ou un modèle de transcription facturé chez OpenAI. Tu pourras changer ça dans les réglages.",
+  "live.transcribe.enable": "Transcrire",
+  "live.transcribe.skip": "Pas maintenant",
 
   "whisper.notConfigured.title": "Whisper non configuré",
   "whisper.notConfigured.message":
@@ -721,6 +727,9 @@ export const fr: Translations = {
   "settings.general.detectionBoxes": "Afficher les boxes de détection",
   "settings.general.detectionBoxesHelp":
     "Entoure les éléments de l'écran sur lesquels la sélection de l'overlay s'aimante.",
+  "settings.general.liveTranscription": "Transcrire ta voix en live",
+  "settings.general.liveTranscriptionHelp":
+    "Écrit tes paroles dans le chat. Utilise une deuxième session sur le serveur avec les modèles locaux, et un modèle de transcription facturé chez OpenAI. Gemini transcrit toujours.",
   "settings.general.autoRead": "Lecture automatique des réponses",
   "settings.general.autoReadHelp":
     "Lit la réponse à voix haute quand tu demandes à la voix.",
@@ -866,6 +875,7 @@ export const fr: Translations = {
   "settings.model.capThinking": "Réflexion",
   "settings.model.capAudio": "Audio",
   "settings.model.capVideo": "Vidéo",
+  "settings.model.capLive": "Voix en direct",
 
   "settings.service.litert": "Sur l'appareil",
   "settings.service.litertHelp":

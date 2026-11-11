@@ -35,6 +35,10 @@ export type LiveSession = {
   stop(): void;
 };
 
+//client vad for servers without one
+const VAD_RMS_THRESHOLD = 0.01;
+const VAD_END_SILENCE_MS = 700;
+const VAD_PREROLL_CHUNKS = 3;
 //voice must beat the measured echo for 300 ms
 const BARGE_IN_RMS = 0.08;
 const BARGE_IN_ECHO_RATIO = 3;
@@ -51,6 +55,7 @@ export async function startLiveSession(
   backend: LiveBackend,
   instructions: string,
   cb: LiveCallbacks,
+  options: { transcribe: boolean; voicePlaceholder: string },
 ): Promise<LiveSession> {
   let state: LiveState = 'connecting';
   const setState = (next: LiveState) => {
@@ -74,8 +79,9 @@ export async function startLiveSession(
   let replyStart = 0;
   let replyMetrics: MessageMetrics = {};
   //the question is saved once the reply starts
-  const saveUser = () => {
-    const text = turnUser.trim();
+  //untranscribed speech still marks the turn
+  const saveUser = (final = false) => {
+    const text = turnUser.trim() || (final && !protocol.transcribesUser ? options.voicePlaceholder : '');
     if (userSaved || !text) return;
     userSaved = true;
     cb.onMessage('user', text);
@@ -94,7 +100,7 @@ export async function startLiveSession(
     flushTimer = null;
     //widgets stay saved with the reply
     const assistant = (turnWidgets + turnAssistant).trim();
-    saveUser();
+    if (assistant || turnUser.trim()) saveUser(true);
     if (assistant) cb.onMessage('assistant', assistant, replyMetrics);
     turnUser = '';
     turnAssistant = '';
@@ -187,7 +193,7 @@ export async function startLiveSession(
         tokensPerSec: tokens && timeSec ? tokens / timeSec : undefined,
       };
       replyStart = 0;
-      if (!turnUser.trim() && turnAssistant.trim()) {
+      if (protocol.transcribesUser && !turnUser.trim() && turnAssistant.trim()) {
         flushTimer = setTimeout(flushTurn, USER_TRANSCRIPT_WAIT_MS);
       } else {
         flushTurn();
@@ -207,7 +213,7 @@ export async function startLiveSession(
   };
 
   const { wsUrl, apiKey } = await liveEndpoint(backend);
-  const options = {
+  const protocolOptions = {
     wsUrl,
     apiKey,
     model: backend.model,
@@ -217,10 +223,17 @@ export async function startLiveSession(
   };
   const protocol: LiveProtocol =
     backend.kind === 'gemini'
-      ? await connectGeminiLive(options)
-      : await connectOpenAIRealtime(options);
+      ? await connectGeminiLive(protocolOptions)
+      : await connectOpenAIRealtime({
+          ...protocolOptions,
+          llamacpp: backend.kind === 'llamacpp',
+          transcribe: options.transcribe,
+        });
 
   let muted = false;
+  let talking = false;
+  let lastVoice = 0;
+  let preroll: Float32Array[] = [];
   let bargeChunks: Float32Array[] = [];
   //speaker sound picked up by the mic
   let echoLevel = 0;
@@ -247,6 +260,10 @@ export async function startLiveSession(
         const heard = bargeChunks;
         bargeChunks = [];
         session.interrupt();
+        if (!protocol.serverVad) {
+          talking = true;
+          lastVoice = Date.now();
+        }
         heard.forEach(append);
         return;
       }
@@ -256,7 +273,31 @@ export async function startLiveSession(
     }
     //mic is ignored while maestro talks, echo would loop
     if (muted || sounding.size > 0 || state === 'tool') return;
-    append(samples);
+    if (protocol.serverVad) {
+      append(samples);
+      return;
+    }
+    if (state === 'thinking') return;
+    const now = Date.now();
+    if (level > VAD_RMS_THRESHOLD) {
+      if (!talking) {
+        talking = true;
+        preroll.forEach(append);
+        preroll = [];
+      }
+      lastVoice = now;
+    }
+    if (talking) {
+      append(samples);
+      if (now - lastVoice > VAD_END_SILENCE_MS) {
+        talking = false;
+        protocol.endTurn();
+        setState('thinking');
+      }
+    } else {
+      preroll.push(samples);
+      if (preroll.length > VAD_PREROLL_CHUNKS) preroll.shift();
+    }
   };
 
   let mic: MicStream;
@@ -271,6 +312,10 @@ export async function startLiveSession(
   const session: LiveSession = {
     setMicMuted(next) {
       muted = next;
+      if (next) {
+        talking = false;
+        preroll = [];
+      }
     },
     sendFrame(jpegBase64) {
       protocol.sendFrame(jpegBase64);

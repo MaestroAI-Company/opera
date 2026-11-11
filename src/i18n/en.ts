@@ -292,6 +292,12 @@ export const en = {
   "live.camera": "Camera",
   "live.selectCamera": "Select a camera",
   "live.hangUp": "Hang up",
+  "live.voiceMessage": "Voice message",
+  "live.transcribe.title": "Write down what you say?",
+  "live.transcribe.message":
+    "Writing your words in the chat needs extra work: a second session on your server for local models, or a billed transcription model with OpenAI. You can change this in Settings.",
+  "live.transcribe.enable": "Transcribe",
+  "live.transcribe.skip": "Not now",
 
   "whisper.notConfigured.title": "Whisper Not Configured",
   "whisper.notConfigured.message":
@@ -716,6 +722,9 @@ export const en = {
   "settings.general.detectionBoxes": "Show detection boxes",
   "settings.general.detectionBoxesHelp":
     "Outline the screen elements the overlay selection snaps to.",
+  "settings.general.liveTranscription": "Transcribe your voice in live mode",
+  "settings.general.liveTranscriptionHelp":
+    "Writes your words in the chat. Uses a second session on the server with local models, and a billed transcription model with OpenAI. Gemini always transcribes.",
   "settings.general.autoRead": "Auto-read replies",
   "settings.general.autoReadHelp":
     "Speak the answer aloud when you ask by voice.",
@@ -857,6 +866,7 @@ export const en = {
   "settings.model.capThinking": "Thinking",
   "settings.model.capAudio": "Audio",
   "settings.model.capVideo": "Video",
+  "settings.model.capLive": "Live voice",
 
   "settings.service.litert": "On-Device",
   "settings.service.litertHelp":

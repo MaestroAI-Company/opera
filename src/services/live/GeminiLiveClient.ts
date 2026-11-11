@@ -70,6 +70,9 @@ export async function connectGeminiLive(options: ProtocolOptions): Promise<LiveP
   return {
     inputRate: INPUT_RATE,
     outputRate: OUTPUT_RATE,
+    serverVad: true,
+    transcribesUser: true,
+    endTurn() {},
     appendAudio(pcm16Base64) {
       send({ realtimeInput: { audio: { data: pcm16Base64, mimeType: `audio/pcm;rate=${INPUT_RATE}` } } });
     },

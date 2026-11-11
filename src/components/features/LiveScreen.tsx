@@ -35,11 +35,13 @@ type LiveScreenProps = {
   backend: LiveBackend;
   instructions: string;
   incognito: boolean;
+  //second session transcribes local models
+  transcribe: boolean;
   onTurn: (role: "user" | "assistant", content: string, metrics?: MessageMetrics) => void;
   onClose: () => void;
 };
 
-export default function LiveScreen({ backend, instructions, incognito, onTurn, onClose }: LiveScreenProps) {
+export default function LiveScreen({ backend, instructions, incognito, transcribe, onTurn, onClose }: LiveScreenProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const t = useT();
@@ -93,7 +95,7 @@ export default function LiveScreen({ backend, instructions, incognito, onTurn, o
         onTurnRef.current(role, content, metrics);
       },
       onError: setError,
-    })
+    }, { transcribe, voicePlaceholder: t("live.voiceMessage") })
       .then((session) => {
         if (cancelled) session.stop();
         else sessionRef.current = session;
@@ -105,7 +107,7 @@ export default function LiveScreen({ backend, instructions, incognito, onTurn, o
       sessionRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backend, instructions]);
+  }, [backend, instructions, transcribe]);
 
   //call card in the status bar while live
   const onCloseRef = useRef(onClose);

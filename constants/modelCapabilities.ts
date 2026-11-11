@@ -7,6 +7,8 @@ export const MODEL_CAPABILITY_KEYS = {
   thinking: "settings.model.capThinking",
   audio: "settings.model.capAudio",
   video: "settings.model.capVideo",
+  //speech in and out over realtime
+  live: "settings.model.capLive",
 } as const satisfies Record<string, TranslationKey>;
 
 export type ModelCapabilityId = keyof typeof MODEL_CAPABILITY_KEYS;

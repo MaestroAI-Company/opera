@@ -4,6 +4,7 @@ import { MessageMetrics } from '../../db/DatabaseService';
 import { universalFetch } from '../utils/universalFetch';
 import { sendMessageWithToolPrompt } from '../tools/fallbackToolCall';
 import { getOpenAIApiKey } from './sources';
+import { isLiveModel } from '../../live/liveBackend';
 
 //unreachable ip blocks the socket
 const PROBE_TIMEOUT_MS = 6000;
@@ -205,9 +206,10 @@ export class OpenAIProvider implements IAIProvider {
   //only server refusals remove a capability
   async getModelCapabilities(modelName: string): Promise<string[]> {
     const key = `${this.baseUrl}|${modelName}`;
-    return ALL_CAPABILITIES.filter((c) =>
+    const caps = ALL_CAPABILITIES.filter((c) =>
       !(c === 'tools' && rejectsTools.has(key)) &&
       !(c === 'thinking' && rejectedFields.has(`${key}|reasoning_effort`)));
+    return isLiveModel(this.rawUrl, modelName) ? [...caps, 'live'] : caps;
   }
 
   //no warm-up endpoint in the protocol

@@ -276,6 +276,7 @@ const MODEL_CAPABILITY_ICONS = {
   thinking: brainIcon,
   audio: microIcon,
   video: videocamIcon,
+  live: phoneIcon,
 } as const satisfies Record<ModelCapabilityId, ImageSourcePropType>;
 const photoIcon = require("../../../assets/icons/photo.png");
 const locationIcon = require("../../../assets/icons/location.png");
@@ -412,6 +413,7 @@ const MODEL_CAPABILITY_ROWS = [
   "thinking",
   "audio",
   "video",
+  "live",
 ] as const satisfies readonly ModelCapabilityId[];
 
 //override wins over server caps
@@ -1224,6 +1226,7 @@ export default function SettingsDrawer({
   const [confirmedName, setConfirmedName] = useState("");
   const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
   const [autoSpeak, setAutoSpeakState] = useState(true);
+  const [liveTranscription, setLiveTranscriptionState] = useState(false);
   const [dreamIncognitoButton, setDreamIncognitoButtonState] = useState(true);
   const [dreamAntiBurnIn, setDreamAntiBurnInState] = useState(true);
   const [dreamWakeWord, setDreamWakeWordState] = useState(true);
@@ -1620,6 +1623,7 @@ export default function SettingsDrawer({
       setConfirmedName(s.name || "");
       setAlwaysWhisperState(s.alwaysWhisper);
       setAutoSpeakState(s.autoSpeak);
+      setLiveTranscriptionState(s.liveTranscription === 'on');
       setDreamIncognitoButtonState(s.dreamIncognitoButton);
       setDreamAntiBurnInState(s.dreamAntiBurnIn);
       setDreamWakeWordState(s.dreamWakeWord);
@@ -2693,6 +2697,11 @@ export default function SettingsDrawer({
   const setAutoSpeak = (v: boolean) => {
     setAutoSpeakState(v);
     Settings.set("autoSpeak", v);
+  };
+
+  const setLiveTranscription = (v: boolean) => {
+    setLiveTranscriptionState(v);
+    Settings.set("liveTranscription", v ? "on" : "off");
   };
 
   const setDreamIncognitoButton = (v: boolean) => {
@@ -4290,6 +4299,23 @@ export default function SettingsDrawer({
               </Text>
             </View>
             <Toggle checked={autoSpeak} onToggle={setAutoSpeak} />
+          </View>
+        </View>
+      </View>
+
+      {/* live transcription card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.general.liveTranscription")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.general.liveTranscriptionHelp")}
+              </Text>
+            </View>
+            <Toggle checked={liveTranscription} onToggle={setLiveTranscription} />
           </View>
         </View>
       </View>

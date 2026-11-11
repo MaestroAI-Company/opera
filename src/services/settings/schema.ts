@@ -21,6 +21,8 @@ export type AppSettings = {
   instruction: string;
   speaker: boolean;
   autoSpeak: boolean;
+  //local live models mode
+  liveTranscription: string;
   maestroButterfly: string;
   maestroMood: string;
   maestroStyle: string;
@@ -84,6 +86,7 @@ export const BASE_DEFAULTS: AppSettings = {
   instruction: '',
   speaker: true,
   autoSpeak: true,
+  liveTranscription: 'ask',
   //empty means the first butterfly
   maestroButterfly: '',
   maestroMood: 'neutral',

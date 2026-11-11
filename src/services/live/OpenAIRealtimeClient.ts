@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { getLocale } from '../../i18n';
 import { pcm16Base64ToFloat } from './pcm';
 import {
   frameText,
@@ -11,13 +12,18 @@ import {
 } from './protocol';
 
 const OPENAI_RATE = 24000;
+//openai only transcribes the user when asked
 const OPENAI_TRANSCRIBE_MODEL = 'gpt-4o-mini-transcribe';
+//lfm3 needs this to speak
+const LFM_SPEAK = 'Respond in interleaved text and audio.';
 //benign errors after a cancel
 const IGNORED_ERRORS = ['response_cancel_not_active'];
 
-//openai realtime ga over websocket
-export async function connectOpenAIRealtime(options: ProtocolOptions): Promise<LiveProtocol> {
-  const { wsUrl, apiKey, instructions, events } = options;
+//ga realtime also on llama.cpp
+export async function connectOpenAIRealtime(
+  options: ProtocolOptions & { llamacpp: boolean; transcribe: boolean },
+): Promise<LiveProtocol> {
+  const { wsUrl, apiKey, instructions, events, llamacpp } = options;
   //realtime tools are flat, not nested in function
   const tools = options.tools.map((t) => ({ type: 'function', ...t.function }));
   const isWeb = Platform.OS === 'web';
@@ -29,27 +35,43 @@ export async function connectOpenAIRealtime(options: ProtocolOptions): Promise<L
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
   };
 
-  await waitFor(ws, (m) => m.type === 'session.created');
+  const created = await waitFor(ws, (m) => m.type === 'session.created');
+  const audio = created.session?.audio;
+  const inputRate: number = audio?.input?.format?.rate ?? (llamacpp ? 16000 : OPENAI_RATE);
+  const outputRate: number = audio?.output?.format?.rate ?? OPENAI_RATE;
+
   const updated = waitFor(ws, (m) => m.type === 'session.updated');
   send({
     type: 'session.update',
-    session: {
-      type: 'realtime',
-      instructions,
-      output_modalities: ['audio'],
-      tools,
-      tool_choice: 'auto',
-      audio: {
-        input: {
-          format: { type: 'audio/pcm', rate: OPENAI_RATE },
-          transcription: { model: OPENAI_TRANSCRIBE_MODEL },
-          turn_detection: { type: 'semantic_vad' },
+    session: llamacpp
+      ? {
+          type: 'realtime',
+          instructions: `${instructions}\n${LFM_SPEAK}`,
+          output_modalities: ['text', 'audio'],
+          tools,
+          tool_choice: 'auto',
+        }
+      : {
+          type: 'realtime',
+          instructions,
+          output_modalities: ['audio'],
+          tools,
+          tool_choice: 'auto',
+          audio: {
+            input: {
+              format: { type: 'audio/pcm', rate: OPENAI_RATE },
+              //billed extra so opt in only
+              ...(options.transcribe ? { transcription: { model: OPENAI_TRANSCRIBE_MODEL } } : {}),
+              turn_detection: { type: 'semantic_vad' },
+            },
+            output: { format: { type: 'audio/pcm', rate: OPENAI_RATE } },
+          },
         },
-        output: { format: { type: 'audio/pcm', rate: OPENAI_RATE } },
-      },
-    },
   });
   await updated;
+
+  //llama.cpp needs a second session
+  const asr = llamacpp && options.transcribe ? await openTranscription(wsUrl, headers, events) : null;
 
   let latestFrame: string | null = null;
   let responding = false;
@@ -83,6 +105,8 @@ export async function connectOpenAIRealtime(options: ProtocolOptions): Promise<L
       case 'response.output_audio.delta':
         events.audio(pcm16Base64ToFloat(msg.delta));
         break;
+      //llama.cpp leaves the audio transcript empty
+      case 'response.output_text.delta':
       case 'response.output_audio_transcript.delta':
         events.assistantText(msg.delta);
         break;
@@ -118,10 +142,18 @@ export async function connectOpenAIRealtime(options: ProtocolOptions): Promise<L
   });
 
   return {
-    inputRate: OPENAI_RATE,
-    outputRate: OPENAI_RATE,
+    inputRate,
+    outputRate,
+    serverVad: !llamacpp,
+    transcribesUser: llamacpp ? !!asr : options.transcribe,
     appendAudio(pcm16Base64) {
       send({ type: 'input_audio_buffer.append', audio: pcm16Base64 });
+      asr?.send(JSON.stringify({ type: 'input_audio_buffer.append', audio: pcm16Base64 }));
+    },
+    endTurn() {
+      asr?.send(JSON.stringify({ type: 'input_audio_buffer.commit' }));
+      sendFrameItem();
+      send({ type: 'response.create' });
     },
     sendFrame(jpegBase64) {
       latestFrame = jpegBase64;
@@ -137,7 +169,37 @@ export async function connectOpenAIRealtime(options: ProtocolOptions): Promise<L
     },
     close() {
       closing = true;
+      asr?.close();
       ws.close();
     },
   };
+}
+
+//transcribe only socket
+async function openTranscription(
+  wsUrl: string,
+  headers: Record<string, string> | undefined,
+  events: ProtocolOptions['events'],
+): Promise<WebSocket | null> {
+  const url = `${wsUrl}${wsUrl.includes('?') ? '&' : '?'}intent=transcription`;
+  const ws = openSocket(url, undefined, headers);
+  try {
+    await waitFor(ws, (m) => m.type === 'session.created');
+    const updated = waitFor(ws, (m) => m.type === 'session.updated');
+    ws.send(JSON.stringify({
+      type: 'session.update',
+      session: { type: 'transcription', audio: { input: { transcription: { language: getLocale() } } } },
+    }));
+    await updated;
+  } catch {
+    ws.close();
+    return null;
+  }
+  ws.addEventListener('message', async (e: MessageEvent) => {
+    try {
+      const msg = JSON.parse(await frameText(e.data));
+      if (msg.type === 'conversation.item.input_audio_transcription.completed') events.userText(msg.transcript ?? '');
+    } catch {}
+  });
+  return ws;
 }

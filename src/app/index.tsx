@@ -81,6 +81,7 @@ import {
   ModelSelectorTrigger,
   truncateModel,
 } from "../components/features/ModelSelector";
+import LiveScreen from "../components/features/LiveScreen";
 import SamplerScreen from "../components/features/SamplerScreen";
 import SettingsDrawer, { SubPage } from "../components/features/SettingsDrawer";
 import TopBar from "../components/features/TopBar";
@@ -102,6 +103,8 @@ import { t, useT, type TranslationFn } from "../i18n";
 import { AIModule } from "../services/ai/AIModule";
 import {
   buildSystemPrompt,
+  LIVE_PROMPT_SEGMENT,
+  livePromptLabel,
   screenContextSegment,
 } from "../services/ai/generation/chatGeneration";
 import { GenerationService } from "../services/ai/generation/GenerationService";
@@ -121,7 +124,7 @@ import {
   shouldOfferAssistantRole,
 } from "../services/assistant/DefaultAssistant";
 import { CloudSync } from "../services/CloudSyncService";
-import { Conversation, DB, Message } from "../services/db/DatabaseService";
+import { Conversation, DB, Message, type MessageMetrics } from "../services/db/DatabaseService";
 import {
   getInitialDeepLink,
   subscribeToDeepLinks,
@@ -132,6 +135,7 @@ import { splitDocumentBlocks } from "../services/documents/DocumentService";
 import { AppEvents } from "../services/events";
 import { HubSync } from "../services/hub/HubSync";
 import { PairedHub, SamplerHub } from "../services/hub/SamplerHubService";
+import { liveBackend } from "../services/live/liveBackend";
 import { LocationService } from "../services/location/LocationService";
 import {
   takePendingCrash,
@@ -670,6 +674,74 @@ export default function Index() {
   useEffect(() => {
     activeConversationRef.current = activeConversation;
   }, [activeConversation]);
+
+  //live mode for models that speak
+  const [liveOpen, setLiveOpen] = useState(false);
+  const liveConvRef = useRef<Conversation | null>(null);
+  //turns saved in order so one conversation is created
+  const liveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const currentLiveBackend = useMemo(
+    () => liveBackend(aiService, ollamaUrl, selectedModel),
+    [aiService, ollamaUrl, selectedModel],
+  );
+  const liveInstructions = useMemo(
+    () => buildSystemPrompt(selectedModel, userInstruction, LIVE_PROMPT_SEGMENT),
+    [selectedModel, userInstruction],
+  );
+
+  const openLive = useCallback(() => {
+    liveConvRef.current = activeConversationRef.current;
+    setLiveOpen(true);
+  }, []);
+
+  //each live message joins the conversation
+  const handleLiveTurn = useCallback(
+    (role: "user" | "assistant", content: string, metrics?: MessageMetrics) => {
+      liveQueueRef.current = liveQueueRef.current.then(async () => {
+        let conv = liveConvRef.current;
+        const isNew = !conv;
+        const isIncognitoTask = conv ? conv.id.startsWith("incognito_") : incognitoMode;
+        if (!dbReady && !isIncognitoTask) return;
+        if (!conv) {
+          const name = (role === "user" ? content : t("chatbar.live")).slice(0, 30);
+          if (isIncognitoTask) {
+            conv = {
+              id: "incognito_" + Date.now(),
+              name,
+              model: selectedModel || "unknown",
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            };
+          } else {
+            conv = await DB.createConversation(selectedModel || "unknown", name);
+            setConversations((prev) => [conv!, ...prev]);
+          }
+          liveConvRef.current = conv;
+          setActiveConversation(conv);
+        }
+        const convId = conv.id;
+        const save = async (role: "user" | "assistant", content: string): Promise<Message> =>
+          isIncognitoTask
+            ? {
+                id: "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+                conversationId: convId,
+                role,
+                content,
+                createdAt: Date.now(),
+              }
+            : DB.addMessage(convId, role, content);
+        const msg = await save(role, content);
+        if (role === "assistant") {
+          msg.metrics = { ...metrics, systemPrompt: livePromptLabel(selectedModel) };
+          if (!isIncognitoTask) await DB.updateMessageMetrics(msg.id, msg.metrics);
+        }
+        if (isNew || activeConversationRef.current?.id === convId) {
+          setMessages((prev) => [...prev, msg]);
+        }
+      }).catch((e) => console.error("Failed to save live turn:", e));
+    },
+    [dbReady, incognitoMode, selectedModel, t],
+  );
 
   //every close path must pick up what changed in settings
   const closeSettings = useCallback(() => {
@@ -2793,11 +2865,26 @@ export default function Index() {
                     }}
                     picker={attachments}
                     leadingElement={isDesktop ? modelTrigger : undefined}
+                    onOpenLive={currentLiveBackend && !editSession ? openLive : undefined}
                   />
                 )}
               </View>
             </Animated.View>
           </View>
+
+          {liveOpen && currentLiveBackend && (
+            <LiveScreen
+              backend={currentLiveBackend}
+              instructions={liveInstructions}
+              incognito={
+                activeConversation
+                  ? activeConversation.id.startsWith("incognito_")
+                  : incognitoMode
+              }
+              onTurn={handleLiveTurn}
+              onClose={() => setLiveOpen(false)}
+            />
+          )}
 
           {(showSamplerSwitch || !isDesktop) && (
             <SamplerScreen

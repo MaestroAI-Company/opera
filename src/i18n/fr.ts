@@ -174,6 +174,8 @@ export const fr: Translations = {
   "messageDetails.prompt": "Prompt système",
   "messageDetails.standbyNote":
     "Répondu en Standby : réponses courtes à l'oral et carte à l'écran. Ces règles ne valent qu'en Standby, si tu continues cette conversation dans Opera, c'est le prompt habituel qui s'applique.",
+  "messageDetails.liveNote":
+    "Répondu en mode live : réponses courtes à l'oral, widgets affichés à l'écran. Ces règles ne valent qu'en mode live, si tu continues cette conversation à l'écrit, c'est le prompt habituel qui s'applique.",
   "messageDetails.thinking": "Réflexion",
   "messageDetails.tools": "Outils",
   "messageDetails.reasoning": "Raisonnement",
@@ -279,6 +281,20 @@ export const fr: Translations = {
   "chatbar.micPermission.title": "Autorisation du microphone",
   "chatbar.micPermission.message":
     "L'accès au microphone est nécessaire pour la saisie vocale. Active-le dans les réglages de ton appareil.",
+  "chatbar.live": "Mode live",
+
+  "live.state.connecting": "Connexion…",
+  "live.state.listening": "Je t'écoute",
+  "live.state.thinking": "Réflexion…",
+  "live.state.speaking": "Maestro parle",
+  "live.state.tool": "Je regarde…",
+  "live.error": "Le mode live s'est arrêté",
+  "live.tapToInterrupt": "Touche pour interrompre",
+  "live.mute": "Couper le micro",
+  "live.unmute": "Réactiver le micro",
+  "live.camera": "Caméra",
+  "live.selectCamera": "Choisir une caméra",
+  "live.hangUp": "Raccrocher",
 
   "whisper.notConfigured.title": "Whisper non configuré",
   "whisper.notConfigured.message":

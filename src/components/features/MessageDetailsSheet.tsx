@@ -4,7 +4,7 @@ import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constan
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
-import { STANDBY_PROMPT_TAG } from "../../services/ai/generation/chatGeneration";
+import { LIVE_PROMPT_TAG, STANDBY_PROMPT_TAG } from "../../services/ai/generation/chatGeneration";
 import type { ToolCall } from "../../services/ai/tools/ITool";
 import { MessageMetrics } from "../../services/db/DatabaseService";
 import ActionButton from "../ui/ActionButton";
@@ -83,6 +83,9 @@ export default function MessageDetailsSheet({ details, onClose, isLargeScreen = 
                 </Group>
                 {!!metrics?.systemPrompt?.endsWith(STANDBY_PROMPT_TAG) && (
                   <Text style={styles.helpText}>{t("messageDetails.standbyNote")}</Text>
+                )}
+                {!!metrics?.systemPrompt?.endsWith(LIVE_PROMPT_TAG) && (
+                  <Text style={styles.helpText}>{t("messageDetails.liveNote")}</Text>
                 )}
               </View>
             )}

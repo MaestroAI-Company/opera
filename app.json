@@ -2,7 +2,7 @@
   "expo": {
     "name": "Opera",
     "slug": "opera",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "orientation": "default",
     "icon": "./assets/icons/opera.png",
     "scheme": [
@@ -34,6 +34,7 @@
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.CAMERA",
@@ -165,7 +166,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Opera needs access to your camera to scan the Sampler pairing code.",
+          "cameraPermission": "Opera needs access to your camera to scan the Sampler pairing code and to show what you see to Maestro in live mode.",
           "recordAudioAndroid": false
         }
       ],

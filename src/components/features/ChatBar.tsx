@@ -52,6 +52,7 @@ const stopIcon = require("../../../assets/icons/stop.png");
 const fileIcon = require("../../../assets/icons/file.png");
 const pencilIcon = require("../../../assets/icons/pencil.png");
 const cancelIcon = require("../../../assets/icons/cancel2.png");
+const liveIcon = require("../../../assets/icons/phone.png");
 
 const IMAGE_MAX_WIDTH = 1280;
 const IMAGE_COMPRESS_QUALITY = 0.7;
@@ -109,6 +110,8 @@ type ChatInputBarProps = {
   editFiles?: SelectedFile[] | null;
   //host frame already spaces the bar
   flush?: boolean;
+  //set only for models that speak live
+  onOpenLive?: () => void;
 };
 
 export type ChatBarHandle = {
@@ -231,6 +234,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   editDraft = null,
   editFiles = null,
   flush = false,
+  onOpenLive,
 }, ref) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -1170,9 +1174,11 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 </Animated.View>
               ) : null}
 
+              <View style={styles.barRow}>
               <Animated.View
                 style={[
                   styles.container,
+                  styles.containerFill,
                   incognito && styles.containerIncognito,
                   isDesktop && { paddingHorizontal: 8, paddingVertical: 6, minHeight: 48 },
                   { backgroundColor: backgroundColor }
@@ -1289,6 +1295,20 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                   </Pressable>
                 )}
               </Animated.View>
+
+              {onOpenLive && !isRecording && !isGenerating && (
+                <Pressable
+                  accessibilityLabel={t("chatbar.live")}
+                  onPress={onOpenLive}
+                  style={pressStyle(
+                    [styles.container, styles.liveButton, isDesktop && styles.liveButtonDesktop, incognito && styles.containerIncognito, { backgroundColor: incognito ? Colors.incognito : Colors.primary }],
+                    { backgroundColor: incognito ? Colors.incognitoBright : Colors.primaryBright },
+                  )}
+                >
+                  <Image source={liveIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
+                </Pressable>
+              )}
+              </View>
             </Animated.View>
           </Pressable>
 
@@ -1332,6 +1352,25 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     minHeight: 56,
     boxShadow: `2px 6px 22px ${Colors.primary}`,
     elevation: 8,
+  },
+  barRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: Spacing.md,
+  },
+  containerFill: {
+    flex: 1,
+  },
+  //square tile matching the bar height
+  liveButton: {
+    width: 56,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    justifyContent: "center",
+  },
+  liveButtonDesktop: {
+    width: 48,
+    minHeight: 48,
   },
   containerIncognito: {
     boxShadow: `2px 6px 15px ${Colors.incognito}`,

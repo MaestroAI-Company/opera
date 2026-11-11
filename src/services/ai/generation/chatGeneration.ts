@@ -203,6 +203,15 @@ function completeMetrics(metrics: MessageMetrics, content: string, think: boolea
 
 export const STANDBY_PROMPT_TAG = 'standby';
 
+//voice rules added to the live mode prompt
+export const LIVE_PROMPT_SEGMENT = `\n\n---\n\n${SYSTEM_PROMPTS.LIVE}`;
+export const LIVE_PROMPT_TAG = 'live';
+
+//prompt label shown in the technical details
+export function livePromptLabel(model: string): string {
+  return `${modelTier(model)} + ${LIVE_PROMPT_TAG}`;
+}
+
 //one streaming path for both screens
 export async function streamAssistantReply(params: {
   model: string;

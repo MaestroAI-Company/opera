@@ -131,6 +131,17 @@ function withNativeAndroid(config) {
       });
     }
 
+    //ongoing call notification of live mode
+    if (!application.service.some(s => s.$['android:name'] === '.LiveCallService')) {
+      application.service.push({
+        $: {
+          'android:name': '.LiveCallService',
+          'android:exported': 'false',
+          'android:foregroundServiceType': 'microphone',
+        },
+      });
+    }
+
     //offer opera as a system screensaver
     if (!application.service.some(s => s.$['android:name'] === '.OperaDreamService')) {
       application.service.push({
@@ -240,6 +251,8 @@ function withNativeAndroid(config) {
       copyTemplate('src/OperaDreamService.kt', path.join(javaDir, 'OperaDreamService.kt'), packageName);
       copyTemplate('src/WakeWordModule.kt', path.join(javaDir, 'WakeWordModule.kt'), packageName);
       copyTemplate('src/WakeWordDetector.kt', path.join(javaDir, 'WakeWordDetector.kt'), packageName);
+      copyTemplate('src/LiveCallService.kt', path.join(javaDir, 'LiveCallService.kt'), packageName);
+      copyTemplate('src/LiveCallModule.kt', path.join(javaDir, 'LiveCallModule.kt'), packageName);
 
       // AICore (ML Kit GenAI) modules
       copyTemplate('src/AICorePackage.kt', path.join(javaDir, 'AICorePackage.kt'), packageName);

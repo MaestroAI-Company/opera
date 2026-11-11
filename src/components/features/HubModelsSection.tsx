@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import {
@@ -18,9 +18,12 @@ import ActionButton from "../ui/ActionButton";
 import CardGrid, { type GridCard } from "../ui/CardGrid";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
+import ProgressBar from "../ui/ProgressBar";
 
 const binIcon = require("../../../assets/icons/bin.png");
 const cloudIcon = require("../../../assets/icons/cloud.png");
+const downloadIcon = require("../../../assets/icons/download.png");
+const cancelIcon = require("../../../assets/icons/cancel.png");
 
 type HubModelsSectionProps = {
   onOpenModel: (file: string, name: string) => void;
@@ -31,23 +34,6 @@ export default function HubModelsSection({ onOpenModel }: HubModelsSectionProps)
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const { status, catalog } = useHubModels();
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [cancelFile, setCancelFile] = useState<string | null>(null);
-
-  const message = (e: unknown) => t("hubModels.failed", { error: e instanceof Error ? e.message : String(e) });
-
-  const cancel = async () => {
-    const file = cancelFile;
-    setCancelFile(null);
-    if (!file) return;
-    setActionError(null);
-    try {
-      await runHubModels((models) => models.cancel(file));
-    } catch (e) {
-      setActionError(message(e));
-    }
-  };
-
   //models of the servers the hub relays, listed only
   const [relayed, setRelayed] = useState<GridCard[]>([]);
   useEffect(() => {
@@ -79,10 +65,11 @@ export default function HubModelsSection({ onOpenModel }: HubModelsSectionProps)
       key: `download-${d.file}`,
       title: nameOf(d.file),
       error: !!d.error,
+      progress: d.error ? undefined : d.total ? d.received / d.total : 0,
       status: d.error
         ? t("hubModels.downloadFailed")
         : t("hubModels.downloading", { percent: d.total ? Math.floor((d.received / d.total) * 100) : 0 }),
-      onPress: () => setCancelFile(d.file),
+      onPress: () => onOpenModel(d.file, nameOf(d.file)),
     })),
     ...(status?.installed ?? []).map((m) => ({
       key: m.file,
@@ -101,23 +88,91 @@ export default function HubModelsSection({ onOpenModel }: HubModelsSectionProps)
           <CardGrid cards={cards} />
         </View>
       )}
-
-      <NotificationModal
-        visible={!!cancelFile}
-        title={t("hubModels.cancelTitle", { name: cancelFile ? nameOf(cancelFile) : "" })}
-        message={t("hubModels.cancelMessage")}
-        onClose={() => setCancelFile(null)}
-        buttons={[
-          { text: t("common.cancel"), style: "secondary", onPress: () => setCancelFile(null) },
-          { text: t("hubModels.cancel"), style: "danger", onPress: cancel },
-        ]}
-      />
     </>
   );
 }
 
-//one installed model, opened from the grid
+//a running download opens its progress, an installed model its page
 export function HubModelPage({ file, onDeleted }: { file: string; onDeleted: () => void }) {
+  const { status } = useHubModels();
+  const running = status?.downloads.find((d) => d.file === file && !d.error);
+  if (running) return <HubDownloadPage file={file} received={running.received} total={running.total} onClosed={onDeleted} />;
+  return <HubInstalledPage file={file} onDeleted={onDeleted} />;
+}
+
+//same layout as the on-device download sheet
+function HubDownloadPage({
+  file,
+  received,
+  total,
+  onClosed,
+}: {
+  file: string;
+  received: number;
+  total: number;
+  onClosed: () => void;
+}) {
+  const styles = useThemedStyles(makeStyles);
+  const t = useT();
+  const { catalog } = useHubModels();
+  const [error, setError] = useState<string | null>(null);
+  //speed from the gap between two polls, smoothed
+  const last = useRef({ received, time: Date.now() });
+  const [speed, setSpeed] = useState(0);
+  useEffect(() => {
+    const now = Date.now();
+    const seconds = (now - last.current.time) / 1000;
+    if (seconds > 0.5 && received >= last.current.received) {
+      const instant = (received - last.current.received) / seconds;
+      setSpeed((previous) => (previous ? previous * 0.6 + instant * 0.4 : instant));
+      last.current = { received, time: now };
+    }
+  }, [received]);
+
+  const cancel = async () => {
+    setError(null);
+    try {
+      await runHubModels((models) => models.cancel(file));
+      onClosed();
+    } catch (e) {
+      setError(t("hubModels.failed", { error: e instanceof Error ? e.message : String(e) }));
+    }
+  };
+
+  const starting = t("download.starting");
+  const eta = speed > 0 && total ? Math.round((total - received) / speed) : 0;
+  return (
+    <View style={styles.sheetCard}>
+      <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+        {t("settings.litert.downloadingModel", { name: hubModelName(file, catalog) })}
+      </Text>
+      {!!error && <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{error}</Text>}
+      <Group style={{ marginBottom: Spacing.lg2 }}>
+        <ProgressBar progress={total ? received / total : 0} icon={downloadIcon} />
+        <ActionButton
+          label={t("settings.litert.downloaded")}
+          rightElement={
+            <Text style={styles.rowMeta}>{total ? `${formatBytes(received)} / ${formatBytes(total)}` : starting}</Text>
+          }
+        />
+        <ActionButton
+          label={t("settings.litert.speed")}
+          rightElement={<Text style={styles.rowMeta}>{speed ? `${formatBytes(speed)}/s` : starting}</Text>}
+        />
+        <ActionButton
+          label={t("settings.litert.timeLeft")}
+          rightElement={<Text style={styles.rowMeta}>{eta ? `${eta}s` : starting}</Text>}
+        />
+      </Group>
+      <Group>
+        <ActionButton icon={cancelIcon} label={t("settings.litert.cancelDownload")} onPress={cancel} />
+      </Group>
+    </View>
+  );
+}
+
+//one installed model, opened from the grid
+function HubInstalledPage({ file, onDeleted }: { file: string; onDeleted: () => void }) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const { status, catalog } = useHubModels();
@@ -283,6 +338,11 @@ const makeStyles = (Colors: ThemeColors) =>
       fontSize: FontSizes.caption,
       color: Colors.textSecondary,
       lineHeight: 20,
+    },
+    rowMeta: {
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.micro,
+      color: Colors.textMuted,
     },
     detailSection: {
       marginTop: Spacing.xxl,

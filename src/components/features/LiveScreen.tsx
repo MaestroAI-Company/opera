@@ -1,10 +1,11 @@
 import { useCameraPermissions } from "expo-camera";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, BackHandler, Easing, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Animated, BackHandler, Easing, Image, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { useResponsive } from "../../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import type { MessageMetrics } from "../../services/db/DatabaseService";
@@ -12,24 +13,23 @@ import { showLiveCall, startLiveCall } from "../../services/live/LiveCall";
 import type { LiveBackend } from "../../services/live/liveBackend";
 import { startLiveSession, type LiveSession, type LiveState } from "../../services/live/LiveSession";
 import Group from "../ui/Group";
-import { renderMarkdown } from "../ui/MarkdownText";
 import Selector from "../ui/Selector";
+import VoiceGrid from "./VoiceGrid";
 import LiveCamera, { listCameras, type CameraDevice, type LiveCameraHandle } from "./LiveCamera";
 import { pressStyle } from "../ui/pressStyle";
 
+//buttons are 28px in a 56px bar, slop fills its height
+const HIT_SLOP = { top: 14, bottom: 14, left: 6, right: 6 };
 const micIcon = require("../../../assets/icons/microphone.png");
-const cameraIcon = require("../../../assets/icons/videocam.png");
+const micMutedIcon = require("../../../assets/icons/microphone-muted.png");
+const cameraIcon = require("../../../assets/icons/camera.png");
 const hangUpIcon = require("../../../assets/icons/cancel.png");
 
-const BUTTON_SIZE = 56;
-const ORB_SIZE = 120;
-const RING_SIZE = 168;
 const FRAME_INTERVAL_MS = 1000;
 const FRAME_QUALITY = 0.4;
 //speech rms rarely passes 0.15
-const VOLUME_GAIN = 7;
-
-type Turn = { user: string; assistant: string };
+const VOICE_GRID_GAIN = 0.9;
+const SPINNER_SIZE = 18;
 
 type LiveScreenProps = {
   backend: LiveBackend;
@@ -41,31 +41,29 @@ type LiveScreenProps = {
   onClose: () => void;
 };
 
+//replaces the composer while live, turns land in the chat above
 export default function LiveScreen({ backend, instructions, incognito, transcribe, onTurn, onClose }: LiveScreenProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const insets = useSafeAreaInsets();
-  const accent = incognito ? Colors.incognito : Colors.primary;
+  const { isDesktop } = useResponsive();
 
   const [state, setState] = useState<LiveState>("connecting");
   const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const [current, setCurrent] = useState<Turn>({ user: "", assistant: "" });
   const [permission, requestPermission] = useCameraPermissions();
 
   const sessionRef = useRef<LiveSession | null>(null);
   const cameraRef = useRef<LiveCameraHandle>(null);
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [cameraId, setCameraId] = useState("");
-  const scrollRef = useRef<ScrollView>(null);
-  const volume = useAnimatedValue(0);
+  //raw mic level read by the pixel wave
+  const voiceRef = useRef(0);
+  const getVoice = useCallback(() => voiceRef.current, []);
   const spin = useAnimatedValue(0);
-  const pulse = useAnimatedValue(0);
-  const [toolName, setToolName] = useState<string | null>(null);
-  const [widgets, setWidgets] = useState("");
+  const pressAnim = useAnimatedValue(0);
   //latest callback without restarting the session
   const onTurnRef = useRef(onTurn);
   useEffect(() => {
@@ -76,24 +74,13 @@ export default function LiveScreen({ backend, instructions, incognito, transcrib
     let cancelled = false;
     startLiveSession(backend, instructions, {
       onState: setState,
-      onVolume: (level) => volume.setValue(Math.min(1, level * VOLUME_GAIN)),
-      onTranscript: (user, assistant) => setCurrent({ user, assistant }),
-      onTool: setToolName,
-      onWidgets: setWidgets,
-      onMessage: (role, content, metrics) => {
-        if (role === "user") {
-          setTurns((prev) => [...prev, { user: content, assistant: "" }]);
-        } else {
-          //widgets show above, not in the transcript
-          const said = content.replace(/```[\s\S]*?```/g, "").trim();
-          setTurns((prev) => {
-            const last = prev[prev.length - 1];
-            if (last && !last.assistant) return [...prev.slice(0, -1), { ...last, assistant: said }];
-            return [...prev, { user: "", assistant: said }];
-          });
-        }
-        onTurnRef.current(role, content, metrics);
+      onVolume: (level) => {
+        voiceRef.current = level * VOICE_GRID_GAIN;
       },
+      onTranscript: () => {},
+      onWidgets: () => {},
+      onTool: () => {},
+      onMessage: (role, content, metrics) => onTurnRef.current(role, content, metrics),
       onError: setError,
     }, { transcribe, voicePlaceholder: t("live.voiceMessage") })
       .then((session) => {
@@ -164,19 +151,10 @@ export default function LiveScreen({ backend, instructions, incognito, transcrib
   useEffect(() => {
     if (!waiting) return;
     spin.setValue(0);
-    pulse.setValue(0);
-    const loop = Animated.parallel([
-      Animated.loop(Animated.timing(spin, { toValue: 1, duration: 1200, easing: Easing.linear, useNativeDriver: true })),
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulse, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-          Animated.timing(pulse, { toValue: 0, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        ]),
-      ),
-    ]);
+    const loop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 1200, easing: Easing.linear, useNativeDriver: true }));
     loop.start();
     return () => loop.stop();
-  }, [waiting, spin, pulse]);
+  }, [waiting, spin]);
 
   const toggleMute = () => {
     sessionRef.current?.setMicMuted(!muted);
@@ -191,23 +169,27 @@ export default function LiveScreen({ backend, instructions, incognito, transcrib
     setCameraOn(!cameraOn);
   };
 
-  const stateLabel = error ? t("live.error") : t(`live.state.${state}`);
-  const orbScale = volume.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] });
+  //same touch feedback as the composer
+  const handlePressIn = () => {
+    Vibration.vibrate(10);
+    Animated.timing(pressAnim, { toValue: 1, duration: 150, useNativeDriver: false }).start();
+  };
+  const handlePressOut = () => {
+    Animated.timing(pressAnim, { toValue: 0, duration: 150, useNativeDriver: false }).start();
+  };
+  const scale = pressAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] });
+  const barColor = pressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: incognito ? [Colors.incognito, Colors.incognitoBright] : [Colors.primary, Colors.primaryBright],
+  });
   const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
-  const breathe = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.75] });
-  const widgetNodes = useMemo(() => (widgets ? renderMarkdown(widgets, incognito) : null), [widgets, incognito]);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + Spacing.xxxl, paddingBottom: insets.bottom + Spacing.xxl }]}>
-      <View style={styles.header}>
-        <Text style={styles.model} numberOfLines={1}>{backend.model}</Text>
-        <Text style={styles.state}>{stateLabel}</Text>
+    <View style={styles.root}>
+      <View style={styles.column}>
         {error && <Text style={styles.error} numberOfLines={3}>{error}</Text>}
-      </View>
 
-      {/* tap stops the reply */}
-      <Pressable style={styles.stage} onPress={() => sessionRef.current?.interrupt()}>
-        {cameraOn ? (
+        {cameraOn && (
           <View style={styles.cameraBox}>
             <LiveCamera ref={cameraRef} style={styles.camera} deviceId={cameraId || undefined} />
             {cameras.length > 1 && (
@@ -222,87 +204,79 @@ export default function LiveScreen({ backend, instructions, incognito, transcrib
               </Group>
             )}
           </View>
-        ) : waiting ? (
-          <View style={styles.orbBox}>
-            <Animated.View style={[styles.ring, { borderTopColor: accent, transform: [{ rotate }] }]} />
-            <Animated.View style={[styles.orb, { backgroundColor: accent, transform: [{ scale: breathe }] }]} />
-          </View>
-        ) : (
-          <Animated.View style={[styles.orb, { backgroundColor: accent, transform: [{ scale: orbScale }] }]} />
         )}
-        {state === "tool" && !!toolName && <Text style={styles.hint}>{toolName}</Text>}
-        {state === "speaking" && <Text style={styles.hint}>{t("live.tapToInterrupt")}</Text>}
-      </Pressable>
 
-      {widgetNodes && (
-        <ScrollView style={styles.widgets} contentContainerStyle={styles.widgetsContent}>
-          {widgetNodes}
-        </ScrollView>
-      )}
-
-      <ScrollView
-        ref={scrollRef}
-        style={styles.transcript}
-        contentContainerStyle={styles.transcriptContent}
-        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
-      >
-        {[...turns, current].map((turn, i) => (
-          <View key={i} style={styles.turn}>
-            {!!turn.user && <Text style={styles.userText}>{turn.user}</Text>}
-            {!!turn.assistant && <Text style={styles.assistantText}>{turn.assistant}</Text>}
-          </View>
-        ))}
-      </ScrollView>
-
-      <View style={styles.controls}>
-        <Pressable
-          accessibilityLabel={t(muted ? "live.unmute" : "live.mute")}
-          onPress={toggleMute}
-          style={pressStyle([styles.button, muted && { backgroundColor: accent, borderColor: Colors.borderOnPrimary }], "fadeLight")}
-        >
-          <Image source={micIcon} style={styles.icon} tintColor={muted ? Colors.textOnPrimary : Colors.textPrimary} />
-        </Pressable>
-        {backend.camera && (
+        <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut}>
+        <Animated.View style={[styles.bar, incognito && styles.barIncognito, isDesktop && styles.barDesktop, { backgroundColor: barColor, transform: [{ scale }] }]}>
           <Pressable
-            accessibilityLabel={t("live.camera")}
-            onPress={toggleCamera}
-            style={pressStyle([styles.button, cameraOn && { backgroundColor: accent, borderColor: Colors.borderOnPrimary }], "fadeLight")}
+            accessibilityLabel={t(muted ? "live.unmute" : "live.mute")}
+            onPress={toggleMute}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            hitSlop={HIT_SLOP}
+            style={pressStyle(styles.iconButton, "fadeLight")}
           >
-            <Image source={cameraIcon} style={styles.icon} tintColor={cameraOn ? Colors.textOnPrimary : Colors.textPrimary} />
+            <Image source={muted ? micMutedIcon : micIcon} style={styles.icon} tintColor={Colors.textOnPrimary} />
           </Pressable>
-        )}
-        <Pressable
-          accessibilityLabel={t("live.hangUp")}
-          onPress={onClose}
-          style={pressStyle([styles.button, { backgroundColor: accent, borderColor: Colors.borderOnPrimary }], "fadeLight")}
-        >
-          <Image source={hangUpIcon} style={styles.icon} tintColor={Colors.textOnPrimary} />
+
+          {backend.camera && (
+            <Pressable
+              accessibilityLabel={t("live.camera")}
+              onPress={toggleCamera}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              hitSlop={HIT_SLOP}
+              style={pressStyle([styles.iconButton, cameraOn && styles.iconButtonActive], "fadeLight")}
+            >
+              <Image source={cameraIcon} style={styles.icon} tintColor={cameraOn ? (incognito ? Colors.incognito : Colors.primary) : Colors.textOnPrimary} />
+            </Pressable>
+          )}
+
+          {/* tap stops the reply */}
+          <Pressable
+            onPress={() => sessionRef.current?.interrupt()}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            style={[styles.center, { marginVertical: isDesktop ? -6 : -10 }]}
+          >
+            {waiting && (
+              <Animated.View style={[styles.spinner, { transform: [{ rotate }] }]} />
+            )}
+            <VoiceGrid getVolume={getVoice} color={muted ? Colors.whiteSoft : Colors.textOnPrimary} style={styles.grid} />
+          </Pressable>
+
+          <Pressable
+            accessibilityLabel={t("live.hangUp")}
+            onPress={onClose}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            hitSlop={HIT_SLOP}
+            style={pressStyle(styles.iconButton, "fadeLight")}
+          >
+            <Image source={hangUpIcon} style={styles.icon} tintColor={Colors.textOnPrimary} />
+          </Pressable>
+        </Animated.View>
         </Pressable>
       </View>
+      {/* keeps the bar clear of the safe area */}
+      <View style={{ width: "100%", height: insets.bottom }} />
     </View>
   );
 }
 
 const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
-  container: {
-    ...StyleSheet.absoluteFill,
-    zIndex: 200,
-    backgroundColor: Colors.background,
-    paddingHorizontal: Spacing.xxl,
+  root: {
+    width: "100%",
+    maxWidth: 840,
+    alignSelf: "center",
   },
-  header: {
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  model: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.label,
-    color: Colors.textMuted,
-  },
-  state: {
-    fontFamily: Fonts.display,
-    fontSize: FontSizes.displayMd,
-    color: Colors.textPrimary,
+  column: {
+    width: "100%",
+    maxWidth: 800,
+    alignSelf: "center",
+    paddingHorizontal: Spacing.xl2,
+    paddingBottom: Spacing.xl2,
+    gap: Spacing.md,
   },
   error: {
     fontFamily: Fonts.body,
@@ -310,100 +284,77 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     color: Colors.error,
     textAlign: "center",
   },
-  stage: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.xxl,
-  },
-  orb: {
-    width: ORB_SIZE,
-    height: ORB_SIZE,
-    borderRadius: ORB_SIZE / 2,
-  },
-  orbBox: {
-    width: RING_SIZE,
-    height: RING_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ring: {
-    position: "absolute",
-    width: RING_SIZE,
-    height: RING_SIZE,
-    borderRadius: RING_SIZE / 2,
-    borderWidth: 3,
-    borderColor: Colors.border,
-  },
-  //compact column, the orb stays the focus
-  widgets: {
-    width: "100%",
-    maxWidth: 360,
-    alignSelf: "center",
-    maxHeight: 220,
-    marginBottom: Spacing.lg2,
-  },
-  widgetsContent: {
-    gap: Spacing.md,
-  },
   cameraBox: {
-    width: "100%",
-    maxWidth: 480,
+    width: 180,
+    alignSelf: "flex-end",
     gap: Spacing.md,
   },
   camera: {
     width: "100%",
-    maxWidth: 480,
     aspectRatio: 3 / 4,
     borderRadius: Radius.window,
     borderWidth: 2,
     borderColor: Colors.border,
     overflow: "hidden",
   },
-  hint: {
-    fontFamily: Fonts.mono,
-    fontSize: FontSizes.label,
-    color: Colors.textMuted,
-  },
-  transcript: {
-    maxHeight: 160,
-    marginBottom: Spacing.xxl,
-  },
-  transcriptContent: {
-    gap: Spacing.md,
-  },
-  turn: {
-    gap: Spacing.xs,
-  },
-  userText: {
-    fontFamily: Fonts.body,
-    fontSize: FontSizes.bodyMd,
-    color: Colors.textMuted,
-    textAlign: "right",
-  },
-  assistantText: {
-    fontFamily: Fonts.body,
-    fontSize: FontSizes.body,
-    lineHeight: 21,
-    color: Colors.textPrimary,
-  },
-  controls: {
+  //same pill as the composer
+  bar: {
     flexDirection: "row",
-    justifyContent: "center",
-    gap: Spacing.xxl2,
-  },
-  button: {
-    width: BUTTON_SIZE,
-    height: BUTTON_SIZE,
-    borderRadius: BUTTON_SIZE / 2,
+    alignItems: "center",
+    gap: Spacing.md,
+    minHeight: 56,
+    paddingHorizontal: Spacing.lg2,
+    paddingVertical: Spacing.lg,
+    borderRadius: Radius.window,
     borderWidth: 2,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
+    borderColor: Colors.borderOnPrimary,
+    backgroundColor: Colors.primary,
+    boxShadow: `2px 6px 22px ${Colors.primary}`,
+    elevation: 8,
+  },
+  barIncognito: {
+    boxShadow: `2px 6px 15px ${Colors.incognito}`,
+  },
+  barDesktop: {
+    minHeight: 48,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  iconButton: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.xl,
     alignItems: "center",
     justifyContent: "center",
   },
+  iconButtonActive: {
+    backgroundColor: Colors.textOnPrimary,
+  },
   icon: {
-    width: 22,
-    height: 22,
+    width: 18,
+    height: 18,
+  },
+  center: {
+    flex: 1,
+    alignSelf: "stretch",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.md,
+    overflow: "hidden",
+  },
+  grid: {
+    flex: 1,
+    alignSelf: "stretch",
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
+  spinner: {
+    width: SPINNER_SIZE,
+    height: SPINNER_SIZE,
+    borderRadius: SPINNER_SIZE / 2,
+    borderWidth: 2,
+    borderColor: Colors.borderOnPrimary,
+    borderTopColor: Colors.textOnPrimary,
   },
 });

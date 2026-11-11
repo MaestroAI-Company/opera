@@ -29,10 +29,7 @@ import {
   View,
 } from "react-native";
 import { KeyboardController } from "react-native-keyboard-controller";
-import Reanimated, {
-  useAnimatedStyle,
-  useSharedValue,
-} from "react-native-reanimated";
+import Reanimated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import HeadlessWebView from "../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
@@ -582,9 +579,6 @@ export default function Index() {
   useEffect(() => {
     editSessionRef.current = editSession;
   }, [editSession]);
-  //home butterfly flies to the chat header
-  const homeButterflyRef = useRef<View>(null);
-  const [butterflyFrom, setButterflyFrom] = useState<DOMRect | null>(null);
   //per conversation, tied to their reply
   const [suggestionsByConv, setSuggestionsByConv] = useState<
     Record<string, { msgId: string; items: Suggestion[] }>
@@ -680,6 +674,28 @@ export default function Index() {
   const liveConvRef = useRef<Conversation | null>(null);
   //turns saved in order so one conversation is created
   const liveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  //reply slot a spoken question opened, waiting for its answer
+  const livePendingRef = useRef<{ convId: string; id: string } | null>(null);
+  const [livePending, setLivePending] = useState<{
+    convId: string;
+    id: string;
+  } | null>(null);
+  const setLivePendingSlot = useCallback(
+    (next: { convId: string; id: string } | null) => {
+      livePendingRef.current = next;
+      setLivePending(next);
+    },
+    [],
+  );
+  //a slot still empty belongs to an answer that never came
+  const dropLiveSlot = useCallback(async () => {
+    const pending = livePendingRef.current;
+    if (!pending) return;
+    setLivePendingSlot(null);
+    if (!pending.convId.startsWith("incognito_"))
+      await DB.deleteMessage(pending.id);
+    setMessages((prev) => prev.filter((m) => m.id !== pending.id));
+  }, [setLivePendingSlot]);
   const currentLiveBackend = useMemo(
     () => liveBackend(aiService, ollamaUrl, selectedModel, modelCapabilities),
     [aiService, ollamaUrl, selectedModel, modelCapabilities],
@@ -745,18 +761,48 @@ export default function Index() {
                 createdAt: Date.now(),
               }
             : DB.addMessage(convId, role, content);
+        const shown = isNew || activeConversationRef.current?.id === convId;
+        const replyMetrics = { ...metrics, systemPrompt: livePromptLabel(selectedModel) };
+
+        //an answer fills the slot its question opened
+        const pending = livePendingRef.current;
+        if (role === "assistant" && pending?.convId === convId) {
+          setLivePendingSlot(null);
+          if (!isIncognitoTask) {
+            await DB.updateMessageContent(pending.id, content);
+            await DB.updateMessageMetrics(pending.id, replyMetrics);
+          }
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === pending.id ? { ...m, content, metrics: replyMetrics } : m,
+            ),
+          );
+          return;
+        }
+
         const msg = await save(role, content);
         if (role === "assistant") {
-          msg.metrics = { ...metrics, systemPrompt: livePromptLabel(selectedModel) };
+          msg.metrics = replyMetrics;
           if (!isIncognitoTask) await DB.updateMessageMetrics(msg.id, msg.metrics);
+          if (shown) setMessages((prev) => [...prev, msg]);
+          return;
         }
-        if (isNew || activeConversationRef.current?.id === convId) {
-          setMessages((prev) => [...prev, msg]);
-        }
+
+        //the slot opens with the question, so the view moves once
+        await dropLiveSlot();
+        const slot = await save("assistant", "…");
+        setLivePendingSlot({ convId, id: slot.id });
+        if (shown) setMessages((prev) => [...prev, msg, slot]);
       }).catch((e) => console.error("Failed to save live turn:", e));
     },
-    [dbReady, incognitoMode, selectedModel, t],
+    [dbReady, incognitoMode, selectedModel, t, dropLiveSlot, setLivePendingSlot],
   );
+
+  //the slot streams like a typed reply, so the chat pins it the same way
+  const liveSlotId =
+    livePending && livePending.convId === activeConversation?.id
+      ? livePending.id
+      : null;
 
   //every close path must pick up what changed in settings
   const closeSettings = useCallback(() => {
@@ -889,16 +935,6 @@ export default function Index() {
   const keyboardLiftStyle = useAnimatedStyle(() => ({
     //bar's safe area spacer sits under the keyboard
     paddingBottom: Math.max(keyboardLift.value - insets.bottom, 0),
-  }));
-  //lift at send, -1 when not sending
-  const sendLift = useSharedValue(-1);
-  const homeFreezeStyle = useAnimatedStyle(() => ({
-    //home keeps its height while keyboard closes
-    marginBottom:
-      sendLift.value < 0
-        ? 0
-        : Math.max(sendLift.value - insets.bottom, 0) -
-          Math.max(keyboardLift.value - insets.bottom, 0),
   }));
 
   const openBugReport = useCallback(async () => {
@@ -1511,9 +1547,7 @@ export default function Index() {
   const startNewConversation = useCallback(() => {
     setActiveConversation(null);
     setMessages([]);
-    setButterflyFrom(null);
-    sendLift.set(-1);
-  }, [sendLift]);
+  }, []);
 
   //desktop shells open settings in their own os window instead of the drawer
   const settingsWindowOpenRef = useRef(false);
@@ -1858,11 +1892,6 @@ export default function Index() {
       //create conversation if this is the first message
       if (!conv) {
         isFirstMessage = true;
-        //chatbar dismisses the keyboard right after
-        sendLift.set(keyboardLift.get());
-        //read before the home screen unmounts
-        const homeButterfly =
-          homeButterflyRef.current?.getBoundingClientRect() ?? null;
         const name = text.length > 30 ? text.slice(0, 30) + "…" : text;
         if (isIncognitoTask) {
           conv = {
@@ -1876,7 +1905,6 @@ export default function Index() {
           conv = await DB.createConversation(selectedModel || "unknown", name);
           setConversations((prev) => [conv!, ...prev]);
         }
-        setButterflyFrom(homeButterfly);
         setActiveConversation(conv);
       }
 
@@ -1898,10 +1926,6 @@ export default function Index() {
       //attach images to incognito message as well if needed
       if (images && images.length > 0) {
         userMsg.images = images;
-      }
-
-      if (isFirstMessage || activeConversationRef.current?.id === conv.id) {
-        setMessages((prev) => [...prev, userMsg]);
       }
 
       //build history for this task
@@ -1934,8 +1958,9 @@ export default function Index() {
         assistantMsg = await DB.addMessage(conv.id, "assistant", "…");
       }
 
+      //both land together, so the view moves once on send
       if (isFirstMessage || activeConversationRef.current?.id === conv.id) {
-        setMessages((prev) => [...prev, assistantMsg]);
+        setMessages((prev) => [...prev, userMsg, assistantMsg]);
       }
 
       const task = async () => {
@@ -2026,8 +2051,6 @@ export default function Index() {
       userInstruction,
       aiService,
       ollamaUrl,
-      sendLift,
-      keyboardLift,
     ],
   );
 
@@ -2351,7 +2374,6 @@ export default function Index() {
           original.screenContext,
         );
       }
-      setMessages((prev) => [...prev, userMsg]);
       taskHistory.push({ role: "user", content: text, images: newImages });
 
       let assistantMsg: Message;
@@ -2367,7 +2389,8 @@ export default function Index() {
       } else {
         assistantMsg = await DB.addMessage(conv.id, "assistant", "…");
       }
-      setMessages((prev) => [...prev, assistantMsg]);
+      //both land together, so the view moves once on send
+      setMessages((prev) => [...prev, userMsg, assistantMsg]);
       setEditSession(null);
 
       const taskSelectedModel = selectedModel;
@@ -2726,11 +2749,8 @@ export default function Index() {
                 </Pressable>
               )}
               {!activeConversation && (
-                <Reanimated.View
-                  style={[styles.centerContent, homeFreezeStyle]}
-                >
+                <Reanimated.View style={styles.centerContent}>
                   <ButterflyCluster
-                    ref={homeButterflyRef}
                     incognito={incognitoMode}
                     style={styles.butterfly}
                   />
@@ -2790,7 +2810,7 @@ export default function Index() {
                   generatingMessageId={
                     generatingConvId === activeConversation.id
                       ? streamingMsgId
-                      : null
+                      : liveSlotId
                   }
                   queuedMessageIds={pendingMsgIds}
                   hideGradients={isDesktop}
@@ -2806,7 +2826,6 @@ export default function Index() {
                   }
                   onImagePress={setPreviewImage}
                   onDetailsPress={setPreviewDetails}
-                  butterflyFrom={butterflyFrom}
                 />
               )}
 
@@ -2842,6 +2861,27 @@ export default function Index() {
                     <View style={{ width: "100%", height: insets.bottom }} />
                   </View>
                 ) : (
+                  <>
+                  {liveOpen && currentLiveBackend && (
+                    <LiveScreen
+                      backend={currentLiveBackend}
+                      instructions={liveInstructions}
+                      incognito={
+                        activeConversation
+                          ? activeConversation.id.startsWith("incognito_")
+                          : incognitoMode
+                      }
+                      transcribe={liveTranscribe}
+                      onTurn={handleLiveTurn}
+                      onClose={() => {
+                        setLiveOpen(false);
+                        //hanging up leaves no empty reply behind
+                        liveQueueRef.current = liveQueueRef.current.then(dropLiveSlot);
+                      }}
+                    />
+                  )}
+                  {/* stays mounted so the draft survives the call */}
+                  <View style={liveOpen ? { display: "none" } : undefined}>
                   <ChatBar
                     ref={chatBarRef}
                     onSend={(text, images, viaVoice) =>
@@ -2882,25 +2922,12 @@ export default function Index() {
                     leadingElement={isDesktop ? modelTrigger : undefined}
                     onOpenLive={currentLiveBackend && !editSession ? openLive : undefined}
                   />
+                  </View>
+                  </>
                 )}
               </View>
             </Animated.View>
           </View>
-
-          {liveOpen && currentLiveBackend && (
-            <LiveScreen
-              backend={currentLiveBackend}
-              instructions={liveInstructions}
-              incognito={
-                activeConversation
-                  ? activeConversation.id.startsWith("incognito_")
-                  : incognitoMode
-              }
-              transcribe={liveTranscribe}
-              onTurn={handleLiveTurn}
-              onClose={() => setLiveOpen(false)}
-            />
-          )}
 
           <NotificationModal
             visible={liveAskVisible}

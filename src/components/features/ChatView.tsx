@@ -54,6 +54,20 @@ const fileIcon = require("../../../assets/icons/file.png");
 const rightArrowIcon = require("../../../assets/icons/right.png");
 const pencilIcon = require("../../../assets/icons/edit.png");
 
+//share of the remaining distance covered in one 60fps frame
+const FOLLOW_EASING = 0.22;
+const FRAME_MS = 1000 / 60;
+//a long gap still moves like a few frames, never like a jump
+const MAX_CATCHUP_FRAMES = 3;
+//distance from the bottom that resumes the follow
+const FOLLOW_REGAIN = 60;
+//under it the glide snaps and stops
+const FOLLOW_SNAP = 1;
+//a conversation moves without a slide while it settles in
+const SETTLE_MS = 500;
+//a regeneration lands in the room of the reply it replaces
+const ROOM_GRACE = 300;
+
 //android 13+ shows its own clipboard confirmation
 const ANDROID_CLIPBOARD_UI_API = 33;
 
@@ -176,8 +190,6 @@ type ChatViewProps = {
   onEditMessage?: (item: Message) => void;
   //toggle gates the ai edit button
   editAiEnabled?: boolean;
-  //home butterfly frame to fly from
-  butterflyFrom?: DOMRect | null;
   //lets a host size itself to the content
   onContentHeight?: (height: number) => void;
 };
@@ -549,14 +561,14 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
   prev.editAiEnabled === next.editAiEnabled);
 MessageItem.displayName = "MessageItem";
 
-export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, queuedMessageIds, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress, onEditMessage, editAiEnabled, butterflyFrom, onContentHeight }: ChatViewProps) {
+export default function ChatView({ messages, conversation, contentTopPadding, contentBottomPadding, incognito, onRegenerate, speakerEnabled, showMetrics, generatingMessageId, queuedMessageIds, hideHeader, hideGradients, onOpenConfidentiality, canThink, dark, alignBottom, onOpenInApp, suggestions, onSuggestionPress, onImagePress, onDetailsPress, onEditMessage, editAiEnabled, onContentHeight }: ChatViewProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const listRef = useRef<FlatList>(null);
-  const [headerHeight, setHeaderHeight] = useState(0);
-  const isAtBottomRef = useRef(true);
-  //chat from home keeps its header in view
-  const initialScrollDone = useRef(!!butterflyFrom);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  //reply pinned to the top of the view while it grows
+  const [anchorId, setAnchorId] = useState<string | null>(null);
+  const anchorRef = useRef<string | null>(null);
 
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
 
@@ -586,28 +598,126 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
     }
   }, [snackbarMessage]);
 
-  //scroll past header on first load
-  useEffect(() => {
-    if (!initialScrollDone.current && messages.length > 0 && headerHeight > 0) {
-      setTimeout(() => {
-        listRef.current?.scrollToOffset({ offset: headerHeight, animated: false });
-        initialScrollDone.current = true;
-      }, 50);
-    }
-  }, [messages.length, headerHeight]);
+  const followingRef = useRef(true);
+  const followRaf = useRef<number | null>(null);
+  const contentHeightRef = useRef(0);
+  const viewportRef = useRef(0);
+  //position we command, events lag behind it
+  const posRef = useRef(0);
+  const lastYRef = useRef(0);
+  const lastHeightRef = useRef(0);
+  //clock of the last step, so a pause does not become a jump
+  const lastStepRef = useRef(0);
+  //instant moves while a conversation settles in, armed per conversation
+  const settleUntilRef = useRef(0);
 
-  const isAutoScrolling = useRef(false);
-  const autoScrollTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
+  //room a pinned reply takes between the two bars
+  const viewRoom = Math.max(0, viewportHeight - contentTopPadding - contentBottomPadding);
+
+  const jumpToBottom = useCallback(() => {
+    const max = Math.max(0, contentHeightRef.current - viewportRef.current);
+    posRef.current = max;
+    lastYRef.current = max;
+    listRef.current?.scrollToOffset({ offset: max, animated: false });
+  }, []);
+
+  //one eased glide toward the bottom, paced by the clock and not by the frames
+  const startFollow = useCallback(() => {
+    if (followRaf.current !== null) return;
+    const tick = (now: number) => {
+      followRaf.current = null;
+      if (!followingRef.current) return;
+      const max = Math.max(0, contentHeightRef.current - viewportRef.current);
+      //content can shrink under us
+      if (posRef.current > max) posRef.current = max;
+      const delta = max - posRef.current;
+      if (delta < FOLLOW_SNAP) {
+        lastStepRef.current = 0;
+        return;
+      }
+      //a dropped frame covers the ground it missed, so the pace holds
+      const elapsed = lastStepRef.current > 0 ? now - lastStepRef.current : FRAME_MS;
+      lastStepRef.current = now;
+      const frames = Math.min(MAX_CATCHUP_FRAMES, Math.max(1, elapsed / FRAME_MS));
+      const eased = 1 - Math.pow(1 - FOLLOW_EASING, frames);
+      posRef.current = delta < 2 ? max : posRef.current + delta * eased;
+      listRef.current?.scrollToOffset({ offset: Math.round(posRef.current), animated: false });
+      followRaf.current = requestAnimationFrame(tick);
+    };
+    followRaf.current = requestAnimationFrame(tick);
+  }, []);
+
+  useEffect(() => () => {
+    if (followRaf.current !== null) cancelAnimationFrame(followRaf.current);
+  }, []);
+
+  //a wheel is the only scroll gesture the web list never reports
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const node = (listRef.current as any)?.getScrollableNode?.();
+    if (!node?.addEventListener) return;
+    const onWheel = (e: any) => { if (e.deltaY < 0) followingRef.current = false; };
+    node.addEventListener("wheel", onWheel, { passive: true });
+    return () => node.removeEventListener("wheel", onWheel);
+  }, []);
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    //threshold for bottom detection
-    const atBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 100;
-
-    if (!isAutoScrolling.current) {
-      isAtBottomRef.current = atBottom;
+    const y = contentOffset.y;
+    const height = contentSize.height;
+    const max = Math.max(0, height - layoutMeasurement.height);
+    //a move carrying a size change comes from the layout, not from a finger
+    const settled = height === lastHeightRef.current;
+    lastHeightRef.current = height;
+    if (settled && y < lastYRef.current - 1 && y < max - 1) {
+      followingRef.current = false;
+    } else if (!followingRef.current && y > lastYRef.current && max - y < FOLLOW_REGAIN) {
+      followingRef.current = true;
+      posRef.current = y;
+      startFollow();
     }
+    //the layout can move us while no glide owns the position
+    if (!followingRef.current || y > posRef.current || (!settled && followRaf.current === null)) posRef.current = y;
+    lastYRef.current = y;
   };
+
+  //every conversation opens at its own bottom, with no room left over
+  useEffect(() => {
+    anchorRef.current = null;
+    followingRef.current = true;
+    posRef.current = 0;
+    lastYRef.current = 0;
+    settleUntilRef.current = Date.now() + SETTLE_MS;
+    //drops the room of the conversation we leave
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAnchorId(null);
+  }, [conversation?.id]);
+
+  //a reply that left the list gives its room back, late enough for a regeneration
+  useEffect(() => {
+    if (anchorRef.current && !messages.some((m) => m.id === anchorRef.current)) anchorRef.current = null;
+    if (anchorRef.current || !anchorId) return;
+    const timer = setTimeout(() => setAnchorId(null), ROOM_GRACE);
+    return () => clearTimeout(timer);
+  }, [messages, anchorId]);
+
+  //the reply being written, pinned under the top bar like the other assistants
+  const last = messages.length > 0 ? messages[messages.length - 1] : null;
+  //a list from the conversation we just left must not pin anything
+  const liveId =
+    last && last.role === "assistant" && last.conversationId === conversation?.id &&
+      (last.id === generatingMessageId || !!queuedMessageIds?.includes(last.id))
+      ? last.id
+      : null;
+  useEffect(() => {
+    if (alignBottom || !liveId || liveId === anchorRef.current) return;
+    anchorRef.current = liveId;
+    followingRef.current = true;
+    lastStepRef.current = 0;
+    //pins the new reply once per generation
+    setAnchorId(liveId);
+    startFollow();
+  }, [liveId, alignBottom, startFollow]);
 
   //suggestions belong to the newest assistant message
   const lastAssistantId = useMemo(() => {
@@ -618,31 +728,33 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   }, [messages]);
 
   const renderItem = useCallback(({ item }: { item: Message }) => {
-    return <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isQueued={!!queuedMessageIds?.includes(item.id)} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} suggestions={item.id === lastAssistantId ? suggestions : undefined} onSuggestionPress={onSuggestionPress} onImagePress={onImagePress} onDetailsPress={onDetailsPress} onEditMessage={onEditMessage} editAiEnabled={editAiEnabled} />;
-  }, [incognito, onRegenerate, speakerEnabled, handleSpeak, speakingMessageId, generatingMessageId, queuedMessageIds, showMetrics, conversation?.model, canThink, dark, onOpenInApp, lastAssistantId, suggestions, onSuggestionPress, onImagePress, onDetailsPress, onEditMessage, editAiEnabled]);
+    return (
+      <View style={item.id === anchorId ? { minHeight: viewRoom } : undefined}>
+        <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isQueued={!!queuedMessageIds?.includes(item.id)} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} suggestions={item.id === lastAssistantId ? suggestions : undefined} onSuggestionPress={onSuggestionPress} onImagePress={onImagePress} onDetailsPress={onDetailsPress} onEditMessage={onEditMessage} editAiEnabled={editAiEnabled} />
+      </View>
+    );
+  }, [incognito, onRegenerate, speakerEnabled, handleSpeak, speakingMessageId, generatingMessageId, queuedMessageIds, showMetrics, conversation?.model, canThink, dark, onOpenInApp, lastAssistantId, suggestions, onSuggestionPress, onImagePress, onDetailsPress, onEditMessage, editAiEnabled, anchorId, viewRoom]);
 
   return (
     <View style={styles.container}>
       <FlatList
         style={{ flex: 1, width: '100%' }}
         ref={listRef}
+        onLayout={(e) => {
+          viewportRef.current = e.nativeEvent.layout.height;
+          setViewportHeight(e.nativeEvent.layout.height);
+          if (!anchorRef.current && Date.now() < settleUntilRef.current) jumpToBottom();
+        }}
         data={messages}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         nestedScrollEnabled={true}
         ListHeaderComponent={
           !hideHeader && conversation ? (
-            <View
-              style={styles.headerBlock}
-              //only the initial scroll reads it
-              onLayout={(e) => {
-                if (!initialScrollDone.current) setHeaderHeight(e.nativeEvent.layout.height);
-              }}
-            >
+            <View style={styles.headerBlock}>
               <ButterflyCluster
                 incognito={incognito}
                 style={styles.headerButterfly}
-                from={butterflyFrom}
                 parallax={false}
                 intro={false}
               />
@@ -677,20 +789,22 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
         initialNumToRender={8}
         removeClippedSubviews={true}
         onScroll={handleScroll}
-        scrollEventThrottle={16}
+        //the glide owns the position, events only watch the user
+        scrollEventThrottle={32}
         onScrollBeginDrag={() => {
-          isAutoScrolling.current = false;
-          if (autoScrollTimeout.current) clearTimeout(autoScrollTimeout.current);
+          followingRef.current = false;
         }}
         onContentSizeChange={(w, h) => {
           onContentHeight?.(h);
-          if (!isAtBottomRef.current) return;
-          isAutoScrolling.current = true;
-          if (autoScrollTimeout.current) clearTimeout(autoScrollTimeout.current);
-          autoScrollTimeout.current = setTimeout(() => {
-            isAutoScrolling.current = false;
-          }, 500);
-          listRef.current?.scrollToOffset({ offset: h + 1000, animated: true });
+          contentHeightRef.current = h;
+          if (viewportRef.current <= 0) return;
+          //a conversation opens at its bottom without a slide
+          if (!anchorRef.current && Date.now() < settleUntilRef.current) {
+            jumpToBottom();
+            return;
+          }
+          //a reply filling its own room never changes this height
+          if (followingRef.current) startFollow();
         }}
       />
       {!hideGradients && (

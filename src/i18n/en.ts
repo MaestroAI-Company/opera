@@ -280,13 +280,6 @@ export const en = {
     "Microphone access is required for voice input. Please enable it in your device settings.",
   "chatbar.live": "Live mode",
 
-  "live.state.connecting": "Connecting…",
-  "live.state.listening": "Listening",
-  "live.state.thinking": "Thinking…",
-  "live.state.speaking": "Maestro is speaking",
-  "live.state.tool": "Looking it up…",
-  "live.error": "Live mode stopped",
-  "live.tapToInterrupt": "Tap to interrupt",
   "live.mute": "Mute the microphone",
   "live.unmute": "Unmute the microphone",
   "live.camera": "Camera",

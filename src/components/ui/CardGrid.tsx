@@ -12,6 +12,8 @@ export type GridCard = {
   //small mark left of the title
   badge?: ImageSourcePropType;
   error?: boolean;
+  //0 to 1, the card itself fills with the primary color
+  progress?: number;
   disabled?: boolean;
   onPress?: () => void;
 };
@@ -58,6 +60,12 @@ export default function CardGrid({ cards, minCardWidth, singleLineTitle, style }
               card.onPress?.();
             }}
           >
+            {card.progress !== undefined && (
+              <View
+                pointerEvents="none"
+                style={[styles.fill, { width: `${Math.max(0, Math.min(1, card.progress)) * 100}%` }]}
+              />
+            )}
             {card.icon && <Image source={card.icon} style={styles.icon} tintColor={Colors.textPrimary} />}
             <View style={styles.titleRow}>
               {card.badge && <Image source={card.badge} style={styles.badge} tintColor={Colors.textMuted} />}
@@ -92,6 +100,15 @@ const makeStyles = (Colors: ThemeColors) =>
       minHeight: 76,
       justifyContent: "center",
       alignItems: "center",
+      overflow: "hidden",
+    },
+    //grows from the left edge behind the content
+    fill: {
+      position: "absolute",
+      left: 0,
+      top: 0,
+      bottom: 0,
+      backgroundColor: Colors.primary,
     },
     cardWide: {
       minHeight: 70,

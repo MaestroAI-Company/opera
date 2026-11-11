@@ -90,8 +90,6 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
   @ReactMethod
   fun setHubSettings(deviceKey: String, hub: ReadableMap, settings: ReadableMap, promise: Promise) =
     launchPromise(promise) {
-      //app quota is not edited here
-      val current = client(deviceKey).hubSettings(hubFromMap(hub))
       val wanted = HubSettings(
         settings.getBoolean("lanDiscovery"),
         settings.getBoolean("shareProviders"),
@@ -101,7 +99,6 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
         settings.getInt("ctxSize").toUInt(),
         settings.getInt("keepAlive").toUInt(),
         settings.getInt("parallel").toUInt(),
-        current.appQuota,
       )
       settingsToMap(client(deviceKey).setHubSettings(hubFromMap(hub), wanted))
     }

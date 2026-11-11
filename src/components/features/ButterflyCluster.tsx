@@ -1,13 +1,4 @@
-import {
-  memo,
-  useEffect,
-  useImperativeHandle,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type Ref,
-} from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import {
   Animated,
   AppState,
@@ -21,13 +12,6 @@ import {
   ViewStyle,
 } from "react-native";
 import { Gyroscope } from "expo-sensors";
-import Reanimated, {
-  Easing as ReanimatedEasing,
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
 import { Colors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { AppEvents } from "../../services/events";
@@ -37,24 +21,12 @@ import { MAESTRO_BUTTERFLIES, useMaestroButterfly, useVoiceColor } from "./maest
 const MAX_SHIFT = 16;
 const DECAY = 0.92;
 const GYRO_SPEED = 3.2;
-//shared by the intro and the flight
 const EASE_OUT = [0.16, 1, 0.3, 1] as const;
-
-type Flight = {
-  top: number;
-  width: number;
-  height: number;
-  toWidth: number;
-  toHeight: number;
-};
 
 export type ButterflyClusterProps = {
   style?: StyleProp<ViewStyle>;
   incognito?: boolean;
   delay?: number;
-  //flies in from this frame, skips intro
-  from?: DOMRect | null;
-  ref?: Ref<View>;
   parallax?: boolean;
   intro?: boolean;
   //accent takes the voice color
@@ -66,58 +38,19 @@ function ButterflyCluster({
   style,
   incognito,
   delay = 250,
-  from,
-  ref,
   parallax = true,
   intro = true,
   voiceColor = false,
 }: ButterflyClusterProps) {
   const butterfly = MAESTRO_BUTTERFLIES[useMaestroButterfly()];
   const color = useVoiceColor();
-  //flight or no intro starts fully shown
-  const introAnim = useAnimatedValue(from || !intro ? 1 : 0);
+  //no intro starts fully shown
+  const introAnim = useAnimatedValue(intro ? 0 : 1);
   const gyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-  const flightProgress = useSharedValue(0);
-  //plain numbers, worklets cannot read DOMRect getters
-  const [flight, setFlight] = useState<Flight | null>(null);
-  const viewRef = useRef<View>(null);
-  useImperativeHandle(ref, () => viewRef.current!, []);
-
-  //sync read so the chat never paints unpushed
-  useLayoutEffect(() => {
-    if (!from || !viewRef.current) return;
-    const to = viewRef.current.getBoundingClientRect();
-    setFlight({
-      top: from.y - to.y,
-      width: from.width,
-      height: from.height,
-      toWidth: to.width,
-      toHeight: to.height,
-    });
-  }, [from]);
-
-  //ui thread keeps it smooth while the chat mounts
-  const flightStyle = useAnimatedStyle(() => {
-    if (!flight) return {};
-    const p = flightProgress.value;
-    return {
-      marginTop: interpolate(p, [0, 1], [flight.top, 0]),
-      width: interpolate(p, [0, 1], [flight.width, flight.toWidth]),
-      height: interpolate(p, [0, 1], [flight.height, flight.toHeight]),
-    };
-  });
-
-  //after the style mapper so it starts at zero
-  useEffect(() => {
-    if (!flight) return;
-    flightProgress.set(
-      withTiming(1, { duration: 700, easing: ReanimatedEasing.bezier(...EASE_OUT) }),
-    );
-  }, [flight, flightProgress]);
 
   //reveal butterfly on screen load
   useEffect(() => {
-    if (from || !intro) return;
+    if (!intro) return;
     const timer = setTimeout(() => {
       Animated.timing(introAnim, {
         toValue: 1,
@@ -128,7 +61,7 @@ function ButterflyCluster({
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [introAnim, delay, from, intro]);
+  }, [introAnim, delay, intro]);
 
   useEffect(() => {
     if (Platform.OS === "web" || !parallax) {
@@ -268,18 +201,7 @@ function ButterflyCluster({
   );
 
   return (
-    <Reanimated.View
-      ref={viewRef}
-      pointerEvents="none"
-      style={[
-        style,
-        //hidden until measured
-        from && !flight && styles.hidden,
-        //starts at home size, pushes chat down
-        flight && { marginTop: flight.top, width: flight.width, height: flight.height },
-        flightStyle,
-      ]}
-    >
+    <View pointerEvents="none" style={style}>
       <Animated.View
         style={[styles.imageFill, { opacity: introOpacity, transform: introTransform }]}
       >
@@ -297,7 +219,7 @@ function ButterflyCluster({
           resizeMethod="resize"
         />
       </Animated.View>
-    </Reanimated.View>
+    </View>
   );
 }
 
@@ -311,9 +233,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 0,
     left: 0,
-  },
-  hidden: {
-    opacity: 0,
   },
 });
 

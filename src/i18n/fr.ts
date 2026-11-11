@@ -283,13 +283,6 @@ export const fr: Translations = {
     "L'accès au microphone est nécessaire pour la saisie vocale. Active-le dans les réglages de ton appareil.",
   "chatbar.live": "Mode live",
 
-  "live.state.connecting": "Connexion…",
-  "live.state.listening": "Je t'écoute",
-  "live.state.thinking": "Réflexion…",
-  "live.state.speaking": "Maestro parle",
-  "live.state.tool": "Je regarde…",
-  "live.error": "Le mode live s'est arrêté",
-  "live.tapToInterrupt": "Touche pour interrompre",
   "live.mute": "Couper le micro",
   "live.unmute": "Réactiver le micro",
   "live.camera": "Caméra",

@@ -45,6 +45,8 @@ import { classifyAttachment, type AttachmentKind, type Attachments, type Selecte
 import { pressStyle } from "../ui/pressStyle";
 import VoiceGrid from "./VoiceGrid";
 
+//buttons are 28px in a 56px bar, slop fills its height
+const HIT_SLOP = { top: 14, bottom: 14, left: 6, right: 6 };
 const nextWhiteIcon = require("../../../assets/icons/arrow.png");
 const micIcon = require("../../../assets/icons/microphone.png");
 const addIcon = require("../../../assets/icons/add.png");
@@ -52,7 +54,7 @@ const stopIcon = require("../../../assets/icons/stop.png");
 const fileIcon = require("../../../assets/icons/file.png");
 const pencilIcon = require("../../../assets/icons/pencil.png");
 const cancelIcon = require("../../../assets/icons/cancel2.png");
-const liveIcon = require("../../../assets/icons/phone.png");
+const liveIcon = require("../../../assets/icons/live.png");
 
 const IMAGE_MAX_WIDTH = 1280;
 const IMAGE_COMPRESS_QUALITY = 0.7;
@@ -1187,13 +1189,13 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 {leadingElement && <View style={{ marginRight: 8 }}>{leadingElement}</View>}
 
                 {supportsFiles && !isRecording && (
-                  <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={isDesktop ? 8 : undefined} style={pressStyle(styles.plusButton, "fadeLight")}>
+                  <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.plusButton, "fadeLight")}>
                     <Image source={addIcon} style={styles.plusIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 )}
 
                 {(Platform.OS !== 'web' || Settings.getCached().whisperModel !== 'none' || canTranscribeRemotely) && !isGenerating && (
-                  <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={isDesktop ? 8 : undefined} style={pressStyle(styles.micButton, "fadeLight")}>
+                  <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.micButton, "fadeLight")}>
                     <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
                       <Image source={isRecording ? stopIcon : micIcon} style={styles.micIcon} tintColor={Colors.textOnPrimary} />
                     </Animated.View>
@@ -1286,28 +1288,20 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 )}
 
                 {isGenerating ? (
-                  <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={isDesktop ? 8 : undefined} style={pressStyle(styles.sendButton, "fadeLight")}>
+                  <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.sendButton, "fadeLight")}>
                     <Image source={stopIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
+                ) : onOpenLive && !isRecording && !text.trim() && attachments.length === 0 ? (
+                  <Pressable accessibilityLabel={t("chatbar.live")} onPress={onOpenLive} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.sendButton, "fadeLight")}>
+                    <Image source={liveIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
+                  </Pressable>
                 ) : (
-                  <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={isDesktop ? 8 : undefined} style={pressStyle(styles.sendButton, "fadeLight")}>
+                  <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.sendButton, "fadeLight")}>
                     <Image source={nextWhiteIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 )}
               </Animated.View>
 
-              {onOpenLive && !isRecording && !isGenerating && (
-                <Pressable
-                  accessibilityLabel={t("chatbar.live")}
-                  onPress={onOpenLive}
-                  style={pressStyle(
-                    [styles.container, styles.liveButton, isDesktop && styles.liveButtonDesktop, incognito && styles.containerIncognito, { backgroundColor: incognito ? Colors.incognito : Colors.primary }],
-                    { backgroundColor: incognito ? Colors.incognitoBright : Colors.primaryBright },
-                  )}
-                >
-                  <Image source={liveIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
-                </Pressable>
-              )}
               </View>
             </Animated.View>
           </Pressable>
@@ -1360,17 +1354,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   containerFill: {
     flex: 1,
-  },
-  //square tile matching the bar height
-  liveButton: {
-    width: 56,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    justifyContent: "center",
-  },
-  liveButtonDesktop: {
-    width: 48,
-    minHeight: 48,
   },
   containerIncognito: {
     boxShadow: `2px 6px 15px ${Colors.incognito}`,

@@ -239,6 +239,7 @@ const LITERT_CAPABILITY_IDS: readonly ModelCapabilityId[] = [
 const searchIcon = require("../../../assets/icons/search.png");
 const profilIcon = require("../../../assets/icons/profil.png");
 const cloudIcon = require("../../../assets/icons/cloud.png");
+const cloud2Icon = require("../../../assets/icons/cloud2.png");
 const ollamaIcon = require("../../../assets/icons/ollama.png");
 const phoneIcon = require("../../../assets/icons/phone.png");
 const sampler2Icon = require("../../../assets/icons/sampler2.png");
@@ -530,7 +531,7 @@ const hubModelLabel = (key: string) => splitHubModelKey(key).model;
 const hubModelIcon = (key: string) => {
   const { url } = splitHubModelKey(key);
   if (url === LLAMA_SERVER_URL) return undefined;
-  return hubProviderKind(url) === "openai" ? cloudIcon : ollamaIcon;
+  return hubProviderKind(url) === "openai" ? cloud2Icon : ollamaIcon;
 };
 
 const ModelToggleRow = memo(function ModelToggleRow({
@@ -1005,6 +1006,7 @@ export default function SettingsDrawer({
   const openaiModelsRequest = useRef(0);
   //key text saved on blur
   const [openaiKeyDraft, setOpenAIKeyDraft] = useState("");
+  const [openaiKeyOpen, setOpenAIKeyOpen] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const [lastSyncSize, setLastSyncSize] = useState<number | null>(null);
 
@@ -1954,6 +1956,7 @@ export default function SettingsDrawer({
       clientId: "",
     });
     setOpenAIKeyDraft("");
+    setOpenAIKeyOpen(false);
     setServerDraftBusy(false);
     setOpenAIAddVisible(true);
   };
@@ -4910,7 +4913,7 @@ export default function SettingsDrawer({
               })),
               ...openaiServers.map((server, index) => ({
                 key: `cloud-${index}`,
-                icon: cloudIcon,
+                icon: cloud2Icon,
                 title: openAIServerLabel(index),
                 status: serverCardStatus(OPENAI_PROVIDER_ID, server),
                 error: serverErrors[server.url.trim()] === true,
@@ -5165,6 +5168,7 @@ export default function SettingsDrawer({
                           (litertDownloadProgress?.progress ?? 0) * 100,
                         ),
                       }),
+                      progress: litertDownloadProgress?.progress ?? 0,
                       onPress: () => setLitertDownloadVisible(true),
                     },
                   ]
@@ -6888,23 +6892,41 @@ export default function SettingsDrawer({
           </View>
 
           <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>
-              {t("settings.cloudapi.apiKey")}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.cloudapi.apiKeyHelp")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={keyIcon}
-                placeholder={t("settings.cloudapi.apiKeyPlaceholder")}
-                autoCapitalize="none"
-                autoCorrect={false}
-                secureTextEntry
-                value={openaiKeyDraft}
-                onChangeText={setOpenAIKeyDraft}
+            <View style={styles.apiKeyHeader}>
+              <Text style={styles.settingLabel}>
+                {t("settings.cloudapi.apiKey")}
+              </Text>
+              <Checkbox
+                checked={openaiKeyOpen}
+                onToggle={(v) => {
+                  setOpenAIKeyOpen(v);
+                  if (!v) setOpenAIKeyDraft("");
+                }}
               />
-            </Group>
+            </View>
+            {openaiKeyOpen ? (
+              <>
+                <Text
+                  style={[
+                    styles.helpText,
+                    { marginTop: Spacing.sm, marginBottom: Spacing.md },
+                  ]}
+                >
+                  {t("settings.cloudapi.apiKeyHelp")}
+                </Text>
+                <Group>
+                  <TextInputField
+                    icon={keyIcon}
+                    placeholder={t("settings.cloudapi.apiKeyPlaceholder")}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    secureTextEntry
+                    value={openaiKeyDraft}
+                    onChangeText={setOpenAIKeyDraft}
+                  />
+                </Group>
+              </>
+            ) : null}
           </View>
 
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -8433,6 +8455,11 @@ const makeStyles = (Colors: ThemeColors) =>
       height: 34,
       backgroundColor: Colors.border,
       marginRight: Spacing.lg2,
+    },
+    apiKeyHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
     },
     checkboxRow: {
       flex: 1,

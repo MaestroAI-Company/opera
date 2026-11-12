@@ -94,6 +94,7 @@ import {
   getOpenAIServers,
   getPromptTierOverride,
   HUB_PROVIDER_ID,
+  isLocalUrl,
   isProviderSupported,
   newOpenAIServerId,
   OllamaServer,
@@ -151,6 +152,7 @@ import {
 import { AppSettings, Settings } from "../../services/settings/SettingsService";
 import { TTS_SPEEDS } from "../../services/speech/engines";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
+import { TTS } from "../../services/speech/TTSService";
 import { SyncPrefs, SyncPrefsStore } from "../../services/SyncPrefs";
 import ActionButton from "../ui/ActionButton";
 import CardGrid, { type GridCard } from "../ui/CardGrid";
@@ -902,9 +904,25 @@ export default function SettingsDrawer({
   const wasVisibleRef = useRef(visible);
   useEffect(() => {
     //page stays mounted while closing, its input would keep the keyboard
-    if (!visible && wasVisibleRef.current) Keyboard.dismiss();
+    if (!visible && wasVisibleRef.current) {
+      Keyboard.dismiss();
+      //keep chat message playback
+      if (!TTS.getSpeakingId()) TTS.stop();
+    }
     wasVisibleRef.current = visible;
   }, [visible]);
+
+  //stop voice test leaving maestro
+  useEffect(() => {
+    if (activeSubPage !== "maestro" && !TTS.getSpeakingId()) TTS.stop();
+  }, [activeSubPage]);
+
+  useEffect(
+    () => () => {
+      if (!TTS.getSpeakingId()) TTS.stop();
+    },
+    [],
+  );
 
   //native back navigates back in the menu, then lets parent close the drawer
   useEffect(() => {
@@ -6205,6 +6223,11 @@ export default function SettingsDrawer({
                     }
                   />
                 </Group>
+                {isLocalUrl(ollamaDetailServer.url) && (
+                  <Text style={[styles.helpText, { marginTop: Spacing.md }]}>
+                    {t("settings.server.localNotSynced")}
+                  </Text>
+                )}
               </View>
 
               <View
@@ -6598,6 +6621,11 @@ export default function SettingsDrawer({
                     }
                   />
                 </Group>
+                {isLocalUrl(server.url) && (
+                  <Text style={[styles.helpText, { marginTop: Spacing.md }]}>
+                    {t("settings.server.localNotSynced")}
+                  </Text>
+                )}
               </View>
 
               <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>

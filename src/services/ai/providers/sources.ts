@@ -43,6 +43,16 @@ export function isProviderSupported(id: string): boolean {
   return !!platforms && platforms.includes(currentPlatform());
 }
 
+//models that exist on this device only
+export function isDeviceOnlyProvider(id: string): boolean {
+  return id === 'local' || id === 'litert';
+}
+
+//loopback servers only work on this device
+export function isLocalUrl(url: string): boolean {
+  return /^(https?:\/\/)?(localhost|127\.\d+\.\d+\.\d+|\[?::1\]?)(?=[:/?#]|$)/i.test(url.trim());
+}
+
 //retired hosted beta server
 export const BETA_PROVIDER_ID = 'beta';
 

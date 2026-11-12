@@ -1063,6 +1063,8 @@ export const fr: Translations = {
   "settings.mcp.remove.title": "Retirer le serveur",
   "settings.mcp.remove.message":
     "Retirer {name} ? Ses outils et sa connexion enregistrée seront supprimés.",
+  "settings.server.localNotSynced":
+    "Ce serveur utilise une adresse locale, il n'est donc pas synchronisé avec vos autres appareils.",
   "settings.server.link": "Lien",
   "settings.server.add": "Ajouter un serveur",
   "settings.server.name": "Nom (optionnel)",

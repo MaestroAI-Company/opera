@@ -1044,6 +1044,8 @@ export const en = {
   "settings.mcp.remove.title": "Remove server",
   "settings.mcp.remove.message":
     "Remove {name}? Its tools and its saved connection will be deleted.",
+  "settings.server.localNotSynced":
+    "This server uses a local address, so it is not synced to your other devices.",
   "settings.server.link": "Link",
   "settings.server.add": "Add server",
   "settings.server.name": "Name (optional)",

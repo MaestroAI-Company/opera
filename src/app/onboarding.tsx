@@ -55,6 +55,7 @@ import { HubSync } from "../services/hub/HubSync";
 import { HubProfile, SamplerHub, PairedHub } from "../services/hub/SamplerHubService";
 import { TTS_SPEEDS, supportedEngineIds } from "../services/speech/engines";
 import { STT } from "../services/speech/STTService";
+import { TTS } from "../services/speech/TTSService";
 import { pressStyle } from "../components/ui/pressStyle";
 
 const texture2 = require("../../assets/images/texture/texture2.png");
@@ -636,6 +637,14 @@ export default function OnboardingPage() {
     contentOpacity.setValue(1);
     busy.current = false;
   }, [step, contentOpacity]);
+
+  //stop voice test on leave
+  useEffect(
+    () => () => {
+      if (!TTS.getSpeakingId()) TTS.stop();
+    },
+    [],
+  );
 
   //sound and rumble ride the logo animation
   useEffect(() => {

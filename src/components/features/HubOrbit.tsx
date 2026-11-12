@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -28,6 +28,8 @@ const LABEL_HEIGHT = 18;
 const LABEL_WIDTH = 120;
 //one slow turn
 const TURN_MS = 120000;
+//extra reach around a node
+const TAP_SLOP = 6;
 
 export type OrbitNode = {
   key: string;
@@ -51,6 +53,16 @@ export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true }: 
   const styles = useThemedStyles(makeStyles);
   const Colors = useColors();
   const turn = useAnimatedValue(0);
+  const angleRef = useRef(0);
+  const [pressedKey, setPressedKey] = useState<string | null>(null);
+
+  //the ring turns natively, keep its angle for taps
+  useEffect(() => {
+    const id = turn.addListener(({ value }) => {
+      angleRef.current = value;
+    });
+    return () => turn.removeListener(id);
+  }, [turn]);
 
   useEffect(() => {
     if (!active) return;
@@ -83,6 +95,25 @@ export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true }: 
   //names and icons stay upright while the ring turns
   const upright = turn.interpolate({ inputRange: [0, 360], outputRange: ["0deg", "-360deg"] });
 
+  //the node under a tap, from the ring angle at that moment
+  const findNode = (x: number, y: number) => {
+    const cx = side / 2;
+    const cy = stageHeight / 2;
+    let hit: OrbitNode | undefined;
+    let best = nodeSize / 2 + TAP_SLOP;
+    nodes.forEach((node, index) => {
+      if (!node.onPress) return;
+      const a = ((index * 360) / nodes.length + angleRef.current) * (Math.PI / 180);
+      const d = node.connected ? nearRadius : radius;
+      const dist = Math.hypot(x - (cx + d * Math.sin(a)), y - (cy - d * Math.cos(a)));
+      if (dist < best) {
+        best = dist;
+        hit = node;
+      }
+    });
+    return hit;
+  };
+
   //whole pixels keep the squares crisp
   const count = Math.round((2 * Math.PI * radius) / (pixelSize * 3));
   const pixels = Array.from({ length: count }, (_, i) => {
@@ -102,6 +133,7 @@ export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true }: 
         ))}
       </View>
       <Animated.View
+        pointerEvents="none"
         style={{
           width: 2 * radius,
           height: 2 * radius,
@@ -120,23 +152,18 @@ export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true }: 
                 ]}
                 pointerEvents="box-none"
               >
-                <Pressable
-                  disabled={!node.onPress}
+                <View
                   style={pressStyle(
                     [styles.circle, styles.nodeCircle, { width: nodeSize, height: nodeSize, borderRadius: nodeSize / 2 }, node.connected && styles.nodeConnected],
                     node.connected ? "primary" : "surface",
-                  )}
-                  onPress={() => {
-                    Vibration.vibrate(8);
-                    node.onPress?.();
-                  }}
+                  )({ pressed: pressedKey === node.key && !!node.onPress, hovered: false })}
                 >
                   <Image
                     source={node.icon}
                     style={{ width: ICON_SIZE * scale, height: ICON_SIZE * scale }}
                     tintColor={node.connected ? Colors.textOnPrimary : Colors.textPrimary}
                   />
-                </Pressable>
+                </View>
                 <Text style={[styles.label, { top: nodeSize + Spacing.sm, left: (nodeSize - LABEL_WIDTH) / 2, fontSize: FontSizes.label * scale }, !node.connected && styles.labelIdle]} numberOfLines={1}>
                   {node.name.toUpperCase()}
                 </Text>
@@ -145,6 +172,19 @@ export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true }: 
           );
         })}
       </Animated.View>
+
+      {/* taps resolved here, above the moving ring */}
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPressIn={(e) => setPressedKey(findNode(e.nativeEvent.locationX, e.nativeEvent.locationY)?.key ?? null)}
+        onPressOut={() => setPressedKey(null)}
+        onPress={(e) => {
+          const node = findNode(e.nativeEvent.locationX, e.nativeEvent.locationY);
+          if (!node) return;
+          Vibration.vibrate(8);
+          node.onPress?.();
+        }}
+      />
 
       {/* above the devices */}
       <View style={[styles.hubWrap, { top: (stageHeight - hubSize) / 2 }]} pointerEvents="box-none">

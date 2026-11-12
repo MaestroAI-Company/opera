@@ -1,16 +1,17 @@
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 
 const loadingAnimation = require("../../../assets/animations/loading.json");
-const size = { width: 35, height: 35 };
+const searchingAnimation = require("../../../assets/animations/searching.json");
 
-export default function ThinkingIcon() {
+//searching swaps the butterfly for a pixel circle with the same pulse
+export default function ThinkingIcon({ searching, size = 35 }: { searching?: boolean; size?: number }) {
   return (
     <DotLottieReact
-      data={loadingAnimation}
+      data={searching ? searchingAnimation : loadingAnimation}
       autoplay
       loop
       layout={{ fit: "contain" }}
-      style={size}
+      style={{ width: size, height: size }}
     />
   );
 }

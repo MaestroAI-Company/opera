@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   Image,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -27,8 +26,10 @@ import {
   NearbyHub,
 } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
+import CardGrid from "../ui/CardGrid";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
+import ThinkingIcon from "../ui/ThinkingIcon";
 import TextInputField from "../ui/TextInputField";
 import DrawerBackButton from "./DrawerBackButton";
 import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
@@ -39,14 +40,17 @@ const addIcon = require("../../../assets/icons/add.png");
 const linkIcon = require("../../../assets/icons/link.png");
 const keyIcon = require("../../../assets/icons/key.png");
 const laptopIcon = require("../../../assets/icons/laptop.png");
-const reloadIcon = require("../../../assets/icons/reload.png");
-const arrowIcon = require("../../../assets/icons/arrow.png");
+const reconnectIcon = require("../../../assets/icons/reconnect.png");
 
-type Page = "discover" | "manual";
+//searching turns into the results, manual is pushed from both
+type Page = "searching" | "discover" | "manual";
 
 const DESKTOP_CARD_WIDTH = 720;
 //delay before rescanning a failed code
 const RESCAN_DELAY_MS = 3000;
+//the animation stays long enough to be seen
+const MIN_SEARCH_MS = 2200;
+const SEARCH_HERO_SIZE = 120;
 
 type HubPairingSheetProps = {
   visible: boolean;
@@ -87,10 +91,9 @@ export default function HubPairingSheet({
   const [found, setFound] = useState<PairedHub | null>(null);
   //scanner fires on every frame
   const lastScan = useRef<{ data: string; at: number } | null>(null);
-  const [page, setPage] = useState<Page>("discover");
+  const [page, setPage] = useState<Page>("searching");
   const [codeMode, setCodeMode] = useState(false);
   const [nearby, setNearby] = useState<NearbyHub[] | null>(null);
-  const [scanKey, setScanKey] = useState(0);
   const [bodyWidth, setBodyWidth] = useState(0);
   const [scrolled, setScrolled] = useState(false);
 
@@ -102,7 +105,7 @@ export default function HubPairingSheet({
       setError(null);
       setTypedLink("");
       setFound(null);
-      setPage("discover");
+      setPage("searching");
       setCodeMode(false);
       setNearby(null);
     }
@@ -169,17 +172,26 @@ export default function HubPairingSheet({
   const shownPage: Page = paged ? page : "manual";
 
   useEffect(() => {
-    if (!visible || !paged || page !== "discover") return;
+    if (!visible || !paged || page !== "searching") return;
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- starts the network scan
     setNearby(null);
+    const minimum = new Promise((resolve) => setTimeout(resolve, MIN_SEARCH_MS));
     SamplerHub.nearbyHubs()
-      .then((hubs) => !cancelled && setNearby(hubs))
-      .catch(() => !cancelled && setNearby([]));
+      .catch(() => [] as NearbyHub[])
+      .then(async (hubs) => {
+        await minimum;
+        if (cancelled) return;
+        setNearby(hubs);
+        //tell the user a hub is nearby
+        if (hubs.length) Vibration.vibrate(30);
+        setScrolled(false);
+        setPage("discover");
+      });
     return () => {
       cancelled = true;
     };
-  }, [visible, paged, page, scanKey]);
+  }, [visible, paged, page]);
 
   const showPage = (next: Page) => {
     setScrolled(false);
@@ -188,8 +200,8 @@ export default function HubPairingSheet({
 
   //android back steps up before the sheet closes
   const handleBack = () => {
-    if (!paged || page === "discover" || found) return false;
-    showPage("discover");
+    if (!paged || page !== "manual" || found) return false;
+    showPage(nearby === null ? "searching" : "discover");
     return true;
   };
 
@@ -301,7 +313,7 @@ export default function HubPairingSheet({
       return (
         <>
           {renderCodeRow()}
-          {renderToggleLink(t("hubPairing.scan"), false)}
+          {renderModeButton(t("hubPairing.scan"), cameraIcon, false)}
         </>
       );
     }
@@ -334,19 +346,29 @@ export default function HubPairingSheet({
             )}
           </Group>
         </View>
-        {paged ? renderToggleLink(t("hubPairing.useCode"), true) : renderCodeRow()}
+        {paged ? renderModeButton(t("hubPairing.useCode"), keyIcon, true) : renderCodeRow()}
       </>
     );
   };
 
   //switches between the camera and the code row
-  const renderToggleLink = (label: string, code: boolean) => (
-    <Pressable
-      style={({ pressed }) => [styles.toggleLink, pressed && styles.toggleLinkPressed]}
-      onPress={() => setCodeMode(code)}
-    >
-      <Text style={styles.toggleLinkText}>{label}</Text>
-    </Pressable>
+  const renderModeButton = (label: string, icon: number, code: boolean) => (
+    <Group style={{ marginTop: Spacing.xxl }}>
+      <ActionButton
+        icon={icon}
+        label={label}
+        onPress={() => setCodeMode(code)}
+      />
+    </Group>
+  );
+
+  //centered like the other empty states
+  const renderSearching = () => (
+    <View style={styles.searchPage}>
+      <ThinkingIcon searching size={SEARCH_HERO_SIZE} />
+      <Text style={styles.searchTitle}>{t("hubPairing.searching")}</Text>
+      <Text style={styles.searchHelp}>{t("hubPairing.scanning")}</Text>
+    </View>
   );
 
   const renderDiscover = () => (
@@ -354,39 +376,43 @@ export default function HubPairingSheet({
       <View style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={styles.settingLabel}>{t("hubPairing.discover")}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {nearby === null
-              ? t("hubPairing.scanning")
-              : nearby.length === 0
-                ? t("hubPairing.noneFound")
-                : t("hubPairing.discoverHelp")}
+          <Text
+            style={[
+              styles.helpText,
+              nearby?.length ? { marginBottom: Spacing.md } : null,
+            ]}
+          >
+            {nearby?.length ? t("hubPairing.discoverHelp") : t("hubPairing.noneFound")}
           </Text>
-          <Group>
-            {nearby?.map((hub) => (
-              <ActionButton
-                key={hub.id}
-                icon={laptopIcon}
-                label={hub.name}
-                onPress={() => pickNearby(hub)}
-              />
-            ))}
-            <ActionButton
-              icon={reloadIcon}
-              label={t("hubPairing.rescan")}
-              disabled={nearby === null}
-              onPress={() => setScanKey((k) => k + 1)}
+          {!!nearby?.length && (
+            <CardGrid
+              singleLineTitle
+              cards={nearby.map((hub) => ({
+                key: hub.id,
+                title: hub.name,
+                status: hub.addrs[0] ?? "",
+                icon: laptopIcon,
+                onPress: () => pickNearby(hub),
+              }))}
             />
-          </Group>
+          )}
         </View>
       </View>
-      {/* page-level navigation group */}
-      <Group style={styles.navGroup}>
-        <ActionButton
-          icon={arrowIcon}
-          label={t("hubPairing.manual")}
-          onPress={() => showPage("manual")}
-        />
-      </Group>
+      {/* actions section, one group with no label */}
+      <View style={styles.contentCard}>
+        <Group>
+          <ActionButton
+            icon={reconnectIcon}
+            label={t("hubPairing.rescan")}
+            onPress={() => showPage("searching")}
+          />
+          <ActionButton
+            icon={addIcon}
+            label={t("hubPairing.manual")}
+            onPress={() => showPage("manual")}
+          />
+        </Group>
+      </View>
     </>
   );
 
@@ -397,6 +423,7 @@ export default function HubPairingSheet({
         contentContainerStyle={[
           styles.content,
           p === "manual" && styles.contentWithBack,
+          p === "searching" && styles.contentCentered,
         ]}
         keyboardShouldPersistTaps="handled"
         onScroll={
@@ -404,7 +431,9 @@ export default function HubPairingSheet({
         }
         scrollEventThrottle={16}
       >
-        {p === "discover" ? (
+        {p === "searching" ? (
+          renderSearching()
+        ) : p === "discover" ? (
           renderDiscover()
         ) : (
           <View style={styles.contentCard}>{renderContent()}</View>
@@ -454,7 +483,9 @@ export default function HubPairingSheet({
               page={shownPage}
               visible={visible}
               width={bodyWidth}
-              parentOf={(p) => (p === "manual" ? "discover" : null)}
+              parentOf={(p) =>
+                p === "manual" ? (nearby === null ? "searching" : "discover") : null
+              }
               onBack={handleBack}
               renderPage={renderPage}
             />
@@ -527,25 +558,6 @@ const makeStyles = (Colors: ThemeColors) =>
       paddingBottom: Spacing.lg,
       gap: Spacing.xxl2,
     },
-    navGroup: {
-      borderRadius: Radius.xxl + Spacing.md,
-      borderWidth: 0,
-    },
-    toggleLink: {
-      alignSelf: "center",
-      marginTop: Spacing.md,
-      paddingVertical: Spacing.xs,
-      paddingHorizontal: Spacing.md,
-    },
-    toggleLinkPressed: {
-      opacity: 0.6,
-    },
-    toggleLinkText: {
-      fontFamily: Fonts.body,
-      fontSize: FontSizes.bodyMd,
-      color: Colors.textMuted,
-      textDecorationLine: "underline",
-    },
     contentCard: {
       backgroundColor: Colors.surface,
       borderRadius: Radius.xxl + Spacing.md,
@@ -569,6 +581,30 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     settingRowVertical: {
       marginBottom: Spacing.xxl,
+    },
+    contentCentered: {
+      flexGrow: 1,
+      justifyContent: "center",
+    },
+    searchPage: {
+      alignItems: "center",
+      paddingBottom: Spacing.xxxl,
+    },
+    searchTitle: {
+      fontSize: FontSizes.displayMd,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.display,
+      textAlign: "center",
+      marginTop: Spacing.xxl,
+    },
+    searchHelp: {
+      fontSize: FontSizes.bodyMd,
+      color: Colors.textMuted,
+      fontFamily: Fonts.body,
+      lineHeight: 20,
+      textAlign: "center",
+      maxWidth: 420,
+      marginTop: Spacing.md,
     },
     foundTitle: {
       fontSize: FontSizes.displayMd,

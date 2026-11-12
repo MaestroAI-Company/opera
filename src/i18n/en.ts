@@ -285,6 +285,10 @@ export const en = {
   "live.camera": "Camera",
   "live.selectCamera": "Select a camera",
   "live.hangUp": "Hang up",
+  "live.notifPerm.title": "Allow notifications",
+  "live.notifPerm.message": "Opera needs notifications to show your ongoing call with Maestro and let you hang up or mute from the status bar.",
+  "live.notifPerm.allow": "Allow",
+  "live.notifPerm.cancel": "Not now",
   "live.voiceMessage": "Voice message",
   "live.transcribe.title": "Write down what you say?",
   "live.transcribe.message":

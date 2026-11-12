@@ -288,6 +288,10 @@ export const fr: Translations = {
   "live.camera": "Caméra",
   "live.selectCamera": "Choisir une caméra",
   "live.hangUp": "Raccrocher",
+  "live.notifPerm.title": "Autoriser les notifications",
+  "live.notifPerm.message": "Opera a besoin des notifications pour afficher ton appel en cours avec Maestro et te laisser raccrocher ou couper le micro depuis la barre d'état.",
+  "live.notifPerm.allow": "Autoriser",
+  "live.notifPerm.cancel": "Plus tard",
   "live.voiceMessage": "Message vocal",
   "live.transcribe.title": "Écrire ce que tu dis ?",
   "live.transcribe.message":

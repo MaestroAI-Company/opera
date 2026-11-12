@@ -79,6 +79,7 @@ import {
   truncateModel,
 } from "../components/features/ModelSelector";
 import LiveScreen from "../components/features/LiveScreen";
+import { hasLiveCallPermission, requestLiveCallPermission } from "../services/live/LiveCall";
 import SamplerScreen from "../components/features/SamplerScreen";
 import SettingsDrawer, { SubPage } from "../components/features/SettingsDrawer";
 import TopBar from "../components/features/TopBar";
@@ -707,7 +708,13 @@ export default function Index() {
 
   const [liveAskVisible, setLiveAskVisible] = useState(false);
   const [liveTranscribe, setLiveTranscribe] = useState(false);
-  const openLive = useCallback(() => {
+  const [liveNotifVisible, setLiveNotifVisible] = useState(false);
+  const openLive = useCallback(async () => {
+    //no call card without notifications
+    if (!(await hasLiveCallPermission())) {
+      setLiveNotifVisible(true);
+      return;
+    }
     liveConvRef.current = activeConversationRef.current;
     const choice = Settings.getCached().liveTranscription;
     //transcription costs extra
@@ -718,6 +725,10 @@ export default function Index() {
     setLiveTranscribe(choice === "on");
     setLiveOpen(true);
   }, [currentLiveBackend]);
+  const allowLiveNotif = useCallback(async () => {
+    setLiveNotifVisible(false);
+    if (await requestLiveCallPermission()) openLive();
+  }, [openLive]);
   const answerLiveAsk = useCallback((transcribe: boolean) => {
     Settings.set("liveTranscription", transcribe ? "on" : "off");
     setLiveAskVisible(false);
@@ -2928,6 +2939,17 @@ export default function Index() {
               </View>
             </Animated.View>
           </View>
+
+          <NotificationModal
+            visible={liveNotifVisible}
+            title={t("live.notifPerm.title")}
+            message={t("live.notifPerm.message")}
+            buttons={[
+              { text: t("live.notifPerm.cancel"), style: "secondary", onPress: () => setLiveNotifVisible(false) },
+              { text: t("live.notifPerm.allow"), style: "primary", onPress: allowLiveNotif },
+            ]}
+            onClose={() => setLiveNotifVisible(false)}
+          />
 
           <NotificationModal
             visible={liveAskVisible}

@@ -209,6 +209,8 @@ pub fn run() {
             #[cfg(desktop)]
             hub::hub_invite,
             #[cfg(desktop)]
+            hub::hub_invite_watch,
+            #[cfg(desktop)]
             hub::hub_qr_svg,
             #[cfg(desktop)]
             hub::hub_models_catalog,

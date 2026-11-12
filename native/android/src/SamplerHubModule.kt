@@ -83,6 +83,11 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
       }
     }
 
+  //true once a device used the code
+  @ReactMethod
+  fun inviteWatch(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) { client(deviceKey).inviteWatch(hubFromMap(hub)) }
+
   @ReactMethod
   fun hubSettings(deviceKey: String, hub: ReadableMap, promise: Promise) =
     launchPromise(promise) { settingsToMap(client(deviceKey).hubSettings(hubFromMap(hub))) }

@@ -1,6 +1,6 @@
 import * as Clipboard from "expo-clipboard";
-import { useCallback, useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SvgXml } from "react-native-svg";
 import {
   Fonts,
@@ -54,13 +54,29 @@ export default function HubQrSheet({
   const [invite, setInvite] = useState<HubInvite | null>(null);
   const [svg, setSvg] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   //a device typed the link code
   const [joining, setJoining] = useState<LinkJoining | null>(null);
   const [answering, setAnswering] = useState(false);
 
+  //a new hub object keeps the code
+  const hubRef = useRef(hub);
+  const colorsRef = useRef(colors);
+  useEffect(() => {
+    hubRef.current = hub;
+    colorsRef.current = colors;
+  });
+  const hasHub = !!hub;
+
   const refresh = useCallback(async () => {
+    const hub = hubRef.current;
+    const colors = colorsRef.current;
     if (!hub) return;
+    setLoading(true);
+    //a stale code never shows while reloading
+    setInvite(null);
+    setSvg(null);
     try {
       setJoining(null);
       const fresh =
@@ -76,8 +92,10 @@ export default function HubQrSheet({
       console.warn("[SamplerHub] no pairing code:", e);
       setInvite(null);
       setFailed(true);
+    } finally {
+      setLoading(false);
     }
-  }, [hub, mode, colors.textPrimary, colors.surface]);
+  }, [mode]);
 
   //a closed sheet forgets its code
   const [prevVisible, setPrevVisible] = useState(visible);
@@ -87,6 +105,8 @@ export default function HubQrSheet({
       setInvite(null);
       setSvg(null);
       setJoining(null);
+      setFailed(false);
+      setLoading(false);
     }
   }
   //each opening invalidates the previous code
@@ -97,24 +117,65 @@ export default function HubQrSheet({
 
   //waits for the device that types the link code
   useEffect(() => {
-    if (!visible || !hub || mode !== "link" || !invite || joining) return;
+    if (!visible || !hasHub || mode !== "link" || !invite || joining) return;
     let stopped = false;
     (async () => {
       while (!stopped) {
+        const hub = hubRef.current;
+        if (!hub) return;
         try {
           const found = await SamplerHub.linkWatch(hub);
-          if (found && !stopped) return setJoining(found);
+          if (found && !stopped) {
+            //the code is spent
+            setInvite(null);
+            setSvg(null);
+            return setJoining(found);
+          }
         } catch (e) {
           console.warn("[SamplerHub] link watch failed:", e);
-          if (!stopped) setFailed(true);
-          return;
+          //only a dead code is permanent
+          const msg = String((e as Error)?.message ?? e).toLowerCase();
+          if (msg.includes("expired") || msg.includes("no link in progress")) {
+            if (!stopped) setFailed(true);
+            return;
+          }
+          await new Promise((r) => setTimeout(r, 2000));
         }
       }
     })();
     return () => {
       stopped = true;
     };
-  }, [visible, hub, mode, invite, joining]);
+  }, [visible, hasHub, mode, invite, joining]);
+
+  //closes once another device used the invite
+  useEffect(() => {
+    if (!visible || !hasHub || mode !== "invite" || !invite) return;
+    let stopped = false;
+    (async () => {
+      while (!stopped) {
+        const hub = hubRef.current;
+        if (!hub) return;
+        try {
+          if (await SamplerHub.inviteWatch(hub)) {
+            if (stopped) return;
+            //the code is spent
+            setInvite(null);
+            setSvg(null);
+            return onClose();
+          }
+        } catch (e) {
+          console.warn("[SamplerHub] invite watch failed:", e);
+          const msg = String((e as Error)?.message ?? e).toLowerCase();
+          if (msg.includes("expired") || msg.includes("no invite in progress")) return;
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+      }
+    })();
+    return () => {
+      stopped = true;
+    };
+  }, [visible, hasHub, mode, invite, onClose]);
 
   const answer = async (approve: boolean) => {
     if (!hub || answering) return;
@@ -199,7 +260,15 @@ export default function HubQrSheet({
                   ? t("hubQr.linkHelp")
                   : t("hubQr.help")}
             </Text>
-            {invite && svg && (
+            {loading ? (
+              <Group style={styles.groupSpacingTight}>
+                <View style={[styles.qr, styles.qrLoading]}>
+                  <ActivityIndicator color={colors.textMuted} />
+                </View>
+              </Group>
+            ) : (
+              invite &&
+              svg && (
               <Group style={styles.groupSpacingTight}>
                 <View style={styles.qr}>
                   <SvgXml xml={svg} width="100%" height="100%" />
@@ -208,17 +277,19 @@ export default function HubQrSheet({
                   {invite.code}
                 </Text>
               </Group>
+              )
             )}
             <Group>
               <ActionButton
                 icon={copyIcon}
                 label={copied ? t("hubQr.copied") : t("hubQr.copy")}
-                disabled={!invite}
+                disabled={!invite || loading}
                 onPress={copy}
               />
               <ActionButton
                 icon={reloadIcon}
                 label={t("hubQr.refresh")}
+                disabled={loading}
                 onPress={refresh}
               />
             </Group>
@@ -299,6 +370,10 @@ const makeStyles = (Colors: ThemeColors) =>
       aspectRatio: 1,
       padding: Spacing.xl2,
       paddingBottom: Spacing.md,
+    },
+    qrLoading: {
+      alignItems: "center",
+      justifyContent: "center",
     },
     //typed on devices without a camera
     code: {

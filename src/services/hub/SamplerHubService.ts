@@ -103,6 +103,7 @@ type NativeHub = {
   pair(deviceKey: string, link: string, deviceName: string, kind: string): Promise<PairedHub>;
   pairWithCode(deviceKey: string, code: string, deviceName: string, kind: string): Promise<PairedHub>;
   invite(deviceKey: string, hub: PairedHub): Promise<HubInvite>;
+  inviteWatch(deviceKey: string, hub: PairedHub): Promise<boolean>;
   qrSvg(text: string, dark: string, light: string): Promise<string>;
   //admin profiles only, older clients lack it
   hubSettings?(deviceKey: string, hub: PairedHub): Promise<HubSettings>;
@@ -276,6 +277,7 @@ const tauriHub: NativeHub = {
   pairWithCode: (deviceKey, code, deviceName, kind) =>
     invoke('hub_pair_with_code', { deviceKey, code, deviceName, kind }),
   invite: (deviceKey, hub) => invoke('hub_invite', { deviceKey, hub }),
+  inviteWatch: (deviceKey, hub) => invoke('hub_invite_watch', { deviceKey, hub }),
   qrSvg: (text, dark, light) => invoke('hub_qr_svg', { text, dark, light }),
   hubSettings: (deviceKey, hub) => invoke('hub_settings', { deviceKey, hub }),
   setHubSettings: (deviceKey, hub, settings) => invoke('hub_set_settings', { deviceKey, hub, settings }),
@@ -349,6 +351,7 @@ type WebClient = {
   pair(link: string, deviceName: string, kind: string): Promise<PairedHub>;
   pairWithCode(code: string, deviceName: string, kind: string): Promise<PairedHub>;
   invite(hub: PairedHub): Promise<HubInvite>;
+  inviteWatch(hub: PairedHub): Promise<boolean>;
   status(hub: PairedHub): Promise<HubStatus>;
   unpair(hub: PairedHub): Promise<void>;
   devices(hub: PairedHub): Promise<HubDevice[]>;
@@ -444,6 +447,7 @@ const webHub: NativeHub = {
   pairWithCode: async (deviceKey, code, deviceName, kind) =>
     (await loadWebClient(deviceKey)).pairWithCode(code, deviceName, kind),
   invite: async (deviceKey, hub) => (await loadWebClient(deviceKey)).invite(hub),
+  inviteWatch: async (deviceKey, hub) => (await loadWebClient(deviceKey)).inviteWatch(hub),
   qrSvg: async (text, dark, light) => (await loadWebModule()).qrSvg(text, dark, light),
   status: async (deviceKey, hub) => (await loadWebClient(deviceKey)).status(hub),
   unpair: async (deviceKey, hub) => (await loadWebClient(deviceKey)).unpair(hub),
@@ -736,6 +740,10 @@ class SamplerHubServiceImpl {
   //a code for another device, needs the admin scope
   async invite(hub: PairedHub): Promise<HubInvite> {
     return this.native().invite(await this.deviceKey(), hub);
+  }
+
+  async inviteWatch(hub: PairedHub): Promise<boolean> {
+    return this.native().inviteWatch(await this.deviceKey(), hub);
   }
 
   async qrSvg(text: string, dark: string, light: string): Promise<string> {

@@ -117,6 +117,15 @@ pub async fn hub_invite(
 }
 
 #[tauri::command]
+pub async fn hub_invite_watch(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<bool, HubError> {
+    state.client(&device_key).await?.invite_watch(hub).await
+}
+
+#[tauri::command]
 pub async fn hub_settings(
     state: State<'_, HubState>,
     device_key: String,

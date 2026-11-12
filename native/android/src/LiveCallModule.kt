@@ -19,13 +19,16 @@ class LiveCallModule(private val context: ReactApplicationContext) : ReactContex
   }
 
   @ReactMethod
-  fun start(title: String, text: String, hangUpLabel: String, muteLabel: String) {
+  fun start(title: String, text: String, hangUpLabel: String, muteLabel: String, baseUri: String, accentUri: String, accentColor: Int) {
     val intent = Intent(context, LiveCallService::class.java)
       .setAction(LiveCallService.ACTION_START)
       .putExtra(LiveCallService.EXTRA_TITLE, title)
       .putExtra(LiveCallService.EXTRA_TEXT, text)
       .putExtra(LiveCallService.EXTRA_HANG_UP, hangUpLabel)
       .putExtra(LiveCallService.EXTRA_MUTE, muteLabel)
+      .putExtra(LiveCallService.EXTRA_BASE, baseUri)
+      .putExtra(LiveCallService.EXTRA_ACCENT, accentUri)
+      .putExtra(LiveCallService.EXTRA_COLOR, accentColor)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
   }
 

@@ -1,15 +1,37 @@
 import notifee, { AuthorizationStatus } from '@notifee/react-native';
-import { DeviceEventEmitter, NativeModules, Platform } from 'react-native';
+import { Asset } from 'expo-asset';
+import { DeviceEventEmitter, ImageSourcePropType, NativeModules, Platform, processColor } from 'react-native';
 
 type LiveCallNative = {
-  start(title: string, text: string, hangUpLabel: string, muteLabel: string): void;
+  start(title: string, text: string, hangUpLabel: string, muteLabel: string, baseUri: string, accentUri: string, accentColor: number): void;
   stop(): void;
 };
 
+//todo ios needs a live activity
 const native: LiveCallNative | undefined = Platform.OS === 'android' ? NativeModules.LiveCallModule : undefined;
 
 export type LiveCallAction = 'hangup' | 'mute';
-export type LiveCallLabels = { title: string; text: string; hangUp: string; mute: string };
+export type LiveCallAvatar = { baseUri: string; accentUri: string; color: number };
+export type LiveCallLabels = {
+  title: string; text: string; hangUp: string; mute: string;
+  avatar?: LiveCallAvatar | null;
+};
+
+//local files of butterfly layers
+export async function loadLiveCallAvatar(base: ImageSourcePropType, accent: ImageSourcePropType, tint: string): Promise<LiveCallAvatar | null> {
+  if (!native) return null;
+  try {
+    const [baseAsset, accentAsset] = await Promise.all([base, accent].map((source) => Asset.fromModule(source as number).downloadAsync()));
+    if (!baseAsset.localUri || !accentAsset.localUri) return null;
+    return {
+      baseUri: baseAsset.localUri.replace('file://', ''),
+      accentUri: accentAsset.localUri.replace('file://', ''),
+      color: processColor(tint) as number,
+    };
+  } catch {
+    return null;
+  }
+}
 
 //android 13+ hides the card without the grant
 export async function hasLiveCallPermission(): Promise<boolean> {
@@ -39,5 +61,6 @@ export function startLiveCall(onAction: (action: LiveCallAction) => void): () =>
 
 //shows or refreshes the notification
 export function showLiveCall(labels: LiveCallLabels): void {
-  native?.start(labels.title, labels.text, labels.hangUp, labels.mute);
+  if (!native) return;
+  native.start(labels.title, labels.text, labels.hangUp, labels.mute, labels.avatar?.baseUri ?? '', labels.avatar?.accentUri ?? '', labels.avatar?.color ?? 0);
 }

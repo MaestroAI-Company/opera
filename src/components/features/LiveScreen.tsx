@@ -9,7 +9,8 @@ import { useResponsive } from "../../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import type { MessageMetrics } from "../../services/db/DatabaseService";
-import { showLiveCall, startLiveCall } from "../../services/live/LiveCall";
+import { MAESTRO_BUTTERFLIES, useMaestroButterfly, useVoiceColor } from "./maestroButterfly";
+import { loadLiveCallAvatar, showLiveCall, startLiveCall } from "../../services/live/LiveCall";
 import type { LiveBackend } from "../../services/live/liveBackend";
 import { startLiveSession, type LiveSession, type LiveState } from "../../services/live/LiveSession";
 import Group from "../ui/Group";
@@ -107,9 +108,17 @@ export default function LiveScreen({ backend, instructions, incognito, transcrib
     [],
   );
   //label follows the mute state
+  const butterfly = MAESTRO_BUTTERFLIES[useMaestroButterfly()];
+  const voiceColor = useVoiceColor();
   useEffect(() => {
-    showLiveCall({ title: "Maestro", text: backend.model, hangUp: t("live.hangUp"), mute: t(muted ? "live.unmute" : "live.mute") });
-  }, [backend, t, muted]);
+    let cancelled = false;
+    const labels = { title: "Maestro", text: backend.model, hangUp: t("live.hangUp"), mute: t(muted ? "live.unmute" : "live.mute") };
+    //butterfly follows personality and voice
+    loadLiveCallAvatar(butterfly.base, butterfly.accent, incognito ? Colors.incognito : voiceColor).then((avatar) => {
+      if (!cancelled) showLiveCall({ ...labels, avatar });
+    });
+    return () => { cancelled = true; };
+  }, [backend, t, muted, butterfly, voiceColor, incognito, Colors]);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {

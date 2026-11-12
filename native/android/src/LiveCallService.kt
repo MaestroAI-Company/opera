@@ -9,6 +9,15 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
+import android.graphics.RectF
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.IBinder
 
@@ -22,6 +31,9 @@ class LiveCallService : Service() {
     const val EXTRA_TEXT = "text"
     const val EXTRA_HANG_UP = "hangUpLabel"
     const val EXTRA_MUTE = "muteLabel"
+    const val EXTRA_BASE = "butterflyBase"
+    const val EXTRA_ACCENT = "butterflyAccent"
+    const val EXTRA_COLOR = "accentColor"
     private const val CHANNEL_ID = "live_call"
     private const val NOTIFICATION_ID = 4217
 
@@ -29,6 +41,9 @@ class LiveCallService : Service() {
     var onAction: ((String) -> Unit)? = null
     //label updates keep the call timer
     private var startedAt = 0L
+    //recomposed only when the butterfly changes
+    private var avatarKey = ""
+    private var avatar: Bitmap? = null
   }
 
   override fun onBind(intent: Intent?): IBinder? = null
@@ -52,9 +67,40 @@ class LiveCallService : Service() {
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
+  //home butterfly drawn on its color
+  private fun avatarFor(intent: Intent): Bitmap? {
+    val base = intent.getStringExtra(EXTRA_BASE)?.takeIf { it.isNotEmpty() } ?: return null
+    val accent = intent.getStringExtra(EXTRA_ACCENT)?.takeIf { it.isNotEmpty() } ?: return null
+    val color = intent.getIntExtra(EXTRA_COLOR, Color.RED)
+    val key = "$base|$accent|$color"
+    if (key == avatarKey) return avatar
+    val size = 256
+    val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(out)
+    //wings turn cream on the color
+    canvas.drawColor(color)
+    //inset keeps wings inside the round crop
+    val target = RectF(size * 0.08f, size * 0.08f, size * 0.92f, size * 0.92f)
+    val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+    for ((path, tint) in listOf(base to null, accent to 0xFFFEFBF6.toInt())) {
+      val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+      BitmapFactory.decodeFile(path, bounds)
+      if (bounds.outWidth <= 0) return null
+      val options = BitmapFactory.Options().apply { inSampleSize = maxOf(1, bounds.outWidth / (size * 2)) }
+      val layer = BitmapFactory.decodeFile(path, options) ?: return null
+      paint.colorFilter = tint?.let { PorterDuffColorFilter(it, PorterDuff.Mode.SRC_IN) }
+      canvas.drawBitmap(layer, null, target, paint)
+      layer.recycle()
+    }
+    avatarKey = key
+    avatar = out
+    return out
+  }
+
   private fun show(intent: Intent) {
     val title = intent.getStringExtra(EXTRA_TITLE) ?: "Maestro"
     val text = intent.getStringExtra(EXTRA_TEXT) ?: ""
+    val avatar = avatarFor(intent)
     val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       manager.createNotificationChannel(
@@ -78,10 +124,13 @@ class LiveCallService : Service() {
       .setUsesChronometer(true)
       .setWhen(startedAt)
       .setCategory(Notification.CATEGORY_CALL)
+      //avatar of the pre-android 12 card
+      .setLargeIcon(avatar)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
       //call style gets the status bar call chip
-      val maestro = Person.Builder().setName(title).setImportant(true).build()
-      builder.setStyle(Notification.CallStyle.forOngoingCall(maestro, hangUp))
+      val person = Person.Builder().setName(title).setImportant(true)
+      if (avatar != null) person.setIcon(Icon.createWithBitmap(avatar))
+      builder.setStyle(Notification.CallStyle.forOngoingCall(person.build(), hangUp))
     } else {
       builder.addAction(Notification.Action.Builder(null, intent.getStringExtra(EXTRA_HANG_UP), hangUp).build())
     }

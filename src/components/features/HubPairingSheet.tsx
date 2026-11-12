@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Image,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -23,18 +24,25 @@ import {
   hubErrorCode,
   SamplerHub,
   PairedHub,
+  NearbyHub,
 } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
-import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
+import DrawerBackButton from "./DrawerBackButton";
+import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
+import PageStack from "./PageStack";
 
 const cameraIcon = require("../../../assets/icons/camera.png");
 const addIcon = require("../../../assets/icons/add.png");
 const linkIcon = require("../../../assets/icons/link.png");
 const keyIcon = require("../../../assets/icons/key.png");
 const laptopIcon = require("../../../assets/icons/laptop.png");
+const reloadIcon = require("../../../assets/icons/reload.png");
+const arrowIcon = require("../../../assets/icons/arrow.png");
+
+type Page = "discover" | "manual";
 
 const DESKTOP_CARD_WIDTH = 720;
 //delay before rescanning a failed code
@@ -48,6 +56,9 @@ type HubPairingSheetProps = {
   link?: string | null;
   //a second hub would silently replace it
   pairedHub?: PairedHub | null;
+  //opens on hubs found nearby
+  discover?: boolean;
+  onNearby?: (hub: NearbyHub) => void;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
 };
@@ -58,6 +69,8 @@ export default function HubPairingSheet({
   onPaired,
   link = null,
   pairedHub = null,
+  discover = false,
+  onNearby,
   isLargeScreen = false,
   isDesktop = false,
 }: HubPairingSheetProps) {
@@ -74,6 +87,12 @@ export default function HubPairingSheet({
   const [found, setFound] = useState<PairedHub | null>(null);
   //scanner fires on every frame
   const lastScan = useRef<{ data: string; at: number } | null>(null);
+  const [page, setPage] = useState<Page>("discover");
+  const [codeMode, setCodeMode] = useState(false);
+  const [nearby, setNearby] = useState<NearbyHub[] | null>(null);
+  const [scanKey, setScanKey] = useState(0);
+  const [bodyWidth, setBodyWidth] = useState(0);
+  const [scrolled, setScrolled] = useState(false);
 
   //a reopened sheet starts clean
   const [prevVisible, setPrevVisible] = useState(visible);
@@ -83,6 +102,9 @@ export default function HubPairingSheet({
       setError(null);
       setTypedLink("");
       setFound(null);
+      setPage("discover");
+      setCodeMode(false);
+      setNearby(null);
     }
   }
   useEffect(() => {
@@ -141,6 +163,41 @@ export default function HubPairingSheet({
 
   //desktop and web have no camera to scan with
   const mode = link ? "confirm" : Platform.OS === "web" ? "code" : "scan";
+
+  //discovery page only leads to the manual ones
+  const paged = discover && mode !== "confirm" && !pairedHub && SamplerHub.canDiscover();
+  const shownPage: Page = paged ? page : "manual";
+
+  useEffect(() => {
+    if (!visible || !paged || page !== "discover") return;
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- starts the network scan
+    setNearby(null);
+    SamplerHub.nearbyHubs()
+      .then((hubs) => !cancelled && setNearby(hubs))
+      .catch(() => !cancelled && setNearby([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, paged, page, scanKey]);
+
+  const showPage = (next: Page) => {
+    setScrolled(false);
+    setPage(next);
+  };
+
+  //android back steps up before the sheet closes
+  const handleBack = () => {
+    if (!paged || page === "discover" || found) return false;
+    showPage("discover");
+    return true;
+  };
+
+  const pickNearby = (hub: NearbyHub) => {
+    //older clients still pair with a code
+    if (!SamplerHub.canSignIn()) return showPage("manual");
+    onNearby?.(hub);
+  };
 
   const renderPairButton = (
     value: string,
@@ -240,16 +297,27 @@ export default function HubPairingSheet({
         </>
       );
     }
+    if (paged && codeMode) {
+      return (
+        <>
+          {renderCodeRow()}
+          {renderToggleLink(t("hubPairing.scan"), false)}
+        </>
+      );
+    }
     return (
       <>
-        <View style={styles.settingRowVertical}>
+        <View
+          style={[styles.settingRowVertical, paged && { marginBottom: 0 }]}
+        >
           <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
             {t("hubPairing.scan")}
           </Text>
           <Group>
             {permission?.granted ? (
               //unmount to release the camera
-              visible && (
+              visible &&
+              shownPage === "manual" && (
                 <CameraView
                   style={styles.camera}
                   facing="back"
@@ -266,16 +334,98 @@ export default function HubPairingSheet({
             )}
           </Group>
         </View>
-        {renderCodeRow()}
+        {paged ? renderToggleLink(t("hubPairing.useCode"), true) : renderCodeRow()}
       </>
     );
   };
+
+  //switches between the camera and the code row
+  const renderToggleLink = (label: string, code: boolean) => (
+    <Pressable
+      style={({ pressed }) => [styles.toggleLink, pressed && styles.toggleLinkPressed]}
+      onPress={() => setCodeMode(code)}
+    >
+      <Text style={styles.toggleLinkText}>{label}</Text>
+    </Pressable>
+  );
+
+  const renderDiscover = () => (
+    <>
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>{t("hubPairing.discover")}</Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {nearby === null
+              ? t("hubPairing.scanning")
+              : nearby.length === 0
+                ? t("hubPairing.noneFound")
+                : t("hubPairing.discoverHelp")}
+          </Text>
+          <Group>
+            {nearby?.map((hub) => (
+              <ActionButton
+                key={hub.id}
+                icon={laptopIcon}
+                label={hub.name}
+                onPress={() => pickNearby(hub)}
+              />
+            ))}
+            <ActionButton
+              icon={reloadIcon}
+              label={t("hubPairing.rescan")}
+              disabled={nearby === null}
+              onPress={() => setScanKey((k) => k + 1)}
+            />
+          </Group>
+        </View>
+      </View>
+      {/* page-level navigation group */}
+      <Group style={styles.navGroup}>
+        <ActionButton
+          icon={arrowIcon}
+          label={t("hubPairing.manual")}
+          onPress={() => showPage("manual")}
+        />
+      </Group>
+    </>
+  );
+
+  //pages push like settings pages
+  const renderPage = (p: Page, active: boolean) => (
+    <>
+      <SheetScrollView
+        contentContainerStyle={[
+          styles.content,
+          p === "manual" && styles.contentWithBack,
+        ]}
+        keyboardShouldPersistTaps="handled"
+        onScroll={
+          active ? (e) => setScrolled(e.nativeEvent.contentOffset.y > 4) : undefined
+        }
+        scrollEventThrottle={16}
+      >
+        {p === "discover" ? (
+          renderDiscover()
+        ) : (
+          <View style={styles.contentCard}>{renderContent()}</View>
+        )}
+      </SheetScrollView>
+
+      {/* floats like the settings back button */}
+      {p === "manual" && !found && (
+        <View style={styles.backWrapper} pointerEvents="box-none">
+          <DrawerBackButton kind="back" onPress={handleBack} scrolled={scrolled} />
+        </View>
+      )}
+    </>
+  );
 
   return (
     <>
       <DrawerSheet
         visible={visible}
         onClose={handleClose}
+        onBackPress={handleBack}
         mode="overlay"
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
@@ -284,17 +434,39 @@ export default function HubPairingSheet({
         sheetStyle={[
           styles.sheet,
           {
-            maxHeight: windowHeight - insets.top - Spacing.xl2,
+            //stacked pages cannot size the sheet
+            ...(paged
+              ? { height: windowHeight - insets.top - Spacing.xl2 }
+              : { maxHeight: windowHeight - insets.top - Spacing.xl2 }),
           },
         ]}
-        desktopStyle={styles.desktopCard}
+        desktopStyle={[styles.desktopCard, paged && { height: "100%" }]}
       >
-        <SheetScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.contentCard}>{renderContent()}</View>
-        </SheetScrollView>
+        {paged ? (
+          <SheetBody
+            style={styles.body}
+            onLayout={(e) => {
+              const width = e.nativeEvent.layout.width;
+              setBodyWidth((prev) => (prev !== width ? width : prev));
+            }}
+          >
+            <PageStack
+              page={shownPage}
+              visible={visible}
+              width={bodyWidth}
+              parentOf={(p) => (p === "manual" ? "discover" : null)}
+              onBack={handleBack}
+              renderPage={renderPage}
+            />
+          </SheetBody>
+        ) : (
+          <SheetScrollView
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.contentCard}>{renderContent()}</View>
+          </SheetScrollView>
+        )}
       </DrawerSheet>
       <NotificationModal
         visible={visible && (pairing || !!error)}
@@ -334,9 +506,45 @@ const makeStyles = (Colors: ThemeColors) =>
       alignItems: "center",
       paddingVertical: Spacing.md,
     },
+    body: {
+      flex: 1,
+    },
+    //room for the floating back button
+    contentWithBack: {
+      paddingTop: 40 + Spacing.xxl,
+    },
+    backWrapper: {
+      position: "absolute",
+      top: Spacing.md + 4,
+      left: Spacing.lg2,
+      width: 40,
+      height: 40,
+      zIndex: 10,
+      elevation: 10,
+    },
     content: {
       paddingHorizontal: Spacing.lg2,
       paddingBottom: Spacing.lg,
+      gap: Spacing.xxl2,
+    },
+    navGroup: {
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
+    },
+    toggleLink: {
+      alignSelf: "center",
+      marginTop: Spacing.md,
+      paddingVertical: Spacing.xs,
+      paddingHorizontal: Spacing.md,
+    },
+    toggleLinkPressed: {
+      opacity: 0.6,
+    },
+    toggleLinkText: {
+      fontFamily: Fonts.body,
+      fontSize: FontSizes.bodyMd,
+      color: Colors.textMuted,
+      textDecorationLine: "underline",
     },
     contentCard: {
       backgroundColor: Colors.surface,

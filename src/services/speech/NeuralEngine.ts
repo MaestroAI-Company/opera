@@ -20,6 +20,8 @@ export interface NeuralTTSEngine {
   //named voices for a language
   voiceOptions(lang: string): VoiceOption[];
   download(onProgress: (progress: number) => void): Promise<void>;
+  canCancelDownload(): boolean;
+  cancelDownload(): Promise<void>;
   remove(): Promise<void>;
   preload(lang: string, voice: string): Promise<void>;
   synthesize(text: string, lang: string, options: SynthesisOptions): Promise<Float32Array>;

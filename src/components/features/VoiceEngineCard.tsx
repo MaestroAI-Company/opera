@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useVoicePackInstalled } from "../../hooks/useVoicePackInstalled";
@@ -9,22 +9,23 @@ import {
   InstallSnapshot,
   getInstallSnapshot,
   install,
+  InstallCancelled,
   isInstalling,
   subscribeInstall,
   supportedEngineIds,
 } from "../../services/speech/engines";
 import ActionButton from "../ui/ActionButton";
-import DownloadProgress from "../ui/DownloadProgress";
 import Group from "../ui/Group";
+import ProgressBar from "../ui/ProgressBar";
 
 const downloadIcon = require("../../../assets/icons/download.png");
 
-const TTS_ENGINE_KEYS = {
+export const TTS_ENGINE_KEYS = {
   supertonic: "settings.tts.supertonic",
 } as const;
 
 //voice pack download, shared by settings and onboarding
-export default function VoiceEngineCard() {
+export default function VoiceEngineCard({ onOpenDownload }: { onOpenDownload: () => void }) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const packId = supportedEngineIds()[0];
@@ -37,13 +38,12 @@ export default function VoiceEngineCard() {
 
   useEffect(() => subscribeInstall((id, snapshot) => setDownload(snapshot ? { id, snapshot } : null)), []);
 
-  const engineName = (id: string) => t(TTS_ENGINE_KEYS[id as keyof typeof TTS_ENGINE_KEYS]);
-
   const handleDownloadPack = async () => {
     try {
       await install(packId);
       Settings.set("ttsEngine", packId);
     } catch (e) {
+      if (e instanceof InstallCancelled) return;
       console.error(`Failed to download ${packId} voice`, e);
     }
   };
@@ -55,20 +55,14 @@ export default function VoiceEngineCard() {
       <Text style={styles.settingLabel}>{t("settings.tts.pack.title")}</Text>
       <Text style={[styles.helpText, styles.labelGap]}>{t("settings.tts.pack.help")}</Text>
       <Group>
-        <ActionButton
-          icon={downloadIcon}
-          label={t("settings.tts.pack.download")}
-          disabled={!!download}
-          onPress={handleDownloadPack}
-        />
+        {download ? (
+          <Pressable onPress={onOpenDownload}>
+            <ProgressBar progress={download.snapshot.progress} icon={downloadIcon} />
+          </Pressable>
+        ) : (
+          <ActionButton icon={downloadIcon} label={t("settings.tts.pack.download")} onPress={handleDownloadPack} />
+        )}
       </Group>
-      {download && (
-        <DownloadProgress
-          title={t("settings.tts.downloading", { engine: engineName(download.id) })}
-          progress={download.snapshot.progress}
-          sizeStr={download.snapshot.sizeStr || undefined}
-        />
-      )}
     </View>
   );
 }

@@ -3,7 +3,7 @@ import NotificationModal from '../ui/NotificationModal';
 import { useT } from '../../i18n';
 import { formatBytes } from '../../services/ai/providers/huggingFaceCatalog';
 import { Settings } from '../../services/settings/SettingsService';
-import { install, NEURAL_ENGINES } from '../../services/speech/engines';
+import { install, InstallCancelled, NEURAL_ENGINES } from '../../services/speech/engines';
 import { VoicePack } from '../../services/speech/VoicePack';
 
 //offers voice pack before system speech
@@ -21,6 +21,7 @@ export default function VoicePackHost() {
       install(engineId)
         .then(() => setResult('installed'))
         .catch((e) => {
+          if (e instanceof InstallCancelled) return;
           console.error('Failed to download voice pack', e);
           setResult('failed');
         });

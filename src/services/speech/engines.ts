@@ -13,7 +13,11 @@ export function supportedEngineIds(): string[] {
   return Object.keys(NEURAL_ENGINES).filter((id) => NEURAL_ENGINES[id].isSupported());
 }
 
-export type InstallSnapshot = { progress: number; sizeStr: string };
+export type InstallSnapshot = { progress: number; sizeStr: string; speedStr?: string; etaSeconds?: number };
+
+//thrown when the user stops a download
+export class InstallCancelled extends Error {}
+const cancelled = new Set<string>();
 type InstallListener = (id: string, snapshot: InstallSnapshot | null) => void;
 
 //settings and chat share one download
@@ -43,17 +47,30 @@ async function download(id: string): Promise<void> {
   const engine = NEURAL_ENGINES[id];
   const sizeStr = (progress: number) => `${formatBytes(progress * engine.sizeBytes)} / ${formatBytes(engine.sizeBytes)}`;
   let lastPercent = -1;
+  const startedAt = Date.now();
   const report = (progress: number) => {
     //one update per percent
     const percent = Math.floor(progress * 100);
     if (percent === lastPercent) return;
     lastPercent = percent;
-    broadcastInstall(id, { progress, sizeStr: sizeStr(progress) });
+    //average since the start, the progress is sparse
+    const seconds = (Date.now() - startedAt) / 1000;
+    const speed = seconds > 1 ? (progress * engine.sizeBytes) / seconds : 0;
+    broadcastInstall(id, {
+      progress,
+      sizeStr: sizeStr(progress),
+      speedStr: speed ? `${formatBytes(speed)}/s` : undefined,
+      etaSeconds: speed ? ((1 - progress) * engine.sizeBytes) / speed : undefined,
+    });
   };
   report(0);
   try {
     await engine.download(report);
+  } catch (e) {
+    if (cancelled.has(id)) throw new InstallCancelled();
+    throw e;
   } finally {
+    cancelled.delete(id);
     broadcastInstall(id, null);
   }
 }
@@ -61,6 +78,16 @@ async function download(id: string): Promise<void> {
 export function install(id: string): Promise<void> {
   installs[id] ??= download(id).finally(() => delete installs[id]);
   return installs[id];
+}
+
+export async function cancelInstall(id: string): Promise<void> {
+  if (!isInstalling(id)) return;
+  cancelled.add(id);
+  await NEURAL_ENGINES[id].cancelDownload();
+}
+
+export function canCancelInstall(id: string): boolean {
+  return NEURAL_ENGINES[id]?.canCancelDownload() ?? false;
 }
 
 export function isInstalling(id: string): boolean {

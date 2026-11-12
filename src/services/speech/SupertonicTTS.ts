@@ -1,4 +1,4 @@
-import { canStoreModels, downloadFiles, isDownloaded, modelInput, readText, removeFiles } from './modelFiles';
+import { canCancelDownload, cancelDownload, canStoreModels, downloadFiles, isDownloaded, modelInput, readText, removeFiles } from './modelFiles';
 import { NeuralTTSEngine, SerialQueue, SynthesisOptions, VoiceOption } from './NeuralEngine';
 import { loadOrt, Ort, ortAvailable, RUNTIME_LABEL, sessionOptions } from './ortRuntime';
 
@@ -112,6 +112,14 @@ class SupertonicEngine implements NeuralTTSEngine {
 
   download(onProgress: (progress: number) => void): Promise<void> {
     return downloadFiles(SOURCES, onProgress);
+  }
+
+  canCancelDownload(): boolean {
+    return canCancelDownload();
+  }
+
+  cancelDownload(): Promise<void> {
+    return cancelDownload(SOURCES);
   }
 
   async remove(): Promise<void> {

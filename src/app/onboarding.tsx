@@ -32,6 +32,7 @@ import ButterflyCluster from "../components/features/ButterflyCluster";
 import DrawerSheet, { SheetScrollView } from "../components/features/DrawerSheet";
 import HubPairingSheet from "../components/features/HubPairingSheet";
 import HubProfileSheet from "../components/features/HubProfileSheet";
+import VoiceDownloadSheet from "../components/features/VoiceDownloadSheet";
 import VoiceEngineCard from "../components/features/VoiceEngineCard";
 import { VOICE_OPTIONS, selectVoice, useVoice } from "../components/features/maestroButterfly";
 import ActionButton from "../components/ui/ActionButton";
@@ -330,6 +331,7 @@ export default function OnboardingPage() {
   const { height: windowHeight } = useWindowDimensions();
 
   const [step, setStep] = useState(0);
+  const [voiceDownloadVisible, setVoiceDownloadVisible] = useState(false);
   //no neural engine on this platform, nothing to pick
   const [hasVoiceEngines] = useState(() => supportedEngineIds().length > 0);
   const [name, setName] = useState(() => Settings.getCached().name);
@@ -753,7 +755,7 @@ export default function OnboardingPage() {
         <ButterflyCluster parallax={false} intro={false} style={styles.voiceButterfly} />
       </Reveal>
       <Reveal delay={200}>
-        <VoiceEngineCard />
+        <VoiceEngineCard onOpenDownload={() => setVoiceDownloadVisible(true)} />
         {voicePackInstalled && (
           <View style={styles.contentCard}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.maestro.voice")}</Text>
@@ -1016,6 +1018,12 @@ export default function OnboardingPage() {
         </SheetScrollView>
       </DrawerSheet>
 
+      <VoiceDownloadSheet
+        visible={voiceDownloadVisible}
+        onClose={() => setVoiceDownloadVisible(false)}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
       <HubPairingSheet
         visible={hubPairingVisible}
         onClose={() => setHubPairingVisible(false)}

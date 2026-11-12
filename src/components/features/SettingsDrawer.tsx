@@ -184,6 +184,7 @@ import PersonalitySheet, {
   slotWord,
 } from "./PersonalitySheet";
 import ProfileCard from "./ProfileCard";
+import VoiceDownloadSheet from "./VoiceDownloadSheet";
 import VoiceEngineCard from "./VoiceEngineCard";
 
 const isTauri =
@@ -1032,6 +1033,7 @@ export default function SettingsDrawer({
   const [mcpAddVisible, setMcpAddVisible] = useState(false);
   const [profileEditVisible, setProfileEditVisible] = useState(false);
   const [litertDownloadVisible, setLitertDownloadVisible] = useState(false);
+  const [voiceDownloadVisible, setVoiceDownloadVisible] = useState(false);
   //id outlives the close so the sheet keeps its content
   const [cloudSetupVisible, setCloudSetupVisible] = useState(false);
   const [cloudSetupId, setCloudSetupId] = useState("");
@@ -1113,6 +1115,7 @@ export default function SettingsDrawer({
     openaiDetailIndex !== null ||
     mcpAddVisible ||
     litertDownloadVisible ||
+    voiceDownloadVisible ||
     cloudSetupVisible ||
     selectedLocalModel !== null ||
     installedModel !== null;
@@ -4254,7 +4257,7 @@ export default function SettingsDrawer({
       )}
 
       {/* voice engine card */}
-      <VoiceEngineCard />
+      <VoiceEngineCard onOpenDownload={() => setVoiceDownloadVisible(true)} />
 
       {/* navigation to maestro subpages */}
       <Group style={styles.groupSpacing}>
@@ -7609,6 +7612,16 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
+  //voice pack download detail sheet
+  const voiceDownloadSheet = (
+    <VoiceDownloadSheet
+      visible={voiceDownloadVisible}
+      onClose={() => setVoiceDownloadVisible(false)}
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+    />
+  );
+
   const installedEntry = installedModel
     ? getCatalogEntry(installedModel.id)
     : null;
@@ -7883,6 +7896,7 @@ export default function SettingsDrawer({
             {cloudSetupSheet}
             {localModelDetailSheet}
             {litertDownloadSheet}
+{voiceDownloadSheet}
             {litertModelDetailSheet}
             {profileEditSheet}
           </Animated.View>
@@ -7934,6 +7948,7 @@ export default function SettingsDrawer({
       {cloudSetupSheet}
       {localModelDetailSheet}
       {litertDownloadSheet}
+{voiceDownloadSheet}
       {litertModelDetailSheet}
       {profileEditSheet}
     </View>

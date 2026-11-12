@@ -1,9 +1,9 @@
 {
-  "version": "v0.12.0",
+  "version": "v0.13.2",
   "sha256": {
-    "sampler-hub-client-arm64-v8a.so": "aa286c0a6b4a12d1e6fa411c27e865a45a61aa59e2c38ca299ab6996a0efa912",
-    "sampler_hub_client.kt": "5432ef9e7883e0458198bc20103a32bc669885f43588678cb24605d0d2e9c266",
-    "sampler-hub-client-web.js": "5cbe90e52db42e33d888678758bf075e479ae476ae038876a336e9d649a3878a",
-    "sampler-hub-client-web.wasm": "e94b9a6242bc037e2b320bcf00f2704add4825d0248bc0392de8d7ecb0367485"
+    "sampler-hub-client-arm64-v8a.so": "3b8fae0a277ce4243a2439b8356b7872a71b2ae03e7523800c2f0b636f4809d9",
+    "sampler_hub_client.kt": "101c5c496bca19c151640a37269295cfa9c48d182010962099b58f3ced6e2a34",
+    "sampler-hub-client-web.js": "eecb1e4513fa6a2682d51703cceb16d0f98cf961b86305ca52c8f23389548303",
+    "sampler-hub-client-web.wasm": "21fa937750e08aa2e330ff192279b91e5d53045ecf88cd17b4691618f9e62e83"
   }
 }

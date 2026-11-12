@@ -1,3 +1,3 @@
-Fixes for Opera 1.0.
+You decide when Opera looks for updates.
 
-The macOS installer no longer says it is damaged, and the Sampler page no longer shows up empty on a wide window when no hub is linked.
+New Check for updates setting, a Check now button, and Sampler buttons to check Sampler Hub and update llama.cpp. Needs Sampler Hub 0.13.2.

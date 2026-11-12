@@ -124,6 +124,19 @@ npm run lint            # ESLint
 
 Coding conventions for this repo are in [AGENTS.md](./AGENTS.md); the visual language - colors, type, spacing, component specs - is documented separately in [DESIGN.md](./DESIGN.md).
 
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+Windows installers are built from this repository by GitHub Actions and signed only after manual approval of each release.
+
+- **Committers and reviewers**: [MaestroAI-Company members](https://github.com/orgs/MaestroAI-Company/people). Ethan Caillat, Charly Charteux
+- **Approvers**: Ethan Caillat, Charly Charteux
+
+## Privacy policy
+
+Opera sends nothing off your device unless you choose an online model, a cloud sync, a web search or a model download, and update checks have their own switch in the settings. See the full [privacy policy](https://maestroai.company/privacy).
+
 ## License
 
 [AGPLv3](./LICENSE) - if you run a modified version of Opera as a network service, you must make your source available too.

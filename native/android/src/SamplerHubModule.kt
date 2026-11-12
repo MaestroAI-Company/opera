@@ -66,6 +66,10 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
   @ReactMethod
+  fun checkHubUpdate(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) { client(deviceKey).checkHubUpdate(hubFromMap(hub)) }
+
+  @ReactMethod
   fun updateHub(deviceKey: String, hub: ReadableMap, promise: Promise) =
     launchPromise(promise) { client(deviceKey).updateHub(hubFromMap(hub)) }
 
@@ -99,6 +103,7 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
         settings.getInt("ctxSize").toUInt(),
         settings.getInt("keepAlive").toUInt(),
         settings.getInt("parallel").toUInt(),
+        settings.getBoolean("updateChecks"),
       )
       settingsToMap(client(deviceKey).setHubSettings(hubFromMap(hub), wanted))
     }
@@ -166,6 +171,10 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
   @ReactMethod
   fun modelsDownload(deviceKey: String, hub: ReadableMap, repo: String, file: String, promise: Promise) =
     launchPromise(promise) { statusToMap(client(deviceKey).modelsDownload(hubFromMap(hub), repo, file)) }
+
+  @ReactMethod
+  fun modelsUpdate(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) { statusToMap(client(deviceKey).modelsUpdate(hubFromMap(hub))) }
 
   @ReactMethod
   fun modelsCancel(deviceKey: String, hub: ReadableMap, file: String, promise: Promise) =
@@ -561,6 +570,7 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
       putDouble("ctxSize", settings.ctxSize.toDouble())
       putDouble("keepAlive", settings.keepAlive.toDouble())
       putDouble("parallel", settings.parallel.toDouble())
+      putBoolean("updateChecks", settings.updateChecks)
     }
 
   private fun hubToMap(hub: PairedHub): WritableMap =

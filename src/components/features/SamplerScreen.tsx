@@ -23,7 +23,11 @@ import {
   Spacing,
   ThemeColors,
 } from "../../../constants/theme";
-import { useHubModels } from "../../hooks/useHubModels";
+import {
+  isHubModelsBusy,
+  runHubModels,
+  useHubModels,
+} from "../../hooks/useHubModels";
 import { useResponsive } from "../../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { getLocale, useT } from "../../i18n";
@@ -585,6 +589,49 @@ export default function SamplerScreen({
       setModal({
         title: t("hubUpdate.title"),
         message: t("hubUpdate.failed", { error: message(e) }),
+        buttons: [
+          { text: t("common.ok"), style: "secondary", onPress: closeModal },
+        ],
+      });
+    }
+  };
+
+  //asks github now
+  const checkUpdate = async () => {
+    if (!pairedHub) return;
+    try {
+      const version = await SamplerHub.checkHubUpdate(pairedHub);
+      if (!version) {
+        setModal({
+          title: t("hubUpdate.title"),
+          message: t("hubUpdate.upToDate"),
+          buttons: [
+            { text: t("common.ok"), style: "secondary", onPress: closeModal },
+          ],
+        });
+        return;
+      }
+      setModal({
+        title: t("hubUpdate.title"),
+        message: t("hubUpdate.message", {
+          version,
+          current: status?.version ?? "",
+        }),
+        buttons: [
+          { text: t("hubUpdate.later"), style: "secondary", onPress: closeModal },
+          {
+            text: t("hubUpdate.install"),
+            onPress: () => {
+              closeModal();
+              installUpdate(version);
+            },
+          },
+        ],
+      });
+    } catch (e) {
+      setModal({
+        title: t("hubUpdate.title"),
+        message: t("hubUpdate.checkFailed", { error: message(e) }),
         buttons: [
           { text: t("common.ok"), style: "secondary", onPress: closeModal },
         ],
@@ -1439,6 +1486,13 @@ export default function SamplerScreen({
             ))}
           </Group>
           <Group>
+            {isAdmin && SamplerHub.canCheckHubUpdate() && (
+              <ActionButton
+                icon={downloadIcon}
+                label={t("settings.hub.checkUpdate")}
+                onPress={checkUpdate}
+              />
+            )}
             {status?.update && isAdmin && SamplerHub.canUpdateHub() && (
               <ActionButton
                 icon={downloadIcon}
@@ -1618,6 +1672,14 @@ export default function SamplerScreen({
                     </Text>
                   }
                 />
+                <ActionButton
+                  icon={downloadIcon}
+                  label={t("sampler.model.updateBuild")}
+                  disabled={isHubModelsBusy(modelsStatus)}
+                  onPress={() =>
+                    runHubModels((api) => api.update()).catch(() => {})
+                  }
+                />
               </Group>
             )}
           </View>
@@ -1690,6 +1752,13 @@ export default function SamplerScreen({
               t("settings.hub.lanDiscoveryHelp"),
               settings.lanDiscovery,
               (value) => changeSettings({ lanDiscovery: value }),
+              false,
+            )}
+            {renderToggleRow(
+              t("settings.hub.updateChecks"),
+              t("settings.hub.updateChecksHelp"),
+              settings.updateChecks,
+              (value) => changeSettings({ updateChecks: value }),
             )}
           </View>
         )}

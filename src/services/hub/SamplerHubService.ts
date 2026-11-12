@@ -64,6 +64,8 @@ export type HubSettings = {
   ctxSize: number;
   keepAlive: number;
   parallel: number;
+  //hub and llama.cpp auto checks
+  updateChecks: boolean;
 };
 export type NearbyHub = { id: string; name: string; addrs: string[] };
 //llama.cpp models on the hub
@@ -120,6 +122,8 @@ type NativeHub = {
     kind: string,
   ): Promise<{ hub: PairedHub; profile: UnlockedProfile }>;
   updateHub?(deviceKey: string, hub: PairedHub): Promise<string>;
+  //null when up to date
+  checkHubUpdate?(deviceKey: string, hub: PairedHub): Promise<string | null>;
   //admin profiles only, older clients lack it
   modelsCatalog?(deviceKey: string, hub: PairedHub): Promise<CatalogModel[]>;
   modelsSearch?(deviceKey: string, hub: PairedHub, query: string): Promise<ModelRepo[]>;
@@ -128,6 +132,7 @@ type NativeHub = {
   modelsCancel?(deviceKey: string, hub: PairedHub, file: string): Promise<LlamaStatus>;
   modelsDelete?(deviceKey: string, hub: PairedHub, file: string): Promise<LlamaStatus>;
   modelsStatus?(deviceKey: string, hub: PairedHub): Promise<LlamaStatus>;
+  modelsUpdate?(deviceKey: string, hub: PairedHub): Promise<LlamaStatus>;
   mcpJson?(deviceKey: string, hub: PairedHub, request: string): Promise<string>;
   //admin only, every profile's servers
   mcpOverview?(deviceKey: string, hub: PairedHub): Promise<McpServerSummary[]>;
@@ -251,6 +256,7 @@ export type HubModels = {
   cancel(file: string): Promise<LlamaStatus>;
   remove(file: string): Promise<LlamaStatus>;
   status(): Promise<LlamaStatus>;
+  update(): Promise<LlamaStatus>;
 };
 
 type HubHost = {
@@ -284,6 +290,7 @@ const tauriHub: NativeHub = {
   signIn: (deviceKey, hub, profileId, password, deviceName, kind) =>
     invoke('hub_sign_in', { deviceKey, hub, profileId, password, deviceName, kind }),
   updateHub: (deviceKey, hub) => invoke('hub_update', { deviceKey, hub }),
+  checkHubUpdate: (deviceKey, hub) => invoke('hub_check_update', { deviceKey, hub }),
   modelsCatalog: (deviceKey, hub) => invoke('hub_models_catalog', { deviceKey, hub }),
   modelsSearch: (deviceKey, hub, query) => invoke('hub_models_search', { deviceKey, hub, query }),
   modelsFiles: (deviceKey, hub, repo) => invoke('hub_models_files', { deviceKey, hub, repo }),
@@ -291,6 +298,7 @@ const tauriHub: NativeHub = {
   modelsCancel: (deviceKey, hub, file) => invoke('hub_models_cancel', { deviceKey, hub, file }),
   modelsDelete: (deviceKey, hub, file) => invoke('hub_models_delete', { deviceKey, hub, file }),
   modelsStatus: (deviceKey, hub) => invoke('hub_models_status', { deviceKey, hub }),
+  modelsUpdate: (deviceKey, hub) => invoke('hub_models_update', { deviceKey, hub }),
   mcpJson: (deviceKey, hub, request) => invoke('hub_mcp_json', { deviceKey, hub, request }),
   mcpOverview: (deviceKey, hub) => invoke('hub_mcp_overview', { deviceKey, hub }),
   mcpManage: (deviceKey, hub, id, action) => invoke('hub_mcp_manage', { deviceKey, hub, id, action }),
@@ -357,6 +365,7 @@ type WebClient = {
   hubSettings(hub: PairedHub): Promise<HubSettings>;
   setHubSettings(hub: PairedHub, settings: HubSettings): Promise<HubSettings>;
   updateHub(hub: PairedHub): Promise<string>;
+  checkHubUpdate(hub: PairedHub): Promise<string | null>;
   removeProfile(hub: PairedHub, id: string): Promise<void>;
   setProfileRole(hub: PairedHub, id: string, role: string): Promise<void>;
   mcpOverview(hub: PairedHub): Promise<McpServerSummary[]>;
@@ -368,6 +377,7 @@ type WebClient = {
   modelsCancel(hub: PairedHub, file: string): Promise<LlamaStatus>;
   modelsDelete(hub: PairedHub, file: string): Promise<LlamaStatus>;
   modelsStatus(hub: PairedHub): Promise<LlamaStatus>;
+  modelsUpdate(hub: PairedHub): Promise<LlamaStatus>;
   push(hub: PairedHub, collection: string, records: SyncRecord[]): Promise<void>;
   pull(hub: PairedHub, collection: string, since: number): Promise<PullPage>;
   watch(hub: PairedHub, since: number): Promise<number>;
@@ -454,6 +464,7 @@ const webHub: NativeHub = {
   hubSettings: async (deviceKey, hub) => (await loadWebClient(deviceKey)).hubSettings(hub),
   setHubSettings: async (deviceKey, hub, settings) => (await loadWebClient(deviceKey)).setHubSettings(hub, settings),
   updateHub: async (deviceKey, hub) => (await loadWebClient(deviceKey)).updateHub(hub),
+  checkHubUpdate: async (deviceKey, hub) => (await loadWebClient(deviceKey)).checkHubUpdate(hub),
   removeProfile: async (deviceKey, hub, id) => (await loadWebClient(deviceKey)).removeProfile(hub, id),
   setProfileRole: async (deviceKey, hub, id, role) => (await loadWebClient(deviceKey)).setProfileRole(hub, id, role),
   mcpOverview: async (deviceKey, hub) => (await loadWebClient(deviceKey)).mcpOverview(hub),
@@ -466,6 +477,7 @@ const webHub: NativeHub = {
   modelsCancel: async (deviceKey, hub, file) => (await loadWebClient(deviceKey)).modelsCancel(hub, file),
   modelsDelete: async (deviceKey, hub, file) => (await loadWebClient(deviceKey)).modelsDelete(hub, file),
   modelsStatus: async (deviceKey, hub) => (await loadWebClient(deviceKey)).modelsStatus(hub),
+  modelsUpdate: async (deviceKey, hub) => (await loadWebClient(deviceKey)).modelsUpdate(hub),
   push: async (deviceKey, hub, collection, records) =>
     (await loadWebClient(deviceKey)).push(hub, collection, records),
   pull: async (deviceKey, hub, collection, since) => (await loadWebClient(deviceKey)).pull(hub, collection, since),
@@ -792,6 +804,7 @@ class SamplerHubServiceImpl {
       cancel: (file) => native.modelsCancel!(key, hub, file),
       remove: (file) => native.modelsDelete!(key, hub, file),
       status: () => native.modelsStatus!(key, hub),
+      update: () => native.modelsUpdate!(key, hub),
     };
   }
 
@@ -834,6 +847,18 @@ class SamplerHubServiceImpl {
   //older clients lack it
   canUpdateHub(): boolean {
     return !!native?.updateHub;
+  }
+
+  //older clients lack it
+  canCheckHubUpdate(): boolean {
+    return !!native?.checkHubUpdate;
+  }
+
+  //null when up to date
+  async checkHubUpdate(hub: PairedHub): Promise<string | null> {
+    const check = this.native().checkHubUpdate;
+    if (!check) throw Object.assign(new Error('Hub updates need the app'), { code: 'Unauthorized' });
+    return check(await this.deviceKey(), hub);
   }
 
   //the hub on this computer opens its installer, others update themselves

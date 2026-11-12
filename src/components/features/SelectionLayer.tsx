@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
 import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useDerivedValue, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
-import { Colors, Radius } from '../../../constants/theme';
+import { Radius, ThemeColors } from '../../../constants/theme';
+import { useColors, useThemedStyles } from '../../hooks/useTheme';
 import { pickRegion } from '../../services/overlay/selectionPick';
 import { FULL_SCREEN, Selection, SelectionRegion } from '../../services/overlay/useScreenSelection';
 
@@ -153,6 +154,8 @@ function toRegion(rect: Rect, size: Size): SelectionRegion {
 }
 
 export default function SelectionLayer({ selection, onChange, onVibrate, onDrawingChange, onDismiss, detections, showDetections }: Props) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const [size, setSize] = useState<Size>({ w: 1, h: 1 });
   const [resizing, setResizing] = useState(false);
   const [drawing, setDrawing] = useState(false);
@@ -514,7 +517,7 @@ export default function SelectionLayer({ selection, onChange, onVibrate, onDrawi
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   dim: {
     position: 'absolute',
     backgroundColor: Colors.selectionDim,

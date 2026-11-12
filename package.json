@@ -15,6 +15,7 @@
     "@tauri-apps/plugin-opener": "^2.5.4",
     "buffer": "^6.0.3",
     "expo": "^58.0.22",
+    "expo-alternate-app-icons": "^11.0.0",
     "expo-asset": "~58.0.19",
     "expo-audio": "~58.0.11",
     "expo-auth-session": "~58.0.16",

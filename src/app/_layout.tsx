@@ -24,6 +24,7 @@ import { IconLabelProvider } from "../components/ui/IconLabel";
 import { Radius, Spacing } from "../../constants/theme";
 import { initI18n } from "../i18n";
 import { initTheme, useColors, useIsDark } from "../hooks/useTheme";
+import { initAppIcon } from "../services/appIcon";
 import { installCrashHandler } from "../services/logging/CrashReporter";
 import { installLogger } from "../services/logging/Logger";
 import { setupQuickActions } from "../services/quickActions/QuickActionsService";
@@ -46,6 +47,9 @@ if (typeof window !== "undefined") {
 
   //resolve locale before first paint
   initI18n();
+
+  //launcher icon follows the maestro color
+  initAppIcon();
 
   //crash reported on next launch
   installCrashHandler();

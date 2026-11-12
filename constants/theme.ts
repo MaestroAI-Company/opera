@@ -146,6 +146,41 @@ export const VoiceColors = {
   blue: "#1A6DD2",
 } as const;
 
+//supertonic voice id to its accent
+export const VoiceAccents: Record<string, string> = {
+  F1: VoiceColors.red,
+  F2: VoiceColors.pink,
+  M1: VoiceColors.amber,
+  M2: VoiceColors.blue,
+};
+
+function toRgb(hex: string): number[] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+//pressed state goes lighter, 22% toward white turns #FF1A1A into primaryBright
+function lighten(hex: string): string {
+  const mixed = toRgb(hex).map((c) => Math.round(c + (255 - c) * 0.223));
+  return `#${mixed.map((c) => c.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+}
+
+//the primary family follows the accent, red returns the palette untouched
+export function withAccent(base: ThemeColors, accent: string): ThemeColors {
+  if (accent === base.primary) return base;
+
+  const rgb = toRgb(accent).join(",");
+  return {
+    ...base,
+    primary: accent,
+    primaryBright: lighten(accent),
+    primarySelection: `rgba(${rgb},0.4)`,
+    primaryHeader: `rgba(${rgb},0.07)`,
+    overlayHalo: `rgba(${rgb},0.45)`,
+    overlayHaloClear: `rgba(${rgb},0)`,
+  };
+}
+
 export const Fonts = {
   display: "Petrona",
   body: "Figtree",

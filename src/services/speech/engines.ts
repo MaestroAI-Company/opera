@@ -1,4 +1,5 @@
 import { formatBytes } from '../ai/providers/huggingFaceCatalog';
+import { parseTtsVoices } from '../settings/schema';
 import { Settings } from '../settings/SettingsService';
 import { NeuralTTSEngine } from './NeuralEngine';
 import { Supertonic } from './SupertonicTTS';
@@ -99,11 +100,7 @@ export function getSpeed(): number {
 }
 
 function storedVoices(): Record<string, string> {
-  try {
-    return JSON.parse(Settings.getCached().ttsVoices) || {};
-  } catch {
-    return {};
-  }
+  return parseTtsVoices(Settings.getCached().ttsVoices);
 }
 
 export function getVoice(id: string): string {

@@ -12,7 +12,7 @@
     ],
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/icons/opera.png",
+      "icon": "./assets/images/app-icons/ios-red.png",
       "supportsTablet": true,
       "bundleIdentifier": "ai.maestro.opera",
       "deploymentTarget": "17.0",
@@ -188,6 +188,38 @@
           "locationAlwaysAndWhenInUsePermission": "Opera uses your location to give the assistant local context for better answers.",
           "locationWhenInUsePermission": "Opera uses your location to give the assistant local context for better answers."
         }
+      ],
+      [
+        "expo-alternate-app-icons",
+        [
+          {
+            "name": "Pink",
+            "ios": "./assets/images/app-icons/ios-pink.png",
+            "android": {
+              "foregroundImage": "./assets/images/app-icons/android-foreground-pink.png",
+              "backgroundColor": "#EE8695",
+              "monochromeImage": "./assets/images/android-icon-monochrome.png"
+            }
+          },
+          {
+            "name": "Amber",
+            "ios": "./assets/images/app-icons/ios-amber.png",
+            "android": {
+              "foregroundImage": "./assets/images/app-icons/android-foreground-amber.png",
+              "backgroundColor": "#E49D22",
+              "monochromeImage": "./assets/images/android-icon-monochrome.png"
+            }
+          },
+          {
+            "name": "Blue",
+            "ios": "./assets/images/app-icons/ios-blue.png",
+            "android": {
+              "foregroundImage": "./assets/images/app-icons/android-foreground-blue.png",
+              "backgroundColor": "#1A6DD2",
+              "monochromeImage": "./assets/images/android-icon-monochrome.png"
+            }
+          }
+        ]
       ],
       "./plugins/withNotifeeRepo.js",
       "./plugins/withNativeAndroid",

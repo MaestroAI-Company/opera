@@ -24,6 +24,8 @@ export type AppSettings = {
   //local live models mode
   liveTranscription: string;
   maestroButterfly: string;
+  //primary color follows the maestro voice
+  applyMaestroColor: boolean;
   maestroMood: string;
   maestroStyle: string;
   maestroDepth: string;
@@ -89,6 +91,7 @@ export const BASE_DEFAULTS: AppSettings = {
   liveTranscription: 'ask',
   //empty means the first butterfly
   maestroButterfly: '',
+  applyMaestroColor: false,
   maestroMood: 'neutral',
   maestroStyle: 'common',
   maestroDepth: 'balanced',
@@ -131,6 +134,7 @@ const BOOLEAN_KEYS = [
   'modelFailover',
   'speaker',
   'autoSpeak',
+  'applyMaestroColor',
   'alwaysWhisper',
   'autoStartMic',
   'hasSeenOnboarding',
@@ -166,4 +170,13 @@ export function isBooleanKey(key: string): boolean {
 
 export function isNumberKey(key: string): boolean {
   return (NUMBER_KEYS as readonly string[]).includes(key);
+}
+
+//saved voice per engine, unreadable json means none
+export function parseTtsVoices(raw: string): Record<string, string> {
+  try {
+    return JSON.parse(raw) || {};
+  } catch {
+    return {};
+  }
 }

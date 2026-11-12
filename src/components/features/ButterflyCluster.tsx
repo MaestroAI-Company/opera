@@ -14,6 +14,7 @@ import {
 import { Gyroscope } from "expo-sensors";
 import { Colors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { useAccent } from "../../hooks/useTheme";
 import { AppEvents } from "../../services/events";
 import { OverlayPresence } from "../../services/overlay/overlayPresence";
 import { MAESTRO_BUTTERFLIES, useMaestroButterfly, useVoiceColor } from "./maestroButterfly";
@@ -44,6 +45,8 @@ function ButterflyCluster({
 }: ButterflyClusterProps) {
   const butterfly = MAESTRO_BUTTERFLIES[useMaestroButterfly()];
   const color = useVoiceColor();
+  //every butterfly follows the app accent when it is applied
+  const accent = useAccent();
   //no intro starts fully shown
   const introAnim = useAnimatedValue(intro ? 0 : 1);
   const gyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -213,7 +216,7 @@ function ButterflyCluster({
         />
         <Animated.Image
           source={butterfly.accent}
-          tintColor={incognito ? Colors.incognito : voiceColor ? color : undefined}
+          tintColor={incognito ? Colors.incognito : voiceColor ? color : (accent ?? undefined)}
           style={[styles.imageFill, styles.imageOverlay, { transform: gyroTransform }]}
           resizeMode="contain"
           resizeMethod="resize"

@@ -18,9 +18,9 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import HeadlessWebView from "../../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../../constants/prompts";
-import { DarkColors, FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
-import { ColorsOverride, initTheme, useColors, useThemedStyles } from "../../hooks/useTheme";
+import { ColorsOverride, initTheme, useColors, useDarkColors, useThemedStyles } from "../../hooks/useTheme";
 import { getLocale, initI18n, useT } from "../../i18n";
 import { AIModule } from "../../services/ai/AIModule";
 import { buildSystemPrompt } from "../../services/ai/generation/chatGeneration";
@@ -157,12 +157,13 @@ function modelLabel(model: string): string {
 }
 
 export default function OperaDreamRoot() {
+  const darkColors = useDarkColors();
   return (
     <SafeAreaProvider>
       <KeyboardProvider>
         <GestureHandlerRootView style={rootStyles.fill}>
           {/* dark screen ignores the app theme */}
-          <ColorsOverride.Provider value={DarkColors}>
+          <ColorsOverride.Provider value={darkColors}>
             <OperaDream />
           </ColorsOverride.Provider>
         </GestureHandlerRootView>

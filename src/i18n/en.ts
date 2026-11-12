@@ -643,6 +643,9 @@ export const en = {
   "settings.nav.maestro.subtitle": "Voice, preferences",
   "settings.nav.maestro.subtitleDesktop": "Instructions",
   "settings.maestro.voice": "Voice",
+  "settings.maestro.applyColor": "Apply the Maestro color across the app",
+  "settings.maestro.applyColorHelp":
+    "Buttons, toggles, links and the chat bar take the color of your Maestro voice.",
   "settings.personality.title": "Personality",
   "settings.personality.edit": "Edit",
   "settings.personality.save": "Save",

@@ -20,7 +20,7 @@ import { KeyboardAvoidingView, KeyboardProvider, useGenericKeyboardHandler } fro
 import Reanimated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
-import { Colors, DarkColors, Fonts, FontSizes, Radius, Spacing } from '../../../constants/theme';
+import { DarkColors, Fonts, FontSizes, Radius, Spacing } from '../../../constants/theme';
 import { useColors } from '../../hooks/useTheme';
 import { pressStyle } from '../ui/pressStyle';
 import { AIModule } from '../../services/ai/AIModule';
@@ -953,10 +953,10 @@ function AssistantOverlay() {
         </Animated.View>
 
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: haloOpacity }]} pointerEvents="none">
-          <LinearGradient colors={[Colors.overlayHalo, Colors.overlayHaloClear]} style={styles.haloTop} />
-          <LinearGradient colors={[Colors.overlayHaloClear, Colors.overlayHalo]} style={styles.haloBottom} />
-          <LinearGradient colors={[Colors.overlayHalo, Colors.overlayHaloClear]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloLeft} />
-          <LinearGradient colors={[Colors.overlayHaloClear, Colors.overlayHalo]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloRight} />
+          <LinearGradient colors={[themeColors.overlayHalo, themeColors.overlayHaloClear]} style={styles.haloTop} />
+          <LinearGradient colors={[themeColors.overlayHaloClear, themeColors.overlayHalo]} style={styles.haloBottom} />
+          <LinearGradient colors={[themeColors.overlayHalo, themeColors.overlayHaloClear]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloLeft} />
+          <LinearGradient colors={[themeColors.overlayHaloClear, themeColors.overlayHalo]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloRight} />
         </Animated.View>
 
         <NotificationModal

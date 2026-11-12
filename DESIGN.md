@@ -29,6 +29,10 @@ colors:
   incognito-pressed: "#3E4157"
   incognito-bright: "#70748E"
   incognito-surface: "#2A2A35"
+  voice-red: "#FF1A1A"
+  voice-pink: "#EE8695"
+  voice-amber: "#E49D22"
+  voice-blue: "#1A6DD2"
 typography:
   display-hero:
     fontFamily: Petrona
@@ -169,18 +173,24 @@ components:
 
 Opera is a local, on-device, privacy-respecting AI assistant. The app is **Opera**; the assistant persona inside it is **Maestro**. The UI reads as warm, editorial, and slightly technical: a cream canvas, a single bold red accent, serif display headings, and monospace UI chrome that evokes a terminal. Everything runs locally (Ollama, Whisper, Gemini Nano) and the copy consistently reinforces privacy ("no trace", "disappears forever"). The tagline is "AI for all, privacy for freedom", and a butterfly is the visual mascot.
 
-Emotionally the app should feel trustworthy and calm — like a premium broadsheet, not a loud consumer app. Red is the only interaction color and must stay rare and intentional.
+Emotionally the app should feel trustworthy and calm — like a premium broadsheet, not a loud consumer app. One accent is the only interaction color and must stay rare and intentional. It is Opera Red by default, and the user can hand it over to the color of their Maestro voice (see Maestro accent).
 
 ## Colors
 
-The palette is rooted in a warm cream foundation, a single red accent, and a full purple-gray recolor for incognito mode.
+The palette is rooted in a warm cream foundation, a single red accent, and a full purple-gray recolor for incognito mode. Everywhere this document says "red", read "primary": it is Opera Red by default and the Maestro accent when that option is on.
 
 - **Primary — Opera Red (#FF1A1A):** The sole interaction color. Drives primary actions, the chat composer, user chat bubbles, CTAs, and text selection. It also marks the active state of controls (checked Toggle and Checkbox, selected pill, selected IconSelector tile, granted permission badge) and the icon badges of top-level navigation (settings home, conversations quick actions). Use it for the single most important action per screen; never for decoration.
-- **Primary bright (#FF4D4D):** The pressed color. Every pressed, hovered or lit red surface goes to this lighter red, never to a darker one. Incognito does the same with its own bright tone (#70748E).
+- **Primary bright (#FF4D4D):** The pressed color. Every pressed, hovered or lit red surface goes to this lighter red, never to a darker one. Incognito does the same with its own bright tone (#70748E). With a Maestro accent it is derived, never picked by hand (see Maestro accent).
+- **Maestro accent (optional):** Each Maestro voice owns a color: F1 red `#FF1A1A`, F2 pink `#EE8695`, M1 amber `#E49D22`, M2 blue `#1A6DD2` (`VoiceColors` and `VoiceAccents` in `constants/theme.ts`, shown as `voice-*` above). Settings › Maestro › Preferences has a toggle, "Apply the Maestro color across the app" (`applyMaestroColor`, off by default). When it is on, the primary family takes the color of the selected voice on every screen, window, notification and overlay. The default voice is red, so it looks the same as off.
+  - **What follows:** `primary`, `primaryBright` (the accent mixed 22% toward white, which gives exactly `#FF4D4D` for red), `primarySelection` (40% alpha), `primaryHeader` (7%), `overlayHalo` (45%) and `overlayHaloClear` (0%). `withAccent` in `constants/theme.ts` builds them. The accent layer of every Maestro butterfly follows too (`useAccent()`), as it always did on the Maestro card.
+  - **What stays:** every neutral, `error` (a failure is never pink or blue), `window-close`, and the incognito family, which wins over the accent. The native splash screen stays red, it is baked at build time.
+  - **Launcher icon:** the same toggle swaps the home-screen icon on Android and iOS. The voice color becomes the icon background and the accent pixels of the butterfly take the same color; red keeps the default icon. `app.json` declares one alternate icon per non-red voice (Pink, Amber, Blue, through `expo-alternate-app-icons`) and `src/services/appIcon.ts` switches it once the setting settles. Never export the icons by hand: after changing a voice color or the butterfly art, run `node scripts/generate-app-icons.mjs`. A native rebuild is needed when an icon is added.
+  - **In code:** `useTheme.ts` keeps one palette object per base palette and accent, so style caches still hit. Read `primary*` through `useColors()`, `useThemedStyles()` or `getColors()`, never from a static `Colors` import, and test dark with `useIsDark()` instead of comparing palettes. A screen pinned to the dark palette (Standby) uses `useDarkColors()` to keep the accent.
+  - **Contrast:** white text on the accent is about 3.9:1 on red, 5.0:1 on blue, 2.5:1 on pink and 2.3:1 on amber. The rule for red holds, and harder for pink and amber: red-surface text stays large or bold chrome, never small body copy.
 - **Background (#FEFBF6):** A warm cream canvas, softer than white, giving the editorial feel. Every screen sits on it.
 - **Surfaces (#FFFFFF + muted/subtle/pressed):** White cards and fields on the cream canvas; muted grays for pressed rows and subtle fills.
 - **Text ramp (#000000 → #888888):** Three neutral steps — primary (#000000), secondary (#444444) and muted (#888888) — plus white on colored surfaces. Full-black text on cream keeps maximum readability. Do not introduce intermediate greys outside these tokens.
-- **Incognito (#565A75):** A purple-gray identity that swaps out every red element when ephemeral mode is on. Base #565A75 acts like the red's role, with a dark surface #2A2A35 for the composer.
+- **Incognito (#565A75):** A purple-gray identity that swaps out every red element (or Maestro accent) when ephemeral mode is on. Base #565A75 acts like the red's role, with a dark surface #2A2A35 for the composer.
 - **Links:** Opera Red with an underline, in markdown and onboarding. There is no separate link blue.
 - **Code (host surface / #D63384 inline):** Code blocks share the background of their host (white widget card, drawer surface); pink inline code.
 
@@ -229,7 +239,7 @@ The shape language is **sticker-like**: 2px outlines on nearly every interactive
 - **Drawers & modals:** Drawers and sheets sit on the grouped background with a drawer scrim (rgba(0,0,0,0.25)), modals are white windows on a modal scrim (rgba(0,0,0,0.4)); desktop sheet cards use the sticker shadow (see Drawers). Confirmation/info modals (`NotificationModal`) use a 15px window radius, with their buttons and text input kept at the 10px default.
 - **Top bar:** white 44px pills (`Radius.xxl`) with the offset sticker shadow, floating over the content. Discussions and new chat on the left (one shared pill on mobile, labeled pills on desktop), an optional centered middle pill, the settings button on the right.
 - **Snackbar:** A dark pill (`snackbar-bg`: #444444 in light, #3A3A3A in dark) floating above the composer, white mono text.
-- **Pressed state:** any element with a pressed or hover feedback lightens its main color, never darkens it. Red surfaces (buttons, checked checkbox, selected rows, banner, call-to-action) go to `primary-bright` (#FF4D4D), incognito surfaces go to `incognito-bright` (#70748E), and the chat composer and the Selector, Slider and model pills already do. An icon button on a red row lifts it with a white tint. Neutral surfaces keep their gray fill (`surface-pressed`), since white cannot get lighter. In code, use `pressStyle(base, "primary")` or `Colors.primaryBright`; never hardcode a darker red.
+- **Pressed state:** any element with a pressed or hover feedback lightens its main color, never darkens it. Red surfaces (buttons, checked checkbox, selected rows, banner, call-to-action) go to `primary-bright` (#FF4D4D), incognito surfaces go to `incognito-bright` (#70748E), and the chat composer and the Selector, Slider and model pills already do. An icon button on a red row lifts it with a white tint. Neutral surfaces keep their gray fill (`surface-pressed`), since white cannot get lighter. In code, use `pressStyle(base, "primary")` or `Colors.primaryBright` from the live palette; never hardcode a darker red, nor a red at all.
 
 ## Page Structure
 
@@ -793,13 +803,16 @@ Structured results (weather, contact lookup, calendar events, timers, math) shar
 
 ## Do's and Don'ts
 
-- Do keep Opera Red for the main action of a screen, the active state of controls and top-level navigation badges; never for decoration.
+- Do keep Opera Red for the main action of a screen, the active state of controls and top-level navigation badges; never for decoration. It stands for the primary family, so it may be the Maestro accent.
+- Do read `primary`, `primaryBright`, `primarySelection`, `primaryHeader` and `overlayHalo` from the live palette (`useColors`, `useThemedStyles`, `getColors`) so the Maestro accent reaches them.
 - Do always pull values from the design tokens in `constants/theme.ts` (Colors, Fonts, FontSizes, Spacing, Radius) — never hardcode colors, fonts, or radii.
 - Do use Petrona for display headings, Figtree for reading, and Fragment Mono for UI chrome.
 - Do keep the incognito recolor coherent: swap every red element to the purple-gray #565A75 family.
 - Do lighten the main color on press and hover (`primary-bright`, `incognito-bright` in incognito), the same way on every element.
 
 - Don't darken the main color for a pressed state.
+- Don't hardcode `#FF1A1A`, `#FF4D4D` or `rgba(255,26,26,…)`, and don't compute a pressed color by hand: it would stay red when the user picked another Maestro color.
+- Don't use the primary family to show an error state: use `error`, which never follows the Maestro accent. A `danger` modal button is only a solid primary button, so it follows the accent like any other.
 - Don't add heavy drop shadows; prefer sticker shadows and 2px outlines.
 - Don't mix serif display and monospace in the same heading.
 - Don't exceed the 10px default radius on data-dense cards, except widget cards, markdown tables and modal windows (15px).

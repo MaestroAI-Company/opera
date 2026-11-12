@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { DeviceEventEmitter, ImageSourcePropType } from "react-native";
 import { DEFAULT_PERSONALITY, PERSONALITY_DEPTHS, PERSONALITY_MOODS, PERSONALITY_STYLES, type PersonalitySettings } from "../../../constants/personality";
-import { VoiceColors } from "../../../constants/theme";
+import { VoiceAccents } from "../../../constants/theme";
 import { getLocale, t, type TranslationKey } from "../../i18n";
 import { AppEvents } from "../../services/events";
 import { Settings } from "../../services/settings/SettingsService";
@@ -64,12 +64,7 @@ export const MAESTRO_BUTTERFLIES: Record<MaestroButterflyId, MaestroButterfly> =
   };
 
 //each supertonic voice owns an accent color
-export const VOICE_OPTIONS = [
-  { id: "F1", color: VoiceColors.red },
-  { id: "F2", color: VoiceColors.pink },
-  { id: "M1", color: VoiceColors.amber },
-  { id: "M2", color: VoiceColors.blue },
-];
+export const VOICE_OPTIONS = Object.entries(VoiceAccents).map(([id, color]) => ({ id, color }));
 
 const PREVIEW_COUNT = 8;
 let previewIndex = 0;

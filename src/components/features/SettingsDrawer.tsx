@@ -1231,6 +1231,7 @@ export default function SettingsDrawer({
   const [confirmedName, setConfirmedName] = useState("");
   const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
   const [autoSpeak, setAutoSpeakState] = useState(true);
+  const [applyMaestroColor, setApplyMaestroColorState] = useState(false);
   const [liveTranscription, setLiveTranscriptionState] = useState(false);
   const [dreamIncognitoButton, setDreamIncognitoButtonState] = useState(true);
   const [dreamAntiBurnIn, setDreamAntiBurnInState] = useState(true);
@@ -1628,6 +1629,7 @@ export default function SettingsDrawer({
       setConfirmedName(s.name || "");
       setAlwaysWhisperState(s.alwaysWhisper);
       setAutoSpeakState(s.autoSpeak);
+      setApplyMaestroColorState(s.applyMaestroColor);
       setLiveTranscriptionState(s.liveTranscription === 'on');
       setDreamIncognitoButtonState(s.dreamIncognitoButton);
       setDreamAntiBurnInState(s.dreamAntiBurnIn);
@@ -2703,6 +2705,11 @@ export default function SettingsDrawer({
   const setAutoSpeak = (v: boolean) => {
     setAutoSpeakState(v);
     Settings.set("autoSpeak", v);
+  };
+
+  const setApplyMaestroColor = (v: boolean) => {
+    setApplyMaestroColorState(v);
+    Settings.set("applyMaestroColor", v);
   };
 
   const setLiveTranscription = (v: boolean) => {
@@ -4322,6 +4329,26 @@ export default function SettingsDrawer({
               </Text>
             </View>
             <Toggle checked={liveTranscription} onToggle={setLiveTranscription} />
+          </View>
+        </View>
+      </View>
+
+      {/* maestro color card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.maestro.applyColor")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.maestro.applyColorHelp")}
+              </Text>
+            </View>
+            <Toggle
+              checked={applyMaestroColor}
+              onToggle={setApplyMaestroColor}
+            />
           </View>
         </View>
       </View>

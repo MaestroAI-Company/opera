@@ -2,7 +2,7 @@ import { Platform, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { IWidget } from '../../services/widgets/WidgetManager';
 import { Radius, ThemeColors } from '../../../constants/theme';
-import { useThemedStyles } from '../../hooks/useTheme';
+import { getColors, useThemedStyles } from '../../hooks/useTheme';
 import { useT } from '../../i18n';
 import WidgetTouchArea from './WidgetTouchArea';
 
@@ -17,7 +17,10 @@ export const HtmlWidget: IWidget<HtmlWidgetData> = {
   name: 'Web Page',
   hasBorder: true,
   aiDefinesTitle: true,
-  description: 'Displays a web page (URL) or raw HTML. For raw HTML, use font-family: "Figtree", system-ui; text: #333; accent: #FF1A1A; background: #F9F9F9; border-radius: 12px.',
+  //read per prompt so generated html follows the accent
+  get description() {
+    return `Displays a web page (URL) or raw HTML. For raw HTML, use font-family: "Figtree", system-ui; text: #333; accent: ${getColors().primary}; background: #F9F9F9; border-radius: 12px.`;
+  },
   schema: `{
     "html": "<html>...</html>",
     "url": "https://example.com",

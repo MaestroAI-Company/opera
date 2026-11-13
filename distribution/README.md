@@ -55,6 +55,22 @@ A beta can come from any branch, no need to merge into `main` first.
 
 The Play uploads only run when the `PLAY_SERVICE_ACCOUNT_JSON` secret is set, and the beta one also needs the upload keystore secrets, since Play refuses a debug-signed bundle.
 
+## After a release: old branches
+
+The tag is what keeps a release, not the branch: once `v1.2.3` is tagged on `main`, the `1.2.3` branch no longer holds anything the release needs, so it can be deleted. Betas work the same way, their tags (`v1.2.3-beta.1`) stay and only the working branch goes.
+
+1. Check that the branch is fully merged into `main`, the command must print nothing. If it lists commits, merge what you want to keep first.
+2. Delete the branch on GitHub and locally, then drop the stale remote references:
+
+   ```bash
+   git log main..origin/1.2.3
+   git push origin --delete 1.2.3
+   git branch -d 1.2.3
+   git fetch --prune
+   ```
+
+Branches that aren't tied to a version (`sampler-hub`, `desktop-design`, `iOS`) stay as they are. If a fix is needed on an old release later, a branch can be recreated from its tag with `git checkout -b 1.2.3-hotfix v1.2.3`.
+
 ## versionCode
 
 Play refuses a `versionCode` it has already received, beta included. On each tag, `scripts/next-version-code.mjs` asks Play for the highest code it holds and builds with the next one, so `android.versionCode` in `app.json` never needs a bump. A higher value in `app.json` still wins. Without the `PLAY_SERVICE_ACCOUNT_JSON` secret, the build keeps the `app.json` value.

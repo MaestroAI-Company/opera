@@ -106,5 +106,9 @@
     "desktop": "tauri dev",
     "build:desktop": "tauri build"
   },
-  "private": true
+  "private": true,
+  "allowScripts": {
+    "react-native-litert-lm@0.8.2": true,
+    "unrs-resolver@1.12.2": true
+  }
 }

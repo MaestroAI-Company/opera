@@ -292,6 +292,8 @@ export const fr: Translations = {
   "live.notifPerm.message": "Opera a besoin des notifications pour afficher ton appel en cours avec Maestro et te laisser raccrocher ou couper le micro depuis la barre d'état.",
   "live.notifPerm.allow": "Autoriser",
   "live.notifPerm.cancel": "Plus tard",
+  "live.locked.title": "Appel en cours",
+  "live.locked.message": "Raccroche le mode live avant de changer de conversation.",
   "live.voiceMessage": "Message vocal",
   "live.transcribe.title": "Écrire ce que tu dis ?",
   "live.transcribe.message":

@@ -709,6 +709,12 @@ export default function Index() {
   const [liveAskVisible, setLiveAskVisible] = useState(false);
   const [liveTranscribe, setLiveTranscribe] = useState(false);
   const [liveNotifVisible, setLiveNotifVisible] = useState(false);
+  const [liveLockedVisible, setLiveLockedVisible] = useState(false);
+  //read by callbacks that must not change identity
+  const liveOpenRef = useRef(false);
+  useEffect(() => {
+    liveOpenRef.current = liveOpen;
+  }, [liveOpen]);
   const openLive = useCallback(async () => {
     //no call card without notifications
     if (!(await hasLiveCallPermission())) {
@@ -1533,6 +1539,10 @@ export default function Index() {
 
   //load messages when a conversation is selected
   const selectConversation = useCallback(async (conv: Conversation) => {
+    if (liveOpenRef.current) {
+      setLiveLockedVisible(true);
+      return;
+    }
     setActiveConversation(conv);
     const msgs = await DB.getMessages(conv.id);
 
@@ -1559,6 +1569,15 @@ export default function Index() {
     setActiveConversation(null);
     setMessages([]);
   }, []);
+
+  //same as above but refused during a live call
+  const requestNewConversation = useCallback(() => {
+    if (liveOpenRef.current) {
+      setLiveLockedVisible(true);
+      return;
+    }
+    startNewConversation();
+  }, [startNewConversation]);
 
   //desktop shells open settings in their own os window instead of the drawer
   const settingsWindowOpenRef = useRef(false);
@@ -1766,7 +1785,7 @@ export default function Index() {
   //open a new chat when the home screen shortcut is pressed
   useQuickActionCallback((action) => {
     if (action.id === NEW_CHAT_ACTION_ID) {
-      startNewConversation();
+      requestNewConversation();
     }
   });
 
@@ -2644,7 +2663,7 @@ export default function Index() {
       conversations={conversations}
       selectedConversationId={activeConversation?.id ?? null}
       onSelectConversation={selectConversation}
-      onNewConversation={startNewConversation}
+      onNewConversation={requestNewConversation}
       onDeleteConversation={deleteConversation}
       onTogglePinConversation={togglePinConversation}
       onShareConversation={askToShareConversation}
@@ -2949,6 +2968,13 @@ export default function Index() {
               { text: t("live.notifPerm.allow"), style: "primary", onPress: allowLiveNotif },
             ]}
             onClose={() => setLiveNotifVisible(false)}
+          />
+
+          <NotificationModal
+            visible={liveLockedVisible}
+            title={t("live.locked.title")}
+            message={t("live.locked.message")}
+            onClose={() => setLiveLockedVisible(false)}
           />
 
           <NotificationModal

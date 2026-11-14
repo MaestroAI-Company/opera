@@ -223,6 +223,7 @@ pub fn run() {
             hub::hub_models_download,
             #[cfg(desktop)]
             hub::hub_models_cancel,
+            hub::hub_models_update,
             #[cfg(desktop)]
             hub::hub_models_delete,
             #[cfg(desktop)]
@@ -239,6 +240,7 @@ pub fn run() {
             hub::hub_sign_in,
             #[cfg(desktop)]
             hub::hub_update,
+            hub::hub_check_update,
             #[cfg(desktop)]
             hub::hub_install_update,
             #[cfg(desktop)]

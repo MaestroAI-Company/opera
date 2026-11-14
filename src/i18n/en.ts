@@ -302,6 +302,9 @@ export const en = {
   "update.installing": "Downloading Opera {version}. Opera restarts when it is done.",
   "update.install": "Update now",
   "update.later": "Later",
+  "update.upToDate": "Opera is up to date.",
+  "update.checkFailed": "The update check failed. Check your connection.",
+  "settings.update.checkNow": "Check now",
 
   "settings.nav.profile.title": "Profile",
   "settings.nav.profile.subtitle": "Name",
@@ -369,6 +372,9 @@ export const en = {
   "hubUpdate.install": "Install now",
   "hubUpdate.later": "Later",
   "hubUpdate.failed": "The update could not be installed: {error}",
+  "hubUpdate.upToDate": "Sampler Hub is up to date.",
+  "hubUpdate.checkFailed": "The update check failed: {error}",
+  "settings.hub.checkUpdate": "Check for updates",
   "settings.hub.update": "Update",
   "settings.hub.updateAvailable": "{version} available",
   "settings.hub.installUpdate": "Update Sampler Hub",
@@ -383,6 +389,8 @@ export const en = {
   "settings.hub.customRelay": "Custom relay",
   "settings.hub.customRelayHelp": "When a direct connection is not possible, devices reach Sampler Hub through this iroh relay instead of the public one.",
   "settings.hub.lanDiscovery": "Auto discovery",
+  "settings.hub.updateChecks": "Check for updates",
+  "settings.hub.updateChecksHelp": "Sampler Hub and llama.cpp check GitHub for new versions on their own. Turn off to stop these requests, llama.cpp then keeps its installed build.",
   "settings.hub.lanDiscoveryHelp": "Devices on the same network find Sampler Hub and connect to it even without internet. They sign into an existing profile with its password, a new profile needs a code.",
   "settings.hub.shareProviders": "Share Sampler Hub's providers",
   "settings.hub.shareProvidersHelp": "Paired devices use Ollama and LM Studio on Sampler Hub's machine.",
@@ -558,6 +566,7 @@ export const en = {
   "sampler.model.nightly": "llama.cpp nightly",
   "sampler.model.nightlyHelp": "Runs the newest llama.cpp build instead of the stable one. A change restarts llama.cpp.",
   "sampler.model.build": "llama.cpp version",
+  "sampler.model.updateBuild": "Update llama.cpp",
   "sampler.registries": "MCP registries",
   "sampler.registriesHelp": "Where Sampler Hub searches for MCP servers. Empty, only the selection and manual installs remain.",
   "sampler.addRegistry": "Add a registry",
@@ -842,6 +851,9 @@ export const en = {
   "settings.startup.launch": "Launch at startup",
   "settings.startup.launchHelp":
     "Opera starts with your computer and waits in the tray.",
+  "settings.update.checks": "Check for updates",
+  "settings.update.checksHelp":
+    "Ask GitHub for new versions of Opera. Turn off to stop all update requests.",
   "settings.update.beta": "Beta versions",
   "settings.update.betaHelp":
     "Get new versions of Opera before they reach everyone.",

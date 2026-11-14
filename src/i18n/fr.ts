@@ -305,6 +305,9 @@ export const fr: Translations = {
   "update.installing": "Téléchargement d'Opera {version}. Opera redémarre à la fin.",
   "update.install": "Mettre à jour",
   "update.later": "Plus tard",
+  "update.upToDate": "Opera est à jour.",
+  "update.checkFailed": "La recherche de mise à jour a échoué. Vérifie ta connexion.",
+  "settings.update.checkNow": "Vérifier maintenant",
 
   "settings.nav.profile.title": "Profil",
   "settings.nav.profile.subtitle": "Nom",
@@ -372,6 +375,9 @@ export const fr: Translations = {
   "hubUpdate.install": "Installer maintenant",
   "hubUpdate.later": "Plus tard",
   "hubUpdate.failed": "La mise à jour n'a pas pu être installée : {error}",
+  "hubUpdate.upToDate": "Sampler Hub est à jour.",
+  "hubUpdate.checkFailed": "La recherche de mise à jour a échoué : {error}",
+  "settings.hub.checkUpdate": "Rechercher les mises à jour",
   "settings.hub.update": "Mise à jour",
   "settings.hub.updateAvailable": "{version} disponible",
   "settings.hub.installUpdate": "Mettre à jour Sampler Hub",
@@ -386,6 +392,8 @@ export const fr: Translations = {
   "settings.hub.customRelay": "Relais personnalisé",
   "settings.hub.customRelayHelp": "Quand une connexion directe n'est pas possible, les appareils joignent Sampler Hub par ce relais iroh au lieu du relais public.",
   "settings.hub.lanDiscovery": "Découverte automatique",
+  "settings.hub.updateChecks": "Rechercher les mises à jour",
+  "settings.hub.updateChecksHelp": "Sampler Hub et llama.cpp vérifient seuls sur GitHub les nouvelles versions. Désactive pour couper ces requêtes, llama.cpp garde alors son build installé.",
   "settings.hub.lanDiscoveryHelp": "Les appareils du même réseau trouvent Sampler Hub et s'y connectent même sans internet. Ils se connectent à un profil existant avec son mot de passe, un nouveau profil demande un code.",
   "settings.hub.shareProviders": "Partager les providers de Sampler Hub",
   "settings.hub.shareProvidersHelp": "Les appareils appairés utilisent Ollama et LM Studio de la machine de Sampler Hub.",
@@ -560,6 +568,7 @@ export const fr: Translations = {
   "sampler.model.readOnly": "Réglés par l'admin de Sampler Hub.",
   "sampler.model.nightly": "llama.cpp nightly",
   "sampler.model.nightlyHelp": "Utilise la build llama.cpp la plus récente au lieu de la stable. Un changement redémarre llama.cpp.",
+  "sampler.model.updateBuild": "Mettre à jour llama.cpp",
   "sampler.model.build": "Version de llama.cpp",
   "sampler.registries": "Registres MCP",
   "sampler.registriesHelp": "Là où Sampler Hub cherche des serveurs MCP. Vide, il reste la sélection et les installations manuelles.",
@@ -848,6 +857,9 @@ export const fr: Translations = {
   "settings.startup.launch": "Lancer au démarrage",
   "settings.startup.launchHelp":
     "Opera démarre avec l'ordinateur et attend dans la zone de notification.",
+  "settings.update.checks": "Rechercher les mises à jour",
+  "settings.update.checksHelp":
+    "Demande à GitHub les nouvelles versions d'Opera. Désactive pour couper toutes les requêtes de mise à jour.",
   "settings.update.beta": "Versions bêta",
   "settings.update.betaHelp":
     "Reçois les nouvelles versions d'Opera avant tout le monde.",

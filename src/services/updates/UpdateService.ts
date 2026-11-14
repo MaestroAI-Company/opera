@@ -14,6 +14,8 @@ const BETA_PREFIX = 'beta:';
 
 //desktop opt-in kept per computer
 const BETA_CHANNEL_KEY = 'betaChannel';
+//on unless turned off
+const UPDATE_CHECKS_KEY = 'updateChecks';
 
 //one network check per app session window
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -113,6 +115,16 @@ async function fetchNewestRelease(): Promise<AppRelease | null> {
   return newest;
 }
 
+export async function getUpdateChecks(): Promise<boolean> {
+  return (await Settings.getLocal(UPDATE_CHECKS_KEY)) !== 'false';
+}
+
+export async function setUpdateChecks(enabled: boolean): Promise<void> {
+  await Settings.setLocal(UPDATE_CHECKS_KEY, String(enabled));
+  cachedAt = 0;
+  cachedRelease = null;
+}
+
 export async function getBetaChannel(): Promise<boolean> {
   return isTauri && (await Settings.getLocal(BETA_CHANNEL_KEY)) === 'true';
 }
@@ -124,16 +136,20 @@ export async function setBetaChannel(enabled: boolean): Promise<void> {
 }
 
 //latest release when newer than build
-export async function getAvailableUpdate(): Promise<AppRelease | null> {
+//force skips setting and cache
+export async function getAvailableUpdate(force = false): Promise<AppRelease | null> {
   const current = getBuildVersion();
+  //no github call when turned off
+  if (!force && !(await getUpdateChecks())) return null;
 
-  if (Date.now() - cachedAt > CHECK_INTERVAL_MS) {
+  if (force || Date.now() - cachedAt > CHECK_INTERVAL_MS) {
     try {
       const beta = isBetaVersion(current) || (await getBetaChannel());
       cachedRelease = beta ? await fetchNewestRelease() : await fetchLatestRelease();
     } catch (e) {
       console.warn('[UpdateService] release check failed:', e);
       cachedRelease = null;
+      if (force) throw e;
     }
     cachedAt = Date.now();
   }
@@ -174,6 +190,7 @@ export async function takeReleaseNotes(firstRun: boolean): Promise<ReleaseNotes 
   const seenBeta = `${BETA_PREFIX}${current}`;
   const seen = await Settings.getLocal(SEEN_VERSION_KEY);
   if (seen === current) return null;
+  if (!(await getUpdateChecks())) return null;
 
   //fresh installs and downgrades skip the notes
   const seenVersion = seen?.replace(BETA_PREFIX, '');

@@ -124,7 +124,7 @@ function PersonalityEditor({
   };
 
   const save = () => {
-    //answers pick the butterfly, which also clears the easter egg
+    //butterfly pick clears the easter egg
     Settings.setMany({ ...draft, maestroButterfly: butterflyForPersonality(draft) });
     onSaved(draft);
     onClose();
@@ -182,6 +182,75 @@ function PersonalityEditor({
           variant="highlight"
         />
       </Group>
+    </View>
+  );
+}
+
+//saves on every pick
+export function PersonalityPicker({
+  onChange,
+}: {
+  onChange?: (value: PersonalitySettings) => void;
+}) {
+  const styles = useThemedStyles(makeStyles);
+  const t = useT();
+  const [draft, setDraft] = useState<PersonalitySettings>(readPersonality);
+  const [slot, setSlot] = useState<Slot>("mood");
+
+  const pick = (value: string) => {
+    Vibration.vibrate(10);
+    const next = { ...draft, [SLOT_KEY[slot]]: value };
+    setDraft(next);
+    //butterfly pick clears the easter egg
+    Settings.setMany({ ...next, maestroButterfly: butterflyForPersonality(next) });
+    onChange?.(next);
+    const nextSlot = SLOT_ORDER[SLOT_ORDER.indexOf(slot) + 1];
+    if (nextSlot) setSlot(nextSlot);
+  };
+
+  return (
+    <View style={styles.sheetCard}>
+      <Text style={styles.sentence}>
+        {personalityParts(t("settings.personality.sentence")).map((part, i) =>
+          part === "mood" || part === "style" || part === "depth" ? (
+            <Text
+              key={i}
+              onPress={() => {
+                Vibration.vibrate(10);
+                setSlot(part);
+              }}
+              style={[styles.slot, slot === part && styles.slotActive]}
+            >
+              {` ${slotWord(t, part, draft[SLOT_KEY[part]])} `}
+            </Text>
+          ) : (
+            <Text key={i}>{part}</Text>
+          ),
+        )}
+      </Text>
+
+      <View style={[styles.chips, { marginBottom: Spacing.md }]}>
+        {SLOT_OPTIONS[slot].map((value) => {
+          const selected = draft[SLOT_KEY[slot]] === value;
+          const word = slotWord(t, slot, value);
+          return (
+            <Pressable
+              key={value}
+              onPress={() => pick(value)}
+              style={pressStyle(
+                [styles.chip, selected && styles.chipSelected],
+                selected ? "primary" : "surface",
+              )}
+            >
+              <Text
+                style={[styles.chipLabel, selected && styles.chipLabelSelected]}
+              >
+                {word.charAt(0).toUpperCase() + word.slice(1)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }

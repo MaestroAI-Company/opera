@@ -77,6 +77,8 @@ type HubProfileSheetProps = {
   defaultName?: string;
   //opens on the password change instead
   changePassword?: boolean;
+  //opens on create after pairing
+  startOnCreate?: boolean;
   //target profile shown in drawer
   profile?: HubProfile | null;
   //hub devices of the profile
@@ -112,6 +114,7 @@ export default function HubProfileSheet({
   allowCreate = true,
   defaultName = "",
   changePassword = false,
+  startOnCreate = false,
   profile: profileProp = null,
   devices: devicesProp = null,
   thisDeviceId: thisDeviceIdProp = null,
@@ -166,7 +169,15 @@ export default function HubProfileSheet({
   if (visible !== wasVisible) {
     setWasVisible(visible);
     if (visible) {
-      setPage(changePassword ? "password" : profileProp ? "profile" : "pick");
+      setPage(
+        changePassword
+          ? "password"
+          : profileProp
+            ? "profile"
+            : startOnCreate
+              ? "create"
+              : "pick",
+      );
       setProfiles(null);
       setChosen(null);
       setName(defaultName);
@@ -233,6 +244,11 @@ export default function HubProfileSheet({
     let stopped = false;
     (async () => {
       try {
+        //list loads alongside the join
+        const listing = SamplerHub.profiles(hub).then(
+          (list) => ({ list }),
+          (error) => ({ error }),
+        );
         if (await SamplerHub.linkJoin(hub)) {
           setLinkOpen(true);
           while (!stopped) {
@@ -244,8 +260,9 @@ export default function HubProfileSheet({
           }
           return;
         }
-        const list = await SamplerHub.profiles(hub);
-        if (!stopped) setProfiles(list);
+        const result = await listing;
+        if ("error" in result) throw result.error;
+        if (!stopped) setProfiles(result.list);
       } catch (e) {
         console.warn("[HubProfile] profiles unavailable:", e);
         if (!stopped) setError(t(`hubPairing.error.${hubErrorCode(e)}`));

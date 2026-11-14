@@ -1,6 +1,8 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as IntentLauncher from "expo-intent-launcher";
 import { useEffect, useRef, useState } from "react";
 import {
+  AppState,
   Image,
   Platform,
   StyleSheet,
@@ -62,6 +64,8 @@ type HubPairingSheetProps = {
   pairedHub?: PairedHub | null;
   //opens on hubs found nearby
   discover?: boolean;
+  //new profile skips the search
+  startWithCode?: boolean;
   onNearby?: (hub: NearbyHub) => void;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
@@ -74,6 +78,7 @@ export default function HubPairingSheet({
   link = null,
   pairedHub = null,
   discover = false,
+  startWithCode = false,
   onNearby,
   isLargeScreen = false,
   isDesktop = false,
@@ -94,6 +99,8 @@ export default function HubPairingSheet({
   const [page, setPage] = useState<Page>("searching");
   const [codeMode, setCodeMode] = useState(false);
   const [nearby, setNearby] = useState<NearbyHub[] | null>(null);
+  const [noWifi, setNoWifi] = useState(false);
+  const [wifiModal, setWifiModal] = useState(false);
   const [bodyWidth, setBodyWidth] = useState(0);
   const [scrolled, setScrolled] = useState(false);
 
@@ -105,8 +112,8 @@ export default function HubPairingSheet({
       setError(null);
       setTypedLink("");
       setFound(null);
-      setPage("searching");
-      setCodeMode(false);
+      setPage(startWithCode ? "manual" : "searching");
+      setCodeMode(startWithCode);
       setNearby(null);
     }
   }
@@ -177,14 +184,21 @@ export default function HubPairingSheet({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- starts the network scan
     setNearby(null);
     const minimum = new Promise((resolve) => setTimeout(resolve, MIN_SEARCH_MS));
-    SamplerHub.nearbyHubs()
-      .catch(() => [] as NearbyHub[])
+    SamplerHub.localNetworkAvailable()
+      .catch(() => true)
+      //no network means nothing to search
+      .then((online) =>
+        online
+          ? SamplerHub.nearbyHubs().catch(() => [] as NearbyHub[])
+          : null,
+      )
       .then(async (hubs) => {
-        await minimum;
+        if (hubs) await minimum;
         if (cancelled) return;
-        setNearby(hubs);
+        setNoWifi(!hubs);
+        setNearby(hubs ?? []);
         //tell the user a hub is nearby
-        if (hubs.length) Vibration.vibrate(30);
+        if (hubs?.length) Vibration.vibrate(30);
         setScrolled(false);
         setPage("discover");
       });
@@ -192,6 +206,37 @@ export default function HubPairingSheet({
       cancelled = true;
     };
   }, [visible, paged, page]);
+
+  //back from settings restarts the search
+  useEffect(() => {
+    if (!visible || !paged || !noWifi || page !== "discover") return;
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") return;
+      SamplerHub.localNetworkAvailable()
+        .then((online) => {
+          if (!online) return;
+          setScrolled(false);
+          setPage("searching");
+        })
+        .catch(() => {});
+    });
+    return () => sub.remove();
+  }, [visible, paged, noWifi, page]);
+
+  const openWifiSettings = () => {
+    IntentLauncher.startActivityAsync(
+      IntentLauncher.ActivityAction.WIFI_SETTINGS,
+    ).catch(() => {});
+  };
+
+  //still offline so no search
+  const rescan = async () => {
+    if (await SamplerHub.localNetworkAvailable().catch(() => true)) {
+      showPage("searching");
+    } else {
+      setWifiModal(true);
+    }
+  };
 
   const showPage = (next: Page) => {
     setScrolled(false);
@@ -233,6 +278,11 @@ export default function HubPairingSheet({
 
   const renderCodeRow = () => (
     <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+      {startWithCode && (
+        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+          {t("hubPairing.createNeedsCode")}
+        </Text>
+      )}
       <Text style={styles.settingLabel}>{t("hubPairing.code")}</Text>
       <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
         {t("hubPairing.codeHelp")}
@@ -382,7 +432,11 @@ export default function HubPairingSheet({
               nearby?.length ? { marginBottom: Spacing.md } : null,
             ]}
           >
-            {nearby?.length ? t("hubPairing.discoverHelp") : t("hubPairing.noneFound")}
+            {noWifi
+              ? t("hubPairing.noWifi")
+              : nearby?.length
+                ? t("hubPairing.discoverHelp")
+                : t("hubPairing.noneFound")}
           </Text>
           {!!nearby?.length && (
             <CardGrid
@@ -401,10 +455,17 @@ export default function HubPairingSheet({
       {/* actions section, one group with no label */}
       <View style={styles.contentCard}>
         <Group>
+          {noWifi && (
+            <ActionButton
+              icon={linkIcon}
+              label={t("hubPairing.wifiOn")}
+              onPress={openWifiSettings}
+            />
+          )}
           <ActionButton
             icon={reconnectIcon}
             label={t("hubPairing.rescan")}
-            onPress={() => showPage("searching")}
+            onPress={rescan}
           />
           <ActionButton
             icon={addIcon}
@@ -499,6 +560,27 @@ export default function HubPairingSheet({
           </SheetScrollView>
         )}
       </DrawerSheet>
+      <NotificationModal
+        visible={visible && wifiModal}
+        title={t("hubPairing.wifiOffTitle")}
+        message={t("hubPairing.wifiOffMessage")}
+        buttons={[
+          {
+            text: t("common.cancel"),
+            style: "secondary",
+            onPress: () => setWifiModal(false),
+          },
+          {
+            text: t("hubPairing.wifiSettings"),
+            style: "primary",
+            onPress: () => {
+              setWifiModal(false);
+              openWifiSettings();
+            },
+          },
+        ]}
+        onClose={() => setWifiModal(false)}
+      />
       <NotificationModal
         visible={visible && (pairing || !!error)}
         message={pairing ? t("hubPairing.pairing") : (error ?? undefined)}

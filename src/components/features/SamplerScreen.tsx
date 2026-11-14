@@ -82,7 +82,10 @@ import HubMcpSection, { HubMcpServerPage } from "./HubMcpSection";
 import HubMcpSheet, { HubFolderSheet } from "./HubMcpSheet";
 import HubModelsSection, { HubModelPage } from "./HubModelsSection";
 import HubModelsSheet from "./HubModelsSheet";
-import HubOnboarding, { isHubOnboardingDone } from "./HubOnboarding";
+import HubOnboarding, {
+  forgetHubOnboarding,
+  isHubOnboardingDone,
+} from "./HubOnboarding";
 import HubPairingSheet from "./HubPairingSheet";
 import HubProfileSheet from "./HubProfileSheet";
 import HubQrSheet from "./HubQrSheet";
@@ -282,6 +285,10 @@ export default function SamplerScreen({
     null,
   );
   const [pairingVisible, setPairingVisible] = useState(false);
+  //new profiles need the hub code
+  const [pairingWithCode, setPairingWithCode] = useState(false);
+  //sheet opens on create after code
+  const [createAfterPairing, setCreateAfterPairing] = useState(false);
   const [helpVisible, setHelpVisible] = useState(false);
   //topic stays through the close animation
   const [helpTopic, setHelpTopic] = useState<"welcome" | "models" | "mcp">(
@@ -548,6 +555,7 @@ export default function SamplerScreen({
 
   //same as joining from the settings
   const handleProfileDone = (next: HubProfile) => {
+    setCreateAfterPairing(false);
     setProfileSheet(null);
     setProfile(next);
     refresh();
@@ -673,6 +681,7 @@ export default function SamplerScreen({
             setModal((shown) => shown && { ...shown, loading: true });
             await SamplerHub.unpair(pairedHub);
             await HubSync.forgetHub();
+            await forgetHubOnboarding(pairedHub.id);
             closeModal();
             setPage("home");
             setDetail(null);
@@ -2119,7 +2128,10 @@ export default function SamplerScreen({
           <View style={styles.welcomeAction}>
             <Pressable
               style={pressStyle(styles.welcomePill, "surface")}
-              onPress={() => setPairingVisible(true)}
+              onPress={() => {
+                setPairingWithCode(false);
+                setPairingVisible(true);
+              }}
             >
               <Text style={styles.welcomePillText}>{t("sampler.linkHub")}</Text>
             </Pressable>
@@ -2143,7 +2155,10 @@ export default function SamplerScreen({
           </Pressable>
           <Pressable
             style={styles.welcomeLink}
-            onPress={() => setPairingVisible(true)}
+            onPress={() => {
+              setPairingWithCode(false);
+              setPairingVisible(true);
+            }}
           >
             <Text style={styles.welcomeLinkText}>{t("sampler.linkHub")}</Text>
           </Pressable>
@@ -2524,6 +2539,7 @@ export default function SamplerScreen({
         onPaired={() => {
           setPairingVisible(false);
           refresh();
+          setCreateAfterPairing(pairingWithCode);
           setProfileSheet("pick");
         }}
         pairedHub={pairedHub}
@@ -2533,6 +2549,7 @@ export default function SamplerScreen({
           setSignInHub(hub);
           setProfileSheet("pick");
         }}
+        startWithCode={pairingWithCode}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />
@@ -2542,6 +2559,8 @@ export default function SamplerScreen({
         nearby={pairedHub ? null : signInHub}
         onCreateWithCode={() => {
           setProfileSheet(null);
+          setSignInHub(null);
+          setPairingWithCode(true);
           setPairingVisible(true);
         }}
         profile={selectedProfile ?? profile}
@@ -2550,8 +2569,10 @@ export default function SamplerScreen({
         isSelf={!selectedProfile || selectedProfile.id === profile?.id}
         canManage={isAdmin}
         changePassword={profileSheet === "password"}
+        startOnCreate={createAfterPairing}
         defaultName={Settings.getCached().name}
         onClose={() => {
+          setCreateAfterPairing(false);
           setProfileSheet(null);
           setSelectedProfile(null);
         }}

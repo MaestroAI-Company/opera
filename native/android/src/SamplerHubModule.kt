@@ -1,6 +1,8 @@
 package __PACKAGE_NAME__
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.provider.Settings
 import com.facebook.react.bridge.Arguments
@@ -113,6 +115,23 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
       )
       settingsToMap(client(deviceKey).setHubSettings(hubFromMap(hub), wanted))
     }
+
+  //mobile data cannot reach local hubs
+  @ReactMethod
+  fun localNetworkAvailable(promise: Promise) {
+    try {
+      val manager = reactApplicationContext.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+      val caps = manager.getNetworkCapabilities(manager.activeNetwork)
+      promise.resolve(
+        caps != null && (
+          caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+        )
+      )
+    } catch (e: Exception) {
+      promise.resolve(false)
+    }
+  }
 
   //android drops multicast without a lock
   @ReactMethod

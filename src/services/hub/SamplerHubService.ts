@@ -115,6 +115,8 @@ type NativeHub = {
   setHubSettings?(deviceKey: string, hub: PairedHub, settings: HubSettings): Promise<HubSettings>;
   //browsers cannot use multicast
   nearbyHubs?(deviceKey: string, waitMs: number): Promise<NearbyHub[]>;
+  //only android checks the network
+  localNetworkAvailable?(): Promise<boolean>;
   //hub 0.11.1 and later, desktop for now
   nearbyProfiles?(deviceKey: string, hub: NearbyHub): Promise<HubProfile[]>;
   signIn?(
@@ -778,6 +780,12 @@ class SamplerHubServiceImpl {
   async nearbyHubs(waitMs = NEARBY_WAIT_MS): Promise<NearbyHub[]> {
     const nearby = this.native().nearbyHubs;
     return nearby ? nearby(await this.deviceKey(), waitMs) : [];
+  }
+
+  //false on android without wifi
+  async localNetworkAvailable(): Promise<boolean> {
+    const check = native?.localNetworkAvailable;
+    return check && Platform.OS === 'android' ? check() : true;
   }
 
   canSignIn(): boolean {

@@ -32,11 +32,7 @@ import DrawerSheet, { SheetScrollView } from "../components/features/DrawerSheet
 import HubOnboarding, { isHubOnboardingDone } from "../components/features/HubOnboarding";
 import HubPairingSheet from "../components/features/HubPairingSheet";
 import HubProfileSheet from "../components/features/HubProfileSheet";
-import PersonalitySheet, {
-  personalityParts,
-  readPersonality,
-  slotWord,
-} from "../components/features/PersonalitySheet";
+import { PersonalityPicker } from "../components/features/PersonalitySheet";
 import VoiceEngineCard from "../components/features/VoiceEngineCard";
 import { VOICE_OPTIONS, selectVoice, useVoice } from "../components/features/maestroButterfly";
 import ActionButton from "../components/ui/ActionButton";
@@ -58,7 +54,7 @@ import { CLOUD_PROVIDERS, getCloudProviderDefinition } from "../services/cloud/r
 import { LocationService } from "../services/location/LocationService";
 import { Settings } from "../services/settings/SettingsService";
 import { HubSync } from "../services/hub/HubSync";
-import { HubProfile, SamplerHub, PairedHub } from "../services/hub/SamplerHubService";
+import { HubProfile, SamplerHub, PairedHub, NearbyHub } from "../services/hub/SamplerHubService";
 import { TTS_SPEEDS, supportedEngineIds } from "../services/speech/engines";
 import { STT } from "../services/speech/STTService";
 import { TTS } from "../services/speech/TTSService";
@@ -321,8 +317,6 @@ export default function OnboardingPage() {
   //no neural engine on this platform, nothing to pick
   const [hasVoiceEngines] = useState(() => supportedEngineIds().length > 0);
   const [name, setName] = useState(() => Settings.getCached().name);
-  const [personality, setPersonality] = useState(readPersonality);
-  const [personalitySheetVisible, setPersonalitySheetVisible] = useState(false);
   const [ttsSpeed, setTtsSpeedState] = useState(() => Settings.getCached().ttsSpeed);
   const voicePackInstalled = useVoicePackInstalled();
   const voice = useVoice();
@@ -343,6 +337,8 @@ export default function OnboardingPage() {
   const [hubPairingVisible, setHubPairingVisible] = useState(false);
   //the paired sampler whose profile is picked
   const [profileHub, setProfileHub] = useState<PairedHub | null>(null);
+  //hub found by the network search
+  const [nearbyHub, setNearbyHub] = useState<NearbyHub | null>(null);
   //just joined hub shows setup once
   const [joinedHub, setJoinedHub] = useState<PairedHub | null>(null);
   const [alertVisible, setAlertVisible] = useState(false);
@@ -436,6 +432,7 @@ export default function OnboardingPage() {
   //the profile brings its conversations and settings back
   const restoreFromHub = async (profile: HubProfile) => {
     setProfileHub(null);
+    setNearbyHub(null);
     showAlert("Sampler", t("cloudSync.syncing"), undefined, { loading: true, messageAlign: "center" });
     try {
       await Settings.set("name", profile.name);
@@ -747,30 +744,19 @@ export default function OnboardingPage() {
           </Group>
         </View>
       </Reveal>
+    </>
+  );
+
+  const renderPersonality = () => (
+    <>
+      <Reveal>
+        <Text style={styles.title}>{t("onboarding.personality.title")}</Text>
+      </Reveal>
+      <Reveal delay={100}>
+        <Text style={styles.helpText}>{t("onboarding.personality.subtitle")}</Text>
+      </Reveal>
       <Reveal delay={200}>
-        <View style={styles.contentCard}>
-          <Text style={styles.settingLabel}>{t("settings.personality.title")}</Text>
-          <Text style={styles.personalitySentence}>
-            {personalityParts(t("settings.personality.sentence"))
-              .map((part) =>
-                part === "mood"
-                  ? slotWord(t, part, personality.maestroMood)
-                  : part === "style"
-                    ? slotWord(t, part, personality.maestroStyle)
-                    : part === "depth"
-                      ? slotWord(t, part, personality.maestroDepth)
-                      : part,
-              )
-              .join("")}
-          </Text>
-          <Group>
-            <ActionButton
-              icon={pencilIcon}
-              label={t("settings.personality.edit")}
-              onPress={() => setPersonalitySheetVisible(true)}
-            />
-          </Group>
-        </View>
+        <PersonalityPicker />
       </Reveal>
     </>
   );
@@ -863,7 +849,7 @@ export default function OnboardingPage() {
     </View>
   );
 
-  const steps = [renderIntro, renderProfile, ...(hasVoiceEngines ? [renderVoice] : []), renderPermissions, renderReady];
+  const steps = [renderIntro, renderProfile, renderPersonality, ...(hasVoiceEngines ? [renderVoice] : []), renderPermissions, renderReady];
 
   const isLast = step === steps.length - 1;
   const ctaLabel = step === 0 ? t("onboarding.welcome.cta") : isLast ? t("onboarding.ready.cta") : t("onboarding.next");
@@ -1058,21 +1044,23 @@ export default function OnboardingPage() {
           setHubPairingVisible(false);
           setProfileHub(hub);
         }}
-        isLargeScreen={isLargeScreen}
-        isDesktop={isDesktop}
-      />
-      <PersonalitySheet
-        visible={personalitySheetVisible}
-        onClose={() => setPersonalitySheetVisible(false)}
-        onSaved={setPersonality}
+        discover
+        onNearby={(hub) => {
+          setHubPairingVisible(false);
+          setNearbyHub(hub);
+        }}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />
       <HubProfileSheet
-        visible={!!profileHub}
+        visible={!!profileHub || !!nearbyHub}
         hub={profileHub}
+        nearby={profileHub ? null : nearbyHub}
         allowCreate={false}
-        onClose={() => setProfileHub(null)}
+        onClose={() => {
+          setProfileHub(null);
+          setNearbyHub(null);
+        }}
         onDone={restoreFromHub}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
@@ -1274,16 +1262,6 @@ const makeStyles = (Colors: ThemeColors) =>
       fontSize: FontSizes.body,
       color: Colors.textPrimary,
       paddingTop: Spacing.xs,
-      paddingHorizontal: Spacing.md,
-    },
-    personalitySentence: {
-      fontSize: FontSizes.lg,
-      lineHeight: 26,
-      color: Colors.textPrimary,
-      fontFamily: Fonts.body,
-      textAlign: "center",
-      marginTop: Spacing.xs,
-      marginBottom: Spacing.md,
       paddingHorizontal: Spacing.md,
     },
     helpText: {

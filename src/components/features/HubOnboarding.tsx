@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
   BackHandler,
@@ -64,6 +64,11 @@ const doneHubs = async (): Promise<string[]> => {
 
 export async function isHubOnboardingDone(hubId: string): Promise<boolean> {
   return (await doneHubs()).includes(hubId);
+}
+
+//a rejoined hub walks through again
+export async function forgetHubOnboarding(hubId: string): Promise<void> {
+  await Settings.setLocal(DONE_KEY, JSON.stringify((await doneHubs()).filter((id) => id !== hubId)));
 }
 
 async function markHubOnboardingDone(hubId: string): Promise<void> {
@@ -134,8 +139,16 @@ export default function HubOnboarding({
   const [modelNames, setModelNames] = useState<string[]>([]);
 
   const isAdmin = mode === "admin";
-  const hubLlama = getHubServers().find((s) => s.url === LLAMA_SERVER_URL);
-  const hubMcp = McpService.getHubServers();
+  //module lists recomputed each refresh
+  const { hubLlama, hubMcp } = useMemo(
+    () => ({
+      hubLlama: getHubServers().find((s) => s.url === LLAMA_SERVER_URL),
+      hubMcp: McpService.getHubServers(),
+    }),
+    //tick marks a provider refresh
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [offersTick],
+  );
   const offers = !!hubLlama || hubMcp.length > 0;
   const keys = isAdmin
     ? ["name", "share", ...(settings?.models ? ["model"] : []), "reach", "connect"]
@@ -144,18 +157,31 @@ export default function HubOnboarding({
   const { catalog } = useHubModels(isAdmin && current === "model");
 
   //old hubs send no flags, pick smallest
-  const fitting = catalog.filter((m) => m.fits !== false);
-  const smallest = fitting.length > 0 ? fitting.reduce((a, b) => (b.size < a.size ? b : a)) : null;
-  const advised = fitting.find((m) => m.recommended) ?? smallest;
+  const allFitting = catalog.filter((m) => m.fits !== false);
+  const smallest = allFitting.length > 0 ? allFitting.reduce((a, b) => (b.size < a.size ? b : a)) : null;
+  const advised = allFitting.find((m) => m.recommended) ?? smallest;
+  //advised first then other families
+  const family = (m: { name: string }) => m.name.split(/[^a-z]/i)[0].toLowerCase();
+  const others = [...allFitting]
+    .sort((a, b) => b.size - a.size)
+    .filter((m, i, all) => m !== advised && family(m) !== (advised && family(advised)) && all.findIndex((o) => family(o) === family(m)) === i);
+  const lead = [...(advised ? [advised] : []), ...others];
+  //same family variants fill the gaps
+  const rest = allFitting.filter((m) => !lead.includes(m)).sort((a, b) => b.size - a.size);
+  const fitting = [...lead, ...rest].slice(0, 4);
   const pickedModel = fitting.find((m) => m.file === modelFile) ?? advised;
+
+  //offers step waits for the hub
+  const loadProviders = () =>
+    HubSync.refreshProviders()
+      .catch((e) => console.warn("[HubOnboarding] hub providers not loaded:", e))
+      .finally(() => setOffersTick((tick) => tick + 1));
 
   //member needs sync choices and hub offers
   useEffect(() => {
     if (isAdmin) return;
     SyncPrefsStore.load().then(setPrefs);
-    HubSync.refreshProviders()
-      .catch((e) => console.warn("[HubOnboarding] hub providers not loaded:", e))
-      .finally(() => setOffersTick((tick) => tick + 1));
+    loadProviders();
     const subs = [AppEvents.settingsChanged, AppEvents.mcpServersChanged].map((event) =>
       DeviceEventEmitter.addListener(event, () => setOffersTick((tick) => tick + 1)),
     );
@@ -377,15 +403,17 @@ export default function HubOnboarding({
       {renderHead(t("hubOnboarding.sync.title"), t("hubOnboarding.sync.lead"))}
       <Reveal delay={100}>
         <View style={styles.contentCard}>
-          {syncRows.map((row, index) =>
-            renderToggleRow(
-              row.label,
-              row.help,
-              prefs[row.key],
-              (value) => SyncPrefsStore.set(row.key, value).then(setPrefs),
-              index === syncRows.length - 1,
-            ),
-          )}
+          {syncRows.map((row, index) => (
+            <Fragment key={row.key}>
+              {renderToggleRow(
+                row.label,
+                row.help,
+                prefs[row.key],
+                (value) => SyncPrefsStore.set(row.key, value).then(setPrefs),
+                index === syncRows.length - 1,
+              )}
+            </Fragment>
+          ))}
         </View>
       </Reveal>
     </>
@@ -493,7 +521,15 @@ export default function HubOnboarding({
     },
     reach: { key: "reach", render: renderReach },
     connect: { key: "connect", render: renderConnect, cta: t("hubOnboarding.finish") },
-    sync: { key: "sync", render: renderSync },
+    sync: {
+      key: "sync",
+      render: renderSync,
+      beforeNext: async () => {
+        //first fetch may race the join
+        await loadProviders();
+        return true;
+      },
+    },
     offers: { key: "offers", render: renderOffers },
     ready: {
       key: "ready",

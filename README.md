@@ -19,6 +19,39 @@
 
 Opera is a privacy-first AI assistant. Run a model on the device itself, on your own Ollama server, or on any OpenAI-compatible endpoint - no account, and nothing leaves your device unless you pick an online model, a cloud sync or a web search.
 
+## One assistant, every device
+
+Pair your phone, tablet and computer with your own [Sampler Hub](https://github.com/MaestroAI-Company/sampler-hub) in a few seconds: scan a QR code, share your models and your voice, and pick up any conversation anywhere.
+
+<div align="center">
+  <img src="./docs/readme/sampler-pairing.webp" alt="Pairing devices with Sampler Hub" width="800" />
+</div>
+
+## See it in action
+
+<table>
+  <tr>
+    <th width="40%">Preview</th>
+    <th width="60%">What it does</th>
+  </tr>
+  <tr>
+    <td><img src="./docs/readme/mobile.png" alt="Opera on Android" width="300" /></td>
+    <td valign="middle"><b>Chat anywhere</b><br /><br />A clean, fast chat on Android with your history, your models and your tools one tap away.</td>
+  </tr>
+  <tr>
+    <td><img src="./docs/readme/assistant.png" alt="Maestro assistant overlay" width="300" /></td>
+    <td valign="middle"><b>Maestro, over any app</b><br /><br />Set Opera as your default assistant and ask Maestro from the bottom of any screen, by voice or text.</td>
+  </tr>
+  <tr>
+    <td><img src="./docs/readme/standby.png" alt="Opera standby mode" width="300" /></td>
+    <td valign="middle"><b>Standby mode</b><br /><br />Turn your phone into a bedside assistant with a clock and a push-to-talk button always ready.</td>
+  </tr>
+  <tr>
+    <td><img src="./docs/readme/desktop.png" alt="Opera on desktop" width="300" /></td>
+    <td valign="middle"><b>Desktop and Sampler Hub</b><br /><br />Native on Windows, macOS and Linux, with every paired device visible at a glance.</td>
+  </tr>
+</table>
+
 ## Features
 
 | | |

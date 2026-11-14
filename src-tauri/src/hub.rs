@@ -327,6 +327,18 @@ pub async fn hub_rename_device(
     client.rename_device(hub, id, name).await
 }
 
+//empty name resets to the hostname
+#[tauri::command]
+pub async fn hub_rename_hub(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    name: String,
+) -> Result<String, HubError> {
+    let client = state.client(&device_key).await?;
+    client.rename_hub(hub, name).await
+}
+
 #[tauri::command]
 pub async fn hub_remove_device(
     state: State<'_, HubState>,

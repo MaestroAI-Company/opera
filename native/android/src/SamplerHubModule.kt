@@ -209,6 +209,10 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
   @ReactMethod
+  fun renameHub(deviceKey: String, hub: ReadableMap, name: String, promise: Promise) =
+    launchPromise(promise) { client(deviceKey).renameHub(hubFromMap(hub), name) }
+
+  @ReactMethod
   fun removeDevice(deviceKey: String, hub: ReadableMap, id: String, promise: Promise) =
     launchPromise(promise) {
       client(deviceKey).removeDevice(hubFromMap(hub), id)

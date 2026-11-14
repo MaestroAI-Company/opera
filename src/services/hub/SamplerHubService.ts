@@ -69,7 +69,8 @@ export type HubSettings = {
 };
 export type NearbyHub = { id: string; name: string; addrs: string[] };
 //llama.cpp models on the hub
-export type CatalogModel = { repo: string; file: string; name: string; size: number };
+//set by hubs reading host memory
+export type CatalogModel = { repo: string; file: string; name: string; size: number; fits?: boolean; recommended?: boolean };
 export type ModelRepo = { repo: string; downloads: number };
 export type ModelFile = { file: string; size: number };
 //repo is unknown for files copied by hand
@@ -139,6 +140,8 @@ type NativeHub = {
   unpair(deviceKey: string, hub: PairedHub): Promise<void>;
   devices(deviceKey: string, hub: PairedHub): Promise<HubDevice[]>;
   renameDevice(deviceKey: string, hub: PairedHub, id: string, name: string): Promise<void>;
+  //admin only, returns the effective name
+  renameHub(deviceKey: string, hub: PairedHub, name: string): Promise<string>;
   removeDevice(deviceKey: string, hub: PairedHub, id: string): Promise<void>;
   push(deviceKey: string, hub: PairedHub, collection: string, records: SyncRecord[]): Promise<void>;
   pull(deviceKey: string, hub: PairedHub, collection: string, since: number): Promise<PullPage>;
@@ -302,6 +305,7 @@ const tauriHub: NativeHub = {
   unpair: (deviceKey, hub) => invoke('hub_unpair', { deviceKey, hub }),
   devices: (deviceKey, hub) => invoke('hub_devices', { deviceKey, hub }),
   renameDevice: (deviceKey, hub, id, name) => invoke('hub_rename_device', { deviceKey, hub, id, name }),
+  renameHub: (deviceKey, hub, name) => invoke('hub_rename_hub', { deviceKey, hub, name }),
   removeDevice: (deviceKey, hub, id) => invoke('hub_remove_device', { deviceKey, hub, id }),
   push: (deviceKey, hub, collection, records) => invoke('hub_push', { deviceKey, hub, collection, records }),
   pull: (deviceKey, hub, collection, since) => invoke('hub_pull', { deviceKey, hub, collection, since }),
@@ -358,6 +362,7 @@ type WebClient = {
   unpair(hub: PairedHub): Promise<void>;
   devices(hub: PairedHub): Promise<HubDevice[]>;
   renameDevice(hub: PairedHub, id: string, name: string): Promise<void>;
+  renameHub(hub: PairedHub, name: string): Promise<string>;
   removeDevice(hub: PairedHub, id: string): Promise<void>;
   hubSettings(hub: PairedHub): Promise<HubSettings>;
   setHubSettings(hub: PairedHub, settings: HubSettings): Promise<HubSettings>;
@@ -455,6 +460,7 @@ const webHub: NativeHub = {
   unpair: async (deviceKey, hub) => (await loadWebClient(deviceKey)).unpair(hub),
   devices: async (deviceKey, hub) => (await loadWebClient(deviceKey)).devices(hub),
   renameDevice: async (deviceKey, hub, id, name) => (await loadWebClient(deviceKey)).renameDevice(hub, id, name),
+  renameHub: async (deviceKey, hub, name) => (await loadWebClient(deviceKey)).renameHub(hub, name),
   removeDevice: async (deviceKey, hub, id) => (await loadWebClient(deviceKey)).removeDevice(hub, id),
   //the hub only answers admin profiles
   hubSettings: async (deviceKey, hub) => (await loadWebClient(deviceKey)).hubSettings(hub),
@@ -920,6 +926,8 @@ class SamplerHubServiceImpl {
         await setSecret(PAIRED_HUB_KEY, JSON.stringify({ ...paired, relays }));
       }
     }
+    //hub may be renamed elsewhere
+    if (status.name && status.name !== hub.name) await this.keepHubName(hub, status.name);
     return status;
   }
 
@@ -929,6 +937,13 @@ class SamplerHubServiceImpl {
 
   async renameDevice(hub: PairedHub, id: string, name: string): Promise<void> {
     return this.native().renameDevice(await this.deviceKey(), hub, id, name);
+  }
+
+  //admin only, empty resets to hostname
+  async renameHub(hub: PairedHub, name: string): Promise<string> {
+    const effective = await this.native().renameHub(await this.deviceKey(), hub, name);
+    await this.keepHubName(hub, effective);
+    return effective;
   }
 
   //it loses access at once
@@ -1019,6 +1034,11 @@ class SamplerHubServiceImpl {
   async forget(): Promise<void> {
     await setSecret(PAIRED_HUB_KEY, null);
     await this.forgetProfile();
+  }
+
+  private async keepHubName(hub: PairedHub, name: string): Promise<void> {
+    const stored = await this.getPairedHub();
+    if (stored?.id === hub.id) await setSecret(PAIRED_HUB_KEY, JSON.stringify({ ...stored, name }));
   }
 
   //the key stays only as long as the pairing

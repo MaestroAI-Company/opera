@@ -266,8 +266,9 @@ class HubSyncImpl {
     const hub = await SamplerHub.getPairedHub();
     if (!hub || !(await SamplerHub.getProfile())) return;
     await this.dropInjectedServers();
-    await this.storeProviders(await SamplerHub.providers(hub), hub.name);
+    //status first refreshes stored hub name
     await this.refreshTuning(hub);
+    await this.storeProviders(await SamplerHub.providers(hub), await this.hubName(hub));
     await this.offerUpdate(hub);
     await this.matchProfile(hub);
     //a cloud sync account replaces sampler, a backup does not
@@ -305,8 +306,12 @@ class HubSyncImpl {
   async refreshProviders(): Promise<void> {
     const hub = await SamplerHub.getPairedHub();
     if (!hub) return;
-    await this.storeProviders(await SamplerHub.providers(hub), hub.name);
     await this.refreshTuning(hub);
+    await this.storeProviders(await SamplerHub.providers(hub), await this.hubName(hub));
+  }
+
+  private async hubName(hub: PairedHub): Promise<string> {
+    return (await SamplerHub.getPairedHub())?.name ?? hub.name;
   }
 
   //sync hub engine tuning

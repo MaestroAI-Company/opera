@@ -78,6 +78,7 @@ import HubMcpSection, { HubMcpServerPage } from "./HubMcpSection";
 import HubMcpSheet, { HubFolderSheet } from "./HubMcpSheet";
 import HubModelsSection, { HubModelPage } from "./HubModelsSection";
 import HubModelsSheet from "./HubModelsSheet";
+import HubOnboarding, { isHubOnboardingDone } from "./HubOnboarding";
 import HubPairingSheet from "./HubPairingSheet";
 import HubProfileSheet from "./HubProfileSheet";
 import HubQrSheet from "./HubQrSheet";
@@ -306,6 +307,10 @@ export default function SamplerScreen({
     done: (path: string) => void;
   } | null>(null);
   const [modal, setModal] = useState<Modal | null>(null);
+  //hub first run shows its setup
+  const [onboarding, setOnboarding] = useState<"admin" | "member" | null>(null);
+  const [hubNameDraft, setHubNameDraft] = useState<string | null>(null);
+  const [hubNameError, setHubNameError] = useState<string | null>(null);
 
   //every answer also feeds the graphs
   const receiveStatus = useCallback((next: HubStatus) => {
@@ -552,6 +557,30 @@ export default function SamplerScreen({
     HubSync.joinedProfile().catch((e) =>
       console.warn("[HubSync] first sync failed:", e),
     );
+    startOnboarding(next);
+  };
+
+  //first admin device sets up, others join
+  const startOnboarding = async (joined: HubProfile) => {
+    const hub = await SamplerHub.getPairedHub();
+    if (!hub || (await isHubOnboardingDone(hub.id))) return;
+    const devices =
+      joined.role === "admin"
+        ? await SamplerHub.devices(hub).catch(() => null)
+        : null;
+    setOnboarding(devices && devices.length <= 1 ? "admin" : "member");
+  };
+
+  const saveHubName = async () => {
+    if (!pairedHub || hubNameDraft === null) return;
+    try {
+      await SamplerHub.renameHub(pairedHub, hubNameDraft.trim());
+      setHubNameDraft(null);
+      setHubNameError(null);
+      refresh();
+    } catch (e) {
+      setHubNameError(t("settings.hub.renameFailed", { error: message(e) }));
+    }
   };
 
   const changeSettings = async (patch: Partial<HubSettings>) => {
@@ -1672,6 +1701,38 @@ export default function SamplerScreen({
   const renderPreferences = () => {
     return (
       <>
+        {/* what devices call this hub */}
+        {online && isAdmin && (
+          <View style={styles.contentCard}>
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <Text style={styles.settingLabel}>
+                {t("settings.hub.renameLabel")}
+              </Text>
+              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                {hubNameError ?? t("settings.hub.renameHelp")}
+              </Text>
+              <Group>
+                <TextInputField
+                  icon={serverIcon}
+                  placeholder={t("settings.hub.name")}
+                  value={hubNameDraft ?? status?.name ?? ""}
+                  onChangeText={setHubNameDraft}
+                  onSubmitEditing={saveHubName}
+                  autoCorrect={false}
+                />
+                <ActionButton
+                  icon={activateIcon}
+                  label={t("settings.hub.renameSave")}
+                  disabled={
+                    hubNameDraft === null || hubNameDraft === status?.name
+                  }
+                  onPress={saveHubName}
+                />
+              </Group>
+            </View>
+          </View>
+        )}
+
         {online && settings && (
           <View style={styles.contentCard}>
             {renderToggleRow(
@@ -2038,7 +2099,8 @@ export default function SamplerScreen({
     mcp: [[{ body: t("sampler.helpMcp") }]],
   };
 
-  const ready = !!pairedHub && !!profile && online && !hubStopped;
+  const hubUp = !!pairedHub && !!profile && online && !hubStopped;
+  const ready = hubUp && !onboarding;
   const { dockedWidth, resizeResponder } = useDockedWidth();
 
   useEffect(() => {
@@ -2342,6 +2404,20 @@ export default function SamplerScreen({
                   renderPage={renderScrollPage}
                 />
               </View>
+            ) : hubUp && onboarding && pairedHub && profile ? (
+              <HubOnboarding
+                mode={onboarding}
+                hub={pairedHub}
+                profileName={profile.name}
+                status={status}
+                settings={settings}
+                onChangeSettings={changeSettings}
+                topInset={contentTop - 44}
+                onDone={() => {
+                  setOnboarding(null);
+                  refresh();
+                }}
+              />
             ) : (
               <>
                 {renderWelcome()}

@@ -139,6 +139,7 @@ pub fn run() {
             hub::hub_devices,
             #[cfg(desktop)]
             hub::hub_rename_device,
+            hub::hub_rename_hub,
             #[cfg(desktop)]
             hub::hub_remove_device,
             #[cfg(desktop)]

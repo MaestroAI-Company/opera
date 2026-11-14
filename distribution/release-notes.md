@@ -1,7 +1,10 @@
-## Update checks you control
+## Set up your Sampler Hub in a few steps
 
-- **Check for updates** is now a setting. Turn it off in Settings, and Opera stops asking GitHub for new versions on its own.
-- **Check now** in Settings looks for a new version of Opera on demand, even when automatic checks are off.
-- Sampler gets **Check for updates** and **Update llama.cpp** buttons, and a **Check for updates** setting that also covers llama.cpp on your Sampler Hub.
+A new onboarding walks you through your Sampler Hub: it looks for hubs on your network, pairs with one, then suggests models that fit its memory.
 
-The Sampler buttons and setting need Sampler Hub 0.13.2 or newer, which Opera offers to install.
+- Rename your hub from Opera.
+- New profiles open straight on the create step after pairing.
+- Without a network, Opera skips the search instead of waiting for it.
+- Pick the Maestro personality from the same sentence in the onboarding and in Settings.
+
+Models shared by a hub now show even when it doesn't share its providers. This needs Sampler Hub 0.14.1, which Opera offers to install.

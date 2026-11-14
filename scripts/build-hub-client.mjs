@@ -19,10 +19,15 @@ const WINDOWS_CLANG = 'C:\\Program Files\\LLVM\\bin';
 
 const target = process.argv[2] ?? 'android';
 const works = (command, args) => spawnSync(command, args, { stdio: 'ignore' }).status === 0;
-const hasHub = existsSync(join(hubDir, 'Cargo.toml'));
+//the :hub npm scripts set it
+const local = Boolean(process.env.SAMPLER_HUB_LOCAL);
+if (local && !existsSync(join(hubDir, 'Cargo.toml'))) {
+  throw new Error(`no Sampler-Hub repo at ${hubDir}, set SAMPLER_HUB_DIR`);
+}
 
 if (target === 'web') {
-  if (hasHub && works('wasm-bindgen', ['--version']) && hasClang()) {
+  if (local) {
+    if (!hasClang()) throw new Error('clang is needed to build the web hub client');
     buildWebFromSource();
   } else {
     await downloadPinned([
@@ -30,7 +35,7 @@ if (target === 'web') {
       ['sampler-hub-client-web.wasm', join(webDir, 'sampler-hub-client-web.wasm')],
     ]);
   }
-} else if (hasHub && works('cargo', ['ndk', '--version'])) {
+} else if (local) {
   buildAndroidFromSource();
 } else {
   await downloadPinned([

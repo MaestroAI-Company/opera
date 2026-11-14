@@ -22,6 +22,17 @@ You can get updated docs with the context7 mcp
 
 When asked to deploy, release or publish a version (production or beta), read `distribution/README.md` first and follow its steps.
 
+# Updating Sampler-Hub
+
+Opera depends on Sampler-Hub (`../Sampler-Hub`). Every platform ships the release pinned in `sampler-hub-client.json`: the desktop release build checks out Sampler-Hub at that tag, Android and the web download its prebuilt clients. The local `../Sampler-Hub` path in `src-tauri/Cargo.toml` is only for testing hub changes on desktop before they are released. When a change in Opera needs something new from the hub (a request, a client method), update the whole chain:
+
+1. Make and commit the hub change in Sampler-Hub (client in `crates/sampler-hub-client`, bindings in `src/web.rs`, server and proto if needed).
+2. Release the hub: follow `Sampler-Hub/distribution/README.md` (bump the three crates, write `release-notes.md`, push `main`, tag `vX.Y.Z`) and wait for `release.yml` to publish.
+3. Pin it in Opera: `node scripts/pin-hub-client.mjs vX.Y.Z`, then commit `sampler-hub-client.json` with the Opera change.
+4. Wire the new method in Opera: `src-tauri/src/hub.rs` and `lib.rs`, `native/android/src/SamplerHubModule.kt`, `src/services/hub/SamplerHubService.ts`.
+
+Without the pin, Android and the web keep the old client and the new method is missing at runtime.
+
 # Expo HAS CHANGED
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v58.0.0/ before writing any code.

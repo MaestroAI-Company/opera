@@ -20,7 +20,7 @@ import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 
 const binIcon = require("../../../assets/icons/bin.png");
-const cloudIcon = require("../../../assets/icons/cloud.png");
+const cloudIcon = require("../../../assets/icons/cloud2.png");
 
 type HubModelsSectionProps = {
   onOpenModel: (file: string, name: string) => void;

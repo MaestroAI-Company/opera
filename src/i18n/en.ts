@@ -380,6 +380,8 @@ export const en = {
   "settings.hub.syncProviders": "Sync providers",
   "settings.hub.syncProvidersHelp": "Ollama, OpenAI and MCP servers. API keys and tokens of cloud API providers are synced with Sampler Hub.",
   "settings.hub.syncHubOnly": "Sampler Hub only. API keys and tokens of cloud API providers are synced with Sampler Hub.",
+  "settings.hub.customRelay": "Custom relay",
+  "settings.hub.customRelayHelp": "When a direct connection is not possible, devices reach Sampler Hub through this iroh relay instead of the public one.",
   "settings.hub.lanDiscovery": "Auto discovery",
   "settings.hub.lanDiscoveryHelp": "Devices on the same network find Sampler Hub and connect to it even without internet. They sign into an existing profile with its password, a new profile needs a code.",
   "settings.hub.shareProviders": "Share Sampler Hub's providers",

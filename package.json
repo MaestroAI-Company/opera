@@ -96,6 +96,7 @@
     "preandroid": "expo prebuild --platform android --no-install",
     "android": "expo run:android --app-id ai.maestro.opera.dev",
     "android:preview": "expo run:android --variant preview --app-id ai.maestro.opera.dev --no-bundler",
+    "android:hub": "node scripts/local-hub.mjs android",
     "build:android": "expo prebuild --platform android && cd android && ./gradlew assembleRelease",
     "ios": "expo run:ios",
     "preweb": "node scripts/build-hub-client.mjs web",
@@ -103,6 +104,7 @@
     "lint": "expo lint",
     "tauri": "tauri",
     "desktop": "tauri dev",
+    "desktop:hub": "node scripts/local-hub.mjs desktop",
     "build:desktop": "tauri build"
   },
   "private": true

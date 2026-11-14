@@ -129,7 +129,14 @@ jobs:
           if [ "${{ matrix.platform }}" = linux-x86_64 ]; then
             export LD_LIBRARY_PATH="$PWD/src-tauri/target/release" NO_STRIP=1
           fi
-          npm run build:desktop -- --bundles ${{ matrix.bundles }} --config '{"version":"${{ steps.versions.outputs.bundle }}","bundle":{"createUpdaterArtifacts":true}}' "${extra[@]}"
+          # another hub ref replaces the pinned tag
+          cargo=()
+          if [ -n "${{ inputs.sampler_hub_ref }}" ]; then
+            for crate in sampler-hub sampler-hub-client; do
+              cargo+=(--config "patch.'https://github.com/MaestroAI-Company/sampler-hub'.$crate.path='$SAMPLER_HUB_DIR/crates/$crate'")
+            done
+          fi
+          npm run build:desktop -- --bundles ${{ matrix.bundles }} --config '{"version":"${{ steps.versions.outputs.bundle }}","bundle":{"createUpdaterArtifacts":true}}' "${extra[@]}" -- "${cargo[@]}"
 
       # stable names so the website can link them
       - name: Collect bundles

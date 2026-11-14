@@ -114,6 +114,15 @@ npm run android:preview   # release build (R8, bundled JS, no Metro) for testing
 
 Both share the same app slot and data, so downloaded models survive switching between them. Once installed, JS-only changes just need `npm start` and opening Opera Dev; rebuild only after native changes (plugins, `app.json`, Kotlin modules, native deps).
 
+**Sampler Hub client** - builds use the hub client release pinned in `sampler-hub-client.json` (and the same tag in `src-tauri/Cargo.toml`). To test changes to the hub, build it from the `sampler-hub` repo next to this one (or `SAMPLER_HUB_DIR`) instead. Android needs Rust with `cargo-ndk` and the `aarch64-linux-android` target:
+
+```bash
+npm run android:hub   # Android with the hub client built from source
+npm run desktop:hub   # Opera Desktop on the local hub crates
+```
+
+A throwaway hub to pair with is described in the Sampler Hub README.
+
 Then, only if you need it:
 
 ```bash

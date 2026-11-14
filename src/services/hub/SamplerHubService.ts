@@ -16,6 +16,8 @@ export type HubStatus = {
   ctxSize?: number | null;
   keepAlive?: number | null;
   parallel?: number | null;
+  //none on older hubs and empty for n0
+  relays?: string[] | null;
 };
 export type HubDevice = {
   id: string;
@@ -909,7 +911,16 @@ class SamplerHubServiceImpl {
 
 
   async status(hub: PairedHub): Promise<HubStatus> {
-    return this.native().status(await this.deviceKey(), hub);
+    const status = await this.native().status(await this.deviceKey(), hub);
+    //keeps reaching a hub that moved relay
+    const relays = status.relays;
+    if (relays) {
+      const paired = await this.getPairedHub();
+      if (paired?.id === hub.id && relays.join() !== paired.relays.join()) {
+        await setSecret(PAIRED_HUB_KEY, JSON.stringify({ ...paired, relays }));
+      }
+    }
+    return status;
   }
 
   async devices(hub: PairedHub): Promise<HubDevice[]> {

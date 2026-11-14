@@ -62,6 +62,7 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
         status.ctxSize?.let { putDouble("ctxSize", it.toDouble()) }
         status.keepAlive?.let { putDouble("keepAlive", it.toDouble()) }
         status.parallel?.let { putDouble("parallel", it.toDouble()) }
+        status.relays?.let { putArray("relays", Arguments.fromList(it)) }
       }
     }
 

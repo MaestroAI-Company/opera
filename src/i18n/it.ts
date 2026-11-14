@@ -381,6 +381,8 @@ export const it: Translations = {
   "settings.hub.syncProviders": "Sincronizza i provider",
   "settings.hub.syncProvidersHelp": "Ollama, OpenAI e server MCP. Le chiavi API e i token dei provider API cloud sono sincronizzati con Sampler Hub.",
   "settings.hub.syncHubOnly": "Solo Sampler Hub. Le chiavi API e i token dei provider API cloud sono sincronizzati con Sampler Hub.",
+  "settings.hub.customRelay": "Relay personalizzato",
+  "settings.hub.customRelayHelp": "Quando non è possibile una connessione diretta, i dispositivi raggiungono Sampler Hub tramite questo relay iroh invece di quello pubblico.",
   "settings.hub.lanDiscovery": "Rilevamento automatico",
   "settings.hub.lanDiscoveryHelp": "I dispositivi sulla stessa rete trovano Sampler Hub e si connettono anche senza internet. Accedono a un profilo esistente con la sua password, un nuovo profilo richiede un codice.",
   "settings.hub.shareProviders": "Condividi i provider di Sampler Hub",

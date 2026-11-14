@@ -1683,6 +1683,25 @@ export default function SamplerScreen({
           </View>
         )}
 
+        {/* only when not the public n0 relays */}
+        {online && !!status?.relays?.length && (
+          <View style={styles.contentCard}>
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <Text style={styles.settingLabel}>
+                {t("settings.hub.customRelay")}
+              </Text>
+              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                {t("settings.hub.customRelayHelp")}
+              </Text>
+              <Group style={styles.infoGroup}>
+                {status.relays.map((url) => (
+                  <ActionButton key={url} label={url} />
+                ))}
+              </Group>
+            </View>
+          </View>
+        )}
+
         {/* where the sampler looks for mcp servers */}
         {online && isAdmin && registries && (
           <View style={styles.contentCard}>

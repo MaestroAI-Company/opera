@@ -28,6 +28,10 @@ export function parseDeepLink(url: string): DeepLinkRoute {
     if (target === "new") return { type: "new-chat" };
     if (target === "settings") return { type: "settings" };
     //rebuilt so web urls work too
+    if (path.endsWith("hub/pair") && params.get("h") && secret) {
+      return { type: "hub-pair", link: `opera://hub/pair?${query}#${secret}` };
+    }
+    //links from older hubs
     if (path.endsWith("hub/pair") && params.get("id") && params.get("secret")) {
       return { type: "hub-pair", link: `opera://hub/pair?${query}` };
     }

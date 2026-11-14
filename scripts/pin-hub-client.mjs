@@ -1,6 +1,6 @@
 //pins the hub client release for android and web
 
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -34,4 +34,10 @@ if (missing.length) throw new Error(`${version} has no ${missing.join(', ')}`);
 
 const root = resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
 writeFileSync(join(root, 'sampler-hub-client.json'), JSON.stringify({ version, sha256 }, null, 2) + '\n');
-console.log(`pinned sampler hub client ${version}`);
+//desktop builds the same release
+const manifest = join(root, 'src-tauri', 'Cargo.toml');
+writeFileSync(
+  manifest,
+  readFileSync(manifest, 'utf8').replace(/sampler-hub", tag = "v[^"]+"/g, `sampler-hub", tag = "${version}"`),
+);
+console.log(`pinned sampler hub client ${version}, run cargo update -p sampler-hub in src-tauri`);

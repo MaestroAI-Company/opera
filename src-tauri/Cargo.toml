@@ -30,8 +30,9 @@ tokio = { version = "1", features = ["sync", "time", "rt-multi-thread", "macros"
 
 #desktop only, the hub client is native code
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-sampler-hub = { path = "../../Sampler-Hub/crates/sampler-hub", default-features = false }
-sampler-hub-client = { path = "../../Sampler-Hub/crates/sampler-hub-client" }
+#same tag as sampler-hub-client.json
+sampler-hub = { git = "https://github.com/MaestroAI-Company/sampler-hub", tag = "v0.14.0", default-features = false }
+sampler-hub-client = { git = "https://github.com/MaestroAI-Company/sampler-hub", tag = "v0.14.0" }
 machine-uid = "0.6"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-updater = "2"

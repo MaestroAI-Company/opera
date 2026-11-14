@@ -204,7 +204,9 @@ function withNativeAndroid(config) {
       copyTemplate('res/xml/recognition_service.xml', path.join(xmlDir, 'recognition_service.xml'), packageName);
       copyTemplate('res/xml/dream_info.xml', path.join(xmlDir, 'dream_info.xml'), packageName);
       copyTemplate('res/values/dream_strings.xml', path.join(valuesDir, 'dream_strings.xml'), packageName);
-      copyTemplate('res/values-fr/dream_strings.xml', path.join(projectRoot, 'app', 'src', 'main', 'res', 'values-fr', 'dream_strings.xml'), packageName);
+      for (const lang of ['fr', 'es', 'de', 'it', 'pt']) {
+        copyTemplate(`res/values-${lang}/dream_strings.xml`, path.join(projectRoot, 'app', 'src', 'main', 'res', `values-${lang}`, 'dream_strings.xml'), packageName);
+      }
       //binary file, no package substitution
       const drawableDir = path.join(projectRoot, 'app', 'src', 'main', 'res', 'drawable-nodpi');
       fs.mkdirSync(drawableDir, { recursive: true });

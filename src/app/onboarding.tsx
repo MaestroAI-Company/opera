@@ -32,6 +32,11 @@ import ButterflyCluster from "../components/features/ButterflyCluster";
 import DrawerSheet, { SheetScrollView } from "../components/features/DrawerSheet";
 import HubPairingSheet from "../components/features/HubPairingSheet";
 import HubProfileSheet from "../components/features/HubProfileSheet";
+import PersonalitySheet, {
+  personalityParts,
+  readPersonality,
+  slotWord,
+} from "../components/features/PersonalitySheet";
 import VoiceEngineCard from "../components/features/VoiceEngineCard";
 import { VOICE_OPTIONS, selectVoice, useVoice } from "../components/features/maestroButterfly";
 import ActionButton from "../components/ui/ActionButton";
@@ -334,6 +339,8 @@ export default function OnboardingPage() {
   //no neural engine on this platform, nothing to pick
   const [hasVoiceEngines] = useState(() => supportedEngineIds().length > 0);
   const [name, setName] = useState(() => Settings.getCached().name);
+  const [personality, setPersonality] = useState(readPersonality);
+  const [personalitySheetVisible, setPersonalitySheetVisible] = useState(false);
   const [ttsSpeed, setTtsSpeedState] = useState(() => Settings.getCached().ttsSpeed);
   const voicePackInstalled = useVoicePackInstalled();
   const voice = useVoice();
@@ -750,6 +757,31 @@ export default function OnboardingPage() {
           </Group>
         </View>
       </Reveal>
+      <Reveal delay={200}>
+        <View style={styles.contentCard}>
+          <Text style={styles.settingLabel}>{t("settings.personality.title")}</Text>
+          <Text style={styles.personalitySentence}>
+            {personalityParts(t("settings.personality.sentence"))
+              .map((part) =>
+                part === "mood"
+                  ? slotWord(t, part, personality.maestroMood)
+                  : part === "style"
+                    ? slotWord(t, part, personality.maestroStyle)
+                    : part === "depth"
+                      ? slotWord(t, part, personality.maestroDepth)
+                      : part,
+              )
+              .join("")}
+          </Text>
+          <Group>
+            <ActionButton
+              icon={pencilIcon}
+              label={t("settings.personality.edit")}
+              onPress={() => setPersonalitySheetVisible(true)}
+            />
+          </Group>
+        </View>
+      </Reveal>
     </>
   );
 
@@ -1035,6 +1067,13 @@ export default function OnboardingPage() {
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />
+      <PersonalitySheet
+        visible={personalitySheetVisible}
+        onClose={() => setPersonalitySheetVisible(false)}
+        onSaved={setPersonality}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
       <HubProfileSheet
         visible={!!profileHub}
         hub={profileHub}
@@ -1241,6 +1280,16 @@ const makeStyles = (Colors: ThemeColors) =>
       fontSize: FontSizes.body,
       color: Colors.textPrimary,
       paddingTop: Spacing.xs,
+      paddingHorizontal: Spacing.md,
+    },
+    personalitySentence: {
+      fontSize: FontSizes.lg,
+      lineHeight: 26,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.body,
+      textAlign: "center",
+      marginTop: Spacing.xs,
+      marginBottom: Spacing.md,
       paddingHorizontal: Spacing.md,
     },
     helpText: {

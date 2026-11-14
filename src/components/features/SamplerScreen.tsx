@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Animated,
   AppState,
@@ -69,6 +69,8 @@ import DrawerSheet, {
   SheetKeyboardAwareScrollView,
   SheetScrollView,
 } from "./DrawerSheet";
+import IconButton from "../ui/IconButton";
+import HelpSheet, { type HelpSection } from "./HelpSheet";
 import HubDeviceSheet from "./HubDeviceSheet";
 import HubOrbit, { type OrbitNode } from "./HubOrbit";
 import HubSheet from "./HubSheet";
@@ -97,6 +99,7 @@ const botIcon = require("../../../assets/icons/bot.png");
 const toolIcon = require("../../../assets/icons/tool.png");
 const settingsIcon = require("../../../assets/icons/settings.png");
 const addIcon = require("../../../assets/icons/add.png");
+const questionIcon = require("../../../assets/icons/question.png");
 const reconnectIcon = require("../../../assets/icons/reconnect.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 const cancelIcon = require("../../../assets/icons/cancel.png");
@@ -274,6 +277,23 @@ export default function SamplerScreen({
     null,
   );
   const [pairingVisible, setPairingVisible] = useState(false);
+  const [helpVisible, setHelpVisible] = useState(false);
+  //topic stays through the close animation
+  const [helpTopic, setHelpTopic] = useState<"welcome" | "models" | "mcp">(
+    "welcome",
+  );
+  const openHelp = (topic: "welcome" | "models" | "mcp") => {
+    setHelpTopic(topic);
+    setHelpVisible(true);
+  };
+  const renderHelpButton = (topic: "welcome" | "models" | "mcp") => (
+    <IconButton
+      icon={questionIcon}
+      label={t("settings.help.open")}
+      onPress={() => openHelp(topic)}
+      tintColor={Colors.textPrimary}
+    />
+  );
   //nearby hub the profile sheet signs into
   const [signInHub, setSignInHub] = useState<NearbyHub | null>(null);
   const [qrMode, setQrMode] = useState<"invite" | "link" | null>(null);
@@ -1548,13 +1568,13 @@ export default function SamplerScreen({
   };
 
   //the back button floats above, the spacers keep the title centered
-  const renderPageHeader = (title: string) => (
+  const renderPageHeader = (title: string, right?: ReactNode) => (
     <View style={styles.header}>
       <View style={styles.headerSpacer} />
       <Text style={styles.title} numberOfLines={1}>
         {title}
       </Text>
-      <View style={styles.headerSpacer} />
+      <View style={[styles.headerSpacer, styles.headerRight]}>{right}</View>
     </View>
   );
 
@@ -1750,6 +1770,7 @@ export default function SamplerScreen({
 
   //open sheets keep the back press for themselves
   const sheetOpen =
+    helpVisible ||
     pairingVisible ||
     profileSheet !== null ||
     qrMode !== null ||
@@ -1872,7 +1893,12 @@ export default function SamplerScreen({
             if (width > 0 && width !== pageWidth) setPageWidth(width);
           }}
         >
-          {renderPageHeader(pageTitles[shown])}
+          {renderPageHeader(
+            pageTitles[shown],
+            shown === "models" || shown === "mcp"
+              ? renderHelpButton(shown)
+              : undefined,
+          )}
           {renderPageContent(shown)}
         </View>
       </KeyboardAwareScrollView>
@@ -1979,6 +2005,20 @@ export default function SamplerScreen({
 
   //the nav and pages need the hub up and a profile
   //a stopped hub may still answer for a moment
+  const helpCards: Record<"welcome" | "models" | "mcp", HelpSection[][]> = {
+    welcome: [
+      [{ body: t("sampler.helpIntro") }],
+      [
+        ...(canHost
+          ? [{ title: t("sampler.startHosting"), body: t("sampler.helpHost") }]
+          : []),
+        { title: t("sampler.linkHub"), body: t("sampler.helpLink") },
+      ],
+    ],
+    models: [[{ body: t("sampler.helpModels") }]],
+    mcp: [[{ body: t("sampler.helpMcp") }]],
+  };
+
   const ready = !!pairedHub && !!profile && online && !hubStopped;
   const { dockedWidth, resizeResponder } = useDockedWidth();
 
@@ -2284,12 +2324,35 @@ export default function SamplerScreen({
                 />
               </View>
             ) : (
-              renderWelcome()
+              <>
+                {renderWelcome()}
+                {!pairedHub && (
+                  <View
+                    style={[styles.welcomeHelpButton, { top: contentTop }]}
+                    pointerEvents="box-none"
+                  >
+                    {renderHelpButton("welcome")}
+                  </View>
+                )}
+              </>
             ))}
         </Animated.View>
       </View>
 
       {!isDesktop && mobileDrawer}
+
+      <HelpSheet
+        visible={helpVisible}
+        onClose={() => setHelpVisible(false)}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        title={
+          helpTopic === "welcome"
+            ? t("sampler.switch.sampler")
+            : pageTitles[helpTopic]
+        }
+        cards={helpCards[helpTopic]}
+      />
 
       <HubPairingSheet
         visible={pairingVisible}
@@ -2554,6 +2617,12 @@ const makeStyles = (Colors: ThemeColors) =>
       maxWidth: PAGE_MAX_WIDTH,
       alignSelf: "center",
     },
+    welcomeHelpButton: {
+      position: "absolute",
+      right: Spacing.xl2,
+      alignItems: "flex-end",
+      zIndex: 100,
+    },
     welcome: {
       flex: 1,
       justifyContent: "center",
@@ -2609,6 +2678,10 @@ const makeStyles = (Colors: ThemeColors) =>
       justifyContent: "space-between",
       marginBottom: Spacing.xxxl,
       minHeight: 40,
+    },
+    headerRight: {
+      alignItems: "flex-end",
+      justifyContent: "center",
     },
     headerSpacer: {
       width: 40,

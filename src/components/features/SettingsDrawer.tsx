@@ -8,7 +8,7 @@ import * as Location from "expo-location";
 import * as MediaLibrary from "expo-media-library/legacy";
 import * as Sharing from "expo-sharing";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   AppState,
@@ -160,6 +160,7 @@ import Checkbox from "../ui/Checkbox";
 import DownloadProgress, { throttleProgress } from "../ui/DownloadProgress";
 import FloatingButton from "../ui/FloatingButton";
 import Group from "../ui/Group";
+import IconButton from "../ui/IconButton";
 import IconSelector from "../ui/IconSelector";
 import NotificationBanner from "../ui/NotificationBanner";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
@@ -174,6 +175,7 @@ import DrawerSheet, {
   SheetKeyboardAwareScrollView,
   SheetScrollView,
 } from "./DrawerSheet";
+import HelpSheet, { type HelpSection } from "./HelpSheet";
 import {
   VOICE_OPTIONS,
   selectVoice,
@@ -227,6 +229,7 @@ import PageStack from "./PageStack";
 
 const linkIcon = require("../../../assets/icons/link.png");
 const addIcon = require("../../../assets/icons/add.png");
+const questionIcon = require("../../../assets/icons/question.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 const deleteIcon = require("../../../assets/icons/delete.png");
 const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
@@ -241,6 +244,7 @@ const LITERT_CAPABILITY_IDS: readonly ModelCapabilityId[] = [
 const searchIcon = require("../../../assets/icons/search.png");
 const profilIcon = require("../../../assets/icons/profil.png");
 const cloudIcon = require("../../../assets/icons/cloud.png");
+const providerCloudIcon = require("../../../assets/icons/cloud2.png");
 const ollamaIcon = require("../../../assets/icons/ollama.png");
 const phoneIcon = require("../../../assets/icons/phone.png");
 const sampler2Icon = require("../../../assets/icons/sampler2.png");
@@ -326,6 +330,8 @@ type SettingsDrawerProps = {
   //fills its own os window instead of floating over the app
   windowed?: boolean;
   initialSubPage?: SubPage;
+  //provider whose sheet opens on show
+  initialSheet?: { service: string; url: string } | null;
   //an opera://hub/pair link to confirm
   hubPairLink?: string | null;
   onHubPairLinkHandled?: () => void;
@@ -351,6 +357,8 @@ export type SubPage =
   | "mcpserver"
   | "mcpserversettings"
   | "sociallinks";
+
+type HelpTopic = "providers" | "cloud" | "syncchoices" | "tools" | "mcp";
 
 //page a subpage steps back to, followed by the header arrow and the android back button
 const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
@@ -530,7 +538,7 @@ const hubModelLabel = (key: string) => splitHubModelKey(key).model;
 const hubModelIcon = (key: string) => {
   const { url } = splitHubModelKey(key);
   if (url === LLAMA_SERVER_URL) return undefined;
-  return hubProviderKind(url) === "openai" ? cloudIcon : ollamaIcon;
+  return hubProviderKind(url) === "openai" ? providerCloudIcon : ollamaIcon;
 };
 
 const ModelToggleRow = memo(function ModelToggleRow({
@@ -848,6 +856,7 @@ export default function SettingsDrawer({
   isDesktop = false,
   windowed = false,
   initialSubPage,
+  initialSheet,
   hubPairLink = null,
   onHubPairLinkHandled,
 }: SettingsDrawerProps) {
@@ -1115,7 +1124,24 @@ export default function SettingsDrawer({
   const [personalitySheetVisible, setPersonalitySheetVisible] =
     useState(false);
   //open sheets keep the back press for themselves
+  const [helpVisible, setHelpVisible] = useState(false);
+  //topic stays through the close animation
+  const [helpTopic, setHelpTopic] = useState<HelpTopic>("providers");
+  const openHelp = (topic: HelpTopic) => {
+    setHelpTopic(topic);
+    setHelpVisible(true);
+  };
+  //question button for a page header
+  const renderHelpButton = (topic: HelpTopic) => (
+    <IconButton
+      icon={questionIcon}
+      label={t("settings.help.open")}
+      onPress={() => openHelp(topic)}
+      tintColor={Colors.textPrimary}
+    />
+  );
   const sheetOpen =
+    helpVisible ||
     personalitySheetVisible ||
     profileEditVisible ||
     addModelSheetVisible ||
@@ -1306,6 +1332,10 @@ export default function SettingsDrawer({
   const languageOptions = [
     { id: "en", label: "English" },
     { id: "fr", label: "Français" },
+    { id: "es", label: "Español" },
+    { id: "de", label: "Deutsch" },
+    { id: "it", label: "Italiano" },
+    { id: "pt", label: "Português" },
   ];
 
   const cloudStorageOptions = [
@@ -2615,6 +2645,36 @@ export default function SettingsDrawer({
     ...(localAvailable ? ["local"] : []),
   ];
 
+  //opens the picked provider sheet once its servers load
+  const initialSheetDone = useRef(false);
+  useEffect(() => {
+    if (!visible || !initialSheet) {
+      initialSheetDone.current = false;
+      return;
+    }
+    if (initialSheetDone.current) return;
+    const { service, url } = initialSheet;
+    if (service === "local" || service === "litert") {
+      setLitertSheetVisible(true);
+    } else if (service === "ollama") {
+      const index = ollamaServers.findIndex((s) => s.url === url);
+      if (index < 0) return;
+      openOllamaServer(index);
+    } else if (service === OPENAI_PROVIDER_ID) {
+      const index = openaiServers.findIndex((s) => s.url === url);
+      if (index < 0) return;
+      openOpenAIServer(index);
+    } else if (service === HUB_PROVIDER_ID) {
+      const hubServers = getHubServers();
+      const server =
+        hubServers.find((s) => s.url === LLAMA_SERVER_URL) ?? hubServers[0];
+      if (!server) return;
+      openHubServer(server);
+    }
+    initialSheetDone.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- openers are plain functions over these lists
+  }, [visible, initialSheet, ollamaServers, openaiServers]);
+
   //dead downloads resume from disk
   useEffect(() => {
     if (!litertSheetVisible || downloadingLitert) return;
@@ -3356,13 +3416,13 @@ export default function SettingsDrawer({
   }, [visible, isDesktop, largeScreenAnim, progress]);
 
   //back header for subpages
-  const renderSubPageHeader = (title: string) => (
+  const renderSubPageHeader = (title: string, right?: ReactNode) => (
     <View style={styles.header}>
       <View style={styles.headerSpacer} />
       <Text style={styles.title} numberOfLines={1}>
         {title}
       </Text>
-      <View style={styles.headerSpacer} />
+      <View style={[styles.headerSpacer, styles.headerRight]}>{right}</View>
     </View>
   );
 
@@ -4490,7 +4550,7 @@ export default function SettingsDrawer({
 
     return (
       <View style={styles.subPageContainer}>
-        {renderSubPageHeader(t("settings.nav.syncChoices.title"))}
+        {renderSubPageHeader(t("settings.nav.syncChoices.title"), renderHelpButton("syncchoices"))}
 
         {/* sync choices card */}
         {syncAccount !== "none" && syncPrefs && (
@@ -4682,7 +4742,7 @@ export default function SettingsDrawer({
 
     return (
       <View style={styles.subPageContainer}>
-        {renderSubPageHeader(t("settings.nav.cloud.title"))}
+        {renderSubPageHeader(t("settings.nav.cloud.title"), renderHelpButton("cloud"))}
 
         {/* sync account card, red while a sync account is active */}
         <View
@@ -4865,7 +4925,10 @@ export default function SettingsDrawer({
 
   const renderServiceSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.nav.service.title"))}
+      {renderSubPageHeader(
+        t("settings.nav.service.title"),
+        renderHelpButton("providers"),
+      )}
 
       {/* every provider as a tile, the icon tells where it comes from */}
       {(onDeviceProviders.length > 0 ||
@@ -4902,7 +4965,7 @@ export default function SettingsDrawer({
               })),
               ...openaiServers.map((server, index) => ({
                 key: `cloud-${index}`,
-                icon: cloudIcon,
+                icon: providerCloudIcon,
                 title: openAIServerLabel(index),
                 status: serverCardStatus(OPENAI_PROVIDER_ID, server),
                 error: serverErrors[server.url.trim()] === true,
@@ -5502,7 +5565,7 @@ export default function SettingsDrawer({
 
   const renderToolsSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.nav.tools.title"))}
+      {renderSubPageHeader(t("settings.nav.tools.title"), renderHelpButton("tools"))}
 
       {/* mcp link on top */}
       <Group style={styles.groupSpacing}>
@@ -5526,7 +5589,7 @@ export default function SettingsDrawer({
   //mcp list page
   const renderMcpServersSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.tools.mcp.title"))}
+      {renderSubPageHeader(t("settings.tools.mcp.title"), renderHelpButton("mcp"))}
 
       {mcpServers.length === 0 && McpService.getHubServers().length === 0 && (
         <Text style={styles.helpText}>{t("settings.tools.mcp.empty")}</Text>
@@ -6075,6 +6138,72 @@ export default function SettingsDrawer({
         {renderLitertContent()}
       </SheetScrollView>
     </DrawerSheet>
+  );
+
+  const helpCards: Record<HelpTopic, { title: string; cards: HelpSection[][] }> = {
+    providers: {
+      title: t("settings.nav.service.title"),
+      cards: [
+        [
+          { body: t("settings.service.helpIntro") },
+          { title: t("settings.service.helpTypesTitle"), body: t("settings.service.helpTypes") },
+        ],
+        [
+          { title: t("settings.service.helpAddTitle"), body: t("settings.service.helpAdd") },
+          { title: t("settings.service.helpUseTitle"), body: t("settings.service.helpUse") },
+        ],
+      ],
+    },
+    cloud: {
+      title: t("settings.nav.cloud.title"),
+      cards: [
+        [{ body: t("settings.cloud.helpIntro") }],
+        [
+          { title: t("settings.cloud.helpSamplerTitle"), body: t("settings.cloud.helpSampler") },
+          { title: t("settings.cloud.helpCloudTitle"), body: t("settings.cloud.helpCloud") },
+          { title: t("settings.cloud.helpPinTitle"), body: t("settings.cloud.helpPin") },
+        ],
+      ],
+    },
+    syncchoices: {
+      title: t("settings.nav.syncChoices.title"),
+      cards: [
+        [{ body: t("settings.syncChoices.helpIntro") }],
+        [
+          { title: t("settings.hub.syncData"), body: t("settings.hub.syncDataHelp") },
+          { title: t("settings.hub.syncSettings"), body: t("settings.hub.syncSettingsHelpCloud") },
+          { title: t("settings.hub.syncProviders"), body: t("settings.syncChoices.helpProviders") },
+        ],
+      ],
+    },
+    tools: {
+      title: t("settings.nav.tools.title"),
+      cards: [
+        [{ body: t("settings.tools.helpIntro") }],
+        [
+          { title: t("settings.tools.helpBuiltinTitle"), body: t("settings.tools.helpBuiltin") },
+          { title: t("settings.tools.mcp.title"), body: t("settings.tools.helpMcp") },
+        ],
+      ],
+    },
+    mcp: {
+      title: t("settings.tools.mcp.title"),
+      cards: [
+        [{ body: t("settings.tools.helpMcpWhat") }],
+        [{ title: t("settings.service.helpAddTitle"), body: t("settings.tools.helpMcpAdd") }],
+      ],
+    },
+  };
+
+  const helpSheet = (
+    <HelpSheet
+      visible={helpVisible}
+      onClose={() => setHelpVisible(false)}
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      title={helpCards[helpTopic].title}
+      cards={helpCards[helpTopic].cards}
+    />
   );
 
   const addModelSheet = (
@@ -7851,6 +7980,7 @@ export default function SettingsDrawer({
             </View>
 
             {litertSheet}
+            {helpSheet}
             {addModelSheet}
             {ollamaServerSheet}
             {hubServerSheet}
@@ -7902,6 +8032,7 @@ export default function SettingsDrawer({
 
       {notificationModal}
       {litertSheet}
+      {helpSheet}
       {addModelSheet}
       {ollamaServerSheet}
       {hubServerSheet}
@@ -8070,6 +8201,10 @@ const makeStyles = (Colors: ThemeColors) =>
     headerSpacer: {
       width: 40,
       height: 40,
+    },
+    headerRight: {
+      alignItems: "flex-end",
+      justifyContent: "center",
     },
     addModelSheet: {
       position: "absolute",

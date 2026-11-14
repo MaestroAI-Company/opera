@@ -179,6 +179,15 @@ pub async fn hub_update(
     state.client(&device_key).await?.update_hub(hub).await
 }
 
+#[tauri::command]
+pub async fn hub_check_update(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<Option<String>, HubError> {
+    state.client(&device_key).await?.check_hub_update(hub).await
+}
+
 //false where the hub swaps its own binaries
 #[tauri::command]
 pub async fn hub_install_update(version: String) -> Result<bool, String> {
@@ -237,6 +246,15 @@ pub async fn hub_models_download(
 ) -> Result<LlamaStatus, HubError> {
     let client = state.client(&device_key).await?;
     client.models_download(hub, repo, file).await
+}
+
+#[tauri::command]
+pub async fn hub_models_update(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<LlamaStatus, HubError> {
+    state.client(&device_key).await?.models_update(hub).await
 }
 
 #[tauri::command]

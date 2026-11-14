@@ -205,6 +205,9 @@ import {
 import {
   getBetaChannel,
   setBetaChannel,
+  getUpdateChecks,
+  setUpdateChecks,
+  getAvailableUpdate,
 } from "../../services/updates/UpdateService";
 
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
@@ -1214,6 +1217,7 @@ export default function SettingsDrawer({
     useDesktopUpdate();
   const [launchAtStartup, setLaunchAtStartupState] = useState(true);
   const [betaChannel, setBetaChannelState] = useState(false);
+  const [updateChecks, setUpdateChecksState] = useState(true);
   //not part of synced settings
   useEffect(() => {
     if (!visible || !isTauri) return;
@@ -1222,6 +1226,9 @@ export default function SettingsDrawer({
       .catch(() => {});
     getBetaChannel()
       .then(setBetaChannelState)
+      .catch(() => {});
+    getUpdateChecks()
+      .then(setUpdateChecksState)
       .catch(() => {});
   }, [visible]);
   const report = useBugReport(showAlert);
@@ -2827,6 +2834,29 @@ export default function SettingsDrawer({
     setLaunchAtStartup(v).catch(() => setLaunchAtStartupState(!v));
   };
 
+  //manual check ignores the setting
+  const checkUpdateNow = async () => {
+    try {
+      const release = await getAvailableUpdate(true);
+      if (release) {
+        promptUpdate(release);
+        return;
+      }
+      showAlert(t("update.title"), t("update.upToDate"), [
+        { text: t("common.ok"), onPress: () => setAlertModalVisible(false), style: "secondary" },
+      ]);
+    } catch (e) {
+      showAlert(t("update.title"), t("update.checkFailed"), [
+        { text: t("common.ok"), onPress: () => setAlertModalVisible(false), style: "secondary" },
+      ]);
+    }
+  };
+
+  const setUpdateChecksValue = (v: boolean) => {
+    setUpdateChecksState(v);
+    setUpdateChecks(v).catch(() => setUpdateChecksState(!v));
+  };
+
   //betas can break things
   const setBetaChannelValue = (v: boolean) => {
     if (!v) {
@@ -3744,7 +3774,7 @@ export default function SettingsDrawer({
 
       {isTauri && (
         <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={[styles.settingRowVertical, { marginBottom: Spacing.md }]}>
             <View style={styles.toggleGroupRow}>
               <View style={styles.toggleGroupContent}>
                 <Text style={styles.settingLabel}>
@@ -3757,6 +3787,26 @@ export default function SettingsDrawer({
               <Toggle checked={betaChannel} onToggle={setBetaChannelValue} />
             </View>
           </View>
+          <View style={[styles.settingRowVertical, { marginBottom: Spacing.md }]}>
+            <View style={styles.toggleGroupRow}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.update.checks")}
+                </Text>
+                <Text style={styles.helpText}>
+                  {t("settings.update.checksHelp")}
+                </Text>
+              </View>
+              <Toggle checked={updateChecks} onToggle={setUpdateChecksValue} />
+            </View>
+          </View>
+          <Group>
+            <ActionButton
+              icon={downloadIcon}
+              label={t("settings.update.checkNow")}
+              onPress={checkUpdateNow}
+            />
+          </Group>
         </View>
       )}
 

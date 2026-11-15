@@ -3036,6 +3036,7 @@ export default function Index() {
               showNewButton={!inSampler && !!activeConversation}
               isDesktop={isDesktop}
               middleElement={samplerSwitch}
+              middleOnly={inSampler && !isDesktop && !samplerReady}
               rightElement={settingsButton}
               showIncognitoButton={!isDesktop && !inSampler && !activeConversation}
               incognito={incognitoMode}

@@ -120,6 +120,7 @@ const tilesIcon = require("../../../assets/icons/tiles.png");
 const quickIcon = require("../../../assets/icons/Quick.png");
 const stopIcon = require("../../../assets/icons/stop.png");
 const activateIcon = require("../../../assets/icons/activate.png");
+const pencilIcon = require("../../../assets/icons/pencil.png");
 const rightArrowIcon = require("../../../assets/icons/right.png");
 
 const HUB_DEVICE_ICONS: Record<string, ImageSourcePropType> = {
@@ -277,6 +278,7 @@ export default function SamplerScreen({
   const [registries, setRegistries] = useState<string[] | null>(null);
   const [registryDraft, setRegistryDraft] = useState("");
   const [registryError, setRegistryError] = useState<string | null>(null);
+  const [registrySheet, setRegistrySheet] = useState(false);
   const [pageWidth, setPageWidth] = useState(0);
   const [profileSheet, setProfileSheet] = useState<
     "pick" | "view" | "password" | null
@@ -322,6 +324,7 @@ export default function SamplerScreen({
   const [onboarding, setOnboarding] = useState<"admin" | "member" | null>(null);
   const [hubNameDraft, setHubNameDraft] = useState<string | null>(null);
   const [hubNameError, setHubNameError] = useState<string | null>(null);
+  const [hubNameSheet, setHubNameSheet] = useState(false);
 
   //every answer also feeds the graphs
   const receiveStatus = useCallback((next: HubStatus) => {
@@ -589,6 +592,7 @@ export default function SamplerScreen({
       await SamplerHub.renameHub(pairedHub, hubNameDraft.trim());
       setHubNameDraft(null);
       setHubNameError(null);
+      setHubNameSheet(false);
       refresh();
     } catch (e) {
       setHubNameError(t("settings.hub.renameFailed", { error: message(e) }));
@@ -750,6 +754,7 @@ export default function SamplerScreen({
       const api = await SamplerHub.mcp();
       setRegistries(await api.setRegistries(urls));
       setRegistryDraft("");
+      setRegistrySheet(false);
     } catch (e) {
       setRegistryError(t("sampler.registryFailed", { error: message(e) }));
     }
@@ -915,7 +920,7 @@ export default function SamplerScreen({
     }
     return rows;
   }, [shownProfiles]);
-  const renderProfilesCard = (withActions: boolean) => (
+  const renderProfilesCard = () => (
     <View style={styles.contentCard}>
       <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
         <Text style={styles.settingLabel}>{t("sampler.profiles")}</Text>
@@ -946,7 +951,7 @@ export default function SamplerScreen({
             </View>
           ))}
         </View>
-        {withActions && isAdmin && (
+        {isAdmin && (
           <Group style={{ marginTop: Spacing.md }}>
             <ActionButton
               icon={profilIcon}
@@ -1563,8 +1568,15 @@ export default function SamplerScreen({
           ? () => setSelectedDeviceId(device.id)
           : undefined,
     }));
+    const connectedCount = nodes.filter((node) => node.connected).length;
     return (
       <View style={styles.contentCard}>
+        <View style={styles.orbitHeader}>
+          <Text style={styles.settingLabel}>{t("settings.hub.devices")}</Text>
+          <Text style={styles.infoValue}>
+            {connectedCount}/{nodes.length}
+          </Text>
+        </View>
         <HubOrbit
           hubIcon={HUB_DEVICE_ICONS.desktop}
           nodes={nodes}
@@ -1578,13 +1590,13 @@ export default function SamplerScreen({
   const renderHome = () => (
     <>
       {renderHubOrbit()}
-      {renderProfilesCard(false)}
+      {renderProfilesCard()}
     </>
   );
 
   const renderProfiles = () => (
     <>
-      {renderProfilesCard(true)}
+      {renderProfilesCard()}
       {renderDevicesCard(true)}
     </>
   );
@@ -1780,24 +1792,13 @@ export default function SamplerScreen({
                 {t("settings.hub.renameLabel")}
               </Text>
               <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-                {hubNameError ?? t("settings.hub.renameHelp")}
+                {t("settings.hub.renameHelp")}
               </Text>
               <Group>
-                <TextInputField
-                  icon={serverIcon}
-                  placeholder={t("settings.hub.name")}
-                  value={hubNameDraft ?? status?.name ?? ""}
-                  onChangeText={setHubNameDraft}
-                  onSubmitEditing={saveHubName}
-                  autoCorrect={false}
-                />
                 <ActionButton
-                  icon={activateIcon}
-                  label={t("settings.hub.renameSave")}
-                  disabled={
-                    hubNameDraft === null || hubNameDraft === status?.name
-                  }
-                  onPress={saveHubName}
+                  icon={pencilIcon}
+                  label={status?.name || t("settings.hub.name")}
+                  onPress={() => setHubNameSheet(true)}
                 />
               </Group>
             </View>
@@ -1862,25 +1863,10 @@ export default function SamplerScreen({
                 </Group>
               )}
               <Group>
-                <TextInputField
-                  icon={serverIcon}
-                  placeholder="https://registry.example.com"
-                  value={registryDraft}
-                  onChangeText={setRegistryDraft}
-                  onSubmitEditing={() =>
-                    registryDraft.trim() &&
-                    saveRegistries([...registries, registryDraft.trim()])
-                  }
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
                 <ActionButton
                   icon={addIcon}
                   label={t("sampler.addRegistry")}
-                  disabled={!registryDraft.trim()}
-                  onPress={() =>
-                    saveRegistries([...registries, registryDraft.trim()])
-                  }
+                  onPress={() => setRegistrySheet(true)}
                 />
               </Group>
             </View>
@@ -2405,6 +2391,139 @@ export default function SamplerScreen({
     </DrawerSheet>
   );
 
+  //hub name edit sheet
+  const closeHubNameSheet = () => {
+    setHubNameSheet(false);
+    setHubNameDraft(null);
+    setHubNameError(null);
+  };
+  const hubNameEditSheet = (
+    <DrawerSheet
+      visible={hubNameSheet}
+      onClose={closeHubNameSheet}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      avoidKeyboard
+      sheetStyle={[
+        styles.sheet,
+        {
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.desktopCard}
+    >
+      <SheetScrollView
+        contentContainerStyle={styles.sheetContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.sheetCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={styles.settingLabel}>
+              {t("settings.hub.renameLabel")}
+            </Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {hubNameError ?? t("settings.hub.renameHelp")}
+            </Text>
+            <Group style={styles.groupSpacingTight}>
+              <TextInputField
+                icon={serverIcon}
+                placeholder={t("settings.hub.name")}
+                value={hubNameDraft ?? status?.name ?? ""}
+                onChangeText={setHubNameDraft}
+                onSubmitEditing={saveHubName}
+                autoCorrect={false}
+              />
+            </Group>
+            <Group
+              style={[
+                styles.highlightGroup,
+                (hubNameDraft === null || hubNameDraft === status?.name) &&
+                  styles.highlightGroupDisabled,
+              ]}
+            >
+              <ActionButton
+                icon={activateIcon}
+                label={t("settings.hub.renameSave")}
+                variant="highlight"
+                disabled={hubNameDraft === null || hubNameDraft === status?.name}
+                onPress={saveHubName}
+              />
+            </Group>
+          </View>
+        </View>
+      </SheetScrollView>
+    </DrawerSheet>
+  );
+
+  //add mcp registry sheet
+  const closeRegistrySheet = () => {
+    setRegistrySheet(false);
+    setRegistryDraft("");
+    setRegistryError(null);
+  };
+  const addRegistry = () =>
+    registryDraft.trim() &&
+    saveRegistries([...(registries ?? []), registryDraft.trim()]);
+  const registrySheetView = (
+    <DrawerSheet
+      visible={registrySheet}
+      onClose={closeRegistrySheet}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      avoidKeyboard
+      sheetStyle={[
+        styles.sheet,
+        {
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.desktopCard}
+    >
+      <SheetScrollView
+        contentContainerStyle={styles.sheetContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.sheetCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={styles.settingLabel}>{t("sampler.addRegistry")}</Text>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+              {registryError ?? t("sampler.registriesHelp")}
+            </Text>
+            <Group style={styles.groupSpacingTight}>
+              <TextInputField
+                icon={serverIcon}
+                placeholder="https://registry.example.com"
+                value={registryDraft}
+                onChangeText={setRegistryDraft}
+                onSubmitEditing={addRegistry}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </Group>
+            <Group
+              style={[
+                styles.highlightGroup,
+                !registryDraft.trim() && styles.highlightGroupDisabled,
+              ]}
+            >
+              <ActionButton
+                icon={addIcon}
+                label={t("sampler.addRegistry")}
+                variant="highlight"
+                disabled={!registryDraft.trim()}
+                onPress={addRegistry}
+              />
+            </Group>
+          </View>
+        </View>
+      </SheetScrollView>
+    </DrawerSheet>
+  );
+
   return (
     <>
       <View style={styles.root} pointerEvents={visible ? "box-none" : "none"}>
@@ -2630,6 +2749,7 @@ export default function SamplerScreen({
         device={devices?.find((d) => d.id === selectedDeviceId) ?? null}
         hub={pairedHub}
         isSelf={selectedDeviceId === thisDeviceId}
+        ownerName={ownerName(devices?.find((d) => d.id === selectedDeviceId)?.profile)}
         canManage={isAdmin}
         onClose={() => setSelectedDeviceId(null)}
         onChanged={refresh}
@@ -2659,6 +2779,8 @@ export default function SamplerScreen({
       />
       {mcpServerSheet}
       {myMcpServerSheet}
+      {hubNameEditSheet}
+      {registrySheetView}
       <HubFolderSheet
         visible={folderPick !== null}
         start={folderPick?.start}
@@ -2959,6 +3081,12 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     infoGroup: {
       borderWidth: 0,
+    },
+    orbitHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingRight: Spacing.md,
     },
     infoValue: {
       flexShrink: 1,

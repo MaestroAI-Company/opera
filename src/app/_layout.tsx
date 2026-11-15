@@ -117,6 +117,10 @@ export default function RootLayout() {
     if (Platform.OS !== "web") return;
     const style = document.createElement('style');
     style.textContent = `
+html,body{overscroll-behavior:none}
+#root{overflow:hidden;-webkit-user-select:none;user-select:none}
+input,textarea{-webkit-user-select:text;user-select:text}
+[data-chatbar-input]::-webkit-scrollbar{display:none}
 ::-webkit-scrollbar{width:${Spacing.md}px;height:${Spacing.md}px;background:transparent}
 ::-webkit-scrollbar-button{display:none}
 ::-webkit-scrollbar-track,::-webkit-scrollbar-corner{background:transparent}

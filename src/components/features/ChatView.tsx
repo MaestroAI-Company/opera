@@ -67,6 +67,13 @@ const FOLLOW_SNAP = 1;
 const SETTLE_MS = 500;
 //a regeneration lands in the room of the reply it replaces
 const ROOM_GRACE = 300;
+//space between two rows, and between a question and its reply
+const LIST_GAP = 10;
+//the pinned question stops this far under the top bar buttons
+const PIN_MARGIN = Spacing.xxl;
+
+//a question and the replies that follow it
+type Turn = { id: string; messages: Message[] };
 
 //android 13+ shows its own clipboard confirmation
 const ANDROID_CLIPBOARD_UI_API = 33;
@@ -566,7 +573,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   const styles = useThemedStyles(makeStyles);
   const listRef = useRef<FlatList>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
-  //reply pinned to the top of the view while it grows
+  //turn pinned to the top of the view while its reply grows
   const [anchorId, setAnchorId] = useState<string | null>(null);
   const anchorRef = useRef<string | null>(null);
 
@@ -612,7 +619,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
   const settleUntilRef = useRef(0);
 
   //room a pinned reply takes between the two bars
-  const viewRoom = Math.max(0, viewportHeight - contentTopPadding - contentBottomPadding);
+  const viewRoom = Math.max(0, viewportHeight - contentTopPadding - contentBottomPadding - PIN_MARGIN);
 
   const jumpToBottom = useCallback(() => {
     const max = Math.max(0, contentHeightRef.current - viewportRef.current);
@@ -701,7 +708,18 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
     return () => clearTimeout(timer);
   }, [messages, anchorId]);
 
-  //the reply being written, pinned under the top bar like the other assistants
+  //a reply lives in the row of its question, so the room pins the question
+  const turns = useMemo(() => {
+    const rows: Turn[] = [];
+    for (const m of messages) {
+      const row = rows[rows.length - 1];
+      if (m.role === "assistant" && row) row.messages.push(m);
+      else rows.push({ id: m.id, messages: [m] });
+    }
+    return rows;
+  }, [messages]);
+
+  //the reply being written, its turn pinned under the top bar
   const last = messages.length > 0 ? messages[messages.length - 1] : null;
   //a list from the conversation we just left must not pin anything
   const liveId =
@@ -709,15 +727,16 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
       (last.id === generatingMessageId || !!queuedMessageIds?.includes(last.id))
       ? last.id
       : null;
+  const liveTurnId = liveId ? turns[turns.length - 1].id : null;
   useEffect(() => {
     if (alignBottom || !liveId || liveId === anchorRef.current) return;
     anchorRef.current = liveId;
     followingRef.current = true;
     lastStepRef.current = 0;
-    //pins the new reply once per generation
-    setAnchorId(liveId);
+    //pins the new turn once per generation
+    setAnchorId(liveTurnId);
     startFollow();
-  }, [liveId, alignBottom, startFollow]);
+  }, [liveId, liveTurnId, alignBottom, startFollow]);
 
   //suggestions belong to the newest assistant message
   const lastAssistantId = useMemo(() => {
@@ -727,13 +746,15 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
     return null;
   }, [messages]);
 
-  const renderItem = useCallback(({ item }: { item: Message }) => {
+  const renderItem = useCallback(({ item: turn }: { item: Turn }) => {
     return (
-      <View style={item.id === anchorId ? { minHeight: viewRoom } : undefined}>
-        <MessageItem item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isQueued={!!queuedMessageIds?.includes(item.id)} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} suggestions={item.id === lastAssistantId ? suggestions : undefined} onSuggestionPress={onSuggestionPress} onImagePress={onImagePress} onDetailsPress={onDetailsPress} onEditMessage={onEditMessage} editAiEnabled={editAiEnabled} />
+      <View style={[styles.turn, turn.id === anchorId && { minHeight: viewRoom }]}>
+        {turn.messages.map((item) => (
+          <MessageItem key={item.id} item={item} incognito={incognito} onRegenerate={onRegenerate} speakerEnabled={speakerEnabled} onSpeak={handleSpeak} isSpeaking={speakingMessageId === item.id} showSnackbar={setSnackbarMessage} isGenerating={item.id === generatingMessageId} isQueued={!!queuedMessageIds?.includes(item.id)} isChatGenerating={!!generatingMessageId} showMetrics={showMetrics} fallbackModel={conversation?.model} canThink={canThink} dark={dark} onOpenInApp={onOpenInApp} suggestions={item.id === lastAssistantId ? suggestions : undefined} onSuggestionPress={onSuggestionPress} onImagePress={onImagePress} onDetailsPress={onDetailsPress} onEditMessage={onEditMessage} editAiEnabled={editAiEnabled} />
+        ))}
       </View>
     );
-  }, [incognito, onRegenerate, speakerEnabled, handleSpeak, speakingMessageId, generatingMessageId, queuedMessageIds, showMetrics, conversation?.model, canThink, dark, onOpenInApp, lastAssistantId, suggestions, onSuggestionPress, onImagePress, onDetailsPress, onEditMessage, editAiEnabled, anchorId, viewRoom]);
+  }, [styles.turn, incognito, onRegenerate, speakerEnabled, handleSpeak, speakingMessageId, generatingMessageId, queuedMessageIds, showMetrics, conversation?.model, canThink, dark, onOpenInApp, lastAssistantId, suggestions, onSuggestionPress, onImagePress, onDetailsPress, onEditMessage, editAiEnabled, anchorId, viewRoom]);
 
   return (
     <View style={styles.container}>
@@ -745,7 +766,7 @@ export default function ChatView({ messages, conversation, contentTopPadding, co
           setViewportHeight(e.nativeEvent.layout.height);
           if (!anchorRef.current && Date.now() < settleUntilRef.current) jumpToBottom();
         }}
-        data={messages}
+        data={turns}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         nestedScrollEnabled={true}
@@ -838,7 +859,10 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   list: {
     paddingHorizontal: 16,
-    gap: 10,
+    gap: LIST_GAP,
+  },
+  turn: {
+    gap: LIST_GAP,
   },
   bubble: {
     paddingHorizontal: 14,

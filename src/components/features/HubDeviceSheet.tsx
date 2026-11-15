@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Image, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
-import { useThemedStyles } from "../../hooks/useTheme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { HubDevice, SamplerHub, PairedHub } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
@@ -13,7 +13,15 @@ import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 const pencilIcon = require("../../../assets/icons/pencil.png");
 const binIcon = require("../../../assets/icons/bin.png");
+const activateIcon = require("../../../assets/icons/activate.png");
 const cancelIcon = require("../../../assets/icons/cancel.png");
+
+const KIND_ICONS = {
+  phone: require("../../../assets/icons/phone.png"),
+  desktop: require("../../../assets/icons/laptop.png"),
+  web: require("../../../assets/icons/website.png"),
+  other: require("../../../assets/icons/operaicon.png"),
+};
 
 const DESKTOP_CARD_WIDTH = 720;
 const KINDS = ["phone", "desktop", "web"] as const;
@@ -22,6 +30,8 @@ type HubDeviceSheetProps = {
   device: HubDevice | null;
   hub: PairedHub | null;
   isSelf: boolean;
+  //profile the device belongs to
+  ownerName: string;
   //admins manage every device
   canManage: boolean;
   onClose: () => void;
@@ -37,6 +47,7 @@ export default function HubDeviceSheet({
   device,
   hub,
   isSelf,
+  ownerName,
   canManage,
   onClose,
   onChanged,
@@ -45,6 +56,7 @@ export default function HubDeviceSheet({
   isDesktop = false,
 }: HubDeviceSheetProps) {
   const styles = useThemedStyles(makeStyles);
+  const Colors = useColors();
   const t = useT();
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -94,6 +106,7 @@ export default function HubDeviceSheet({
   const rows = device
     ? [
         { label: t("hubDevice.kind"), value: t(`hubDevice.kinds.${kind}`) },
+        { label: t("hubDevice.profile"), value: ownerName },
         { label: t("hubDevice.pairedAt"), value: date(device.pairedAt) },
         {
           label: t("hubDevice.lastSeen"),
@@ -122,6 +135,14 @@ export default function HubDeviceSheet({
       desktopStyle={styles.desktopCard}
     >
       <SheetScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {/* device header */}
+        <View style={styles.header}>
+          <Text style={styles.headerName} numberOfLines={2}>
+            {device?.name}
+          </Text>
+          <Image source={KIND_ICONS[kind]} style={styles.headerIcon} tintColor={Colors.textPrimary} />
+        </View>
+
         {/* name */}
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -140,7 +161,7 @@ export default function HubDeviceSheet({
             </Group>
             <Group style={[styles.highlightGroup, (busy || unchanged) && styles.highlightGroupDisabled]}>
               <ActionButton
-                icon={pencilIcon}
+                icon={activateIcon}
                 label={t("hubDevice.rename")}
                 variant="highlight"
                 disabled={busy || unchanged}
@@ -275,6 +296,21 @@ const makeStyles = (Colors: ThemeColors) =>
       opacity: 0.5,
     },
     //static rows on the white card
+    header: {
+      alignItems: "center",
+      gap: Spacing.xl2,
+      paddingTop: Spacing.lg2,
+    },
+    headerName: {
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.lg,
+      color: Colors.textPrimary,
+      textAlign: "center",
+    },
+    headerIcon: {
+      width: 96,
+      height: 96,
+    },
     infoGroup: {
       borderWidth: 0,
     },

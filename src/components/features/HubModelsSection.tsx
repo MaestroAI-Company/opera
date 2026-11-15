@@ -85,6 +85,9 @@ export default function HubModelsSection({ onOpenModel }: HubModelsSectionProps)
       {/* models on the hub */}
       {cards.length > 0 && (
         <View style={styles.contentCard}>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+            {t("hubModels.current")}
+          </Text>
           <CardGrid cards={cards} />
         </View>
       )}

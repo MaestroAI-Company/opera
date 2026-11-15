@@ -795,5 +795,5 @@ pub async fn hub_host_pairing_link() -> Result<String, String> {
 //the name other devices see
 #[tauri::command]
 pub fn hub_computer_name() -> String {
-    config::Config::default().hub_name()
+    sampler_hub::name::hostname()
 }

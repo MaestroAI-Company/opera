@@ -139,6 +139,7 @@ pub fn run() {
             hub::hub_devices,
             #[cfg(desktop)]
             hub::hub_rename_device,
+            hub::hub_rename_hub,
             #[cfg(desktop)]
             hub::hub_remove_device,
             #[cfg(desktop)]
@@ -208,6 +209,8 @@ pub fn run() {
             hub::hub_pair_with_code,
             #[cfg(desktop)]
             hub::hub_invite,
+            #[cfg(desktop)]
+            hub::hub_invite_watch,
             #[cfg(desktop)]
             hub::hub_qr_svg,
             #[cfg(desktop)]

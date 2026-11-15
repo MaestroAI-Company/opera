@@ -251,7 +251,7 @@ export type ModelSelectorDrawerProps = {
   triggerRef?: React.RefObject<View | null>;
   //current conversation, fills the token window
   messages?: { content: string; images?: string[]; metrics?: MessageMetrics }[];
-  onOpenProviderSettings?: (provider: string) => void;
+  onOpenProviderSettings?: (source: ModelSource) => void;
   hideScrim?: boolean;
 };
 
@@ -546,14 +546,17 @@ export function ModelSelectorDrawer({
     selectModelRef.current(model);
   }, []);
 
+  const openSourceSettings = (source: ModelSource) => {
+    if (!onOpenProviderSettings) return;
+    onClose();
+    onOpenProviderSettings(source);
+  };
+
   //tab switch restores its last model
   const handleSelectSource = (source: ModelSource) => {
     //open provider settings on reselect
     if (browsedSource && source.key === browsedSource.key) {
-      if (onOpenProviderSettings) {
-        onClose();
-        onOpenProviderSettings(source.service);
-      }
+      openSourceSettings(source);
       return;
     }
     setBrowsedKey(source.key);
@@ -882,6 +885,7 @@ export function ModelSelectorDrawer({
           scrollTabIntoView();
         }}
         onPress={() => handleSelectSource(source)}
+        onLongPress={() => openSourceSettings(source)}
         style={pressStyle(styles.tab, "subtle")}
       >
         <Text

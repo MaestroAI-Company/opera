@@ -14,6 +14,8 @@ export type GridCard = {
   error?: boolean;
   //0 to 1, the card itself fills with the primary color
   progress?: number;
+  //red tile of a picked choice
+  selected?: boolean;
   disabled?: boolean;
   onPress?: () => void;
 };
@@ -54,7 +56,10 @@ export default function CardGrid({ cards, minCardWidth, singleLineTitle, style }
           <Pressable
             key={card.key}
             disabled={card.disabled || !card.onPress}
-            style={pressStyle([styles.card, { width: cardWidth, flexGrow: 1 }, lone && styles.cardWide], "surface")}
+            style={pressStyle(
+              [styles.card, { width: cardWidth, flexGrow: 1 }, lone && styles.cardWide, card.selected && styles.cardSelected],
+              card.selected ? "primary" : "surface",
+            )}
             onPress={() => {
               Vibration.vibrate(8);
               card.onPress?.();
@@ -69,11 +74,11 @@ export default function CardGrid({ cards, minCardWidth, singleLineTitle, style }
             {card.icon && <Image source={card.icon} style={styles.icon} tintColor={Colors.textPrimary} />}
             <View style={styles.titleRow}>
               {card.badge && <Image source={card.badge} style={styles.badge} tintColor={Colors.textMuted} />}
-              <Text style={styles.title} numberOfLines={singleLineTitle ? 1 : 2}>
+              <Text style={[styles.title, card.selected && styles.titleSelected]} numberOfLines={singleLineTitle ? 1 : 2}>
                 {card.title}
               </Text>
             </View>
-            <Text style={[styles.status, card.error && styles.error]} numberOfLines={1}>
+            <Text style={[styles.status, card.error && styles.error, card.selected && styles.titleSelected]} numberOfLines={1}>
               {card.status}
             </Text>
           </Pressable>
@@ -112,6 +117,13 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     cardWide: {
       minHeight: 70,
+    },
+    cardSelected: {
+      backgroundColor: Colors.primary,
+      borderColor: Colors.borderOnPrimary,
+    },
+    titleSelected: {
+      color: Colors.textOnPrimary,
     },
     icon: {
       width: 32,

@@ -21,7 +21,7 @@ import NotificationModal from "../ui/NotificationModal";
 import ProgressBar from "../ui/ProgressBar";
 
 const binIcon = require("../../../assets/icons/bin.png");
-const cloudIcon = require("../../../assets/icons/cloud.png");
+const cloudIcon = require("../../../assets/icons/cloud2.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 const cancelIcon = require("../../../assets/icons/cancel.png");
 

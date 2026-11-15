@@ -3,7 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   BackHandler,
@@ -23,20 +23,22 @@ import {
   type ImageSourcePropType,
   type StyleProp,
   type TextStyle,
-  type ViewStyle,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../constants/theme";
 import ButterflyCluster from "../components/features/ButterflyCluster";
 import DrawerSheet, { SheetScrollView } from "../components/features/DrawerSheet";
+import HubOnboarding, { isHubOnboardingDone } from "../components/features/HubOnboarding";
 import HubPairingSheet from "../components/features/HubPairingSheet";
 import HubProfileSheet from "../components/features/HubProfileSheet";
 import VoiceDownloadSheet from "../components/features/VoiceDownloadSheet";
+import { PersonalityPicker } from "../components/features/PersonalitySheet";
 import VoiceEngineCard from "../components/features/VoiceEngineCard";
 import { VOICE_OPTIONS, selectVoice, useVoice } from "../components/features/maestroButterfly";
 import ActionButton from "../components/ui/ActionButton";
 import Group from "../components/ui/Group";
+import Reveal from "../components/ui/Reveal";
 import IconSelector from "../components/ui/IconSelector";
 import NotificationModal, { type ModalButton } from "../components/ui/NotificationModal";
 import Slider from "../components/ui/Slider";
@@ -53,9 +55,10 @@ import { CLOUD_PROVIDERS, getCloudProviderDefinition } from "../services/cloud/r
 import { LocationService } from "../services/location/LocationService";
 import { Settings } from "../services/settings/SettingsService";
 import { HubSync } from "../services/hub/HubSync";
-import { HubProfile, SamplerHub, PairedHub } from "../services/hub/SamplerHubService";
+import { HubProfile, SamplerHub, PairedHub, NearbyHub } from "../services/hub/SamplerHubService";
 import { TTS_SPEEDS, supportedEngineIds } from "../services/speech/engines";
 import { STT } from "../services/speech/STTService";
+import { TTS } from "../services/speech/TTSService";
 import { pressStyle } from "../components/ui/pressStyle";
 
 const texture2 = require("../../assets/images/texture/texture2.png");
@@ -190,25 +193,6 @@ const PERMISSIONS: PermissionDef[] = isWeb
       ...(Platform.OS === "android" ? [] : [{ id: "photos" as const, icon: photoIcon, request: async () => (await MediaLibrary.requestPermissionsAsync()).granted }]),
       { id: "location", icon: locationIcon, request: requestLocation },
     ];
-
-//staggered fade up on mount
-function Reveal({ delay = 0, style, children }: { delay?: number; style?: StyleProp<ViewStyle>; children: ReactNode }) {
-  const progress = useAnimatedValue(0);
-
-  useEffect(() => {
-    Animated.timing(progress, {
-      toValue: 1,
-      duration: 420,
-      delay,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [progress, delay]);
-
-  const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [14, 0] });
-  return <Animated.View style={[style, { opacity: progress, transform: [{ translateY }] }]}>{children}</Animated.View>;
-}
-
 
 type PhraseCyclerProps = {
   phrases: string[];
@@ -355,6 +339,10 @@ export default function OnboardingPage() {
   const [hubPairingVisible, setHubPairingVisible] = useState(false);
   //the paired sampler whose profile is picked
   const [profileHub, setProfileHub] = useState<PairedHub | null>(null);
+  //hub found by the network search
+  const [nearbyHub, setNearbyHub] = useState<NearbyHub | null>(null);
+  //just joined hub shows setup once
+  const [joinedHub, setJoinedHub] = useState<PairedHub | null>(null);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{
     title?: string;
@@ -446,12 +434,19 @@ export default function OnboardingPage() {
   //the profile brings its conversations and settings back
   const restoreFromHub = async (profile: HubProfile) => {
     setProfileHub(null);
+    setNearbyHub(null);
     showAlert("Sampler", t("cloudSync.syncing"), undefined, { loading: true, messageAlign: "center" });
     try {
       await Settings.set("name", profile.name);
       await HubSync.init();
       await HubSync.joinedProfile();
       await HubSync.syncNow();
+      const hub = await SamplerHub.getPairedHub();
+      if (hub && !(await isHubOnboardingDone(hub.id))) {
+        setAlertVisible(false);
+        setJoinedHub(hub);
+        return;
+      }
       await completeRestore();
     } catch (e) {
       showAlert(t("common.error"), e instanceof Error && e.message ? e.message : t("settings.cloud.unknownError"));
@@ -639,6 +634,14 @@ export default function OnboardingPage() {
     busy.current = false;
   }, [step, contentOpacity]);
 
+  //stop voice test on leave
+  useEffect(
+    () => () => {
+      if (!TTS.getSpeakingId()) TTS.stop();
+    },
+    [],
+  );
+
   //sound and rumble ride the logo animation
   useEffect(() => {
     startupPlayer.play();
@@ -746,6 +749,20 @@ export default function OnboardingPage() {
     </>
   );
 
+  const renderPersonality = () => (
+    <>
+      <Reveal>
+        <Text style={styles.title}>{t("onboarding.personality.title")}</Text>
+      </Reveal>
+      <Reveal delay={100}>
+        <Text style={styles.helpText}>{t("onboarding.personality.subtitle")}</Text>
+      </Reveal>
+      <Reveal delay={200}>
+        <PersonalityPicker />
+      </Reveal>
+    </>
+  );
+
   const renderVoice = () => (
     <>
       <Reveal>
@@ -834,10 +851,14 @@ export default function OnboardingPage() {
     </View>
   );
 
-  const steps = [renderIntro, renderProfile, ...(hasVoiceEngines ? [renderVoice] : []), renderPermissions, renderReady];
+  const steps = [renderIntro, renderProfile, renderPersonality, ...(hasVoiceEngines ? [renderVoice] : []), renderPermissions, renderReady];
 
   const isLast = step === steps.length - 1;
   const ctaLabel = step === 0 ? t("onboarding.welcome.cta") : isLast ? t("onboarding.ready.cta") : t("onboarding.next");
+
+  if (joinedHub) {
+    return <HubOnboarding mode="member" hub={joinedHub} profileName={Settings.getCached().name} onDone={completeRestore} />;
+  }
 
   return (
     <View style={styles.container}>
@@ -1031,14 +1052,23 @@ export default function OnboardingPage() {
           setHubPairingVisible(false);
           setProfileHub(hub);
         }}
+        discover
+        onNearby={(hub) => {
+          setHubPairingVisible(false);
+          setNearbyHub(hub);
+        }}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />
       <HubProfileSheet
-        visible={!!profileHub}
+        visible={!!profileHub || !!nearbyHub}
         hub={profileHub}
+        nearby={profileHub ? null : nearbyHub}
         allowCreate={false}
-        onClose={() => setProfileHub(null)}
+        onClose={() => {
+          setProfileHub(null);
+          setNearbyHub(null);
+        }}
         onDone={restoreFromHub}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}

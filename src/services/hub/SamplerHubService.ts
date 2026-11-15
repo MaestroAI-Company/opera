@@ -16,6 +16,8 @@ export type HubStatus = {
   ctxSize?: number | null;
   keepAlive?: number | null;
   parallel?: number | null;
+  //none on older hubs and empty for n0
+  relays?: string[] | null;
 };
 export type HubDevice = {
   id: string;
@@ -69,7 +71,8 @@ export type HubSettings = {
 };
 export type NearbyHub = { id: string; name: string; addrs: string[] };
 //llama.cpp models on the hub
-export type CatalogModel = { repo: string; file: string; name: string; size: number };
+//set by hubs reading host memory
+export type CatalogModel = { repo: string; file: string; name: string; size: number; fits?: boolean; recommended?: boolean };
 export type ModelRepo = { repo: string; downloads: number };
 export type ModelFile = { file: string; size: number };
 //repo is unknown for files copied by hand
@@ -105,12 +108,15 @@ type NativeHub = {
   pair(deviceKey: string, link: string, deviceName: string, kind: string): Promise<PairedHub>;
   pairWithCode(deviceKey: string, code: string, deviceName: string, kind: string): Promise<PairedHub>;
   invite(deviceKey: string, hub: PairedHub): Promise<HubInvite>;
+  inviteWatch(deviceKey: string, hub: PairedHub): Promise<boolean>;
   qrSvg(text: string, dark: string, light: string): Promise<string>;
   //admin profiles only, older clients lack it
   hubSettings?(deviceKey: string, hub: PairedHub): Promise<HubSettings>;
   setHubSettings?(deviceKey: string, hub: PairedHub, settings: HubSettings): Promise<HubSettings>;
   //browsers cannot use multicast
   nearbyHubs?(deviceKey: string, waitMs: number): Promise<NearbyHub[]>;
+  //only android checks the network
+  localNetworkAvailable?(): Promise<boolean>;
   //hub 0.11.1 and later, desktop for now
   nearbyProfiles?(deviceKey: string, hub: NearbyHub): Promise<HubProfile[]>;
   signIn?(
@@ -141,6 +147,8 @@ type NativeHub = {
   unpair(deviceKey: string, hub: PairedHub): Promise<void>;
   devices(deviceKey: string, hub: PairedHub): Promise<HubDevice[]>;
   renameDevice(deviceKey: string, hub: PairedHub, id: string, name: string): Promise<void>;
+  //admin only, returns the effective name
+  renameHub(deviceKey: string, hub: PairedHub, name: string): Promise<string>;
   removeDevice(deviceKey: string, hub: PairedHub, id: string): Promise<void>;
   push(deviceKey: string, hub: PairedHub, collection: string, records: SyncRecord[]): Promise<void>;
   pull(deviceKey: string, hub: PairedHub, collection: string, since: number): Promise<PullPage>;
@@ -282,6 +290,7 @@ const tauriHub: NativeHub = {
   pairWithCode: (deviceKey, code, deviceName, kind) =>
     invoke('hub_pair_with_code', { deviceKey, code, deviceName, kind }),
   invite: (deviceKey, hub) => invoke('hub_invite', { deviceKey, hub }),
+  inviteWatch: (deviceKey, hub) => invoke('hub_invite_watch', { deviceKey, hub }),
   qrSvg: (text, dark, light) => invoke('hub_qr_svg', { text, dark, light }),
   hubSettings: (deviceKey, hub) => invoke('hub_settings', { deviceKey, hub }),
   setHubSettings: (deviceKey, hub, settings) => invoke('hub_set_settings', { deviceKey, hub, settings }),
@@ -306,6 +315,7 @@ const tauriHub: NativeHub = {
   unpair: (deviceKey, hub) => invoke('hub_unpair', { deviceKey, hub }),
   devices: (deviceKey, hub) => invoke('hub_devices', { deviceKey, hub }),
   renameDevice: (deviceKey, hub, id, name) => invoke('hub_rename_device', { deviceKey, hub, id, name }),
+  renameHub: (deviceKey, hub, name) => invoke('hub_rename_hub', { deviceKey, hub, name }),
   removeDevice: (deviceKey, hub, id) => invoke('hub_remove_device', { deviceKey, hub, id }),
   push: (deviceKey, hub, collection, records) => invoke('hub_push', { deviceKey, hub, collection, records }),
   pull: (deviceKey, hub, collection, since) => invoke('hub_pull', { deviceKey, hub, collection, since }),
@@ -357,10 +367,12 @@ type WebClient = {
   pair(link: string, deviceName: string, kind: string): Promise<PairedHub>;
   pairWithCode(code: string, deviceName: string, kind: string): Promise<PairedHub>;
   invite(hub: PairedHub): Promise<HubInvite>;
+  inviteWatch(hub: PairedHub): Promise<boolean>;
   status(hub: PairedHub): Promise<HubStatus>;
   unpair(hub: PairedHub): Promise<void>;
   devices(hub: PairedHub): Promise<HubDevice[]>;
   renameDevice(hub: PairedHub, id: string, name: string): Promise<void>;
+  renameHub(hub: PairedHub, name: string): Promise<string>;
   removeDevice(hub: PairedHub, id: string): Promise<void>;
   hubSettings(hub: PairedHub): Promise<HubSettings>;
   setHubSettings(hub: PairedHub, settings: HubSettings): Promise<HubSettings>;
@@ -519,11 +531,13 @@ const webHub: NativeHub = {
   pairWithCode: async (deviceKey, code, deviceName, kind) =>
     (await loadWebClient(deviceKey)).pairWithCode(code, deviceName, kind),
   invite: async (deviceKey, hub) => (await loadWebClient(deviceKey)).invite(hub),
+  inviteWatch: async (deviceKey, hub) => (await loadWebClient(deviceKey)).inviteWatch(hub),
   qrSvg: async (text, dark, light) => (await loadWebModule()).qrSvg(text, dark, light),
   status: async (deviceKey, hub) => (await loadWebClient(deviceKey)).status(hub),
   unpair: async (deviceKey, hub) => (await loadWebClient(deviceKey)).unpair(hub),
   devices: async (deviceKey, hub) => (await loadWebClient(deviceKey)).devices(hub),
   renameDevice: async (deviceKey, hub, id, name) => (await loadWebClient(deviceKey)).renameDevice(hub, id, name),
+  renameHub: async (deviceKey, hub, name) => (await loadWebClient(deviceKey)).renameHub(hub, name),
   removeDevice: async (deviceKey, hub, id) => (await loadWebClient(deviceKey)).removeDevice(hub, id),
   //the hub only answers admin profiles
   hubSettings: async (deviceKey, hub) => (await loadWebClient(deviceKey)).hubSettings(hub),
@@ -815,6 +829,10 @@ class SamplerHubServiceImpl {
     return this.native().invite(await this.deviceKey(), hub);
   }
 
+  async inviteWatch(hub: PairedHub): Promise<boolean> {
+    return this.native().inviteWatch(await this.deviceKey(), hub);
+  }
+
   async qrSvg(text: string, dark: string, light: string): Promise<string> {
     return this.native().qrSvg(text, dark, light);
   }
@@ -827,6 +845,12 @@ class SamplerHubServiceImpl {
   async nearbyHubs(waitMs = NEARBY_WAIT_MS): Promise<NearbyHub[]> {
     const nearby = this.native().nearbyHubs;
     return nearby ? nearby(await this.deviceKey(), waitMs) : [];
+  }
+
+  //false on android without wifi
+  async localNetworkAvailable(): Promise<boolean> {
+    const check = native?.localNetworkAvailable;
+    return check && Platform.OS === 'android' ? check() : true;
   }
 
   canSignIn(): boolean {
@@ -991,7 +1015,18 @@ class SamplerHubServiceImpl {
 
 
   async status(hub: PairedHub): Promise<HubStatus> {
-    return this.native().status(await this.deviceKey(), hub);
+    const status = await this.native().status(await this.deviceKey(), hub);
+    //keeps reaching a hub that moved relay
+    const relays = status.relays;
+    if (relays) {
+      const paired = await this.getPairedHub();
+      if (paired?.id === hub.id && relays.join() !== paired.relays.join()) {
+        await setSecret(PAIRED_HUB_KEY, JSON.stringify({ ...paired, relays }));
+      }
+    }
+    //hub may be renamed elsewhere
+    if (status.name && status.name !== hub.name) await this.keepHubName(hub, status.name);
+    return status;
   }
 
   async devices(hub: PairedHub): Promise<HubDevice[]> {
@@ -1000,6 +1035,13 @@ class SamplerHubServiceImpl {
 
   async renameDevice(hub: PairedHub, id: string, name: string): Promise<void> {
     return this.native().renameDevice(await this.deviceKey(), hub, id, name);
+  }
+
+  //admin only, empty resets to hostname
+  async renameHub(hub: PairedHub, name: string): Promise<string> {
+    const effective = await this.native().renameHub(await this.deviceKey(), hub, name);
+    await this.keepHubName(hub, effective);
+    return effective;
   }
 
   //it loses access at once
@@ -1102,6 +1144,11 @@ class SamplerHubServiceImpl {
   async forget(): Promise<void> {
     await setSecret(PAIRED_HUB_KEY, null);
     await this.forgetProfile();
+  }
+
+  private async keepHubName(hub: PairedHub, name: string): Promise<void> {
+    const stored = await this.getPairedHub();
+    if (stored?.id === hub.id) await setSecret(PAIRED_HUB_KEY, JSON.stringify({ ...stored, name }));
   }
 
   //the key stays only as long as the pairing

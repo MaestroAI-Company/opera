@@ -490,6 +490,10 @@ export default function Index() {
   const modelSelectorProgress = useAnimatedValue(0);
   const [settingsInitialSubPage, setSettingsInitialSubPage] =
     useState<SubPage>("main");
+  const [settingsInitialSheet, setSettingsInitialSheet] = useState<{
+    service: string;
+    url: string;
+  } | null>(null);
   //a hub release waiting for the user
   const [hubUpdate, setHubUpdate] = useState<{
     hub: PairedHub;
@@ -825,6 +829,7 @@ export default function Index() {
   const closeSettings = useCallback(() => {
     setSettingsDrawerVisible(false);
     setSettingsInitialSubPage("main");
+    setSettingsInitialSheet(null);
     const cached = Settings.getCached();
     if (cached.ollamaModel) setSelectedModel(cached.ollamaModel);
     setAiService(cached.aiService);
@@ -2678,6 +2683,7 @@ export default function Index() {
       isDesktop={isDesktop}
       visible={settingsDrawerVisible}
       initialSubPage={settingsInitialSubPage}
+      initialSheet={settingsInitialSheet}
       hubPairLink={hubPairLink}
       onHubPairLinkHandled={() => setHubPairLink(null)}
       onClose={closeSettings}
@@ -3157,16 +3163,11 @@ export default function Index() {
         isDesktop={isDesktop}
         triggerRef={modelTriggerRef}
         messages={messages}
-        onOpenProviderSettings={(provider) => {
+        onOpenProviderSettings={(source) => {
           setModelSelectorVisible(false);
           openDrawerSafely(() => {
-            //built-in models live under on-device
-            const page = (
-              provider === "local" || provider === "litert"
-                ? "litert"
-                : "service"
-            ) as SubPage;
-            setSettingsInitialSubPage(page);
+            setSettingsInitialSubPage("service");
+            setSettingsInitialSheet({ service: source.service, url: source.url });
             setSettingsDrawerVisible(true);
           });
         }}

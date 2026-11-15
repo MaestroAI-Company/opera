@@ -1,6 +1,8 @@
 package __PACKAGE_NAME__
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.provider.Settings
 import com.facebook.react.bridge.Arguments
@@ -62,6 +64,7 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
         status.ctxSize?.let { putDouble("ctxSize", it.toDouble()) }
         status.keepAlive?.let { putDouble("keepAlive", it.toDouble()) }
         status.parallel?.let { putDouble("parallel", it.toDouble()) }
+        status.relays?.let { putArray("relays", Arguments.fromList(it)) }
       }
     }
 
@@ -87,6 +90,11 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
       }
     }
 
+  //true once a device used the code
+  @ReactMethod
+  fun inviteWatch(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) { client(deviceKey).inviteWatch(hubFromMap(hub)) }
+
   @ReactMethod
   fun hubSettings(deviceKey: String, hub: ReadableMap, promise: Promise) =
     launchPromise(promise) { settingsToMap(client(deviceKey).hubSettings(hubFromMap(hub))) }
@@ -107,6 +115,23 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
       )
       settingsToMap(client(deviceKey).setHubSettings(hubFromMap(hub), wanted))
     }
+
+  //mobile data cannot reach local hubs
+  @ReactMethod
+  fun localNetworkAvailable(promise: Promise) {
+    try {
+      val manager = reactApplicationContext.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+      val caps = manager.getNetworkCapabilities(manager.activeNetwork)
+      promise.resolve(
+        caps != null && (
+          caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+        )
+      )
+    } catch (e: Exception) {
+      promise.resolve(false)
+    }
+  }
 
   //android drops multicast without a lock
   @ReactMethod
@@ -210,6 +235,10 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
       client(deviceKey).renameDevice(hubFromMap(hub), id, name)
       null
     }
+
+  @ReactMethod
+  fun renameHub(deviceKey: String, hub: ReadableMap, name: String, promise: Promise) =
+    launchPromise(promise) { client(deviceKey).renameHub(hubFromMap(hub), name) }
 
   @ReactMethod
   fun removeDevice(deviceKey: String, hub: ReadableMap, id: String, promise: Promise) =

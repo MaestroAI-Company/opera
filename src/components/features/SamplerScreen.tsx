@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Animated,
   AppState,
@@ -73,6 +73,8 @@ import DrawerSheet, {
   SheetKeyboardAwareScrollView,
   SheetScrollView,
 } from "./DrawerSheet";
+import IconButton from "../ui/IconButton";
+import HelpSheet, { type HelpSection } from "./HelpSheet";
 import HubDeviceSheet from "./HubDeviceSheet";
 import HubOrbit, { type OrbitNode } from "./HubOrbit";
 import HubSheet from "./HubSheet";
@@ -80,7 +82,10 @@ import HubMcpSection, { HubMcpServerPage } from "./HubMcpSection";
 import HubMcpSheet, { HubFolderSheet } from "./HubMcpSheet";
 import HubModelsSection, { HubModelPage } from "./HubModelsSection";
 import HubModelsSheet from "./HubModelsSheet";
-import HubDetectedSheet from "./HubDetectedSheet";
+import HubOnboarding, {
+  forgetHubOnboarding,
+  isHubOnboardingDone,
+} from "./HubOnboarding";
 import HubPairingSheet from "./HubPairingSheet";
 import HubProfileSheet from "./HubProfileSheet";
 import HubQrSheet from "./HubQrSheet";
@@ -102,6 +107,7 @@ const botIcon = require("../../../assets/icons/bot.png");
 const toolIcon = require("../../../assets/icons/tool.png");
 const settingsIcon = require("../../../assets/icons/settings.png");
 const addIcon = require("../../../assets/icons/add.png");
+const questionIcon = require("../../../assets/icons/question.png");
 const reconnectIcon = require("../../../assets/icons/reconnect.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 const cancelIcon = require("../../../assets/icons/cancel.png");
@@ -279,8 +285,27 @@ export default function SamplerScreen({
     null,
   );
   const [pairingVisible, setPairingVisible] = useState(false);
-  const [detectedHub, setDetectedHub] = useState<NearbyHub | null>(null);
-  const [detectedVisible, setDetectedVisible] = useState(false);
+  //new profiles need the hub code
+  const [pairingWithCode, setPairingWithCode] = useState(false);
+  //sheet opens on create after code
+  const [createAfterPairing, setCreateAfterPairing] = useState(false);
+  const [helpVisible, setHelpVisible] = useState(false);
+  //topic stays through the close animation
+  const [helpTopic, setHelpTopic] = useState<"welcome" | "models" | "mcp">(
+    "welcome",
+  );
+  const openHelp = (topic: "welcome" | "models" | "mcp") => {
+    setHelpTopic(topic);
+    setHelpVisible(true);
+  };
+  const renderHelpButton = (topic: "welcome" | "models" | "mcp") => (
+    <IconButton
+      icon={questionIcon}
+      label={t("settings.help.open")}
+      onPress={() => openHelp(topic)}
+      tintColor={Colors.textPrimary}
+    />
+  );
   //nearby hub the profile sheet signs into
   const [signInHub, setSignInHub] = useState<NearbyHub | null>(null);
   const [qrMode, setQrMode] = useState<"invite" | "link" | null>(null);
@@ -293,6 +318,10 @@ export default function SamplerScreen({
     done: (path: string) => void;
   } | null>(null);
   const [modal, setModal] = useState<Modal | null>(null);
+  //hub first run shows its setup
+  const [onboarding, setOnboarding] = useState<"admin" | "member" | null>(null);
+  const [hubNameDraft, setHubNameDraft] = useState<string | null>(null);
+  const [hubNameError, setHubNameError] = useState<string | null>(null);
 
   //every answer also feeds the graphs
   const receiveStatus = useCallback((next: HubStatus) => {
@@ -358,34 +387,6 @@ export default function SamplerScreen({
     });
     return () => subscription.remove();
   }, [visible, refresh]);
-
-  //one scan per arrival on the unpaired welcome
-  const scannedNearby = useRef(false);
-  useEffect(() => {
-    if (!visible) {
-      scannedNearby.current = false;
-      return;
-    }
-    if (
-      !loaded ||
-      pairedHub ||
-      scannedNearby.current ||
-      !SamplerHub.canDiscover()
-    )
-      return;
-    scannedNearby.current = true;
-    let cancelled = false;
-    SamplerHub.nearbyHubs()
-      .then((found) => {
-        if (cancelled || found.length === 0) return;
-        setDetectedHub(found[0]);
-        setDetectedVisible(true);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [visible, loaded, pairedHub]);
 
   //usage stays live while the screen shows
   useEffect(() => {
@@ -554,6 +555,7 @@ export default function SamplerScreen({
 
   //same as joining from the settings
   const handleProfileDone = (next: HubProfile) => {
+    setCreateAfterPairing(false);
     setProfileSheet(null);
     setProfile(next);
     refresh();
@@ -567,6 +569,30 @@ export default function SamplerScreen({
     HubSync.joinedProfile().catch((e) =>
       console.warn("[HubSync] first sync failed:", e),
     );
+    startOnboarding(next);
+  };
+
+  //first admin device sets up, others join
+  const startOnboarding = async (joined: HubProfile) => {
+    const hub = await SamplerHub.getPairedHub();
+    if (!hub || (await isHubOnboardingDone(hub.id))) return;
+    const devices =
+      joined.role === "admin"
+        ? await SamplerHub.devices(hub).catch(() => null)
+        : null;
+    setOnboarding(devices && devices.length <= 1 ? "admin" : "member");
+  };
+
+  const saveHubName = async () => {
+    if (!pairedHub || hubNameDraft === null) return;
+    try {
+      await SamplerHub.renameHub(pairedHub, hubNameDraft.trim());
+      setHubNameDraft(null);
+      setHubNameError(null);
+      refresh();
+    } catch (e) {
+      setHubNameError(t("settings.hub.renameFailed", { error: message(e) }));
+    }
   };
 
   const changeSettings = async (patch: Partial<HubSettings>) => {
@@ -655,6 +681,7 @@ export default function SamplerScreen({
             setModal((shown) => shown && { ...shown, loading: true });
             await SamplerHub.unpair(pairedHub);
             await HubSync.forgetHub();
+            await forgetHubOnboarding(pairedHub.id);
             closeModal();
             setPage("home");
             setDetail(null);
@@ -1633,13 +1660,13 @@ export default function SamplerScreen({
   };
 
   //the back button floats above, the spacers keep the title centered
-  const renderPageHeader = (title: string) => (
+  const renderPageHeader = (title: string, right?: ReactNode) => (
     <View style={styles.header}>
       <View style={styles.headerSpacer} />
       <Text style={styles.title} numberOfLines={1}>
         {title}
       </Text>
-      <View style={styles.headerSpacer} />
+      <View style={[styles.headerSpacer, styles.headerRight]}>{right}</View>
     </View>
   );
 
@@ -1745,6 +1772,38 @@ export default function SamplerScreen({
   const renderPreferences = () => {
     return (
       <>
+        {/* what devices call this hub */}
+        {online && isAdmin && (
+          <View style={styles.contentCard}>
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <Text style={styles.settingLabel}>
+                {t("settings.hub.renameLabel")}
+              </Text>
+              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                {hubNameError ?? t("settings.hub.renameHelp")}
+              </Text>
+              <Group>
+                <TextInputField
+                  icon={serverIcon}
+                  placeholder={t("settings.hub.name")}
+                  value={hubNameDraft ?? status?.name ?? ""}
+                  onChangeText={setHubNameDraft}
+                  onSubmitEditing={saveHubName}
+                  autoCorrect={false}
+                />
+                <ActionButton
+                  icon={activateIcon}
+                  label={t("settings.hub.renameSave")}
+                  disabled={
+                    hubNameDraft === null || hubNameDraft === status?.name
+                  }
+                  onPress={saveHubName}
+                />
+              </Group>
+            </View>
+          </View>
+        )}
+
         {online && settings && (
           <View style={styles.contentCard}>
             {renderToggleRow(
@@ -1760,6 +1819,25 @@ export default function SamplerScreen({
               settings.updateChecks,
               (value) => changeSettings({ updateChecks: value }),
             )}
+          </View>
+        )}
+
+        {/* only when not the public n0 relays */}
+        {online && !!status?.relays?.length && (
+          <View style={styles.contentCard}>
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <Text style={styles.settingLabel}>
+                {t("settings.hub.customRelay")}
+              </Text>
+              <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+                {t("settings.hub.customRelayHelp")}
+              </Text>
+              <Group style={styles.infoGroup}>
+                {status.relays.map((url) => (
+                  <ActionButton key={url} label={url} />
+                ))}
+              </Group>
+            </View>
           </View>
         )}
 
@@ -1850,8 +1928,8 @@ export default function SamplerScreen({
 
   //open sheets keep the back press for themselves
   const sheetOpen =
+    helpVisible ||
     pairingVisible ||
-    detectedVisible ||
     profileSheet !== null ||
     qrMode !== null ||
     selectedDeviceId !== null ||
@@ -1973,7 +2051,12 @@ export default function SamplerScreen({
             if (width > 0 && width !== pageWidth) setPageWidth(width);
           }}
         >
-          {renderPageHeader(pageTitles[shown])}
+          {renderPageHeader(
+            pageTitles[shown],
+            shown === "models" || shown === "mcp"
+              ? renderHelpButton(shown)
+              : undefined,
+          )}
           {renderPageContent(shown)}
         </View>
       </KeyboardAwareScrollView>
@@ -2045,7 +2128,10 @@ export default function SamplerScreen({
           <View style={styles.welcomeAction}>
             <Pressable
               style={pressStyle(styles.welcomePill, "surface")}
-              onPress={() => setPairingVisible(true)}
+              onPress={() => {
+                setPairingWithCode(false);
+                setPairingVisible(true);
+              }}
             >
               <Text style={styles.welcomePillText}>{t("sampler.linkHub")}</Text>
             </Pressable>
@@ -2069,7 +2155,10 @@ export default function SamplerScreen({
           </Pressable>
           <Pressable
             style={styles.welcomeLink}
-            onPress={() => setPairingVisible(true)}
+            onPress={() => {
+              setPairingWithCode(false);
+              setPairingVisible(true);
+            }}
           >
             <Text style={styles.welcomeLinkText}>{t("sampler.linkHub")}</Text>
           </Pressable>
@@ -2080,7 +2169,22 @@ export default function SamplerScreen({
 
   //the nav and pages need the hub up and a profile
   //a stopped hub may still answer for a moment
-  const ready = !!pairedHub && !!profile && online && !hubStopped;
+  const helpCards: Record<"welcome" | "models" | "mcp", HelpSection[][]> = {
+    welcome: [
+      [{ body: t("sampler.helpIntro") }],
+      [
+        ...(canHost
+          ? [{ title: t("sampler.startHosting"), body: t("sampler.helpHost") }]
+          : []),
+        { title: t("sampler.linkHub"), body: t("sampler.helpLink") },
+      ],
+    ],
+    models: [[{ body: t("sampler.helpModels") }]],
+    mcp: [[{ body: t("sampler.helpMcp") }]],
+  };
+
+  const hubUp = !!pairedHub && !!profile && online && !hubStopped;
+  const ready = hubUp && !onboarding;
   const { dockedWidth, resizeResponder } = useDockedWidth();
 
   useEffect(() => {
@@ -2384,37 +2488,68 @@ export default function SamplerScreen({
                   renderPage={renderScrollPage}
                 />
               </View>
+            ) : hubUp && onboarding && pairedHub && profile ? (
+              <HubOnboarding
+                mode={onboarding}
+                hub={pairedHub}
+                profileName={profile.name}
+                status={status}
+                settings={settings}
+                onChangeSettings={changeSettings}
+                topInset={contentTop - 44}
+                onDone={() => {
+                  setOnboarding(null);
+                  refresh();
+                }}
+              />
             ) : (
-              renderWelcome()
+              <>
+                {renderWelcome()}
+                {!pairedHub && (
+                  <View
+                    style={[styles.welcomeHelpButton, { top: contentTop }]}
+                    pointerEvents="box-none"
+                  >
+                    {renderHelpButton("welcome")}
+                  </View>
+                )}
+              </>
             ))}
         </Animated.View>
       </View>
 
       {!isDesktop && mobileDrawer}
 
-      <HubDetectedSheet
-        visible={detectedVisible}
-        hub={detectedHub}
-        onClose={() => setDetectedVisible(false)}
-        onLink={(hub) => {
-          setDetectedVisible(false);
-          //older clients still pair with a code
-          if (!SamplerHub.canSignIn()) return setPairingVisible(true);
-          setSignInHub(hub);
-          setProfileSheet("pick");
-        }}
+      <HelpSheet
+        visible={helpVisible}
+        onClose={() => setHelpVisible(false)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
+        title={
+          helpTopic === "welcome"
+            ? t("sampler.switch.sampler")
+            : pageTitles[helpTopic]
+        }
+        cards={helpCards[helpTopic]}
       />
+
       <HubPairingSheet
         visible={pairingVisible}
         onClose={() => setPairingVisible(false)}
         onPaired={() => {
           setPairingVisible(false);
           refresh();
+          setCreateAfterPairing(pairingWithCode);
           setProfileSheet("pick");
         }}
         pairedHub={pairedHub}
+        discover
+        onNearby={(hub) => {
+          setPairingVisible(false);
+          setSignInHub(hub);
+          setProfileSheet("pick");
+        }}
+        startWithCode={pairingWithCode}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />
@@ -2424,6 +2559,8 @@ export default function SamplerScreen({
         nearby={pairedHub ? null : signInHub}
         onCreateWithCode={() => {
           setProfileSheet(null);
+          setSignInHub(null);
+          setPairingWithCode(true);
           setPairingVisible(true);
         }}
         profile={selectedProfile ?? profile}
@@ -2432,8 +2569,10 @@ export default function SamplerScreen({
         isSelf={!selectedProfile || selectedProfile.id === profile?.id}
         canManage={isAdmin}
         changePassword={profileSheet === "password"}
+        startOnCreate={createAfterPairing}
         defaultName={Settings.getCached().name}
         onClose={() => {
+          setCreateAfterPairing(false);
           setProfileSheet(null);
           setSelectedProfile(null);
         }}
@@ -2663,6 +2802,12 @@ const makeStyles = (Colors: ThemeColors) =>
       maxWidth: PAGE_MAX_WIDTH,
       alignSelf: "center",
     },
+    welcomeHelpButton: {
+      position: "absolute",
+      right: Spacing.xl2,
+      alignItems: "flex-end",
+      zIndex: 100,
+    },
     welcome: {
       flex: 1,
       justifyContent: "center",
@@ -2718,6 +2863,10 @@ const makeStyles = (Colors: ThemeColors) =>
       justifyContent: "space-between",
       marginBottom: Spacing.xxxl,
       minHeight: 40,
+    },
+    headerRight: {
+      alignItems: "flex-end",
+      justifyContent: "center",
     },
     headerSpacer: {
       width: 40,

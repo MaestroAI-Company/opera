@@ -117,6 +117,15 @@ pub async fn hub_invite(
 }
 
 #[tauri::command]
+pub async fn hub_invite_watch(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<bool, HubError> {
+    state.client(&device_key).await?.invite_watch(hub).await
+}
+
+#[tauri::command]
 pub async fn hub_settings(
     state: State<'_, HubState>,
     device_key: String,
@@ -334,6 +343,18 @@ pub async fn hub_rename_device(
 ) -> Result<(), HubError> {
     let client = state.client(&device_key).await?;
     client.rename_device(hub, id, name).await
+}
+
+//empty name resets to the hostname
+#[tauri::command]
+pub async fn hub_rename_hub(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    name: String,
+) -> Result<String, HubError> {
+    let client = state.client(&device_key).await?;
+    client.rename_hub(hub, name).await
 }
 
 #[tauri::command]
@@ -774,5 +795,5 @@ pub async fn hub_host_pairing_link() -> Result<String, String> {
 //the name other devices see
 #[tauri::command]
 pub fn hub_computer_name() -> String {
-    config::Config::default().hub_name()
+    sampler_hub::name::hostname()
 }

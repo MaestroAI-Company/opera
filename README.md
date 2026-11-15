@@ -11,7 +11,7 @@
 
   <p>
     <img alt="platform" src="https://img.shields.io/badge/platform-Android%20%7C%20Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-FF1A1A?style=flat-square">
-    <img alt="Expo" src="https://img.shields.io/badge/Expo-SDK%2057-000020?style=flat-square&logo=expo&logoColor=white">
+    <img alt="Expo" src="https://img.shields.io/badge/Expo-SDK%2058-000020?style=flat-square&logo=expo&logoColor=white">
     <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white">
     <img alt="License" src="https://img.shields.io/badge/license-AGPLv3-333333?style=flat-square">
   </p>
@@ -65,6 +65,7 @@ Pair your phone, tablet and computer with your own [Sampler Hub](https://github.
 | Desktop | Windows, macOS and Linux |
 | Rich replies | Markdown with KaTeX math and code highlighting, citations, reply suggestions; weather, maps, HTML and Mermaid widgets |
 | Sync & backup |Nextcloud/Google Drive sync encrypted with a PIN, local JSON export / import |
+| Sampler Hub | pair with your own [Sampler Hub](https://github.com/MaestroAI-Company/sampler-hub) by QR code or one-time code, share its models and live voice across your devices, hub profiles that follow you on every device |
 | Sharing | conversations shared as encrypted [PrivateBin](https://privatebin.info) links, key kept in the URL fragment, instance configurable |
 | Incognito mode | conversations that are never written to history |
 | Languages | English, French |
@@ -73,19 +74,21 @@ Pair your phone, tablet and computer with your own [Sampler Hub](https://github.
 
 | Layer | Technology |
 |---|---|
-| Mobile / Web UI | Expo (SDK 57), React Native, `expo-router`, React 19 |
+| Mobile / Web UI | Expo (SDK 58), React Native 0.88, `expo-router`, React 19.3 |
+| Desktop | Tauri 2.11 (Rust) |
+| Hub client | `sampler-hub-client` (Rust, prebuilt for Android and web, version pinned in `sampler-hub-client.json`) |
 | Local database | SQLite (`expo-sqlite`) |
 | On-device AI | LiteRT-LM (`react-native-litert-lm`), Android AICore (Gemini Nano), ExecuTorch (on-screen object detection), Whisper via `@xenova/transformers` (web) |
 | Native Android | Kotlin / Java (voice interaction service, overlay, screen capture, text selection, AICore bridge) |
 | Crypto | `react-native-quick-crypto` / WebCrypto |
-| Language | TypeScript, strict |
+| Language | TypeScript 6, strict |
 
 <details>
 <summary><strong>Project structure</strong></summary>
 
 ```
 src/
-  app/                 expo-router screens (chat, onboarding, oauth redirects)
+  app/                 expo-router screens (chat, onboarding, standby, oauth redirects)
   components/
     features/          feature UI (chat, drawers, overlay, settings sheets…)
     ui/                design-system primitives (buttons, inputs, cards…)
@@ -100,6 +103,9 @@ src/
     overlay/           screen capture, text selection, object detection
     documents/         PDF / DOCX extraction
     share/             PrivateBin share links
+    hub/               Sampler Hub client, pairing and sync
+    desktop/           Tauri desktop bridges
+    search/, widgets/  web search and widget data
     settings/, notifications/, updates/, ...
   hooks/               shared hooks
   i18n/                en / fr catalogs
@@ -108,7 +114,7 @@ constants/             design tokens (theme.ts) and system prompts
 native/android/        native Kotlin/Java modules (assistant service, overlay, screen capture)
 plugins/               custom Expo config plugins
 src-tauri/             desktop shell
-design/                design system rules (DESIGN.md)
+DESIGN.md              design system rules
 assets/                icons, images, fonts, animations, on-device models
 ```
 
@@ -140,6 +146,15 @@ npm run android:preview   # release build (R8, bundled JS, no Metro) for testing
 ```
 
 Both share the same app slot and data, so downloaded models survive switching between them. Once installed, JS-only changes just need `npm start` and opening Opera Dev; rebuild only after native changes (plugins, `app.json`, Kotlin modules, native deps).
+
+**Sampler Hub client** - builds use the hub client release pinned in `sampler-hub-client.json` (and the same tag in `src-tauri/Cargo.toml`). To test changes to the hub, build it from the `sampler-hub` repo next to this one (or `SAMPLER_HUB_DIR`) instead. Android needs Rust with `cargo-ndk` and the `aarch64-linux-android` target:
+
+```bash
+npm run android:hub   # Android with the hub client built from source
+npm run desktop:hub   # Opera Desktop on the local hub crates
+```
+
+A throwaway hub to pair with is described in the Sampler Hub README.
 
 Then, only if you need it:
 

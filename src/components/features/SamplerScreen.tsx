@@ -1,5 +1,12 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ReactNode,
+  Ref,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   Animated,
   AppState,
@@ -14,7 +21,11 @@ import {
   Text,
   View,
 } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import {
+  KeyboardAwareScrollView,
+  KeyboardAwareScrollViewRef,
+} from "react-native-keyboard-controller";
+import { useAnimatedRef } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   FontSizes,
@@ -62,6 +73,7 @@ import ActionButton from "../ui/ActionButton";
 import CardGrid, { type GridCard } from "../ui/CardGrid";
 import FloatingButton from "../ui/FloatingButton";
 import Group from "../ui/Group";
+import IconButton from "../ui/IconButton";
 import MetricChart, { CHART_POINTS } from "../ui/MetricChart";
 import NotificationModal, { type ModalButton } from "../ui/NotificationModal";
 import Slider from "../ui/Slider";
@@ -73,11 +85,10 @@ import DrawerSheet, {
   SheetKeyboardAwareScrollView,
   SheetScrollView,
 } from "./DrawerSheet";
-import IconButton from "../ui/IconButton";
 import HelpSheet, { type HelpSection } from "./HelpSheet";
+import HomeAddSheet from "./HomeAddSheet";
+import HomeSections from "./HomeSections";
 import HubDeviceSheet from "./HubDeviceSheet";
-import HubOrbit, { type OrbitNode } from "./HubOrbit";
-import HubSheet from "./HubSheet";
 import HubMcpSection, { HubMcpServerPage } from "./HubMcpSection";
 import HubMcpSheet, { HubFolderSheet } from "./HubMcpSheet";
 import HubModelsSection, { HubModelPage } from "./HubModelsSection";
@@ -86,9 +97,11 @@ import HubOnboarding, {
   forgetHubOnboarding,
   isHubOnboardingDone,
 } from "./HubOnboarding";
+import HubOrbit, { type OrbitNode } from "./HubOrbit";
 import HubPairingSheet from "./HubPairingSheet";
 import HubProfileSheet from "./HubProfileSheet";
 import HubQrSheet from "./HubQrSheet";
+import HubSheet from "./HubSheet";
 import PageStack from "./PageStack";
 import ProfileCard from "./ProfileCard";
 import {
@@ -100,27 +113,36 @@ import {
   settleDrawer,
   useDockedWidth,
 } from "./drawerAnimation";
+import { setHomeEditing, useHomeEditing } from "./homeEditing";
 
 const homeIcon = require("../../../assets/icons/home.png");
 const profilIcon = require("../../../assets/icons/profil.png");
+const profil2Icon = require("../../../assets/icons/profil2.png");
 const botIcon = require("../../../assets/icons/bot.png");
+const bot2Icon = require("../../../assets/icons/bot2.png");
 const toolIcon = require("../../../assets/icons/tool.png");
 const settingsIcon = require("../../../assets/icons/settings.png");
 const addIcon = require("../../../assets/icons/add.png");
+const add2Icon = require("../../../assets/icons/add2.png");
 const questionIcon = require("../../../assets/icons/question.png");
 const reconnectIcon = require("../../../assets/icons/reconnect.png");
 const downloadIcon = require("../../../assets/icons/download.png");
+const validIcon = require("../../../assets/icons/valid.png");
+const sampler2Icon = require("../../../assets/icons/sampler2.png");
 const cancelIcon = require("../../../assets/icons/cancel.png");
 const binIcon = require("../../../assets/icons/bin.png");
 const serverIcon = require("../../../assets/icons/server.png");
+const server2Icon = require("../../../assets/icons/server2.png");
 const operaIcon = require("../../../assets/icons/operaicon.png");
 const messageIcon = require("../../../assets/icons/message.png");
 const timeIcon = require("../../../assets/icons/time.png");
 const tilesIcon = require("../../../assets/icons/tiles.png");
 const quickIcon = require("../../../assets/icons/Quick.png");
+const quick2Icon = require("../../../assets/icons/quick2.png");
 const stopIcon = require("../../../assets/icons/stop.png");
 const activateIcon = require("../../../assets/icons/activate.png");
 const pencilIcon = require("../../../assets/icons/pencil.png");
+const editIcon = require("../../../assets/icons/edit.png");
 const rightArrowIcon = require("../../../assets/icons/right.png");
 
 const HUB_DEVICE_ICONS: Record<string, ImageSourcePropType> = {
@@ -152,6 +174,19 @@ const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 //title bar, then the top bar and its padding
 const CONTENT_TOP = (isTauri ? 32 : 0) + 60 + Spacing.xl2;
+
+//cards the home can show, a new home starts with the first two
+const HOME_SECTIONS = [
+  "orbit",
+  "profiles",
+  "performance",
+  "models",
+  "hub",
+] as const;
+type HomeSection = (typeof HOME_SECTIONS)[number];
+const DEFAULT_HOME_SECTIONS: HomeSection[] = ["orbit", "profiles"];
+//layout stays on this device, out of the cloud sync
+const HOME_SECTIONS_KEY = "samplerHomeSections";
 
 type Page =
   | "home"
@@ -243,6 +278,8 @@ export default function SamplerScreen({
     title: string;
   } | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  //the home page scrolls itself while a section is dragged near an edge
+  const homeScrollRef = useAnimatedRef<ScrollView>();
   const [drawerScrolled, setDrawerScrolled] = useState(false);
   const [stackWidth, setStackWidth] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -312,6 +349,11 @@ export default function SamplerScreen({
   const [signInHub, setSignInHub] = useState<NearbyHub | null>(null);
   const [qrMode, setQrMode] = useState<"invite" | "link" | null>(null);
   const [hubSheetVisible, setHubSheetVisible] = useState(false);
+  const [homeSections, setHomeSections] = useState<HomeSection[]>(
+    DEFAULT_HOME_SECTIONS,
+  );
+  const homeEditing = useHomeEditing();
+  const [homeSheetVisible, setHomeSheetVisible] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [modelsSheetVisible, setModelsSheetVisible] = useState(false);
   const [mcpSheetVisible, setMcpSheetVisible] = useState(false);
@@ -325,6 +367,28 @@ export default function SamplerScreen({
   const [hubNameDraft, setHubNameDraft] = useState<string | null>(null);
   const [hubNameError, setHubNameError] = useState<string | null>(null);
   const [hubNameSheet, setHubNameSheet] = useState(false);
+
+  useEffect(() => {
+    Settings.getLocal(HOME_SECTIONS_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        const saved: unknown = JSON.parse(raw);
+        if (!Array.isArray(saved)) return;
+        //unknown ids come from another version
+        setHomeSections(
+          saved.filter(
+            (id, index): id is HomeSection =>
+              HOME_SECTIONS.includes(id) && saved.indexOf(id) === index,
+          ),
+        );
+      })
+      .catch(() => {});
+  }, []);
+
+  const changeHomeSections = (next: HomeSection[]) => {
+    setHomeSections(next);
+    Settings.setLocal(HOME_SECTIONS_KEY, JSON.stringify(next)).catch(() => {});
+  };
 
   //every answer also feeds the graphs
   const receiveStatus = useCallback((next: HubStatus) => {
@@ -440,7 +504,9 @@ export default function SamplerScreen({
     visible &&
       online &&
       showModels &&
-      (page === "performance" || page === "models"),
+      (page === "performance" ||
+        page === "models" ||
+        (page === "home" && homeSections.includes("performance"))),
   );
   //every profile's servers on desktop, personal servers on mobile
   const showMcpOverview = isAdmin && SamplerHub.canSeeMcpServers();
@@ -648,7 +714,11 @@ export default function SamplerScreen({
           current: status?.version ?? "",
         }),
         buttons: [
-          { text: t("hubUpdate.later"), style: "secondary", onPress: closeModal },
+          {
+            text: t("hubUpdate.later"),
+            style: "secondary",
+            onPress: closeModal,
+          },
           {
             text: t("hubUpdate.install"),
             onPress: () => {
@@ -784,6 +854,7 @@ export default function SamplerScreen({
   //every page opens at the top
   const openPage = (next: SubPage) => {
     setPage(next);
+    setHomeEditing(false);
     setScrolled(false);
   };
 
@@ -1022,9 +1093,7 @@ export default function SamplerScreen({
   );
 
   const modelsSection = () => (
-    <HubModelsSection
-      onOpenModel={(file, name) => setDetail({ file, name })}
-    />
+    <HubModelsSection onOpenModel={(file, name) => setDetail({ file, name })} />
   );
 
   const myMcpSection = () => (
@@ -1587,11 +1656,81 @@ export default function SamplerScreen({
     );
   };
 
+  //a section the role or the hub cannot show stays saved but hidden
+  const homeCatalog: Record<
+    HomeSection,
+    {
+      icon: ImageSourcePropType;
+      label: string;
+      available: boolean;
+      render: () => ReactNode;
+    }
+  > = {
+    orbit: {
+      icon: sampler2Icon,
+      label: t("sampler.home.orbit"),
+      available: true,
+      render: renderHubOrbit,
+    },
+    profiles: {
+      icon: profil2Icon,
+      label: t("sampler.profiles"),
+      available: true,
+      render: renderProfilesCard,
+    },
+    performance: {
+      icon: quick2Icon,
+      label: t("sampler.performance"),
+      available: isAdmin && status?.memory != null,
+      render: renderPerformance,
+    },
+    models: {
+      icon: bot2Icon,
+      label: t("sampler.home.models"),
+      available: showModels && modelsOn,
+      render: modelsSection,
+    },
+    hub: {
+      icon: server2Icon,
+      label: t("sampler.home.hub"),
+      available: true,
+      render: renderHubCard,
+    },
+  };
+  const shownHome = homeSections.filter((id) => homeCatalog[id].available);
+  const hiddenHome = HOME_SECTIONS.filter(
+    (id) => !homeSections.includes(id) && homeCatalog[id].available,
+  );
+  const homeItem = (id: HomeSection) => ({
+    id,
+    icon: homeCatalog[id].icon,
+    label: homeCatalog[id].label,
+  });
+
+  //the saved list also keeps the sections hidden for now
+  const reorderHome = (ids: string[]) => {
+    let next = 0;
+    changeHomeSections(
+      homeSections.map((id) =>
+        homeCatalog[id].available ? (ids[next++] as HomeSection) : id,
+      ),
+    );
+  };
+
   const renderHome = () => (
-    <>
-      {renderHubOrbit()}
-      {renderProfilesCard()}
-    </>
+    <HomeSections
+      scrollRef={homeScrollRef}
+      topInset={contentTop}
+      bottomInset={isDesktop ? 0 : insets.bottom}
+      sections={shownHome.map((id) => ({
+        id,
+        content: homeCatalog[id].render(),
+      }))}
+      onReorder={reorderHome}
+      onRemove={(id) =>
+        changeHomeSections(homeSections.filter((s) => s !== id))
+      }
+    />
   );
 
   const renderProfiles = () => (
@@ -1671,6 +1810,27 @@ export default function SamplerScreen({
     );
   };
 
+  const renderHomeEditButton = () => (
+    <View style={styles.homeHeaderButtons}>
+      {homeEditing && hiddenHome.length > 0 && (
+        <IconButton
+          icon={add2Icon}
+          label={t("sampler.home.add")}
+          containerSize={40}
+          tintColor={Colors.textPrimary}
+          onPress={() => setHomeSheetVisible(true)}
+        />
+      )}
+      <IconButton
+        icon={homeEditing ? validIcon : editIcon}
+        label={homeEditing ? t("common.done") : t("sampler.home.edit")}
+        containerSize={40}
+        tintColor={Colors.textPrimary}
+        onPress={() => setHomeEditing(!homeEditing)}
+      />
+    </View>
+  );
+
   //the back button floats above, the spacers keep the title centered
   const renderPageHeader = (title: string, right?: ReactNode) => (
     <View style={styles.header}>
@@ -1685,45 +1845,45 @@ export default function SamplerScreen({
   //share, nightly build and llama.cpp options
   const renderModelSettings = () => (
     <>
-        {modelsOn && settings && (
-          <View style={styles.contentCard}>
-            {renderToggleRow(
-              t("settings.hub.shareProviders"),
-              t("settings.hub.shareProvidersHelp"),
-              settings.shareProviders,
-              (value) => changeSettings({ shareProviders: value }),
-              false,
-            )}
-            {renderToggleRow(
-              t("sampler.model.nightly"),
-              t("sampler.model.nightlyHelp"),
-              settings.modelsNightly,
-              (value) => changeSettings({ modelsNightly: value }),
-              !modelsStatus?.build,
-            )}
-            {modelsStatus?.build && (
-              <Group style={styles.infoGroup}>
-                <ActionButton
-                  label={t("sampler.model.build")}
-                  rightElement={
-                    <Text style={styles.infoValue} numberOfLines={1}>
-                      {modelsStatus.build}
-                    </Text>
-                  }
-                />
-                <ActionButton
-                  icon={downloadIcon}
-                  label={t("sampler.model.updateBuild")}
-                  disabled={isHubModelsBusy(modelsStatus)}
-                  onPress={() =>
-                    runHubModels((api) => api.update()).catch(() => {})
-                  }
-                />
-              </Group>
-            )}
-          </View>
-        )}
-        {modelsOn && renderModelOptions()}
+      {modelsOn && settings && (
+        <View style={styles.contentCard}>
+          {renderToggleRow(
+            t("settings.hub.shareProviders"),
+            t("settings.hub.shareProvidersHelp"),
+            settings.shareProviders,
+            (value) => changeSettings({ shareProviders: value }),
+            false,
+          )}
+          {renderToggleRow(
+            t("sampler.model.nightly"),
+            t("sampler.model.nightlyHelp"),
+            settings.modelsNightly,
+            (value) => changeSettings({ modelsNightly: value }),
+            !modelsStatus?.build,
+          )}
+          {modelsStatus?.build && (
+            <Group style={styles.infoGroup}>
+              <ActionButton
+                label={t("sampler.model.build")}
+                rightElement={
+                  <Text style={styles.infoValue} numberOfLines={1}>
+                    {modelsStatus.build}
+                  </Text>
+                }
+              />
+              <ActionButton
+                icon={downloadIcon}
+                label={t("sampler.model.updateBuild")}
+                disabled={isHubModelsBusy(modelsStatus)}
+                onPress={() =>
+                  runHubModels((api) => api.update()).catch(() => {})
+                }
+              />
+            </Group>
+          )}
+        </View>
+      )}
+      {modelsOn && renderModelOptions()}
     </>
   );
 
@@ -1915,6 +2075,7 @@ export default function SamplerScreen({
   //open sheets keep the back press for themselves
   const sheetOpen =
     helpVisible ||
+    homeSheetVisible ||
     pairingVisible ||
     profileSheet !== null ||
     qrMode !== null ||
@@ -2014,6 +2175,12 @@ export default function SamplerScreen({
     <View style={{ flex: 1 }}>
       {/* focused field scrolls just above the keyboard */}
       <KeyboardAwareScrollView
+        //an animated ref is a function ref the types do not know
+        ref={
+          shown === "home"
+            ? (homeScrollRef as unknown as Ref<KeyboardAwareScrollViewRef>)
+            : undefined
+        }
         bottomOffset={Spacing.xl2}
         contentContainerStyle={[
           styles.scroll,
@@ -2041,7 +2208,9 @@ export default function SamplerScreen({
             pageTitles[shown],
             shown === "models" || shown === "mcp"
               ? renderHelpButton(shown)
-              : undefined,
+              : shown === "home"
+                ? renderHomeEditButton()
+                : undefined,
           )}
           {renderPageContent(shown)}
         </View>
@@ -2447,7 +2616,9 @@ export default function SamplerScreen({
                 icon={activateIcon}
                 label={t("settings.hub.renameSave")}
                 variant="highlight"
-                disabled={hubNameDraft === null || hubNameDraft === status?.name}
+                disabled={
+                  hubNameDraft === null || hubNameDraft === status?.name
+                }
                 onPress={saveHubName}
               />
             </Group>
@@ -2726,6 +2897,14 @@ export default function SamplerScreen({
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />
+      <HomeAddSheet
+        visible={homeSheetVisible}
+        choices={hiddenHome.map(homeItem)}
+        onAdd={(id) => changeHomeSections([...homeSections, id as HomeSection])}
+        onClose={() => setHomeSheetVisible(false)}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
       <HubSheet
         visible={hubSheetVisible}
         rows={[
@@ -2749,7 +2928,9 @@ export default function SamplerScreen({
         device={devices?.find((d) => d.id === selectedDeviceId) ?? null}
         hub={pairedHub}
         isSelf={selectedDeviceId === thisDeviceId}
-        ownerName={ownerName(devices?.find((d) => d.id === selectedDeviceId)?.profile)}
+        ownerName={ownerName(
+          devices?.find((d) => d.id === selectedDeviceId)?.profile,
+        )}
         canManage={isAdmin}
         onClose={() => setSelectedDeviceId(null)}
         onChanged={refresh}
@@ -2989,6 +3170,14 @@ const makeStyles = (Colors: ThemeColors) =>
     headerRight: {
       alignItems: "flex-end",
       justifyContent: "center",
+    },
+    //wider than the spacer, it grows to the left
+    homeHeaderButtons: {
+      position: "absolute",
+      right: 0,
+      width: 80,
+      flexDirection: "row",
+      justifyContent: "flex-end",
     },
     headerSpacer: {
       width: 40,

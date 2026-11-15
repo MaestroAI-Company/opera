@@ -16,6 +16,7 @@ import { FontSizes, Fonts, Spacing, ThemeColors } from "../../../constants/theme
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { pressStyle } from "../ui/pressStyle";
+import { useHomeEditing } from "./homeEditing";
 
 //side of one square of the path
 const PIXEL = 3;
@@ -138,20 +139,38 @@ export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true }: 
     return () => turn.removeListener(id);
   }, [turn]);
 
+  //still while the home is edited, the drag has the frames
+  const editing = useHomeEditing();
+
   useEffect(() => {
-    if (!active) return;
-    turn.setValue(0);
-    const loop = Animated.loop(
-      Animated.timing(turn, {
-        toValue: 360,
-        duration: TURN_MS,
-        easing: Easing.linear,
-        useNativeDriver: Platform.OS !== "web",
-      }),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [active, turn]);
+    if (!active || editing) return;
+    const useNativeDriver = Platform.OS !== "web";
+    let loop: Animated.CompositeAnimation | undefined;
+    //a pause keeps the angle, the turn resumes from it
+    const rest = Animated.timing(turn, {
+      toValue: 360,
+      duration: TURN_MS * (1 - angleRef.current / 360),
+      easing: Easing.linear,
+      useNativeDriver,
+    });
+    rest.start(({ finished }) => {
+      if (!finished) return;
+      turn.setValue(0);
+      loop = Animated.loop(
+        Animated.timing(turn, {
+          toValue: 360,
+          duration: TURN_MS,
+          easing: Easing.linear,
+          useNativeDriver,
+        }),
+      );
+      loop.start();
+    });
+    return () => {
+      rest.stop();
+      loop?.stop();
+    };
+  }, [active, editing, turn]);
 
   //more devices need a wider ring
   const baseRadius = Math.max(BASE_RADIUS, (nodes.length * (NODE_SIZE + Spacing.xl2)) / (2 * Math.PI));

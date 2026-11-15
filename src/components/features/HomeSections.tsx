@@ -1,0 +1,439 @@
+import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Image, ScrollView, StyleSheet, Vibration, View } from "react-native";
+import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
+import Animated, {
+  AnimatedRef,
+  Easing,
+  SharedValue,
+  measure as measureView,
+  scrollTo,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useDerivedValue,
+  useFrameCallback,
+  useScrollOffset,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
+import { Spacing } from "../../../constants/theme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useT } from "../../i18n";
+import IconButton from "../ui/IconButton";
+import { setHomeEditing, useHomeEditing } from "./homeEditing";
+
+const binIcon = require("../../../assets/icons/bin.png");
+const gripIcon = require("../../../assets/icons/More.png");
+
+//sections shrink to this while editing, the sides hold the buttons
+const EDIT_SCALE = 0.7;
+const EDIT_MS = 220;
+//the grabbed section grows by this, the buttons stay clear of it
+const LIFT_SCALE = 1.08;
+const LIFT_MS = 150;
+//the others slide aside as the grabbed one passes
+const MAKE_ROOM_MS = 160;
+//a release eases into its slot, no spring so nothing pushes or bounces
+const SETTLE_MS = 220;
+//pull past the first or last slot gets harder as it goes
+const RUBBER_RANGE = 100;
+//a finger this close to the top or bottom edge scrolls the page, faster the closer it is
+const EDGE_ZONE = 90;
+//page speed in px per second with the finger right on the edge
+const EDGE_SPEED = 900;
+//same as the ActionButton icons
+const CONTROL_ICON = 18;
+const CONTROL_SIZE = 36;
+
+//rubber-band curve resists further pull
+const rubberBand = (d: number, dim: number) => {
+  "worklet";
+  const sign = d < 0 ? -1 : 1;
+  return sign * dim * (1 - 1 / (1 + Math.abs(d) / dim));
+};
+
+//height of the slots from one to the other
+const span = (sizes: number[], from: number, to: number) => {
+  "worklet";
+  let total = 0;
+  for (let i = from; i < to; i++) total += sizes[i];
+  return total;
+};
+
+//where the grabbed section is drawn and which slot it is over
+const follow = (sizes: number[], from: number, dy: number) => {
+  "worklet";
+  const top = span(sizes, 0, from);
+  //first and last slot, the pull goes past them with a resistance
+  const inside = Math.max(-top, Math.min(span(sizes, 0, sizes.length) - top - sizes[from], dy));
+  //the leading edge passes a neighbour's middle, so a tall section still reaches the ends
+  const edgeTop = top + inside;
+  const edgeBottom = edgeTop + sizes[from];
+  let to = from;
+  let start = 0;
+  for (let i = 0; i < sizes.length; i++) {
+    const middle = start + sizes[i] / 2;
+    if (i < from && middle > edgeTop) to--;
+    if (i > from && middle < edgeBottom) to++;
+    start += sizes[i];
+  }
+  return { offset: inside + rubberBand(dy - inside, RUBBER_RANGE), to };
+};
+
+const buzz = () => Vibration.vibrate(10);
+
+export type HomeSection = { id: string; content: ReactNode };
+
+//one set for every row, all of it read on the UI thread while a section is dragged
+type DragState = {
+  //0 at rest, 1 once the sections are shrunk
+  progress: SharedValue<number>;
+  //shrunk height of each section, in the order shown
+  sizes: SharedValue<number[]>;
+  //section ids in the order shown, swapped with the reset so both land in one frame
+  order: SharedValue<string[]>;
+  //slot of the grabbed section, -1 when none
+  active: SharedValue<number>;
+  //slot it is over now
+  target: SharedValue<number>;
+  dragY: SharedValue<number>;
+  lift: SharedValue<number>;
+  //a released section is still sliding into its slot
+  settling: SharedValue<boolean>;
+  //finger height on the screen, -1 when nothing is held
+  pointer: SharedValue<number>;
+  //how far the finger moved since the grab
+  travel: SharedValue<number>;
+  //page scroll now and when the grab began
+  scroll: SharedValue<number>;
+  grabScroll: SharedValue<number>;
+};
+
+//the grabbed section follows the finger and the page scrolling under it
+const place = (drag: DragState) => {
+  "worklet";
+  const { sizes, active, target, dragY, travel, scroll, grabScroll } = drag;
+  const placed = follow(sizes.get(), active.get(), travel.get() + scroll.get() - grabScroll.get());
+  dragY.set(placed.offset);
+  if (placed.to === target.get()) return;
+  target.set(placed.to);
+  scheduleOnRN(buzz);
+};
+
+type RowProps = {
+  id: string;
+  content: ReactNode;
+  editing: boolean;
+  drag: DragState;
+  onMeasure: (id: string, height: number) => void;
+  onDrop: (from: number, to: number) => void;
+  onRemove: (id: string) => void;
+};
+
+function HomeSectionRow({ id, content, editing, drag, onMeasure, onDrop, onRemove }: RowProps) {
+  const { progress, order, sizes, active, target, dragY, lift, settling, pointer, travel, scroll, grabScroll } = drag;
+  const styles = useThemedStyles(makeStyles);
+  const Colors = useColors();
+  const t = useT();
+  //natural height, 0 until measured
+  const natural = useSharedValue(0);
+  const slot = useDerivedValue(() => order.get().indexOf(id));
+  const held = useSharedValue(false);
+
+  //the others make room for the grabbed one, a drop puts them back with no motion
+  const shift = useDerivedValue(() => {
+    const from = active.value;
+    if (from < 0) return 0;
+    const me = slot.value;
+    const to = target.value;
+    const size = sizes.value[from] ?? 0;
+    let room = 0;
+    if (from < me && me <= to) room = -size;
+    else if (to <= me && me < from) room = size;
+    return withTiming(room, { duration: MAKE_ROOM_MS });
+  });
+
+  const pan = usePanGesture({
+    enabled: editing,
+    //a grip held still must not take the page scroll, a small pull does
+    activeOffsetY: [-3, 3],
+    onBegin: () => {
+      "worklet";
+      if (settling.get() || active.get() >= 0) return;
+      held.set(true);
+      active.set(slot.get());
+      target.set(slot.get());
+      dragY.set(0);
+      travel.set(0);
+      grabScroll.set(scroll.get());
+      lift.set(withTiming(1, { duration: LIFT_MS }));
+    },
+    onUpdate: (e) => {
+      "worklet";
+      if (!held.get()) return;
+      pointer.set(e.absoluteY);
+      travel.set(e.translationY);
+      place(drag);
+    },
+    onFinalize: () => {
+      "worklet";
+      if (!held.get()) return;
+      held.set(false);
+      //the page stops following the finger
+      pointer.set(-1);
+      settling.set(true);
+      const from = slot.get();
+      const to = target.get();
+      const list = sizes.get();
+      //its slot, from where it started
+      const rest = to > from ? span(list, from + 1, to + 1) : -span(list, to, from);
+      lift.set(withTiming(0, { duration: LIFT_MS }));
+      dragY.set(
+        withTiming(rest, { duration: SETTLE_MS, easing: Easing.out(Easing.cubic) }, () => {
+          "worklet";
+          scheduleOnRN(onDrop, from, to);
+        }),
+      );
+    },
+  });
+
+  //the layout follows the shrunk size, a transform alone leaves a gap
+  const rowStyle = useAnimatedStyle(() => {
+    const dragging = active.value === slot.value;
+    return {
+      marginBottom: -(1 - EDIT_SCALE) * progress.value * natural.value,
+      zIndex: dragging ? 2 : 0,
+      transform: [{ translateY: dragging ? dragY.value : shift.value }],
+    };
+  });
+
+  //one scale shrinks it from the top and grows the grabbed one around its middle
+  const contentStyle = useAnimatedStyle(() => {
+    const shrunk = 1 - (1 - EDIT_SCALE) * progress.value;
+    const grow = active.value === slot.value ? 1 + (LIFT_SCALE - 1) * lift.value : 1;
+    return {
+      transform: [
+        { translateY: ((shrunk * natural.value) / 2) * (1 - grow) },
+        { scale: shrunk * grow },
+      ],
+    };
+  });
+
+  //the buttons fade in and out with the shrink, in the margins it leaves
+  const controlsStyle = useAnimatedStyle(() => ({
+    height: natural.value * (1 - (1 - EDIT_SCALE) * progress.value),
+    opacity: progress.value,
+  }));
+
+  return (
+    <Animated.View style={rowStyle}>
+      <Animated.View
+        pointerEvents={editing ? "none" : "auto"}
+        onLayout={(e) => {
+          natural.set(e.nativeEvent.layout.height);
+          onMeasure(id, e.nativeEvent.layout.height);
+        }}
+        style={[styles.content, contentStyle]}
+      >
+        {content}
+      </Animated.View>
+      <Animated.View
+        pointerEvents={editing ? "box-none" : "none"}
+        accessibilityElementsHidden={!editing}
+        importantForAccessibility={editing ? "auto" : "no-hide-descendants"}
+        style={[styles.controls, controlsStyle]}
+      >
+        <GestureDetector gesture={pan}>
+          <View style={styles.control}>
+            <Image source={gripIcon} style={styles.controlIcon} tintColor={Colors.textPrimary} />
+          </View>
+        </GestureDetector>
+        <IconButton
+          icon={binIcon}
+          label={t("sampler.home.remove")}
+          size={CONTROL_ICON}
+          containerSize={CONTROL_SIZE}
+          tintColor={Colors.textPrimary}
+          onPress={() => onRemove(id)}
+        />
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+type HomeSectionsProps = {
+  sections: HomeSection[];
+  //page scroll view, scrolled when a section is held near its top or bottom
+  scrollRef: AnimatedRef<ScrollView>;
+  //what covers the top and bottom of that scroll view
+  topInset: number;
+  bottomInset: number;
+  onReorder: (ids: string[]) => void;
+  onRemove: (id: string) => void;
+};
+
+//the home sections, shrunk while editing with a grip to reorder and a bin to remove each one
+export default function HomeSections({ sections, scrollRef, topInset, bottomInset, onReorder, onRemove }: HomeSectionsProps) {
+  const editing = useHomeEditing();
+  const progress = useSharedValue(0);
+  const order = useSharedValue<string[]>(sections.map((section) => section.id));
+  const sizes = useSharedValue<number[]>([]);
+  const active = useSharedValue(-1);
+  const target = useSharedValue(-1);
+  const dragY = useSharedValue(0);
+  const lift = useSharedValue(0);
+  const settling = useSharedValue(false);
+  const pointer = useSharedValue(-1);
+  const travel = useSharedValue(0);
+  const grabScroll = useSharedValue(0);
+  const scroll = useScrollOffset(scrollRef);
+  const drag: DragState = { progress, order, sizes, active, target, dragY, lift, settling, pointer, travel, scroll, grabScroll };
+  const heights = useRef<Record<string, number>>({});
+  const sent = useRef("");
+  //the drop is read through this, it lands after the render that reorders
+  const latest = useRef({ sections, onReorder });
+  const reorderSent = useRef(false);
+  //last order sent to the ui thread
+  const pushed = useRef(sections.map((section) => section.id).join());
+  //what each section showed when the edit began, a poll cannot change a height under the drag
+  const [frozen, setFrozen] = useState<{ editing: boolean; contents: Record<string, ReactNode> }>({
+    editing: false,
+    contents: {},
+  });
+  //a section added while editing is frozen as it first shows
+  if (frozen.editing !== editing || (editing && sections.some((section) => !(section.id in frozen.contents)))) {
+    setFrozen({
+      editing,
+      contents: editing
+        ? Object.fromEntries(sections.map((section) => [section.id, frozen.contents[section.id] ?? section.content]))
+        : {},
+    });
+  }
+
+  useEffect(() => {
+    progress.set(withTiming(editing ? 1 : 0, { duration: EDIT_MS }));
+  }, [editing, progress]);
+
+  //a held section near the top or bottom edge brings the page along
+  const edgeScroll = useFrameCallback((frame) => {
+    const y = pointer.get();
+    if (y < 0) return;
+    const box = measureView(scrollRef);
+    if (!box) return;
+    const top = box.pageY + topInset + EDGE_ZONE;
+    const bottom = box.pageY + box.height - bottomInset - EDGE_ZONE;
+    const depth = y < top ? -(top - y) / EDGE_ZONE : y > bottom ? (y - bottom) / EDGE_ZONE : 0;
+    if (depth === 0) return;
+    const dt = Math.min(frame.timeSincePreviousFrame ?? 16, 50) / 1000;
+    const next = scroll.get() + Math.max(-1, Math.min(1, depth)) * EDGE_SPEED * dt;
+    scrollTo(scrollRef, 0, Math.max(0, next), false);
+  }, false);
+
+  useEffect(() => {
+    edgeScroll.setActive(editing);
+  }, [editing, edgeScroll]);
+
+  //the page moved under a held finger, the section moves with it
+  useAnimatedReaction(
+    () => scroll.get(),
+    () => {
+      if (pointer.get() >= 0) place(drag);
+    },
+  );
+
+  //leaving the page ends the edit
+  useEffect(() => () => setHomeEditing(false), []);
+
+  //the drag only reads sizes on the UI thread, they are sent when one changes
+  const sendSizes = () => {
+    const list = latest.current.sections.map((section) => (heights.current[section.id] ?? 0) * EDIT_SCALE);
+    const key = list.join();
+    if (key === sent.current) return;
+    sent.current = key;
+    sizes.set(list);
+  };
+
+  const measure = (id: string, height: number) => {
+    heights.current[id] = height;
+    sendSizes();
+  };
+
+  //one worklet on the ui thread, the new slots and the reset never show apart
+  const rest = (ids: string[]) => {
+    scheduleOnUI(() => {
+      "worklet";
+      order.set(ids);
+      active.set(-1);
+      target.set(-1);
+      dragY.set(0);
+      lift.set(0);
+      settling.set(false);
+    });
+  };
+
+  const drop = (from: number, to: number) => {
+    const ids = latest.current.sections.map((section) => section.id);
+    if (from === to) {
+      rest(ids);
+      return;
+    }
+    ids.splice(to, 0, ...ids.splice(from, 1));
+    reorderSent.current = true;
+    latest.current.onReorder(ids);
+  };
+
+  //the new order is on screen before the dragged section lets go of its offset
+  useLayoutEffect(() => {
+    latest.current = { sections, onReorder };
+    sendSizes();
+    const ids = sections.map((section) => section.id);
+    if (ids.join() === pushed.current && !reorderSent.current) return;
+    pushed.current = ids.join();
+    reorderSent.current = false;
+    rest(ids);
+  });
+
+  return (
+    <>
+      {sections.map((section) => (
+        <HomeSectionRow
+          key={section.id}
+          id={section.id}
+          content={editing ? (frozen.contents[section.id] ?? section.content) : section.content}
+          editing={editing}
+          drag={drag}
+          onMeasure={measure}
+          onDrop={drop}
+          onRemove={onRemove}
+        />
+      ))}
+    </>
+  );
+}
+
+const makeStyles = () =>
+  StyleSheet.create({
+    content: {
+      transformOrigin: "top",
+    },
+    controls: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    control: {
+      width: CONTROL_SIZE,
+      height: CONTROL_SIZE,
+      marginLeft: Spacing.xs,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    controlIcon: {
+      width: CONTROL_ICON,
+      height: CONTROL_ICON,
+    },
+  });

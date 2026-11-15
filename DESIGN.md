@@ -788,6 +788,7 @@ sheetCard: {
 - Pages use the Page, Section, Row and Group structure, with the same `makeStyles` values as `SettingsDrawer.tsx`. Each feature page (models, MCP) opens with a toggle card that turns the feature off for every profile. The feature's content shows inline below it, only while the feature is on.
 - Item pages (a profile, an MCP server) pushed from a tile: info rows in an `infoGroup`, then the actions section.
 - Home gathers the cards of the other pages without their main action (the red Group stays on its own page). From 760px of page width it splits in two columns that fill independently.
+- Home is editable: the pencil `IconButton` in the page header (a check while editing) shrinks the sections to 70% in place (`HomeSections`), each with a grip on its left and a bin on its right, in the margins the shrink leaves. The grip drags a section to reorder it: it grows by 8% around its middle, the others slide aside, a pull past the first or last slot resists like a rubber band, and on release it springs into its slot. While editing, an add `IconButton` sits beside the check and opens `HomeAddSheet`, a DrawerSheet with the hidden sections as a `CardGrid` (24px icons), one tap adds one at the end. The layout is an ordered list of section ids kept on the device (`Settings.setLocal`), so it never syncs. A section the role or the hub cannot show stays saved but hidden.
 - No hub yet, no profile, hub stopped or out of reach: an empty state instead of the sidebar and pages (see Other patterns).
 
 ## Widgets

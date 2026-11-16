@@ -1,10 +1,10 @@
-## Set up your Sampler Hub in a few steps
+## Talk with Maestro live
 
-A new onboarding walks you through your Sampler Hub: it looks for hubs on your network, pairs with one, then suggests models that fit its memory.
+Live mode lets you have a voice conversation with Maestro, right inside your chat. It works with Gemini Live, OpenAI Realtime, or llama.cpp through your Sampler Hub, with optional transcription.
 
-- Rename your hub from Opera.
-- New profiles open straight on the create step after pairing.
-- Without a network, Opera skips the search instead of waiting for it.
-- Pick the Maestro personality from the same sentence in the onboarding and in Settings.
+- Maestro's voice color can now tint the whole app and its launcher icon.
+- Download voice packs with their speed, time left and a cancel button.
+- New home screen widgets: start a discussion or open the camera in one tap, or show your Maestro butterfly.
+- Choose and reorder the cards on the Sampler home. Your layout follows you on every device paired with your hub.
 
-Models shared by a hub now show even when it doesn't share its providers. This needs Sampler Hub 0.14.1, which Opera offers to install.
+This version also hardens tools and widgets: Opera asks before each MCP tool runs, and HTML, Mermaid and math widgets run apart from the app.

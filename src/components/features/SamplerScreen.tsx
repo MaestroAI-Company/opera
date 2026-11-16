@@ -11,6 +11,7 @@ import {
   Animated,
   AppState,
   BackHandler,
+  DeviceEventEmitter,
   Image,
   ImageSourcePropType,
   Keyboard,
@@ -68,6 +69,7 @@ import {
   KEEP_ALIVE_OPTIONS,
   PARALLEL_OPTIONS,
 } from "../../services/hub/modelOptions";
+import { AppEvents } from "../../services/events";
 import { Settings } from "../../services/settings/SettingsService";
 import ActionButton from "../ui/ActionButton";
 import CardGrid, { type GridCard } from "../ui/CardGrid";
@@ -185,7 +187,7 @@ const HOME_SECTIONS = [
 ] as const;
 type HomeSection = (typeof HOME_SECTIONS)[number];
 const DEFAULT_HOME_SECTIONS: HomeSection[] = ["orbit", "profiles"];
-//layout stays on this device, out of the cloud sync
+//layout before it followed the profile
 const HOME_SECTIONS_KEY = "samplerHomeSections";
 
 type Page =
@@ -369,9 +371,9 @@ export default function SamplerScreen({
   const [hubNameSheet, setHubNameSheet] = useState(false);
 
   useEffect(() => {
-    Settings.getLocal(HOME_SECTIONS_KEY)
-      .then((raw) => {
-        if (!raw) return;
+    const read = (raw: string) => {
+      if (!raw) return setHomeSections(DEFAULT_HOME_SECTIONS);
+      try {
         const saved: unknown = JSON.parse(raw);
         if (!Array.isArray(saved)) return;
         //unknown ids come from another version
@@ -381,13 +383,28 @@ export default function SamplerScreen({
               HOME_SECTIONS.includes(id) && saved.indexOf(id) === index,
           ),
         );
+      } catch {}
+    };
+    Settings.load()
+      .then(async (settings) => {
+        if (settings.samplerHomeSections) return read(settings.samplerHomeSections);
+        //older builds kept the layout on device
+        const legacy = await Settings.getLocal(HOME_SECTIONS_KEY);
+        if (!legacy) return;
+        read(legacy);
+        await Settings.set("samplerHomeSections", legacy);
       })
       .catch(() => {});
+    //hub sync brings other devices layout
+    const sub = DeviceEventEmitter.addListener(AppEvents.settingsChanged, () =>
+      read(Settings.getCached().samplerHomeSections),
+    );
+    return () => sub.remove();
   }, []);
 
   const changeHomeSections = (next: HomeSection[]) => {
     setHomeSections(next);
-    Settings.setLocal(HOME_SECTIONS_KEY, JSON.stringify(next)).catch(() => {});
+    Settings.set("samplerHomeSections", JSON.stringify(next)).catch(() => {});
   };
 
   //every answer also feeds the graphs

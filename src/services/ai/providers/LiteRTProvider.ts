@@ -37,8 +37,14 @@ function modelsDirectory(): Directory {
   return new Directory(Paths.document, MODELS_DIR);
 }
 
-//repo id keeps filenames unique
 function localFile(entry: CatalogEntry): File {
+  //remote names must stay in models dir
+  const segments = entry.file.split('/');
+  if (!entry.file || entry.file.includes('\\') || entry.file.startsWith('/')
+    || segments.some((s) => s === '' || s === '.' || s === '..')) {
+    throw new Error(`Invalid model file name: ${entry.file}`);
+  }
+  //repo id keeps filenames unique
   const name = `${entry.repoId.replace(/\//g, '__')}__${entry.file}`;
   return new File(modelsDirectory(), name);
 }

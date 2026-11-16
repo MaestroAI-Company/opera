@@ -3,7 +3,7 @@ import { openExternalUrl } from '../utils/openExternalUrl';
 
 //never open these schemes
 //handled by the send_message tool
-const BLOCKED_SCHEME = /^\s*(javascript|data|file|vbscript|tel|sms|mailto):/i;
+const BLOCKED_SCHEME = /^\s*(javascript|data|file|vbscript|tel|sms|mailto|opera):/i;
 
 export class OpenAppTool implements ITool {
   displayName = 'Open App or Link';

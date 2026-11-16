@@ -1126,6 +1126,9 @@ export const it: Translations = {
   "tools.consent.allow": "Consenti",
   "tools.consent.decline": "Rifiuta",
   "tools.consent.expired": "Questa richiesta è stata interrotta. Chiedi di nuovo per riprovare.",
+  "tools.consent.always": "Consenti sempre",
+  "tools.consent.mcp.title": "Usare {tool}?",
+  "tools.consent.mcp.message": "Maestro vuole eseguire {tool} dal server MCP {server}. Può inviare dati a quel server.",
 
   "settings.mcp.connecting": "Connessione...",
   "settings.mcp.noTools": "Nessuno strumento",

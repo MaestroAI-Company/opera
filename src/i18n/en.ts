@@ -1154,6 +1154,9 @@ export const en = {
   "tools.consent.allow": "Allow",
   "tools.consent.decline": "Decline",
   "tools.consent.expired": "This request was interrupted. Ask again to retry.",
+  "tools.consent.always": "Always allow",
+  "tools.consent.mcp.title": "Use {tool}?",
+  "tools.consent.mcp.message": "Maestro wants to run {tool} from the MCP server {server}. It can send data to that server.",
 
   "settings.mcp.connecting": "Connecting...",
   "settings.mcp.noTools": "No tools",

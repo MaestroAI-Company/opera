@@ -16,6 +16,28 @@ function imageMarkdown(img: PageImage): string {
   return `- ![${alt}](${url})`;
 }
 
+//keeps the model off local and private hosts
+function isBlockedUrl(raw: unknown): boolean {
+  if (typeof raw !== 'string' || !/^https?:\/\//i.test(raw.trim())) return true;
+  let host: string;
+  try {
+    host = new URL(raw.trim()).hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+  } catch {
+    return true;
+  }
+  if (host === 'localhost' || host.endsWith('.localhost')) return true;
+  const v4 = host.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  }
+  if (host.includes(':')) {
+    //mapped v4 hides a private address
+    return host === '::' || host === '::1' || /^f[cd]/.test(host) || /^fe[89ab]/.test(host) || host.startsWith('::ffff:');
+  }
+  return false;
+}
+
 export class FetchPagesTool implements ITool {
   displayName = 'Fetch Pages';
   displayDescription = 'Allow the assistant to read the full content of web pages from search results.';
@@ -55,7 +77,11 @@ export class FetchPagesTool implements ITool {
     //focus keeps the summary on point
     const focus = typeof args.focus === 'string' ? args.focus.trim().slice(0, MAX_FOCUS_LENGTH) : '';
 
-    const targetUrls = urls.slice(0, 2); //max 2 urls
+    const requested = urls.slice(0, 2); //max 2 urls
+    const targetUrls = requested.filter(u => !isBlockedUrl(u));
+    const blocked = requested
+      .filter(u => isBlockedUrl(u))
+      .map(u => ({ url: String(u), content: 'Failed to fetch: this URL is not allowed.' }));
 
     try {
       let results: any[] = [];
@@ -97,9 +123,10 @@ export class FetchPagesTool implements ITool {
         });
         
         results = await Promise.all(fetchPromises);
-      } else {
+      } else if (targetUrls.length > 0) {
         results = await SearchBridge.fetchPages(targetUrls);
       }
+      results = [...results, ...blocked];
 
       //both platforms prefix failures this way
       if (results.every(r => r.content?.startsWith('Failed to'))) {

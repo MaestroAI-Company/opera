@@ -1,3 +1,4 @@
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc;
 use std::time::Duration;
@@ -29,6 +30,31 @@ fn bridge_script(script: &str) -> String {
     )
 }
 
+//blocks local and private network targets
+fn is_public_host(host: &str) -> bool {
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    if host.is_empty() || host == "localhost" || host.ends_with(".localhost") {
+        return false;
+    }
+    //url keeps ipv6 literals in brackets
+    let literal = host.trim_start_matches('[').trim_end_matches(']');
+    match literal.parse::<IpAddr>() {
+        Ok(IpAddr::V4(ip)) => is_public_v4(ip),
+        Ok(IpAddr::V6(ip)) => match ip.to_ipv4_mapped() {
+            Some(mapped) => is_public_v4(mapped),
+            None => {
+                let first = ip.segments()[0];
+                !(ip.is_loopback() || ip.is_unspecified() || first & 0xfe00 == 0xfc00 || first & 0xffc0 == 0xfe80)
+            }
+        },
+        Err(_) => true,
+    }
+}
+
+fn is_public_v4(ip: Ipv4Addr) -> bool {
+    !(ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified())
+}
+
 //run script in a hidden window
 #[tauri::command]
 pub async fn webview_task(
@@ -38,7 +64,13 @@ pub async fn webview_task(
     user_agent: Option<String>,
     timeout_ms: u64,
 ) -> Result<String, String> {
-    let target = url.parse().map_err(|e| format!("invalid url: {e}"))?;
+    let target: tauri::Url = url.parse().map_err(|e| format!("invalid url: {e}"))?;
+    if !matches!(target.scheme(), "http" | "https") {
+        return Err("only http and https urls are allowed".into());
+    }
+    if !is_public_host(target.host_str().unwrap_or("")) {
+        return Err("local and private hosts are not allowed".into());
+    }
     let label = format!("webview-task-{}", COUNTER.fetch_add(1, Ordering::Relaxed));
     let (tx, rx) = mpsc::channel::<String>();
 

@@ -6304,8 +6304,8 @@ dependencies = [
 
 [[package]]
 name = "sampler-hub"
-version = "0.14.1"
-source = "git+https://github.com/MaestroAI-Company/sampler-hub?tag=v0.14.1#b416724230161c617f5145135f10292113cc04b6"
+version = "0.14.2"
+source = "git+https://github.com/MaestroAI-Company/sampler-hub?tag=v0.14.2#41f10cec33b69f9fa87d0bc91ad7b8614425cbf6"
 dependencies = [
  "anyhow",
  "chacha20poly1305",
@@ -6345,8 +6345,8 @@ dependencies = [
 
 [[package]]
 name = "sampler-hub-client"
-version = "0.14.1"
-source = "git+https://github.com/MaestroAI-Company/sampler-hub?tag=v0.14.1#b416724230161c617f5145135f10292113cc04b6"
+version = "0.14.2"
+source = "git+https://github.com/MaestroAI-Company/sampler-hub?tag=v0.14.2#41f10cec33b69f9fa87d0bc91ad7b8614425cbf6"
 dependencies = [
  "anyhow",
  "argon2",
@@ -6382,8 +6382,8 @@ dependencies = [
 
 [[package]]
 name = "sampler-hub-proto"
-version = "0.14.1"
-source = "git+https://github.com/MaestroAI-Company/sampler-hub?tag=v0.14.1#b416724230161c617f5145135f10292113cc04b6"
+version = "0.14.2"
+source = "git+https://github.com/MaestroAI-Company/sampler-hub?tag=v0.14.2#41f10cec33b69f9fa87d0bc91ad7b8614425cbf6"
 dependencies = [
  "anyhow",
  "argon2",

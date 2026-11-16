@@ -24,6 +24,8 @@ export type AppSettings = {
   //local live models mode
   liveTranscription: string;
   maestroButterfly: string;
+  //sampler home cards as a json list
+  samplerHomeSections: string;
   //primary color follows the maestro voice
   applyMaestroColor: boolean;
   maestroMood: string;
@@ -91,6 +93,8 @@ export const BASE_DEFAULTS: AppSettings = {
   liveTranscription: 'ask',
   //empty means the first butterfly
   maestroButterfly: '',
+  //empty means the default cards
+  samplerHomeSections: '',
   applyMaestroColor: false,
   maestroMood: 'neutral',
   maestroStyle: 'common',

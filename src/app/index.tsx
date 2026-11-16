@@ -1711,6 +1711,10 @@ export default function Index() {
       }
       if (route.type === "new-chat") {
         startNewConversation();
+      } else if (route.type === "camera") {
+        //photo goes to the new chat
+        startNewConversation();
+        attachmentsRef.current.openCamera();
       } else if (route.type === "shared") {
         openSharedConversation(route.pasteId, route.secret);
       } else if (route.type === "conversation") {

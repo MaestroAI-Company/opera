@@ -262,7 +262,63 @@
       "expo-image",
       "expo-secure-store",
       "expo-web-browser",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-widgets",
+        {
+          "enableAndroid": true,
+          "widgets": [
+            {
+              "name": "QuickActions",
+              "displayName": "Quick actions",
+              "description": "Start a discussion or open the camera",
+              "ios": {
+                "supportedFamilies": ["systemSmall", "systemMedium"],
+                "initialLayout": "./src/widgets/QuickActions.ios.tsx"
+              },
+              "android": {
+                "targetCellWidth": 2,
+                "targetCellHeight": 2,
+                "minWidth": 110,
+                "minHeight": 110,
+                "resizeMode": "none",
+                "initialLayout": "./src/widgets/QuickActions.android.tsx"
+              }
+            },
+            {
+              "name": "QuickActionsWide",
+              "displayName": "Quick actions (wide)",
+              "description": "Start a discussion or open the camera",
+              "ios": null,
+              "android": {
+                "targetCellWidth": 4,
+                "targetCellHeight": 2,
+                "minWidth": 250,
+                "minHeight": 110,
+                "resizeMode": "none",
+                "initialLayout": "./src/widgets/QuickActions.android.tsx"
+              }
+            },
+            {
+              "name": "Butterfly",
+              "displayName": "Butterfly",
+              "description": "Your Maestro butterfly",
+              "ios": {
+                "supportedFamilies": ["systemSmall", "systemLarge"],
+                "initialLayout": "./src/widgets/Butterfly.ios.tsx"
+              },
+              "android": {
+                "targetCellWidth": 2,
+                "targetCellHeight": 2,
+                "minWidth": 110,
+                "minHeight": 110,
+                "resizeMode": "both",
+                "initialLayout": "./src/widgets/Butterfly.android.tsx"
+              }
+            }
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

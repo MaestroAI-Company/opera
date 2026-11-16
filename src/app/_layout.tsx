@@ -28,6 +28,7 @@ import { initAppIcon } from "../services/appIcon";
 import { installCrashHandler } from "../services/logging/CrashReporter";
 import { installLogger } from "../services/logging/Logger";
 import { setupQuickActions } from "../services/quickActions/QuickActionsService";
+import { initWidgets } from "../services/widgets/WidgetService";
 import "../services/widgets/registerWidgets";
 
 import * as WebBrowser from "expo-web-browser";
@@ -50,6 +51,9 @@ if (typeof window !== "undefined") {
 
   //launcher icon follows the maestro color
   initAppIcon();
+
+  //widgets follow butterfly and accent
+  initWidgets();
 
   //crash reported on next launch
   installCrashHandler();

@@ -102,6 +102,9 @@ function getSnapshot(): MaestroButterflyId {
   return butterflyForPersonality({ maestroMood, maestroStyle, maestroDepth });
 }
 
+//widgets read it outside react
+export { getSnapshot as getMaestroButterflyId };
+
 function subscribe(callback: () => void): () => void {
   //settings page writes through Settings.set
   const sub = DeviceEventEmitter.addListener(AppEvents.settingsChanged, callback);

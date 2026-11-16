@@ -1942,9 +1942,7 @@ export default function Index() {
           };
         } else {
           conv = await DB.createConversation(selectedModel || "unknown", name);
-          setConversations((prev) => [conv!, ...prev]);
         }
-        setActiveConversation(conv);
       }
 
       //save user message immediately
@@ -1995,6 +1993,12 @@ export default function Index() {
         };
       } else {
         assistantMsg = await DB.addMessage(conv.id, "assistant", "…");
+      }
+
+      //the chat opens with its question already in
+      if (isFirstMessage) {
+        if (!isIncognitoTask) setConversations((prev) => [taskConv, ...prev]);
+        setActiveConversation(taskConv);
       }
 
       //both land together, so the view moves once on send

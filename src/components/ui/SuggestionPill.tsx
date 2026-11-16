@@ -5,35 +5,41 @@ import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { pressStyle } from "./pressStyle";
 
-const ENTRANCE_DURATION = 260;
-const ENTRANCE_SCALE = 0.1;
-const ENTRANCE_BOUNCE = 1;
+const ENTRANCE_DURATION = 320;
+const ENTRANCE_DELAY_STEP = 90;
+const ENTRANCE_SCALE = 0.94;
+const ENTRANCE_RISE = 8;
+//barely overshoots
+const ENTRANCE_BOUNCE = 1.1;
 
 export type SuggestionPillProps = {
   icon: ImageSourcePropType;
   label: string;
   onPress: () => void;
   width?: number;
+  //position in the list, staggers the entrance
+  index?: number;
   disabled?: boolean;
 };
 
 //mirror of the source pill
-export default function SuggestionPill({ icon, label, onPress, width, disabled = false }: SuggestionPillProps) {
+export default function SuggestionPill({ icon, label, onPress, width, index = 0, disabled = false }: SuggestionPillProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
 
-  //streaming mounts give free stagger
+  //streaming mounts add their own stagger
   const entrance = useAnimatedValue(0);
   useEffect(() => {
     const animation = Animated.timing(entrance, {
       toValue: 1,
       duration: ENTRANCE_DURATION,
+      delay: index * ENTRANCE_DELAY_STEP,
       easing: Easing.out(Easing.back(ENTRANCE_BOUNCE)),
       useNativeDriver: true,
     });
     animation.start();
     return () => animation.stop();
-  }, [entrance]);
+  }, [entrance, index]);
 
   return (
     <Animated.View
@@ -41,6 +47,7 @@ export default function SuggestionPill({ icon, label, onPress, width, disabled =
         width,
         opacity: entrance.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: "clamp" }),
         transform: [
+          { translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [ENTRANCE_RISE, 0] }) },
           { scale: entrance.interpolate({ inputRange: [0, 1], outputRange: [ENTRANCE_SCALE, 1] }) },
         ],
       }}
@@ -59,12 +66,12 @@ export default function SuggestionPill({ icon, label, onPress, width, disabled =
 
 const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   pill: {
-    flex: 1,
-    alignItems: "flex-start",
+    //grow keeps height auto in a column
+    flexGrow: 1,
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.surface,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: Radius.xxl,
+    borderRadius: Radius.huge,
     padding: Spacing.lg,
     gap: Spacing.md,
   },
@@ -73,6 +80,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     height: 20,
   },
   label: {
+    flex: 1,
     color: Colors.textSecondary,
     fontFamily: Fonts.mono,
     fontSize: FontSizes.label,

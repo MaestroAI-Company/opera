@@ -3,6 +3,7 @@ import { Image, ScrollView, StyleSheet, Vibration, View } from "react-native";
 import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
 import Animated, {
   AnimatedRef,
+  DerivedValue,
   Easing,
   SharedValue,
   measure as measureView,
@@ -30,11 +31,15 @@ const EDIT_SCALE = 0.7;
 const EDIT_MS = 220;
 //the grabbed section grows by this, the buttons stay clear of it
 const LIFT_SCALE = 1.08;
-const LIFT_MS = 150;
+const LIFT_MS = 220;
+//the grow and the shrink overshoot a bit before resting
+const LIFT_BOUNCE = 1;
 //the others slide aside as the grabbed one passes
-const MAKE_ROOM_MS = 160;
-//a release eases into its slot, no spring so nothing pushes or bounces
-const SETTLE_MS = 220;
+const MAKE_ROOM_MS = 260;
+const MAKE_ROOM_BOUNCE = 0.8;
+//a release overshoots its slot then rests, a timing so the drop lands on a known frame
+const SETTLE_MS = 320;
+const SETTLE_BOUNCE = 1.1;
 //pull past the first or last slot gets harder as it goes
 const RUBBER_RANGE = 100;
 //a finger this close to the top or bottom edge scrolls the page, faster the closer it is
@@ -88,10 +93,14 @@ export type HomeSection = { id: string; content: ReactNode };
 type DragState = {
   //0 at rest, 1 once the sections are shrunk
   progress: SharedValue<number>;
+  //shrunk height of each section by id
+  sizeById: SharedValue<Record<string, number>>;
   //shrunk height of each section, in the order shown
-  sizes: SharedValue<number[]>;
-  //section ids in the order shown, swapped with the reset so both land in one frame
+  sizes: DerivedValue<number[]>;
+  //section ids in the order shown, a drop swaps it on the ui thread alone
   order: SharedValue<string[]>;
+  //section ids in the order the views are laid out, it only changes when the edit ends
+  layout: SharedValue<string[]>;
   //slot of the grabbed section, -1 when none
   active: SharedValue<number>;
   //slot it is over now
@@ -126,12 +135,12 @@ type RowProps = {
   editing: boolean;
   drag: DragState;
   onMeasure: (id: string, height: number) => void;
-  onDrop: (from: number, to: number) => void;
+  onDrop: (ids: string[]) => void;
   onRemove: (id: string) => void;
 };
 
 function HomeSectionRow({ id, content, editing, drag, onMeasure, onDrop, onRemove }: RowProps) {
-  const { progress, order, sizes, active, target, dragY, lift, settling, pointer, travel, scroll, grabScroll } = drag;
+  const { progress, order, layout, sizeById, sizes, active, target, dragY, lift, settling, pointer, travel, scroll, grabScroll } = drag;
   const styles = useThemedStyles(makeStyles);
   const Colors = useColors();
   const t = useT();
@@ -139,6 +148,18 @@ function HomeSectionRow({ id, content, editing, drag, onMeasure, onDrop, onRemov
   const natural = useSharedValue(0);
   const slot = useDerivedValue(() => order.get().indexOf(id));
   const held = useSharedValue(false);
+
+  //where the views are laid out and where the order shows it, the gap is its offset
+  const home = useDerivedValue(() => {
+    const me = slot.value;
+    if (me < 0) return 0;
+    const list = layout.value;
+    const byId = sizeById.value;
+    const mine = list.indexOf(id);
+    let laid = 0;
+    for (let i = 0; i < mine; i++) laid += byId[list[i]] ?? 0;
+    return span(sizes.value, 0, me) - laid;
+  });
 
   //the others make room for the grabbed one, a drop puts them back with no motion
   const shift = useDerivedValue(() => {
@@ -150,7 +171,7 @@ function HomeSectionRow({ id, content, editing, drag, onMeasure, onDrop, onRemov
     let room = 0;
     if (from < me && me <= to) room = -size;
     else if (to <= me && me < from) room = size;
-    return withTiming(room, { duration: MAKE_ROOM_MS });
+    return withTiming(room, { duration: MAKE_ROOM_MS, easing: Easing.out(Easing.back(MAKE_ROOM_BOUNCE)) });
   });
 
   const pan = usePanGesture({
@@ -166,7 +187,7 @@ function HomeSectionRow({ id, content, editing, drag, onMeasure, onDrop, onRemov
       dragY.set(0);
       travel.set(0);
       grabScroll.set(scroll.get());
-      lift.set(withTiming(1, { duration: LIFT_MS }));
+      lift.set(withTiming(1, { duration: LIFT_MS, easing: Easing.out(Easing.back(LIFT_BOUNCE)) }));
     },
     onUpdate: (e) => {
       "worklet";
@@ -187,11 +208,20 @@ function HomeSectionRow({ id, content, editing, drag, onMeasure, onDrop, onRemov
       const list = sizes.get();
       //its slot, from where it started
       const rest = to > from ? span(list, from + 1, to + 1) : -span(list, to, from);
-      lift.set(withTiming(0, { duration: LIFT_MS }));
+      lift.set(withTiming(0, { duration: LIFT_MS, easing: Easing.out(Easing.back(LIFT_BOUNCE)) }));
       dragY.set(
-        withTiming(rest, { duration: SETTLE_MS, easing: Easing.out(Easing.cubic) }, () => {
+        withTiming(rest, { duration: SETTLE_MS, easing: Easing.out(Easing.back(SETTLE_BOUNCE)) }, () => {
           "worklet";
-          scheduleOnRN(onDrop, from, to);
+          //the new slots and the reset land in one ui frame, the views never move
+          const next = order.get().slice();
+          next.splice(to, 0, ...next.splice(from, 1));
+          order.set(next);
+          active.set(-1);
+          target.set(-1);
+          dragY.set(0);
+          lift.set(0);
+          settling.set(false);
+          scheduleOnRN(onDrop, next);
         }),
       );
     },
@@ -203,7 +233,7 @@ function HomeSectionRow({ id, content, editing, drag, onMeasure, onDrop, onRemov
     return {
       marginBottom: -(1 - EDIT_SCALE) * progress.value * natural.value,
       zIndex: dragging ? 2 : 0,
-      transform: [{ translateY: dragging ? dragY.value : shift.value }],
+      transform: [{ translateY: home.value + (dragging ? dragY.value : shift.value) }],
     };
   });
 
@@ -277,7 +307,9 @@ export default function HomeSections({ sections, scrollRef, topInset, bottomInse
   const editing = useHomeEditing();
   const progress = useSharedValue(0);
   const order = useSharedValue<string[]>(sections.map((section) => section.id));
-  const sizes = useSharedValue<number[]>([]);
+  const layout = useSharedValue<string[]>(sections.map((section) => section.id));
+  const sizeById = useSharedValue<Record<string, number>>({});
+  const sizes = useDerivedValue(() => order.get().map((id) => sizeById.get()[id] ?? 0));
   const active = useSharedValue(-1);
   const target = useSharedValue(-1);
   const dragY = useSharedValue(0);
@@ -287,28 +319,37 @@ export default function HomeSections({ sections, scrollRef, topInset, bottomInse
   const travel = useSharedValue(0);
   const grabScroll = useSharedValue(0);
   const scroll = useScrollOffset(scrollRef);
-  const drag: DragState = { progress, order, sizes, active, target, dragY, lift, settling, pointer, travel, scroll, grabScroll };
+  const drag: DragState = { progress, order, layout, sizeById, sizes, active, target, dragY, lift, settling, pointer, travel, scroll, grabScroll };
   const heights = useRef<Record<string, number>>({});
   const sent = useRef("");
   //the drop is read through this, it lands after the render that reorders
   const latest = useRef({ sections, onReorder });
-  const reorderSent = useRef(false);
   //last order sent to the ui thread
   const pushed = useRef(sections.map((section) => section.id).join());
-  //what each section showed when the edit began, a poll cannot change a height under the drag
-  const [frozen, setFrozen] = useState<{ editing: boolean; contents: Record<string, ReactNode> }>({
+  //last layout order sent to the ui thread
+  const laidOut = useRef(sections.map((section) => section.id).join());
+  //what each section showed and where it sat when the edit began, a poll cannot change a height under the drag
+  const [frozen, setFrozen] = useState<{ editing: boolean; ids: string[]; contents: Record<string, ReactNode> }>({
     editing: false,
+    ids: [],
     contents: {},
   });
   //a section added while editing is frozen as it first shows
   if (frozen.editing !== editing || (editing && sections.some((section) => !(section.id in frozen.contents)))) {
+    const kept = editing && frozen.editing ? frozen.ids.filter((id) => sections.some((section) => section.id === id)) : [];
     setFrozen({
       editing,
+      ids: editing ? [...kept, ...sections.map((section) => section.id).filter((id) => !kept.includes(id))] : [],
       contents: editing
         ? Object.fromEntries(sections.map((section) => [section.id, frozen.contents[section.id] ?? section.content]))
         : {},
     });
   }
+  //a drop reorders the saved list, the views stay where they were until the edit ends
+  const byId = Object.fromEntries(sections.map((section) => [section.id, section]));
+  const shown = editing && frozen.editing
+    ? frozen.ids.filter((id) => id in byId).concat(sections.map((section) => section.id).filter((id) => !frozen.ids.includes(id)))
+    : sections.map((section) => section.id);
 
   useEffect(() => {
     progress.set(withTiming(editing ? 1 : 0, { duration: EDIT_MS }));
@@ -350,7 +391,7 @@ export default function HomeSections({ sections, scrollRef, topInset, bottomInse
     const key = list.join();
     if (key === sent.current) return;
     sent.current = key;
-    sizes.set(list);
+    sizeById.set(Object.fromEntries(latest.current.sections.map((section, i) => [section.id, list[i]])));
   };
 
   const measure = (id: string, height: number) => {
@@ -358,10 +399,11 @@ export default function HomeSections({ sections, scrollRef, topInset, bottomInse
     sendSizes();
   };
 
-  //one worklet on the ui thread, the new slots and the reset never show apart
-  const rest = (ids: string[]) => {
+  //the saved list changed outside a drop, the order and the reset land in one worklet
+  const rest = (ids: string[], laid: string[]) => {
     scheduleOnUI(() => {
       "worklet";
+      layout.set(laid);
       order.set(ids);
       active.set(-1);
       target.set(-1);
@@ -371,31 +413,34 @@ export default function HomeSections({ sections, scrollRef, topInset, bottomInse
     });
   };
 
-  const drop = (from: number, to: number) => {
-    const ids = latest.current.sections.map((section) => section.id);
-    if (from === to) {
-      rest(ids);
-      return;
-    }
-    ids.splice(to, 0, ...ids.splice(from, 1));
-    reorderSent.current = true;
+  //the ui thread already holds this order, only the saved list needs it
+  const drop = (ids: string[]) => {
+    if (ids.join() === pushed.current) return;
+    pushed.current = ids.join();
     latest.current.onReorder(ids);
   };
 
-  //the new order is on screen before the dragged section lets go of its offset
   useLayoutEffect(() => {
     latest.current = { sections, onReorder };
     sendSizes();
     const ids = sections.map((section) => section.id);
-    if (ids.join() === pushed.current && !reorderSent.current) return;
-    pushed.current = ids.join();
-    reorderSent.current = false;
-    rest(ids);
+    const laid = shown.join();
+    if (ids.join() !== pushed.current) {
+      pushed.current = ids.join();
+      laidOut.current = laid;
+      rest(ids, shown);
+    } else if (laid !== laidOut.current) {
+      laidOut.current = laid;
+      scheduleOnUI(() => {
+        "worklet";
+        layout.set(shown);
+      });
+    }
   });
 
   return (
     <>
-      {sections.map((section) => (
+      {shown.map((id) => byId[id]).map((section) => (
         <HomeSectionRow
           key={section.id}
           id={section.id}

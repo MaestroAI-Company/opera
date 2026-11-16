@@ -33,7 +33,7 @@ const generateMermaidHtml = (rawCode: string) => {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-        mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+        mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'strict' });
 
         async function renderDiagram() {
             try {
@@ -84,7 +84,7 @@ export const MermaidWidget: IWidget<MermaidWidgetData> = {
             <iframe
               srcDoc={html}
               style={{ width: '100%', height: '100%', border: 'none', backgroundColor: 'transparent' }}
-              sandbox="allow-scripts allow-same-origin"
+              sandbox="allow-scripts"
             />
           ) : (
             <WebView

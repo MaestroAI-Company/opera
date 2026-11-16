@@ -18,6 +18,15 @@ import IconButton from "./IconButton";
 import MarkdownImage from "./MarkdownImage";
 import { ensureKatexStylesheet, getKatexCss, KATEX_STYLESHEET_NAME } from "./katexStylesheet";
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 const copyIcon = require("../../../assets/icons/copy.png");
 const fullIcon = require("../../../assets/icons/full.png");
 const downloadIcon = require("../../../assets/icons/download2.png");
@@ -471,7 +480,7 @@ const MathView = React.memo(function MathView({ latex, displayMode, width, incog
       return katex.renderToString(latex, { displayMode, throwOnError: false });
     } catch {
       //malformed latex shows as text
-      return latex;
+      return escapeHtml(latex);
     }
   }, [latex, displayMode]);
 

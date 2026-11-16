@@ -58,6 +58,7 @@ function WebView({ source, onMessage, style }: WebViewProps) {
       ref={iframeRef}
       srcDoc={html}
       title="webview"
+      sandbox="allow-scripts"
       style={{ border: "none", display: "block", ...toCssStyle(style) }}
     />
   );

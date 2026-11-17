@@ -10,7 +10,7 @@
   [maestroai.company](https://maestroai.company)
 
   <p>
-    <img alt="platform" src="https://img.shields.io/badge/platform-Android%20%7C%20Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-FF1A1A?style=flat-square">
+    <img alt="platform" src="https://img.shields.io/badge/platform-Android%20%7C%20iOS%20%7C%20iPadOS%20%7C%20Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-FF1A1A?style=flat-square">
     <img alt="Expo" src="https://img.shields.io/badge/Expo-SDK%2058-000020?style=flat-square&logo=expo&logoColor=white">
     <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white">
     <img alt="License" src="https://img.shields.io/badge/license-AGPLv3-333333?style=flat-square">
@@ -76,7 +76,7 @@ Pair your phone, tablet and computer with your own [Sampler Hub](https://github.
 |---|---|
 | Mobile / Web UI | Expo (SDK 58), React Native 0.88, `expo-router`, React 19.3 |
 | Desktop | Tauri 2.11 (Rust) |
-| Hub client | `sampler-hub-client` (Rust, prebuilt for Android and web, version pinned in `sampler-hub-client.json`) |
+| Hub client | `sampler-hub-client` (Rust, prebuilt for Android, iOS and web, version pinned in `sampler-hub-client.json`) |
 | Local database | SQLite (`expo-sqlite`) |
 | On-device AI | LiteRT-LM (`react-native-litert-lm`), Android AICore (Gemini Nano), ExecuTorch (on-screen object detection), Whisper via `@xenova/transformers` (web) |
 | Native Android | Kotlin / Java (voice interaction service, overlay, screen capture, text selection, AICore bridge) |
@@ -126,7 +126,7 @@ Android ([Play Store](https://play.google.com/store/apps/details?id=ai.maestro.o
 
 ## Getting started
 
-**Prerequisites** - Node.js & npm, [Expo CLI](https://docs.expo.dev/more/expo-cli/) (via `npx`), and for native builds: Android Studio/SDK. The desktop build also needs a Rust toolchain.
+**Prerequisites** - Node.js & npm, [Expo CLI](https://docs.expo.dev/more/expo-cli/) (via `npx`), and for native builds: Android Studio/SDK (Android) or a Mac with Xcode (iOS and iPadOS). The desktop build also needs a Rust toolchain.
 
 ```bash
 npm install
@@ -147,7 +147,7 @@ npm run android:preview   # release build (R8, bundled JS, no Metro) for testing
 
 Both share the same app slot and data, so downloaded models survive switching between them. Once installed, JS-only changes just need `npm start` and opening Opera Dev; rebuild only after native changes (plugins, `app.json`, Kotlin modules, native deps).
 
-**Dev builds on iOS** - needs a Mac with Xcode. iOS 17 or newer is required.
+**Dev builds on iOS and iPadOS** - needs a Mac with Xcode. iOS and iPadOS 17 or newer are required.
 
 ```bash
 npx expo prebuild --platform ios --clean

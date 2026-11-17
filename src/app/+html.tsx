@@ -10,7 +10,7 @@ html,body{overscroll-behavior:none}
 /*selection opt in like native, only selectable texts and fields*/
 #root{-webkit-user-select:none;user-select:none}
 input,textarea{-webkit-user-select:text;user-select:text}
-[data-chatbar-input]::-webkit-scrollbar{display:none}
+[data-chatbar-input]::-webkit-scrollbar,[data-drawer-sheet] ::-webkit-scrollbar{display:none}
 `;
 
 export default function Root({ children }: PropsWithChildren) {

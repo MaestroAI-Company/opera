@@ -1,36 +1,50 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { createContext, forwardRef, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
-  Animated,
-  BackHandler,
-  Keyboard,
-  LayoutChangeEvent,
-  PanResponder,
-  Platform,
-  Pressable,
-  ScrollView,
-  ScrollViewProps,
-  StyleProp,
-  StyleSheet,
-  View,
-  ViewProps,
-  ViewStyle,
+    createContext,
+    forwardRef,
+    ReactNode,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
+} from "react";
+import {
+    Animated,
+    BackHandler,
+    Keyboard,
+    LayoutChangeEvent,
+    PanResponder,
+    Platform,
+    Pressable,
+    ScrollView,
+    ScrollViewProps,
+    StyleProp,
+    StyleSheet,
+    View,
+    ViewProps,
+    ViewStyle,
 } from "react-native";
 import {
-  KeyboardAwareScrollView,
-  KeyboardAwareScrollViewProps,
-  KeyboardAwareScrollViewRef,
-  useKeyboardState,
+    KeyboardAwareScrollView,
+    KeyboardAwareScrollViewProps,
+    KeyboardAwareScrollViewRef,
+    useKeyboardState,
 } from "react-native-keyboard-controller";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Reanimated, { useAnimatedStyle } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useKeyboardLift } from "../../hooks/useKeyboardLift";
 import { usePredictiveBack } from "../../hooks/usePredictiveBack";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import DrawerBackButton from "./DrawerBackButton";
-import { dragDrawer, gestureVelocity, releaseOpens, settleDrawer } from "./drawerAnimation";
+import {
+    dragDrawer,
+    gestureVelocity,
+    releaseOpens,
+    settleDrawer,
+} from "./drawerAnimation";
 
 //slide fallback before real measure
 const CLOSED_SLIDE = 420;
@@ -54,8 +68,25 @@ function fadeStops(clear: string): [string, string, ...string[]] {
 }
 
 //bled once a SheetBody covers the band
-type SheetInsets = { bottom: number; fade: number; bled: boolean };
-const SheetInsetsContext = createContext<SheetInsets>({ bottom: 0, fade: 0, bled: false });
+type SheetInsets = {
+  bottom: number;
+  fade: number;
+  bled: boolean;
+  roundedBottom: boolean;
+};
+const SheetInsetsContext = createContext<SheetInsets>({
+  bottom: 0,
+  fade: 0,
+  bled: false,
+  roundedBottom: false,
+});
+//tablet and desktop cards clip both ends
+const DESKTOP_INSETS: SheetInsets = {
+  bottom: 0,
+  fade: 0,
+  bled: false,
+  roundedBottom: true,
+};
 
 const fadeBottomStyle = StyleSheet.create({
   fade: { position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 1 },
@@ -68,21 +99,47 @@ function SheetFade() {
   const Colors = useColors();
   const { bottom, fade } = useContext(SheetInsetsContext);
   const colors = useMemo(
-    () => [...fadeStops(Colors.groupedBackgroundClear)].reverse() as [string, string, ...string[]],
-    [Colors.groupedBackgroundClear]
+    () =>
+      [...fadeStops(Colors.groupedBackgroundClear)].reverse() as [
+        string,
+        string,
+        ...string[],
+      ],
+    [Colors.groupedBackgroundClear],
   );
-  return <LinearGradient colors={colors} style={[fadeBottomStyle.fade, { height: bottom + fade }]} pointerEvents="none" />;
+  return (
+    <LinearGradient
+      colors={colors}
+      style={[fadeBottomStyle.fade, { height: bottom + fade }]}
+      pointerEvents="none"
+    />
+  );
 }
 
-//wrapper clips top, android ignores radius
-function useSheetScroll(style: StyleProp<ViewStyle>, contentContainerStyle: StyleProp<ViewStyle>) {
-  const { bottom, fade, bled } = useContext(SheetInsetsContext);
+//wrapper clips scroll edges, android ignores radius
+function useSheetScroll(
+  style: StyleProp<ViewStyle>,
+  contentContainerStyle: StyleProp<ViewStyle>,
+) {
+  const { bottom, fade, bled, roundedBottom } = useContext(SheetInsetsContext);
   const content = StyleSheet.flatten(contentContainerStyle) ?? {};
   //margin so the clip matches the cards
   const side = Number(content.paddingHorizontal ?? 0);
   return {
-    wrapStyle: [style, scrollWrap, { marginHorizontal: side }, !bled && { marginBottom: -bottom }],
-    contentContainerStyle: [content, { paddingHorizontal: 0, paddingBottom: Number(content.paddingBottom ?? 0) + bottom + fade }],
+    wrapStyle: [
+      style,
+      scrollWrap,
+      roundedBottom && scrollWrapBottom,
+      { marginHorizontal: side },
+      !bled && { marginBottom: -bottom },
+    ],
+    contentContainerStyle: [
+      content,
+      {
+        paddingHorizontal: 0,
+        paddingBottom: Number(content.paddingBottom ?? 0) + bottom + fade,
+      },
+    ],
   };
 }
 
@@ -95,10 +152,18 @@ const scrollWrap = {
   overflow: "hidden",
 } as const;
 
+const scrollWrapBottom = {
+  borderBottomLeftRadius: Radius.xxl + Spacing.md,
+  borderBottomRightRadius: Radius.xxl + Spacing.md,
+} as const;
+
 //pages bleed into the band as one block
 export function SheetBody({ style, ...props }: ViewProps) {
-  const { bottom, fade } = useContext(SheetInsetsContext);
-  const inner = useMemo(() => ({ bottom, fade, bled: true }), [bottom, fade]);
+  const { bottom, fade, roundedBottom } = useContext(SheetInsetsContext);
+  const inner = useMemo(
+    () => ({ bottom, fade, bled: true, roundedBottom }),
+    [bottom, fade, roundedBottom],
+  );
   return (
     <>
       <SheetInsetsContext.Provider value={inner}>
@@ -110,33 +175,56 @@ export function SheetBody({ style, ...props }: ViewProps) {
 }
 
 //drop-in ScrollView for a sheet body
-export const SheetScrollView = forwardRef<ScrollView, ScrollViewProps>(function SheetScrollView(props, ref) {
-  const { wrapStyle, contentContainerStyle } = useSheetScroll(props.style, props.contentContainerStyle);
+export const SheetScrollView = forwardRef<ScrollView, ScrollViewProps>(
+  function SheetScrollView(props, ref) {
+    const { wrapStyle, contentContainerStyle } = useSheetScroll(
+      props.style,
+      props.contentContainerStyle,
+    );
+    const { bled } = useContext(SheetInsetsContext);
+    return (
+      <>
+        <View style={wrapStyle}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            showsHorizontalScrollIndicator={false}
+            {...props}
+            ref={ref}
+            style={scrollFill}
+            contentContainerStyle={contentContainerStyle}
+          />
+        </View>
+        {!bled && <SheetFade />}
+      </>
+    );
+  },
+);
+
+export const SheetKeyboardAwareScrollView = forwardRef<
+  KeyboardAwareScrollViewRef,
+  KeyboardAwareScrollViewProps
+>(function SheetKeyboardAwareScrollView(props, ref) {
+  const { wrapStyle, contentContainerStyle } = useSheetScroll(
+    props.style,
+    props.contentContainerStyle,
+  );
   const { bled } = useContext(SheetInsetsContext);
   return (
     <>
       <View style={wrapStyle}>
-        <ScrollView {...props} ref={ref} style={scrollFill} contentContainerStyle={contentContainerStyle} />
+        <KeyboardAwareScrollView
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
+          {...props}
+          ref={ref}
+          style={scrollFill}
+          contentContainerStyle={contentContainerStyle}
+        />
       </View>
       {!bled && <SheetFade />}
     </>
   );
 });
-
-export const SheetKeyboardAwareScrollView = forwardRef<KeyboardAwareScrollViewRef, KeyboardAwareScrollViewProps>(
-  function SheetKeyboardAwareScrollView(props, ref) {
-    const { wrapStyle, contentContainerStyle } = useSheetScroll(props.style, props.contentContainerStyle);
-    const { bled } = useContext(SheetInsetsContext);
-    return (
-      <>
-        <View style={wrapStyle}>
-          <KeyboardAwareScrollView {...props} ref={ref} style={scrollFill} contentContainerStyle={contentContainerStyle} />
-        </View>
-        {!bled && <SheetFade />}
-      </>
-    );
-  }
-);
 
 //lets an outside gesture drag a sheet one to one
 const sheetTravels = new WeakMap<Animated.Value, number>();
@@ -194,9 +282,12 @@ export default function DrawerSheet({
   const keyboardOpen = useKeyboardState((state) => state.isVisible);
   const bottom = BOTTOM_BAND + (keyboardOpen ? 0 : safeArea.bottom);
   const sheetBox = [sheetStyle, { paddingBottom: bottom }];
-  const insets = useMemo(() => ({ bottom, fade: FADE_EXTRA, bled: false }), [bottom]);
+  const insets = useMemo(
+    () => ({ bottom, fade: FADE_EXTRA, bled: false, roundedBottom: false }),
+    [bottom],
+  );
   const ownedProgress = useAnimatedValue(0);
-  const progress = isLift ? ownedProgress : externalProgress ?? ownedProgress;
+  const progress = isLift ? ownedProgress : (externalProgress ?? ownedProgress);
   const nativeDriver = !isLift;
   //outside gesture needs it mounted to show
   const keepMounted = !isLift && externalProgress !== undefined;
@@ -221,7 +312,7 @@ export default function DrawerSheet({
         if (!keepMounted) setContentHeight(0);
       });
     },
-    [progress, nativeDriver, keepMounted]
+    [progress, nativeDriver, keepMounted],
   );
 
   useEffect(() => {
@@ -237,19 +328,23 @@ export default function DrawerSheet({
     settle(visible);
   }, [visible, slides, measured, settle]);
 
-  const dismiss = useCallback((velocity = 0) => {
-    //keyboard lift would hold it on screen
-    Keyboard.dismiss();
-    settle(false, velocity);
-    onClose();
-  }, [settle, onClose]);
+  const dismiss = useCallback(
+    (velocity = 0) => {
+      //keyboard lift would hold it on screen
+      Keyboard.dismiss();
+      settle(false, velocity);
+      onClose();
+    },
+    [settle, onClose],
+  );
 
   //pull down moves the sheet with the finger
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gestureState) =>
-          gestureState.dy > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+          gestureState.dy > 8 &&
+          Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
         onPanResponderMove: (_, gestureState) => {
           dragDrawer(progress, 1 - gestureState.dy / travel);
         },
@@ -263,7 +358,7 @@ export default function DrawerSheet({
         },
         onPanResponderTerminate: () => settle(true),
       }),
-    [dismiss, settle, progress, travel]
+    [dismiss, settle, progress, travel],
   );
 
   //android back gesture pulls the sheet down, release closes it
@@ -305,19 +400,36 @@ export default function DrawerSheet({
     if (!rendered) return null;
     return (
       <Animated.View
-        onLayout={(e: LayoutChangeEvent) => setContentHeight(e.nativeEvent.layout.height)}
+        onLayout={(e: LayoutChangeEvent) =>
+          setContentHeight(e.nativeEvent.layout.height)
+        }
         pointerEvents={visible ? "auto" : "none"}
         style={
           !measured
             ? styles.measuring
             : {
-              //open state eats the safe area below so the sheet reaches the screen edge
-              marginBottom: progress.interpolate({ inputRange: [0, 1], outputRange: [-contentHeight, -liftOffset] }),
-              transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [liftOffset, 0] }) }],
-            }
+                //open state eats the safe area below so the sheet reaches the screen edge
+                marginBottom: progress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-contentHeight, -liftOffset],
+                }),
+                transform: [
+                  {
+                    translateY: progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [liftOffset, 0],
+                    }),
+                  },
+                ],
+              }
         }
       >
-        <View style={sheetBox} {...panResponder.panHandlers}>
+        <View
+          style={sheetBox}
+          {...panResponder.panHandlers}
+          {...(Platform.OS === "web" &&
+            ({ dataSet: { drawerSheet: true } } as any))}
+        >
           {handle}
           {children}
         </View>
@@ -327,12 +439,29 @@ export default function DrawerSheet({
 
   if (!rendered && !keepMounted) return null;
 
-  const translateYMobile = progress.interpolate({ inputRange: [0, 1], outputRange: [travel + CLOSED_MARGIN, 0] });
-  const translateYDesktop = progress.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] });
+  const translateYMobile = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [travel + CLOSED_MARGIN, 0],
+  });
+  const translateYDesktop = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-10, 0],
+  });
 
   return (
-    <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
-      <Animated.View style={[styles.overlay, hideScrim && styles.overlayHidden, { opacity: progress }]}>
+    <View
+      style={styles.root}
+      pointerEvents={visible ? "auto" : "none"}
+      {...(Platform.OS === "web" &&
+        ({ dataSet: { drawerSheet: true } } as any))}
+    >
+      <Animated.View
+        style={[
+          styles.overlay,
+          hideScrim && styles.overlayHidden,
+          { opacity: progress },
+        ]}
+      >
         <Pressable style={StyleSheet.absoluteFill} onPress={() => dismiss()} />
       </Animated.View>
 
@@ -341,25 +470,42 @@ export default function DrawerSheet({
           {/* box-none re-enables hit testing on the web, so the closed card has to opt out itself */}
           <Animated.View
             pointerEvents={visible ? "auto" : "none"}
-            style={[styles.desktopCard, desktopStyle, { opacity: progress, transform: [{ translateY: translateYDesktop }] }]}
+            style={[
+              styles.desktopCard,
+              desktopStyle,
+              {
+                opacity: progress,
+                transform: [{ translateY: translateYDesktop }],
+              },
+            ]}
           >
             {!anchored && (
               <View style={styles.desktopHeader}>
                 <DrawerBackButton kind="close" onPress={() => dismiss()} />
               </View>
             )}
-            {children}
+            <SheetInsetsContext.Provider value={DESKTOP_INSETS}>
+              {children}
+            </SheetInsetsContext.Provider>
           </Animated.View>
         </View>
       ) : (
         <Animated.View
           pointerEvents={visible ? "auto" : "none"}
-          onLayout={(e: LayoutChangeEvent) => setContentHeight(e.nativeEvent.layout.height)}
-          style={[sheetBox, { transform: [{ translateY: translateYMobile }] }, !measured && styles.hidden]}
+          onLayout={(e: LayoutChangeEvent) =>
+            setContentHeight(e.nativeEvent.layout.height)
+          }
+          style={[
+            sheetBox,
+            { transform: [{ translateY: translateYMobile }] },
+            !measured && styles.hidden,
+          ]}
           {...panResponder.panHandlers}
         >
           {handle}
-          <SheetInsetsContext.Provider value={insets}>{children}</SheetInsetsContext.Provider>
+          <SheetInsetsContext.Provider value={insets}>
+            {children}
+          </SheetInsetsContext.Provider>
           {avoidKeyboard && <KeyboardSpacer />}
         </Animated.View>
       )}
@@ -374,61 +520,60 @@ function KeyboardSpacer() {
   return <Reanimated.View style={style} />;
 }
 
-const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
-  root: {
-    ...StyleSheet.absoluteFill,
-    zIndex: 1000,
-    elevation: 1000,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: Colors.scrimDrawer,
-  },
-  overlayHidden: {
-    backgroundColor: "transparent",
-  },
-  desktopRootWrapper: {
-    ...StyleSheet.absoluteFill,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: Spacing.xxl2,
-  },
-  desktopCard: {
-    backgroundColor: Colors.groupedBackground,
-    //same as the settings window
-    borderRadius: Radius.window,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
-    elevation: 5,
-    overflow: "hidden",
-    //content scrolls instead of leaving the screen
-    maxWidth: "100%",
-    maxHeight: "100%",
-    paddingBottom: Spacing.lg,
-  },
-  desktopHeader: {
-    paddingTop: Spacing.lg2,
-    paddingHorizontal: Spacing.lg2,
-    paddingBottom: Spacing.md,
-  },
-  hidden: {
-    opacity: 0,
-  },
-  measuring: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0,
-  },
-  handleContainer: {
-    alignItems: "center",
-  },
-  handle: {
-    width: 48,
-    height: 4,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.textMuted,
-  },
-});
+const makeStyles = (Colors: ThemeColors) =>
+  StyleSheet.create({
+    root: {
+      ...StyleSheet.absoluteFill,
+      zIndex: 1000,
+      elevation: 1000,
+    },
+    overlay: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: Colors.scrimDrawer,
+    },
+    overlayHidden: {
+      backgroundColor: "transparent",
+    },
+    desktopRootWrapper: {
+      ...StyleSheet.absoluteFill,
+      alignItems: "center",
+      justifyContent: "center",
+      padding: Spacing.xxl2,
+    },
+    desktopCard: {
+      backgroundColor: Colors.groupedBackground,
+      //matches mobile sheet top radius
+      borderRadius: Radius.huge2,
+      boxShadow: `-6px 6px 0px ${Colors.shadowInk}`,
+      elevation: 5,
+      overflow: "hidden",
+      //content scrolls instead of leaving the screen
+      maxWidth: "100%",
+      maxHeight: "100%",
+      paddingBottom: Spacing.lg,
+    },
+    desktopHeader: {
+      paddingTop: Spacing.lg2,
+      paddingHorizontal: Spacing.lg2,
+      paddingBottom: Spacing.md,
+    },
+    hidden: {
+      opacity: 0,
+    },
+    measuring: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 0,
+      opacity: 0,
+    },
+    handleContainer: {
+      alignItems: "center",
+    },
+    handle: {
+      width: 48,
+      height: 4,
+      borderRadius: Radius.pill,
+      backgroundColor: Colors.textMuted,
+    },
+  });

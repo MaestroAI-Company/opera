@@ -1606,7 +1606,7 @@ export default function SamplerScreen({
           <Group>
             {isAdmin && SamplerHub.canCheckHubUpdate() && (
               <ActionButton
-                icon={downloadIcon}
+                icon={reconnectIcon}
                 label={t("settings.hub.checkUpdate")}
                 onPress={checkUpdate}
               />
@@ -1879,24 +1879,28 @@ export default function SamplerScreen({
             !modelsStatus?.build,
           )}
           {modelsStatus?.build && (
-            <Group style={styles.infoGroup}>
-              <ActionButton
-                label={t("sampler.model.build")}
-                rightElement={
-                  <Text style={styles.infoValue} numberOfLines={1}>
-                    {modelsStatus.build}
-                  </Text>
-                }
-              />
-              <ActionButton
-                icon={downloadIcon}
-                label={t("sampler.model.updateBuild")}
-                disabled={isHubModelsBusy(modelsStatus)}
-                onPress={() =>
-                  runHubModels((api) => api.update()).catch(() => {})
-                }
-              />
-            </Group>
+            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+              <Group style={[styles.infoGroup, styles.groupSpacingTight]}>
+                <ActionButton
+                  label={t("sampler.model.build")}
+                  rightElement={
+                    <Text style={styles.infoValue} numberOfLines={1}>
+                      {modelsStatus.build}
+                    </Text>
+                  }
+                />
+              </Group>
+              <Group>
+                <ActionButton
+                  icon={downloadIcon}
+                  label={t("sampler.model.updateBuild")}
+                  disabled={isHubModelsBusy(modelsStatus)}
+                  onPress={() =>
+                    runHubModels((api) => api.update()).catch(() => {})
+                  }
+                />
+              </Group>
+            </View>
           )}
         </View>
       )}

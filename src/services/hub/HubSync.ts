@@ -7,11 +7,14 @@ import {
   getOpenAIApiKeyById,
   getOpenAIServers,
   HUB_PREFS_KEY,
+  isDeviceOnlyProvider,
+  isLocalUrl,
   isProviderSupported,
   OllamaServer,
   serializeServers,
   setHubProviders,
   setHubServerPrefs,
+  setHubTuning,
   setOpenAIApiKey,
 } from '../ai/providers/sources';
 import { DB } from '../db/DatabaseService';
@@ -40,6 +43,12 @@ const SHARED_SETTINGS = (Object.keys(BASE_DEFAULTS) as (keyof AppSettings)[]).fi
 );
 //changes here retune the ai module
 const ACTIVE_MODEL_KEYS: readonly string[] = ['aiService', 'ollamaUrl', 'ollamaContextLength', 'ollamaKeepAlive'];
+//device only model stays local
+const SELECTION_KEYS: readonly string[] = ['aiService', 'ollamaUrl', 'ollamaModel'];
+
+function heldSelection(): ReadonlySet<string> {
+  return new Set(isDeviceOnlyProvider(Settings.getCached().aiService) ? SELECTION_KEYS : []);
+}
 
 type CachedProviders = { hubName: string; providers: HubProvider[] };
 
@@ -191,7 +200,22 @@ class HubSyncImpl {
     await SamplerHub.renameProfile(hub, trimmed);
   }
 
-  //a profile on a fresh hub gets everything again
+  //offline name and look reach hub later
+  private async matchProfile(hub: PairedHub): Promise<void> {
+    const live = await SamplerHub.refreshProfile(hub).catch(() => null);
+    if (!live) return;
+    const { name, maestroButterfly } = Settings.getCached();
+    if (name.trim() && name.trim() !== live.name) {
+      await SamplerHub.renameProfile(hub, name.trim()).catch((e) => console.warn('[HubSync] profile rename failed:', e));
+    }
+    if (maestroButterfly && maestroButterfly !== live.butterfly) {
+      await SamplerHub.setProfileButterfly(hub, maestroButterfly).catch((e) =>
+        console.warn('[HubSync] profile butterfly failed:', e),
+      );
+    }
+  }
+
+    //fresh hub gets everything again
   async joinedProfile(): Promise<void> {
     //one name for device and hub
     const profile = await SamplerHub.getProfile();
@@ -242,8 +266,11 @@ class HubSyncImpl {
     const hub = await SamplerHub.getPairedHub();
     if (!hub || !(await SamplerHub.getProfile())) return;
     await this.dropInjectedServers();
-    await this.storeProviders(await SamplerHub.providers(hub), hub.name);
+    //status first refreshes stored hub name
+    await this.refreshTuning(hub);
+    await this.storeProviders(await SamplerHub.providers(hub), await this.hubName(hub));
     await this.offerUpdate(hub);
+    await this.matchProfile(hub);
     //a cloud sync account replaces sampler, a backup does not
     if (this.paused || (CloudSync.getProviderName() !== 'none' && !CloudSync.isBackupMode())) return;
     const prefs = SyncPrefsStore.get();
@@ -251,7 +278,7 @@ class HubSyncImpl {
       await this.syncFingerprinted(hub, 'providers', await this.providerEntries(), (r) => this.applyProviders(r));
     }
     if (prefs.settings) {
-      await this.syncFingerprinted(hub, 'settings', this.settingEntries(), (r) => this.applySettings(r));
+      await this.syncFingerprinted(hub, 'settings', this.settingEntries(), (r) => this.applySettings(r), heldSelection());
     }
     if (!prefs.data) return;
     await pushLocalChanges(hub);
@@ -279,7 +306,24 @@ class HubSyncImpl {
   async refreshProviders(): Promise<void> {
     const hub = await SamplerHub.getPairedHub();
     if (!hub) return;
-    await this.storeProviders(await SamplerHub.providers(hub), hub.name);
+    await this.refreshTuning(hub);
+    await this.storeProviders(await SamplerHub.providers(hub), await this.hubName(hub));
+  }
+
+  private async hubName(hub: PairedHub): Promise<string> {
+    return (await SamplerHub.getPairedHub())?.name ?? hub.name;
+  }
+
+  //sync hub engine tuning
+  private async refreshTuning(hub: PairedHub): Promise<void> {
+    const status = await SamplerHub.status(hub).catch(() => null);
+    if (!status) return;
+    setHubTuning({ ctxSize: status.ctxSize ?? 0, keepAlive: status.keepAlive ?? 0 });
+    const { ollamaUrl } = Settings.getCached();
+    if (isHubUrl(ollamaUrl)) {
+      const tuning = getOllamaTuning(ollamaUrl);
+      AIModule.configure(ollamaUrl, tuning.contextLength, tuning.keepAlive);
+    }
   }
 
   private async storeProviders(providers: HubProvider[], hubName: string): Promise<void> {
@@ -314,6 +358,7 @@ class HubSyncImpl {
     local: Map<string, string>,
     //returns the ids it refused to apply
     apply: (winners: SyncRecord[]) => Promise<string[] | void>,
+    held: ReadonlySet<string> = new Set(),
   ): Promise<void> {
     const raw = await getSecret(STATE_KEYS[collection]);
     const state: FingerprintState = raw ? JSON.parse(raw) : { cursor: 0, entries: {} };
@@ -349,13 +394,14 @@ class HubSyncImpl {
     const now = Date.now();
     const outgoing: SyncRecord[] = [];
     for (const [id, json] of local) {
+      if (held.has(id)) continue;
       const fingerprint = hash(json);
       if (adopted.has(id) || state.entries[id]?.hash === fingerprint) continue;
       outgoing.push({ id, updatedAt: now, deleted: false, payload: json });
       state.entries[id] = { hash: fingerprint, updatedAt: now };
     }
     for (const [id, known] of Object.entries(state.entries)) {
-      if (adopted.has(id) || local.has(id) || known.hash === '') continue;
+      if (adopted.has(id) || held.has(id) || local.has(id) || known.hash === '') continue;
       outgoing.push({ id, updatedAt: now, deleted: true, payload: null });
       state.entries[id] = { hash: '', updatedAt: now };
     }
@@ -394,6 +440,12 @@ class HubSyncImpl {
         delete patch[key];
       }
     }
+    if (isDeviceOnlyProvider(Settings.getCached().aiService)) {
+      for (const key of SELECTION_KEYS) {
+        if (key in patch) refused.push(key);
+        delete patch[key];
+      }
+    }
     if (Object.keys(patch).length === 0) return refused;
     await this.write(() => Settings.setMany(patch as Partial<AppSettings>));
     DeviceEventEmitter.emit(AppEvents.settingsSynced);
@@ -412,10 +464,10 @@ class HubSyncImpl {
     const lists = await this.withIds();
     const entries = new Map<string, ProviderEntry>();
     for (const server of lists.ollama) {
-      if (!isHubUrl(server.url)) entries.set(server.id!, { kind: 'ollama', server });
+      if (!isHubUrl(server.url) && !isLocalUrl(server.url)) entries.set(server.id!, { kind: 'ollama', server });
     }
     for (const server of lists.openai) {
-      if (isHubUrl(server.url)) continue;
+      if (isHubUrl(server.url) || isLocalUrl(server.url)) continue;
       entries.set(server.id!, { kind: 'openai', server, apiKey: await getOpenAIApiKeyById(server.id!) });
     }
     for (const server of lists.mcp) {
@@ -469,8 +521,16 @@ class HubSyncImpl {
       }
       const entry = JSON.parse(record.payload) as ProviderEntry;
       if (entry.kind === 'ollama') {
+        //keep shared copy of same server
+        for (const twin of ollama.filter((s) => s.url.trim() === entry.server.url.trim())) drop(ollama, twin.id!);
         upsert(ollama, entry.server);
       } else if (entry.kind === 'openai') {
+        for (const twin of openai.filter((s) => s.url.trim() === entry.server.url.trim())) {
+          //same url with another key is another account
+          if ((await getOpenAIApiKeyById(twin.id!)) !== entry.apiKey) continue;
+          drop(openai, twin.id!);
+          await setOpenAIApiKey(twin.id!, '');
+        }
         upsert(openai, entry.server);
         await setOpenAIApiKey(record.id, entry.apiKey);
       } else {

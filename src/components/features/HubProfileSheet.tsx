@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   ImageSourcePropType,
   Keyboard,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,12 +23,14 @@ import {
   HubDevice,
   HubProfile,
   hubErrorCode,
+  NearbyHub,
   SamplerHub,
   PairedHub,
 } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
 import CardGrid, { GridCard } from "../ui/CardGrid";
 import Group from "../ui/Group";
+import NotificationModal from "../ui/NotificationModal";
 import { pressStyle } from "../ui/pressStyle";
 import TextInputField from "../ui/TextInputField";
 import DrawerBackButton from "./DrawerBackButton";
@@ -38,7 +39,7 @@ import PageStack from "./PageStack";
 import ProfileCard from "./ProfileCard";
 
 const keyIcon = require("../../../assets/icons/key.png");
-const newIcon = require("../../../assets/icons/hyperlink2.png");
+const newIcon = require("../../../assets/icons/add.png");
 const penIcon = require("../../../assets/icons/pencil.png");
 const binIcon = require("../../../assets/icons/bin.png");
 const profilIcon = require("../../../assets/icons/profil.png");
@@ -61,17 +62,23 @@ const DESKTOP_CARD_WIDTH_NARROW = 560;
 //shorter passwords fall to a guessing hub
 export const MIN_PASSWORD_LENGTH = 8;
 
-type Page = "pick" | "create" | "unlock" | "link" | "profile" | "password";
+type Page = "pick" | "create" | "unlock" | "profile" | "password";
 
 type HubProfileSheetProps = {
   visible: boolean;
   hub: PairedHub | null;
+  //unpaired hub signs in by password
+  nearby?: NearbyHub | null;
+  //new profiles need a code
+  onCreateWithCode?: () => void;
   //onboarding restores, settings may also create
   allowCreate?: boolean;
   //prefilled name of a new profile
   defaultName?: string;
   //opens on the password change instead
   changePassword?: boolean;
+  //opens on create after pairing
+  startOnCreate?: boolean;
   //target profile shown in drawer
   profile?: HubProfile | null;
   //hub devices of the profile
@@ -93,7 +100,7 @@ type HubProfileSheetProps = {
 
 //navigate up stack
 const parentOf = (page: Page): Page | null => {
-  if (page === "create" || page === "unlock" || page === "link") return "pick";
+  if (page === "create" || page === "unlock") return "pick";
   if (page === "password") return "profile";
   return null;
 };
@@ -102,9 +109,12 @@ const parentOf = (page: Page): Page | null => {
 export default function HubProfileSheet({
   visible,
   hub,
+  nearby = null,
+  onCreateWithCode,
   allowCreate = true,
   defaultName = "",
   changePassword = false,
+  startOnCreate = false,
   profile: profileProp = null,
   devices: devicesProp = null,
   thisDeviceId: thisDeviceIdProp = null,
@@ -134,6 +144,8 @@ export default function HubProfileSheet({
   const [confirm, setConfirm] = useState("");
   const [current, setCurrent] = useState("");
   const [digits, setDigits] = useState<string | null>(null);
+  //the other device confirms in an overlay
+  const [linkOpen, setLinkOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
@@ -157,7 +169,15 @@ export default function HubProfileSheet({
   if (visible !== wasVisible) {
     setWasVisible(visible);
     if (visible) {
-      setPage(changePassword ? "password" : profileProp ? "profile" : "pick");
+      setPage(
+        changePassword
+          ? "password"
+          : profileProp
+            ? "profile"
+            : startOnCreate
+              ? "create"
+              : "pick",
+      );
       setProfiles(null);
       setChosen(null);
       setName(defaultName);
@@ -165,6 +185,7 @@ export default function HubProfileSheet({
       setConfirm("");
       setCurrent("");
       setDigits(null);
+      setLinkOpen(false);
       setBusy(false);
       setError(null);
     }
@@ -202,14 +223,34 @@ export default function HubProfileSheet({
     SamplerHub.deviceId().then(setLoadedDeviceId).catch(() => null);
   }, [visible, thisDeviceIdProp]);
 
+  //a nearby hub lists its profiles before pairing
+  useEffect(() => {
+    if (!visible || hub || !nearby) return;
+    let stopped = false;
+    SamplerHub.nearbyProfiles(nearby)
+      .then((list) => !stopped && setProfiles(list))
+      .catch((e) => {
+        console.warn("[HubProfile] nearby profiles unavailable:", e);
+        if (!stopped) setError(t(`hubPairing.error.${hubErrorCode(e)}`));
+      });
+    return () => {
+      stopped = true;
+    };
+  }, [visible, hub, nearby, t]);
+
   //a link code joins at once, an admin code lists profiles
   useEffect(() => {
     if (!visible || !hub || changePassword || profileProp) return;
     let stopped = false;
     (async () => {
       try {
+        //list loads alongside the join
+        const listing = SamplerHub.profiles(hub).then(
+          (list) => ({ list }),
+          (error) => ({ error }),
+        );
         if (await SamplerHub.linkJoin(hub)) {
-          setPage("link");
+          setLinkOpen(true);
           while (!stopped) {
             const progress = await SamplerHub.linkFetch(hub);
             if (stopped) return;
@@ -219,8 +260,9 @@ export default function HubProfileSheet({
           }
           return;
         }
-        const list = await SamplerHub.profiles(hub);
-        if (!stopped) setProfiles(list);
+        const result = await listing;
+        if ("error" in result) throw result.error;
+        if (!stopped) setProfiles(result.list);
       } catch (e) {
         console.warn("[HubProfile] profiles unavailable:", e);
         if (!stopped) setError(t(`hubPairing.error.${hubErrorCode(e)}`));
@@ -291,7 +333,11 @@ export default function HubProfileSheet({
   const unlock = () => {
     if (!chosen || !password) return;
     run(async () =>
-      onDone(await SamplerHub.unlockProfile(hub!, chosen.id, password)),
+      onDone(
+        hub
+          ? await SamplerHub.unlockProfile(hub, chosen.id, password)
+          : await SamplerHub.signIn(nearby!, chosen.id, password),
+      ),
     );
   };
 
@@ -357,6 +403,7 @@ export default function HubProfileSheet({
               >
                 <ProfileCard
                   name={profile.name}
+                  butterfly={profile.butterfly}
                   createdAt={profile.createdAt * 1000}
                   compact
                 />
@@ -369,7 +416,9 @@ export default function HubProfileSheet({
             <ActionButton
               icon={newIcon}
               label={t("hubProfile.create")}
-              onPress={() => showPage("create")}
+              onPress={() =>
+                !hub && onCreateWithCode ? onCreateWithCode() : showPage("create")
+              }
             />
           </Group>
         )}
@@ -381,7 +430,11 @@ export default function HubProfileSheet({
     chosen && (
       <View style={styles.contentCard}>
         <View style={styles.settingRowVertical}>
-          <ProfileCard name={chosen.name} createdAt={chosen.createdAt * 1000} />
+          <ProfileCard
+            name={chosen.name}
+            createdAt={chosen.createdAt * 1000}
+            butterfly={chosen.butterfly}
+          />
         </View>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={styles.settingLabel}>{t("hubProfile.password")}</Text>
@@ -463,23 +516,6 @@ export default function HubProfileSheet({
     </View>
   );
 
-  const renderLink = () => (
-    <View style={styles.contentCard}>
-      <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-        <Text style={styles.settingLabel}>{t("hubProfile.linkTitle")}</Text>
-        <Text style={[styles.helpText, digits && { marginBottom: Spacing.md }]}>
-          {error ??
-            (digits ? t("hubProfile.linkHelp") : t("hubProfile.linkWaiting"))}
-        </Text>
-        {digits && !error && (
-          <Group>
-            <Text style={styles.digits}>{digits}</Text>
-          </Group>
-        )}
-      </View>
-    </View>
-  );
-
   const renderPasswordChange = () => (
     <View style={styles.contentCard}>
       <View style={styles.settingRowVertical}>
@@ -540,7 +576,11 @@ export default function HubProfileSheet({
         {/* profile card */}
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <ProfileCard name={target.name} createdAt={target.createdAt ? target.createdAt * 1000 : undefined} />
+            <ProfileCard
+              name={target.name}
+              createdAt={target.createdAt ? target.createdAt * 1000 : undefined}
+              butterfly={target.butterfly}
+            />
           </View>
         </View>
 
@@ -551,7 +591,7 @@ export default function HubProfileSheet({
               {t("settings.hub.devices")}
             </Text>
             {deviceCards.length > 0 ? (
-              <CardGrid cards={deviceCards} minCardWidth={140} />
+              <CardGrid cards={deviceCards} minCardWidth={140} singleLineTitle />
             ) : (
               <Text style={styles.helpText}>{t("hubProfile.noDevices")}</Text>
             )}
@@ -560,7 +600,7 @@ export default function HubProfileSheet({
 
         {/* actions section */}
         {(effectiveIsSelf || (canManage && !effectiveIsSelf)) && (
-          <View style={[styles.contentCard, { marginBottom: 0 }]}>
+          <View style={styles.contentCard}>
             <Group>
               {effectiveIsSelf && (
                 <ActionButton
@@ -613,7 +653,6 @@ export default function HubProfileSheet({
         {p === "pick" && renderPick()}
         {p === "unlock" && renderUnlock()}
         {p === "create" && renderCreate()}
-        {p === "link" && renderLink()}
         {p === "profile" && renderProfileView()}
         {p === "password" && renderPasswordChange()}
       </SheetScrollView>
@@ -633,43 +672,64 @@ export default function HubProfileSheet({
   );
 
   return (
-    <DrawerSheet
-      visible={visible}
-      onClose={onClose}
-      onBackPress={handleBack}
-      mode="overlay"
-      isLargeScreen={isLargeScreen}
-      isDesktop={isDesktop}
-      handleContainerStyle={styles.sheetHandleContainer}
-      avoidKeyboard
-      sheetStyle={[
-        styles.sheet,
-        {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
-          //stacked pages need fixed height
-          height: windowHeight - insets.top - Spacing.xl2,
-        },
-      ]}
-      //desktop card fills drawer height
-      desktopStyle={[styles.desktopCard, { height: "100%" }]}
-    >
-      <SheetBody
-        style={styles.body}
-        onLayout={(e) => {
-          const width = e.nativeEvent.layout.width;
-          setBodyWidth((prev) => (prev !== width ? width : prev));
-        }}
+    <>
+      <DrawerSheet
+        visible={visible}
+        onClose={onClose}
+        onBackPress={handleBack}
+        mode="overlay"
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        handleContainerStyle={styles.sheetHandleContainer}
+        avoidKeyboard
+        sheetStyle={[
+          styles.sheet,
+          {
+            //stacked pages need fixed height
+            height: windowHeight - insets.top - Spacing.xl2,
+          },
+        ]}
+        //desktop card fills drawer height
+        desktopStyle={[styles.desktopCard, { height: "100%" }]}
       >
-        <PageStack
-          page={page}
-          visible={visible}
-          width={bodyWidth}
-          parentOf={parentOf}
-          onBack={handleBack}
-          renderPage={renderPage}
-        />
-      </SheetBody>
-    </DrawerSheet>
+        <SheetBody
+          style={styles.body}
+          onLayout={(e) => {
+            const width = e.nativeEvent.layout.width;
+            setBodyWidth((prev) => (prev !== width ? width : prev));
+          }}
+        >
+          <PageStack
+            page={page}
+            visible={visible}
+            width={bodyWidth}
+            parentOf={parentOf}
+            onBack={handleBack}
+            renderPage={renderPage}
+          />
+        </SheetBody>
+      </DrawerSheet>
+      <NotificationModal
+        visible={visible && linkOpen}
+        title={t("hubProfile.linkTitle")}
+        message={
+          error ??
+          (digits
+            ? `${t("hubProfile.linkHelp")}\n\n${digits}`
+            : t("hubProfile.linkWaiting"))
+        }
+        messageAlign="center"
+        loading={!digits && !error}
+        buttons={[
+          {
+            text: t(error ? "common.ok" : "common.cancel"),
+            style: "secondary",
+            onPress: onClose,
+          },
+        ]}
+        onClose={onClose}
+      />
+    </>
   );
 }
 
@@ -708,6 +768,7 @@ const makeStyles = (Colors: ThemeColors) =>
     content: {
       paddingHorizontal: Spacing.lg2,
       paddingBottom: Spacing.lg,
+      gap: Spacing.xxl2,
     },
     //room for the floating back button
     contentWithBack: {
@@ -727,7 +788,6 @@ const makeStyles = (Colors: ThemeColors) =>
       borderRadius: Radius.xxl + Spacing.md,
       borderWidth: 0,
       padding: Spacing.md,
-      marginBottom: Spacing.xxl2,
     },
     settingRowVertical: {
       marginBottom: Spacing.xxl,

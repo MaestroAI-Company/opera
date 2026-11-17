@@ -16,6 +16,8 @@ export type HubStatus = {
   ctxSize?: number | null;
   keepAlive?: number | null;
   parallel?: number | null;
+  //none on older hubs and empty for n0
+  relays?: string[] | null;
 };
 export type HubDevice = {
   id: string;
@@ -28,7 +30,8 @@ export type HubDevice = {
   profile?: string | null;
 };
 //one person on the hub
-export type HubProfile = { id: string; name: string; role: 'admin' | 'member'; createdAt: number };
+//butterfly stays empty on hubs before 0.12
+export type HubProfile = { id: string; name: string; role: 'admin' | 'member'; createdAt: number; butterfly?: string | null };
 //the key only lives in this device's secure store
 export type UnlockedProfile = { profile: HubProfile; key: string; lock?: ProfileLock | null };
 //what reopens a profile key with its password
@@ -63,10 +66,13 @@ export type HubSettings = {
   ctxSize: number;
   keepAlive: number;
   parallel: number;
+  //hub and llama.cpp auto checks
+  updateChecks: boolean;
 };
 export type NearbyHub = { id: string; name: string; addrs: string[] };
 //llama.cpp models on the hub
-export type CatalogModel = { repo: string; file: string; name: string; size: number };
+//set by hubs reading host memory
+export type CatalogModel = { repo: string; file: string; name: string; size: number; fits?: boolean; recommended?: boolean };
 export type ModelRepo = { repo: string; downloads: number };
 export type ModelFile = { file: string; size: number };
 //repo is unknown for files copied by hand
@@ -102,13 +108,28 @@ type NativeHub = {
   pair(deviceKey: string, link: string, deviceName: string, kind: string): Promise<PairedHub>;
   pairWithCode(deviceKey: string, code: string, deviceName: string, kind: string): Promise<PairedHub>;
   invite(deviceKey: string, hub: PairedHub): Promise<HubInvite>;
+  inviteWatch(deviceKey: string, hub: PairedHub): Promise<boolean>;
   qrSvg(text: string, dark: string, light: string): Promise<string>;
   //admin profiles only, older clients lack it
   hubSettings?(deviceKey: string, hub: PairedHub): Promise<HubSettings>;
   setHubSettings?(deviceKey: string, hub: PairedHub, settings: HubSettings): Promise<HubSettings>;
   //browsers cannot use multicast
   nearbyHubs?(deviceKey: string, waitMs: number): Promise<NearbyHub[]>;
+  //only android checks the network
+  localNetworkAvailable?(): Promise<boolean>;
+  //hub 0.11.1 and later, desktop for now
+  nearbyProfiles?(deviceKey: string, hub: NearbyHub): Promise<HubProfile[]>;
+  signIn?(
+    deviceKey: string,
+    hub: NearbyHub,
+    profileId: string,
+    password: string,
+    deviceName: string,
+    kind: string,
+  ): Promise<{ hub: PairedHub; profile: UnlockedProfile }>;
   updateHub?(deviceKey: string, hub: PairedHub): Promise<string>;
+  //null when up to date
+  checkHubUpdate?(deviceKey: string, hub: PairedHub): Promise<string | null>;
   //admin profiles only, older clients lack it
   modelsCatalog?(deviceKey: string, hub: PairedHub): Promise<CatalogModel[]>;
   modelsSearch?(deviceKey: string, hub: PairedHub, query: string): Promise<ModelRepo[]>;
@@ -117,6 +138,7 @@ type NativeHub = {
   modelsCancel?(deviceKey: string, hub: PairedHub, file: string): Promise<LlamaStatus>;
   modelsDelete?(deviceKey: string, hub: PairedHub, file: string): Promise<LlamaStatus>;
   modelsStatus?(deviceKey: string, hub: PairedHub): Promise<LlamaStatus>;
+  modelsUpdate?(deviceKey: string, hub: PairedHub): Promise<LlamaStatus>;
   mcpJson?(deviceKey: string, hub: PairedHub, request: string): Promise<string>;
   //admin only, every profile's servers
   mcpOverview?(deviceKey: string, hub: PairedHub): Promise<McpServerSummary[]>;
@@ -125,6 +147,8 @@ type NativeHub = {
   unpair(deviceKey: string, hub: PairedHub): Promise<void>;
   devices(deviceKey: string, hub: PairedHub): Promise<HubDevice[]>;
   renameDevice(deviceKey: string, hub: PairedHub, id: string, name: string): Promise<void>;
+  //admin only, returns the effective name
+  renameHub(deviceKey: string, hub: PairedHub, name: string): Promise<string>;
   removeDevice(deviceKey: string, hub: PairedHub, id: string): Promise<void>;
   push(deviceKey: string, hub: PairedHub, collection: string, records: SyncRecord[]): Promise<void>;
   pull(deviceKey: string, hub: PairedHub, collection: string, since: number): Promise<PullPage>;
@@ -139,6 +163,8 @@ type NativeHub = {
   unlockProfile(deviceKey: string, hub: PairedHub, profileId: string, password: string): Promise<UnlockedProfile>;
   changePassword(deviceKey: string, hub: PairedHub, current: string, next: string): Promise<void>;
   renameProfile(deviceKey: string, hub: PairedHub, name: string): Promise<HubProfile>;
+  //hub client 0.12 and later
+  setProfileButterfly?(deviceKey: string, hub: PairedHub, butterfly: string): Promise<HubProfile>;
   lockedKey(deviceKey: string, hub: PairedHub): Promise<ProfileLock>;
   openLockedKey(lock: ProfileLock, password: string): Promise<string>;
   profileBackupKey(key: string): Promise<string>;
@@ -238,6 +264,7 @@ export type HubModels = {
   cancel(file: string): Promise<LlamaStatus>;
   remove(file: string): Promise<LlamaStatus>;
   status(): Promise<LlamaStatus>;
+  update(): Promise<LlamaStatus>;
 };
 
 type HubHost = {
@@ -263,11 +290,16 @@ const tauriHub: NativeHub = {
   pairWithCode: (deviceKey, code, deviceName, kind) =>
     invoke('hub_pair_with_code', { deviceKey, code, deviceName, kind }),
   invite: (deviceKey, hub) => invoke('hub_invite', { deviceKey, hub }),
+  inviteWatch: (deviceKey, hub) => invoke('hub_invite_watch', { deviceKey, hub }),
   qrSvg: (text, dark, light) => invoke('hub_qr_svg', { text, dark, light }),
   hubSettings: (deviceKey, hub) => invoke('hub_settings', { deviceKey, hub }),
   setHubSettings: (deviceKey, hub, settings) => invoke('hub_set_settings', { deviceKey, hub, settings }),
   nearbyHubs: (deviceKey, waitMs) => invoke('hub_nearby', { deviceKey, waitMs }),
+  nearbyProfiles: (deviceKey, hub) => invoke('hub_nearby_profiles', { deviceKey, hub }),
+  signIn: (deviceKey, hub, profileId, password, deviceName, kind) =>
+    invoke('hub_sign_in', { deviceKey, hub, profileId, password, deviceName, kind }),
   updateHub: (deviceKey, hub) => invoke('hub_update', { deviceKey, hub }),
+  checkHubUpdate: (deviceKey, hub) => invoke('hub_check_update', { deviceKey, hub }),
   modelsCatalog: (deviceKey, hub) => invoke('hub_models_catalog', { deviceKey, hub }),
   modelsSearch: (deviceKey, hub, query) => invoke('hub_models_search', { deviceKey, hub, query }),
   modelsFiles: (deviceKey, hub, repo) => invoke('hub_models_files', { deviceKey, hub, repo }),
@@ -275,6 +307,7 @@ const tauriHub: NativeHub = {
   modelsCancel: (deviceKey, hub, file) => invoke('hub_models_cancel', { deviceKey, hub, file }),
   modelsDelete: (deviceKey, hub, file) => invoke('hub_models_delete', { deviceKey, hub, file }),
   modelsStatus: (deviceKey, hub) => invoke('hub_models_status', { deviceKey, hub }),
+  modelsUpdate: (deviceKey, hub) => invoke('hub_models_update', { deviceKey, hub }),
   mcpJson: (deviceKey, hub, request) => invoke('hub_mcp_json', { deviceKey, hub, request }),
   mcpOverview: (deviceKey, hub) => invoke('hub_mcp_overview', { deviceKey, hub }),
   mcpManage: (deviceKey, hub, id, action) => invoke('hub_mcp_manage', { deviceKey, hub, id, action }),
@@ -282,6 +315,7 @@ const tauriHub: NativeHub = {
   unpair: (deviceKey, hub) => invoke('hub_unpair', { deviceKey, hub }),
   devices: (deviceKey, hub) => invoke('hub_devices', { deviceKey, hub }),
   renameDevice: (deviceKey, hub, id, name) => invoke('hub_rename_device', { deviceKey, hub, id, name }),
+  renameHub: (deviceKey, hub, name) => invoke('hub_rename_hub', { deviceKey, hub, name }),
   removeDevice: (deviceKey, hub, id) => invoke('hub_remove_device', { deviceKey, hub, id }),
   push: (deviceKey, hub, collection, records) => invoke('hub_push', { deviceKey, hub, collection, records }),
   pull: (deviceKey, hub, collection, since) => invoke('hub_pull', { deviceKey, hub, collection, since }),
@@ -296,6 +330,8 @@ const tauriHub: NativeHub = {
     invoke('hub_unlock_profile', { deviceKey, hub, profileId, password }),
   changePassword: (deviceKey, hub, current, next) => invoke('hub_change_password', { deviceKey, hub, current, next }),
   renameProfile: (deviceKey, hub, name) => invoke('hub_rename_profile', { deviceKey, hub, name }),
+  setProfileButterfly: (deviceKey, hub, butterfly) =>
+    invoke('hub_set_profile_butterfly', { deviceKey, hub, butterfly }),
   lockedKey: (deviceKey, hub) => invoke('hub_locked_key', { deviceKey, hub }),
   openLockedKey: (lock, password) => invoke('hub_open_locked_key', { lock, password }),
   profileBackupKey: (key) => invoke('hub_profile_backup_key', { key }),
@@ -331,14 +367,17 @@ type WebClient = {
   pair(link: string, deviceName: string, kind: string): Promise<PairedHub>;
   pairWithCode(code: string, deviceName: string, kind: string): Promise<PairedHub>;
   invite(hub: PairedHub): Promise<HubInvite>;
+  inviteWatch(hub: PairedHub): Promise<boolean>;
   status(hub: PairedHub): Promise<HubStatus>;
   unpair(hub: PairedHub): Promise<void>;
   devices(hub: PairedHub): Promise<HubDevice[]>;
   renameDevice(hub: PairedHub, id: string, name: string): Promise<void>;
+  renameHub(hub: PairedHub, name: string): Promise<string>;
   removeDevice(hub: PairedHub, id: string): Promise<void>;
   hubSettings(hub: PairedHub): Promise<HubSettings>;
   setHubSettings(hub: PairedHub, settings: HubSettings): Promise<HubSettings>;
   updateHub(hub: PairedHub): Promise<string>;
+  checkHubUpdate(hub: PairedHub): Promise<string | null>;
   removeProfile(hub: PairedHub, id: string): Promise<void>;
   setProfileRole(hub: PairedHub, id: string, role: string): Promise<void>;
   mcpOverview(hub: PairedHub): Promise<McpServerSummary[]>;
@@ -350,6 +389,7 @@ type WebClient = {
   modelsCancel(hub: PairedHub, file: string): Promise<LlamaStatus>;
   modelsDelete(hub: PairedHub, file: string): Promise<LlamaStatus>;
   modelsStatus(hub: PairedHub): Promise<LlamaStatus>;
+  modelsUpdate(hub: PairedHub): Promise<LlamaStatus>;
   push(hub: PairedHub, collection: string, records: SyncRecord[]): Promise<void>;
   pull(hub: PairedHub, collection: string, since: number): Promise<PullPage>;
   watch(hub: PairedHub, since: number): Promise<number>;
@@ -360,6 +400,7 @@ type WebClient = {
   unlockProfile(hub: PairedHub, profileId: string, password: string): Promise<UnlockedProfile>;
   changePassword(hub: PairedHub, current: string, next: string): Promise<void>;
   renameProfile(hub: PairedHub, name: string): Promise<HubProfile>;
+  setProfileButterfly?(hub: PairedHub, butterfly: string): Promise<HubProfile>;
   lockedKey(hub: PairedHub): Promise<ProfileLock>;
   linkStart(hub: PairedHub): Promise<HubInvite>;
   linkWatch(hub: PairedHub): Promise<LinkJoining | null>;
@@ -425,16 +466,19 @@ const webHub: NativeHub = {
   pairWithCode: async (deviceKey, code, deviceName, kind) =>
     (await loadWebClient(deviceKey)).pairWithCode(code, deviceName, kind),
   invite: async (deviceKey, hub) => (await loadWebClient(deviceKey)).invite(hub),
+  inviteWatch: async (deviceKey, hub) => (await loadWebClient(deviceKey)).inviteWatch(hub),
   qrSvg: async (text, dark, light) => (await loadWebModule()).qrSvg(text, dark, light),
   status: async (deviceKey, hub) => (await loadWebClient(deviceKey)).status(hub),
   unpair: async (deviceKey, hub) => (await loadWebClient(deviceKey)).unpair(hub),
   devices: async (deviceKey, hub) => (await loadWebClient(deviceKey)).devices(hub),
   renameDevice: async (deviceKey, hub, id, name) => (await loadWebClient(deviceKey)).renameDevice(hub, id, name),
+  renameHub: async (deviceKey, hub, name) => (await loadWebClient(deviceKey)).renameHub(hub, name),
   removeDevice: async (deviceKey, hub, id) => (await loadWebClient(deviceKey)).removeDevice(hub, id),
   //the hub only answers admin profiles
   hubSettings: async (deviceKey, hub) => (await loadWebClient(deviceKey)).hubSettings(hub),
   setHubSettings: async (deviceKey, hub, settings) => (await loadWebClient(deviceKey)).setHubSettings(hub, settings),
   updateHub: async (deviceKey, hub) => (await loadWebClient(deviceKey)).updateHub(hub),
+  checkHubUpdate: async (deviceKey, hub) => (await loadWebClient(deviceKey)).checkHubUpdate(hub),
   removeProfile: async (deviceKey, hub, id) => (await loadWebClient(deviceKey)).removeProfile(hub, id),
   setProfileRole: async (deviceKey, hub, id, role) => (await loadWebClient(deviceKey)).setProfileRole(hub, id, role),
   mcpOverview: async (deviceKey, hub) => (await loadWebClient(deviceKey)).mcpOverview(hub),
@@ -447,6 +491,7 @@ const webHub: NativeHub = {
   modelsCancel: async (deviceKey, hub, file) => (await loadWebClient(deviceKey)).modelsCancel(hub, file),
   modelsDelete: async (deviceKey, hub, file) => (await loadWebClient(deviceKey)).modelsDelete(hub, file),
   modelsStatus: async (deviceKey, hub) => (await loadWebClient(deviceKey)).modelsStatus(hub),
+  modelsUpdate: async (deviceKey, hub) => (await loadWebClient(deviceKey)).modelsUpdate(hub),
   push: async (deviceKey, hub, collection, records) =>
     (await loadWebClient(deviceKey)).push(hub, collection, records),
   pull: async (deviceKey, hub, collection, since) => (await loadWebClient(deviceKey)).pull(hub, collection, since),
@@ -461,6 +506,11 @@ const webHub: NativeHub = {
   changePassword: async (deviceKey, hub, current, next) =>
     (await loadWebClient(deviceKey)).changePassword(hub, current, next),
   renameProfile: async (deviceKey, hub, name) => (await loadWebClient(deviceKey)).renameProfile(hub, name),
+  setProfileButterfly: async (deviceKey, hub, butterfly) => {
+    const client = await loadWebClient(deviceKey);
+    if (!client.setProfileButterfly) throw Object.assign(new Error('Hub client too old'), { code: 'Outdated' });
+    return client.setProfileButterfly(hub, butterfly);
+  },
   lockedKey: async (deviceKey, hub) => (await loadWebClient(deviceKey)).lockedKey(hub),
   openLockedKey: async (lock, password) => (await loadWebModule()).openLockedKey(lock, password),
   profileBackupKey: async (key) => (await loadWebModule()).profileBackupKey(key),
@@ -612,6 +662,17 @@ class SamplerHubServiceImpl {
     return profile;
   }
 
+  //older clients keep the card look local
+  async setProfileButterfly(hub: PairedHub, butterfly: string): Promise<HubProfile | null> {
+    const set = this.native().setProfileButterfly;
+    if (!set) return null;
+    await this.ensureProfile();
+    const profile = await set(await this.deviceKey(), hub, butterfly);
+    const stored = await this.storedProfile();
+    if (stored) await setSecret(PROFILE_KEY, JSON.stringify({ ...stored, profile }));
+    return profile;
+  }
+
   //null without a profile or any known lock
   async profileBackup(): Promise<ProfileBackup | null> {
     const stored = await this.storedProfile();
@@ -703,6 +764,10 @@ class SamplerHubServiceImpl {
     return this.native().invite(await this.deviceKey(), hub);
   }
 
+  async inviteWatch(hub: PairedHub): Promise<boolean> {
+    return this.native().inviteWatch(await this.deviceKey(), hub);
+  }
+
   async qrSvg(text: string, dark: string, light: string): Promise<string> {
     return this.native().qrSvg(text, dark, light);
   }
@@ -715,6 +780,34 @@ class SamplerHubServiceImpl {
   async nearbyHubs(waitMs = NEARBY_WAIT_MS): Promise<NearbyHub[]> {
     const nearby = this.native().nearbyHubs;
     return nearby ? nearby(await this.deviceKey(), waitMs) : [];
+  }
+
+  //false on android without wifi
+  async localNetworkAvailable(): Promise<boolean> {
+    const check = native?.localNetworkAvailable;
+    return check && Platform.OS === 'android' ? check() : true;
+  }
+
+  canSignIn(): boolean {
+    return !!native?.signIn;
+  }
+
+  //profiles a nearby hub offers
+  async nearbyProfiles(hub: NearbyHub): Promise<HubProfile[]> {
+    const list = this.native().nearbyProfiles;
+    if (!list) throw Object.assign(new Error('Needs the app'), { code: 'Outdated' });
+    return list(await this.deviceKey(), hub);
+  }
+
+  //pairs and unlocks with the profile password
+  async signIn(hub: NearbyHub, profileId: string, password: string): Promise<HubProfile> {
+    const signIn = this.native().signIn;
+    if (!signIn) throw Object.assign(new Error('Needs the app'), { code: 'Outdated' });
+    await this.forgetProfile();
+    const { name, kind } = await this.identity();
+    const signed = await signIn(await this.deviceKey(), hub, profileId, password, name, kind);
+    await setSecret(PAIRED_HUB_KEY, JSON.stringify(signed.hub));
+    return this.keepProfile(signed.hub, signed.profile);
   }
 
   canManageModels(): boolean {
@@ -735,6 +828,7 @@ class SamplerHubServiceImpl {
       cancel: (file) => native.modelsCancel!(key, hub, file),
       remove: (file) => native.modelsDelete!(key, hub, file),
       status: () => native.modelsStatus!(key, hub),
+      update: () => native.modelsUpdate!(key, hub),
     };
   }
 
@@ -777,6 +871,18 @@ class SamplerHubServiceImpl {
   //older clients lack it
   canUpdateHub(): boolean {
     return !!native?.updateHub;
+  }
+
+  //older clients lack it
+  canCheckHubUpdate(): boolean {
+    return !!native?.checkHubUpdate;
+  }
+
+  //null when up to date
+  async checkHubUpdate(hub: PairedHub): Promise<string | null> {
+    const check = this.native().checkHubUpdate;
+    if (!check) throw Object.assign(new Error('Hub updates need the app'), { code: 'Unauthorized' });
+    return check(await this.deviceKey(), hub);
   }
 
   //the hub on this computer opens its installer, others update themselves
@@ -844,7 +950,18 @@ class SamplerHubServiceImpl {
 
 
   async status(hub: PairedHub): Promise<HubStatus> {
-    return this.native().status(await this.deviceKey(), hub);
+    const status = await this.native().status(await this.deviceKey(), hub);
+    //keeps reaching a hub that moved relay
+    const relays = status.relays;
+    if (relays) {
+      const paired = await this.getPairedHub();
+      if (paired?.id === hub.id && relays.join() !== paired.relays.join()) {
+        await setSecret(PAIRED_HUB_KEY, JSON.stringify({ ...paired, relays }));
+      }
+    }
+    //hub may be renamed elsewhere
+    if (status.name && status.name !== hub.name) await this.keepHubName(hub, status.name);
+    return status;
   }
 
   async devices(hub: PairedHub): Promise<HubDevice[]> {
@@ -853,6 +970,13 @@ class SamplerHubServiceImpl {
 
   async renameDevice(hub: PairedHub, id: string, name: string): Promise<void> {
     return this.native().renameDevice(await this.deviceKey(), hub, id, name);
+  }
+
+  //admin only, empty resets to hostname
+  async renameHub(hub: PairedHub, name: string): Promise<string> {
+    const effective = await this.native().renameHub(await this.deviceKey(), hub, name);
+    await this.keepHubName(hub, effective);
+    return effective;
   }
 
   //it loses access at once
@@ -943,6 +1067,11 @@ class SamplerHubServiceImpl {
   async forget(): Promise<void> {
     await setSecret(PAIRED_HUB_KEY, null);
     await this.forgetProfile();
+  }
+
+  private async keepHubName(hub: PairedHub, name: string): Promise<void> {
+    const stored = await this.getPairedHub();
+    if (stored?.id === hub.id) await setSecret(PAIRED_HUB_KEY, JSON.stringify({ ...stored, name }));
   }
 
   //the key stays only as long as the pairing

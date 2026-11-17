@@ -139,6 +139,7 @@ pub fn run() {
             hub::hub_devices,
             #[cfg(desktop)]
             hub::hub_rename_device,
+            hub::hub_rename_hub,
             #[cfg(desktop)]
             hub::hub_remove_device,
             #[cfg(desktop)]
@@ -169,6 +170,7 @@ pub fn run() {
             hub::hub_change_password,
             #[cfg(desktop)]
             hub::hub_rename_profile,
+            hub::hub_set_profile_butterfly,
             #[cfg(desktop)]
             hub::hub_locked_key,
             #[cfg(desktop)]
@@ -208,6 +210,8 @@ pub fn run() {
             #[cfg(desktop)]
             hub::hub_invite,
             #[cfg(desktop)]
+            hub::hub_invite_watch,
+            #[cfg(desktop)]
             hub::hub_qr_svg,
             #[cfg(desktop)]
             hub::hub_models_catalog,
@@ -219,6 +223,7 @@ pub fn run() {
             hub::hub_models_download,
             #[cfg(desktop)]
             hub::hub_models_cancel,
+            hub::hub_models_update,
             #[cfg(desktop)]
             hub::hub_models_delete,
             #[cfg(desktop)]
@@ -231,8 +236,11 @@ pub fn run() {
             hub::hub_set_settings,
             #[cfg(desktop)]
             hub::hub_nearby,
+            hub::hub_nearby_profiles,
+            hub::hub_sign_in,
             #[cfg(desktop)]
             hub::hub_update,
+            hub::hub_check_update,
             #[cfg(desktop)]
             hub::hub_install_update,
             #[cfg(desktop)]

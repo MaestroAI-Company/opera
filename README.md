@@ -19,6 +19,39 @@
 
 Opera is a privacy-first AI assistant. Run a model on the device itself, on your own Ollama server, or on any OpenAI-compatible endpoint - no account, and nothing leaves your device unless you pick an online model, a cloud sync or a web search.
 
+## One assistant, every device
+
+Pair your phone, tablet and computer with your own [Sampler Hub](https://github.com/MaestroAI-Company/sampler-hub) in a few seconds: scan a QR code, share your models and your voice, and pick up any conversation anywhere.
+
+<div align="center">
+  <img src="./docs/readme/sampler-pairing.webp" alt="Pairing devices with Sampler Hub" width="800" />
+</div>
+
+## See it in action
+
+<table>
+  <tr>
+    <th width="40%">Preview</th>
+    <th width="60%">What it does</th>
+  </tr>
+  <tr>
+    <td><img src="./docs/readme/mobile.png" alt="Opera on Android" width="300" /></td>
+    <td valign="middle"><b>Chat anywhere</b><br /><br />A clean, fast chat on Android with your history, your models and your tools one tap away.</td>
+  </tr>
+  <tr>
+    <td><img src="./docs/readme/assistant.png" alt="Maestro assistant overlay" width="300" /></td>
+    <td valign="middle"><b>Maestro, over any app</b><br /><br />Set Opera as your default assistant and ask Maestro from the bottom of any screen, by voice or text.</td>
+  </tr>
+  <tr>
+    <td><img src="./docs/readme/standby.png" alt="Opera standby mode" width="300" /></td>
+    <td valign="middle"><b>Standby mode</b><br /><br />Turn your phone into a bedside assistant with a clock and a push-to-talk button always ready.</td>
+  </tr>
+  <tr>
+    <td><img src="./docs/readme/desktop.png" alt="Opera on desktop" width="300" /></td>
+    <td valign="middle"><b>Desktop and Sampler Hub</b><br /><br />Native on Windows, macOS and Linux, with every paired device visible at a glance.</td>
+  </tr>
+</table>
+
 ## Features
 
 | | |
@@ -32,6 +65,7 @@ Opera is a privacy-first AI assistant. Run a model on the device itself, on your
 | Desktop | Windows, macOS and Linux |
 | Rich replies | Markdown with KaTeX math and code highlighting, citations, reply suggestions; weather, maps, HTML and Mermaid widgets |
 | Sync & backup |Nextcloud/Google Drive sync encrypted with a PIN, local JSON export / import |
+| Sampler Hub | pair with your own [Sampler Hub](https://github.com/MaestroAI-Company/sampler-hub) by QR code or one-time code, share its models and live voice across your devices, hub profiles that follow you on every device |
 | Sharing | conversations shared as encrypted [PrivateBin](https://privatebin.info) links, key kept in the URL fragment, instance configurable |
 | Incognito mode | conversations that are never written to history |
 | Languages | English, French |
@@ -40,19 +74,21 @@ Opera is a privacy-first AI assistant. Run a model on the device itself, on your
 
 | Layer | Technology |
 |---|---|
-| Mobile / Web UI | Expo (SDK 58), React Native, `expo-router`, React 19 |
+| Mobile / Web UI | Expo (SDK 58), React Native 0.88, `expo-router`, React 19.3 |
+| Desktop | Tauri 2.11 (Rust) |
+| Hub client | `sampler-hub-client` (Rust, prebuilt for Android and web, version pinned in `sampler-hub-client.json`) |
 | Local database | SQLite (`expo-sqlite`) |
 | On-device AI | LiteRT-LM (`react-native-litert-lm`), Android AICore (Gemini Nano), ExecuTorch (on-screen object detection), Whisper via `@xenova/transformers` (web) |
 | Native Android | Kotlin / Java (voice interaction service, overlay, screen capture, text selection, AICore bridge) |
 | Crypto | `react-native-quick-crypto` / WebCrypto |
-| Language | TypeScript, strict |
+| Language | TypeScript 6, strict |
 
 <details>
 <summary><strong>Project structure</strong></summary>
 
 ```
 src/
-  app/                 expo-router screens (chat, onboarding, oauth redirects)
+  app/                 expo-router screens (chat, onboarding, standby, oauth redirects)
   components/
     features/          feature UI (chat, drawers, overlay, settings sheets…)
     ui/                design-system primitives (buttons, inputs, cards…)
@@ -67,6 +103,9 @@ src/
     overlay/           screen capture, text selection, object detection
     documents/         PDF / DOCX extraction
     share/             PrivateBin share links
+    hub/               Sampler Hub client, pairing and sync
+    desktop/           Tauri desktop bridges
+    search/, widgets/  web search and widget data
     settings/, notifications/, updates/, ...
   hooks/               shared hooks
   i18n/                en / fr catalogs
@@ -75,7 +114,7 @@ constants/             design tokens (theme.ts) and system prompts
 native/android/        native Kotlin/Java modules (assistant service, overlay, screen capture)
 plugins/               custom Expo config plugins
 src-tauri/             desktop shell
-design/                design system rules (DESIGN.md)
+DESIGN.md              design system rules
 assets/                icons, images, fonts, animations, on-device models
 ```
 
@@ -124,6 +163,15 @@ npm run ios
 
 The app runs without them, but the largest on-device models may run out of memory and sharing to Opera from other apps is off. A paid Apple developer account keeps the entitlement and avoids the 7-day expiry of free signing.
 
+**Sampler Hub client** - builds use the hub client release pinned in `sampler-hub-client.json` (and the same tag in `src-tauri/Cargo.toml`). To test changes to the hub, build it from the `sampler-hub` repo next to this one (or `SAMPLER_HUB_DIR`) instead. Android needs Rust with `cargo-ndk` and the `aarch64-linux-android` target:
+
+```bash
+npm run android:hub   # Android with the hub client built from source
+npm run desktop:hub   # Opera Desktop on the local hub crates
+```
+
+A throwaway hub to pair with is described in the Sampler Hub README.
+
 Then, only if you need it:
 
 ```bash
@@ -139,6 +187,19 @@ npm run lint            # ESLint
 ```
 
 Coding conventions for this repo are in [AGENTS.md](./AGENTS.md); the visual language - colors, type, spacing, component specs - is documented separately in [DESIGN.md](./DESIGN.md).
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+Windows installers are built from this repository by GitHub Actions and signed only after manual approval of each release.
+
+- **Committers and reviewers**: [MaestroAI-Company members](https://github.com/orgs/MaestroAI-Company/people). Ethan Caillat, Charly Charteux
+- **Approvers**: Ethan Caillat, Charly Charteux
+
+## Privacy policy
+
+Opera sends nothing off your device unless you choose an online model, a cloud sync, a web search or a model download, and update checks have their own switch in the settings. See the full [privacy policy](https://maestroai.company/privacy).
 
 ## License
 

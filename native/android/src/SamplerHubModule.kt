@@ -1,6 +1,8 @@
 package __PACKAGE_NAME__
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.provider.Settings
 import com.facebook.react.bridge.Arguments
@@ -22,6 +24,7 @@ import uniffi.sampler_hub_client.HubProfile
 import uniffi.sampler_hub_client.HubSettings
 import uniffi.sampler_hub_client.LlamaStatus
 import uniffi.sampler_hub_client.ModelFile
+import uniffi.sampler_hub_client.NearbyHub
 import uniffi.sampler_hub_client.PairedHub
 import uniffi.sampler_hub_client.ProfileLock
 //aliased so the bridge methods keep their js names
@@ -61,8 +64,13 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
         status.ctxSize?.let { putDouble("ctxSize", it.toDouble()) }
         status.keepAlive?.let { putDouble("keepAlive", it.toDouble()) }
         status.parallel?.let { putDouble("parallel", it.toDouble()) }
+        status.relays?.let { putArray("relays", Arguments.fromList(it)) }
       }
     }
+
+  @ReactMethod
+  fun checkHubUpdate(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) { client(deviceKey).checkHubUpdate(hubFromMap(hub)) }
 
   @ReactMethod
   fun updateHub(deviceKey: String, hub: ReadableMap, promise: Promise) =
@@ -82,6 +90,11 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
       }
     }
 
+  //true once a device used the code
+  @ReactMethod
+  fun inviteWatch(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) { client(deviceKey).inviteWatch(hubFromMap(hub)) }
+
   @ReactMethod
   fun hubSettings(deviceKey: String, hub: ReadableMap, promise: Promise) =
     launchPromise(promise) { settingsToMap(client(deviceKey).hubSettings(hubFromMap(hub))) }
@@ -98,9 +111,27 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
         settings.getInt("ctxSize").toUInt(),
         settings.getInt("keepAlive").toUInt(),
         settings.getInt("parallel").toUInt(),
+        settings.getBoolean("updateChecks"),
       )
       settingsToMap(client(deviceKey).setHubSettings(hubFromMap(hub), wanted))
     }
+
+  //mobile data cannot reach local hubs
+  @ReactMethod
+  fun localNetworkAvailable(promise: Promise) {
+    try {
+      val manager = reactApplicationContext.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+      val caps = manager.getNetworkCapabilities(manager.activeNetwork)
+      promise.resolve(
+        caps != null && (
+          caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+        )
+      )
+    } catch (e: Exception) {
+      promise.resolve(false)
+    }
+  }
 
   //android drops multicast without a lock
   @ReactMethod
@@ -167,6 +198,10 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
     launchPromise(promise) { statusToMap(client(deviceKey).modelsDownload(hubFromMap(hub), repo, file)) }
 
   @ReactMethod
+  fun modelsUpdate(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) { statusToMap(client(deviceKey).modelsUpdate(hubFromMap(hub))) }
+
+  @ReactMethod
   fun modelsCancel(deviceKey: String, hub: ReadableMap, file: String, promise: Promise) =
     launchPromise(promise) { statusToMap(client(deviceKey).modelsCancel(hubFromMap(hub), file)) }
 
@@ -200,6 +235,10 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
       client(deviceKey).renameDevice(hubFromMap(hub), id, name)
       null
     }
+
+  @ReactMethod
+  fun renameHub(deviceKey: String, hub: ReadableMap, name: String, promise: Promise) =
+    launchPromise(promise) { client(deviceKey).renameHub(hubFromMap(hub), name) }
 
   @ReactMethod
   fun removeDevice(deviceKey: String, hub: ReadableMap, id: String, promise: Promise) =
@@ -294,6 +333,32 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
   @ReactMethod
+  fun nearbyProfiles(deviceKey: String, hub: ReadableMap, promise: Promise) =
+    launchPromise(promise) {
+      Arguments.createArray().apply {
+        for (profile in client(deviceKey).nearbyProfiles(nearbyFromMap(hub))) pushMap(profileToMap(profile))
+      }
+    }
+
+  @ReactMethod
+  fun signIn(
+    deviceKey: String,
+    hub: ReadableMap,
+    profileId: String,
+    password: String,
+    deviceName: String,
+    kind: String,
+    promise: Promise,
+  ) =
+    launchPromise(promise) {
+      val signed = client(deviceKey).signIn(nearbyFromMap(hub), profileId, password, deviceName, kind, machineId())
+      Arguments.createMap().apply {
+        putMap("hub", hubToMap(signed.hub))
+        putMap("profile", unlockedToMap(signed.profile))
+      }
+    }
+
+  @ReactMethod
   fun createProfile(deviceKey: String, hub: ReadableMap, name: String, password: String, promise: Promise) =
     launchPromise(promise) { unlockedToMap(client(deviceKey).createProfile(hubFromMap(hub), name, password)) }
 
@@ -311,6 +376,10 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
   @ReactMethod
   fun renameProfile(deviceKey: String, hub: ReadableMap, name: String, promise: Promise) =
     launchPromise(promise) { profileToMap(client(deviceKey).renameProfile(hubFromMap(hub), name)) }
+
+  @ReactMethod
+  fun setProfileButterfly(deviceKey: String, hub: ReadableMap, butterfly: String, promise: Promise) =
+    launchPromise(promise) { profileToMap(client(deviceKey).setProfileButterfly(hubFromMap(hub), butterfly)) }
 
   @ReactMethod
   fun lockedKey(deviceKey: String, hub: ReadableMap, promise: Promise) =
@@ -503,6 +572,7 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
       putString("name", profile.name)
       putString("role", profile.role)
       putDouble("createdAt", profile.createdAt.toDouble())
+      putString("butterfly", profile.butterfly)
     }
 
   private fun unlockedToMap(unlocked: UnlockedProfile): WritableMap =
@@ -529,6 +599,7 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
       putDouble("ctxSize", settings.ctxSize.toDouble())
       putDouble("keepAlive", settings.keepAlive.toDouble())
       putDouble("parallel", settings.parallel.toDouble())
+      putBoolean("updateChecks", settings.updateChecks)
     }
 
   private fun hubToMap(hub: PairedHub): WritableMap =
@@ -541,6 +612,11 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
   private fun hubFromMap(map: ReadableMap): PairedHub {
     val relays = map.getArray("relays")?.toArrayList()?.map { it.toString() } ?: emptyList()
     return PairedHub(map.getString("id") ?: "", map.getString("name") ?: "", relays)
+  }
+
+  private fun nearbyFromMap(map: ReadableMap): NearbyHub {
+    val addrs = map.getArray("addrs")?.toArrayList()?.map { it.toString() } ?: emptyList()
+    return NearbyHub(map.getString("id") ?: "", map.getString("name") ?: "", addrs)
   }
 
   override fun invalidate() {

@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { Animated, Easing, Image, Pressable, StyleSheet, View } from "react-native";
 import { Radius, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { useShadowShift } from "../../hooks/useShadowShift";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { pressStyle } from "../ui/pressStyle";
 import { DRAWER_NATIVE_DRIVER } from "./drawerAnimation";
@@ -29,6 +30,7 @@ export default function DrawerBackButton({
   const styles = useThemedStyles(makeStyles);
   const pulse = useAnimatedValue(0);
   const scrolledAnim = useAnimatedValue(scrolled ? 1 : 0);
+  const shadowShift = useShadowShift();
 
   //dissolve surface and shadow in and out
   useEffect(() => {
@@ -70,7 +72,13 @@ export default function DrawerBackButton({
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.shadow, { opacity: scrolledAnim }]} pointerEvents="none" />
+      <Animated.View
+        style={[
+          styles.shadow,
+          { opacity: scrolledAnim, transform: shadowShift.getTranslateTransform() },
+        ]}
+        pointerEvents="none"
+      />
       <Animated.View style={pulseStyle}>
         <Animated.View style={[styles.surface, { opacity: scrolledAnim }]} pointerEvents="none" />
         <Pressable

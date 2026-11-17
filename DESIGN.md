@@ -694,7 +694,9 @@ To add a settings subpage:
 - `avoidKeyboard` when it holds a TextInputField; it then needs a `maxHeight` in `sheetStyle`. A sheet too tall to ride the keyboard scrolls in a `SheetKeyboardAwareScrollView` instead (MCP add server).
 - `onBackPress` returns `true` when the sheet popped one of its own pages instead of closing.
 - Content: a `SheetScrollView` padded `Spacing.lg2` on the sides, then sections, rows and Groups like a page, without the Petrona header. The first row label acts as the title.
-- Edge scroll: on mobile the scroll runs to the bottom edge of the sheet under a `LinearGradient` fade (grouped background to clear, eased stops), same as the drawers. The top edge sits in a 20px band (`paddingTop: Spacing.xxl`) with the handle floating in it (`sheetHandleContainer` is absolute) and the scroll sits in a wrapping view clipped by a rounded top (`Radius.xxl + Spacing.md`, like the cards; android scrolls ignore the radius themselves), so `SheetScrollView` (or `SheetKeyboardAwareScrollView`) turns its content's side padding into margin. It reads the bottom band (`paddingBottom` of `sheetStyle`) plus `FADE_EXTRA` and moves them into its content padding, so rows sit clear of the fade at rest. Never a plain `ScrollView` as a sheet body. Desktop cards and `lift` mode keep their own padding.
+- Spacing is owned by containers, nothing is computed. The sheet content spaces its sections with `gap: Spacing.xxl2` and the section cards inside a sheet carry no `marginBottom` (`sheetCard`, not the page's `contentCard`), so the last card needs no override and a conditional card never leaves a hole. Rows inside a card keep `settingRowVertical`, with `0` on the last one.
+- The bottom band belongs to `DrawerSheet`. It adds the safe area to a base band (20 on iOS, 10 elsewhere) and drops the safe area while the keyboard is open. A sheet never passes a `paddingBottom` or a bottom inset in `sheetStyle`, only `maxHeight` or `height`.
+- Edge scroll: on mobile the scroll runs to the bottom edge of the sheet under a `LinearGradient` fade (grouped background to clear, eased stops), same as the drawers. The top edge sits in a 20px band (`paddingTop: Spacing.xxl`) with the handle floating in it (`sheetHandleContainer` is absolute) and the scroll sits in a wrapping view clipped by a rounded top (`Radius.xxl + Spacing.md`, like the cards; android scrolls ignore the radius themselves), so `SheetScrollView` (or `SheetKeyboardAwareScrollView`) turns its content's side padding into margin. It reads the bottom band of the sheet plus `FADE_EXTRA` and moves them into its content padding, so rows sit clear of the fade at rest. Never a plain `ScrollView` as a sheet body. Desktop cards and `lift` mode keep their own padding.
 - A sheet with several pages puts a `PageStack` in a `SheetBody` (the block bleeds into the bottom band and owns the fade, each page's `SheetScrollView` then only pads and rounds its content), a floating `DrawerBackButton kind="back"` on non-root pages, and pops pages in `onBackPress` (add model sheet). A `SheetBody` also wraps a `SheetScrollView` that sits inside another view, so the scroll never reaches outside its parent's bounds.
 
 ```tsx
@@ -709,7 +711,6 @@ To add a settings subpage:
   sheetStyle={[
     styles.sheet,
     {
-      paddingBottom: (Platform.OS === "ios" ? 20 : 10) + bottomInset,
       maxHeight: windowHeight - insets.top - Spacing.xl2,
     },
   ]}
@@ -719,7 +720,7 @@ To add a settings subpage:
     contentContainerStyle={styles.content}
     keyboardShouldPersistTaps="handled"
   >
-    <View style={styles.contentCard}>
+    <View style={styles.sheetCard}>
       {/* rows */}
       <Group style={styles.highlightGroup}>
         <ActionButton
@@ -759,6 +760,12 @@ desktopCard: {
 content: {
   paddingHorizontal: Spacing.lg2,
   paddingBottom: Spacing.lg,
+  gap: Spacing.xxl2,
+},
+sheetCard: {
+  backgroundColor: Colors.surface,
+  borderRadius: Radius.xxl + Spacing.md,
+  padding: Spacing.md,
 },
 ```
 

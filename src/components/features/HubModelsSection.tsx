@@ -10,13 +10,17 @@ import {
 } from "../../hooks/useHubModels";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+import { AIModule } from "../../services/ai/AIModule";
 import { fetchModelDescription, formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
+import { getHubServers, HUB_PROVIDER_ID } from "../../services/ai/providers/sources";
+import { LLAMA_SERVER_URL } from "../../services/hub/modelOptions";
 import ActionButton from "../ui/ActionButton";
 import CardGrid, { type GridCard } from "../ui/CardGrid";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 
 const binIcon = require("../../../assets/icons/bin.png");
+const cloudIcon = require("../../../assets/icons/cloud2.png");
 
 type HubModelsSectionProps = {
   onOpenModel: (file: string, name: string) => void;
@@ -44,6 +48,31 @@ export default function HubModelsSection({ onOpenModel }: HubModelsSectionProps)
     }
   };
 
+  //models of the servers the hub relays, listed only
+  const [relayed, setRelayed] = useState<GridCard[]>([]);
+  useEffect(() => {
+    let dropped = false;
+    Promise.all(
+      getHubServers()
+        .filter((s) => s.url !== LLAMA_SERVER_URL)
+        .map((s) =>
+          AIModule.getModelsFor(HUB_PROVIDER_ID, s.url, true)
+            .catch(() => [] as string[])
+            .then((models) =>
+              models.map((m) => ({
+                key: `${s.url}|${m}`,
+                title: m,
+                status: s.provider,
+                badge: s.kind === "openai" ? cloudIcon : undefined,
+              })),
+            ),
+        ),
+    ).then((lists) => !dropped && setRelayed(lists.flat()));
+    return () => {
+      dropped = true;
+    };
+  }, []);
+
   const nameOf = (file: string) => hubModelName(file, catalog);
   const cards: GridCard[] = [
     ...(status?.downloads ?? []).map((d) => ({
@@ -61,6 +90,7 @@ export default function HubModelsSection({ onOpenModel }: HubModelsSectionProps)
       status: formatBytes(m.size),
       onPress: () => onOpenModel(m.file, nameOf(m.file)),
     })),
+    ...relayed,
   ];
 
   return (
@@ -125,7 +155,7 @@ export function HubModelPage({ file, onDeleted }: { file: string; onDeleted: () 
 
   return (
     <>
-      <View style={styles.contentCard}>
+      <View style={styles.sheetCard}>
         <View style={styles.detailHeader}>
           <View style={styles.detailTile}>
             <Image source={{ uri: hubModelAvatar(name, repo) }} style={styles.tileImage} />
@@ -153,7 +183,7 @@ export function HubModelPage({ file, onDeleted }: { file: string; onDeleted: () 
       </View>
 
       {/* actions section */}
-      <View style={[styles.contentCard, { marginBottom: 0 }]}>
+      <View style={styles.sheetCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           {!!error && <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{error}</Text>}
           <Group>
@@ -190,6 +220,12 @@ const makeStyles = (Colors: ThemeColors) =>
       borderWidth: 0,
       padding: Spacing.md,
       marginBottom: Spacing.xxl2,
+    },
+    sheetCard: {
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
+      padding: Spacing.md,
     },
     settingRowVertical: {
       marginBottom: Spacing.xxl,

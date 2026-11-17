@@ -5,7 +5,7 @@ use sampler_hub::{config, hub, service};
 use sampler_hub_client::{
     CatalogModel, HubClient, HubDevice, HubError, HubInvite, HubProfile, HubProvider, HubSettings,
     HubStatus, LinkJoining, LinkProgress, LlamaStatus, McpServerSummary, ModelFile, ModelRepo,
-    NearbyHub, PairedHub, ProfileLock, ProxyInfo, PullPage, SyncRecord, UnlockedProfile,
+    NearbyHub, PairedHub, ProfileLock, ProxyInfo, PullPage, SignedIn, SyncRecord, UnlockedProfile,
 };
 use serde::Serialize;
 use tauri::State;
@@ -117,6 +117,15 @@ pub async fn hub_invite(
 }
 
 #[tauri::command]
+pub async fn hub_invite_watch(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<bool, HubError> {
+    state.client(&device_key).await?.invite_watch(hub).await
+}
+
+#[tauri::command]
 pub async fn hub_settings(
     state: State<'_, HubState>,
     device_key: String,
@@ -146,12 +155,46 @@ pub async fn hub_nearby(
 }
 
 #[tauri::command]
+pub async fn hub_nearby_profiles(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: NearbyHub,
+) -> Result<Vec<HubProfile>, HubError> {
+    state.client(&device_key).await?.nearby_profiles(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_sign_in(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: NearbyHub,
+    profile_id: String,
+    password: String,
+    device_name: String,
+    kind: String,
+) -> Result<SignedIn, HubError> {
+    let client = state.client(&device_key).await?;
+    client
+        .sign_in(hub, profile_id, password, device_name, kind, machine_id())
+        .await
+}
+
+#[tauri::command]
 pub async fn hub_update(
     state: State<'_, HubState>,
     device_key: String,
     hub: PairedHub,
 ) -> Result<String, HubError> {
     state.client(&device_key).await?.update_hub(hub).await
+}
+
+#[tauri::command]
+pub async fn hub_check_update(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<Option<String>, HubError> {
+    state.client(&device_key).await?.check_hub_update(hub).await
 }
 
 //false where the hub swaps its own binaries
@@ -212,6 +255,15 @@ pub async fn hub_models_download(
 ) -> Result<LlamaStatus, HubError> {
     let client = state.client(&device_key).await?;
     client.models_download(hub, repo, file).await
+}
+
+#[tauri::command]
+pub async fn hub_models_update(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+) -> Result<LlamaStatus, HubError> {
+    state.client(&device_key).await?.models_update(hub).await
 }
 
 #[tauri::command]
@@ -291,6 +343,18 @@ pub async fn hub_rename_device(
 ) -> Result<(), HubError> {
     let client = state.client(&device_key).await?;
     client.rename_device(hub, id, name).await
+}
+
+//empty name resets to the hostname
+#[tauri::command]
+pub async fn hub_rename_hub(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    name: String,
+) -> Result<String, HubError> {
+    let client = state.client(&device_key).await?;
+    client.rename_hub(hub, name).await
 }
 
 #[tauri::command]
@@ -490,6 +554,17 @@ pub async fn hub_rename_profile(
     name: String,
 ) -> Result<HubProfile, HubError> {
     state.client(&device_key).await?.rename_profile(hub, name).await
+}
+
+#[tauri::command]
+pub async fn hub_set_profile_butterfly(
+    state: State<'_, HubState>,
+    device_key: String,
+    hub: PairedHub,
+    butterfly: String,
+) -> Result<HubProfile, HubError> {
+    let client = state.client(&device_key).await?;
+    client.set_profile_butterfly(hub, butterfly).await
 }
 
 #[tauri::command]
@@ -720,5 +795,5 @@ pub async fn hub_host_pairing_link() -> Result<String, String> {
 //the name other devices see
 #[tauri::command]
 pub fn hub_computer_name() -> String {
-    config::Config::default().hub_name()
+    sampler_hub::name::hostname()
 }

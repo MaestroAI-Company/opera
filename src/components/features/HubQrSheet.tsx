@@ -1,6 +1,6 @@
 import * as Clipboard from "expo-clipboard";
-import { useCallback, useEffect, useState } from "react";
-import { Platform, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SvgXml } from "react-native-svg";
 import {
   Fonts,
@@ -49,18 +49,67 @@ export default function HubQrSheet({
   isDesktop = false,
 }: HubQrSheetProps) {
   const styles = useThemedStyles(makeStyles);
+
+  return (
+    <DrawerSheet
+      visible={visible}
+      onClose={onClose}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      sheetStyle={[
+        styles.sheet,
+      ]}
+      desktopStyle={styles.desktopCard}
+    >
+      <SheetScrollView contentContainerStyle={styles.content}>
+        <HubQrContent active={visible} onClose={onClose} hub={hub} mode={mode} />
+      </SheetScrollView>
+    </DrawerSheet>
+  );
+}
+
+type HubQrContentProps = {
+  active: boolean;
+  onClose: () => void;
+  hub: PairedHub | null;
+  mode: "invite" | "link";
+  //host page explains the code
+  bare?: boolean;
+};
+
+//code card for sheet or page
+export function HubQrContent({ active, onClose, hub, mode, bare = false }: HubQrContentProps) {
+  const styles = useThemedStyles(makeStyles);
   const colors = useColors();
   const t = useT();
   const [invite, setInvite] = useState<HubInvite | null>(null);
   const [svg, setSvg] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   //a device typed the link code
   const [joining, setJoining] = useState<LinkJoining | null>(null);
   const [answering, setAnswering] = useState(false);
 
+  //a new hub object keeps the code
+  const hubRef = useRef(hub);
+  const colorsRef = useRef(colors);
+  useEffect(() => {
+    hubRef.current = hub;
+    colorsRef.current = colors;
+  });
+  const hasHub = !!hub;
+
   const refresh = useCallback(async () => {
+    const hub = hubRef.current;
+    const colors = colorsRef.current;
     if (!hub) return;
+    setLoading(true);
+    //a stale code never shows while reloading
+    setInvite(null);
+    setSvg(null);
     try {
       setJoining(null);
       const fresh =
@@ -76,45 +125,90 @@ export default function HubQrSheet({
       console.warn("[SamplerHub] no pairing code:", e);
       setInvite(null);
       setFailed(true);
+    } finally {
+      setLoading(false);
     }
-  }, [hub, mode, colors.textPrimary, colors.surface]);
+  }, [mode]);
 
   //a closed sheet forgets its code
-  const [prevVisible, setPrevVisible] = useState(visible);
-  if (visible !== prevVisible) {
-    setPrevVisible(visible);
-    if (!visible) {
+  const [prevVisible, setPrevVisible] = useState(active);
+  if (active !== prevVisible) {
+    setPrevVisible(active);
+    if (!active) {
       setInvite(null);
       setSvg(null);
       setJoining(null);
+      setFailed(false);
+      setLoading(false);
     }
   }
   //each opening invalidates the previous code
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- asks the hub for a code
-    if (visible) refresh();
-  }, [visible, refresh]);
+    if (active) refresh();
+  }, [active, refresh]);
 
   //waits for the device that types the link code
   useEffect(() => {
-    if (!visible || !hub || mode !== "link" || !invite || joining) return;
+    if (!active || !hasHub || mode !== "link" || !invite || joining) return;
     let stopped = false;
     (async () => {
       while (!stopped) {
+        const hub = hubRef.current;
+        if (!hub) return;
         try {
           const found = await SamplerHub.linkWatch(hub);
-          if (found && !stopped) return setJoining(found);
+          if (found && !stopped) {
+            //the code is spent
+            setInvite(null);
+            setSvg(null);
+            return setJoining(found);
+          }
         } catch (e) {
           console.warn("[SamplerHub] link watch failed:", e);
-          if (!stopped) setFailed(true);
-          return;
+          //only a dead code is permanent
+          const msg = String((e as Error)?.message ?? e).toLowerCase();
+          if (msg.includes("expired") || msg.includes("no link in progress")) {
+            if (!stopped) setFailed(true);
+            return;
+          }
+          await new Promise((r) => setTimeout(r, 2000));
         }
       }
     })();
     return () => {
       stopped = true;
     };
-  }, [visible, hub, mode, invite, joining]);
+  }, [active, hasHub, mode, invite, joining]);
+
+  //closes once another device used the invite
+  useEffect(() => {
+    if (!active || !hasHub || mode !== "invite" || !invite) return;
+    let stopped = false;
+    (async () => {
+      while (!stopped) {
+        const hub = hubRef.current;
+        if (!hub) return;
+        try {
+          if (await SamplerHub.inviteWatch(hub)) {
+            if (stopped) return;
+            //the code is spent
+            setInvite(null);
+            setSvg(null);
+            return onClose();
+          }
+        } catch (e) {
+          console.warn("[SamplerHub] invite watch failed:", e);
+          const msg = String((e as Error)?.message ?? e).toLowerCase();
+          if (msg.includes("expired") || msg.includes("no invite in progress")) return;
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+      }
+    })();
+    return () => {
+      stopped = true;
+    };
+  }, [active, hasHub, mode, invite, onClose]);
 
   const answer = async (approve: boolean) => {
     if (!hub || answering) return;
@@ -139,60 +233,50 @@ export default function HubQrSheet({
   };
 
   return (
-    <DrawerSheet
-      visible={visible}
-      onClose={onClose}
-      mode="overlay"
-      isLargeScreen={isLargeScreen}
-      isDesktop={isDesktop}
-      handleContainerStyle={styles.sheetHandleContainer}
-      sheetStyle={[
-        styles.sheet,
-        { paddingBottom: Platform.OS === "ios" ? 34 : 20 },
-      ]}
-      desktopStyle={styles.desktopCard}
-    >
-      <SheetScrollView contentContainerStyle={styles.content}>
-        {joining ? (
-          //the user compares the digits on both screens
-          <View style={styles.contentCard}>
-            <Text style={styles.settingLabel}>
-              {t("hubQr.joiningTitle", { device: joining.device })}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {failed ? t("hubQr.failed") : t("hubQr.joiningHelp")}
-            </Text>
-            <Group style={styles.groupSpacingTight}>
-              <Text style={[styles.code, styles.digits]}>{joining.digits}</Text>
-            </Group>
-            <Group style={styles.groupSpacingTight}>
-              <ActionButton
-                icon={cancelIcon}
-                label={t("hubQr.deny")}
-                disabled={answering}
-                onPress={() => answer(false)}
-              />
-            </Group>
-            <Group
-              style={[
-                styles.highlightGroup,
-                answering && styles.highlightGroupDisabled,
-              ]}
-            >
-              <ActionButton
-                icon={keyIcon}
-                label={t("hubQr.confirm")}
-                variant="highlight"
-                disabled={answering}
-                onPress={() => answer(true)}
-              />
-            </Group>
-          </View>
-        ) : (
-          <View style={styles.contentCard}>
+    <>
+      {joining ? (
+        //the user compares the digits on both screens
+        <View style={styles.contentCard}>
+          <Text style={styles.settingLabel}>
+            {t("hubQr.joiningTitle", { device: joining.device })}
+          </Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {failed ? t("hubQr.failed") : t("hubQr.joiningHelp")}
+          </Text>
+          <Group style={styles.groupSpacingTight}>
+            <Text style={[styles.code, styles.digits]}>{joining.digits}</Text>
+          </Group>
+          <Group style={styles.groupSpacingTight}>
+            <ActionButton
+              icon={cancelIcon}
+              label={t("hubQr.deny")}
+              disabled={answering}
+              onPress={() => answer(false)}
+            />
+          </Group>
+          <Group
+            style={[
+              styles.highlightGroup,
+              answering && styles.highlightGroupDisabled,
+            ]}
+          >
+            <ActionButton
+              icon={keyIcon}
+              label={t("hubQr.confirm")}
+              variant="highlight"
+              disabled={answering}
+              onPress={() => answer(true)}
+            />
+          </Group>
+        </View>
+      ) : (
+        <View style={styles.contentCard}>
+          {!bare && (
             <Text style={styles.settingLabel}>
               {mode === "link" ? t("hubQr.linkTitle") : t("hubQr.title")}
             </Text>
+          )}
+          {(!bare || failed) && (
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
               {failed
                 ? t("hubQr.failed")
@@ -200,33 +284,43 @@ export default function HubQrSheet({
                   ? t("hubQr.linkHelp")
                   : t("hubQr.help")}
             </Text>
-            {invite && svg && (
-              <Group style={styles.groupSpacingTight}>
-                <View style={styles.qr}>
-                  <SvgXml xml={svg} width="100%" height="100%" />
-                </View>
-                <Text style={styles.code} selectable>
-                  {invite.code}
-                </Text>
-              </Group>
-            )}
-            <Group>
-              <ActionButton
-                icon={copyIcon}
-                label={copied ? t("hubQr.copied") : t("hubQr.copy")}
-                disabled={!invite}
-                onPress={copy}
-              />
-              <ActionButton
-                icon={reloadIcon}
-                label={t("hubQr.refresh")}
-                onPress={refresh}
-              />
+          )}
+          {loading ? (
+            <Group style={styles.groupSpacingTight}>
+              <View style={[styles.qr, styles.qrLoading]}>
+                <ActivityIndicator color={colors.textMuted} />
+              </View>
             </Group>
-          </View>
-        )}
-      </SheetScrollView>
-    </DrawerSheet>
+          ) : (
+            invite &&
+            svg && (
+            <Group style={styles.groupSpacingTight}>
+              <View style={styles.qr}>
+                <SvgXml xml={svg} width="100%" height="100%" />
+              </View>
+              <Text style={styles.code} selectable>
+                {invite.code}
+              </Text>
+            </Group>
+            )
+          )}
+          <Group>
+            <ActionButton
+              icon={copyIcon}
+              label={copied ? t("hubQr.copied") : t("hubQr.copy")}
+              disabled={!invite || loading}
+              onPress={copy}
+            />
+            <ActionButton
+              icon={reloadIcon}
+              label={t("hubQr.refresh")}
+              disabled={loading}
+              onPress={refresh}
+            />
+          </Group>
+        </View>
+      )}
+    </>
   );
 }
 
@@ -300,6 +394,10 @@ const makeStyles = (Colors: ThemeColors) =>
       aspectRatio: 1,
       padding: Spacing.xl2,
       paddingBottom: Spacing.md,
+    },
+    qrLoading: {
+      alignItems: "center",
+      justifyContent: "center",
     },
     //typed on devices without a camera
     code: {

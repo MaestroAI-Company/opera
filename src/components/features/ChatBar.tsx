@@ -36,6 +36,7 @@ import {
 import { findMentionSpans, listMentionables, MentionSpan } from "../../services/ai/mentions";
 import { Settings } from "../../services/settings/SettingsService";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
+import { TTS } from "../../services/speech/TTSService";
 import { buildWavBuffer } from "../../services/speech/wav";
 import IconButton from "../ui/IconButton";
 import NotificationModal from "../ui/NotificationModal";
@@ -479,6 +480,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       let locale = Settings.getCached().whisperLanguage || "en-US";
       if (locale === "auto" || locale.length > 5) locale = "en-US";
       const recordAudio = canTranscribeRemotely && STT.supportsRecording();
+      TTS.stop();
       STT.start(locale, {
         onPartial: (t) => { if (t) { liveTextRef.current = t; setText(t); } },
         onFinal: (t) => { if (t) liveTextRef.current = t; },
@@ -1163,17 +1165,6 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                           </Pressable>
                         </View>
                       ))}
-                      {hasAttachments && (
-                        <Text style={[styles.filesAddedText, incognito && { color: Colors.textMuted }]}>
-                          {(() => {
-                            const filesPart = attachments.length > 0 ? t(attachments.length === 1 ? 'chatbar.fileCount.one' : 'chatbar.fileCount.other', { count: attachments.length }) : '';
-                            const appPart = appContextChip ? 'App context' : '';
-                            if (filesPart && appPart) return `${filesPart} and app context Added`;
-                            if (filesPart) return `${filesPart} Added`;
-                            return `${appPart} Added`;
-                          })()}
-                        </Text>
-                      )}
                     </View>
                   </View>
                 </Animated.View>
@@ -1455,7 +1446,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingBottom: 10,
     marginBottom: -10,
     marginHorizontal: 10,
-    minHeight: 60,
+    minHeight: 52,
   },
   filesContainerTopIncognito: {
     backgroundColor: Colors.incognitoSurface,
@@ -1575,12 +1566,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: FontSizes.caption,
     color: Colors.textMuted,
-  },
-  filesAddedText: {
-    fontFamily: Fonts.mono,
-    color: Colors.textMuted,
-    fontSize: FontSizes.bodyMd,
-    marginLeft: 4,
   },
   filesContainerTopEditOnly: {
     minHeight: 0,

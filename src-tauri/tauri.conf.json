@@ -45,6 +45,9 @@
     ],
     "publisher": "Maestro AI",
     "copyright": "© Maestro AI",
+    "macOS": {
+      "signingIdentity": "-"
+    },
     "windows": {
       "nsis": {
         "installMode": "currentUser",

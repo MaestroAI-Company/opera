@@ -1,4 +1,4 @@
-import { Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useT } from "../../i18n";
@@ -19,11 +19,10 @@ type AssistantSheetProps = {
   onClose: () => void;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
-  bottomInset?: number;
 };
 
 //offers the default assistant role once
-export default function AssistantSheet({ visible, onClose, isLargeScreen = false, isDesktop = false, bottomInset = 0 }: AssistantSheetProps) {
+export default function AssistantSheet({ visible, onClose, isLargeScreen = false, isDesktop = false }: AssistantSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const { height: windowHeight } = useWindowDimensions();
@@ -39,7 +38,7 @@ export default function AssistantSheet({ visible, onClose, isLargeScreen = false
       handleContainerStyle={styles.sheetHandleContainer}
       sheetStyle={[
         styles.sheet,
-        { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + bottomInset, maxHeight: windowHeight - insets.top - Spacing.xl2 },
+        { maxHeight: windowHeight - insets.top - Spacing.xl2 },
       ]}
       desktopStyle={styles.desktopCard}
     >

@@ -78,6 +78,7 @@ import {
   displayName,
   ModelSelectorDrawer,
   ModelSelectorTrigger,
+  truncateModel,
 } from "../components/features/ModelSelector";
 import SamplerScreen from "../components/features/SamplerScreen";
 import SettingsDrawer, { SubPage } from "../components/features/SettingsDrawer";
@@ -90,6 +91,7 @@ import { pressStyle } from "../components/ui/pressStyle";
 import SliderToggle from "../components/ui/SliderToggle";
 import { isWidgetTouchActive } from "../components/widgets/WidgetTouchArea";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
+import { useShadowShift } from "../hooks/useShadowShift";
 import { useBugReportTrigger } from "../hooks/useBugReportTrigger";
 import { useDesktopUpdate } from "../hooks/useDesktopUpdate";
 import { useKeyboardLift } from "../hooks/useKeyboardLift";
@@ -158,6 +160,7 @@ import {
   usesDefaultPasteHost,
 } from "../services/share/ShareService";
 import { speakReplyLive } from "../services/speech/liveReply";
+import { TTS } from "../services/speech/TTSService";
 import { STT, WhisperSTT } from "../services/speech/STTService";
 import {
   getAvailableUpdate,
@@ -166,7 +169,7 @@ import {
 } from "../services/updates/UpdateService";
 import { vibrate } from "@/services/haptics";
 
-const texture2 = require("../../assets/images/texture2.png");
+const texture2 = require("../../assets/images/texture/texture2.png");
 const settingsIcon = require("../../assets/icons/settings.png");
 const addIcon = require("../../assets/icons/add.png");
 const chatIcon = require("../../assets/icons/message.png");
@@ -394,6 +397,7 @@ export default function Index() {
   const router = useRouter();
   const { width, isLargeScreen, isDesktop } = useResponsive();
   const { dockedWidth } = useDockedWidth();
+  const settingsShadowShift = useShadowShift();
   //edge drag maps to drawer progress
   const dragWidth = drawerWidthFor(width);
   //computed once per mount so it doesn't shift mid-session
@@ -461,6 +465,7 @@ export default function Index() {
             : 0,
     [isDesktop, samplerAnim, dockedWidth, samplerReady, inSampler],
   );
+  const [incognitoMode, setIncognitoMode] = useState(false);
   const samplerSwitchOptions = useMemo(
     () => [
       { id: "chat", label: t("sampler.switch.chat"), icon: chatIcon },
@@ -476,12 +481,17 @@ export default function Index() {
       radius={Radius.lg2}
       iconOnly
       withLabel={isDesktop}
+      incognito={incognitoMode}
     />
   ) : undefined;
   //shared with the panResponder below so the swipe-up gesture can drag it live
   const modelSelectorProgress = useAnimatedValue(0);
   const [settingsInitialSubPage, setSettingsInitialSubPage] =
     useState<SubPage>("main");
+  const [settingsInitialSheet, setSettingsInitialSheet] = useState<{
+    service: string;
+    url: string;
+  } | null>(null);
   //a hub release waiting for the user
   const [hubUpdate, setHubUpdate] = useState<{
     hub: PairedHub;
@@ -524,7 +534,6 @@ export default function Index() {
     }
   }, [drawerVisible, settingsDrawerVisible, isDesktop]);
 
-  const [incognitoMode, setIncognitoMode] = useState(false);
   //fades the incognito blurb in and out instead of snapping it
   const incognitoProgress = useAnimatedValue(0);
   useEffect(() => {
@@ -670,6 +679,7 @@ export default function Index() {
   const closeSettings = useCallback(() => {
     setSettingsDrawerVisible(false);
     setSettingsInitialSubPage("main");
+    setSettingsInitialSheet(null);
     const cached = Settings.getCached();
     if (cached.ollamaModel) setSelectedModel(cached.ollamaModel);
     setAiService(cached.aiService);
@@ -1255,6 +1265,25 @@ export default function Index() {
     fetchCapabilities();
   }, [selectedModel, aiService, ollamaUrl, capsRevision]);
 
+  //leaving the app silences the voice
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") TTS.stop();
+    });
+    return () => {
+      sub.remove();
+      TTS.stop();
+    };
+  }, []);
+
+  //switching chats silences the voice
+  const prevConvIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = activeConversation?.id ?? null;
+    if (prevConvIdRef.current && prevConvIdRef.current !== id) TTS.stop();
+    prevConvIdRef.current = id;
+  }, [activeConversation?.id]);
+
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       //overlay resume is not app resume
@@ -1377,6 +1406,12 @@ export default function Index() {
   const selectConversation = useCallback(async (conv: Conversation) => {
     setActiveConversation(conv);
     const msgs = await DB.getMessages(conv.id);
+
+    //back to the level of the last reply
+    const lastThinking = [...msgs].reverse().find((m) => m.metrics?.thinking)?.metrics?.thinking;
+    if (lastThinking === "none" || lastThinking === "low" || lastThinking === "high") {
+      setSelectedReflection(lastThinking);
+    }
 
     if (generatingConvIdRef.current === conv.id && streamingMsgIdRef.current) {
       const patched = msgs.map((m) =>
@@ -2448,7 +2483,12 @@ export default function Index() {
   //opens the settings, in the chat and sampler bars
   const settingsButton = (
     <View style={styles.settingsShadowLayer}>
-      <View style={styles.settingsShadowBlock} />
+      <Animated.View
+        style={[
+          styles.settingsShadowBlock,
+          { transform: settingsShadowShift.getTranslateTransform() },
+        ]}
+      />
       <Pressable
         style={pressStyle(
           [
@@ -2503,6 +2543,7 @@ export default function Index() {
       isDesktop={isDesktop}
       visible={settingsDrawerVisible}
       initialSubPage={settingsInitialSubPage}
+      initialSheet={settingsInitialSheet}
       hubPairLink={hubPairLink}
       onHubPairLinkHandled={() => setHubPairLink(null)}
       onClose={closeSettings}
@@ -2589,9 +2630,11 @@ export default function Index() {
                   }}
                 >
                   <Text style={styles.modelInfoText} numberOfLines={1}>
-                    {selectedModel
-                      ? displayName(selectedModel)
-                      : t("modelSelector.none")}
+                    {truncateModel(
+                      selectedModel
+                        ? displayName(selectedModel)
+                        : t("modelSelector.none"),
+                    )}
                   </Text>
                   <Image
                     source={nextIcon}
@@ -2704,7 +2747,7 @@ export default function Index() {
                   <View style={styles.addSharedContainer}>
                     <View style={styles.addSharedInner}>
                       <View style={styles.addSharedWrapper}>
-                        <Group>
+                        <Group style={styles.addSharedGroup}>
                           <ActionButton
                             icon={addIcon}
                             label={t("share.preview.add")}
@@ -2836,7 +2879,6 @@ export default function Index() {
         onLongPressRecentPhoto={attachments.toggleRecentPhoto}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
-        bottomInset={insets.bottom}
       />
 
       <NotificationModal
@@ -2874,7 +2916,6 @@ export default function Index() {
         }}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
-        bottomInset={insets.bottom}
       />
 
       <AssistantSheet
@@ -2882,7 +2923,6 @@ export default function Index() {
         onClose={() => setAssistantSheetVisible(false)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
-        bottomInset={insets.bottom}
       />
 
       <ImagePreviewSheet
@@ -2890,7 +2930,6 @@ export default function Index() {
         onClose={() => setPreviewImage(null)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
-        bottomInset={insets.bottom}
       />
 
       <CodePreviewSheet
@@ -2898,7 +2937,6 @@ export default function Index() {
         onClose={() => setPreviewCode(null)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
-        bottomInset={insets.bottom}
       />
 
       <MessageDetailsSheet
@@ -2906,7 +2944,6 @@ export default function Index() {
         onClose={() => setPreviewDetails(null)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
-        bottomInset={insets.bottom}
       />
 
       <NotificationModal {...updateModalProps} />
@@ -2916,7 +2953,6 @@ export default function Index() {
         onClose={() => setReleaseNotes(null)}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
-        bottomInset={insets.bottom}
       />
 
       <ModelSelectorDrawer
@@ -2938,18 +2974,11 @@ export default function Index() {
         isDesktop={isDesktop}
         triggerRef={modelTriggerRef}
         messages={messages}
-        onOpenProviderSettings={(provider) => {
+        onOpenProviderSettings={(source) => {
           setModelSelectorVisible(false);
           openDrawerSafely(() => {
-            //built-in models live under on-device
-            const page = (
-              provider === "local"
-                ? "litert"
-                : ["litert", "ollama", "openai"].includes(provider)
-                  ? provider
-                  : "service"
-            ) as SubPage;
-            setSettingsInitialSubPage(page);
+            setSettingsInitialSubPage("service");
+            setSettingsInitialSheet({ service: source.service, url: source.url });
             setSettingsDrawerVisible(true);
           });
         }}
@@ -3131,6 +3160,17 @@ const makeStyles = (Colors: ThemeColors) =>
     addSharedWrapper: {
       marginHorizontal: 16,
       marginBottom: 16,
+      borderRadius: Radius.window,
+      backgroundColor: Colors.surface,
+      shadowColor: Colors.shadowInk,
+      shadowOffset: { width: -6, height: 6 },
+      shadowOpacity: 1,
+      shadowRadius: 0,
+      elevation: 2,
+    },
+    addSharedGroup: {
+      borderWidth: 0,
+      borderRadius: Radius.window,
     },
     addSharedButton: {
       height: 56,

@@ -8,7 +8,7 @@ import * as Location from "expo-location";
 import * as MediaLibrary from "expo-media-library/legacy";
 import * as Sharing from "expo-sharing";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   AppState,
@@ -85,14 +85,16 @@ import { OpenAIProvider } from "../../services/ai/providers/OpenAIProvider";
 import {
   buildSources,
   getEnabledProviders,
-  getHubName,
   getHubServers,
+  hubModelKeyOf,
+  hubProviderKind,
   getOllamaServers,
   getOllamaTuning,
   getOpenAIApiKeyById,
   getOpenAIServers,
   getPromptTierOverride,
   HUB_PROVIDER_ID,
+  isLocalUrl,
   isProviderSupported,
   newOpenAIServerId,
   OllamaServer,
@@ -101,6 +103,7 @@ import {
   patchHubServer,
   PROMPT_TIERS,
   serializeProviders,
+  splitHubModelKey,
   serializeServers,
   setOpenAIApiKey,
   type PromptTier,
@@ -112,10 +115,7 @@ import {
 import { ITool } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { openExternalUrl } from "../../services/ai/utils/openExternalUrl";
-import {
-  isDefaultAssistant,
-  openAssistantSettings,
-} from "../../services/assistant/DefaultAssistant";
+import { openAssistantSettings } from "../../services/assistant/DefaultAssistant";
 import { BackupService } from "../../services/BackupService";
 import { CloudUserInfo } from "../../services/cloud/CloudProvider";
 import {
@@ -145,10 +145,14 @@ import {
   pushDesktopOverlayConfig,
 } from "../../services/overlay/desktopOverlay";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
-import { openScreenSaverSettings } from "../../services/screensaver/ScreenSaver";
+import {
+  isScreenSaverActive,
+  openScreenSaverSettings,
+} from "../../services/screensaver/ScreenSaver";
 import { AppSettings, Settings } from "../../services/settings/SettingsService";
 import { TTS_SPEEDS } from "../../services/speech/engines";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
+import { TTS } from "../../services/speech/TTSService";
 import { SyncPrefs, SyncPrefsStore } from "../../services/SyncPrefs";
 import ActionButton from "../ui/ActionButton";
 import CardGrid, { type GridCard } from "../ui/CardGrid";
@@ -156,6 +160,7 @@ import Checkbox from "../ui/Checkbox";
 import DownloadProgress, { throttleProgress } from "../ui/DownloadProgress";
 import FloatingButton from "../ui/FloatingButton";
 import Group from "../ui/Group";
+import IconButton from "../ui/IconButton";
 import IconSelector from "../ui/IconSelector";
 import NotificationBanner from "../ui/NotificationBanner";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
@@ -170,12 +175,18 @@ import DrawerSheet, {
   SheetKeyboardAwareScrollView,
   SheetScrollView,
 } from "./DrawerSheet";
+import HelpSheet, { type HelpSection } from "./HelpSheet";
 import {
-  BUTTERFLY_OPTIONS,
-  selectButterfly,
-  useMaestroButterfly,
+  VOICE_OPTIONS,
+  selectVoice,
+  useVoice,
 } from "./maestroButterfly";
 import MaestroCard from "./MaestroCard";
+import PersonalitySheet, {
+  personalityParts,
+  readPersonality,
+  slotWord,
+} from "./PersonalitySheet";
 import ProfileCard from "./ProfileCard";
 import VoiceEngineCard from "./VoiceEngineCard";
 
@@ -197,6 +208,9 @@ import {
 import {
   getBetaChannel,
   setBetaChannel,
+  getUpdateChecks,
+  setUpdateChecks,
+  getAvailableUpdate,
 } from "../../services/updates/UpdateService";
 
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
@@ -218,6 +232,7 @@ import PageStack from "./PageStack";
 
 const linkIcon = require("../../../assets/icons/link.png");
 const addIcon = require("../../../assets/icons/add.png");
+const questionIcon = require("../../../assets/icons/question.png");
 const downloadIcon = require("../../../assets/icons/download.png");
 const deleteIcon = require("../../../assets/icons/delete.png");
 const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
@@ -232,9 +247,11 @@ const LITERT_CAPABILITY_IDS: readonly ModelCapabilityId[] = [
 const searchIcon = require("../../../assets/icons/search.png");
 const profilIcon = require("../../../assets/icons/profil.png");
 const cloudIcon = require("../../../assets/icons/cloud.png");
+const providerCloudIcon = require("../../../assets/icons/cloud2.png");
 const ollamaIcon = require("../../../assets/icons/ollama.png");
 const phoneIcon = require("../../../assets/icons/phone.png");
 const sampler2Icon = require("../../../assets/icons/sampler2.png");
+const samplerNavIcon = require("../../../assets/icons/sampler.png");
 const cloudUploadIcon = require("../../../assets/icons/cloudupload.png");
 const cloudDownloadIcon = require("../../../assets/icons/clouddownload.png");
 const arrowIcon = require("../../../assets/icons/arrow.png");
@@ -252,7 +269,7 @@ const supportIcon = require("../../../assets/icons/support.png");
 const informationIcon = require("../../../assets/icons/information.png");
 const githubIcon = require("../../../assets/icons/github.png");
 const operaIcon = require("../../../assets/icons/operaicon.png");
-const samplerIcon = require("../../../assets/icons/operaicon5.png");
+const samplerIcon = require("../../../assets/icons/operaiconEgg.png");
 const instagramIcon = require("../../../assets/icons/instagram.png");
 const tiktokIcon = require("../../../assets/icons/tiktok.png");
 const micIcon = require("../../../assets/icons/microphone.png");
@@ -316,6 +333,8 @@ type SettingsDrawerProps = {
   //fills its own os window instead of floating over the app
   windowed?: boolean;
   initialSubPage?: SubPage;
+  //provider whose sheet opens on show
+  initialSheet?: { service: string; url: string } | null;
   //an opera://hub/pair link to confirm
   hubPairLink?: string | null;
   onHubPairLinkHandled?: () => void;
@@ -330,18 +349,19 @@ export type SubPage =
   | "assistantoverlay"
   | "screensaver"
   | "service"
-  | "ollama"
-  | "openai"
   | "confidentiality"
   | "reports"
   | "tools"
   | "profile"
   | "cloud"
-  | "hubprovider"
+  | "syncchoices"
+  | "datamanagement"
   | "mcpservers"
   | "mcpserver"
   | "mcpserversettings"
   | "sociallinks";
+
+type HelpTopic = "providers" | "cloud" | "syncchoices" | "tools" | "mcp";
 
 //page a subpage steps back to, followed by the header arrow and the android back button
 const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
@@ -353,14 +373,13 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   assistantoverlay: "general",
   screensaver: "general",
   service: "main",
-  ollama: "service",
-  openai: "service",
   confidentiality: "main",
   reports: "main",
   tools: "main",
   profile: "main",
   cloud: "main",
-  hubprovider: "service",
+  syncchoices: "cloud",
+  datamanagement: "cloud",
   sociallinks: "main",
   mcpservers: "tools",
   mcpserver: "mcpservers",
@@ -517,6 +536,14 @@ const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
   );
 });
 
+const hubModelLabel = (key: string) => splitHubModelKey(key).model;
+//llama.cpp is the hub itself, no badge
+const hubModelIcon = (key: string) => {
+  const { url } = splitHubModelKey(key);
+  if (url === LLAMA_SERVER_URL) return undefined;
+  return hubProviderKind(url) === "openai" ? providerCloudIcon : ollamaIcon;
+};
+
 const ModelToggleRow = memo(function ModelToggleRow({
   model,
   enabled,
@@ -528,8 +555,13 @@ const ModelToggleRow = memo(function ModelToggleRow({
   onExpand,
   onCapabilitiesChange,
   onPromptTierChange,
+  label,
+  icon,
 }: {
   model: string;
+  label?: string;
+  //server the model comes from
+  icon?: ImageSourcePropType;
   enabled: boolean;
   last: boolean;
   expanded: boolean;
@@ -550,11 +582,18 @@ const ModelToggleRow = memo(function ModelToggleRow({
           style={pressStyle(styles.modelToggleName, "fadeLight")}
           onPress={() => onExpand(model)}
         >
+          {icon && (
+            <Image
+              source={icon}
+              style={[styles.litertCapabilityIcon, styles.modelToggleIcon]}
+              tintColor={Colors.textSecondary}
+            />
+          )}
           <Text
             style={[styles.settingLabel, styles.modelToggleLabel]}
             numberOfLines={1}
           >
-            {model}
+            {label ?? model}
           </Text>
           <Image
             source={rightArrowIcon}
@@ -602,8 +641,13 @@ const ModelToggleList = memo(function ModelToggleList({
   hideSearch = false,
   searchQuery,
   style,
+  labelOf,
+  iconOf,
 }: {
   models: string[];
+  //models are keys here, these show them
+  labelOf?: (model: string) => string;
+  iconOf?: (model: string) => ImageSourcePropType | undefined;
   loading: boolean;
   service: string;
   url: string;
@@ -643,9 +687,11 @@ const ModelToggleList = memo(function ModelToggleList({
   const shown = useMemo(() => {
     const query = search.trim().toLowerCase();
     return query
-      ? models.filter((m) => m.toLowerCase().includes(query))
+      ? models.filter((m) =>
+          (labelOf?.(m) ?? m).toLowerCase().includes(query),
+        )
       : models;
-  }, [models, search]);
+  }, [models, search, labelOf]);
   const enabledCount = models.filter((m) => !disabledSet.has(m)).length;
 
   //stable handler keeps memo rows still
@@ -704,7 +750,7 @@ const ModelToggleList = memo(function ModelToggleList({
   const visible = shown.slice(0, limit);
 
   return (
-    <View style={[styles.contentCard, style]}>
+    <View style={[styles.sheetCard, style]}>
       <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
         <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
           {models.length > 0
@@ -769,6 +815,8 @@ const ModelToggleList = memo(function ModelToggleList({
                 <ModelToggleRow
                   key={model}
                   model={model}
+                  label={labelOf?.(model)}
+                  icon={iconOf?.(model)}
                   enabled={!disabledSet.has(model)}
                   last={index === visible.length - 1}
                   expanded={expanded === model}
@@ -811,6 +859,7 @@ export default function SettingsDrawer({
   isDesktop = false,
   windowed = false,
   initialSubPage,
+  initialSheet,
   hubPairLink = null,
   onHubPairLinkHandled,
 }: SettingsDrawerProps) {
@@ -867,9 +916,25 @@ export default function SettingsDrawer({
   const wasVisibleRef = useRef(visible);
   useEffect(() => {
     //page stays mounted while closing, its input would keep the keyboard
-    if (!visible && wasVisibleRef.current) Keyboard.dismiss();
+    if (!visible && wasVisibleRef.current) {
+      Keyboard.dismiss();
+      //keep chat message playback
+      if (!TTS.getSpeakingId()) TTS.stop();
+    }
     wasVisibleRef.current = visible;
   }, [visible]);
+
+  //stop voice test leaving maestro
+  useEffect(() => {
+    if (activeSubPage !== "maestro" && !TTS.getSpeakingId()) TTS.stop();
+  }, [activeSubPage]);
+
+  useEffect(
+    () => () => {
+      if (!TTS.getSpeakingId()) TTS.stop();
+    },
+    [],
+  );
 
   //native back navigates back in the menu, then lets parent close the drawer
   useEffect(() => {
@@ -947,6 +1012,14 @@ export default function SettingsDrawer({
   if (hubDetailUrl !== null && hubDetailUrl !== shownHubUrl) {
     setShownHubUrl(hubDetailUrl);
   }
+  //hub model opened in its info sheet
+  const [hubModelKey, setHubModelKey] = useState<string | null>(null);
+  const [shownHubModelKey, setShownHubModelKey] = useState<string | null>(
+    null,
+  );
+  if (hubModelKey !== null && hubModelKey !== shownHubModelKey) {
+    setShownHubModelKey(hubModelKey);
+  }
   //hub server prefs live outside react state
   const [, setHubPrefsTick] = useState(0);
   //ignore stale server answers
@@ -965,7 +1038,6 @@ export default function SettingsDrawer({
 
   const [addModelSheetVisible, setAddModelSheetVisible] = useState(false);
   const [litertSheetVisible, setLitertSheetVisible] = useState(false);
-  const [ollamaAddVisible, setOllamaAddVisible] = useState(false);
   const [openaiAddVisible, setOpenAIAddVisible] = useState(false);
   const [openaiModelsPage, setOpenAIModelsPage] =
     useState<CloudModelsPage>("server");
@@ -1051,14 +1123,35 @@ export default function SettingsDrawer({
     return () => sub.remove();
   }, [windowed, refreshHub]);
 
+  const [personality, setPersonality] = useState(readPersonality);
+  const [personalitySheetVisible, setPersonalitySheetVisible] =
+    useState(false);
   //open sheets keep the back press for themselves
+  const [helpVisible, setHelpVisible] = useState(false);
+  //topic stays through the close animation
+  const [helpTopic, setHelpTopic] = useState<HelpTopic>("providers");
+  const openHelp = (topic: HelpTopic) => {
+    setHelpTopic(topic);
+    setHelpVisible(true);
+  };
+  //question button for a page header
+  const renderHelpButton = (topic: HelpTopic) => (
+    <IconButton
+      icon={questionIcon}
+      label={t("settings.help.open")}
+      onPress={() => openHelp(topic)}
+      tintColor={Colors.textPrimary}
+    />
+  );
   const sheetOpen =
+    helpVisible ||
+    personalitySheetVisible ||
     profileEditVisible ||
     addModelSheetVisible ||
     litertSheetVisible ||
-    ollamaAddVisible ||
     ollamaDetailIndex !== null ||
     hubDetailUrl !== null ||
+    hubModelKey !== null ||
     openaiAddVisible ||
     openaiDetailIndex !== null ||
     mcpAddVisible ||
@@ -1127,7 +1220,7 @@ export default function SettingsDrawer({
   };
   //empty id means chores follow the main model
   const [quickFlowId, setQuickFlowIdState] = useState("");
-  const maestroButterfly = useMaestroButterfly();
+  const voice = useVoice();
   const [ttsSpeed, setTtsSpeedState] = useState(
     () => Settings.getCached().ttsSpeed,
   );
@@ -1161,6 +1254,7 @@ export default function SettingsDrawer({
     useDesktopUpdate();
   const [launchAtStartup, setLaunchAtStartupState] = useState(true);
   const [betaChannel, setBetaChannelState] = useState(false);
+  const [updateChecks, setUpdateChecksState] = useState(true);
   //not part of synced settings
   useEffect(() => {
     if (!visible || !isTauri) return;
@@ -1169,6 +1263,9 @@ export default function SettingsDrawer({
       .catch(() => {});
     getBetaChannel()
       .then(setBetaChannelState)
+      .catch(() => {});
+    getUpdateChecks()
+      .then(setUpdateChecksState)
       .catch(() => {});
   }, [visible]);
   const report = useBugReport(showAlert);
@@ -1242,6 +1339,10 @@ export default function SettingsDrawer({
   const languageOptions = [
     { id: "en", label: "English" },
     { id: "fr", label: "Français" },
+    { id: "es", label: "Español" },
+    { id: "de", label: "Deutsch" },
+    { id: "it", label: "Italiano" },
+    { id: "pt", label: "Português" },
   ];
 
   const cloudStorageOptions = [
@@ -1350,24 +1451,22 @@ export default function SettingsDrawer({
     return () => sub.remove();
   }, [visible, activeSubPage, refreshPermissionStatuses]);
 
-  //null means no assistant role here
-  const [assistantStatus, setAssistantStatus] = useState<boolean | null>(null);
+  //hides the open settings card once opera is the screen saver
+  const [screenSaverActive, setScreenSaverActive] = useState(false);
 
-  const refreshAssistantStatus = useCallback(() => {
-    isDefaultAssistant()
-      .then(setAssistantStatus)
-      .catch(() => {});
+  const refreshScreenSaverStatus = useCallback(() => {
+    isScreenSaverActive().then(setScreenSaverActive);
   }, []);
 
   //recheck after returning from system settings
   useEffect(() => {
-    if (!visible || activeSubPage !== "assistantoverlay") return;
-    refreshAssistantStatus();
+    if (!visible || activeSubPage !== "screensaver") return;
+    refreshScreenSaverStatus();
     const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") refreshAssistantStatus();
+      if (state === "active") refreshScreenSaverStatus();
     });
     return () => sub.remove();
-  }, [visible, activeSubPage, refreshAssistantStatus]);
+  }, [visible, activeSubPage, refreshScreenSaverStatus]);
 
   const renderPermissionBadge = (status: PermissionState) => (
     <View
@@ -1567,6 +1666,11 @@ export default function SettingsDrawer({
       setWhisperModelState(s.whisperModel);
       setWhisperLanguageState(s.whisperLanguage);
       setInstructionState(s.instruction);
+      setPersonality({
+        maestroMood: s.maestroMood,
+        maestroStyle: s.maestroStyle,
+        maestroDepth: s.maestroDepth,
+      });
       setNameState(s.name || "");
       setConfirmedName(s.name || "");
       setAlwaysWhisperState(s.alwaysWhisper);
@@ -1868,18 +1972,6 @@ export default function SettingsDrawer({
     setMcpAddVisible(true);
   };
 
-  const openOllamaAddSheet = () => {
-    setServerDraft({
-      name: "",
-      url: "",
-      headerName: "",
-      headerValue: "",
-      clientId: "",
-    });
-    setServerDraftBusy(false);
-    setOllamaAddVisible(true);
-  };
-
   const submitMcpDraft = async () => {
     const url = serverDraft.url.trim();
     if (mcpServers.some((s) => s.url.trim() === url)) {
@@ -1904,35 +1996,6 @@ export default function SettingsDrawer({
     }
   };
 
-  const submitOllamaDraft = async () => {
-    const url = serverDraft.url.trim();
-    if (ollamaServers.some((s) => s.url.trim() === url)) {
-      showAlert(t("settings.server.addFailed"), t("settings.server.duplicate"));
-      return;
-    }
-    setServerDraftBusy(true);
-    try {
-      if (!(await AIModule.isSourceAvailable("ollama", url))) {
-        showAlert(
-          t("settings.ollama.unreachableTitle"),
-          t("settings.ollama.unreachableInfo"),
-          undefined,
-          { image: errorImage, messageAlign: "left" },
-        );
-        return;
-      }
-      saveOllamaServers([
-        ...ollamaServers,
-        { url, name: serverDraft.name.trim() },
-      ]);
-      //skip waiting for the next sweep
-      setServerErrors((prev) => ({ ...prev, [url]: false }));
-      setOllamaAddVisible(false);
-    } finally {
-      setServerDraftBusy(false);
-    }
-  };
-
   const openOpenAIAddSheet = () => {
     setServerDraft({
       name: "",
@@ -1946,14 +2009,25 @@ export default function SettingsDrawer({
     setOpenAIAddVisible(true);
   };
 
-  const submitOpenAIDraft = async () => {
+  //answering protocol picks the provider
+  const submitServerDraft = async () => {
     const url = serverDraft.url.trim();
-    if (openaiServers.some((s) => s.url.trim() === url)) {
+    if ([...ollamaServers, ...openaiServers].some((s) => s.url.trim() === url)) {
       showAlert(t("settings.server.addFailed"), t("settings.server.duplicate"));
       return;
     }
     setServerDraftBusy(true);
     try {
+      //ollama first, it also answers the openai route
+      if (await AIModule.isSourceAvailable("ollama", url)) {
+        saveOllamaServers([
+          ...ollamaServers,
+          { url, name: serverDraft.name.trim() },
+        ]);
+        setServerErrors((prev) => ({ ...prev, [url]: false }));
+        setOpenAIAddVisible(false);
+        return;
+      }
       //unsaved key probes with the draft
       if (!(await new OpenAIProvider(url, openaiKeyDraft).isAvailable())) {
         showAlert(
@@ -2166,14 +2240,24 @@ export default function SettingsDrawer({
     setHubDetailUrl(server.url);
     //the llama.cpp options ride the hub status
     if (server.url === LLAMA_SERVER_URL) refreshHub();
-    setOllamaContextDraft(
-      server.contextLength != null ? String(server.contextLength) : "",
-    );
-    setOllamaKeepAliveDraft(
-      server.keepAlive != null ? String(server.keepAlive) : "",
-    );
     setOllamaModels([]);
-    loadOllamaModels(server.url, HUB_PROVIDER_ID);
+    loadHubModels();
+  };
+
+  //hub servers in one list
+  const loadHubModels = async () => {
+    const request = ++ollamaModelsRequest.current;
+    setOllamaModelsLoading(true);
+    const lists = await Promise.all(
+      getHubServers().map((s) =>
+        AIModule.getModelsFor(HUB_PROVIDER_ID, s.url, true)
+          .catch(() => [] as string[])
+          .then((models) => models.map((m) => hubModelKeyOf(s.url, m))),
+      ),
+    );
+    if (ollamaModelsRequest.current !== request) return;
+    setOllamaModels(lists.flat());
+    setOllamaModelsLoading(false);
   };
 
   //active server picks up new tuning
@@ -2183,33 +2267,21 @@ export default function SettingsDrawer({
   ) => {
     await patchHubServer(url, patch);
     setHubPrefsTick((tick) => tick + 1);
-    const server = getHubServers().find((s) => s.url === url);
-    if (server && url === ollamaUrl.trim()) {
-      AIModule.configure(
-        url,
-        serverContextLength(server),
-        serverKeepAlive(server),
-      );
+    if (url === ollamaUrl.trim()) {
+      const tuning = getOllamaTuning(url);
+      AIModule.configure(url, tuning.contextLength, tuning.keepAlive);
     }
   };
 
-  const setHubServerContext = (url: string, v: string) => {
-    const next = v.replace(/[^0-9]/g, "");
-    setOllamaContextDraft(next);
-    const parsed = parseInt(next, 10);
-    patchHubServerPrefs(url, {
-      contextLength: isNaN(parsed) ? undefined : parsed,
-    });
-  };
-
-  //leading minus keeps -1 typable
-  const setHubServerKeepAlive = (url: string, v: string) => {
-    const next = (v.startsWith("-") ? "-" : "") + v.replace(/[^0-9]/g, "");
-    setOllamaKeepAliveDraft(next);
-    const parsed = parseInt(next, 10);
-    patchHubServerPrefs(url, {
-      keepAlive: isNaN(parsed) ? undefined : parsed,
-    });
+  //merged list hands back keys, split per server
+  const setHubDisabledKeys = async (keys: string[]) => {
+    for (const s of getHubServers()) {
+      const disabledModels = keys
+        .map(splitHubModelKey)
+        .filter((k) => k.url === s.url)
+        .map((k) => k.model);
+      await patchHubServerPrefs(s.url, { disabledModels });
+    }
   };
 
   const removeOllamaServer = (index: number) => {
@@ -2580,6 +2652,36 @@ export default function SettingsDrawer({
     ...(localAvailable ? ["local"] : []),
   ];
 
+  //opens the picked provider sheet once its servers load
+  const initialSheetDone = useRef(false);
+  useEffect(() => {
+    if (!visible || !initialSheet) {
+      initialSheetDone.current = false;
+      return;
+    }
+    if (initialSheetDone.current) return;
+    const { service, url } = initialSheet;
+    if (service === "local" || service === "litert") {
+      setLitertSheetVisible(true);
+    } else if (service === "ollama") {
+      const index = ollamaServers.findIndex((s) => s.url === url);
+      if (index < 0) return;
+      openOllamaServer(index);
+    } else if (service === OPENAI_PROVIDER_ID) {
+      const index = openaiServers.findIndex((s) => s.url === url);
+      if (index < 0) return;
+      openOpenAIServer(index);
+    } else if (service === HUB_PROVIDER_ID) {
+      const hubServers = getHubServers();
+      const server =
+        hubServers.find((s) => s.url === LLAMA_SERVER_URL) ?? hubServers[0];
+      if (!server) return;
+      openHubServer(server);
+    }
+    initialSheetDone.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- openers are plain functions over these lists
+  }, [visible, initialSheet, ollamaServers, openaiServers]);
+
   //dead downloads resume from disk
   useEffect(() => {
     if (!litertSheetVisible || downloadingLitert) return;
@@ -2786,6 +2888,29 @@ export default function SettingsDrawer({
   const setLaunchAtStartupValue = (v: boolean) => {
     setLaunchAtStartupState(v);
     setLaunchAtStartup(v).catch(() => setLaunchAtStartupState(!v));
+  };
+
+  //manual check ignores the setting
+  const checkUpdateNow = async () => {
+    try {
+      const release = await getAvailableUpdate(true);
+      if (release) {
+        promptUpdate(release);
+        return;
+      }
+      showAlert(t("update.title"), t("update.upToDate"), [
+        { text: t("common.ok"), onPress: () => setAlertModalVisible(false), style: "secondary" },
+      ]);
+    } catch (e) {
+      showAlert(t("update.title"), t("update.checkFailed"), [
+        { text: t("common.ok"), onPress: () => setAlertModalVisible(false), style: "secondary" },
+      ]);
+    }
+  };
+
+  const setUpdateChecksValue = (v: boolean) => {
+    setUpdateChecksState(v);
+    setUpdateChecks(v).catch(() => setUpdateChecksState(!v));
   };
 
   //betas can break things
@@ -3305,6 +3430,7 @@ export default function SettingsDrawer({
         setInstalledModel(null);
         setOllamaDetailIndex(null);
         setHubDetailUrl(null);
+        setHubModelKey(null);
         setOpenAIDetailIndex(null);
       };
       if (isDesktop) {
@@ -3320,13 +3446,13 @@ export default function SettingsDrawer({
   }, [visible, isDesktop, largeScreenAnim, progress]);
 
   //back header for subpages
-  const renderSubPageHeader = (title: string) => (
+  const renderSubPageHeader = (title: string, right?: ReactNode) => (
     <View style={styles.header}>
       <View style={styles.headerSpacer} />
       <Text style={styles.title} numberOfLines={1}>
         {title}
       </Text>
-      <View style={styles.headerSpacer} />
+      <View style={[styles.headerSpacer, styles.headerRight]}>{right}</View>
     </View>
   );
 
@@ -3374,7 +3500,7 @@ export default function SettingsDrawer({
         },
         {
           page: "service",
-          icon: linkIcon,
+          icon: samplerNavIcon,
           label: t("settings.nav.service.title"),
         },
         { page: "tools", icon: toolIcon, label: t("settings.nav.tools.title") },
@@ -3541,7 +3667,7 @@ export default function SettingsDrawer({
         >
           <View style={styles.menuIconWrap}>
             <Image
-              source={linkIcon}
+              source={samplerNavIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
             />
@@ -3704,7 +3830,7 @@ export default function SettingsDrawer({
 
       {isTauri && (
         <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={[styles.settingRowVertical, { marginBottom: Spacing.md }]}>
             <View style={styles.toggleGroupRow}>
               <View style={styles.toggleGroupContent}>
                 <Text style={styles.settingLabel}>
@@ -3717,6 +3843,26 @@ export default function SettingsDrawer({
               <Toggle checked={betaChannel} onToggle={setBetaChannelValue} />
             </View>
           </View>
+          <View style={[styles.settingRowVertical, { marginBottom: Spacing.md }]}>
+            <View style={styles.toggleGroupRow}>
+              <View style={styles.toggleGroupContent}>
+                <Text style={styles.settingLabel}>
+                  {t("settings.update.checks")}
+                </Text>
+                <Text style={styles.helpText}>
+                  {t("settings.update.checksHelp")}
+                </Text>
+              </View>
+              <Toggle checked={updateChecks} onToggle={setUpdateChecksValue} />
+            </View>
+          </View>
+          <Group>
+            <ActionButton
+              icon={downloadIcon}
+              label={t("settings.update.checkNow")}
+              onPress={checkUpdateNow}
+            />
+          </Group>
         </View>
       )}
 
@@ -3754,7 +3900,12 @@ export default function SettingsDrawer({
       {/* android needs a real view */}
       <View ref={profileCardRef} collapsable={false} style={styles.contentCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <ProfileCard name={confirmedName} active={visible} />
+          <ProfileCard
+            name={confirmedName}
+            //same date as the card on the hub
+            createdAt={hubProfile ? hubProfile.createdAt * 1000 : undefined}
+            active={visible}
+          />
         </View>
       </View>
 
@@ -3824,6 +3975,20 @@ export default function SettingsDrawer({
           <Group style={isWide && styles.sliderGroup}>
             <SliderToggle selectedValue={theme} onSelect={setTheme} />
           </Group>
+        </View>
+
+        <View style={styles.settingRowVertical}>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.privacy.remoteImages")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.privacy.remoteImagesHelp")}
+              </Text>
+            </View>
+            <Toggle checked={showRemoteImages} onToggle={setShowRemoteImages} />
+          </View>
         </View>
 
         <View
@@ -3908,7 +4073,7 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.nav.screenSaver.title"))}
 
       {/* screen saver settings card */}
-      {Platform.OS === "android" && (
+      {Platform.OS === "android" && !screenSaverActive && (
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>
@@ -3919,7 +4084,7 @@ export default function SettingsDrawer({
             </Text>
             <Group>
               <ActionButton
-                icon={advancedIcon}
+                icon={hyperlinkIcon}
                 label={t("settings.screenSaver.open")}
                 onPress={openScreenSaverSettings}
               />
@@ -4130,6 +4295,35 @@ export default function SettingsDrawer({
         <MaestroCard />
       </View>
 
+      {/* personality card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+            {t("settings.personality.title")}
+          </Text>
+          <Text style={styles.personalitySentence}>
+            {personalityParts(t("settings.personality.sentence"))
+              .map((part) =>
+                part === "mood"
+                  ? slotWord(t, part, personality.maestroMood)
+                  : part === "style"
+                    ? slotWord(t, part, personality.maestroStyle)
+                    : part === "depth"
+                      ? slotWord(t, part, personality.maestroDepth)
+                      : part,
+              )
+              .join("")}
+          </Text>
+          <Group>
+            <ActionButton
+              icon={penPlaceholderIcon}
+              label={t("settings.personality.edit")}
+              onPress={() => setPersonalitySheetVisible(true)}
+            />
+          </Group>
+        </View>
+      </View>
+
       {/* butterfly selector card */}
       {voicePackInstalled && (
         <View style={styles.contentCard}>
@@ -4138,9 +4332,9 @@ export default function SettingsDrawer({
               {t("settings.maestro.voice")}
             </Text>
             <IconSelector
-              options={BUTTERFLY_OPTIONS}
-              selectedValue={maestroButterfly}
-              onSelect={selectButterfly}
+              options={VOICE_OPTIONS}
+              selectedValue={voice}
+              onSelect={selectVoice}
             />
             {/* desktop puts the slider at the right of the label */}
             <View
@@ -4236,36 +4430,22 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.nav.overlay.title"))}
 
       {/* default assistant card */}
-      {assistantStatus !== null && (
+      {Platform.OS === "android" && (
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>
               {t("settings.overlay.default")}
             </Text>
-            <Text style={styles.helpText}>
+            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
               {t("settings.overlay.defaultHelp")}
             </Text>
-            <Text
-              style={[
-                styles.assistantStatusText,
-                assistantStatus
-                  ? styles.assistantStatusOn
-                  : styles.assistantStatusOff,
-              ]}
-            >
-              {assistantStatus
-                ? t("settings.overlay.isDefault")
-                : t("settings.overlay.isNotDefault")}
-            </Text>
-            {!assistantStatus && (
-              <Group>
-                <ActionButton
-                  icon={operaIcon}
-                  label={t("settings.overlay.setDefault")}
-                  onPress={openAssistantSettings}
-                />
-              </Group>
-            )}
+            <Group>
+              <ActionButton
+                icon={hyperlinkIcon}
+                label={t("settings.overlay.setDefault")}
+                onPress={openAssistantSettings}
+              />
+            </Group>
           </View>
         </View>
       )}
@@ -4389,28 +4569,8 @@ export default function SettingsDrawer({
   );
 
   // cloud subpage
-  const renderCloudSubPage = () => {
-    const cloudDef = getCloudProviderDefinition(cloudProvider);
-    //details only once a backup went up
-    const cloudRows =
-      hasSyncPin && lastSyncTime
-        ? [
-            {
-              label: cloudBackupMode
-                ? t("cloudSync.lastBackup")
-                : t("cloudSync.lastSynced"),
-              value: new Date(lastSyncTime).toLocaleString(),
-            },
-            ...(lastSyncSize != null
-              ? [
-                  {
-                    label: t("cloudSync.backupSize"),
-                    value: formatBytes(lastSyncSize),
-                  },
-                ]
-              : []),
-          ]
-        : [];
+  //sync choices subpage content
+  const renderSyncChoicesSubPage = () => {
     const viaHub = syncAccount === HUB_SYNC_ID;
     //providers only travel through the hub
     const syncRows = [
@@ -4438,6 +4598,89 @@ export default function SettingsDrawer({
       },
     ] as const;
 
+    return (
+      <View style={styles.subPageContainer}>
+        {renderSubPageHeader(t("settings.nav.syncChoices.title"), renderHelpButton("syncchoices"))}
+
+        {/* sync choices card */}
+        {syncAccount !== "none" && syncPrefs && (
+          <View style={styles.contentCard}>
+            {syncRows.map((row, index) => {
+              const locked = row.hubOnly && !viaHub;
+              return renderHubToggle(
+                row.label,
+                row.help,
+                !locked && syncPrefs[row.key],
+                (value) => setSyncPref(row.key, value),
+                index === syncRows.length - 1,
+                locked,
+              );
+            })}
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  //data management subpage content
+  const renderDataManagementSubPage = () => (
+    <View style={styles.subPageContainer}>
+      {renderSubPageHeader(t("settings.data.management"))}
+
+      {/* data management card */}
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>
+            {t("settings.data.management")}
+          </Text>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            {t("settings.data.managementHelp")}
+          </Text>
+
+          <Group>
+            <ActionButton
+              icon={exportIcon}
+              label={t("settings.data.exportAction")}
+              onPress={handleExportData}
+            />
+            <ActionButton
+              icon={downloadIcon}
+              label={t("settings.data.importAction")}
+              onPress={handleImportData}
+            />
+            <ActionButton
+              icon={binIcon}
+              label={t("settings.data.deleteAllAction")}
+              onPress={handleDeleteAllConversations}
+            />
+          </Group>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderCloudSubPage = () => {
+    const cloudDef = getCloudProviderDefinition(cloudProvider);
+    //details only once a backup went up
+    const cloudRows =
+      hasSyncPin && lastSyncTime
+        ? [
+            {
+              label: cloudBackupMode
+                ? t("cloudSync.lastBackup")
+                : t("cloudSync.lastSynced"),
+              value: new Date(lastSyncTime).toLocaleString(),
+            },
+            ...(lastSyncSize != null
+              ? [
+                  {
+                    label: t("cloudSync.backupSize"),
+                    value: formatBytes(lastSyncSize),
+                  },
+                ]
+              : []),
+          ]
+        : [];
     //the linked cloud, for sync or backup
     const accountCard = cloudDef && cloudUserInfo && (
       <View style={styles.contentCard}>
@@ -4549,10 +4792,15 @@ export default function SettingsDrawer({
 
     return (
       <View style={styles.subPageContainer}>
-        {renderSubPageHeader(t("settings.nav.cloud.title"))}
+        {renderSubPageHeader(t("settings.nav.cloud.title"), renderHelpButton("cloud"))}
 
-        {/* sync account card */}
-        <View style={styles.contentCard}>
+        {/* sync account card, red while a sync account is active */}
+        <View
+          style={[
+            styles.contentCard,
+            syncAccount !== "none" && styles.activeCard,
+          ]}
+        >
           <View
             style={[
               styles.settingRowVertical,
@@ -4563,6 +4811,7 @@ export default function SettingsDrawer({
             <Text
               style={[
                 styles.settingLabel,
+                syncAccount !== "none" && styles.activeLabel,
                 isWide
                   ? styles.toggleGroupContent
                   : { marginBottom: Spacing.md },
@@ -4583,23 +4832,6 @@ export default function SettingsDrawer({
         </View>
 
         {!cloudBackupMode && accountCard}
-
-        {/* sync choices card */}
-        {syncAccount !== "none" && syncPrefs && (
-          <View style={styles.contentCard}>
-            {syncRows.map((row, index) => {
-              const locked = row.hubOnly && !viaHub;
-              return renderHubToggle(
-                row.label,
-                row.help,
-                !locked && syncPrefs[row.key],
-                (value) => setSyncPref(row.key, value),
-                index === syncRows.length - 1,
-                locked,
-              );
-            })}
-          </View>
-        )}
 
         {/* daily profile backup while sampler syncs */}
         {syncAccount === HUB_SYNC_ID && (
@@ -4636,6 +4868,22 @@ export default function SettingsDrawer({
           </View>
         )}
         {cloudBackupMode && accountCard}
+
+        {/* navigation to sync choices and data management */}
+        <Group style={styles.groupSpacing}>
+          {syncAccount !== "none" &&
+            syncPrefs &&
+            renderToolsNavRow(
+              "syncchoices",
+              t("settings.nav.syncChoices.title"),
+              t("settings.nav.syncChoices.subtitle"),
+            )}
+          {renderToolsNavRow(
+            "datamanagement",
+            t("settings.data.management"),
+            t("settings.nav.dataManagement.subtitle"),
+          )}
+        </Group>
       </View>
     );
   };
@@ -4667,6 +4915,9 @@ export default function SettingsDrawer({
   //the hub row shows once a provider is detected
   const showHubProvider =
     isProviderSupported(HUB_PROVIDER_ID) && getHubServers().length > 0;
+  const hubMainServer =
+    getHubServers().find((s) => s.url === LLAMA_SERVER_URL) ??
+    getHubServers()[0];
 
   //turning a server on also brings its provider back
   const serverSwitch = (
@@ -4695,10 +4946,12 @@ export default function SettingsDrawer({
     help: string,
     //one server of the provider instead of all of it
     server?: { checked: boolean; onToggle: (v: boolean) => void },
+    //sheets pass the card without margin
+    card: StyleProp<ViewStyle> = styles.contentCard,
   ) => {
     const list = typeof ids === "string" ? [ids] : ids;
     return (
-      <View style={styles.contentCard}>
+      <View style={card}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>
@@ -4722,7 +4975,10 @@ export default function SettingsDrawer({
 
   const renderServiceSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.nav.service.title"))}
+      {renderSubPageHeader(
+        t("settings.nav.service.title"),
+        renderHelpButton("providers"),
+      )}
 
       {/* every provider as a tile, the icon tells where it comes from */}
       {(onDeviceProviders.length > 0 ||
@@ -4759,25 +5015,28 @@ export default function SettingsDrawer({
               })),
               ...openaiServers.map((server, index) => ({
                 key: `cloud-${index}`,
-                icon: cloudIcon,
+                icon: providerCloudIcon,
                 title: openAIServerLabel(index),
                 status: serverCardStatus(OPENAI_PROVIDER_ID, server),
                 error: serverErrors[server.url.trim()] === true,
                 onPress: () => openOpenAIServer(index),
               })),
-              ...(showHubProvider
-                ? getHubServers().map((server) => ({
-                    key: `hub-${server.url}`,
-                    icon: sampler2Icon,
-                    title: server.provider,
-                    status: t(
-                      enabledProviders.includes(HUB_PROVIDER_ID) &&
-                        !server.disabled
-                        ? "settings.service.on"
-                        : "settings.service.off",
-                    ),
-                    onPress: () => openHubServer(server),
-                  }))
+              ...(showHubProvider && hubMainServer
+                ? [
+                    {
+                      key: "hub",
+                      //local servers live inside the hub sheet
+                      icon: sampler2Icon,
+                      title: hubMainServer.provider,
+                      status: t(
+                        enabledProviders.includes(HUB_PROVIDER_ID) &&
+                          !hubMainServer.disabled
+                          ? "settings.service.on"
+                          : "settings.service.off",
+                      ),
+                      onPress: () => openHubServer(hubMainServer),
+                    },
+                  ]
                 : []),
             ]}
           />
@@ -4847,42 +5106,16 @@ export default function SettingsDrawer({
     </View>
   );
 
-  //servers the paired hub shares
-  const renderHubProviderSubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.service.hub"))}
-
-      {/* hub servers card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>
-            {t("settings.hubProvider.title")}
-          </Text>
-          <Text style={styles.helpText}>
-            {t("settings.hubProvider.help", { name: getHubName() })}
-          </Text>
-          {renderCardGrid(
-            getHubServers().map((server) => ({
-              key: server.url,
-              //the subtitle already names the hub
-              title: server.provider,
-              status:
-                server.url === LLAMA_SERVER_URL
-                  ? t("settings.hubProvider.hubModels")
-                  : t("settings.hubProvider.detected"),
-              onPress: () => openHubServer(server),
-            })),
-          )}
-        </View>
-      </View>
-    </View>
-  );
-
   //hub server drawer content like the ollama one
   const renderHubServerContent = (
     server: ReturnType<typeof getHubServers>[number],
   ) => {
     const url = server.url;
+    const hubServers = getHubServers();
+    //per server prefs merged under url keys
+    const disabledKeys = hubServers.flatMap((s) =>
+      (s.disabledModels ?? []).map((m) => hubModelKeyOf(s.url, m)),
+    );
 
     return (
       <>
@@ -4893,11 +5126,38 @@ export default function SettingsDrawer({
           serverSwitch(HUB_PROVIDER_ID, server, (disabled) =>
             patchHubServerPrefs(url, { disabled }),
           ),
+          styles.sheetCard,
+        )}
+
+        <ModelToggleList
+          key={url}
+          models={ollamaModels}
+          loading={ollamaModelsLoading}
+          service={HUB_PROVIDER_ID}
+          url={url}
+          disabled={disabledKeys}
+          labelOf={hubModelLabel}
+          iconOf={hubModelIcon}
+          onChange={setHubDisabledKeys}
+          onOpenModel={setHubModelKey}
+        />
+
+        {/* actions section */}
+        {!ollamaModelsLoading && ollamaModels.length === 0 && (
+          <View style={styles.sheetCard}>
+            <Group>
+              <ActionButton
+                icon={reconnectIcon}
+                label={t("settings.ollama.reconnect")}
+                onPress={loadHubModels}
+              />
+            </Group>
+          </View>
         )}
 
         {/* llama.cpp options, set in the sampler screen */}
         {url === LLAMA_SERVER_URL && hubStatus?.ctxSize != null && (
-          <View style={styles.contentCard}>
+          <View style={styles.sheetCard}>
             <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
               <Text style={styles.settingLabel}>
                 {t("sampler.model.title")}
@@ -4940,127 +5200,6 @@ export default function SettingsDrawer({
             </View>
           </View>
         )}
-
-        {/* tuning card for ollama only */}
-        {server.kind === "ollama" && (
-          <View style={styles.contentCard}>
-            <View
-              style={[
-                styles.settingRowVertical,
-                isSheetWide && styles.toggleGroupRow,
-              ]}
-            >
-              {/* desktop puts the slider at the right of the text */}
-              <View style={isSheetWide && styles.toggleGroupContent}>
-                <Text style={styles.settingLabel}>
-                  {t("settings.ollama.contextLength")}
-                </Text>
-                <Text
-                  style={[
-                    styles.helpText,
-                    !isSheetWide && { marginBottom: Spacing.md },
-                  ]}
-                >
-                  {t("settings.ollama.contextHelp")}
-                </Text>
-              </View>
-              <Group style={isSheetWide && styles.sliderGroup}>
-                {advancedMode ? (
-                  <TextInputField
-                    icon={messageIcon}
-                    placeholder="8192"
-                    value={ollamaContextDraft}
-                    onChangeText={(v) => setHubServerContext(url, v)}
-                    keyboardType="numeric"
-                  />
-                ) : (
-                  <Slider
-                    icon={messageIcon}
-                    options={ollamaContextLengthOptions}
-                    selectedValue={String(serverContextLength(server))}
-                    onSelect={(v) => setHubServerContext(url, v)}
-                  />
-                )}
-              </Group>
-            </View>
-
-            <View
-              style={[
-                styles.settingRowVertical,
-                { marginBottom: 0 },
-                isSheetWide && styles.toggleGroupRow,
-              ]}
-            >
-              <View style={isSheetWide && styles.toggleGroupContent}>
-                <Text style={styles.settingLabel}>
-                  {t("settings.ollama.keepAlive")}
-                </Text>
-                <Text
-                  style={[
-                    styles.helpText,
-                    !isSheetWide && { marginBottom: Spacing.md },
-                  ]}
-                >
-                  {advancedMode
-                    ? t("settings.ollama.keepAliveHelpAdvanced")
-                    : t("settings.ollama.keepAliveHelp")}
-                </Text>
-              </View>
-              <Group style={isSheetWide && styles.sliderGroup}>
-                {advancedMode ? (
-                  <TextInputField
-                    icon={timeIcon}
-                    placeholder="300"
-                    value={ollamaKeepAliveDraft}
-                    onChangeText={(v) => setHubServerKeepAlive(url, v)}
-                    keyboardType="numeric"
-                  />
-                ) : (
-                  <Slider
-                    icon={timeIcon}
-                    options={ollamaKeepAliveOptions}
-                    selectedValue={String(serverKeepAlive(server))}
-                    onSelect={(v) => setHubServerKeepAlive(url, v)}
-                  />
-                )}
-              </Group>
-            </View>
-          </View>
-        )}
-
-        <ModelToggleList
-          key={url}
-          models={ollamaModels}
-          loading={ollamaModelsLoading}
-          service={HUB_PROVIDER_ID}
-          url={url}
-          disabled={server.disabledModels}
-          capabilities={server.capabilities}
-          onChange={(next) =>
-            patchHubServerPrefs(url, { disabledModels: next })
-          }
-          onCapabilitiesChange={(next) =>
-            patchHubServerPrefs(url, { capabilities: next })
-          }
-          style={
-            ollamaModelsLoading || ollamaModels.length > 0
-              ? { marginBottom: 0 }
-              : undefined
-          }
-        />
-
-        {/* actions section */}
-        {!ollamaModelsLoading && ollamaModels.length === 0 && (
-          <View style={[styles.contentCard, { marginBottom: 0 }]}>
-            <Group>
-              <ActionButton
-                icon={reconnectIcon}
-                label={t("settings.ollama.reconnect")}
-                onPress={() => loadOllamaModels(url, HUB_PROVIDER_ID)}
-              />
-            </Group>
-          </View>
-        )}
       </>
     );
   };
@@ -5076,9 +5215,11 @@ export default function SettingsDrawer({
             ? "settings.service.litertHelp"
             : "settings.service.localHelp",
         ),
+        undefined,
+        styles.sheetCard,
       )}
 
-      <View style={styles.contentCard}>
+      <View style={styles.sheetCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={styles.settingLabel}>
             {t("settings.litert.modelTitle")}
@@ -5145,7 +5286,7 @@ export default function SettingsDrawer({
       </View>
 
       {litertSupported && (
-        <View style={styles.contentCard}>
+        <View style={styles.sheetCard}>
           <View
             style={[
               styles.settingRowVertical,
@@ -5178,116 +5319,6 @@ export default function SettingsDrawer({
         </View>
       )}
     </>
-  );
-
-  //ollama server list subpage
-  const renderOllamaSubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader("Ollama")}
-
-      {/* ollama servers card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{t("settings.ollama.title")}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.ollama.help")}
-          </Text>
-
-          <Group style={styles.highlightGroup}>
-            <ActionButton
-              icon={addIcon}
-              label={t("settings.server.add")}
-              variant="highlight"
-              onPress={openOllamaAddSheet}
-            />
-          </Group>
-
-          {ollamaServers.length > 0 &&
-            renderCardGrid(
-              ollamaServers.map((server, index) => ({
-                key: String(index),
-                title: ollamaServerLabel(server),
-                status: ollamaStatusLabel(server),
-                error: serverErrors[server.url.trim()] === true,
-                onPress: () => openOllamaServer(index),
-              })),
-            )}
-        </View>
-      </View>
-
-      {/* model failover card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <View style={styles.toggleGroupRow}>
-            <View style={styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>
-                {t("settings.service.failover")}
-              </Text>
-              <Text style={styles.helpText}>
-                {t("settings.service.failoverHelp")}
-              </Text>
-            </View>
-            <Toggle checked={modelFailover} onToggle={setModelFailover} />
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-
-  //openai server list subpage
-  const renderOpenAISubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.service.cloudapi"))}
-
-      {/* openai servers card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>
-            {t("settings.cloudapi.title")}
-          </Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.cloudapi.help")}
-          </Text>
-
-          <Group style={styles.highlightGroup}>
-            <ActionButton
-              icon={addIcon}
-              label={t("settings.server.add")}
-              variant="highlight"
-              onPress={openOpenAIAddSheet}
-            />
-          </Group>
-
-          {openaiServers.length > 0 &&
-            renderCardGrid(
-              openaiServers.map((server, index) => ({
-                key: String(index),
-                title: openAIServerLabel(index),
-                status: ollamaStatusLabel(server),
-                error: serverErrors[server.url.trim()] === true,
-                onPress: () => openOpenAIServer(index),
-              })),
-            )}
-        </View>
-      </View>
-
-      {/* model failover card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <View style={styles.toggleGroupRow}>
-            <View style={styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>
-                {t("settings.service.failover")}
-              </Text>
-              <Text style={styles.helpText}>
-                {t("settings.service.failoverHelp")}
-              </Text>
-            </View>
-            <Toggle checked={modelFailover} onToggle={setModelFailover} />
-          </View>
-        </View>
-      </View>
-    </View>
   );
 
   //each page opens at the top
@@ -5433,52 +5464,6 @@ export default function SettingsDrawer({
                 )}
               />
             )}
-          </Group>
-        </View>
-      </View>
-
-      <View style={styles.contentCard}>
-        <View style={styles.settingRowVertical}>
-          <View style={styles.toggleGroupRow}>
-            <View style={styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>
-                {t("settings.privacy.remoteImages")}
-              </Text>
-              <Text style={styles.helpText}>
-                {t("settings.privacy.remoteImagesHelp")}
-              </Text>
-            </View>
-            <Toggle checked={showRemoteImages} onToggle={setShowRemoteImages} />
-          </View>
-        </View>
-      </View>
-
-      {/* data management card */}
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>
-            {t("settings.data.management")}
-          </Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {t("settings.data.managementHelp")}
-          </Text>
-
-          <Group>
-            <ActionButton
-              icon={exportIcon}
-              label={t("settings.data.exportAction")}
-              onPress={handleExportData}
-            />
-            <ActionButton
-              icon={downloadIcon}
-              label={t("settings.data.importAction")}
-              onPress={handleImportData}
-            />
-            <ActionButton
-              icon={binIcon}
-              label={t("settings.data.deleteAllAction")}
-              onPress={handleDeleteAllConversations}
-            />
           </Group>
         </View>
       </View>
@@ -5630,7 +5615,7 @@ export default function SettingsDrawer({
 
   const renderToolsSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.nav.tools.title"))}
+      {renderSubPageHeader(t("settings.nav.tools.title"), renderHelpButton("tools"))}
 
       {/* mcp link on top */}
       <Group style={styles.groupSpacing}>
@@ -5654,7 +5639,7 @@ export default function SettingsDrawer({
   //mcp list page
   const renderMcpServersSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.tools.mcp.title"))}
+      {renderSubPageHeader(t("settings.tools.mcp.title"), renderHelpButton("mcp"))}
 
       {mcpServers.length === 0 && McpService.getHubServers().length === 0 && (
         <Text style={styles.helpText}>{t("settings.tools.mcp.empty")}</Text>
@@ -5696,8 +5681,6 @@ export default function SettingsDrawer({
         return renderProfileSubPage();
       case "cloud":
         return renderCloudSubPage();
-      case "hubprovider":
-        return renderHubProviderSubPage();
       case "general":
         return renderGeneralSubPage();
       case "maestro":
@@ -5710,12 +5693,12 @@ export default function SettingsDrawer({
         return renderScreenSaverSubPage();
       case "service":
         return renderServiceSubPage();
-      case "ollama":
-        return renderOllamaSubPage();
-      case "openai":
-        return renderOpenAISubPage();
       case "confidentiality":
         return renderConfidentialitySubPage();
+      case "syncchoices":
+        return renderSyncChoicesSubPage();
+      case "datamanagement":
+        return renderDataManagementSubPage();
       case "advanced":
         return renderAdvancedSubPage();
       case "reports":
@@ -5987,7 +5970,7 @@ export default function SettingsDrawer({
 
     return (
       <>
-        <View style={styles.contentCard}>
+        <View style={styles.sheetCard}>
           <View style={styles.litertDetailHeader}>
             <View style={styles.litertDetailTile}>
               <Image
@@ -6055,7 +6038,7 @@ export default function SettingsDrawer({
         </View>
 
         {sections.length > 0 && (
-          <View style={[styles.contentCard, styles.litertFamilies]}>
+          <View style={[styles.sheetCard, styles.litertFamilies]}>
             {sections.map((section) => (
               <View key={section.title}>
                 <Text style={[styles.settingLabel, styles.litertFamilyTitle]}>
@@ -6147,7 +6130,7 @@ export default function SettingsDrawer({
         scrollEventThrottle={16}
       >
         {page === "browse" ? (
-          <View style={styles.contentCard}>
+          <View style={styles.sheetCard}>
             <View style={styles.settingRowVertical}>
               {renderLitertSearchField(page)}
             </View>
@@ -6155,13 +6138,13 @@ export default function SettingsDrawer({
           </View>
         ) : (
           <>
-            <View style={[styles.contentCard, styles.litertSearchWithBack]}>
+            <View style={[styles.sheetCard, styles.litertSearchWithBack]}>
               {renderLitertSearchField(page)}
             </View>
             {page === "model"
               ? renderLitertDetail()
               : litertSearchList && (
-                  <View style={styles.contentCard}>{litertSearchList}</View>
+                  <View style={styles.sheetCard}>{litertSearchList}</View>
                 )}
           </>
         )}
@@ -6193,7 +6176,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -6206,6 +6188,72 @@ export default function SettingsDrawer({
         {renderLitertContent()}
       </SheetScrollView>
     </DrawerSheet>
+  );
+
+  const helpCards: Record<HelpTopic, { title: string; cards: HelpSection[][] }> = {
+    providers: {
+      title: t("settings.nav.service.title"),
+      cards: [
+        [
+          { body: t("settings.service.helpIntro") },
+          { title: t("settings.service.helpTypesTitle"), body: t("settings.service.helpTypes") },
+        ],
+        [
+          { title: t("settings.service.helpAddTitle"), body: t("settings.service.helpAdd") },
+          { title: t("settings.service.helpUseTitle"), body: t("settings.service.helpUse") },
+        ],
+      ],
+    },
+    cloud: {
+      title: t("settings.nav.cloud.title"),
+      cards: [
+        [{ body: t("settings.cloud.helpIntro") }],
+        [
+          { title: t("settings.cloud.helpSamplerTitle"), body: t("settings.cloud.helpSampler") },
+          { title: t("settings.cloud.helpCloudTitle"), body: t("settings.cloud.helpCloud") },
+          { title: t("settings.cloud.helpPinTitle"), body: t("settings.cloud.helpPin") },
+        ],
+      ],
+    },
+    syncchoices: {
+      title: t("settings.nav.syncChoices.title"),
+      cards: [
+        [{ body: t("settings.syncChoices.helpIntro") }],
+        [
+          { title: t("settings.hub.syncData"), body: t("settings.hub.syncDataHelp") },
+          { title: t("settings.hub.syncSettings"), body: t("settings.hub.syncSettingsHelpCloud") },
+          { title: t("settings.hub.syncProviders"), body: t("settings.syncChoices.helpProviders") },
+        ],
+      ],
+    },
+    tools: {
+      title: t("settings.nav.tools.title"),
+      cards: [
+        [{ body: t("settings.tools.helpIntro") }],
+        [
+          { title: t("settings.tools.helpBuiltinTitle"), body: t("settings.tools.helpBuiltin") },
+          { title: t("settings.tools.mcp.title"), body: t("settings.tools.helpMcp") },
+        ],
+      ],
+    },
+    mcp: {
+      title: t("settings.tools.mcp.title"),
+      cards: [
+        [{ body: t("settings.tools.helpMcpWhat") }],
+        [{ title: t("settings.service.helpAddTitle"), body: t("settings.tools.helpMcpAdd") }],
+      ],
+    },
+  };
+
+  const helpSheet = (
+    <HelpSheet
+      visible={helpVisible}
+      onClose={() => setHelpVisible(false)}
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      title={helpCards[helpTopic].title}
+      cards={helpCards[helpTopic].cards}
+    />
   );
 
   const addModelSheet = (
@@ -6221,7 +6269,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           //stacked pages cannot size the sheet
           height: sheetMaxHeight,
         },
@@ -6245,90 +6292,6 @@ export default function SettingsDrawer({
           renderPage={renderLitertPage}
         />
       </SheetBody>
-    </DrawerSheet>
-  );
-
-  const ollamaAddServerSheet = (
-    <DrawerSheet
-      visible={ollamaAddVisible}
-      onClose={() => setOllamaAddVisible(false)}
-      mode="overlay"
-      isLargeScreen={isLargeScreen}
-      isDesktop={isDesktop}
-      handleContainerStyle={styles.sheetHandleContainer}
-      avoidKeyboard
-      sheetStyle={[
-        styles.addModelSheet,
-        {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
-          maxHeight: sheetMaxHeight,
-        },
-      ]}
-      desktopStyle={styles.addModelSheetDesktop}
-    >
-      <SheetScrollView
-        contentContainerStyle={styles.addModelSheetContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={[styles.contentCard, { marginBottom: 0 }]}>
-          <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {t("settings.server.name")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={penPlaceholderIcon}
-                placeholder={t("settings.server.namePlaceholder")}
-                value={serverDraft.name}
-                onChangeText={(v) =>
-                  setServerDraft((prev) => ({ ...prev, name: v }))
-                }
-              />
-            </Group>
-          </View>
-
-          <View style={styles.settingRowVertical}>
-            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {t("settings.server.link")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={linkIcon}
-                placeholder={t("settings.service.serverLink")}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-                value={serverDraft.url}
-                onChangeText={(v) =>
-                  setServerDraft((prev) => ({ ...prev, url: v }))
-                }
-              />
-            </Group>
-          </View>
-
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Group
-              style={[
-                styles.highlightGroup,
-                (serverDraftBusy || !serverDraft.url.trim()) &&
-                  styles.highlightGroupDisabled,
-              ]}
-            >
-              <ActionButton
-                icon={addIcon}
-                label={
-                  serverDraftBusy
-                    ? t("settings.server.checking")
-                    : t("settings.server.add")
-                }
-                variant="highlight"
-                disabled={serverDraftBusy || !serverDraft.url.trim()}
-                onPress={submitOllamaDraft}
-              />
-            </Group>
-          </View>
-        </View>
-      </SheetScrollView>
     </DrawerSheet>
   );
 
@@ -6366,7 +6329,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -6387,8 +6349,9 @@ export default function SettingsDrawer({
               serverSwitch("ollama", ollamaDetailServer, (disabled) =>
                 patchOllamaServer(shownOllamaIndex, { disabled }),
               ),
+              styles.sheetCard,
             )}
-            <View style={styles.contentCard}>
+            <View style={styles.sheetCard}>
               <View style={styles.settingRowVertical}>
                 <Text
                   style={[styles.settingLabel, { marginBottom: Spacing.md }]}
@@ -6439,6 +6402,11 @@ export default function SettingsDrawer({
                     }
                   />
                 </Group>
+                {isLocalUrl(ollamaDetailServer.url) && (
+                  <Text style={[styles.helpText, { marginTop: Spacing.md }]}>
+                    {t("settings.server.localNotSynced")}
+                  </Text>
+                )}
               </View>
 
               <View
@@ -6555,7 +6523,7 @@ export default function SettingsDrawer({
               }
             />
 
-            <View style={[styles.contentCard, { marginBottom: 0 }]}>
+            <View style={styles.sheetCard}>
               <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
                 <Group>
                   {!ollamaDetailConnected && (
@@ -6588,6 +6556,16 @@ export default function SettingsDrawer({
 
   const shownHubServer = getHubServers().find((s) => s.url === shownHubUrl);
 
+  const personalitySheet = (
+    <PersonalitySheet
+      visible={personalitySheetVisible}
+      onClose={() => setPersonalitySheetVisible(false)}
+      onSaved={setPersonality}
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+    />
+  );
+
   //hub server detail sheet
   const hubServerSheet = (
     <DrawerSheet
@@ -6601,7 +6579,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -6614,6 +6591,104 @@ export default function SettingsDrawer({
         onLayout={(e) => setSheetWidth(e.nativeEvent.layout.width)}
       >
         {shownHubServer && renderHubServerContent(shownHubServer)}
+      </SheetKeyboardAwareScrollView>
+    </DrawerSheet>
+  );
+
+  const shownHubModel = shownHubModelKey
+    ? splitHubModelKey(shownHubModelKey)
+    : null;
+  const shownHubModelServer = getHubServers().find(
+    (s) => s.url === shownHubModel?.url,
+  );
+
+  const renderHubModelContent = (
+    server: ReturnType<typeof getHubServers>[number],
+    model: string,
+  ) => {
+    const disabled = server.disabledModels ?? NO_DISABLED_MODELS;
+    const icon = hubModelIcon(hubModelKeyOf(server.url, model));
+    return (
+      <View style={styles.sheetCard}>
+        <View style={styles.toggleGroupRow}>
+          <View style={[styles.toggleGroupContent, styles.cloudModelText]}>
+            <Text style={styles.litertDetailName}>{model}</Text>
+            <View style={styles.litertCapability}>
+              {icon && (
+                <Image
+                  source={icon}
+                  style={styles.litertCapabilityIcon}
+                  tintColor={Colors.textSecondary}
+                />
+              )}
+              <Text style={styles.litertDetailMeta}>{server.name}</Text>
+            </View>
+          </View>
+          <Toggle
+            checked={!disabled.includes(model)}
+            onToggle={(on) =>
+              patchHubServerPrefs(server.url, {
+                disabledModels: on
+                  ? disabled.filter((m) => m !== model)
+                  : [...disabled, model],
+              })
+            }
+          />
+        </View>
+        <Text style={[styles.settingLabel, styles.litertDetailSection]}>
+          {t("settings.ollama.capabilities")}
+        </Text>
+        <ModelCapabilityToggles
+          key={`${server.url}|${model}`}
+          model={model}
+          service={HUB_PROVIDER_ID}
+          url={server.url}
+          onCapabilitiesChange={(m, caps) =>
+            patchHubServerPrefs(server.url, {
+              capabilities: { ...server.capabilities, [m]: caps },
+            })
+          }
+          onPromptTierChange={(m, tier) => {
+            const { [m]: _removed, ...rest } = server.promptTiers ?? {};
+            patchHubServerPrefs(server.url, {
+              promptTiers: tier ? { ...rest, [m]: tier } : rest,
+            });
+          }}
+          style={styles.cloudModelCapabilities}
+          labelStyle={styles.cloudModelCapabilityLabel}
+          checkboxes
+        />
+      </View>
+    );
+  };
+
+  //hub model info over the hub sheet
+  const hubModelSheet = (
+    <DrawerSheet
+      visible={hubModelKey !== null && !!shownHubModelServer}
+      onClose={() => setHubModelKey(null)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      avoidKeyboard
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.addModelSheetDesktop}
+    >
+      <SheetKeyboardAwareScrollView
+        bottomOffset={Spacing.xl2}
+        contentContainerStyle={styles.addModelSheetContent}
+        keyboardShouldPersistTaps="handled"
+        onLayout={(e) => setSheetWidth(e.nativeEvent.layout.width)}
+      >
+        {shownHubModelServer &&
+          shownHubModel &&
+          renderHubModelContent(shownHubModelServer, shownHubModel.model)}
       </SheetKeyboardAwareScrollView>
     </DrawerSheet>
   );
@@ -6678,8 +6753,9 @@ export default function SettingsDrawer({
               serverSwitch(OPENAI_PROVIDER_ID, server, (disabled) =>
                 patchOpenAIServer(index, { disabled }),
               ),
+              styles.sheetCard,
             )}
-            <View style={styles.contentCard}>
+            <View style={styles.sheetCard}>
               <View style={styles.settingRowVertical}>
                 <Text
                   style={[styles.settingLabel, { marginBottom: Spacing.md }]}
@@ -6724,6 +6800,11 @@ export default function SettingsDrawer({
                     }
                   />
                 </Group>
+                {isLocalUrl(server.url) && (
+                  <Text style={[styles.helpText, { marginTop: Spacing.md }]}>
+                    {t("settings.server.localNotSynced")}
+                  </Text>
+                )}
               </View>
 
               <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -6767,7 +6848,7 @@ export default function SettingsDrawer({
               onOpenSearch={openOpenAISearch}
             />
 
-            <View style={[styles.contentCard, { marginBottom: 0 }]}>
+            <View style={styles.sheetCard}>
               <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
                 <Group>
                   {!openaiDetailConnected && (
@@ -6803,7 +6884,7 @@ export default function SettingsDrawer({
             }
             scrollEventThrottle={16}
           >
-            <View style={[styles.contentCard, styles.litertSearchWithBack]}>
+            <View style={[styles.sheetCard, styles.litertSearchWithBack]}>
               {renderOpenAISearchField(page)}
             </View>
             {page === "list" ? (
@@ -6824,7 +6905,7 @@ export default function SettingsDrawer({
               />
             ) : (
               model && (
-                <View style={styles.contentCard}>
+                <View style={styles.sheetCard}>
                   <View style={styles.toggleGroupRow}>
                     <View
                       style={[styles.toggleGroupContent, styles.cloudModelText]}
@@ -6906,7 +6987,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           height: sheetMaxHeight,
         },
       ]}
@@ -6943,7 +7023,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -6953,7 +7032,7 @@ export default function SettingsDrawer({
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={[styles.contentCard, { marginBottom: 0 }]}>
+        <View style={styles.sheetCard}>
           <View style={styles.settingRowVertical}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
               {t("settings.server.name")}
@@ -7026,7 +7105,7 @@ export default function SettingsDrawer({
                 }
                 variant="highlight"
                 disabled={serverDraftBusy || !serverDraft.url.trim()}
-                onPress={submitOpenAIDraft}
+                onPress={submitServerDraft}
               />
             </Group>
           </View>
@@ -7046,7 +7125,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -7058,7 +7136,7 @@ export default function SettingsDrawer({
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={[styles.contentCard, { marginBottom: 0 }]}>
+        <View style={styles.sheetCard}>
           <View style={styles.settingRowVertical}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
               {t("settings.server.name")}
@@ -7194,7 +7272,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -7214,7 +7291,7 @@ export default function SettingsDrawer({
               contentContainerStyle={styles.addModelSheetContent}
               keyboardShouldPersistTaps="handled"
             >
-              <View style={styles.contentCard}>
+              <View style={styles.sheetCard}>
                 <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
                   <Text style={styles.settingLabel}>{server.name}</Text>
                   <Text
@@ -7229,7 +7306,7 @@ export default function SettingsDrawer({
               </View>
 
               {tools.length > 0 && (
-                <View style={styles.contentCard}>
+                <View style={styles.sheetCard}>
                   <View
                     style={[styles.settingRowVertical, { marginBottom: 0 }]}
                   >
@@ -7289,7 +7366,7 @@ export default function SettingsDrawer({
               )}
 
               {!hosted && (
-                <View style={styles.contentCard}>
+                <View style={styles.sheetCard}>
                   <View style={styles.settingRowVertical}>
                     <Text
                       style={[
@@ -7413,7 +7490,7 @@ export default function SettingsDrawer({
               )}
 
               {(!hosted || status.state !== "connected") && (
-                <View style={[styles.contentCard, { marginBottom: 0 }]}>
+                <View style={styles.sheetCard}>
                   <View
                     style={[styles.settingRowVertical, { marginBottom: 0 }]}
                   >
@@ -7467,7 +7544,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -7477,7 +7553,7 @@ export default function SettingsDrawer({
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.contentCard}>
+        <View style={styles.sheetCard}>
           {CloudSetup && (
             <CloudSetup
               onDone={() => {
@@ -7503,7 +7579,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -7515,7 +7590,7 @@ export default function SettingsDrawer({
             contentContainerStyle={styles.addModelSheetContent}
             keyboardShouldPersistTaps="handled"
           >
-            <View style={styles.contentCard}>
+            <View style={styles.sheetCard}>
               <Group style={styles.infoGroup}>
                 <ActionButton
                   label={selectedLocalModel.label}
@@ -7625,7 +7700,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -7634,7 +7708,7 @@ export default function SettingsDrawer({
       {!!downloadingLitert && (
         <SheetBody style={styles.addModelSheetBody}>
           <SheetScrollView contentContainerStyle={styles.addModelSheetContent}>
-            <View style={styles.contentCard}>
+            <View style={styles.sheetCard}>
               <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
                 <Text
                   style={[styles.settingLabel, { marginBottom: Spacing.md }]}
@@ -7722,7 +7796,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -7734,7 +7807,7 @@ export default function SettingsDrawer({
             contentContainerStyle={styles.addModelSheetContent}
             keyboardShouldPersistTaps="handled"
           >
-            <View style={styles.contentCard}>
+            <View style={styles.sheetCard}>
               <View style={styles.litertDetailHeader}>
                 <View style={styles.litertDetailTile}>
                   <Image
@@ -7785,7 +7858,7 @@ export default function SettingsDrawer({
               </Text>
             </View>
 
-            <View style={styles.contentCard}>
+            <View style={styles.sheetCard}>
               <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
                 <Group>
                   <ActionButton
@@ -7826,7 +7899,6 @@ export default function SettingsDrawer({
       sheetStyle={[
         styles.addModelSheet,
         {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
           maxHeight: sheetMaxHeight,
         },
       ]}
@@ -7836,7 +7908,7 @@ export default function SettingsDrawer({
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.contentCard}>
+        <View style={styles.sheetCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
               {t("settings.profile.name")}
@@ -7958,10 +8030,12 @@ export default function SettingsDrawer({
             </View>
 
             {litertSheet}
+            {helpSheet}
             {addModelSheet}
-            {ollamaAddServerSheet}
             {ollamaServerSheet}
             {hubServerSheet}
+            {personalitySheet}
+            {hubModelSheet}
             {openaiAddServerSheet}
             {openaiServerSheet}
             {mcpAddServerSheet}
@@ -8008,10 +8082,12 @@ export default function SettingsDrawer({
 
       {notificationModal}
       {litertSheet}
+      {helpSheet}
       {addModelSheet}
-      {ollamaAddServerSheet}
       {ollamaServerSheet}
       {hubServerSheet}
+      {personalitySheet}
+      {hubModelSheet}
       {openaiAddServerSheet}
       {openaiServerSheet}
       {mcpAddServerSheet}
@@ -8149,6 +8225,13 @@ const makeStyles = (Colors: ThemeColors) =>
       padding: Spacing.md,
       marginBottom: Spacing.xxl2,
     },
+    //sheet sections, the sheet content spaces them
+    sheetCard: {
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
+      padding: Spacing.md,
+    },
     gradientTop: {
       position: "absolute",
       top: 0,
@@ -8169,6 +8252,10 @@ const makeStyles = (Colors: ThemeColors) =>
       width: 40,
       height: 40,
     },
+    headerRight: {
+      alignItems: "flex-end",
+      justifyContent: "center",
+    },
     addModelSheet: {
       position: "absolute",
       bottom: 0,
@@ -8188,6 +8275,15 @@ const makeStyles = (Colors: ThemeColors) =>
       right: 0,
       alignItems: "center",
       paddingVertical: Spacing.md,
+    },
+    personalitySentence: {
+      fontSize: FontSizes.lg,
+      lineHeight: 26,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.body,
+      textAlign: "center",
+      marginBottom: Spacing.md,
+      paddingHorizontal: Spacing.md,
     },
     addModelSheetDesktop: {
       width: 560,
@@ -8253,6 +8349,9 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     modelToggleLabel: {
       flexShrink: 1,
+    },
+    modelToggleIcon: {
+      marginRight: Spacing.sm,
     },
     modelToggleArrowOpen: {
       transform: [{ rotate: "90deg" }],
@@ -8368,6 +8467,7 @@ const makeStyles = (Colors: ThemeColors) =>
     addModelSheetContent: {
       paddingHorizontal: Spacing.lg2,
       paddingBottom: Spacing.lg,
+      gap: Spacing.xxl2,
     },
     groupSpacing: {
       marginBottom: Spacing.xxl,
@@ -8534,25 +8634,17 @@ const makeStyles = (Colors: ThemeColors) =>
       lineHeight: 20,
       paddingHorizontal: Spacing.md,
     },
-    assistantStatusText: {
-      fontSize: FontSizes.bodyMd,
-      fontFamily: Fonts.body,
-      marginTop: Spacing.sm,
-      marginBottom: Spacing.md,
-      lineHeight: 20,
-      paddingHorizontal: Spacing.md,
-    },
-    assistantStatusOn: {
-      color: Colors.primary,
-    },
-    assistantStatusOff: {
-      color: Colors.textMuted,
-    },
     highlightGroup: {
       backgroundColor: Colors.primary,
       borderColor: Colors.borderOnPrimary,
     },
     highlightGroupDisabled: {
       opacity: 0.5,
+    },
+    activeCard: {
+      backgroundColor: Colors.primary,
+    },
+    activeLabel: {
+      color: Colors.textOnPrimary,
     },
   });

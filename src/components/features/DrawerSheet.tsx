@@ -20,7 +20,9 @@ import {
   KeyboardAwareScrollView,
   KeyboardAwareScrollViewProps,
   KeyboardAwareScrollViewRef,
+  useKeyboardState,
 } from "react-native-keyboard-controller";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Reanimated, { useAnimatedStyle } from "react-native-reanimated";
 import { Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
@@ -37,6 +39,8 @@ const CLOSED_MARGIN = 80;
 const FADE_STEPS = 8;
 //content pads by the same amount
 const FADE_EXTRA = Spacing.xxl;
+//band under the content, the safe area adds to it
+const BOTTOM_BAND = Platform.OS === "ios" ? 20 : 10;
 
 //smoothstep avoids a kink on short fades
 function fadeStops(clear: string): [string, string, ...string[]] {
@@ -213,8 +217,12 @@ export default function DrawerSheet({
 }: DrawerSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const isLift = mode === "lift";
-  const insetBottom = Number(StyleSheet.flatten(sheetStyle)?.paddingBottom ?? 0);
-  const insets = useMemo(() => ({ bottom: insetBottom, fade: FADE_EXTRA, bled: false }), [insetBottom]);
+  const safeArea = useSafeAreaInsets();
+  //an open keyboard covers the safe area
+  const keyboardOpen = useKeyboardState((state) => state.isVisible);
+  const bottom = BOTTOM_BAND + (keyboardOpen ? 0 : safeArea.bottom);
+  const sheetBox = [sheetStyle, { paddingBottom: bottom }];
+  const insets = useMemo(() => ({ bottom, fade: FADE_EXTRA, bled: false }), [bottom]);
   const ownedProgress = useAnimatedValue(0);
   const progress = isLift ? ownedProgress : externalProgress ?? ownedProgress;
   const nativeDriver = !isLift;
@@ -348,7 +356,7 @@ export default function DrawerSheet({
             }
         }
       >
-        <View style={sheetStyle} onTouchStart={onTouchStart} {...panResponder.panHandlers}>
+        <View style={sheetBox} onTouchStart={onTouchStart} {...panResponder.panHandlers}>
           {handle}
           <SheetScrollContext.Provider value={scroll}>{children}</SheetScrollContext.Provider>
         </View>
@@ -386,7 +394,7 @@ export default function DrawerSheet({
         <Animated.View
           pointerEvents={visible ? "auto" : "none"}
           onLayout={(e: LayoutChangeEvent) => setContentHeight(e.nativeEvent.layout.height)}
-          style={[sheetStyle, { transform: [{ translateY: translateYMobile }] }, !measured && styles.hidden]}
+          style={[sheetBox, { transform: [{ translateY: translateYMobile }] }, !measured && styles.hidden]}
           onTouchStart={onTouchStart}
           {...panResponder.panHandlers}
         >

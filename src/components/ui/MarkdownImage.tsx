@@ -17,7 +17,6 @@ import { BROWSER_UA } from "../../services/net/userAgent";
 import { Settings } from "../../services/settings/SettingsService";
 import { pressStyle } from "./pressStyle";
 
-const websiteIcon = require("../../../assets/icons/website.png");
 const photoIcon = require("../../../assets/icons/photo.png");
 
 //hosts reject the default agent
@@ -108,7 +107,7 @@ export default function MarkdownImage({
     DeviceEventEmitter.emit(AppEvents.openImagePreview, { uri: url });
   };
 
-  const cardBg = isDark ? Colors.responseSurface : Colors.surface;
+  const cardBg = Colors.surface;
   const borderColor = incognito
     ? Colors.incognito
     : isDark
@@ -123,22 +122,16 @@ export default function MarkdownImage({
     return (
       <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
         <View style={styles.warningHeader}>
-          <View style={styles.warningTitleRow}>
-            <RNImage
-              source={websiteIcon}
-              style={styles.warningIcon}
-              tintColor={incognito ? Colors.incognito : Colors.primary}
-            />
-            <Text style={[styles.warningTitle, { color: titleColor }]}>
-              {t("markdown.image.external")}
-            </Text>
-          </View>
+          <Text style={[styles.warningTitle, { color: titleColor }]}>
+            {t("markdown.image.external")}
+          </Text>
           {!!domain && (
-            <View style={[styles.domainBadge, { backgroundColor: badgeBg }]}>
-              <Text style={[styles.domainText, { color: mutedColor }]} numberOfLines={1}>
-                {domain}
-              </Text>
-            </View>
+            <Text
+              style={[styles.domainLink, { color: incognito ? Colors.incognito : Colors.primary }]}
+              numberOfLines={1}
+            >
+              {domain}
+            </Text>
           )}
         </View>
         <Text style={[styles.warningText, { color: bodyColor }]}>
@@ -179,7 +172,7 @@ export default function MarkdownImage({
   }
 
   return (
-    <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+    <View style={[styles.card, styles.cardBorderless, { backgroundColor: cardBg }]}>
       <Pressable onPress={handleOpenPreview} style={pressStyle(styles.imageWrap, "fadeLight")}>
         {isLoading && (
           <View
@@ -230,53 +223,37 @@ export default function MarkdownImage({
 const makeStyles = (Colors: ThemeColors) =>
   StyleSheet.create({
     card: {
-      borderRadius: Radius.xxl,
+      borderRadius: Radius.window,
       borderWidth: 2,
       marginVertical: Spacing.md,
       overflow: "hidden",
-      shadowColor: Colors.shadowInk,
-      shadowOffset: { width: -3, height: 3 },
-      shadowOpacity: 1,
-      shadowRadius: 0,
-      elevation: 2,
+    },
+    cardBorderless: {
+      borderWidth: 0,
     },
     warningHeader: {
-      flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
       paddingHorizontal: Spacing.xl,
       paddingTop: Spacing.lg,
       paddingBottom: Spacing.xs,
-      gap: Spacing.md,
-    },
-    warningTitleRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: Spacing.sm,
-    },
-    warningIcon: {
-      width: 16,
-      height: 16,
+      gap: Spacing.xs,
     },
     warningTitle: {
       fontFamily: Fonts.mono,
       fontSize: FontSizes.label,
       letterSpacing: 0.5,
     },
-    domainBadge: {
-      borderRadius: Radius.sm,
-      paddingHorizontal: Spacing.sm,
-      paddingVertical: Spacing.xs2,
-      maxWidth: "50%",
-    },
-    domainText: {
+    domainLink: {
       fontFamily: Fonts.mono,
       fontSize: FontSizes.labelSm,
+      textDecorationLine: "underline",
+      maxWidth: "80%",
     },
     warningText: {
       fontFamily: Fonts.body,
       fontSize: FontSizes.caption,
       lineHeight: 18,
+      textAlign: "center",
       paddingHorizontal: Spacing.xl,
       paddingVertical: Spacing.sm,
     },

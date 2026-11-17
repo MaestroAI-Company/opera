@@ -3,6 +3,7 @@ import { isLocalModel } from '../providers/LocalProvider';
 import { Message, MessageMetrics } from '../../db/DatabaseService';
 import { WidgetManager } from '../../widgets/WidgetManager';
 import { SYSTEM_PROMPTS } from '../../../../constants/prompts';
+import { buildPersonalitySegment } from '../../../../constants/personality';
 import { Settings } from '../../settings/SettingsService';
 import { ToolSource } from '../tools/ITool';
 import { ToolManager } from '../tools/ToolManager';
@@ -156,9 +157,10 @@ function promptForTier(tier: ModelTier, userInstruction: string, extraSegment = 
   const base = instruction.length > 0
     ? `${instruction}\n\n---\n\n${appPrompt}`
     : appPrompt;
+  const personality = buildPersonalitySegment(Settings.getCached());
   //small models see widgets via @mentions
   const widgetSegment = tier === 'small' ? '' : WidgetManager.getSystemPromptSegment();
-  return base + widgetSegment + extraSegment;
+  return base + personality + widgetSegment + extraSegment;
 }
 
 //last mentions drive tools and widgets

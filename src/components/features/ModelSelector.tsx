@@ -8,7 +8,6 @@ import {
   LayoutChangeEvent,
   NativeScrollEvent,
   NativeSyntheticEvent,
-  Platform,
   Pressable,
   ScrollView,
   StyleProp,
@@ -20,13 +19,15 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Reanimated, {
+  Easing,
+  interpolate,
   interpolateColor,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { type ModelCapabilityId } from "../../../constants/modelCapabilities";
 import {
   Fonts,
@@ -41,7 +42,7 @@ import { AIModule } from "../../services/ai/AIModule";
 import { getLocalModelLabel, isLocalModel } from "../../services/ai/providers/LocalProvider";
 import { getLiteRTModelLabel, isLiteRTModel, subscribeLiteRTDownload } from "../../services/ai/providers/LiteRTProvider";
 import { getCachedModels, getLastModel, hydrateModelCache, setCachedModels, setLastModel } from "../../services/ai/providers/modelCache";
-import { buildSources, getOllamaTuning, ModelSource } from "../../services/ai/providers/sources";
+import { buildSources, getOllamaTuning, HUB_PROVIDER_ID, hubModelKeyOf, ModelSource, splitHubModelKey } from "../../services/ai/providers/sources";
 import { estimateContextTokens } from "../../services/ai/generation/chatGeneration";
 import { MessageMetrics } from "../../services/db/DatabaseService";
 import { AppEvents } from "../../services/events";
@@ -50,7 +51,7 @@ import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 import ProgressBar from "../ui/ProgressBar";
 import SliderToggle, { SliderToggleOption } from "../ui/SliderToggle";
-import DrawerSheet from "./DrawerSheet";
+import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 import { pressStyle } from "../ui/pressStyle";
 import { vibrate } from "@/services/haptics";
 
@@ -132,6 +133,11 @@ export const displayName = (model: string) =>
   isLocalModel(model) ? getLocalModelLabel(model, true)
     : isLiteRTModel(model) ? getLiteRTModelLabel(model)
       : model;
+
+//keeps the model pill narrow
+const MODEL_MAX_CHARS = 16;
+export const truncateModel = (name: string) =>
+  name.length > MODEL_MAX_CHARS ? `${name.slice(0, MODEL_MAX_CHARS - 1)}…` : name;
 
 //button trigger in topbar
 export function ModelSelectorTrigger({
@@ -245,7 +251,7 @@ export type ModelSelectorDrawerProps = {
   triggerRef?: React.RefObject<View | null>;
   //current conversation, fills the token window
   messages?: { content: string; images?: string[]; metrics?: MessageMetrics }[];
-  onOpenProviderSettings?: (provider: string) => void;
+  onOpenProviderSettings?: (source: ModelSource) => void;
   hideScrim?: boolean;
 };
 
@@ -273,7 +279,6 @@ export function ModelSelectorDrawer({
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const t = useT();
-  const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
 
   //reflection labels follow the locale
@@ -334,11 +339,24 @@ export function ModelSelectorDrawer({
     if (visible) setSourcesRevision((r) => r + 1);
   }, [visible]);
 
-  const sources = useMemo(
-    () => buildSources(localAvailable),
+  //group hub servers in single tab
+  const { sources, hubUrls } = useMemo(() => {
+    const all = buildSources(localAvailable);
+    const hub = all.filter((s) => s.service === HUB_PROVIDER_ID);
+    if (hub.length === 0) return { sources: all, hubUrls: [] };
+    const merged: ModelSource = { key: HUB_PROVIDER_ID, service: HUB_PROVIDER_ID, label: "Sampler Hub", url: "" };
+    return {
+      sources: [...all.filter((s) => s.service !== HUB_PROVIDER_ID), merged],
+      hubUrls: hub.map((s) => s.url),
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- revision tracks the settings behind buildSources
-    [localAvailable, sourcesRevision],
-  );
+  }, [localAvailable, sourcesRevision]);
+  const isHub = (source?: ModelSource) => source?.service === HUB_PROVIDER_ID;
+  //fetch callback stays stable
+  const hubUrlsRef = useRef(hubUrls);
+  useEffect(() => {
+    hubUrlsRef.current = hubUrls;
+  });
 
   //the source the app currently generates with, falls back to the first tab
   const matchesActive = (source?: ModelSource) =>
@@ -353,6 +371,20 @@ export function ModelSelectorDrawer({
   const browsedSource =
     sources.find((s) => s.key === browsedKey) ?? activeSource;
   const isBrowsingActive = matchesActive(browsedSource);
+  //match composite hub row key
+  const selectedRow =
+    isHub(browsedSource) && selectedModel ? hubModelKeyOf(ollamaUrl, selectedModel) : selectedModel;
+  //switch server when picking hub row
+  const pickRow = (source: ModelSource, row: string) => {
+    if (!isHub(source) || !row) {
+      if (!matchesActive(source)) onServiceChange(source.service, source.url);
+      onModelChange(row);
+      return;
+    }
+    const { url, model } = splitHubModelKey(row);
+    if (aiService !== source.service || url !== ollamaUrl) onServiceChange(source.service, url);
+    onModelChange(model);
+  };
 
   useEffect(() => {
     //active source changed under us, stop browsing an old tab
@@ -398,15 +430,27 @@ export function ModelSelectorDrawer({
     if (pendingKey.current !== key) return;
     applyModels(getCachedModels(key), key);
     try {
-      const available = await AIModule.isSourceAvailable(
-        source.service,
-        source.url,
+      const urls = isHub(source) ? hubUrlsRef.current : [source.url];
+      const lists = await Promise.all(
+        urls.map(async (url) => {
+          if (!isHub(source)) {
+            if (!(await AIModule.isSourceAvailable(source.service, url))) return null;
+            return AIModule.getModelsFor(source.service, url);
+          }
+          //isolate individual hub server failures
+          try {
+            if (!(await AIModule.isSourceAvailable(source.service, url))) return null;
+            const list = await AIModule.getModelsFor(source.service, url);
+            return list.map((m) => hubModelKeyOf(url, m));
+          } catch {
+            return null;
+          }
+        }),
       );
       if (pendingKey.current !== key) return;
+      const available = lists.some((list) => list !== null);
       setIsAvailable(available);
-      const fetched = available
-        ? await AIModule.getModelsFor(source.service, source.url)
-        : [];
+      const fetched = lists.flatMap((list) => list ?? []);
       if (pendingKey.current !== key) return;
       applyModels(fetched, key);
       //offline rows must not be cached
@@ -440,11 +484,11 @@ export function ModelSelectorDrawer({
     //rows stay with the browsed source
     if (shownKey.current !== browsedSource.key) return;
     if (models.length > 0) {
-      if (!selectedModel || !models.includes(selectedModel)) {
+      if (!selectedRow || !models.includes(selectedRow)) {
         const last = getLastModel(browsedSource.key);
-        onModelChange(models.includes(last) ? last : models[0]);
+        pickRow(browsedSource, models.includes(last) ? last : models[0]);
       } else {
-        setLastModel(browsedSource.key, selectedModel);
+        setLastModel(browsedSource.key, selectedRow);
       }
     } else if (selectedModel) {
       onModelChange("");
@@ -453,6 +497,7 @@ export function ModelSelectorDrawer({
   }, [
     models,
     selectedModel,
+    selectedRow,
     loading,
     hasFetched,
     isBrowsingActive,
@@ -485,10 +530,9 @@ export function ModelSelectorDrawer({
 
   const handleSelectModel = (model: string) => {
     const source = browsedSource;
-    if (source && !isBrowsingActive)
-      onServiceChange(source.service, source.url);
-    if (source) setLastModel(source.key, model);
-    onModelChange(model);
+    if (!source) return onModelChange(model);
+    setLastModel(source.key, model);
+    pickRow(source, model);
   };
 
   //ref keeps callback stable for memo
@@ -502,28 +546,38 @@ export function ModelSelectorDrawer({
     selectModelRef.current(model);
   }, []);
 
+  const openSourceSettings = (source: ModelSource) => {
+    if (!onOpenProviderSettings) return;
+    onClose();
+    onOpenProviderSettings(source);
+  };
+
   //tab switch restores its last model
   const handleSelectSource = (source: ModelSource) => {
     //open provider settings on reselect
     if (browsedSource && source.key === browsedSource.key) {
-      if (onOpenProviderSettings) {
-        onClose();
-        onOpenProviderSettings(source.service);
-      }
+      openSourceSettings(source);
       return;
     }
     setBrowsedKey(source.key);
     if (matchesActive(source)) return;
-    onServiceChange(source.service, source.url);
     const last = getLastModel(source.key);
+    if (isHub(source)) {
+      //default to first hub server
+      if (last) pickRow(source, last);
+      else onServiceChange(source.service, hubUrls[0]);
+      return;
+    }
+    onServiceChange(source.service, source.url);
     if (last) onModelChange(last);
   };
 
   //friendly label for local variants
   const displayName = (model: string) =>
-    isLocalModel(model) ? getLocalModelLabel(model, true)
-      : isLiteRTModel(model) ? getLiteRTModelLabel(model)
-        : model;
+    isHub(browsedSource) ? splitHubModelKey(model).model
+      : isLocalModel(model) ? getLocalModelLabel(model, true)
+        : isLiteRTModel(model) ? getLiteRTModelLabel(model)
+          : model;
 
   const displayModels = useMemo(() => {
     return [...models].sort((a, b) => a.localeCompare(b));
@@ -538,11 +592,12 @@ export function ModelSelectorDrawer({
     if (shownKey.current !== browsedSource.key) return;
     const source = browsedSource;
     Promise.all(
-      models.map((model) =>
-        AIModule.getModelCapabilitiesFor(source.service, source.url, model)
+      models.map((model) => {
+        const row = isHub(source) ? splitHubModelKey(model) : { url: source.url, model };
+        return AIModule.getModelCapabilitiesFor(source.service, row.url, row.model)
           .then((caps) => [`${source.key}:${model}`, caps] as const)
-          .catch(() => [`${source.key}:${model}`, [] as string[]] as const),
-      ),
+          .catch(() => [`${source.key}:${model}`, [] as string[]] as const);
+      }),
     ).then((entries) =>
       setCapabilities((prev) => ({ ...prev, ...Object.fromEntries(entries) })),
     );
@@ -571,7 +626,7 @@ export function ModelSelectorDrawer({
   const showTokenWindow = messages.length > 0 && contextWindow > 0;
 
   const selectedIndex = isBrowsingActive
-    ? displayModels.findIndex((m) => m === selectedModel)
+    ? displayModels.findIndex((m) => m === selectedRow)
     : -1;
 
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -582,6 +637,7 @@ export function ModelSelectorDrawer({
   const pillLit = useSharedValue(0);
   const dragStartY = useSharedValue(0);
   const dragIndex = useSharedValue(0);
+  const labelPulse = useSharedValue(0);
 
   const activeIndex = previewIndex ?? (selectedIndex >= 0 ? selectedIndex : 0);
   const hasPill = isBrowsingActive && selectedIndex >= 0;
@@ -649,6 +705,15 @@ export function ModelSelectorDrawer({
 
   //pill parked on this list
   const parkedKey = useRef<string | null>(null);
+
+  //pulse the pill label on each drag swap
+  useEffect(() => {
+    if (previewIndex === null) return;
+    labelPulse.set(withSequence(
+      withTiming(1, { duration: 120, easing: Easing.out(Easing.quad) }),
+      withTiming(0, { duration: 160, easing: Easing.in(Easing.quad) }),
+    ));
+  }, [previewIndex, labelPulse]);
 
   //parks pill on selected before paint
   useLayoutEffect(() => {
@@ -804,6 +869,11 @@ export function ModelSelectorDrawer({
     ),
   }));
 
+  const labelPulseStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(labelPulse.value, [0, 1], [1, 0.6]),
+    transform: [{ scale: interpolate(labelPulse.value, [0, 1], [1, 1.1]) }],
+  }));
+
   const tabs = sources.map((source) => {
     const active = source.key === browsedSource?.key;
     return (
@@ -815,6 +885,7 @@ export function ModelSelectorDrawer({
           scrollTabIntoView();
         }}
         onPress={() => handleSelectSource(source)}
+        onLongPress={() => openSourceSettings(source)}
         style={pressStyle(styles.tab, "subtle")}
       >
         <Text
@@ -888,7 +959,8 @@ export function ModelSelectorDrawer({
               <View
                 style={[
                   styles.optionsList,
-                  rowHeight > 0 && { height: displayModels.length * rowStride },
+                  //last row gap is not space
+                  rowHeight > 0 && { height: displayModels.length * rowStride - ROW_GAP },
                 ]}
               >
                 <View style={{ height: firstRow * rowStride }} />
@@ -898,7 +970,7 @@ export function ModelSelectorDrawer({
                     model={model}
                     label={displayName(model)}
                     caps={capsOf(model)}
-                    highlighted={!pillShown && isBrowsingActive && model === selectedModel}
+                    highlighted={!pillShown && isBrowsingActive && model === selectedRow}
                     height={rowHeight}
                     onSelect={handleRowSelect}
                     onRowLayout={handleRowLayout}
@@ -907,13 +979,15 @@ export function ModelSelectorDrawer({
                 {pillShown && (
                   <GestureDetector gesture={pillPan}>
                     <Reanimated.View style={[styles.pill, pillAnimatedStyle]}>
-                      <Text
-                        style={[styles.optionText, styles.optionTextSelected]}
-                        numberOfLines={1}
-                      >
-                        {displayName(displayModels[activeIndex])}
-                      </Text>
-                      <Capabilities caps={capsOf(displayModels[activeIndex])} onPrimary />
+                      <Reanimated.View style={[styles.pillContent, labelPulseStyle]}>
+                        <Text
+                          style={[styles.optionText, styles.optionTextSelected]}
+                          numberOfLines={1}
+                        >
+                          {displayName(displayModels[activeIndex])}
+                        </Text>
+                        <Capabilities caps={capsOf(displayModels[activeIndex])} onPrimary />
+                      </Reanimated.View>
                     </Reanimated.View>
                   </GestureDetector>
                 )}
@@ -953,7 +1027,7 @@ export function ModelSelectorDrawer({
       <View style={styles.desktopModels}>{modelsContent}</View>
     </View>
   ) : (
-    <View style={styles.sheetInner}>
+    <SheetScrollView contentContainerStyle={styles.sheetInner} nestedScrollEnabled keyboardShouldPersistTaps="handled">
       <ScrollView
         ref={tabsScrollRef}
         onLayout={(e) => {
@@ -973,7 +1047,7 @@ export function ModelSelectorDrawer({
         {tabs}
       </ScrollView>
       {modelsContent}
-    </View>
+    </SheetScrollView>
   );
 
   //card hangs under its trigger
@@ -1004,7 +1078,6 @@ export function ModelSelectorDrawer({
         hideScrim={hideScrim}
         sheetStyle={[
           styles.mobileSheet,
-          { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + insets.bottom },
         ]}
         desktopStyle={
           isDesktop ? styles.centeredCard : [styles.anchoredCard, anchoredStyle]
@@ -1106,6 +1179,7 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     desktopModels: {
       flex: 1,
+      gap: Spacing.lg2,
     },
     mobileSheet: {
       position: "absolute",
@@ -1132,11 +1206,11 @@ const makeStyles = (Colors: ThemeColors) =>
       backgroundColor: Colors.textMuted,
     },
     sheetInner: {
-      width: "100%",
+      paddingBottom: Spacing.lg,
+      gap: Spacing.lg2,
     },
     tabsScroll: {
       flexGrow: 0,
-      marginBottom: Spacing.lg2,
     },
     tabsRow: {
       flexDirection: "row",
@@ -1163,7 +1237,6 @@ const makeStyles = (Colors: ThemeColors) =>
       borderRadius: Radius.xxl + Spacing.md,
       borderWidth: 0,
       padding: Spacing.md,
-      marginBottom: Spacing.lg2,
     },
     modelsBox: {
       borderWidth: 2,
@@ -1209,6 +1282,11 @@ const makeStyles = (Colors: ThemeColors) =>
       borderRadius: Radius.md,
       borderWidth: 2,
       borderColor: Colors.borderOnPrimary,
+    },
+    pillContent: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
     },
     option: {
       flexDirection: "row",
@@ -1256,7 +1334,6 @@ const makeStyles = (Colors: ThemeColors) =>
     downloadProgressRow: {
       padding: 0,
       paddingVertical: Spacing.xs,
-      marginBottom: 0,
     },
     tokenMaxLabel: {
       fontFamily: Fonts.mono,

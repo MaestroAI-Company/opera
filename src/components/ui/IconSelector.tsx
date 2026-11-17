@@ -4,9 +4,13 @@ import { useThemedStyles } from "../../hooks/useTheme";
 import { pressStyle } from "./pressStyle";
 import { vibrate } from "@/services/haptics";
 
+const dotIcon = require("../../../assets/icons/dot.png");
+
 export type IconSelectorOption = {
   id: string;
-  icon: ImageSourcePropType;
+  icon?: ImageSourcePropType;
+  //dot icon tinted with this color instead of an icon
+  color?: string;
 };
 
 type IconSelectorProps = {
@@ -31,11 +35,24 @@ export default function IconSelector({ options, selectedValue, onSelect }: IconS
               onSelect(option.id);
             }}
             style={pressStyle(
-              [styles.option, selected && styles.optionSelected],
-              selected ? "primary" : "surface",
+              [
+                styles.option,
+                selected && styles.optionSelected,
+                //a color tile fills with its own color
+                selected && !!option.color && { backgroundColor: option.color },
+              ],
+              option.color ? "fadeLight" : selected ? "primary" : "surface",
             )}
           >
-            <Image source={option.icon} style={[styles.icon, selected && styles.iconSelected]} />
+            <Image
+              source={option.color ? dotIcon : option.icon}
+              style={[
+                styles.icon,
+                selected && styles.iconSelected,
+                //unselected dot shows its own color
+                !!option.color && !selected && { tintColor: option.color },
+              ]}
+            />
           </Pressable>
         );
       })}

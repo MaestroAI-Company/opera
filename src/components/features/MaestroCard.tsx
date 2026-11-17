@@ -17,12 +17,12 @@ export default function MaestroCard() {
     t.last = now;
     if (t.count < SECRET_TAPS) return;
     t.count = 0;
-    Settings.set("maestroButterfly", "butterfly5");
+    Settings.set("maestroButterfly", "butterflyEgg");
   };
 
   return (
     <Pressable onPress={onPress} style={styles.card}>
-      <ButterflyCluster style={styles.butterfly} />
+      <ButterflyCluster voiceColor style={styles.butterfly} />
     </Pressable>
   );
 }

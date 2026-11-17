@@ -1,12 +1,12 @@
 {
-  "version": "v0.11.1",
+  "version": "v0.14.1",
   "sha256": {
-    "sampler-hub-client-arm64-v8a.so": "835b2d1db0c3a89d9913199d1a469e0b88842d4c54d0b6ebb4684699c0ee69e3",
-    "sampler_hub_client.kt": "f2cb8766dc3d57034c0fbeae44c899e6cdcbff33a9a3622972081cc9feade2c1",
-    "sampler-hub-client-web.js": "12df3e797bf8b8a99404923f2829fcfbeca826234e2e9c9ff2e10ae5e58623b0",
-    "sampler-hub-client-web.wasm": "dc32dfbcdcf6e4ee09adace78880a16f9ca13e535aa6d4b6352ea19f64dfca89",
-    "sampler-hub-client-ios.xcframework.zip": "2856e7feada3cb3f9510852da59b5268485f10081143bff552e1d143492079ef",
-    "sampler_hub_client.swift": "cd9c2eaf14dcd142895b866dfda3c2ae055ea0fe495c8bf9100ec744de03945b",
-    "sampler_hub_clientFFI.h": "34a65cdee77d217b051107e6d6134da6afc5744090a1fdccc964d5d00c8a0bdf"
+    "sampler-hub-client-arm64-v8a.so": "ccb022be593f85013a636df31ef9b435d2dee95d6cbcffe6a84bb40b3503c9df",
+    "sampler_hub_client.kt": "558c5a587612c5abec9aecd18eb09a44bf5384ace99653d9b31737929e77c5b0",
+    "sampler-hub-client-web.js": "aa91921fc59e1d50578107829ffafefe8e213b40871e7360fa0b64befdac7d05",
+    "sampler-hub-client-web.wasm": "6332e5247ac7febbb59a2626243997e0de1e5e2b7c4b30610c2f48c1c00aa671",
+    "sampler-hub-client-ios.xcframework.zip": "00a803d93edb022a55f91d3c4d88a72791b19756d8f364d3ec5e4c0c4c6c3cf2",
+    "sampler_hub_client.swift": "118dbe0a73529780915d52e05c99914496f8975cee12e9a7783469d00dd2ebfe",
+    "sampler_hub_clientFFI.h": "d9b880e0622f025b22b4bcd61c519b591120a0310196aeb13b7e03544d8598d5"
   }
 }

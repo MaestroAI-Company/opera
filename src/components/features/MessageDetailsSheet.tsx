@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemedStyles } from "../../hooks/useTheme";
@@ -27,11 +27,10 @@ type MessageDetailsSheetProps = {
   onClose: () => void;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
-  bottomInset?: number;
 };
 
 //technical details of an assistant reply
-export default function MessageDetailsSheet({ details, onClose, isLargeScreen = false, isDesktop = false, bottomInset = 0 }: MessageDetailsSheetProps) {
+export default function MessageDetailsSheet({ details, onClose, isLargeScreen = false, isDesktop = false }: MessageDetailsSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const { height: windowHeight } = useWindowDimensions();
@@ -65,7 +64,7 @@ export default function MessageDetailsSheet({ details, onClose, isLargeScreen = 
       isDesktop={isDesktop}
       handleContainerStyle={styles.sheetHandleContainer}
       //sheet may grow up to just under the status bar
-      sheetStyle={[styles.sheet, { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + bottomInset, maxHeight: windowHeight - insets.top - Spacing.xl2 }]}
+      sheetStyle={[styles.sheet, { maxHeight: windowHeight - insets.top - Spacing.xl2 }]}
       desktopStyle={styles.desktopCard}
     >
       <SheetScrollView contentContainerStyle={styles.content}>

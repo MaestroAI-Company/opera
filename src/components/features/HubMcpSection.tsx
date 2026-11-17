@@ -220,7 +220,7 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
   return (
     <>
       {/* detail header */}
-      <View style={styles.contentCard}>
+      <View style={styles.sheetCard}>
         <View style={styles.detailHeader}>
           <View style={styles.detailTile}>
             {avatar ? (
@@ -250,7 +250,7 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
 
       {/* settings, saved together */}
       {listing.fields.length > 0 && (
-        <View style={styles.contentCard}>
+        <View style={styles.sheetCard}>
           <McpFieldRows
             fields={listing.fields}
             drafts={shown}
@@ -279,7 +279,7 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
       )}
 
       {/* on or off */}
-      <View style={styles.contentCard}>
+      <View style={styles.sheetCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>
@@ -296,7 +296,7 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
 
       {/* tools maestro gets */}
       {server.tools.length > 0 && (
-        <View style={styles.contentCard}>
+        <View style={styles.sheetCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("hubMcp.tools")}</Text>
             <Group style={styles.infoGroup}>
@@ -309,7 +309,7 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
       )}
 
       {/* what the sandbox lets through */}
-      <View style={styles.contentCard}>
+      <View style={styles.sheetCard}>
         <Group style={styles.infoGroup}>
           {accessRows.map((row) => (
             <ActionButton
@@ -327,7 +327,7 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
 
       {/* last lines the server wrote */}
       {logs && (
-        <View style={styles.contentCard}>
+        <View style={styles.sheetCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("hubMcp.log")}</Text>
             <Text style={styles.codeBlock} selectable>
@@ -338,7 +338,7 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
       )}
 
       {/* actions section */}
-      <View style={[styles.contentCard, { marginBottom: 0 }]}>
+      <View style={styles.sheetCard}>
         <Group>
           {!!server.update && (
             <ActionButton
@@ -397,6 +397,12 @@ const makeStyles = (Colors: ThemeColors) =>
       borderWidth: 0,
       padding: Spacing.md,
       marginBottom: Spacing.xxl2,
+    },
+    sheetCard: {
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
+      padding: Spacing.md,
     },
     settingRowVertical: {
       marginBottom: Spacing.xxl,

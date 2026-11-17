@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Image, Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Image, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemedStyles } from "../../hooks/useTheme";
@@ -17,7 +17,6 @@ type ImagePreviewSheetProps = {
   onClose: () => void;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
-  bottomInset?: number;
 };
 
 //metadata readable from the uri alone
@@ -46,7 +45,7 @@ function formatBytes(bytes: number): string {
 }
 
 //full size view of a sent image
-export default function ImagePreviewSheet({ image, onClose, isLargeScreen = false, isDesktop = false, bottomInset = 0 }: ImagePreviewSheetProps) {
+export default function ImagePreviewSheet({ image, onClose, isLargeScreen = false, isDesktop = false }: ImagePreviewSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const { height: windowHeight } = useWindowDimensions();
@@ -79,7 +78,7 @@ export default function ImagePreviewSheet({ image, onClose, isLargeScreen = fals
       isDesktop={isDesktop}
       handleContainerStyle={styles.sheetHandleContainer}
       //sheet may grow up to just under the status bar
-      sheetStyle={[styles.sheet, { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + bottomInset, maxHeight: windowHeight - insets.top - Spacing.xl2 }]}
+      sheetStyle={[styles.sheet, { maxHeight: windowHeight - insets.top - Spacing.xl2 }]}
       desktopStyle={styles.desktopCard}
     >
       <SheetScrollView contentContainerStyle={styles.content}>

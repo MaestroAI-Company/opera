@@ -1,6 +1,8 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as IntentLauncher from "expo-intent-launcher";
 import { useEffect, useRef, useState } from "react";
 import {
+  AppState,
   Image,
   Platform,
   StyleSheet,
@@ -20,14 +22,19 @@ import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import {
   hubErrorCode,
-  NearbyHub,
   SamplerHub,
   PairedHub,
+  NearbyHub,
 } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
+import CardGrid from "../ui/CardGrid";
 import Group from "../ui/Group";
+import NotificationModal from "../ui/NotificationModal";
+import ThinkingIcon from "../ui/ThinkingIcon";
 import TextInputField from "../ui/TextInputField";
-import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
+import DrawerBackButton from "./DrawerBackButton";
+import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
+import PageStack from "./PageStack";
 import { vibrate } from "@/services/haptics";
 
 const cameraIcon = require("../../../assets/icons/camera.png");
@@ -35,11 +42,17 @@ const addIcon = require("../../../assets/icons/add.png");
 const linkIcon = require("../../../assets/icons/link.png");
 const keyIcon = require("../../../assets/icons/key.png");
 const laptopIcon = require("../../../assets/icons/laptop.png");
-const serverIcon = require("../../../assets/icons/server.png");
+const reconnectIcon = require("../../../assets/icons/reconnect.png");
+
+//searching turns into the results, manual is pushed from both
+type Page = "searching" | "discover" | "manual";
 
 const DESKTOP_CARD_WIDTH = 720;
 //delay before rescanning a failed code
 const RESCAN_DELAY_MS = 3000;
+//the animation stays long enough to be seen
+const MIN_SEARCH_MS = 2200;
+const SEARCH_HERO_SIZE = 120;
 
 type HubPairingSheetProps = {
   visible: boolean;
@@ -49,6 +62,11 @@ type HubPairingSheetProps = {
   link?: string | null;
   //a second hub would silently replace it
   pairedHub?: PairedHub | null;
+  //opens on hubs found nearby
+  discover?: boolean;
+  //new profile skips the search
+  startWithCode?: boolean;
+  onNearby?: (hub: NearbyHub) => void;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
 };
@@ -59,6 +77,9 @@ export default function HubPairingSheet({
   onPaired,
   link = null,
   pairedHub = null,
+  discover = false,
+  startWithCode = false,
+  onNearby,
   isLargeScreen = false,
   isDesktop = false,
 }: HubPairingSheetProps) {
@@ -70,13 +91,18 @@ export default function HubPairingSheet({
   const insets = useSafeAreaInsets();
   const [pairing, setPairing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  //which row the last failure belongs to
-  const [errorRow, setErrorRow] = useState<"scan" | "code">("code");
   const [typedLink, setTypedLink] = useState("");
   //paired hub waiting for the user to confirm the link
   const [found, setFound] = useState<PairedHub | null>(null);
   //scanner fires on every frame
   const lastScan = useRef<{ data: string; at: number } | null>(null);
+  const [page, setPage] = useState<Page>("searching");
+  const [codeMode, setCodeMode] = useState(false);
+  const [nearby, setNearby] = useState<NearbyHub[] | null>(null);
+  const [noWifi, setNoWifi] = useState(false);
+  const [wifiModal, setWifiModal] = useState(false);
+  const [bodyWidth, setBodyWidth] = useState(0);
+  const [scrolled, setScrolled] = useState(false);
 
   //a reopened sheet starts clean
   const [prevVisible, setPrevVisible] = useState(visible);
@@ -86,24 +112,14 @@ export default function HubPairingSheet({
       setError(null);
       setTypedLink("");
       setFound(null);
+      setPage(startWithCode ? "manual" : "searching");
+      setCodeMode(startWithCode);
+      setNearby(null);
     }
   }
   useEffect(() => {
     if (visible) lastScan.current = null;
   }, [visible]);
-
-  //hubs answering on this network
-  const [nearby, setNearby] = useState<NearbyHub[]>([]);
-  useEffect(() => {
-    if (!visible || link || !SamplerHub.canDiscover()) return;
-    let cancelled = false;
-    SamplerHub.nearbyHubs()
-      .then((found) => !cancelled && setNearby(found))
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [visible, link]);
 
   const showFound = (hub: PairedHub) => {
     vibrate(40);
@@ -130,7 +146,6 @@ export default function HubPairingSheet({
       showFound(await SamplerHub.pair(data));
     } catch (e) {
       setError(t(`hubPairing.error.${hubErrorCode(e)}`));
-      setErrorRow("scan");
       //delay counts from the attempt end
       lastScan.current = { data, at: Date.now() };
     } finally {
@@ -151,20 +166,95 @@ export default function HubPairingSheet({
     } catch (e) {
       console.warn("[HubPairing] pairing failed:", e);
       setError(t(`hubPairing.error.${hubErrorCode(e)}`));
-      setErrorRow("code");
     } finally {
       setPairing(false);
     }
   };
 
-  const status = (row: "scan" | "code", idle: string) =>
-    pairing
-      ? t("hubPairing.pairing")
-      : error && errorRow === row
-        ? error
-        : idle;
   //desktop and web have no camera to scan with
   const mode = link ? "confirm" : Platform.OS === "web" ? "code" : "scan";
+
+  //discovery page only leads to the manual ones
+  const paged = discover && mode !== "confirm" && !pairedHub && SamplerHub.canDiscover();
+  const shownPage: Page = paged ? page : "manual";
+
+  useEffect(() => {
+    if (!visible || !paged || page !== "searching") return;
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- starts the network scan
+    setNearby(null);
+    const minimum = new Promise((resolve) => setTimeout(resolve, MIN_SEARCH_MS));
+    SamplerHub.localNetworkAvailable()
+      .catch(() => true)
+      //no network means nothing to search
+      .then((online) =>
+        online
+          ? SamplerHub.nearbyHubs().catch(() => [] as NearbyHub[])
+          : null,
+      )
+      .then(async (hubs) => {
+        if (hubs) await minimum;
+        if (cancelled) return;
+        setNoWifi(!hubs);
+        setNearby(hubs ?? []);
+        //tell the user a hub is nearby
+        if (hubs?.length) vibrate(30);
+        setScrolled(false);
+        setPage("discover");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, paged, page]);
+
+  //back from settings restarts the search
+  useEffect(() => {
+    if (!visible || !paged || !noWifi || page !== "discover") return;
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") return;
+      SamplerHub.localNetworkAvailable()
+        .then((online) => {
+          if (!online) return;
+          setScrolled(false);
+          setPage("searching");
+        })
+        .catch(() => {});
+    });
+    return () => sub.remove();
+  }, [visible, paged, noWifi, page]);
+
+  const openWifiSettings = () => {
+    IntentLauncher.startActivityAsync(
+      IntentLauncher.ActivityAction.WIFI_SETTINGS,
+    ).catch(() => {});
+  };
+
+  //still offline so no search
+  const rescan = async () => {
+    if (await SamplerHub.localNetworkAvailable().catch(() => true)) {
+      showPage("searching");
+    } else {
+      setWifiModal(true);
+    }
+  };
+
+  const showPage = (next: Page) => {
+    setScrolled(false);
+    setPage(next);
+  };
+
+  //android back steps up before the sheet closes
+  const handleBack = () => {
+    if (!paged || page !== "manual" || found) return false;
+    showPage(nearby === null ? "searching" : "discover");
+    return true;
+  };
+
+  const pickNearby = (hub: NearbyHub) => {
+    //older clients still pair with a code
+    if (!SamplerHub.canSignIn()) return showPage("manual");
+    onNearby?.(hub);
+  };
 
   const renderPairButton = (
     value: string,
@@ -188,9 +278,14 @@ export default function HubPairingSheet({
 
   const renderCodeRow = () => (
     <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+      {startWithCode && (
+        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+          {t("hubPairing.createNeedsCode")}
+        </Text>
+      )}
       <Text style={styles.settingLabel}>{t("hubPairing.code")}</Text>
       <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-        {status("code", t("hubPairing.codeHelp"))}
+        {t("hubPairing.codeHelp")}
       </Text>
       <Group style={styles.groupSpacingTight}>
         <TextInputField
@@ -208,22 +303,6 @@ export default function HubPairingSheet({
       {renderPairButton(typedLink, (v) => SamplerHub.pairWithCode(v))}
     </View>
   );
-
-  //found hubs still ask for their code
-  const renderNearbyRow = () =>
-    nearby.length > 0 && (
-      <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("hubPairing.nearby")}</Text>
-        <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-          {t("hubPairing.nearbyHelp")}
-        </Text>
-        <Group style={styles.infoGroup}>
-          {nearby.map((hub) => (
-            <ActionButton key={hub.id} icon={serverIcon} label={hub.name} />
-          ))}
-        </Group>
-      </View>
-    );
 
   const renderFound = (hub: PairedHub) => (
     <>
@@ -267,7 +346,7 @@ export default function HubPairingSheet({
         <>
           <Text style={styles.settingLabel}>{t("hubPairing.confirm")}</Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {status("code", t("hubPairing.confirmHelp"))}
+            {t("hubPairing.confirmHelp")}
           </Text>
           {renderPairButton(link ?? "", (v) => SamplerHub.pair(v))}
         </>
@@ -276,25 +355,31 @@ export default function HubPairingSheet({
     if (mode === "code") {
       return (
         <>
-          {renderNearbyRow()}
           {renderCodeRow()}
+        </>
+      );
+    }
+    if (paged && codeMode) {
+      return (
+        <>
+          {renderCodeRow()}
+          {renderModeButton(t("hubPairing.scan"), cameraIcon, false)}
         </>
       );
     }
     return (
       <>
-        {renderNearbyRow()}
-        <View style={styles.settingRowVertical}>
-          <Text style={styles.settingLabel}>{t("hubPairing.scan")}</Text>
-          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {permission?.granted
-              ? status("scan", t("hubPairing.help"))
-              : t("hubPairing.cameraHelp")}
+        <View
+          style={[styles.settingRowVertical, paged && { marginBottom: 0 }]}
+        >
+          <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+            {t("hubPairing.scan")}
           </Text>
           <Group>
             {permission?.granted ? (
               //unmount to release the camera
-              visible && (
+              visible &&
+              shownPage === "manual" && (
                 <CameraView
                   style={styles.camera}
                   facing="back"
@@ -311,36 +396,200 @@ export default function HubPairingSheet({
             )}
           </Group>
         </View>
-        {renderCodeRow()}
+        {paged ? renderModeButton(t("hubPairing.useCode"), keyIcon, true) : renderCodeRow()}
       </>
     );
   };
 
-  return (
-    <DrawerSheet
-      visible={visible}
-      onClose={handleClose}
-      mode="overlay"
-      isLargeScreen={isLargeScreen}
-      isDesktop={isDesktop}
-      handleContainerStyle={styles.sheetHandleContainer}
-      avoidKeyboard={mode !== "confirm" && !found}
-      sheetStyle={[
-        styles.sheet,
-        {
-          paddingBottom: Platform.OS === "ios" ? 34 : 20,
-          maxHeight: windowHeight - insets.top - Spacing.xl2,
-        },
-      ]}
-      desktopStyle={styles.desktopCard}
-    >
+  //switches between the camera and the code row
+  const renderModeButton = (label: string, icon: number, code: boolean) => (
+    <Group style={{ marginTop: Spacing.xxl }}>
+      <ActionButton
+        icon={icon}
+        label={label}
+        onPress={() => setCodeMode(code)}
+      />
+    </Group>
+  );
+
+  //centered like the other empty states
+  const renderSearching = () => (
+    <View style={styles.searchPage}>
+      <ThinkingIcon searching size={SEARCH_HERO_SIZE} />
+      <Text style={styles.searchTitle}>{t("hubPairing.searching")}</Text>
+      <Text style={styles.searchHelp}>{t("hubPairing.scanning")}</Text>
+    </View>
+  );
+
+  const renderDiscover = () => (
+    <>
+      <View style={styles.contentCard}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <Text style={styles.settingLabel}>{t("hubPairing.discover")}</Text>
+          <Text
+            style={[
+              styles.helpText,
+              nearby?.length ? { marginBottom: Spacing.md } : null,
+            ]}
+          >
+            {noWifi
+              ? t("hubPairing.noWifi")
+              : nearby?.length
+                ? t("hubPairing.discoverHelp")
+                : t("hubPairing.noneFound")}
+          </Text>
+          {!!nearby?.length && (
+            <CardGrid
+              singleLineTitle
+              cards={nearby.map((hub) => ({
+                key: hub.id,
+                title: hub.name,
+                status: hub.addrs[0] ?? "",
+                icon: laptopIcon,
+                onPress: () => pickNearby(hub),
+              }))}
+            />
+          )}
+        </View>
+      </View>
+      {/* actions section, one group with no label */}
+      <View style={styles.contentCard}>
+        <Group>
+          {noWifi && (
+            <ActionButton
+              icon={linkIcon}
+              label={t("hubPairing.wifiOn")}
+              onPress={openWifiSettings}
+            />
+          )}
+          <ActionButton
+            icon={reconnectIcon}
+            label={t("hubPairing.rescan")}
+            onPress={rescan}
+          />
+          <ActionButton
+            icon={addIcon}
+            label={t("hubPairing.manual")}
+            onPress={() => showPage("manual")}
+          />
+        </Group>
+      </View>
+    </>
+  );
+
+  //pages push like settings pages
+  const renderPage = (p: Page, active: boolean) => (
+    <>
       <SheetScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          p === "manual" && styles.contentWithBack,
+          p === "searching" && styles.contentCentered,
+        ]}
         keyboardShouldPersistTaps="handled"
+        onScroll={
+          active ? (e) => setScrolled(e.nativeEvent.contentOffset.y > 4) : undefined
+        }
+        scrollEventThrottle={16}
       >
-        <View style={styles.contentCard}>{renderContent()}</View>
+        {p === "searching" ? (
+          renderSearching()
+        ) : p === "discover" ? (
+          renderDiscover()
+        ) : (
+          <View style={styles.contentCard}>{renderContent()}</View>
+        )}
       </SheetScrollView>
-    </DrawerSheet>
+
+      {/* floats like the settings back button */}
+      {p === "manual" && !found && (
+        <View style={styles.backWrapper} pointerEvents="box-none">
+          <DrawerBackButton kind="back" onPress={handleBack} scrolled={scrolled} />
+        </View>
+      )}
+    </>
+  );
+
+  return (
+    <>
+      <DrawerSheet
+        visible={visible}
+        onClose={handleClose}
+        onBackPress={handleBack}
+        mode="overlay"
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        handleContainerStyle={styles.sheetHandleContainer}
+        avoidKeyboard={mode !== "confirm" && !found}
+        sheetStyle={[
+          styles.sheet,
+          {
+            //stacked pages cannot size the sheet
+            ...(paged
+              ? { height: windowHeight - insets.top - Spacing.xl2 }
+              : { maxHeight: windowHeight - insets.top - Spacing.xl2 }),
+          },
+        ]}
+        desktopStyle={[styles.desktopCard, paged && { height: "100%" }]}
+      >
+        {paged ? (
+          <SheetBody
+            style={styles.body}
+            onLayout={(e) => {
+              const width = e.nativeEvent.layout.width;
+              setBodyWidth((prev) => (prev !== width ? width : prev));
+            }}
+          >
+            <PageStack
+              page={shownPage}
+              visible={visible}
+              width={bodyWidth}
+              parentOf={(p) =>
+                p === "manual" ? (nearby === null ? "searching" : "discover") : null
+              }
+              onBack={handleBack}
+              renderPage={renderPage}
+            />
+          </SheetBody>
+        ) : (
+          <SheetScrollView
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.contentCard}>{renderContent()}</View>
+          </SheetScrollView>
+        )}
+      </DrawerSheet>
+      <NotificationModal
+        visible={visible && wifiModal}
+        title={t("hubPairing.wifiOffTitle")}
+        message={t("hubPairing.wifiOffMessage")}
+        buttons={[
+          {
+            text: t("common.cancel"),
+            style: "secondary",
+            onPress: () => setWifiModal(false),
+          },
+          {
+            text: t("hubPairing.wifiSettings"),
+            style: "primary",
+            onPress: () => {
+              setWifiModal(false);
+              openWifiSettings();
+            },
+          },
+        ]}
+        onClose={() => setWifiModal(false)}
+      />
+      <NotificationModal
+        visible={visible && (pairing || !!error)}
+        message={pairing ? t("hubPairing.pairing") : (error ?? undefined)}
+        messageAlign="center"
+        loading={pairing}
+        buttons={[{ text: t("common.ok"), onPress: () => setError(null) }]}
+        onClose={() => !pairing && setError(null)}
+      />
+    </>
   );
 }
 
@@ -370,9 +619,26 @@ const makeStyles = (Colors: ThemeColors) =>
       alignItems: "center",
       paddingVertical: Spacing.md,
     },
+    body: {
+      flex: 1,
+    },
+    //room for the floating back button
+    contentWithBack: {
+      paddingTop: 40 + Spacing.xxl,
+    },
+    backWrapper: {
+      position: "absolute",
+      top: Spacing.md + 4,
+      left: Spacing.lg2,
+      width: 40,
+      height: 40,
+      zIndex: 10,
+      elevation: 10,
+    },
     content: {
       paddingHorizontal: Spacing.lg2,
       paddingBottom: Spacing.lg,
+      gap: Spacing.xxl2,
     },
     contentCard: {
       backgroundColor: Colors.surface,
@@ -398,9 +664,29 @@ const makeStyles = (Colors: ThemeColors) =>
     settingRowVertical: {
       marginBottom: Spacing.xxl,
     },
-    //static rows on the white card
-    infoGroup: {
-      borderWidth: 0,
+    contentCentered: {
+      flexGrow: 1,
+      justifyContent: "center",
+    },
+    searchPage: {
+      alignItems: "center",
+      paddingBottom: Spacing.xxxl,
+    },
+    searchTitle: {
+      fontSize: FontSizes.displayMd,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.display,
+      textAlign: "center",
+      marginTop: Spacing.xxl,
+    },
+    searchHelp: {
+      fontSize: FontSizes.bodyMd,
+      color: Colors.textMuted,
+      fontFamily: Fonts.body,
+      lineHeight: 20,
+      textAlign: "center",
+      maxWidth: 420,
+      marginTop: Spacing.md,
     },
     foundTitle: {
       fontSize: FontSizes.displayMd,

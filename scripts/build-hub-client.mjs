@@ -22,10 +22,15 @@ const WINDOWS_CLANG = 'C:\\Program Files\\LLVM\\bin';
 
 const target = process.argv[2] ?? 'android';
 const works = (command, args) => spawnSync(command, args, { stdio: 'ignore' }).status === 0;
-const hasHub = existsSync(join(hubDir, 'Cargo.toml'));
+//the :hub npm scripts set it
+const local = Boolean(process.env.SAMPLER_HUB_LOCAL);
+if (local && !existsSync(join(hubDir, 'Cargo.toml'))) {
+  throw new Error(`no Sampler-Hub repo at ${hubDir}, set SAMPLER_HUB_DIR`);
+}
 
 if (target === 'web') {
-  if (hasHub && works('wasm-bindgen', ['--version']) && hasClang()) {
+  if (local) {
+    if (!hasClang()) throw new Error('clang is needed to build the web hub client');
     buildWebFromSource();
   } else {
     await downloadPinned([
@@ -34,7 +39,7 @@ if (target === 'web') {
     ]);
   }
 } else if (target === 'ios') {
-  if (hasHub && works('xcodebuild', ['-version']) && hasIosTargets()) {
+  if (local && works('xcodebuild', ['-version']) && hasIosTargets()) {
     buildIosFromSource();
   } else {
     const zip = join(iosDir, 'sampler-hub-client-ios.xcframework.zip');
@@ -48,7 +53,7 @@ if (target === 'web') {
       execFileSync('ditto', ['-x', '-k', zip, iosDir], { stdio: 'inherit' });
     }
   }
-} else if (hasHub && works('cargo', ['ndk', '--version'])) {
+} else if (local && works('cargo', ['ndk', '--version'])) {
   buildAndroidFromSource();
 } else {
   await downloadPinned([

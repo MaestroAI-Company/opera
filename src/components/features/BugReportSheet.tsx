@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
-import { useKeyboardState } from "react-native-keyboard-controller";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useBugReport } from "../../hooks/useBugReport";
@@ -26,16 +25,14 @@ type BugReportSheetProps = {
   screenshot?: string | null;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
-  bottomInset?: number;
 };
 
 //opens on shake or after crash
-export default function BugReportSheet({ visible, onClose, crash = null, screenshot = null, isLargeScreen = false, isDesktop = false, bottomInset = 0 }: BugReportSheetProps) {
+export default function BugReportSheet({ visible, onClose, crash = null, screenshot = null, isLargeScreen = false, isDesktop = false }: BugReportSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{ title: string; message: string; buttons?: ModalButton[] }>({ title: "", message: "" });
-  const isKeyboardOpen = useKeyboardState((state) => state.isVisible);
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -63,7 +60,7 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
         avoidKeyboard
         sheetStyle={[
           styles.sheet,
-          { paddingBottom: (Platform.OS === "ios" ? 20 : 10) + (isKeyboardOpen ? 0 : bottomInset), maxHeight: windowHeight - insets.top - Spacing.xl2 },
+          { maxHeight: windowHeight - insets.top - Spacing.xl2 },
         ]}
         desktopStyle={styles.desktopCard}
       >

@@ -5509,6 +5509,7 @@ export default function SettingsDrawer({
               placeholder={t("bugReport.placeholder")}
               value={report.text}
               onChangeText={report.setText}
+              variant="large"
             />
           </Group>
 

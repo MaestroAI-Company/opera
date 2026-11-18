@@ -122,6 +122,7 @@ const profilIcon = require("../../../assets/icons/profil.png");
 const profil2Icon = require("../../../assets/icons/profil2.png");
 const botIcon = require("../../../assets/icons/bot.png");
 const bot2Icon = require("../../../assets/icons/bot2.png");
+const tool2Icon = require("../../../assets/icons/tool2.png");
 const toolIcon = require("../../../assets/icons/tool.png");
 const settingsIcon = require("../../../assets/icons/settings.png");
 const addIcon = require("../../../assets/icons/add.png");
@@ -183,6 +184,7 @@ const HOME_SECTIONS = [
   "profiles",
   "performance",
   "models",
+  "mcp",
   "hub",
 ] as const;
 type HomeSection = (typeof HOME_SECTIONS)[number];
@@ -356,6 +358,8 @@ export default function SamplerScreen({
   );
   const homeEditing = useHomeEditing();
   const [homeSheetVisible, setHomeSheetVisible] = useState(false);
+  //the sections are frozen then, a poll would only render for nothing
+  const homePaused = homeEditing || homeSheetVisible;
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [modelsSheetVisible, setModelsSheetVisible] = useState(false);
   const [mcpSheetVisible, setMcpSheetVisible] = useState(false);
@@ -523,7 +527,9 @@ export default function SamplerScreen({
       showModels &&
       (page === "performance" ||
         page === "models" ||
-        (page === "home" && homeSections.includes("performance"))),
+        (page === "home" &&
+          homeSections.includes("performance") &&
+          !homePaused)),
   );
   //every profile's servers on desktop, personal servers on mobile
   const showMcpOverview = isAdmin && SamplerHub.canSeeMcpServers();
@@ -532,7 +538,7 @@ export default function SamplerScreen({
 
   //the home orbit shows who is connected now
   useEffect(() => {
-    if (!visible || page !== "home" || !online || !pairedHub) return;
+    if (!visible || page !== "home" || !online || !pairedHub || homePaused) return;
     let live = true;
     const timer = setInterval(() => {
       SamplerHub.devices(pairedHub)
@@ -547,7 +553,7 @@ export default function SamplerScreen({
       live = false;
       clearInterval(timer);
     };
-  }, [visible, page, online, pairedHub]);
+  }, [visible, page, online, pairedHub, homePaused]);
 
   //read only, on home, performance and its pages
   useEffect(() => {
@@ -558,7 +564,8 @@ export default function SamplerScreen({
         sectionOf(page) !== "mcp") ||
       !showMcpOverview ||
       !online ||
-      !pairedHub
+      !pairedHub ||
+      (page === "home" && homePaused)
     )
       return;
     let live = true;
@@ -578,7 +585,7 @@ export default function SamplerScreen({
       clearTimeout(startTimer);
       clearInterval(timer);
     };
-  }, [visible, page, showMcpOverview, online, pairedHub]);
+  }, [visible, page, showMcpOverview, online, pairedHub, homePaused]);
 
   useEffect(() => {
     if (page !== "preferences" || !isAdmin || !online) return;
@@ -1706,6 +1713,17 @@ export default function SamplerScreen({
       label: t("sampler.home.models"),
       available: showModels && modelsOn,
       render: modelsSection,
+    },
+    mcp: {
+      icon: tool2Icon,
+      label: t("sampler.home.mcp"),
+      available: showMcp && mcpOn,
+      render: () => (
+        <>
+          {canManageMcp && myMcpSection()}
+          {showMcpOverview && renderMcpServers()}
+        </>
+      ),
     },
     hub: {
       icon: server2Icon,

@@ -183,7 +183,9 @@ import DrawerSheet, {
     SheetKeyboardAwareScrollView,
     SheetScrollView,
 } from "./DrawerSheet";
+import ImageCard from "../ui/ImageCard";
 import HelpSheet, { type HelpSection } from "./HelpSheet";
+import WhatsNewSheet from "./WhatsNewSheet";
 import { selectVoice, useVoice, VOICE_OPTIONS } from "./maestroButterfly";
 import MaestroCard from "./MaestroCard";
 import PersonalitySheet, {
@@ -213,9 +215,11 @@ import {
 import {
     getAvailableUpdate,
     getBetaChannel,
+    getCurrentReleaseNotes,
     getUpdateChecks,
     setBetaChannel,
     setUpdateChecks,
+    type ReleaseNotes,
 } from "../../services/updates/UpdateService";
 
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
@@ -300,6 +304,10 @@ const exportIcon = require("../../../assets/icons/export.png");
 const messageIcon = require("../../../assets/icons/message.png");
 const timeIcon = require("../../../assets/icons/time.png");
 const errorIcon = require("../../../assets/icons/error.png");
+const cloudInfoImage = require("../../../assets/images/ImageCard/CloudInfo.png");
+const toolInfoImage = require("../../../assets/images/ImageCard/ToolInfo.png");
+const assistantInfoImage = require("../../../assets/images/ImageCard/AssistantInfo.png");
+const standbyInfoImage = require("../../../assets/images/ImageCard/StandbyInfo.png");
 const errorImage = require("../../../assets/images/ImageCard/error.png");
 const infoIcon = require("../../../assets/icons/info.png");
 const reconnectIcon = require("../../../assets/icons/reconnect.png");
@@ -341,6 +349,8 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
   //provider whose sheet opens on show
   initialSheet?: { service: string; url: string } | null;
+  //opens the sheet alone, the drawer stays closed
+  sheetOnly?: boolean;
   //an opera://hub/pair link to confirm
   hubPairLink?: string | null;
   onHubPairLinkHandled?: () => void;
@@ -781,6 +791,7 @@ export default function SettingsDrawer({
   windowed = false,
   initialSubPage,
   initialSheet,
+  sheetOnly = false,
   hubPairLink = null,
   onHubPairLinkHandled,
 }: SettingsDrawerProps) {
@@ -1141,6 +1152,17 @@ export default function SettingsDrawer({
     inputKeyboardType?: any;
     loading?: boolean;
   }>({ title: "", message: "" });
+
+  const [changelog, setChangelog] = useState<ReleaseNotes | null>(null);
+  const openChangelog = async () => {
+    try {
+      const notes = await getCurrentReleaseNotes();
+      if (notes) setChangelog(notes);
+      else showAlert(t("common.error"), t("settings.info.changelogUnavailable"));
+    } catch {
+      showAlert(t("common.error"), t("settings.info.changelogUnavailable"));
+    }
+  };
 
   const showAlert = (
     title: string,
@@ -2596,13 +2618,14 @@ export default function SettingsDrawer({
   ];
 
   //opens the picked provider sheet once its servers load
-  const initialSheetDone = useRef(false);
+  const initialSheetDone = useRef<typeof initialSheet>(null);
   useEffect(() => {
-    if (!visible || !initialSheet) {
-      initialSheetDone.current = false;
+    if (!(visible || sheetOnly) || !initialSheet) {
+      initialSheetDone.current = null;
       return;
     }
-    if (initialSheetDone.current) return;
+    //each request is a new object, so the same provider can reopen
+    if (initialSheetDone.current === initialSheet) return;
     const { service, url } = initialSheet;
     if (service === "local" || service === "litert") {
       setLitertSheetVisible(true);
@@ -2621,9 +2644,9 @@ export default function SettingsDrawer({
       if (!server) return;
       openHubServer(server);
     }
-    initialSheetDone.current = true;
+    initialSheetDone.current = initialSheet;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- openers are plain functions over these lists
-  }, [visible, initialSheet, ollamaServers, openaiServers]);
+  }, [visible, sheetOnly, initialSheet, ollamaServers, openaiServers]);
 
   //dead downloads resume from disk
   useEffect(() => {
@@ -3361,6 +3384,9 @@ export default function SettingsDrawer({
   //closed overlay leaves the tree, a live page layer would still catch clicks on the web
   const [desktopMounted, setDesktopMounted] = useState(visible);
   if (visible && !desktopMounted) setDesktopMounted(true);
+  //sheets outlive their request so they can slide out
+  const [sheetHostMounted, setSheetHostMounted] = useState(sheetOnly);
+  if (sheetOnly && !sheetHostMounted) setSheetHostMounted(true);
   const [navScrolled, setNavScrolled] = useState(false);
   const [desktopPageWidth, setDesktopPageWidth] = useState(0);
   //initial page width before layout
@@ -3739,10 +3765,10 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.nav.info.title"))}
 
       <View style={styles.contentCard}>
-        <View style={styles.settingRowVertical}>
+        <Pressable style={styles.settingRowVertical} onPress={openChangelog}>
           <Text style={styles.settingLabel}>{t("settings.info.version")}</Text>
           <Text style={styles.helpText}>Opera Beta v{appVersion}</Text>
-        </View>
+        </Pressable>
 
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={styles.settingLabel}>{t("settings.info.links")}</Text>
@@ -4043,6 +4069,7 @@ export default function SettingsDrawer({
       {/* screen saver settings card */}
       {Platform.OS === "android" && !screenSaverActive && (
         <View style={styles.contentCard}>
+          <ImageCard source={standbyInfoImage} width="100%" style={{ marginBottom: Spacing.lg2 }} />
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>
               {t("settings.nav.screenSaver.title")}
@@ -4064,6 +4091,7 @@ export default function SettingsDrawer({
       {/* anti burn-in and incognito card */}
       {Platform.OS === "android" && (
         <View style={styles.contentCard}>
+          {screenSaverActive && <ImageCard source={standbyInfoImage} width="100%" style={{ marginBottom: Spacing.lg2 }} />}
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <View style={styles.toggleGroupRow}>
               <View style={styles.toggleGroupContent}>
@@ -4441,6 +4469,7 @@ export default function SettingsDrawer({
       {/* default assistant card */}
       {Platform.OS === "android" && (
         <View style={styles.contentCard}>
+          <ImageCard source={assistantInfoImage} width="100%" style={{ marginBottom: Spacing.lg2 }} />
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>
               {t("settings.overlay.default")}
@@ -4462,6 +4491,7 @@ export default function SettingsDrawer({
       {/* desktop shortcut card */}
       {isTauri && (
         <View style={styles.contentCard}>
+          <ImageCard source={assistantInfoImage} width="100%" style={{ marginBottom: Spacing.lg2 }} />
           <View
             style={[
               styles.settingRowVertical,
@@ -5830,6 +5860,12 @@ export default function SettingsDrawer({
   const notificationModal = (
     <>
       <NotificationModal {...updateModalProps} />
+      <WhatsNewSheet
+        release={changelog}
+        onClose={() => setChangelog(null)}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
       <NotificationModal
         visible={alertModalVisible}
         title={alertConfig.title}
@@ -6212,7 +6248,7 @@ export default function SettingsDrawer({
 
   const helpCards: Record<
     HelpTopic,
-    { title: string; cards: HelpSection[][] }
+    { title: string; image?: ImageSourcePropType; cards: HelpSection[][] }
   > = {
     providers: {
       title: t("settings.nav.service.title"),
@@ -6238,6 +6274,7 @@ export default function SettingsDrawer({
     },
     cloud: {
       title: t("settings.nav.cloud.title"),
+      image: cloudInfoImage,
       cards: [
         [{ body: t("settings.cloud.helpIntro") }],
         [
@@ -6278,6 +6315,7 @@ export default function SettingsDrawer({
     },
     tools: {
       title: t("settings.nav.tools.title"),
+      image: toolInfoImage,
       cards: [
         [{ body: t("settings.tools.helpIntro") }],
         [
@@ -6313,6 +6351,7 @@ export default function SettingsDrawer({
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
       title={helpCards[helpTopic].title}
+      image={helpCards[helpTopic].image}
       cards={helpCards[helpTopic].cards}
     />
   );
@@ -8089,7 +8128,33 @@ export default function SettingsDrawer({
   );
 
   if (isDesktop) {
-    if (!desktopMounted) return null;
+    if (!desktopMounted) {
+      if (!sheetHostMounted) return null;
+      //drawer closed, only the provider sheets show
+      return (
+        <View style={styles.root} pointerEvents="box-none">
+          {litertSheet}
+          {helpSheet}
+          {addModelSheet}
+          {ollamaServerSheet}
+          {ollamaModelSheet}
+          {hubServerSheet}
+          {personalitySheet}
+          {hubModelSheet}
+          {openaiAddServerSheet}
+          {openaiServerSheet}
+          {mcpAddServerSheet}
+          {mcpDetailSheet}
+          {cloudSetupSheet}
+          {localModelDetailSheet}
+          {litertDownloadSheet}
+          {voiceDownloadSheet}
+          {litertModelDetailSheet}
+          {instructionsSheet}
+          {profileEditSheet}
+        </View>
+      );
+    }
     const windowTranslateY = largeScreenAnim.interpolate({
       inputRange: [0, 1],
       outputRange: [-10, 0],
@@ -8227,8 +8292,14 @@ export default function SettingsDrawer({
   };
 
   const mobileDrawer = (
-    <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
-      <Animated.View style={[styles.overlay, { opacity: progress }]}>
+    <View
+      style={styles.root}
+      pointerEvents={visible ? "auto" : sheetOnly ? "box-none" : "none"}
+    >
+      <Animated.View
+        style={[styles.overlay, { opacity: progress }]}
+        pointerEvents={visible ? "auto" : "none"}
+      >
         <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
       </Animated.View>
 
@@ -8238,6 +8309,7 @@ export default function SettingsDrawer({
           { width: drawerWidth },
           { transform: [{ translateX }] },
         ]}
+        pointerEvents={visible ? "auto" : "none"}
         {...panResponder.panHandlers}
       >
         {innerContent}

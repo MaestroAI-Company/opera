@@ -1,7 +1,8 @@
-import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { ImageSourcePropType, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
+import ImageCard from "../ui/ImageCard";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 const DESKTOP_CARD_WIDTH = 420;
@@ -15,6 +16,7 @@ type HelpSheetProps = {
   visible: boolean;
   onClose: () => void;
   title: string;
+  image?: ImageSourcePropType;
   //one card per group
   cards: HelpSection[][];
   isLargeScreen?: boolean;
@@ -26,6 +28,7 @@ export default function HelpSheet({
   visible,
   onClose,
   title,
+  image,
   cards,
   isLargeScreen = false,
   isDesktop = false,
@@ -48,6 +51,9 @@ export default function HelpSheet({
       <SheetScrollView contentContainerStyle={styles.content}>
         {cards.map((sections, index) => (
           <View key={index} style={styles.contentCard}>
+            {index === 0 && image && (
+              <ImageCard source={image} width="100%" style={styles.image} />
+            )}
             {index === 0 && <Text style={styles.title}>{title}</Text>}
             {sections.map((section, i) => (
               <View key={i}>
@@ -89,6 +95,9 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: Spacing.lg2,
     paddingBottom: Spacing.lg,
     gap: Spacing.xxl2,
+  },
+  image: {
+    marginBottom: Spacing.lg2,
   },
   contentCard: {
     backgroundColor: Colors.surface,

@@ -27,6 +27,8 @@ export type AppRelease = {
 
 export type ReleaseNotes = AppRelease & {
   notes: string;
+  //release tag, v1.2.3 or v1.2.3-beta.1
+  tag?: string;
 };
 
 let cachedAt = 0;
@@ -211,5 +213,14 @@ export async function takeReleaseNotes(firstRun: boolean): Promise<ReleaseNotes 
 
   const notes = typeof data?.body === 'string' ? data.body.trim() : '';
   if (!notes) return null;
-  return { version: current, url: data.html_url ?? LATEST_RELEASE_URL, notes };
+  return { version: current, url: data.html_url ?? LATEST_RELEASE_URL, notes, tag: data.tag_name };
+}
+
+//notes of this build on demand, never marks them as seen
+export async function getCurrentReleaseNotes(): Promise<ReleaseNotes | null> {
+  const current = Constants.expoConfig?.version ?? '0.0.0';
+  const data = (await fetchRelease(`v${current}`)) ?? (await fetchBetaRelease(current));
+  const notes = typeof data?.body === 'string' ? data.body.trim() : '';
+  if (!notes) return null;
+  return { version: current, url: data.html_url ?? LATEST_RELEASE_URL, notes, tag: data.tag_name };
 }

@@ -23,6 +23,8 @@ export const es: Translations = {
   "common.openInApp": "Abrir en la aplicación",
   "common.info": "Info",
   "common.clear": "Borrar",
+  "common.showPassword": "Mostrar contraseña",
+  "common.hidePassword": "Ocultar contraseña",
 
   "onboarding.next": "Continuar",
   "onboarding.back": "Atrás",
@@ -793,6 +795,7 @@ export const es: Translations = {
     "Pregunta a Maestro sin manos en la pantalla inteligente. La escucha se hace en este dispositivo.",
 
   "settings.info.version": "Versión",
+  "settings.info.changelogUnavailable": "Notas de la versión no disponibles. Revisa tu conexión.",
   "settings.info.links": "Enlaces",
   "settings.info.linksHelp":
     "Encuentra Opera en línea, sigue nuestras novedades y contribuye al proyecto.",

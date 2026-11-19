@@ -23,6 +23,8 @@ export const de: Translations = {
   "common.openInApp": "In der App öffnen",
   "common.info": "Info",
   "common.clear": "Leeren",
+  "common.showPassword": "Passwort anzeigen",
+  "common.hidePassword": "Passwort verbergen",
 
   "onboarding.next": "Weiter",
   "onboarding.back": "Zurück",
@@ -793,6 +795,7 @@ export const de: Translations = {
     "Frag Maestro freihändig auf dem Smart Display. Das Zuhören geschieht auf diesem Gerät.",
 
   "settings.info.version": "Version",
+  "settings.info.changelogUnavailable": "Versionshinweise nicht verfügbar. Prüfe deine Verbindung.",
   "settings.info.links": "Links",
   "settings.info.linksHelp":
     "Finde Opera im Netz, verfolge unsere Updates und trage zum Projekt bei.",

@@ -2685,13 +2685,15 @@ export default function Index() {
     />
   );
 
-  const settingsDrawer = settingsInWindow ? null : (
+  //the sheet host stays out of the way until a provider is picked
+  const settingsDrawer = settingsInWindow && !settingsInitialSheet ? null : (
     <SettingsDrawer
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
       visible={settingsDrawerVisible}
       initialSubPage={settingsInitialSubPage}
       initialSheet={settingsInitialSheet}
+      sheetOnly={!settingsDrawerVisible && !!settingsInitialSheet}
       hubPairLink={hubPairLink}
       onHubPairLinkHandled={() => setHubPairLink(null)}
       onClose={closeSettings}
@@ -3174,11 +3176,10 @@ export default function Index() {
         messages={messages}
         onOpenProviderSettings={(source) => {
           setModelSelectorVisible(false);
-          openDrawerSafely(() => {
-            setSettingsInitialSubPage("service");
-            setSettingsInitialSheet({ service: source.service, url: source.url });
-            setSettingsDrawerVisible(true);
-          });
+          //provider sheet opens over home, settings stay closed
+          openDrawerSafely(() =>
+            setSettingsInitialSheet({ service: source.service, url: source.url }),
+          );
         }}
       />
 

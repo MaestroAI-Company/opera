@@ -14,6 +14,8 @@ Markdown. `build-apk.yml` and `build-desktop.yml` publish it as the notes of the
 
 Opera reads the notes of the release matching its own version (`v` + `app.json` version) and shows them once per device, on the first launch after an update. Fresh installs, downgrades and the browser build don't show them.
 
+The first line `![](updatebanner.png)` shows `distribution/updatebanner.png` as the banner of the sheet. The app loads it from the release tag, so replace that file before tagging and each version keeps its own banner. Without the line or the file, the sheet opens with no banner.
+
 Write it for users, not as a commit list. The sheet supports `##` headings, `-` lists, **bold** and links.
 
 ## whatsnew-en-US

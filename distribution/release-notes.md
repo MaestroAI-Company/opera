@@ -1,3 +1,5 @@
+![](updatebanner.png)
+
 ## Talk with Maestro live
 
 Live mode lets you have a voice conversation with Maestro, right inside your chat. It works with Gemini Live, OpenAI Realtime, or llama.cpp through your Sampler Hub, with optional transcription.

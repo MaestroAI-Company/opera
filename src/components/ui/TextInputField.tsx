@@ -5,6 +5,9 @@ import { useRef, useState } from "react";
 import { useT } from "../../i18n";
 import IconButton from "./IconButton";
 
+const visionIcon = require("../../../assets/icons/vision.png");
+const visionOffIcon = require("../../../assets/icons/vision_off.png");
+
 interface TextInputFieldProps extends TextInputProps {
   icon?: ImageSourcePropType;
   containerStyle?: StyleProp<ViewStyle>;
@@ -28,6 +31,7 @@ export default function TextInputField({
   variant = "default",
   multiline,
   textAlignVertical,
+  secureTextEntry,
   ...props
 }: TextInputFieldProps) {
   const Colors = useColors();
@@ -35,6 +39,7 @@ export default function TextInputField({
   const t = useT();
   const inputRef = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   const isLarge = variant === "large";
 
   return (
@@ -58,9 +63,21 @@ export default function TextInputField({
         textAlignVertical={textAlignVertical ?? (isLarge ? "top" : undefined)}
         onFocus={(e) => { setFocused(true); onFocus?.(e); }}
         onBlur={(e) => { setFocused(false); onBlur?.(e); }}
+        secureTextEntry={secureTextEntry && !revealed}
         {...props}
       />
-      {rightIcon && (
+      {secureTextEntry ? (
+        <IconButton
+          icon={revealed ? visionOffIcon : visionIcon}
+          label={revealed ? t("common.hidePassword") : t("common.showPassword")}
+          onPress={() => setRevealed((v) => !v)}
+          size={22}
+          tintColor={Colors.textPrimary}
+          containerSize={32}
+          pressedColor={Colors.surfacePressed}
+          style={styles.rightIconButton}
+        />
+      ) : rightIcon && (
         <IconButton
           icon={rightIcon}
           label={rightIconLabel ?? t("common.clear")}

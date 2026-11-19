@@ -23,6 +23,8 @@ export const fr: Translations = {
   "common.openInApp": "Ouvrir dans l'application",
   "common.info": "Info",
   "common.clear": "Effacer",
+  "common.showPassword": "Afficher le mot de passe",
+  "common.hidePassword": "Masquer le mot de passe",
 
   "onboarding.next": "Continuer",
   "onboarding.back": "Retour",
@@ -819,6 +821,7 @@ export const fr: Translations = {
     "Parle à Maestro sans les mains sur l'écran connecté. L'écoute reste sur l'appareil.",
 
   "settings.info.version": "Version",
+  "settings.info.changelogUnavailable": "Notes de version indisponibles. Vérifie ta connexion.",
   "settings.info.links": "Liens",
   "settings.info.linksHelp":
     "Retrouve Opera en ligne, suis nos actualités et contribue au projet.",

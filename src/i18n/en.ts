@@ -22,6 +22,8 @@ export const en = {
   "common.openInApp": "Open in app",
   "common.info": "Info",
   "common.clear": "Clear",
+  "common.showPassword": "Show password",
+  "common.hidePassword": "Hide password",
 
   "onboarding.next": "Continue",
   "onboarding.back": "Back",
@@ -814,6 +816,7 @@ export const en = {
     "Ask Maestro hands free on the smart display. Listening happens on this device.",
 
   "settings.info.version": "Version",
+  "settings.info.changelogUnavailable": "Release notes unavailable. Check your connection.",
   "settings.info.links": "Links",
   "settings.info.linksHelp":
     "Find Opera online, follow our updates, and contribute to the project.",

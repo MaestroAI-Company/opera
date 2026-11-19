@@ -112,6 +112,7 @@ import {
     PROMPT_TIERS,
     serializeProviders,
     serializeServers,
+    setLitertPromptTier,
     setOpenAIApiKey,
     splitHubModelKey,
     type PromptTier,
@@ -442,6 +443,63 @@ const MODEL_CAPABILITY_ROWS = [
   "live",
 ] as const satisfies readonly ModelCapabilityId[];
 
+//prompt size row of model details
+const PromptTierSelector = memo(function PromptTierSelector({
+  model,
+  service,
+  url,
+  onPromptTierChange,
+  first,
+}: {
+  model: string;
+  service: string;
+  url: string;
+  onPromptTierChange: (model: string, tier: PromptTier | undefined) => void;
+  //drops the gap above
+  first?: boolean;
+}) {
+  const styles = useThemedStyles(makeStyles);
+  const t = useT();
+  const [promptTier, setPromptTier] = useState<string>(
+    () => getPromptTierOverride(service, url, model) ?? "auto",
+  );
+  const promptOptions: SelectorOption[] = [
+    {
+      id: "auto",
+      label: `${t("settings.model.promptAuto")} (${t(PROMPT_TIER_KEYS[autoPromptTier(model, service)])})`,
+    },
+    ...PROMPT_TIERS.map((tier) => ({
+      id: tier,
+      label: t(PROMPT_TIER_KEYS[tier]),
+    })),
+  ];
+
+  return (
+    <>
+      <Text
+        style={[styles.settingLabel, !first && styles.litertDetailSection]}
+      >
+        {t("settings.model.promptSize")}
+      </Text>
+      <Group>
+        <Selector
+          options={promptOptions}
+          selectedValue={promptTier}
+          onSelect={(v) => {
+            setPromptTier(v);
+            onPromptTierChange(
+              model,
+              v === "auto" ? undefined : (v as PromptTier),
+            );
+          }}
+          title={t("settings.model.promptSize")}
+          fullWidth
+        />
+      </Group>
+    </>
+  );
+});
+
 //override wins over server caps
 const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
   model,
@@ -464,19 +522,6 @@ const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const [capabilities, setCapabilities] = useState<string[] | null>(null);
-  const [promptTier, setPromptTier] = useState<string>(
-    () => getPromptTierOverride(service, url, model) ?? "auto",
-  );
-  const promptOptions: SelectorOption[] = [
-    {
-      id: "auto",
-      label: `${t("settings.model.promptAuto")} (${t(PROMPT_TIER_KEYS[autoPromptTier(model, service)])})`,
-    },
-    ...PROMPT_TIERS.map((tier) => ({
-      id: tier,
-      label: t(PROMPT_TIER_KEYS[tier]),
-    })),
-  ];
 
   useEffect(() => {
     let cancelled = false;
@@ -520,24 +565,12 @@ const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
           />
         </View>
       ))}
-      <Text style={[styles.settingLabel, styles.litertDetailSection]}>
-        {t("settings.model.promptSize")}
-      </Text>
-      <Group>
-        <Selector
-          options={promptOptions}
-          selectedValue={promptTier}
-          onSelect={(v) => {
-            setPromptTier(v);
-            onPromptTierChange(
-              model,
-              v === "auto" ? undefined : (v as PromptTier),
-            );
-          }}
-          title={t("settings.model.promptSize")}
-          fullWidth
-        />
-      </Group>
+      <PromptTierSelector
+        model={model}
+        service={service}
+        url={url}
+        onPromptTierChange={onPromptTierChange}
+      />
     </View>
   );
 });
@@ -7986,6 +8019,17 @@ export default function SettingsDrawer({
                   : (installedModel.description ??
                     t("settings.litert.noDescription"))}
               </Text>
+            </View>
+
+            <View style={styles.sheetCard}>
+              <PromptTierSelector
+                key={installedEntry.repoId}
+                model={installedEntry.repoId}
+                service="litert"
+                url=""
+                first
+                onPromptTierChange={setLitertPromptTier}
+              />
             </View>
 
             <View style={styles.sheetCard}>

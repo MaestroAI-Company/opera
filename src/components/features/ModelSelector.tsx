@@ -47,6 +47,7 @@ import { buildSources, getOllamaTuning, HUB_PROVIDER_ID, hubModelKeyOf, ModelSou
 import { estimateContextTokens } from "../../services/ai/generation/chatGeneration";
 import { MessageMetrics } from "../../services/db/DatabaseService";
 import { AppEvents } from "../../services/events";
+import { modelContextCap } from "../../services/ai/providers/huggingFaceCatalog";
 import { Settings } from "../../services/settings/SettingsService";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
@@ -99,8 +100,14 @@ const ANCHORED_CARD_WIDTH = 320;
 const CENTERED_CARD_WIDTH = 840;
 
 //context size configured for the active source
-const contextWindowFor = (service: string, ollamaUrl: string) => {
-  if (service === "litert") return Settings.getCached().litertContextLength;
+const contextWindowFor = (service: string, ollamaUrl: string, model: string) => {
+  if (service === "litert") {
+    //model cache caps the setting
+    return Math.min(
+      Settings.getCached().litertContextLength,
+      modelContextCap(model) || Infinity,
+    );
+  }
   if (service === "ollama") return getOllamaTuning(ollamaUrl).contextLength;
   return 0;
 };
@@ -622,7 +629,7 @@ export function ModelSelectorDrawer({
       .then((sheet) => setLocalContextTokens(sheet?.models.find((m) => m.id === selectedModel)?.contextTokens ?? 0))
       .catch(() => setLocalContextTokens(0));
   }, [visible, aiService, selectedModel]);
-  const contextWindow = aiService === "local" ? localContextTokens : contextWindowFor(aiService, ollamaUrl);
+  const contextWindow = aiService === "local" ? localContextTokens : contextWindowFor(aiService, ollamaUrl, selectedModel);
   const showTokenWindow = messages.length > 0 && contextWindow > 0;
 
   const selectedIndex = isBrowsingActive

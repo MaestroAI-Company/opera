@@ -54,6 +54,7 @@ export type AppSettings = {
   shareInstanceUrl: string;
   litertForceLoad: boolean;
   litertContextLength: number;
+  litertPromptTiers: string;
   showRemoteImages: boolean;
   overlayEnabled: boolean;
   overlayShortcut: string;
@@ -126,6 +127,8 @@ export const BASE_DEFAULTS: AppSettings = {
   shareInstanceUrl: '',
   litertForceLoad: false,
   litertContextLength: 8192,
+  //model id to prompt tier json
+  litertPromptTiers: '{}',
   showRemoteImages: false,
   overlayEnabled: true,
   overlayShortcut: 'CommandOrControl+Shift+Space',

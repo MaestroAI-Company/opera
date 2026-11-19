@@ -52,6 +52,8 @@ export type CatalogEntry = {
   sizeBytes: number;
   capabilities: string[];
   baseModel?: string;
+  //compiled kv cache, 0 unknown
+  contextLength?: number;
 };
 
 export type ModelFamily = { id: string; label: string; repoIds: string[] };
@@ -247,6 +249,7 @@ export async function fetchFamilies(): Promise<ModelFamily[]> {
       sizeBytes: known?.sizeBytes ?? 0,
       capabilities: capabilitiesFromTags(model.id, model.tags ?? [], model.pipeline_tag),
       baseModel: baseModelFromTags(model.tags ?? []),
+      contextLength: known?.contextLength,
     };
   }
 
@@ -274,19 +277,22 @@ function pickFile(siblings: HFSibling[]): { file: string; sizeBytes: number } | 
   return { file: fitting.rfilename, sizeBytes: fitting.size! };
 }
 
-//manifest decides vision and audio
-async function readManifest(repoId: string): Promise<string[] | null> {
+//manifest decides capabilities and cache
+async function readManifest(repoId: string): Promise<{ capabilities: string[] | null; contextLength: number }> {
   try {
     const manifest = await getJson(`https://huggingface.co/${repoId}/raw/main/litertlm_manifest.json`);
+    const contextLength = Number(manifest?.model?.context_length);
     const declared = manifest?.model?.capabilities;
-    if (!declared) return null;
-    const capabilities: string[] = [];
-    if (declared.vision) capabilities.push('vision');
-    if (declared.audio) capabilities.push('audio');
-    if (declared.thinking?.declared) capabilities.push('thinking');
-    return capabilities;
+    let capabilities: string[] | null = null;
+    if (declared) {
+      capabilities = [];
+      if (declared.vision) capabilities.push('vision');
+      if (declared.audio) capabilities.push('audio');
+      if (declared.thinking?.declared) capabilities.push('thinking');
+    }
+    return { capabilities, contextLength: contextLength > 0 ? contextLength : 0 };
   } catch {
-    return null;
+    return { capabilities: null, contextLength: 0 };
   }
 }
 
@@ -298,7 +304,8 @@ async function resolveEntry(repoId: string): Promise<CatalogEntry | null> {
     if (!picked) return null;
 
     const hasManifest = (model.siblings ?? []).some((s) => s.rfilename === 'litertlm_manifest.json');
-    const capabilities = (hasManifest ? await readManifest(repoId) : null)
+    const manifest = hasManifest ? await readManifest(repoId) : null;
+    const capabilities = manifest?.capabilities
       ?? capabilitiesFromTags(repoId, model.tags ?? [], model.pipeline_tag);
 
     const entry: CatalogEntry = {
@@ -310,6 +317,7 @@ async function resolveEntry(repoId: string): Promise<CatalogEntry | null> {
       sizeBytes: picked.sizeBytes,
       capabilities,
       baseModel: baseModelFromTags(model.tags ?? []),
+      contextLength: manifest?.contextLength ?? 0,
     };
     store.entries[repoId] = entry;
     return entry;
@@ -327,6 +335,11 @@ function estimatedBytes(entry: CatalogEntry | undefined): number | null {
   if (entry.sizeBytes > 0) return entry.sizeBytes;
   const paramsB = parseParamsB(entry.label);
   return paramsB === null ? null : paramsB * BYTES_PER_PARAM_FLOOR;
+}
+
+//model kv cache or 0
+export function modelContextCap(repoId: string): number {
+  return store.entries[repoId]?.contextLength ?? 0;
 }
 
 //closest sizes across the listed families
@@ -356,10 +369,11 @@ export function sameFamilyModels(repoId: string): string[] {
 //sizes resolve on pick, not on listing
 export async function fetchCatalogEntry(repoId: string): Promise<CatalogEntry | null> {
   const known = store.entries[repoId];
-  if (known?.url) return known;
+  //old entries lack the cache size
+  if (known?.url && known.contextLength !== undefined) return known;
   const entry = await resolveEntry(repoId);
   persist();
-  return entry;
+  return entry ?? (known?.url ? known : null);
 }
 
 //short cards are link lines

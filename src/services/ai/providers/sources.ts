@@ -247,8 +247,26 @@ export function getCapabilityOverride(service: string, url: string, model: strin
   return findServer(service, url)?.capabilities?.[model];
 }
 
+function litertPromptTiers(): Record<string, PromptTier> {
+  try {
+    return JSON.parse(Settings.getCached().litertPromptTiers) || {};
+  } catch {
+    return {};
+  }
+}
+
 export function getPromptTierOverride(service: string, url: string, model: string): PromptTier | undefined {
+  //on-device models have no server entry
+  if (service === 'litert') {
+    const tier = litertPromptTiers()[model];
+    return PROMPT_TIERS.includes(tier) ? tier : undefined;
+  }
   return findServer(service, url)?.promptTiers?.[model];
+}
+
+export function setLitertPromptTier(model: string, tier: PromptTier | undefined): void {
+  const { [model]: _removed, ...rest } = litertPromptTiers();
+  Settings.set('litertPromptTiers', JSON.stringify(tier ? { ...rest, [model]: tier } : rest));
 }
 
 //undefined falls back to global

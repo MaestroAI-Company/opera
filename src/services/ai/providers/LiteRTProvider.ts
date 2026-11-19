@@ -18,6 +18,7 @@ import { ToolCall, ToolDefinition } from '../tools/ITool';
 import {
   backendForFile,
   CatalogEntry,
+  fetchCatalogEntry,
   formatBytes,
   getCatalogEntry,
   hydrateLiteRTCatalog,
@@ -451,7 +452,11 @@ export class LiteRTProvider implements IAIProvider {
 
   private async load(modelName: string, multimodal: boolean, onProgress?: ProgressCallback): Promise<LiteRTLMInstance> {
     if (!isProviderSupported('litert')) throw new Error('LiteRT-LM is not available on this platform');
-    const model = getCatalogEntry(modelName);
+    let model = getCatalogEntry(modelName);
+    //backfill the cache size of old entries
+    if (model?.url && model.contextLength === undefined) {
+      model = (await fetchCatalogEntry(modelName).catch(() => null)) ?? model;
+    }
     if (!model?.url) throw new Error(`Unknown LiteRT model: ${modelName}`);
 
     if (!this.llm) this.llm = createLLM();
@@ -473,7 +478,11 @@ export class LiteRTProvider implements IAIProvider {
     await downloadLiteRTModel(modelName, onProgress);
 
     const forceLoad = settings.litertForceLoad;
-    const configuredContext = settings.litertContextLength || DEFAULT_CONTEXT_TOKENS;
+    //compiled cache cannot grow
+    const configuredContext = Math.min(
+      settings.litertContextLength || DEFAULT_CONTEXT_TOKENS,
+      model.contextLength || Infinity,
+    );
     const backend: Backend = backendForFile(model.file);
 
     console.log(`[LiteRT] backend: ${backend}`);

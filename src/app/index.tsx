@@ -69,6 +69,7 @@ import { sheetTravel } from "../components/features/DrawerSheet";
 import ImagePreviewSheet, {
   PreviewImage,
 } from "../components/features/ImagePreviewSheet";
+import LiveScreen from "../components/features/LiveScreen";
 import MessageDetailsSheet, {
   PreviewDetails,
 } from "../components/features/MessageDetailsSheet";
@@ -78,8 +79,6 @@ import {
   ModelSelectorTrigger,
   truncateModel,
 } from "../components/features/ModelSelector";
-import LiveScreen from "../components/features/LiveScreen";
-import { hasLiveCallPermission, requestLiveCallPermission } from "../services/live/LiveCall";
 import SamplerScreen from "../components/features/SamplerScreen";
 import SettingsDrawer, { SubPage } from "../components/features/SettingsDrawer";
 import TopBar from "../components/features/TopBar";
@@ -91,11 +90,11 @@ import { pressStyle } from "../components/ui/pressStyle";
 import SliderToggle from "../components/ui/SliderToggle";
 import { isWidgetTouchActive } from "../components/widgets/WidgetTouchArea";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
-import { useShadowShift } from "../hooks/useShadowShift";
 import { useBugReportTrigger } from "../hooks/useBugReportTrigger";
 import { useDesktopUpdate } from "../hooks/useDesktopUpdate";
 import { useKeyboardLift } from "../hooks/useKeyboardLift";
 import { useResponsive } from "../hooks/useResponsive";
+import { useShadowShift } from "../hooks/useShadowShift";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
 import { t, useT, type TranslationFn } from "../i18n";
 import { AIModule } from "../services/ai/AIModule";
@@ -122,7 +121,12 @@ import {
   shouldOfferAssistantRole,
 } from "../services/assistant/DefaultAssistant";
 import { CloudSync } from "../services/CloudSyncService";
-import { Conversation, DB, Message, type MessageMetrics } from "../services/db/DatabaseService";
+import {
+  Conversation,
+  DB,
+  Message,
+  type MessageMetrics,
+} from "../services/db/DatabaseService";
 import {
   getInitialDeepLink,
   subscribeToDeepLinks,
@@ -134,6 +138,10 @@ import { AppEvents } from "../services/events";
 import { HubSync } from "../services/hub/HubSync";
 import { PairedHub, SamplerHub } from "../services/hub/SamplerHubService";
 import { liveBackend } from "../services/live/liveBackend";
+import {
+  hasLiveCallPermission,
+  requestLiveCallPermission,
+} from "../services/live/LiveCall";
 import { LocationService } from "../services/location/LocationService";
 import {
   takePendingCrash,
@@ -163,8 +171,8 @@ import {
   usesDefaultPasteHost,
 } from "../services/share/ShareService";
 import { speakReplyLive } from "../services/speech/liveReply";
-import { TTS } from "../services/speech/TTSService";
 import { STT, WhisperSTT } from "../services/speech/STTService";
+import { TTS } from "../services/speech/TTSService";
 import {
   getAvailableUpdate,
   ReleaseNotes,
@@ -224,11 +232,11 @@ function WelcomeText({
 
   useEffect(() => {
     progress.setValue(0);
-    //let the butterfly intro land first
+    //fade in while the butterfly lands
     const anim = Animated.timing(progress, {
       toValue: 1,
       duration: 420,
-      delay: 1500,
+      delay: 700,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     });
@@ -706,7 +714,8 @@ export default function Index() {
     [aiService, ollamaUrl, selectedModel, modelCapabilities],
   );
   const liveInstructions = useMemo(
-    () => buildSystemPrompt(selectedModel, userInstruction, LIVE_PROMPT_SEGMENT),
+    () =>
+      buildSystemPrompt(selectedModel, userInstruction, LIVE_PROMPT_SEGMENT),
     [selectedModel, userInstruction],
   );
 
@@ -728,7 +737,11 @@ export default function Index() {
     liveConvRef.current = activeConversationRef.current;
     const choice = Settings.getCached().liveTranscription;
     //transcription costs extra
-    if (currentLiveBackend && currentLiveBackend.kind !== "gemini" && choice === "ask") {
+    if (
+      currentLiveBackend &&
+      currentLiveBackend.kind !== "gemini" &&
+      choice === "ask"
+    ) {
       setLiveAskVisible(true);
       return;
     }
@@ -749,74 +762,104 @@ export default function Index() {
   //each live message joins the conversation
   const handleLiveTurn = useCallback(
     (role: "user" | "assistant", content: string, metrics?: MessageMetrics) => {
-      liveQueueRef.current = liveQueueRef.current.then(async () => {
-        let conv = liveConvRef.current;
-        const isNew = !conv;
-        const isIncognitoTask = conv ? conv.id.startsWith("incognito_") : incognitoMode;
-        if (!dbReady && !isIncognitoTask) return;
-        if (!conv) {
-          const name = (role === "user" ? content : t("chatbar.live")).slice(0, 30);
-          if (isIncognitoTask) {
-            conv = {
-              id: "incognito_" + Date.now(),
-              name,
-              model: selectedModel || "unknown",
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            };
-          } else {
-            conv = await DB.createConversation(selectedModel || "unknown", name);
-            setConversations((prev) => [conv!, ...prev]);
-          }
-          liveConvRef.current = conv;
-          setActiveConversation(conv);
-        }
-        const convId = conv.id;
-        const save = async (role: "user" | "assistant", content: string): Promise<Message> =>
-          isIncognitoTask
-            ? {
-                id: "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
-                conversationId: convId,
-                role,
-                content,
+      liveQueueRef.current = liveQueueRef.current
+        .then(async () => {
+          let conv = liveConvRef.current;
+          const isNew = !conv;
+          const isIncognitoTask = conv
+            ? conv.id.startsWith("incognito_")
+            : incognitoMode;
+          if (!dbReady && !isIncognitoTask) return;
+          if (!conv) {
+            const name = (role === "user" ? content : t("chatbar.live")).slice(
+              0,
+              30,
+            );
+            if (isIncognitoTask) {
+              conv = {
+                id: "incognito_" + Date.now(),
+                name,
+                model: selectedModel || "unknown",
                 createdAt: Date.now(),
-              }
-            : DB.addMessage(convId, role, content);
-        const shown = isNew || activeConversationRef.current?.id === convId;
-        const replyMetrics = { ...metrics, systemPrompt: livePromptLabel(selectedModel) };
-
-        //an answer fills the slot its question opened
-        const pending = livePendingRef.current;
-        if (role === "assistant" && pending?.convId === convId) {
-          setLivePendingSlot(null);
-          if (!isIncognitoTask) {
-            await DB.updateMessageContent(pending.id, content);
-            await DB.updateMessageMetrics(pending.id, replyMetrics);
+                updatedAt: Date.now(),
+              };
+            } else {
+              conv = await DB.createConversation(
+                selectedModel || "unknown",
+                name,
+              );
+              setConversations((prev) => [conv!, ...prev]);
+            }
+            liveConvRef.current = conv;
+            setActiveConversation(conv);
           }
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === pending.id ? { ...m, content, metrics: replyMetrics } : m,
-            ),
-          );
-          return;
-        }
+          const convId = conv.id;
+          const save = async (
+            role: "user" | "assistant",
+            content: string,
+          ): Promise<Message> =>
+            isIncognitoTask
+              ? {
+                  id:
+                    "msg_" +
+                    Date.now() +
+                    "_" +
+                    Math.random().toString(36).slice(2, 7),
+                  conversationId: convId,
+                  role,
+                  content,
+                  createdAt: Date.now(),
+                }
+              : DB.addMessage(convId, role, content);
+          const shown = isNew || activeConversationRef.current?.id === convId;
+          const replyMetrics = {
+            ...metrics,
+            systemPrompt: livePromptLabel(selectedModel),
+          };
 
-        const msg = await save(role, content);
-        if (role === "assistant") {
-          msg.metrics = replyMetrics;
-          if (!isIncognitoTask) await DB.updateMessageMetrics(msg.id, msg.metrics);
-          if (shown) setMessages((prev) => [...prev, msg]);
-          return;
-        }
+          //an answer fills the slot its question opened
+          const pending = livePendingRef.current;
+          if (role === "assistant" && pending?.convId === convId) {
+            setLivePendingSlot(null);
+            if (!isIncognitoTask) {
+              await DB.updateMessageContent(pending.id, content);
+              await DB.updateMessageMetrics(pending.id, replyMetrics);
+            }
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === pending.id
+                  ? { ...m, content, metrics: replyMetrics }
+                  : m,
+              ),
+            );
+            return;
+          }
 
-        //the slot opens with the question, so the view moves once
-        await dropLiveSlot();
-        const slot = await save("assistant", "…");
-        setLivePendingSlot({ convId, id: slot.id });
-        if (shown) setMessages((prev) => [...prev, msg, slot]);
-      }).catch((e) => console.error("Failed to save live turn:", e));
+          const msg = await save(role, content);
+          if (role === "assistant") {
+            msg.metrics = replyMetrics;
+            if (!isIncognitoTask)
+              await DB.updateMessageMetrics(msg.id, msg.metrics);
+            if (shown) setMessages((prev) => [...prev, msg]);
+            return;
+          }
+
+          //the slot opens with the question, so the view moves once
+          await dropLiveSlot();
+          const slot = await save("assistant", "…");
+          setLivePendingSlot({ convId, id: slot.id });
+          if (shown) setMessages((prev) => [...prev, msg, slot]);
+        })
+        .catch((e) => console.error("Failed to save live turn:", e));
     },
-    [dbReady, incognitoMode, selectedModel, t, dropLiveSlot, setLivePendingSlot],
+    [
+      dbReady,
+      incognitoMode,
+      selectedModel,
+      t,
+      dropLiveSlot,
+      setLivePendingSlot,
+    ],
   );
 
   //the slot streams like a typed reply, so the chat pins it the same way
@@ -1552,8 +1595,13 @@ export default function Index() {
     const msgs = await DB.getMessages(conv.id);
 
     //back to the level of the last reply
-    const lastThinking = [...msgs].reverse().find((m) => m.metrics?.thinking)?.metrics?.thinking;
-    if (lastThinking === "none" || lastThinking === "low" || lastThinking === "high") {
+    const lastThinking = [...msgs].reverse().find((m) => m.metrics?.thinking)
+      ?.metrics?.thinking;
+    if (
+      lastThinking === "none" ||
+      lastThinking === "low" ||
+      lastThinking === "high"
+    ) {
       setSelectedReflection(lastThinking);
     }
 
@@ -2686,23 +2734,24 @@ export default function Index() {
   );
 
   //the sheet host stays out of the way until a provider is picked
-  const settingsDrawer = settingsInWindow && !settingsInitialSheet ? null : (
-    <SettingsDrawer
-      isLargeScreen={isLargeScreen}
-      isDesktop={isDesktop}
-      visible={settingsDrawerVisible}
-      initialSubPage={settingsInitialSubPage}
-      initialSheet={settingsInitialSheet}
-      sheetOnly={!settingsDrawerVisible && !!settingsInitialSheet}
-      hubPairLink={hubPairLink}
-      onHubPairLinkHandled={() => setHubPairLink(null)}
-      onClose={closeSettings}
-      onDataChanged={async () => {
-        await loadConversations();
-        startNewConversation();
-      }}
-    />
-  );
+  const settingsDrawer =
+    settingsInWindow && !settingsInitialSheet ? null : (
+      <SettingsDrawer
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        visible={settingsDrawerVisible}
+        initialSubPage={settingsInitialSubPage}
+        initialSheet={settingsInitialSheet}
+        sheetOnly={!settingsDrawerVisible && !!settingsInitialSheet}
+        hubPairLink={hubPairLink}
+        onHubPairLinkHandled={() => setHubPairLink(null)}
+        onClose={closeSettings}
+        onDataChanged={async () => {
+          await loadConversations();
+          startNewConversation();
+        }}
+      />
+    );
 
   return (
     <View style={styles.container} ref={rootRef} collapsable={false}>
@@ -2797,6 +2846,7 @@ export default function Index() {
               {!activeConversation && (
                 <Reanimated.View style={styles.centerContent}>
                   <ButterflyCluster
+                    flap
                     incognito={incognitoMode}
                     style={styles.butterfly}
                   />
@@ -2908,67 +2958,72 @@ export default function Index() {
                   </View>
                 ) : (
                   <>
-                  {liveOpen && currentLiveBackend && (
-                    <LiveScreen
-                      backend={currentLiveBackend}
-                      instructions={liveInstructions}
-                      incognito={
-                        activeConversation
-                          ? activeConversation.id.startsWith("incognito_")
-                          : incognitoMode
-                      }
-                      transcribe={liveTranscribe}
-                      onTurn={handleLiveTurn}
-                      onClose={() => {
-                        setLiveOpen(false);
-                        //hanging up leaves no empty reply behind
-                        liveQueueRef.current = liveQueueRef.current.then(dropLiveSlot);
-                      }}
-                    />
-                  )}
-                  {/* stays mounted so the draft survives the call */}
-                  <View style={liveOpen ? { display: "none" } : undefined}>
-                  <ChatBar
-                    ref={chatBarRef}
-                    onSend={(text, images, viaVoice) =>
-                      editSession
-                        ? confirmEdit(text, images)
-                        : handleSend(text, images, viaVoice)
-                    }
-                    editing={!!editSession}
-                    onEditCancel={handleEditCancel}
-                    editDraft={editDraft}
-                    editFiles={editFiles}
-                    incognito={
-                      activeConversation
-                        ? activeConversation.id.startsWith("incognito_")
-                        : incognitoMode
-                    }
-                    isGenerating={
-                      activeConversation
-                        ? generatingConvId === activeConversation.id ||
-                          pendingConvIds.includes(activeConversation.id)
-                        : false
-                    }
-                    onStop={handleStop}
-                    onTranscribe={handleTranscribe}
-                    canTranscribeRemotely={
-                      !alwaysWhisper &&
-                      modelCapabilities.includes("audio") &&
-                      !!selectedModel
-                    }
-                    modelCapabilities={modelCapabilities}
-                    onOpenSettings={() => {
-                      openDrawerSafely(() => {
-                        setSettingsInitialSubPage("main");
-                        setSettingsDrawerVisible(true);
-                      });
-                    }}
-                    picker={attachments}
-                    leadingElement={isDesktop ? modelTrigger : undefined}
-                    onOpenLive={currentLiveBackend && !editSession ? openLive : undefined}
-                  />
-                  </View>
+                    {liveOpen && currentLiveBackend && (
+                      <LiveScreen
+                        backend={currentLiveBackend}
+                        instructions={liveInstructions}
+                        incognito={
+                          activeConversation
+                            ? activeConversation.id.startsWith("incognito_")
+                            : incognitoMode
+                        }
+                        transcribe={liveTranscribe}
+                        onTurn={handleLiveTurn}
+                        onClose={() => {
+                          setLiveOpen(false);
+                          //hanging up leaves no empty reply behind
+                          liveQueueRef.current =
+                            liveQueueRef.current.then(dropLiveSlot);
+                        }}
+                      />
+                    )}
+                    {/* stays mounted so the draft survives the call */}
+                    <View style={liveOpen ? { display: "none" } : undefined}>
+                      <ChatBar
+                        ref={chatBarRef}
+                        onSend={(text, images, viaVoice) =>
+                          editSession
+                            ? confirmEdit(text, images)
+                            : handleSend(text, images, viaVoice)
+                        }
+                        editing={!!editSession}
+                        onEditCancel={handleEditCancel}
+                        editDraft={editDraft}
+                        editFiles={editFiles}
+                        incognito={
+                          activeConversation
+                            ? activeConversation.id.startsWith("incognito_")
+                            : incognitoMode
+                        }
+                        isGenerating={
+                          activeConversation
+                            ? generatingConvId === activeConversation.id ||
+                              pendingConvIds.includes(activeConversation.id)
+                            : false
+                        }
+                        onStop={handleStop}
+                        onTranscribe={handleTranscribe}
+                        canTranscribeRemotely={
+                          !alwaysWhisper &&
+                          modelCapabilities.includes("audio") &&
+                          !!selectedModel
+                        }
+                        modelCapabilities={modelCapabilities}
+                        onOpenSettings={() => {
+                          openDrawerSafely(() => {
+                            setSettingsInitialSubPage("main");
+                            setSettingsDrawerVisible(true);
+                          });
+                        }}
+                        picker={attachments}
+                        leadingElement={isDesktop ? modelTrigger : undefined}
+                        onOpenLive={
+                          currentLiveBackend && !editSession
+                            ? openLive
+                            : undefined
+                        }
+                      />
+                    </View>
                   </>
                 )}
               </View>
@@ -2980,8 +3035,16 @@ export default function Index() {
             title={t("live.notifPerm.title")}
             message={t("live.notifPerm.message")}
             buttons={[
-              { text: t("live.notifPerm.cancel"), style: "secondary", onPress: () => setLiveNotifVisible(false) },
-              { text: t("live.notifPerm.allow"), style: "primary", onPress: allowLiveNotif },
+              {
+                text: t("live.notifPerm.cancel"),
+                style: "secondary",
+                onPress: () => setLiveNotifVisible(false),
+              },
+              {
+                text: t("live.notifPerm.allow"),
+                style: "primary",
+                onPress: allowLiveNotif,
+              },
             ]}
             onClose={() => setLiveNotifVisible(false)}
           />
@@ -2998,8 +3061,16 @@ export default function Index() {
             title={t("live.transcribe.title")}
             message={t("live.transcribe.message")}
             buttons={[
-              { text: t("live.transcribe.skip"), style: "secondary", onPress: () => answerLiveAsk(false) },
-              { text: t("live.transcribe.enable"), style: "primary", onPress: () => answerLiveAsk(true) },
+              {
+                text: t("live.transcribe.skip"),
+                style: "secondary",
+                onPress: () => answerLiveAsk(false),
+              },
+              {
+                text: t("live.transcribe.enable"),
+                style: "primary",
+                onPress: () => answerLiveAsk(true),
+              },
             ]}
             onClose={() => setLiveAskVisible(false)}
           />
@@ -3048,7 +3119,9 @@ export default function Index() {
               middleElement={samplerSwitch}
               middleOnly={inSampler && !isDesktop && !samplerReady}
               rightElement={settingsButton}
-              showIncognitoButton={!isDesktop && !inSampler && !activeConversation}
+              showIncognitoButton={
+                !isDesktop && !inSampler && !activeConversation
+              }
               incognito={incognitoMode}
               onIncognitoPress={() => {
                 Vibration.vibrate(10);
@@ -3178,7 +3251,10 @@ export default function Index() {
           setModelSelectorVisible(false);
           //provider sheet opens over home, settings stay closed
           openDrawerSafely(() =>
-            setSettingsInitialSheet({ service: source.service, url: source.url }),
+            setSettingsInitialSheet({
+              service: source.service,
+              url: source.url,
+            }),
           );
         }}
       />

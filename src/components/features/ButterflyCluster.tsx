@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   AppState,
@@ -6,6 +6,7 @@ import {
   DeviceEventEmitter,
   Easing,
   Platform,
+  Pressable,
   StyleProp,
   StyleSheet,
   View,
@@ -17,6 +18,7 @@ import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useAccent } from "../../hooks/useTheme";
 import { AppEvents } from "../../services/events";
 import { OverlayPresence } from "../../services/overlay/overlayPresence";
+import AsciiButterfly from "./AsciiButterfly";
 import { MAESTRO_BUTTERFLIES, useMaestroButterfly, useVoiceColor } from "./maestroButterfly";
 
 const MAX_SHIFT = 16;
@@ -32,6 +34,8 @@ export type ButterflyClusterProps = {
   intro?: boolean;
   //accent takes the voice color
   voiceColor?: boolean;
+  //flaps on load and on tap
+  flap?: boolean;
 };
 
 //maestro butterfly with gyro parallax
@@ -42,11 +46,14 @@ function ButterflyCluster({
   parallax = true,
   intro = true,
   voiceColor = false,
+  flap = false,
 }: ButterflyClusterProps) {
-  const butterfly = MAESTRO_BUTTERFLIES[useMaestroButterfly()];
+  const butterflyId = useMaestroButterfly();
   const color = useVoiceColor();
   //every butterfly follows the app accent when it is applied
   const accent = useAccent();
+  const [flapKey, setFlapKey] = useState(0);
+  const accentColor = incognito ? Colors.incognito : voiceColor ? color : accent;
   //no intro starts fully shown
   const introAnim = useAnimatedValue(intro ? 0 : 1);
   const gyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -65,6 +72,14 @@ function ButterflyCluster({
 
     return () => clearTimeout(timer);
   }, [introAnim, delay, intro]);
+
+  //flap while the butterfly rises
+  useEffect(() => {
+    if (!flap) return;
+    //start with the intro scaling
+    const timer = setTimeout(() => setFlapKey((key) => key + 1), delay);
+    return () => clearTimeout(timer);
+  }, [delay, flap]);
 
   useEffect(() => {
     if (Platform.OS === "web" || !parallax) {
@@ -204,23 +219,24 @@ function ButterflyCluster({
   );
 
   return (
-    <View pointerEvents="none" style={style}>
+    <View pointerEvents="box-none" style={style}>
       <Animated.View
         style={[styles.imageFill, { opacity: introOpacity, transform: introTransform }]}
       >
-        <Animated.Image
-          source={butterfly.base}
-          style={[styles.imageFill, { transform: gyroTransform }]}
-          resizeMode="contain"
-          resizeMethod="resize"
-        />
-        <Animated.Image
-          source={butterfly.accent}
-          tintColor={incognito ? Colors.incognito : voiceColor ? color : (accent ?? undefined)}
-          style={[styles.imageFill, styles.imageOverlay, { transform: gyroTransform }]}
-          resizeMode="contain"
-          resizeMethod="resize"
-        />
+        <Animated.View style={[styles.imageFill, { transform: gyroTransform }]}>
+          <Pressable
+            style={styles.imageFill}
+            disabled={!flap}
+            onPress={() => setFlapKey((key) => key + 1)}
+          >
+            <AsciiButterfly
+              key={butterflyId}
+              frames={MAESTRO_BUTTERFLIES[butterflyId].frames}
+              accentColor={accentColor ?? Colors.primary}
+              playKey={flapKey}
+            />
+          </Pressable>
+        </Animated.View>
       </Animated.View>
     </View>
   );
@@ -230,12 +246,6 @@ const styles = StyleSheet.create({
   imageFill: {
     width: "100%",
     height: "100%",
-  },
-  //stacks the accent layer exactly over the base layer
-  imageOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
   },
 });
 

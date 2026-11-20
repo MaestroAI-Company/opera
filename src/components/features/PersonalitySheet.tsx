@@ -124,7 +124,7 @@ function PersonalityEditor({
   };
 
   const save = () => {
-    //butterfly pick clears the easter egg
+    //personality picks the butterfly
     Settings.setMany({ ...draft, maestroButterfly: butterflyForPersonality(draft) });
     onSaved(draft);
     onClose();
@@ -201,7 +201,7 @@ export function PersonalityPicker({
     Vibration.vibrate(10);
     const next = { ...draft, [SLOT_KEY[slot]]: value };
     setDraft(next);
-    //butterfly pick clears the easter egg
+    //personality picks the butterfly
     Settings.setMany({ ...next, maestroButterfly: butterflyForPersonality(next) });
     onChange?.(next);
     const nextSlot = SLOT_ORDER[SLOT_ORDER.indexOf(slot) + 1];

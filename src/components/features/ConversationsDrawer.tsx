@@ -1,28 +1,29 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    Animated,
-      Image,
-    Keyboard,
-    NativeScrollEvent,
-    NativeSyntheticEvent,
-    PanResponder,
-    Pressable,
-    SectionList,
-    StyleSheet,
-    Text,
-    useWindowDimensions,
-    View
+  Animated,
+  Image,
+  Keyboard,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  PanResponder,
+  Pressable,
+  SectionList,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-    FontSizes,
-    Fonts,
-    Radius,
-    Spacing,
-    ThemeColors,
+  Fonts,
+  FontSizes,
+  Radius,
+  Spacing,
+  ThemeColors,
 } from "../../../constants/theme";
 import { useResponsive } from "../../hooks/useResponsive";
+import { useShadowShift } from "../../hooks/useShadowShift";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT, type TranslationFn } from "../../i18n";
 import { CloudSync } from "../../services/CloudSyncService";
@@ -34,13 +35,13 @@ import NotificationModal from "../ui/NotificationModal";
 import { pressStyle } from "../ui/pressStyle";
 import TextInputField from "../ui/TextInputField";
 import {
-    conversationsProgress,
-    dragDrawer,
-    drawerWidthFor,
-    gestureVelocity,
-    releaseOpens,
-    settleDrawer,
-    useDockedWidth,
+  conversationsProgress,
+  dragDrawer,
+  drawerWidthFor,
+  gestureVelocity,
+  releaseOpens,
+  settleDrawer,
+  useDockedWidth,
 } from "./drawerAnimation";
 import DrawerBackButton from "./DrawerBackButton";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
@@ -119,6 +120,8 @@ export default function ConversationsDrawer({
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const t = useT();
+  const insets = useSafeAreaInsets();
+  const shadowShift = useShadowShift();
   const { width } = useResponsive();
   const drawerWidth = drawerWidthFor(width);
 
@@ -136,26 +139,25 @@ export default function ConversationsDrawer({
   //detect scroll to morph close button
   const handleScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const scrolled = e.nativeEvent.contentOffset.y > 10;
-    setIsScrolled((prev) => (prev !== scrolled ? scrolled : prev));
+      const scrolled = e.nativeEvent.contentOffset.y > 10;
+      setIsScrolled((prev) => (prev !== scrolled ? scrolled : prev));
     },
     [],
   );
 
-
   const panResponder = useMemo(
     () =>
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => {
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) => {
           return (
             gestureState.dx < -10 &&
             Math.abs(gestureState.dx) > Math.abs(gestureState.dy)
           );
-      },
-      onPanResponderMove: (_, gestureState) => {
-        dragDrawer(progress, 1 + gestureState.dx / drawerWidth);
-      },
-      onPanResponderRelease: (_, gestureState) => {
+        },
+        onPanResponderMove: (_, gestureState) => {
+          dragDrawer(progress, 1 + gestureState.dx / drawerWidth);
+        },
+        onPanResponderRelease: (_, gestureState) => {
           const open = releaseOpens(
             1 + gestureState.dx / drawerWidth,
             gestureState.vx,
@@ -165,11 +167,11 @@ export default function ConversationsDrawer({
             open,
             gestureVelocity(gestureState.vx, drawerWidth),
           );
-        if (!open) onClose();
-      },
-      onPanResponderTerminate: () => {
-        settleDrawer(progress, true);
-      },
+          if (!open) onClose();
+        },
+        onPanResponderTerminate: () => {
+          settleDrawer(progress, true);
+        },
       }),
     [onClose, drawerWidth, progress],
   );
@@ -268,13 +270,13 @@ export default function ConversationsDrawer({
               />
             </>
           ) : conv.pinned ? (
-              <View style={styles.pinnedIndicator}>
+            <View style={styles.pinnedIndicator}>
               <Image
                 source={pinIcon}
                 style={styles.pinnedIcon}
                 tintColor={Colors.textMuted}
               />
-              </View>
+            </View>
           ) : null}
         </View>
       </View>
@@ -334,13 +336,6 @@ export default function ConversationsDrawer({
                   if (!isDesktop) onClose();
                 }}
               />
-              <ActionButton
-                icon={searchIcon}
-                iconBadge
-                label={t("conversations.search.action")}
-                style={isDesktop && styles.desktopButton}
-                onPress={onOpenSearch}
-              />
             </Group>
 
             {conversations.length === 0 && (
@@ -358,7 +353,7 @@ export default function ConversationsDrawer({
         //desktop title level with the top bar buttons
         contentContainerStyle={{
           paddingTop: isDesktop ? Spacing.lg : 60,
-          paddingBottom: 40,
+          paddingBottom: 96 + (isDesktop ? 0 : insets.bottom),
         }}
       />
       {!isDesktop && (
@@ -382,6 +377,41 @@ export default function ConversationsDrawer({
             pointerEvents="none"
           />
         </>
+      )}
+      {onOpenSearch && (
+        <View
+          style={[
+            styles.floatingSearchWrapper,
+            { bottom: Spacing.xl2 + (isDesktop ? 0 : insets.bottom) },
+          ]}
+          pointerEvents="box-none"
+        >
+          <View style={styles.floatingSearchShadowLayer}>
+            <Animated.View
+              style={[
+                styles.floatingSearchShadow,
+                { transform: shadowShift.getTranslateTransform() },
+              ]}
+              pointerEvents="none"
+            />
+            <Pressable
+              style={pressStyle(
+                styles.floatingSearchBar,
+                styles.floatingSearchBarPressed,
+              )}
+              onPress={onOpenSearch}
+            >
+              <Image
+                source={searchIcon}
+                style={styles.floatingSearchIcon}
+                tintColor={Colors.textPrimary}
+              />
+              <Text style={styles.floatingSearchLabel} numberOfLines={1}>
+                {t("conversations.search.action")}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
       )}
     </View>
   );
@@ -719,210 +749,256 @@ export function ConversationSearchSheet({
 
 const makeStyles = (Colors: ThemeColors) =>
   StyleSheet.create({
-  root: {
-    ...StyleSheet.absoluteFill,
-    zIndex: 1000,
-    elevation: 1000,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: Colors.scrimDrawer,
-  },
-  content: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: 0,
-    backgroundColor: Colors.groupedBackground,
-    paddingHorizontal: Spacing.lg2,
-    //pushed pages stay inside the panel
-    overflow: "hidden",
-  },
-  largeScreenContainer: {
-    backgroundColor: Colors.surface,
-    zIndex: 10,
-    overflow: "hidden",
-  },
-  //border rides the inner panel so a closed drawer takes no width
-  dockedPanel: {
-    flex: 1,
-    borderRightWidth: 2,
-    borderRightColor: Colors.border,
-  },
-  //sits over the border
-  resizeHandle: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    right: 0,
-    width: 8,
-  },
-  //desktop buttons round their own hover fill
-  desktopButton: {
-    borderRadius: Radius.pill,
-  },
-  dockedContent: {
-    //clears the tauri title bar
+    root: {
+      ...StyleSheet.absoluteFill,
+      zIndex: 1000,
+      elevation: 1000,
+    },
+    overlay: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: Colors.scrimDrawer,
+    },
+    content: {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      left: 0,
+      backgroundColor: Colors.groupedBackground,
+      paddingHorizontal: Spacing.lg2,
+      //pushed pages stay inside the panel
+      overflow: "hidden",
+    },
+    largeScreenContainer: {
+      backgroundColor: Colors.surface,
+      zIndex: 10,
+      overflow: "hidden",
+    },
+    //border rides the inner panel so a closed drawer takes no width
+    dockedPanel: {
+      flex: 1,
+      borderRightWidth: 2,
+      borderRightColor: Colors.border,
+    },
+    //sits over the border
+    resizeHandle: {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      right: 0,
+      width: 8,
+    },
+    //desktop buttons round their own hover fill
+    desktopButton: {
+      borderRadius: Radius.pill,
+    },
+    dockedContent: {
+      //clears the tauri title bar
       paddingTop:
         typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
           ? 32
           : 0,
-    paddingHorizontal: Spacing.lg2,
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: Spacing.xxxl,
-    minHeight: 40,
-  },
-  headerSpacer: {
-    width: 40,
-    height: 40,
-  },
-  title: {
-    flex: 1,
-    fontSize: FontSizes.xxxl,
-    color: Colors.textPrimary,
-    fontFamily: Fonts.display,
-    textAlign: "center",
-    includeFontPadding: false,
-    lineHeight: 40,
-  },
-  contentCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xxl + Spacing.md,
-    borderWidth: 0,
-    padding: Spacing.md,
-  },
-  quickActionsSpacing: {
-    marginBottom: Spacing.xxl,
-    borderRadius: Radius.xxl + Spacing.md,
-    borderWidth: 0,
-  },
-  scrollListContainer: {
-    flex: 1,
-    position: "relative",
-  },
-  screenGradientTop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    zIndex: 10,
-  },
-  screenGradientBottom: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    zIndex: 10,
-  },
-  fixedCloseWrapper: {
-    position: "absolute",
-    right: 0,
-    zIndex: 100,
-    elevation: 10,
-    width: 40,
-    height: 40,
-  },
-  section: {
-    marginBottom: Spacing.xl2,
-  },
-  sectionTitle: {
-    fontSize: FontSizes.label,
-    color: Colors.textMuted,
-    fontFamily: Fonts.mono,
-    textTransform: "uppercase",
-    marginBottom: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-  },
-  emptyText: {
-    fontSize: FontSizes.bodyMd,
-    color: Colors.textMuted,
-    fontFamily: Fonts.body,
-    textAlign: "center",
-    marginTop: Spacing.xxl,
-  },
-  discussionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radius.xxl,
-    marginBottom: Spacing.xs2,
-    borderWidth: 2,
-    borderColor: "transparent",
-  },
-  discussionRowSelected: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.borderOnPrimary,
-    paddingVertical: Spacing.xs,
-  },
-  discussionTextContainer: {
-    flex: 1,
-    marginRight: Spacing.md,
-  },
-  discussionText: {
-    fontSize: FontSizes.body,
-    color: Colors.textPrimary,
-    fontFamily: Fonts.body,
-  },
-  discussionTextSelected: {
-    color: Colors.textOnPrimary,
-  },
-  rowActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-  },
-  pinnedIndicator: {
-    paddingHorizontal: Spacing.xs,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  pinnedIcon: {
-    width: 22,
-    height: 22,
-    opacity: 0.5,
-  },
-  sheet: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: Colors.groupedBackground,
-    borderTopLeftRadius: Radius.huge2,
-    borderTopRightRadius: Radius.huge2,
-    paddingTop: Spacing.xxl,
-    overflow: "hidden",
-  },
-  sheetHandleContainer: {
-    //floats so top edge matches sides
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-    paddingVertical: Spacing.md,
-  },
-  searchSheetDesktop: {
-    width: DESKTOP_SEARCH_WIDTH,
-    height: DESKTOP_SEARCH_HEIGHT,
-  },
-  searchSheetContent: {
-    paddingHorizontal: Spacing.lg2,
-    paddingBottom: Spacing.lg,
-    gap: Spacing.xxl2,
-  },
-  searchDateText: {
-    fontSize: FontSizes.label,
-    color: Colors.textMuted,
-    fontFamily: Fonts.mono,
-    marginRight: Spacing.xs,
-  },
-});
+      paddingHorizontal: Spacing.lg2,
+      flex: 1,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: Spacing.xxxl,
+      minHeight: 40,
+    },
+    headerSpacer: {
+      width: 40,
+      height: 40,
+    },
+    title: {
+      flex: 1,
+      fontSize: FontSizes.xxxl,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.display,
+      textAlign: "center",
+      includeFontPadding: false,
+      lineHeight: 40,
+    },
+    contentCard: {
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
+      padding: Spacing.md,
+    },
+    quickActionsSpacing: {
+      marginBottom: Spacing.xxl,
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
+    },
+    scrollListContainer: {
+      flex: 1,
+      position: "relative",
+    },
+    screenGradientTop: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 60,
+      zIndex: 10,
+    },
+    screenGradientBottom: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 60,
+      zIndex: 10,
+    },
+    fixedCloseWrapper: {
+      position: "absolute",
+      right: 0,
+      zIndex: 100,
+      elevation: 10,
+      width: 40,
+      height: 40,
+    },
+    floatingSearchWrapper: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      alignItems: "center",
+      zIndex: 100,
+      elevation: 10,
+    },
+    floatingSearchShadowLayer: {
+      position: "relative",
+      width: "70%",
+      maxWidth: 230,
+    },
+    floatingSearchShadow: {
+      position: "absolute",
+      top: 4,
+      left: -4,
+      right: 4,
+      bottom: -4,
+      backgroundColor: Colors.shadowInk,
+      borderRadius: Radius.window,
+    },
+    floatingSearchBar: {
+      height: 44,
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: Spacing.xl,
+      gap: Spacing.md,
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.window,
+      position: "relative",
+      zIndex: 1,
+    },
+    floatingSearchBarPressed: {
+      backgroundColor: Colors.surfacePressed,
+    },
+    floatingSearchIcon: {
+      width: 18,
+      height: 18,
+    },
+    floatingSearchLabel: {
+      flex: 1,
+      fontSize: FontSizes.bodyMd,
+      fontFamily: Fonts.mono,
+      color: Colors.textMuted,
+    },
+    section: {
+      marginBottom: Spacing.xl2,
+    },
+    sectionTitle: {
+      fontSize: FontSizes.label,
+      color: Colors.textMuted,
+      fontFamily: Fonts.mono,
+      textTransform: "uppercase",
+      marginBottom: Spacing.md,
+      paddingHorizontal: Spacing.lg,
+    },
+    emptyText: {
+      fontSize: FontSizes.bodyMd,
+      color: Colors.textMuted,
+      fontFamily: Fonts.body,
+      textAlign: "center",
+      marginTop: Spacing.xxl,
+    },
+    discussionRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: Spacing.md,
+      paddingHorizontal: Spacing.md,
+      borderRadius: Radius.xxl,
+      marginBottom: Spacing.xs2,
+      borderWidth: 2,
+      borderColor: "transparent",
+    },
+    discussionRowSelected: {
+      backgroundColor: Colors.primary,
+      borderColor: Colors.borderOnPrimary,
+      paddingVertical: Spacing.xs,
+    },
+    discussionTextContainer: {
+      flex: 1,
+      marginRight: Spacing.md,
+    },
+    discussionText: {
+      fontSize: FontSizes.body,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.body,
+    },
+    discussionTextSelected: {
+      color: Colors.textOnPrimary,
+    },
+    rowActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Spacing.xs,
+    },
+    pinnedIndicator: {
+      paddingHorizontal: Spacing.xs,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    pinnedIcon: {
+      width: 22,
+      height: 22,
+      opacity: 0.5,
+    },
+    sheet: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: Colors.groupedBackground,
+      borderTopLeftRadius: Radius.huge2,
+      borderTopRightRadius: Radius.huge2,
+      paddingTop: Spacing.xxl,
+      overflow: "hidden",
+    },
+    sheetHandleContainer: {
+      //floats so top edge matches sides
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      alignItems: "center",
+      paddingVertical: Spacing.md,
+    },
+    searchSheetDesktop: {
+      width: DESKTOP_SEARCH_WIDTH,
+      height: DESKTOP_SEARCH_HEIGHT,
+    },
+    searchSheetContent: {
+      paddingHorizontal: Spacing.lg2,
+      paddingBottom: Spacing.lg,
+      gap: Spacing.xxl2,
+    },
+    searchDateText: {
+      fontSize: FontSizes.label,
+      color: Colors.textMuted,
+      fontFamily: Fonts.mono,
+      marginRight: Spacing.xs,
+    },
+  });

@@ -335,6 +335,7 @@ export const fr: Translations = {
   "update.checkFailed": "La recherche de mise à jour a échoué. Vérifie ta connexion.",
   "settings.update.checkNow": "Vérifier maintenant",
 
+  "settings.nav.search.title": "Rechercher",
   "settings.nav.profile.title": "Profil",
   "settings.nav.profile.subtitle": "Nom",
   "settings.nav.cloud.title": "Sync & sauvegarde",

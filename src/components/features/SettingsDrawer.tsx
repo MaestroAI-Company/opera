@@ -171,6 +171,7 @@ import FloatingButton from "../ui/FloatingButton";
 import Group from "../ui/Group";
 import IconButton from "../ui/IconButton";
 import IconSelector from "../ui/IconSelector";
+import ImageCard from "../ui/ImageCard";
 import NotificationBanner from "../ui/NotificationBanner";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import ProgressBar from "../ui/ProgressBar";
@@ -184,9 +185,7 @@ import DrawerSheet, {
     SheetKeyboardAwareScrollView,
     SheetScrollView,
 } from "./DrawerSheet";
-import ImageCard from "../ui/ImageCard";
 import HelpSheet, { type HelpSection } from "./HelpSheet";
-import WhatsNewSheet from "./WhatsNewSheet";
 import { selectVoice, useVoice, VOICE_OPTIONS } from "./maestroButterfly";
 import MaestroCard from "./MaestroCard";
 import PersonalitySheet, {
@@ -197,6 +196,7 @@ import PersonalitySheet, {
 import ProfileCard from "./ProfileCard";
 import VoiceDownloadSheet from "./VoiceDownloadSheet";
 import VoiceEngineCard from "./VoiceEngineCard";
+import WhatsNewSheet from "./WhatsNewSheet";
 
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -208,6 +208,7 @@ import {
 import { useDesktopUpdate } from "../../hooks/useDesktopUpdate";
 import { useResponsive } from "../../hooks/useResponsive";
 import { useSettingsNotices } from "../../hooks/useSettingsNotices";
+import { useShadowShift } from "../../hooks/useShadowShift";
 import { useVoicePackInstalled } from "../../hooks/useVoicePackInstalled";
 import {
     getLaunchAtStartup,
@@ -476,9 +477,7 @@ const PromptTierSelector = memo(function PromptTierSelector({
 
   return (
     <>
-      <Text
-        style={[styles.settingLabel, !first && styles.litertDetailSection]}
-      >
+      <Text style={[styles.settingLabel, !first && styles.litertDetailSection]}>
         {t("settings.model.promptSize")}
       </Text>
       <Group>
@@ -1027,6 +1026,8 @@ export default function SettingsDrawer({
   //query typed in the inline list before show more
   const [mcpAddVisible, setMcpAddVisible] = useState(false);
   const [profileEditVisible, setProfileEditVisible] = useState(false);
+  const [searchSheetVisible, setSearchSheetVisible] = useState(false);
+  const [settingsSearchQuery, setSettingsSearchQuery] = useState("");
   const [nameDraft, setNameDraft] = useState("");
   const [litertDownloadVisible, setLitertDownloadVisible] = useState(false);
   const [voiceDownloadVisible, setVoiceDownloadVisible] = useState(false);
@@ -1122,6 +1123,7 @@ export default function SettingsDrawer({
     personalitySheetVisible ||
     instructionsSheetVisible ||
     profileEditVisible ||
+    searchSheetVisible ||
     addModelSheetVisible ||
     litertSheetVisible ||
     ollamaDetailIndex !== null ||
@@ -1162,6 +1164,7 @@ export default function SettingsDrawer({
   const [litertSearchFailed, setLitertSearchFailed] = useState(false);
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const shadowShift = useShadowShift();
   //sheet may grow up to just under the status bar
   const sheetMaxHeight = windowHeight - insets.top - Spacing.xl2;
   const [alertModalVisible, setAlertModalVisible] = useState(false);
@@ -1191,7 +1194,8 @@ export default function SettingsDrawer({
     try {
       const notes = await getCurrentReleaseNotes();
       if (notes) setChangelog(notes);
-      else showAlert(t("common.error"), t("settings.info.changelogUnavailable"));
+      else
+        showAlert(t("common.error"), t("settings.info.changelogUnavailable"));
     } catch {
       showAlert(t("common.error"), t("settings.info.changelogUnavailable"));
     }
@@ -3553,7 +3557,7 @@ export default function SettingsDrawer({
     return (
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: Spacing.lg, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingTop: Spacing.lg, paddingBottom: 96 }}
       >
         {groups.map((items, index) => (
           <Group key={index} style={styles.sidebarActions}>
@@ -4102,7 +4106,11 @@ export default function SettingsDrawer({
       {/* screen saver settings card */}
       {Platform.OS === "android" && !screenSaverActive && (
         <View style={styles.contentCard}>
-          <ImageCard source={standbyInfoImage} width="100%" style={{ marginBottom: Spacing.lg2 }} />
+          <ImageCard
+            source={standbyInfoImage}
+            width="100%"
+            style={{ marginBottom: Spacing.lg2 }}
+          />
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>
               {t("settings.nav.screenSaver.title")}
@@ -4124,7 +4132,13 @@ export default function SettingsDrawer({
       {/* anti burn-in and incognito card */}
       {Platform.OS === "android" && (
         <View style={styles.contentCard}>
-          {screenSaverActive && <ImageCard source={standbyInfoImage} width="100%" style={{ marginBottom: Spacing.lg2 }} />}
+          {screenSaverActive && (
+            <ImageCard
+              source={standbyInfoImage}
+              width="100%"
+              style={{ marginBottom: Spacing.lg2 }}
+            />
+          )}
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <View style={styles.toggleGroupRow}>
               <View style={styles.toggleGroupContent}>
@@ -4424,9 +4438,7 @@ export default function SettingsDrawer({
             {t("settings.profile.instructions")}
           </Text>
           {instruction.trim() ? (
-            <Text style={styles.personalitySentence}>
-              {instruction.trim()}
-            </Text>
+            <Text style={styles.personalitySentence}>{instruction.trim()}</Text>
           ) : null}
           <Group>
             <ActionButton
@@ -4502,7 +4514,11 @@ export default function SettingsDrawer({
       {/* default assistant card */}
       {Platform.OS === "android" && (
         <View style={styles.contentCard}>
-          <ImageCard source={assistantInfoImage} width="100%" style={{ marginBottom: Spacing.lg2 }} />
+          <ImageCard
+            source={assistantInfoImage}
+            width="100%"
+            style={{ marginBottom: Spacing.lg2 }}
+          />
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>
               {t("settings.overlay.default")}
@@ -4524,7 +4540,11 @@ export default function SettingsDrawer({
       {/* desktop shortcut card */}
       {isTauri && (
         <View style={styles.contentCard}>
-          <ImageCard source={assistantInfoImage} width="100%" style={{ marginBottom: Spacing.lg2 }} />
+          <ImageCard
+            source={assistantInfoImage}
+            width="100%"
+            style={{ marginBottom: Spacing.lg2 }}
+          />
           <View
             style={[
               styles.settingRowVertical,
@@ -5807,6 +5827,42 @@ export default function SettingsDrawer({
         ? openMcpAddSheet
         : null;
 
+  const renderFloatingSearchBar = () => (
+    <View
+      style={[
+        styles.floatingSearchWrapper,
+        { bottom: Spacing.xl2 + (isDesktop ? 0 : insets.bottom) },
+      ]}
+      pointerEvents="box-none"
+    >
+      <View style={styles.floatingSearchShadowLayer}>
+        <Animated.View
+          style={[
+            styles.floatingSearchShadow,
+            { transform: shadowShift.getTranslateTransform() },
+          ]}
+          pointerEvents="none"
+        />
+        <Pressable
+          style={pressStyle(styles.floatingSearchBar, styles.navItemPressed)}
+          onPress={() => {
+            setSettingsSearchQuery("");
+            setSearchSheetVisible(true);
+          }}
+        >
+          <Image
+            source={searchIcon}
+            style={styles.menuIcon}
+            tintColor={Colors.textPrimary}
+          />
+          <Text style={styles.floatingSearchLabel} numberOfLines={1}>
+            {t("settings.nav.search.title")}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
   const renderScrollPage = (page: SubPage, active: boolean) => {
     const onAdd = pageAddAction(page);
     return (
@@ -5819,7 +5875,8 @@ export default function SettingsDrawer({
           scrollEventThrottle={16}
           contentContainerStyle={{
             paddingTop: isDesktop ? Spacing.xxl2 : 60,
-            paddingBottom: 40,
+            paddingBottom:
+              page === "main" ? 96 + (isDesktop ? 0 : insets.bottom) : 40,
             flexGrow: 1,
           }}
           showsVerticalScrollIndicator={false}
@@ -5838,6 +5895,7 @@ export default function SettingsDrawer({
             pointerEvents="none"
           />
         )}
+        {page === "main" && renderFloatingSearchBar()}
         {onAdd && (
           <View
             style={[
@@ -6701,40 +6759,45 @@ export default function SettingsDrawer({
         contentContainerStyle={styles.addModelSheetContent}
         keyboardShouldPersistTaps="handled"
       >
-        {ollamaDetailServer && shownOllamaIndex !== null && shownOllamaModel && (
-          <ProviderModelDetail
-            model={shownOllamaModel}
-            serverLabel={ollamaServerLabel(ollamaDetailServer)}
-            service="ollama"
-            url={ollamaDetailUrl}
-            enabled={
-              !(ollamaDetailServer.disabledModels ?? NO_DISABLED_MODELS).includes(
-                shownOllamaModel,
-              )
-            }
-            onToggle={(on) => {
-              const disabled =
-                ollamaDetailServer.disabledModels ?? NO_DISABLED_MODELS;
-              patchOllamaServer(shownOllamaIndex, {
-                disabledModels: on
-                  ? disabled.filter((m) => m !== shownOllamaModel)
-                  : [...disabled, shownOllamaModel],
-              });
-            }}
-            onCapabilitiesChange={(m, caps) =>
-              patchOllamaServer(shownOllamaIndex, {
-                capabilities: { ...ollamaDetailServer.capabilities, [m]: caps },
-              })
-            }
-            onPromptTierChange={(m, tier) => {
-              const { [m]: _removed, ...rest } =
-                ollamaDetailServer.promptTiers ?? {};
-              patchOllamaServer(shownOllamaIndex, {
-                promptTiers: tier ? { ...rest, [m]: tier } : rest,
-              });
-            }}
-          />
-        )}
+        {ollamaDetailServer &&
+          shownOllamaIndex !== null &&
+          shownOllamaModel && (
+            <ProviderModelDetail
+              model={shownOllamaModel}
+              serverLabel={ollamaServerLabel(ollamaDetailServer)}
+              service="ollama"
+              url={ollamaDetailUrl}
+              enabled={
+                !(
+                  ollamaDetailServer.disabledModels ?? NO_DISABLED_MODELS
+                ).includes(shownOllamaModel)
+              }
+              onToggle={(on) => {
+                const disabled =
+                  ollamaDetailServer.disabledModels ?? NO_DISABLED_MODELS;
+                patchOllamaServer(shownOllamaIndex, {
+                  disabledModels: on
+                    ? disabled.filter((m) => m !== shownOllamaModel)
+                    : [...disabled, shownOllamaModel],
+                });
+              }}
+              onCapabilitiesChange={(m, caps) =>
+                patchOllamaServer(shownOllamaIndex, {
+                  capabilities: {
+                    ...ollamaDetailServer.capabilities,
+                    [m]: caps,
+                  },
+                })
+              }
+              onPromptTierChange={(m, tier) => {
+                const { [m]: _removed, ...rest } =
+                  ollamaDetailServer.promptTiers ?? {};
+                patchOllamaServer(shownOllamaIndex, {
+                  promptTiers: tier ? { ...rest, [m]: tier } : rest,
+                });
+              }}
+            />
+          )}
       </SheetScrollView>
     </DrawerSheet>
   );
@@ -7081,8 +7144,7 @@ export default function SettingsDrawer({
                     })
                   }
                   onPromptTierChange={(m, tier) => {
-                    const { [m]: _removed, ...rest } =
-                      server.promptTiers ?? {};
+                    const { [m]: _removed, ...rest } = server.promptTiers ?? {};
                     patchOpenAIServer(index, {
                       promptTiers: tier ? { ...rest, [m]: tier } : rest,
                     });
@@ -8171,6 +8233,43 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
+  const settingsSearchSheet = (
+    <DrawerSheet
+      visible={searchSheetVisible}
+      onClose={() => setSearchSheetVisible(false)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      avoidKeyboard
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          //fixed so typing never resizes the sheet
+          height: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.searchSheetDesktop}
+    >
+      <SheetScrollView
+        contentContainerStyle={styles.addModelSheetContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.sheetCard}>
+          <Group>
+            <TextInputField
+              icon={searchIcon}
+              placeholder={t("settings.nav.search.title")}
+              value={settingsSearchQuery}
+              onChangeText={setSettingsSearchQuery}
+              autoFocus
+            />
+          </Group>
+        </View>
+      </SheetScrollView>
+    </DrawerSheet>
+  );
+
   if (isDesktop) {
     if (!desktopMounted) {
       if (!sheetHostMounted) return null;
@@ -8257,13 +8356,14 @@ export default function SettingsDrawer({
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{
                       paddingTop: Spacing.xxl2,
-                      paddingBottom: 40,
+                      paddingBottom: 96,
                     }}
                   >
                     {renderMainPage()}
                   </ScrollView>
                 </View>
               )}
+              {renderFloatingSearchBar()}
             </View>
 
             <View
@@ -8317,6 +8417,7 @@ export default function SettingsDrawer({
             {litertModelDetailSheet}
             {instructionsSheet}
             {profileEditSheet}
+            {settingsSearchSheet}
           </Animated.View>
         </View>
         {notificationModal}
@@ -8379,6 +8480,7 @@ export default function SettingsDrawer({
       {litertModelDetailSheet}
       {instructionsSheet}
       {profileEditSheet}
+      {settingsSearchSheet}
     </View>
   );
 
@@ -8469,6 +8571,45 @@ const makeStyles = (Colors: ThemeColors) =>
       right: 0,
       zIndex: 100,
       elevation: 10,
+    },
+    floatingSearchWrapper: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      alignItems: "center",
+      zIndex: 100,
+      elevation: 10,
+    },
+    floatingSearchShadowLayer: {
+      position: "relative",
+      width: "70%",
+      maxWidth: 230,
+    },
+    floatingSearchShadow: {
+      position: "absolute",
+      top: 4,
+      left: -4,
+      right: 4,
+      bottom: -4,
+      backgroundColor: Colors.shadowInk,
+      borderRadius: Radius.window,
+    },
+    floatingSearchBar: {
+      height: 44,
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: Spacing.xl,
+      gap: Spacing.md,
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.window,
+      position: "relative",
+      zIndex: 1,
+    },
+    floatingSearchLabel: {
+      flex: 1,
+      fontSize: FontSizes.bodyMd,
+      fontFamily: Fonts.mono,
+      color: Colors.textMuted,
     },
     fixedBackWrapper: {
       position: "absolute",
@@ -8569,6 +8710,10 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     addModelSheetDesktop: {
       width: 560,
+    },
+    searchSheetDesktop: {
+      width: 720,
+      height: 560,
     },
     //rows like the chat details sheet
     infoGroup: {

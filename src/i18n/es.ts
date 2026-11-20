@@ -309,6 +309,7 @@ export const es: Translations = {
   "update.install": "Actualizar ahora",
   "update.later": "Más tarde",
 
+  "settings.nav.search.title": "Buscar",
   "settings.nav.profile.title": "Perfil",
   "settings.nav.profile.subtitle": "Nombre",
   "settings.nav.cloud.title": "Sincronización y copia",

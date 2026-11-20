@@ -332,6 +332,7 @@ export const en = {
   "update.checkFailed": "The update check failed. Check your connection.",
   "settings.update.checkNow": "Check now",
 
+  "settings.nav.search.title": "Search",
   "settings.nav.profile.title": "Profile",
   "settings.nav.profile.subtitle": "Name",
   "settings.nav.cloud.title": "Sync & backup",

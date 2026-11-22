@@ -156,6 +156,7 @@ import { OverlayPresence } from "../services/overlay/overlayPresence";
 import { PluginRegistry } from "../services/plugins/PluginRegistry";
 import { NEW_CHAT_ACTION_ID } from "../services/quickActions/QuickActionsService";
 import { Settings } from "../services/settings/SettingsService";
+import { hasPlatformFeature, loadPlatformFeatures } from "../services/platform";
 import {
   openSettingsWindow,
   settingsInWindow,
@@ -1363,6 +1364,7 @@ export default function Index() {
       //load and apply settings
       try {
         await Settings.init();
+        await loadPlatformFeatures();
         const s = migrateModelSources(await Settings.load());
         //defer heavy integrity scan after startup
         if (!s.dataWarningDismissed) {

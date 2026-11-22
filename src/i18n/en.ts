@@ -186,6 +186,8 @@ export const en = {
 
   "whatsNew.title": "What's new in Opera {version}",
   "whatsNew.close": "Got it",
+  "whatsNew.openGithub": "Open on GitHub",
+  "whatsNew.storeDelay": "Store distribution can take several days, but release is simultaneous.",
 
   "bugReport.title": "Report a bug",
   "bugReport.crashTitle": "Opera closed unexpectedly",

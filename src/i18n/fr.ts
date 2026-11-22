@@ -188,6 +188,8 @@ export const fr: Translations = {
 
   "whatsNew.title": "Nouveautés d'Opera {version}",
   "whatsNew.close": "C'est noté",
+  "whatsNew.openGithub": "Ouvrir sur GitHub",
+  "whatsNew.storeDelay": "Distribution sur les stores : plusieurs jours possibles, publication simultanée.",
 
   "bugReport.title": "Signaler un bug",
   "bugReport.crashTitle": "Opera s'est fermé de manière inattendue",

@@ -12,6 +12,8 @@ import { renderMarkdown } from "../ui/MarkdownText";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 const arrowIcon = require("../../../assets/icons/arrow.png");
+const downloadIcon = require("../../../assets/icons/download.png");
+const githubIcon =require("../../../assets/icons/github.png");
 
 const DESKTOP_CARD_WIDTH = 420;
 const BANNER_SIZE = { width: 1561, height: 800 };
@@ -31,12 +33,16 @@ function splitBanner(release: ReleaseNotes | null): { banner: string | null; not
 type WhatsNewSheetProps = {
   release: ReleaseNotes | null;
   onClose: () => void;
+  //only shown from update banner
+  onOpenGithub?: () => void;
+  //desktop installs in app
+  onInstall?: () => void;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
 };
 
 //release notes after an update
-export default function WhatsNewSheet({ release, onClose, isLargeScreen = false, isDesktop = false }: WhatsNewSheetProps) {
+export default function WhatsNewSheet({ release, onClose, onOpenGithub, onInstall, isLargeScreen = false, isDesktop = false }: WhatsNewSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const { height: windowHeight } = useWindowDimensions();
@@ -74,8 +80,20 @@ export default function WhatsNewSheet({ release, onClose, isLargeScreen = false,
             )}
             <Text style={styles.title}>{t("whatsNew.title", { version: shown.version })}</Text>
             <View style={styles.notes}>{notes}</View>
+            {onOpenGithub && (
+              <>
+                {!onInstall && <Text style={styles.storeNote}>{t("whatsNew.storeDelay")}</Text>}
+                <Group style={styles.githubGroup}>
+                  <ActionButton icon={githubIcon} label={t("whatsNew.openGithub")} onPress={onOpenGithub} />
+                </Group>
+              </>
+            )}
             <Group style={styles.highlightGroup}>
-              <ActionButton icon={arrowIcon} label={t("whatsNew.close")} onPress={onClose} variant="highlight" />
+              {onInstall ? (
+                <ActionButton icon={downloadIcon} label={t("update.install")} onPress={onInstall} variant="highlight" />
+              ) : (
+                <ActionButton icon={arrowIcon} label={t("whatsNew.close")} onPress={onClose} variant="highlight" />
+              )}
             </Group>
           </View>
         )}
@@ -131,6 +149,16 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   notes: {
     paddingHorizontal: Spacing.md,
     marginBottom: Spacing.lg2,
+  },
+  storeNote: {
+    fontSize: FontSizes.caption,
+    color: Colors.textSecondary,
+    fontFamily: Fonts.mono,
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  githubGroup: {
+    marginBottom: Spacing.md,
   },
   highlightGroup: {
     backgroundColor: Colors.primary,

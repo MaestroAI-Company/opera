@@ -239,6 +239,7 @@ import {
     getUpdateChecks,
     setBetaChannel,
     setUpdateChecks,
+    type AppRelease,
     type ReleaseNotes,
 } from "../../services/updates/UpdateService";
 
@@ -1239,12 +1240,30 @@ export default function SettingsDrawer({
   const openChangelog = async () => {
     try {
       const notes = await getCurrentReleaseNotes();
-      if (notes) setChangelog(notes);
+      if (notes) {
+        setChangelogFromUpdate(false);
+        setChangelog(notes);
+      }
       else
         showAlert(t("common.error"), t("settings.info.changelogUnavailable"));
     } catch {
       showAlert(t("common.error"), t("settings.info.changelogUnavailable"));
     }
+  };
+
+  //true when opened from banner
+  const [changelogFromUpdate, setChangelogFromUpdate] = useState(false);
+  const openUpdateNotes = async (update: AppRelease) => {
+    try {
+      const notes = await getCurrentReleaseNotes(update.version);
+      if (notes) {
+        setChangelogFromUpdate(true);
+        setChangelog(notes);
+        return;
+      }
+    } catch {}
+    //fallback to release page
+    notices.openUpdate();
   };
 
   const showAlert = (
@@ -3651,7 +3670,7 @@ export default function SettingsDrawer({
             version: notices.update.version,
           })}
           onPress={() =>
-            isTauri ? promptUpdate(notices.update!) : notices.openUpdate()
+            openUpdateNotes(notices.update!)
           }
           style={[styles.groupSpacing, styles.mainPageGroup]}
         />
@@ -6001,6 +6020,15 @@ export default function SettingsDrawer({
       <WhatsNewSheet
         release={changelog}
         onClose={() => setChangelog(null)}
+        onOpenGithub={changelogFromUpdate ? notices.openUpdate : undefined}
+        onInstall={
+          changelogFromUpdate && isTauri && notices.update
+            ? () => {
+              setChangelog(null);
+              promptUpdate(notices.update!);
+            }
+            : undefined
+        }
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />

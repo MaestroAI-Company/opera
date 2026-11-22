@@ -216,9 +216,9 @@ export async function takeReleaseNotes(firstRun: boolean): Promise<ReleaseNotes 
   return { version: current, url: data.html_url ?? LATEST_RELEASE_URL, notes, tag: data.tag_name };
 }
 
-//notes of this build on demand, never marks them as seen
-export async function getCurrentReleaseNotes(): Promise<ReleaseNotes | null> {
-  const current = Constants.expoConfig?.version ?? '0.0.0';
+//notes on demand, never marked seen
+export async function getCurrentReleaseNotes(version?: string): Promise<ReleaseNotes | null> {
+  const current = version ?? Constants.expoConfig?.version ?? '0.0.0';
   const data = (await fetchRelease(`v${current}`)) ?? (await fetchBetaRelease(current));
   const notes = typeof data?.body === 'string' ? data.body.trim() : '';
   if (!notes) return null;

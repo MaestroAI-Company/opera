@@ -3020,7 +3020,9 @@ export default function Index() {
                         picker={attachments}
                         leadingElement={isDesktop ? modelTrigger : undefined}
                         onOpenLive={
-                          currentLiveBackend && !editSession
+                          currentLiveBackend &&
+                          !editSession &&
+                          hasPlatformFeature("android.hardware.microphone")
                             ? openLive
                             : undefined
                         }

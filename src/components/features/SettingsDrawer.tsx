@@ -163,6 +163,7 @@ import { AppSettings, Settings } from "../../services/settings/SettingsService";
 import { TTS_SPEEDS } from "../../services/speech/engines";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { TTS } from "../../services/speech/TTSService";
+import { hasPlatformFeature } from "../../services/platform";
 import { SyncPrefs, SyncPrefsStore } from "../../services/SyncPrefs";
 import ActionButton from "../ui/ActionButton";
 import CardGrid, { type GridCard } from "../ui/CardGrid";
@@ -4212,17 +4213,19 @@ export default function SettingsDrawer({
                 onToggle={setDreamIncognitoButton}
               />
             </View>
-            <View style={[styles.toggleGroupRow, { marginTop: Spacing.lg }]}>
-              <View style={styles.toggleGroupContent}>
-                <Text style={styles.settingLabel}>
-                  {t("settings.screenSaver.wakeWord")}
-                </Text>
-                <Text style={styles.helpText}>
-                  {t("settings.screenSaver.wakeWordHelp")}
-                </Text>
+            {hasPlatformFeature("android.hardware.microphone") && (
+              <View style={[styles.toggleGroupRow, { marginTop: Spacing.lg }]}>
+                <View style={styles.toggleGroupContent}>
+                  <Text style={styles.settingLabel}>
+                    {t("settings.screenSaver.wakeWord")}
+                  </Text>
+                  <Text style={styles.helpText}>
+                    {t("settings.screenSaver.wakeWordHelp")}
+                  </Text>
+                </View>
+                <Toggle checked={dreamWakeWord} onToggle={setDreamWakeWord} />
               </View>
-              <Toggle checked={dreamWakeWord} onToggle={setDreamWakeWord} />
-            </View>
+            )}
           </View>
         </View>
       )}

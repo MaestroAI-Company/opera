@@ -206,7 +206,7 @@ Three fonts with strict roles — never swap them.
 
 An 8px-based spacing scale with a 2px micro-step keeps rhythm consistent. Chat content is centered in a column capped at **840px**; messages and cards stay airy.
 
-- Breakpoints are mobile <768px, large screen ≥768px, desktop ≥1024px (web and desktop apps). Drawer layouts per breakpoint are in Drawers.
+- Breakpoints are mobile <768px, large screen ≥768px, desktop ≥1024px (web, desktop apps, Android PCs and desktop windows). Drawer layouts per breakpoint are in Drawers.
 - The chat composer is a full-width **56px** pill pinned at the bottom.
 - Phones lock to portrait.
 - Group related controls in section cards rather than dividers (see Page Structure).
@@ -656,10 +656,10 @@ Layouts used across pages that are not components:
 
 Three containers hold pages. All sit on `Colors.groupedBackground`, pad their content by `Spacing.lg2` and use the same floating `DrawerBackButton`.
 
-| Container             | Mobile (<768)                            | Large screen (≥768)   | Desktop (≥1024, web and desktop apps)                                                                                                                                                                                                                      |
+| Container             | Mobile (<768)                            | Large screen (≥768)   | Desktop (≥1024, web, apps, Android PCs)                                                                                                                                                                                                                      |
 | --------------------- | ---------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ConversationsDrawer` | full width, slides from the left, scrim  | panel `min(90%, 360)` | docked flush left, resizable 240–480 (320 default), no scrim, no radius, no close button                                                                                                                                                                   |
-| `SettingsDrawer`      | full width, slides from the right, scrim | panel `min(90%, 360)` | desktop app: its own OS window (`SettingsWindow`, `windowed`), sidebar on the left and the page on the right. Desktop browser: centered window max 960, `Radius.window`, the main page as the 320px nav column, close button top left of the nav, no title |
+| `SettingsDrawer`      | full width, slides from the right, scrim | panel `min(90%, 360)` | desktop app: its own OS window (`SettingsWindow`, `windowed`), sidebar on the left and the page on the right. Desktop browser and Android: centered window max 960, `Radius.window`, the main page as the 320px nav column, close button top left of the nav, no title |
 | `DrawerSheet`         | bottom sheet                             | centered card         | centered card                                                                                                                                                                                                                                              |
 
 ### Side drawers

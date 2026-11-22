@@ -170,6 +170,8 @@ export const en = {
   "imagePreview.format": "Format",
   "imagePreview.dimensions": "Dimensions",
   "imagePreview.size": "Size",
+  "imagePreview.copyLink": "Copy link",
+  "imagePreview.download": "Download",
   "messageDetails.model": "Model",
   "messageDetails.time": "Time",
   "messageDetails.tokens": "Tokens",

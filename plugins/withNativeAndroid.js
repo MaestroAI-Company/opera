@@ -171,6 +171,14 @@ function withNativeAndroid(config) {
       $: { 'android:name': 'android.permission.ACTIVITY_RECOGNITION', 'tools:node': 'remove' },
     });
 
+    //play filters on implied features
+    manifestDoc.manifest['uses-feature'] = manifestDoc.manifest['uses-feature'] || [];
+    for (const feature of ['android.hardware.screen.portrait', 'android.hardware.wifi']) {
+      if (!manifestDoc.manifest['uses-feature'].some(f => f.$['android:name'] === feature)) {
+        manifestDoc.manifest['uses-feature'].push({ $: { 'android:name': feature, 'android:required': 'false' } });
+      }
+    }
+
     //expose app settings to the system
     if (!application.activity.some(a => a.$['android:name'] === '.SettingsActivity')) {
       application.activity.push({

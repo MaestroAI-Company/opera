@@ -1,4 +1,4 @@
-![](updatebanner.png)
+![](https://raw.githubusercontent.com/MaestroAI-Company/opera/v1.1.0-beta.5/distribution/updatebanner.png)
 
 ## Talk with Maestro live
 

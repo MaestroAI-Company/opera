@@ -1,3 +1,4 @@
+import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { t } from '../../../i18n';
 import { AppSettings, Settings } from '../../settings/SettingsService';
@@ -40,6 +41,8 @@ export function currentPlatform(): ProviderPlatform {
 //unsupported providers stay out of ui
 export function isProviderSupported(id: string): boolean {
   const platforms = PROVIDER_PLATFORMS[id as ProviderId];
+  //litert ships arm64 native code only
+  if (id === 'litert' && Platform.OS === 'android' && Device.supportedCpuArchitectures?.[0] !== 'arm64-v8a') return false;
   return !!platforms && platforms.includes(currentPlatform());
 }
 

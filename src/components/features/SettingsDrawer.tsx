@@ -8857,6 +8857,8 @@ export default function SettingsDrawer({
           style={[
             styles.desktopWindowWrapper,
             windowed && styles.windowedWrapper,
+            //clears the android caption bar
+            { top: insets.top },
           ]}
           pointerEvents="box-none"
         >

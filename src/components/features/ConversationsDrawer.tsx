@@ -477,7 +477,9 @@ export default function ConversationsDrawer({
         ]}
       >
         <View style={[styles.dockedPanel, { width: dockedWidth }]}>
-          <View style={styles.dockedContent}>{innerContent}</View>
+          <View style={[styles.dockedContent, { marginTop: insets.top }]}>
+            {innerContent}
+          </View>
         </View>
         <View
           //rn types only know pointer, the web takes any css cursor

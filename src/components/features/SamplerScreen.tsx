@@ -268,7 +268,7 @@ export default function SamplerScreen({
   const drawerWidth = drawerWidthFor(windowWidth);
   const sheetMaxHeight = windowHeight - insets.top - Spacing.xl2;
   const contentTop =
-    (isDesktop ? (isTauri ? 32 : 0) : insets.top) + 60 + Spacing.xl2;
+    (isDesktop && isTauri ? 32 : 0) + insets.top + 60 + Spacing.xl2;
 
   const [page, setPage] = useState<SubPage>("home");
   const [detail, setDetail] = useState<Detail | null>(null);
@@ -2141,7 +2141,7 @@ export default function SamplerScreen({
       return false;
     });
     return () => sub.remove();
-  }, [visible, isDesktop, drawerVisible, sheetOpen, shownPage, handleBack]);
+  }, [visible, drawerVisible, sheetOpen, shownPage, handleBack]);
 
   const [prevDrawerVisible, setPrevDrawerVisible] = useState(drawerVisible);
   if (drawerVisible !== prevDrawerVisible) {

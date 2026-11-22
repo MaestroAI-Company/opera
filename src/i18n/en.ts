@@ -333,6 +333,8 @@ export const en = {
   "settings.update.checkNow": "Check now",
 
   "settings.nav.search.title": "Search",
+  "settings.nav.search.empty": "No setting found",
+  "settings.nav.search.recent": "Recent",
   "settings.nav.profile.title": "Profile",
   "settings.nav.profile.subtitle": "Name",
   "settings.nav.cloud.title": "Sync & backup",

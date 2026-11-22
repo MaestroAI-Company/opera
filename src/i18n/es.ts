@@ -310,6 +310,8 @@ export const es: Translations = {
   "update.later": "Más tarde",
 
   "settings.nav.search.title": "Buscar",
+  "settings.nav.search.empty": "No se encontró ningún ajuste",
+  "settings.nav.search.recent": "Recientes",
   "settings.nav.profile.title": "Perfil",
   "settings.nav.profile.subtitle": "Nombre",
   "settings.nav.cloud.title": "Sincronización y copia",

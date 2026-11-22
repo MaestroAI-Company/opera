@@ -336,6 +336,8 @@ export const fr: Translations = {
   "settings.update.checkNow": "Vérifier maintenant",
 
   "settings.nav.search.title": "Rechercher",
+  "settings.nav.search.empty": "Aucun réglage trouvé",
+  "settings.nav.search.recent": "Récents",
   "settings.nav.profile.title": "Profil",
   "settings.nav.profile.subtitle": "Nom",
   "settings.nav.cloud.title": "Sync & sauvegarde",

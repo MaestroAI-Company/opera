@@ -14,6 +14,7 @@ import {
     useCallback,
     useEffect,
     useMemo,
+    useDeferredValue,
     useRef,
     useState,
 } from "react";
@@ -200,6 +201,23 @@ import WhatsNewSheet from "./WhatsNewSheet";
 
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+//ignore accents and case
+const normalizeSearch = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+
+const SEARCH_RECENTS_KEY = "settingsSearchRecents";
+const MAX_SEARCH_RECENTS = 5;
+
+type SettingsSearchEntry = {
+  id: string;
+  label: string;
+  help?: string;
+  body: ReactNode;
+};
 
 import {
     KeyboardAwareScrollView,
@@ -1028,6 +1046,34 @@ export default function SettingsDrawer({
   const [profileEditVisible, setProfileEditVisible] = useState(false);
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
   const [settingsSearchQuery, setSettingsSearchQuery] = useState("");
+  //keeps typing instant
+  const deferredSearchQuery = useDeferredValue(settingsSearchQuery);
+  //recently touched card ids
+  const searchRecentsRef = useRef<string[]>([]);
+  const [recentSearchIds, setRecentSearchIds] = useState<string[]>([]);
+  useEffect(() => {
+    Settings.getLocal(SEARCH_RECENTS_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        const ids = JSON.parse(raw);
+        if (Array.isArray(ids)) searchRecentsRef.current = ids.map(String);
+      })
+      .catch(() => {});
+  }, []);
+  const clearSearchRecents = () => {
+    searchRecentsRef.current = [];
+    setRecentSearchIds([]);
+    Settings.setLocal(SEARCH_RECENTS_KEY, "[]").catch(() => {});
+  };
+  //ref avoids reordering under finger
+  const touchSearchEntry = (id: string) => {
+    const next = [id, ...searchRecentsRef.current.filter((r) => r !== id)].slice(
+      0,
+      MAX_SEARCH_RECENTS,
+    );
+    searchRecentsRef.current = next;
+    Settings.setLocal(SEARCH_RECENTS_KEY, JSON.stringify(next)).catch(() => {});
+  };
   const [nameDraft, setNameDraft] = useState("");
   const [litertDownloadVisible, setLitertDownloadVisible] = useState(false);
   const [voiceDownloadVisible, setVoiceDownloadVisible] = useState(false);
@@ -5847,6 +5893,7 @@ export default function SettingsDrawer({
           style={pressStyle(styles.floatingSearchBar, styles.navItemPressed)}
           onPress={() => {
             setSettingsSearchQuery("");
+            setRecentSearchIds(searchRecentsRef.current);
             setSearchSheetVisible(true);
           }}
         >
@@ -8233,6 +8280,372 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
+  //rows matching the query
+  const settingsSearchResults = (() => {
+    const tokens = normalizeSearch(deferredSearchQuery).split(/\s+/).filter(Boolean);
+    if (!searchSheetVisible) return [];
+
+    const toggle = (
+      id: string,
+      label: string,
+      help: string,
+      checked: boolean,
+      onToggle: (v: boolean) => void,
+    ): SettingsSearchEntry => ({
+      id,
+      label,
+      help,
+      body: (
+        <View style={styles.toggleGroupRow}>
+          <View style={styles.toggleGroupContent}>
+            <Text style={styles.settingLabel}>{label}</Text>
+            <Text style={styles.helpText}>{help}</Text>
+          </View>
+          <Toggle checked={checked} onToggle={onToggle} />
+        </View>
+      ),
+    });
+
+    //side by side on wide
+    const control = (
+      id: string,
+      label: string,
+      node: ReactNode,
+      framed = true,
+    ): SettingsSearchEntry => ({
+      id,
+      label,
+      body: (
+        <View style={isWide && framed ? styles.toggleGroupRow : undefined}>
+          <Text
+            style={[
+              styles.settingLabel,
+              isWide && framed
+                ? styles.toggleGroupContent
+                : { marginBottom: Spacing.md },
+            ]}
+          >
+            {label}
+          </Text>
+          {framed ? (
+            <Group style={isWide && styles.sliderGroup}>{node}</Group>
+          ) : (
+            node
+          )}
+        </View>
+      ),
+    });
+
+    //opens the page from search
+    const nav = (
+      page: SubPage,
+      label: string,
+      help: string,
+    ): SettingsSearchEntry => ({
+      id: `page:${page}`,
+      label,
+      help,
+      body: (
+        <Pressable
+          style={pressStyle(
+            styles.toggleGroupRowItem,
+            styles.toggleGroupCardPressed,
+          )}
+          onPress={() => {
+            setSearchSheetVisible(false);
+            setActiveSubPage(page);
+          }}
+        >
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>{label}</Text>
+              <Text style={styles.helpText}>{help}</Text>
+            </View>
+            <Image
+              source={rightArrowIcon}
+              style={[styles.menuIcon, { marginRight: Spacing.md }]}
+              tintColor={Colors.textMuted}
+            />
+          </View>
+        </Pressable>
+      ),
+    });
+
+    const entries: SettingsSearchEntry[] = [
+      nav(
+        "profile",
+        name || t("settings.nav.profile.title"),
+        t("settings.nav.profile.subtitle"),
+      ),
+      nav(
+        "cloud",
+        t("settings.nav.cloud.title"),
+        t("settings.nav.cloud.subtitle"),
+      ),
+      nav(
+        "syncchoices",
+        t("settings.nav.syncChoices.title"),
+        t("settings.nav.syncChoices.subtitle"),
+      ),
+      nav(
+        "datamanagement",
+        t("settings.data.management"),
+        t("settings.nav.dataManagement.subtitle"),
+      ),
+      nav(
+        "maestro",
+        t("settings.nav.maestro.title"),
+        t("settings.nav.maestro.subtitle"),
+      ),
+      nav(
+        "maestropreferences",
+        t("settings.nav.maestroPreferences.title"),
+        t("settings.nav.maestroPreferences.subtitle"),
+      ),
+      nav(
+        "general",
+        t("settings.nav.general.title"),
+        t("settings.nav.general.subtitle"),
+      ),
+      ...(!isDesktop || isTauri
+        ? [
+            nav(
+              "assistantoverlay",
+              t("settings.nav.overlay.title"),
+              t("settings.nav.overlay.subtitle"),
+            ),
+          ]
+        : []),
+      ...(Platform.OS === "android"
+        ? [
+            nav(
+              "screensaver",
+              t("settings.nav.screenSaver.title"),
+              t("settings.nav.screenSaver.subtitle"),
+            ),
+          ]
+        : []),
+      nav(
+        "service",
+        t("settings.nav.service.title"),
+        t("settings.nav.service.subtitle"),
+      ),
+      nav(
+        "tools",
+        t("settings.nav.tools.title"),
+        t("settings.nav.tools.subtitle"),
+      ),
+      nav(
+        "mcpservers",
+        t("settings.tools.mcp.title"),
+        t("settings.tools.mcp.help"),
+      ),
+      ...(advancedMode
+        ? [
+            nav(
+              "advanced",
+              t("settings.nav.advanced.title"),
+              t("settings.nav.advanced.subtitle"),
+            ),
+          ]
+        : []),
+      nav(
+        "confidentiality",
+        t("settings.nav.privacy.title"),
+        t("settings.nav.privacy.subtitle"),
+      ),
+      nav(
+        "reports",
+        t("settings.nav.support.title"),
+        t("settings.nav.support.subtitle"),
+      ),
+      nav(
+        "sociallinks",
+        t("settings.nav.info.title"),
+        t("settings.nav.info.subtitle"),
+      ),
+      control(
+        "language",
+        t("settings.general.language"),
+        <Selector
+          options={languageOptions}
+          selectedValue={language}
+          onSelect={setLanguage}
+          title={t("settings.general.selectLanguage")}
+          fullWidth
+        />,
+      ),
+      control(
+        "theme",
+        t("settings.general.theme"),
+        <SliderToggle selectedValue={theme} onSelect={setTheme} />,
+      ),
+      toggle(
+        "remoteImages",
+        t("settings.privacy.remoteImages"),
+        t("settings.privacy.remoteImagesHelp"),
+        showRemoteImages,
+        setShowRemoteImages,
+      ),
+      toggle(
+        "advancedMode",
+        t("settings.general.advancedMode"),
+        t("settings.general.advancedModeHelp"),
+        advancedMode,
+        setAdvancedMode,
+      ),
+      ...(isTauri
+        ? [
+            toggle(
+              "closeToTray",
+              t("settings.overlay.closeToTray"),
+              t("settings.overlay.closeToTrayHelp"),
+              closeToTray,
+              (v) => setOverlayConfig({ closeToTray: v }),
+            ),
+            toggle(
+              "launchAtStartup",
+              t("settings.startup.launch"),
+              t("settings.startup.launchHelp"),
+              launchAtStartup,
+              setLaunchAtStartupValue,
+            ),
+          ]
+        : []),
+      ...(voicePackInstalled
+        ? [
+            control(
+              "voice",
+              t("settings.maestro.voice"),
+              <IconSelector
+                options={VOICE_OPTIONS}
+                selectedValue={voice}
+                onSelect={selectVoice}
+              />,
+              false,
+            ),
+            control(
+              "ttsSpeed",
+              t("settings.tts.speed"),
+              <Slider
+                icon={timeIcon}
+                options={TTS_SPEEDS.map((id) => ({ id, label: `${id}×` }))}
+                selectedValue={ttsSpeed}
+                onSelect={(v) => {
+                  setTtsSpeedState(v);
+                  Settings.set("ttsSpeed", v);
+                }}
+              />,
+            ),
+          ]
+        : []),
+      toggle(
+        "autoRead",
+        t("settings.general.autoRead"),
+        t("settings.general.autoReadHelp"),
+        autoSpeak,
+        setAutoSpeak,
+      ),
+      toggle(
+        "liveTranscription",
+        t("settings.general.liveTranscription"),
+        t("settings.general.liveTranscriptionHelp"),
+        liveTranscription,
+        setLiveTranscription,
+      ),
+      toggle(
+        "applyColor",
+        t("settings.maestro.applyColor"),
+        t("settings.maestro.applyColorHelp"),
+        applyMaestroColor,
+        setApplyMaestroColor,
+      ),
+      //advanced page needs advanced mode
+      ...(advancedMode
+        ? [
+            toggle(
+              "transcribeLocally",
+              t("settings.transcribeLocally.label"),
+              Platform.OS === "web"
+                ? t("settings.transcribeLocally.helpWeb")
+                : t("settings.transcribeLocally.help"),
+              alwaysWhisper,
+              setAlwaysWhisper,
+            ),
+            toggle(
+              "technicalDetails",
+              t("settings.general.technicalDetails"),
+              t("settings.general.technicalDetailsHelp"),
+              showTechnicalDetails,
+              setShowTechnicalDetails,
+            ),
+            toggle(
+              "editAiMessages",
+              t("settings.general.editAiMessages"),
+              t("settings.general.editAiMessagesHelp"),
+              editAiMessages,
+              setEditAiMessages,
+            ),
+            ...(Platform.OS === "android" || isTauri
+              ? [
+                  toggle(
+                    "detectionBoxes",
+                    t("settings.general.detectionBoxes"),
+                    t("settings.general.detectionBoxesHelp"),
+                    showDetectionBoxes,
+                    setShowDetectionBoxes,
+                  ),
+                ]
+              : []),
+            toggle(
+              "forceLoad",
+              t("settings.litert.forceLoad"),
+              t("settings.litert.forceLoadHelp"),
+              litertForceLoad,
+              setLitertForceLoad,
+            ),
+            control(
+              "quickFlow",
+              t("settings.quickFlow.label"),
+              <Selector
+                options={quickFlowOptions}
+                selectedValue={quickFlowId}
+                onSelect={handleSelectQuickFlow}
+                title={t("settings.quickFlow.select")}
+                fullWidth
+              />,
+            ),
+          ]
+        : []),
+    ];
+
+    //empty query shows recents
+    if (tokens.length === 0) {
+      return recentSearchIds
+        .map((id) => entries.find((e) => e.id === id))
+        .filter((e): e is SettingsSearchEntry => !!e);
+    }
+
+    //label hits rank before help hits
+    const matches: { entry: SettingsSearchEntry; rank: number }[] = [];
+    for (const entry of entries) {
+      const label = normalizeSearch(entry.label);
+      const help = entry.help ? normalizeSearch(entry.help) : "";
+      let rank = 0;
+      let found = true;
+      for (const token of tokens) {
+        if (label.includes(token)) continue;
+        if (help.includes(token)) rank = 1;
+        else {
+          found = false;
+          break;
+        }
+      }
+      if (found) matches.push({ entry, rank });
+    }
+    return matches.sort((a, b) => a.rank - b.rank).map((m) => m.entry);
+  })();
+
   const settingsSearchSheet = (
     <DrawerSheet
       visible={searchSheetVisible}
@@ -8262,10 +8675,45 @@ export default function SettingsDrawer({
               placeholder={t("settings.nav.search.title")}
               value={settingsSearchQuery}
               onChangeText={setSettingsSearchQuery}
+              rightIcon={settingsSearchQuery ? cancelIcon : undefined}
+              onRightIconPress={() => setSettingsSearchQuery("")}
               autoFocus
             />
           </Group>
         </View>
+        {settingsSearchQuery.trim() === "" &&
+          settingsSearchResults.length > 0 && (
+            <View style={styles.searchRecentHeader}>
+              <Text style={styles.searchRecentTitle}>
+                {t("settings.nav.search.recent")}
+              </Text>
+              <IconButton
+                icon={cancelIcon}
+                label={t("common.clear")}
+                onPress={clearSearchRecents}
+                tintColor={Colors.textPrimary}
+              />
+            </View>
+          )}
+        {settingsSearchResults.map((entry) => (
+          <View
+            key={entry.id}
+            style={styles.sheetCard}
+            //record touch without responding
+            onStartShouldSetResponderCapture={() => {
+              touchSearchEntry(entry.id);
+              return false;
+            }}
+          >
+            {entry.body}
+          </View>
+        ))}
+        {deferredSearchQuery.trim() !== "" &&
+          settingsSearchResults.length === 0 && (
+            <Text style={[styles.helpText, { textAlign: "center" }]}>
+              {t("settings.nav.search.empty")}
+            </Text>
+          )}
       </SheetScrollView>
     </DrawerSheet>
   );
@@ -8710,6 +9158,18 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     addModelSheetDesktop: {
       width: 560,
+    },
+    searchRecentHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingLeft: Spacing.md,
+    },
+    searchRecentTitle: {
+      fontSize: FontSizes.label,
+      fontFamily: Fonts.mono,
+      color: Colors.textMuted,
+      textTransform: "uppercase",
     },
     searchSheetDesktop: {
       width: 720,

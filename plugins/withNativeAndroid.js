@@ -258,6 +258,7 @@ function withNativeAndroid(config) {
       copyTemplate('src/MaestroOverlayPackage.kt', path.join(javaDir, 'MaestroOverlayPackage.kt'), packageName);
       copyTemplate('src/AssistantModule.kt', path.join(javaDir, 'AssistantModule.kt'), packageName);
       copyTemplate('src/PredictiveBackModule.kt', path.join(javaDir, 'PredictiveBackModule.kt'), packageName);
+      copyTemplate('src/WindowModeModule.kt', path.join(javaDir, 'WindowModeModule.kt'), packageName);
       copyTemplate('src/OperaDreamService.kt', path.join(javaDir, 'OperaDreamService.kt'), packageName);
       copyTemplate('src/WakeWordModule.kt', path.join(javaDir, 'WakeWordModule.kt'), packageName);
       copyTemplate('src/WakeWordDetector.kt', path.join(javaDir, 'WakeWordDetector.kt'), packageName);

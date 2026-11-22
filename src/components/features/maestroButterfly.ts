@@ -14,6 +14,13 @@ import { ASCII_BUTTERFLY3 } from "./asciiButterfly3Frames";
 import { ASCII_BUTTERFLY4 } from "./asciiButterfly4Frames";
 import { ASCII_BUTTERFLY5 } from "./asciiButterfly5Frames";
 
+import type { IconSource } from "../ui/AppIcon";
+import operaicon1 from "../../../assets/icons/operaicon.svg";
+import operaicon2 from "../../../assets/icons/operaicon2.svg";
+import operaicon3 from "../../../assets/icons/operaicon3.svg";
+import operaicon4 from "../../../assets/icons/operaicon4.svg";
+import operaicon5 from "../../../assets/icons/operaicon5.svg";
+
 export type MaestroButterfly = {
   //square grid that flaps
   frames: AsciiFrames;
@@ -21,7 +28,7 @@ export type MaestroButterfly = {
   base: ImageSourcePropType;
   //accent squares of the rest pose, tinted to recolor it live
   accent: ImageSourcePropType;
-  icon: ImageSourcePropType;
+  icon: IconSource;
 };
 
 export type MaestroButterflyId = "butterfly1" | "butterfly2" | "butterfly3" | "butterfly4" | "butterfly5";
@@ -33,31 +40,31 @@ export const MAESTRO_BUTTERFLIES: Record<MaestroButterflyId, MaestroButterfly> =
     frames: ASCII_BUTTERFLY1,
     base: require("../../../assets/images/butterflies/butterfly1_base.png"),
     accent: require("../../../assets/images/butterflies/butterfly1_accent.png"),
-    icon: require("../../../assets/icons/operaicon.png"),
+    icon: operaicon1,
   },
   butterfly2: {
     frames: ASCII_BUTTERFLY2,
     base: require("../../../assets/images/butterflies/butterfly2_base.png"),
     accent: require("../../../assets/images/butterflies/butterfly2_accent.png"),
-    icon: require("../../../assets/icons/operaicon2.png"),
+    icon: operaicon2,
   },
   butterfly3: {
     frames: ASCII_BUTTERFLY3,
     base: require("../../../assets/images/butterflies/butterfly3_base.png"),
     accent: require("../../../assets/images/butterflies/butterfly3_accent.png"),
-    icon: require("../../../assets/icons/operaicon3.png"),
+    icon: operaicon3,
   },
   butterfly4: {
     frames: ASCII_BUTTERFLY4,
     base: require("../../../assets/images/butterflies/butterfly4_base.png"),
     accent: require("../../../assets/images/butterflies/butterfly4_accent.png"),
-    icon: require("../../../assets/icons/operaicon4.png"),
+    icon: operaicon4,
   },
   butterfly5: {
     frames: ASCII_BUTTERFLY5,
     base: require("../../../assets/images/butterflies/butterfly5_base.png"),
     accent: require("../../../assets/images/butterflies/butterfly5_accent.png"),
-    icon: require("../../../assets/icons/operaicon5.png"),
+    icon: operaicon5,
   },
 };
 

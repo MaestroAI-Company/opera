@@ -3,7 +3,6 @@ import * as IntentLauncher from "expo-intent-launcher";
 import { useEffect, useRef, useState } from "react";
 import {
   AppState,
-  Image,
   Platform,
   StyleSheet,
   Text,
@@ -28,6 +27,7 @@ import {
   NearbyHub,
 } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
+import AppIcon, { type IconSource } from "../ui/AppIcon";
 import CardGrid from "../ui/CardGrid";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
@@ -36,13 +36,12 @@ import TextInputField from "../ui/TextInputField";
 import DrawerBackButton from "./DrawerBackButton";
 import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
 import PageStack from "./PageStack";
-
-const cameraIcon = require("../../../assets/icons/camera.png");
-const addIcon = require("../../../assets/icons/add.png");
-const linkIcon = require("../../../assets/icons/link.png");
-const keyIcon = require("../../../assets/icons/key.png");
-const laptopIcon = require("../../../assets/icons/laptop.png");
-const reconnectIcon = require("../../../assets/icons/reconnect.png");
+import addIcon from "../../../assets/icons/add2.svg";
+import linkIcon from "../../../assets/icons/link2.svg";
+import keyIcon from "../../../assets/icons/key2.svg";
+import laptopIcon from "../../../assets/icons/laptop2.svg";
+import reconnectIcon from "../../../assets/icons/reload2.svg";
+import cameraIcon from "../../../assets/icons/camera2.svg";
 
 //searching turns into the results, manual is pushed from both
 type Page = "searching" | "discover" | "manual";
@@ -309,7 +308,7 @@ export default function HubPairingSheet({
       <Text style={styles.foundTitle} numberOfLines={1}>
         {hub.name}
       </Text>
-      <Image
+      <AppIcon
         source={laptopIcon}
         style={styles.foundIcon}
         tintColor={Colors.textPrimary}
@@ -402,7 +401,7 @@ export default function HubPairingSheet({
   };
 
   //switches between the camera and the code row
-  const renderModeButton = (label: string, icon: number, code: boolean) => (
+  const renderModeButton = (label: string, icon: IconSource, code: boolean) => (
     <Group style={{ marginTop: Spacing.xxl }}>
       <ActionButton
         icon={icon}

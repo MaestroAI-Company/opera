@@ -39,22 +39,23 @@ import { Settings } from "../../services/settings/SettingsService";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { TTS } from "../../services/speech/TTSService";
 import { buildWavBuffer } from "../../services/speech/wav";
+import AppIcon from "../ui/AppIcon";
 import IconButton from "../ui/IconButton";
 import NotificationModal from "../ui/NotificationModal";
 import { classifyAttachment, type AttachmentKind, type Attachments, type SelectedFile } from "./AttachmentSheet";
 import { pressStyle } from "../ui/pressStyle";
 import VoiceGrid from "./VoiceGrid";
+import nextWhiteIcon from "../../../assets/icons/arrow.svg";
+import micIcon from "../../../assets/icons/microphone.svg";
+import addIcon from "../../../assets/icons/add.svg";
+import stopIcon from "../../../assets/icons/stop.svg";
+import fileIcon from "../../../assets/icons/file.svg";
+import pencilIcon from "../../../assets/icons/edit2.svg";
+import cancelIcon from "../../../assets/icons/cancel2.svg";
+import liveIcon from "../../../assets/icons/live.svg";
 
 //buttons are 28px in a 56px bar, slop fills its height
 const HIT_SLOP = { top: 14, bottom: 14, left: 6, right: 6 };
-const nextWhiteIcon = require("../../../assets/icons/arrow.png");
-const micIcon = require("../../../assets/icons/microphone.png");
-const addIcon = require("../../../assets/icons/add.png");
-const stopIcon = require("../../../assets/icons/stop.png");
-const fileIcon = require("../../../assets/icons/file.png");
-const pencilIcon = require("../../../assets/icons/pencil.png");
-const cancelIcon = require("../../../assets/icons/cancel2.png");
-const liveIcon = require("../../../assets/icons/live.png");
 
 const IMAGE_MAX_WIDTH = 1280;
 const IMAGE_COMPRESS_QUALITY = 0.7;
@@ -1131,7 +1132,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                     <View style={styles.fileChipsContainer}>
                       {editing && (
                         <View style={styles.editTrayRow}>
-                          <Image source={pencilIcon} style={styles.filePreviewDocumentIconTop} tintColor={Colors.textMuted} />
+                          <AppIcon source={pencilIcon} style={styles.filePreviewDocumentIconTop} tintColor={Colors.textMuted} />
                           <Text style={styles.editTrayText} numberOfLines={1}>{t("chatbar.editingMessage")}</Text>
                           <IconButton
                             icon={cancelIcon}
@@ -1160,7 +1161,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                           ) : (
                             <View style={styles.filePreviewAudioTop}>
                               {chip.kind === 'document' ? (
-                                <Image source={fileIcon} style={styles.filePreviewDocumentIconTop} tintColor={Colors.textOnPrimary} />
+                                <AppIcon source={fileIcon} style={styles.filePreviewDocumentIconTop} tintColor={Colors.textOnPrimary} />
                               ) : (
                                 <Text style={styles.filePreviewAudioTextTop} numberOfLines={1}>{chip.name}</Text>
                               )}
@@ -1190,14 +1191,14 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
                 {supportsFiles && !isRecording && (
                   <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.plusButton, "fadeLight")}>
-                    <Image source={addIcon} style={styles.plusIcon} tintColor={Colors.textOnPrimary} />
+                    <AppIcon source={addIcon} style={styles.plusIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 )}
 
                 {(Platform.OS !== 'web' || Settings.getCached().whisperModel !== 'none' || canTranscribeRemotely) && !isGenerating && (
                   <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.micButton, "fadeLight")}>
                     <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
-                      <Image source={isRecording ? stopIcon : micIcon} style={styles.micIcon} tintColor={Colors.textOnPrimary} />
+                      <AppIcon source={isRecording ? stopIcon : micIcon} style={styles.micIcon} tintColor={Colors.textOnPrimary} />
                     </Animated.View>
                   </Pressable>
                 )}
@@ -1289,15 +1290,15 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
 
                 {isGenerating ? (
                   <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.sendButton, "fadeLight")}>
-                    <Image source={stopIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
+                    <AppIcon source={stopIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 ) : onOpenLive && !isRecording && !text.trim() && attachments.length === 0 ? (
                   <Pressable accessibilityLabel={t("chatbar.live")} onPress={onOpenLive} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.sendButton, "fadeLight")}>
-                    <Image source={liveIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
+                    <AppIcon source={liveIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 ) : (
                   <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.sendButton, "fadeLight")}>
-                    <Image source={nextWhiteIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
+                    <AppIcon source={nextWhiteIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 )}
               </Animated.View>

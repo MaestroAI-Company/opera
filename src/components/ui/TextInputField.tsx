@@ -1,17 +1,17 @@
 import { FontSizes, Fonts, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
-import { Image, ImageSourcePropType, Pressable, StyleProp, StyleSheet, TextInput, TextInputProps, ViewStyle } from "react-native";
+import { Pressable, StyleProp, StyleSheet, TextInput, TextInputProps, ViewStyle } from "react-native";
 import { useRef, useState } from "react";
 import { useT } from "../../i18n";
+import AppIcon, { IconSource } from "./AppIcon";
 import IconButton from "./IconButton";
-
-const visionIcon = require("../../../assets/icons/vision.png");
-const visionOffIcon = require("../../../assets/icons/vision_off.png");
+import visionIcon from "../../../assets/icons/vision2.svg";
+import visionOffIcon from "../../../assets/icons/vision_off2.svg";
 
 interface TextInputFieldProps extends TextInputProps {
-  icon?: ImageSourcePropType;
+  icon?: IconSource;
   containerStyle?: StyleProp<ViewStyle>;
-  rightIcon?: ImageSourcePropType;
+  rightIcon?: IconSource;
   rightIconTint?: string;
   rightIconLabel?: string;
   onRightIconPress?: () => void;
@@ -54,7 +54,7 @@ export default function TextInputField({
       //skip wrapper on web tab navigation
       tabIndex={-1}
     >
-      {icon && <Image source={icon} style={[styles.icon, isLarge && styles.iconLarge]} />}
+      {icon && <AppIcon source={icon} style={[styles.icon, isLarge && styles.iconLarge]} />}
       <TextInput
         ref={inputRef}
         style={[styles.input, isLarge && styles.inputLarge, style]}

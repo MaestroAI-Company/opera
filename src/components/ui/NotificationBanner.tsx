@@ -1,9 +1,10 @@
-import { Image, ImageSourcePropType, Pressable, StyleProp, StyleSheet, Text, ViewStyle } from "react-native";
+import { Pressable, StyleProp, StyleSheet, Text, ViewStyle } from "react-native";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import AppIcon, { IconSource } from "./AppIcon";
 
 export type NotificationBannerProps = {
-  icon?: ImageSourcePropType;
+  icon?: IconSource;
   label: string;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
@@ -20,7 +21,7 @@ export default function NotificationBanner({ icon, label, onPress, style }: Noti
       onPress={onPress}
       disabled={!onPress}
     >
-      {icon && <Image source={icon} style={styles.icon} tintColor={Colors.textOnPrimary} />}
+      {icon && <AppIcon source={icon} style={styles.icon} tintColor={Colors.textOnPrimary} />}
       <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">{label}</Text>
     </Pressable>
   );

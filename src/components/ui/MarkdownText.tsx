@@ -17,6 +17,9 @@ import WidgetWrapper from "../widgets/WidgetWrapper";
 import IconButton from "./IconButton";
 import MarkdownImage from "./MarkdownImage";
 import { ensureKatexStylesheet, getKatexCss, KATEX_STYLESHEET_NAME } from "./katexStylesheet";
+import copyIcon from "../../../assets/icons/copy2.svg";
+import fullIcon from "../../../assets/icons/full2.svg";
+import downloadIcon from "../../../assets/icons/download2.svg";
 
 function escapeHtml(text: string): string {
   return text
@@ -26,10 +29,6 @@ function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
-
-const copyIcon = require("../../../assets/icons/copy.png");
-const fullIcon = require("../../../assets/icons/full.png");
-const downloadIcon = require("../../../assets/icons/download2.png");
 
 const makeS = (Colors: ThemeColors) => StyleSheet.create({
   base: { fontSize: FontSizes.xl, lineHeight: 28, color: Colors.textPrimary, fontFamily: Fonts.body },

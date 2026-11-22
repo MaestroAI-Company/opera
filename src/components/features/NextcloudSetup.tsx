@@ -8,9 +8,9 @@ import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import TextInputField from "../ui/TextInputField";
 
-const linkIcon = require("../../../assets/icons/link.png");
-const cloudIcon = require("../../../assets/icons/cloud.png");
-const cancelIcon = require("../../../assets/icons/cancel.png");
+import linkIcon from "../../../assets/icons/link2.svg";
+import cloudIcon from "../../../assets/icons/cloud2.svg";
+import cancelIcon from "../../../assets/icons/cancel2.svg";
 
 type NextcloudSetupProps = {
   onDone: () => void;

@@ -20,10 +20,10 @@ import Group from "../ui/Group";
 import DrawerSheet from "./DrawerSheet";
 import { pressStyle } from "../ui/pressStyle";
 import { DOCUMENT_MIME_TYPES, classifyDocument } from "../../services/documents/DocumentService";
-
-const cameraIcon = require("../../../assets/icons/camera.png");
-const fileIcon = require("../../../assets/icons/file.png");
-const photoIcon = require("../../../assets/icons/photo.png");
+import AppIcon from "../ui/AppIcon";
+import cameraIcon from "../../../assets/icons/camera.svg";
+import fileIcon from "../../../assets/icons/file.svg";
+import photoIcon from "../../../assets/icons/photo.svg";
 
 //seconds to m:ss
 function formatDuration(seconds: number): string {
@@ -321,7 +321,7 @@ export default function AttachmentSheet({
             <View key={label} style={styles.sheetIconButtonCell}>
               <Group style={incognito && styles.sheetIconButtonGroupIncognito}>
                 <Pressable style={pressStyle(styles.sheetIconButton, { backgroundColor: incognito ? Colors.incognito : Colors.surfacePressed })} onPress={onPress}>
-                  <Image source={icon} style={[styles.sheetIcon, incognito && styles.sheetIconIncognito]} />
+                  <AppIcon source={icon} style={[styles.sheetIcon, incognito && styles.sheetIconIncognito]} />
                   <Text style={[styles.sheetIconText, incognito && styles.sheetTextIncognito]}>{label}</Text>
                 </Pressable>
               </Group>

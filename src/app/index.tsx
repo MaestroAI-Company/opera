@@ -17,7 +17,6 @@ import {
   BackHandler,
   DeviceEventEmitter,
   Easing,
-  Image,
   ImageBackground,
   PanResponder,
   Platform,
@@ -178,13 +177,14 @@ import {
   ReleaseNotes,
   takeReleaseNotes,
 } from "../services/updates/UpdateService";
+import AppIcon from "../components/ui/AppIcon";
+import settingsIcon from "../../assets/icons/settings.svg";
+import addIcon from "../../assets/icons/add2.svg";
+import chatIcon from "../../assets/icons/message.svg";
+import nextIcon from "../../assets/icons/arrow2.svg";
+import samplerIcon from "../../assets/icons/sampler.svg";
 
 const texture2 = require("../../assets/images/texture/texture2.png");
-const settingsIcon = require("../../assets/icons/settings.png");
-const addIcon = require("../../assets/icons/add.png");
-const chatIcon = require("../../assets/icons/message.png");
-const nextIcon = require("../../assets/icons/right.png");
-const samplerIcon = require("../../assets/icons/sampler.png");
 
 function shareConsentMessage(): string {
   const host = resolvePasteHost()
@@ -2704,7 +2704,7 @@ export default function Index() {
           });
         }}
       >
-        <Image
+        <AppIcon
           source={settingsIcon}
           style={[styles.settingsIcon, !isDesktop && { marginRight: 0 }]}
         />
@@ -2835,7 +2835,7 @@ export default function Index() {
                         : t("modelSelector.none"),
                     )}
                   </Text>
-                  <Image
+                  <AppIcon
                     source={nextIcon}
                     style={styles.modelInfoArrow}
                     resizeMode="contain"

@@ -217,6 +217,7 @@ type SettingsSearchEntry = {
   label: string;
   help?: string;
   body: ReactNode;
+  onPress?: () => void;
 };
 
 import {
@@ -260,13 +261,57 @@ import {
 import DrawerBackButton from "./DrawerBackButton";
 import PageStack from "./PageStack";
 
-const linkIcon = require("../../../assets/icons/link.png");
-const addIcon = require("../../../assets/icons/add.png");
-const questionIcon = require("../../../assets/icons/question.png");
-const downloadIcon = require("../../../assets/icons/download.png");
-const deleteIcon = require("../../../assets/icons/delete.png");
-const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
-const keyIcon = require("../../../assets/icons/key.png");
+import AppIcon, { type IconSource } from "../ui/AppIcon";
+import linkIcon from "../../../assets/icons/link2.svg";
+import addIcon from "../../../assets/icons/add.svg";
+import add2Icon from "../../../assets/icons/add2.svg";
+import download2Icon from "../../../assets/icons/download2.svg";
+import deleteIcon from "../../../assets/icons/delete2.svg";
+import edit2Icon from "../../../assets/icons/edit2.svg";
+import keyIcon from "../../../assets/icons/key2.svg";
+import search2Icon from "../../../assets/icons/search2.svg";
+import profilIcon from "../../../assets/icons/profile.svg";
+import profil2Icon from "../../../assets/icons/profile2.svg";
+import cloudIcon from "../../../assets/icons/cloud.svg";
+import providerCloudIcon from "../../../assets/icons/cloud2.svg";
+import phoneIcon from "../../../assets/icons/phone2.svg";
+import sampler2Icon from "../../../assets/icons/sampler2.svg";
+import cloudUploadIcon from "../../../assets/icons/cloudupload2.svg";
+import cloudDownloadIcon from "../../../assets/icons/clouddownload2.svg";
+import arrowIcon from "../../../assets/icons/arrow2.svg";
+import cancelIcon from "../../../assets/icons/cancel2.svg";
+import activateIcon from "../../../assets/icons/check2.svg";
+import generalIcon from "../../../assets/icons/general.svg";
+import advancedIcon from "../../../assets/icons/settings.svg";
+import server2Icon from "../../../assets/icons/server2.svg";
+import toolIcon from "../../../assets/icons/tool.svg";
+import tool2Icon from "../../../assets/icons/tool2.svg";
+import confidentialityIcon from "../../../assets/icons/confidentiality.svg";
+import reportsIcon from "../../../assets/icons/bug.svg";
+import supportIcon from "../../../assets/icons/support2.svg";
+import informationIcon from "../../../assets/icons/info.svg";
+import githubIcon from "../../../assets/icons/github.svg";
+import operaIcon from "../../../assets/icons/operaicon.svg";
+import micIcon from "../../../assets/icons/microphone2.svg";
+import visionIcon from "../../../assets/icons/vision2.svg";
+import brainIcon from "../../../assets/icons/brain2.svg";
+import photoIcon from "../../../assets/icons/photo.svg";
+import calendarIcon from "../../../assets/icons/calendar2.svg";
+import exportIcon from "../../../assets/icons/export2.svg";
+import message2Icon from "../../../assets/icons/message2.svg";
+import time2Icon from "../../../assets/icons/time2.svg";
+import errorIcon from "../../../assets/icons/error2.svg";
+import infoIcon from "../../../assets/icons/info2.svg";
+import hyperlinkIcon from "../../../assets/icons/hyperlink2.svg";
+import samplerNavIcon from "../../../assets/icons/sampler.svg";
+import reconnectIcon from "../../../assets/icons/reload2.svg";
+import cameraIcon from "../../../assets/icons/camera2.svg";
+import locationIcon from "../../../assets/icons/location2.svg";
+import ollamaIcon from "../../../assets/icons/ollama.svg";
+import videocamIcon from "../../../assets/icons/video2.svg";
+import websiteIcon from "../../../assets/icons/website2.svg";
+
+const samplerIcon = require("../../../assets/icons/operaiconEgg.png");
 
 //tools and video stay hidden here
 const LITERT_CAPABILITY_IDS: readonly ModelCapabilityId[] = [
@@ -274,65 +319,20 @@ const LITERT_CAPABILITY_IDS: readonly ModelCapabilityId[] = [
   "audio",
   "thinking",
 ];
-const searchIcon = require("../../../assets/icons/search.png");
-const profilIcon = require("../../../assets/icons/profil.png");
-const cloudIcon = require("../../../assets/icons/cloud.png");
-const providerCloudIcon = require("../../../assets/icons/cloud2.png");
-const ollamaIcon = require("../../../assets/icons/ollama.png");
-const phoneIcon = require("../../../assets/icons/phone.png");
-const sampler2Icon = require("../../../assets/icons/sampler2.png");
-const samplerNavIcon = require("../../../assets/icons/sampler.png");
-const cloudUploadIcon = require("../../../assets/icons/cloudupload.png");
-const cloudDownloadIcon = require("../../../assets/icons/clouddownload.png");
-const arrowIcon = require("../../../assets/icons/arrow.png");
-const rightArrowIcon = require("../../../assets/icons/right.png");
-const cancelIcon = require("../../../assets/icons/cancel.png");
-const activateIcon = require("../../../assets/icons/activate.png");
-const generalIcon = require("../../../assets/icons/general.png");
-const advancedIcon = require("../../../assets/icons/settings.png");
-const serverIcon = require("../../../assets/icons/server.png");
-const toolIcon = require("../../../assets/icons/tool.png");
-const tool2Icon = require("../../../assets/icons/tool2.png");
-const confidentialityIcon = require("../../../assets/icons/confidentiality.png");
-const reportsIcon = require("../../../assets/icons/bug.png");
-const supportIcon = require("../../../assets/icons/support.png");
-const informationIcon = require("../../../assets/icons/information.png");
-const githubIcon = require("../../../assets/icons/github.png");
-const operaIcon = require("../../../assets/icons/operaicon.png");
-const samplerIcon = require("../../../assets/icons/operaiconEgg.png");
-const instagramIcon = require("../../../assets/icons/instagram.png");
-const tiktokIcon = require("../../../assets/icons/tiktok.png");
-const micIcon = require("../../../assets/icons/microphone.png");
-const cameraIcon = require("../../../assets/icons/camera.png");
-const videocamIcon = require("../../../assets/icons/videocam.png");
-const visionIcon = require("../../../assets/icons/vision.png");
-const microIcon = require("../../../assets/icons/micro.png");
-const brainIcon = require("../../../assets/icons/brain.png");
 //icon set differs from the sheet
 const MODEL_CAPABILITY_ICONS = {
   tools: tool2Icon,
   vision: visionIcon,
   thinking: brainIcon,
-  audio: microIcon,
+  audio: micIcon,
   video: videocamIcon,
   live: phoneIcon,
-} as const satisfies Record<ModelCapabilityId, ImageSourcePropType>;
-const photoIcon = require("../../../assets/icons/photo.png");
-const locationIcon = require("../../../assets/icons/location.png");
-const calendarIcon = require("../../../assets/icons/calendar.png");
-const binIcon = require("../../../assets/icons/bin.png");
-const exportIcon = require("../../../assets/icons/export.png");
-const messageIcon = require("../../../assets/icons/message.png");
-const timeIcon = require("../../../assets/icons/time.png");
-const errorIcon = require("../../../assets/icons/error.png");
+} as const satisfies Record<ModelCapabilityId, IconSource>;
 const cloudInfoImage = require("../../../assets/images/ImageCard/CloudInfo.png");
 const toolInfoImage = require("../../../assets/images/ImageCard/ToolInfo.png");
 const assistantInfoImage = require("../../../assets/images/ImageCard/AssistantInfo.png");
 const standbyInfoImage = require("../../../assets/images/ImageCard/StandbyInfo.png");
 const errorImage = require("../../../assets/images/ImageCard/error.png");
-const infoIcon = require("../../../assets/icons/info.png");
-const reconnectIcon = require("../../../assets/icons/reconnect.png");
-const hyperlinkIcon = require("../../../assets/icons/hyperlink2.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
 //hub entry in the account list
@@ -568,7 +568,7 @@ const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
       {MODEL_CAPABILITY_ROWS.map((c) => (
         <View key={c} style={styles.toggleGroupRow}>
           <View style={[styles.litertCapability, labelStyle]}>
-            <Image
+            <AppIcon
               source={MODEL_CAPABILITY_ICONS[c]}
               style={styles.litertCapabilityIcon}
               tintColor={Colors.textSecondary}
@@ -615,7 +615,7 @@ const ProviderModelDetail = memo(function ProviderModelDetail({
 }: {
   model: string;
   serverLabel: string;
-  icon?: ImageSourcePropType;
+  icon?: IconSource;
   service: string;
   url: string;
   enabled: boolean;
@@ -634,7 +634,7 @@ const ProviderModelDetail = memo(function ProviderModelDetail({
           <Text style={styles.litertDetailName}>{model}</Text>
           {icon ? (
             <View style={styles.litertCapability}>
-              <Image
+              <AppIcon
                 source={icon}
                 style={styles.litertCapabilityIcon}
                 tintColor={Colors.textSecondary}
@@ -685,7 +685,7 @@ const ModelToggleList = memo(function ModelToggleList({
   models: string[];
   //models are keys here, these show them
   labelOf?: (model: string) => string;
-  iconOf?: (model: string) => ImageSourcePropType | undefined;
+  iconOf?: (model: string) => IconSource | undefined;
   loading: boolean;
   disabled?: string[];
   onChange: (next: string[]) => void;
@@ -756,13 +756,13 @@ const ModelToggleList = memo(function ModelToggleList({
               <Group style={styles.groupSpacingTight}>
                 {onOpenSearch ? (
                   <ActionButton
-                    icon={searchIcon}
+                    icon={search2Icon}
                     label={t("settings.ollama.searchModels")}
                     onPress={onOpenSearch}
                   />
                 ) : (
                   <TextInputField
-                    icon={searchIcon}
+                    icon={search2Icon}
                     placeholder={t("settings.ollama.searchModels")}
                     value={search}
                     onChangeText={(v) => {
@@ -814,7 +814,7 @@ const ModelToggleList = memo(function ModelToggleList({
             {shown.length > limit && (
               <Group style={{ marginTop: Spacing.md }}>
                 <ActionButton
-                  icon={addIcon}
+                  icon={add2Icon}
                   label={t("settings.ollama.showMore", {
                     count: shown.length - limit,
                   })}
@@ -1159,7 +1159,7 @@ export default function SettingsDrawer({
   //question button for a page header
   const renderHelpButton = (topic: HelpTopic) => (
     <IconButton
-      icon={questionIcon}
+      icon={infoIcon}
       label={t("settings.help.open")}
       onPress={() => openHelp(topic)}
       tintColor={Colors.textPrimary}
@@ -1223,7 +1223,7 @@ export default function SettingsDrawer({
   const [alertConfig, setAlertConfig] = useState<{
     title: string;
     message: string;
-    icon?: ImageSourcePropType;
+    icon?: IconSource;
     image?: ImageSourcePropType;
     messageAlign?: "left" | "center";
     buttons?: ModalButton[];
@@ -3665,7 +3665,7 @@ export default function SettingsDrawer({
 
       {!!notices.update && (
         <NotificationBanner
-          icon={downloadIcon}
+          icon={download2Icon}
           label={t("settings.notice.update", {
             version: notices.update.version,
           })}
@@ -3683,7 +3683,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("profile")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={profilIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3701,7 +3701,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("cloud")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={cloudIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3717,7 +3717,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("maestro")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={operaIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3737,7 +3737,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("general")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={generalIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3755,7 +3755,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("service")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={samplerNavIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3773,7 +3773,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("tools")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={toolIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3790,7 +3790,7 @@ export default function SettingsDrawer({
             onPress={() => setActiveSubPage("advanced")}
           >
             <View style={styles.menuIconWrap}>
-              <Image
+              <AppIcon
                 source={advancedIcon}
                 style={styles.menuIcon}
                 tintColor={Colors.textOnPrimary}
@@ -3811,7 +3811,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("confidentiality")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={confidentialityIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3829,7 +3829,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("reports")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={reportsIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3847,7 +3847,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("sociallinks")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={informationIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3880,7 +3880,7 @@ export default function SettingsDrawer({
 
           <Group>
             <ActionButton
-              icon={operaIcon}
+              icon={websiteIcon}
               label={t("settings.info.website")}
               onPress={() =>
                 openExternalUrl("https://maestroai.company").catch(() => {})
@@ -3892,24 +3892,6 @@ export default function SettingsDrawer({
               onPress={() =>
                 openExternalUrl(
                   "https://github.com/MaestroAI-Company/opera",
-                ).catch(() => {})
-              }
-            />
-            <ActionButton
-              icon={instagramIcon}
-              label="Instagram"
-              onPress={() =>
-                openExternalUrl(
-                  "https://www.instagram.com/maestroai.company?igsh=MWF4dmZvMXl1ZmdzeA==",
-                ).catch(() => {})
-              }
-            />
-            <ActionButton
-              icon={tiktokIcon}
-              label="TikTok"
-              onPress={() =>
-                openExternalUrl(
-                  "https://www.tiktok.com/@maestroai.company?_r=1&_t=ZG-99DGujxTPEn",
                 ).catch(() => {})
               }
             />
@@ -3951,7 +3933,7 @@ export default function SettingsDrawer({
           </View>
           <Group>
             <ActionButton
-              icon={downloadIcon}
+              icon={download2Icon}
               label={t("settings.update.checkNow")}
               onPress={checkUpdateNow}
             />
@@ -4006,7 +3988,7 @@ export default function SettingsDrawer({
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Group>
             <ActionButton
-              icon={penPlaceholderIcon}
+              icon={edit2Icon}
               label={t("settings.profile.personalize")}
               onPress={() => {
                 setNameDraft(name);
@@ -4347,7 +4329,7 @@ export default function SettingsDrawer({
 
           <Group>
             <TextInputField
-              icon={serverIcon}
+              icon={server2Icon}
               placeholder="https://privatebin.net/"
               value={shareInstanceUrl}
               onChangeText={setShareInstanceUrl}
@@ -4424,7 +4406,7 @@ export default function SettingsDrawer({
           </Text>
           <Group>
             <ActionButton
-              icon={penPlaceholderIcon}
+              icon={edit2Icon}
               label={t("settings.personality.edit")}
               onPress={() => setPersonalitySheetVisible(true)}
             />
@@ -4463,7 +4445,7 @@ export default function SettingsDrawer({
               </Text>
               <Group style={isWide && styles.sliderGroup}>
                 <Slider
-                  icon={timeIcon}
+                  icon={time2Icon}
                   options={TTS_SPEEDS.map((id) => ({ id, label: `${id}×` }))}
                   selectedValue={ttsSpeed}
                   onSelect={(v) => {
@@ -4507,7 +4489,7 @@ export default function SettingsDrawer({
           ) : null}
           <Group>
             <ActionButton
-              icon={penPlaceholderIcon}
+              icon={edit2Icon}
               label={t("settings.personality.edit")}
               onPress={() => {
                 setInstructionDraft(instruction);
@@ -4804,12 +4786,12 @@ export default function SettingsDrawer({
               onPress={handleExportData}
             />
             <ActionButton
-              icon={downloadIcon}
+              icon={download2Icon}
               label={t("settings.data.importAction")}
               onPress={handleImportData}
             />
             <ActionButton
-              icon={binIcon}
+              icon={deleteIcon}
               label={t("settings.data.deleteAllAction")}
               onPress={handleDeleteAllConversations}
             />
@@ -4853,7 +4835,7 @@ export default function SettingsDrawer({
               />
             ) : (
               <View style={styles.cloudAvatar}>
-                <Image
+                <AppIcon
                   source={profilIcon}
                   style={styles.cloudAvatarIcon}
                   tintColor={Colors.textMuted}
@@ -5020,7 +5002,7 @@ export default function SettingsDrawer({
                   {CLOUD_PROVIDERS.map((def) => (
                     <ActionButton
                       key={def.id}
-                      icon={cloudIcon}
+                      icon={providerCloudIcon}
                       label={def.label}
                       onPress={() => pickBackupCloud(def.id)}
                     />
@@ -5400,7 +5382,7 @@ export default function SettingsDrawer({
               ]}
             >
               <ActionButton
-                icon={addIcon}
+                icon={add2Icon}
                 label={t("settings.litert.addModel")}
                 variant="highlight"
                 disabled={!!downloadingLitert}
@@ -5471,7 +5453,7 @@ export default function SettingsDrawer({
             </View>
             <Group style={isWide && styles.sliderGroup}>
               <Slider
-                icon={messageIcon}
+                icon={message2Icon}
                 options={litertContextLengthOptions}
                 selectedValue={litertContextLength}
                 onSelect={setLitertContextLength}
@@ -5608,7 +5590,7 @@ export default function SettingsDrawer({
             )}
             {Platform.OS !== "web" && (
               <ActionButton
-                icon={profilIcon}
+                icon={profil2Icon}
                 label={t("permissions.contacts.label")}
                 onPress={() => Linking.openSettings()}
                 rightElement={renderPermissionBadge(
@@ -5653,7 +5635,7 @@ export default function SettingsDrawer({
           </Text>
           <Group style={styles.groupSpacingTight}>
             <TextInputField
-              icon={penPlaceholderIcon}
+              icon={edit2Icon}
               placeholder={t("bugReport.placeholder")}
               value={report.text}
               onChangeText={report.setText}
@@ -5729,8 +5711,8 @@ export default function SettingsDrawer({
           <Text style={styles.settingLabel}>{title}</Text>
           <Text style={styles.helpText}>{help}</Text>
         </View>
-        <Image
-          source={rightArrowIcon}
+        <AppIcon
+          source={arrowIcon}
           style={[styles.menuIcon, { marginRight: Spacing.md }]}
           tintColor={Colors.textMuted}
         />
@@ -5916,8 +5898,8 @@ export default function SettingsDrawer({
             setSearchSheetVisible(true);
           }}
         >
-          <Image
-            source={searchIcon}
+          <AppIcon
+            source={search2Icon}
             style={styles.menuIcon}
             tintColor={Colors.textPrimary}
           />
@@ -6216,7 +6198,7 @@ export default function SettingsDrawer({
               </Text>
               {capabilities.map((capability) => (
                 <View key={capability.id} style={styles.litertCapability}>
-                  <Image
+                  <AppIcon
                     source={capability.icon}
                     style={styles.litertCapabilityIcon}
                     tintColor={Colors.textSecondary}
@@ -6237,7 +6219,7 @@ export default function SettingsDrawer({
             ]}
           >
             <ActionButton
-              icon={downloadIcon}
+              icon={download2Icon}
               label={
                 installed
                   ? t("settings.litert.installed")
@@ -6320,7 +6302,7 @@ export default function SettingsDrawer({
   const renderLitertSearchField = (page: LitertPage) => (
     <Group>
       <TextInputField
-        icon={searchIcon}
+        icon={search2Icon}
         placeholder={t("settings.litert.addModelPlaceholder")}
         //other pages only lead to the search page
         value={page === "search" ? hfModelInput : ""}
@@ -6626,7 +6608,7 @@ export default function SettingsDrawer({
                 </Text>
                 <Group>
                   <TextInputField
-                    icon={penPlaceholderIcon}
+                    icon={edit2Icon}
                     placeholder={t("settings.server.namePlaceholder")}
                     value={ollamaDetailServer.name}
                     onChangeText={(v) =>
@@ -6697,7 +6679,7 @@ export default function SettingsDrawer({
                 <Group style={isSheetWide && styles.sliderGroup}>
                   {advancedMode ? (
                     <TextInputField
-                      icon={messageIcon}
+                      icon={message2Icon}
                       placeholder="8192"
                       value={ollamaContextDraft}
                       onChangeText={(v) =>
@@ -6707,7 +6689,7 @@ export default function SettingsDrawer({
                     />
                   ) : (
                     <Slider
-                      icon={messageIcon}
+                      icon={message2Icon}
                       options={ollamaContextLengthOptions}
                       selectedValue={String(
                         serverContextLength(ollamaDetailServer),
@@ -6745,7 +6727,7 @@ export default function SettingsDrawer({
                 <Group style={isSheetWide && styles.sliderGroup}>
                   {advancedMode ? (
                     <TextInputField
-                      icon={timeIcon}
+                      icon={time2Icon}
                       placeholder="300"
                       value={ollamaKeepAliveDraft}
                       onChangeText={(v) =>
@@ -6755,7 +6737,7 @@ export default function SettingsDrawer({
                     />
                   ) : (
                     <Slider
-                      icon={timeIcon}
+                      icon={time2Icon}
                       options={ollamaKeepAliveOptions}
                       selectedValue={String(
                         serverKeepAlive(ollamaDetailServer),
@@ -6798,7 +6780,7 @@ export default function SettingsDrawer({
                     />
                   )}
                   <ActionButton
-                    icon={binIcon}
+                    icon={deleteIcon}
                     label={t("settings.ollama.remove.action")}
                     onPress={() => removeOllamaServer(shownOllamaIndex)}
                   />
@@ -7001,7 +6983,7 @@ export default function SettingsDrawer({
   const renderOpenAISearchField = (page: CloudModelsPage) => (
     <Group>
       <TextInputField
-        icon={searchIcon}
+        icon={search2Icon}
         placeholder={t("settings.ollama.searchModels")}
         //only list page edits the search
         value={page === "list" ? openaiSearchQuery : ""}
@@ -7063,7 +7045,7 @@ export default function SettingsDrawer({
                 </Text>
                 <Group>
                   <TextInputField
-                    icon={penPlaceholderIcon}
+                    icon={edit2Icon}
                     placeholder={t("settings.server.namePlaceholder")}
                     value={server.name}
                     onChangeText={(v) => patchOpenAIServer(index, { name: v })}
@@ -7161,7 +7143,7 @@ export default function SettingsDrawer({
                     />
                   )}
                   <ActionButton
-                    icon={binIcon}
+                    icon={deleteIcon}
                     label={t("settings.ollama.remove.action")}
                     onPress={() => removeOpenAIServer(index)}
                   />
@@ -7311,7 +7293,7 @@ export default function SettingsDrawer({
             </Text>
             <Group>
               <TextInputField
-                icon={penPlaceholderIcon}
+                icon={edit2Icon}
                 placeholder={t("settings.server.namePlaceholder")}
                 value={serverDraft.name}
                 onChangeText={(v) =>
@@ -7387,7 +7369,7 @@ export default function SettingsDrawer({
               ]}
             >
               <ActionButton
-                icon={addIcon}
+                icon={add2Icon}
                 label={
                   serverDraftBusy
                     ? t("settings.server.checking")
@@ -7433,7 +7415,7 @@ export default function SettingsDrawer({
             </Text>
             <Group>
               <TextInputField
-                icon={penPlaceholderIcon}
+                icon={edit2Icon}
                 placeholder={t("settings.server.namePlaceholder")}
                 value={serverDraft.name}
                 onChangeText={(v) =>
@@ -7471,7 +7453,7 @@ export default function SettingsDrawer({
             </Text>
             <Group>
               <TextInputField
-                icon={penPlaceholderIcon}
+                icon={edit2Icon}
                 placeholder={t("settings.mcp.headerName")}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -7481,7 +7463,7 @@ export default function SettingsDrawer({
                 }
               />
               <TextInputField
-                icon={penPlaceholderIcon}
+                icon={edit2Icon}
                 placeholder={t("settings.mcp.headerValue")}
                 autoCapitalize="none"
                 secureTextEntry
@@ -7502,7 +7484,7 @@ export default function SettingsDrawer({
             </Text>
             <Group>
               <TextInputField
-                icon={penPlaceholderIcon}
+                icon={edit2Icon}
                 placeholder={t("settings.mcp.clientId")}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -7523,7 +7505,7 @@ export default function SettingsDrawer({
               ]}
             >
               <ActionButton
-                icon={addIcon}
+                icon={add2Icon}
                 label={
                   serverDraftBusy
                     ? t("settings.server.checking")
@@ -7703,7 +7685,7 @@ export default function SettingsDrawer({
                     </Text>
                     <Group>
                       <TextInputField
-                        icon={penPlaceholderIcon}
+                        icon={edit2Icon}
                         placeholder={t("settings.mcp.headerName")}
                         autoCapitalize="none"
                         autoCorrect={false}
@@ -7722,7 +7704,7 @@ export default function SettingsDrawer({
                         }
                       />
                       <TextInputField
-                        icon={penPlaceholderIcon}
+                        icon={edit2Icon}
                         placeholder={t("settings.mcp.headerValue")}
                         autoCapitalize="none"
                         secureTextEntry
@@ -7756,7 +7738,7 @@ export default function SettingsDrawer({
                     </Text>
                     <Group>
                       <TextInputField
-                        icon={penPlaceholderIcon}
+                        icon={edit2Icon}
                         placeholder={t("settings.mcp.clientId")}
                         autoCapitalize="none"
                         autoCorrect={false}
@@ -7802,7 +7784,7 @@ export default function SettingsDrawer({
                       }
                       {!hosted && (
                         <ActionButton
-                          icon={binIcon}
+                          icon={deleteIcon}
                           label={t("settings.mcp.remove.action")}
                           onPress={() =>
                             removeMcpServer(server.id, server.name)
@@ -7953,7 +7935,7 @@ export default function SettingsDrawer({
                     ]}
                   >
                     <ActionButton
-                      icon={downloadIcon}
+                      icon={download2Icon}
                       label={t("settings.local.download")}
                       variant="highlight"
                       disabled={!!localDownload}
@@ -8011,7 +7993,7 @@ export default function SettingsDrawer({
                 <Group style={styles.groupSpacingTight}>
                   <ProgressBar
                     progress={litertDownloadProgress?.progress ?? 0}
-                    icon={downloadIcon}
+                    icon={download2Icon}
                   />
                   <ActionButton
                     label={t("settings.litert.downloaded")}
@@ -8134,7 +8116,7 @@ export default function SettingsDrawer({
                   </Text>
                   {installedCapabilities.map((capability) => (
                     <View key={capability.id} style={styles.litertCapability}>
-                      <Image
+                      <AppIcon
                         source={capability.icon}
                         style={styles.litertCapabilityIcon}
                         tintColor={Colors.textSecondary}
@@ -8173,7 +8155,7 @@ export default function SettingsDrawer({
               <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
                 <Group>
                   <ActionButton
-                    icon={binIcon}
+                    icon={deleteIcon}
                     label={t("settings.litert.deleteModel")}
                     onPress={() =>
                       handleDeleteLitert({
@@ -8220,7 +8202,7 @@ export default function SettingsDrawer({
             </Text>
             <Group>
               <TextInputField
-                icon={penPlaceholderIcon}
+                icon={edit2Icon}
                 placeholder={t("settings.profile.instructionsPlaceholder")}
                 value={instructionDraft}
                 onChangeText={setInstructionDraft}
@@ -8284,7 +8266,7 @@ export default function SettingsDrawer({
             </Text>
             <Group>
               <TextInputField
-                icon={penPlaceholderIcon}
+                icon={edit2Icon}
                 placeholder={t("onboarding.name.placeholder")}
                 value={nameDraft}
                 onChangeText={setNameDraft}
@@ -8373,29 +8355,22 @@ export default function SettingsDrawer({
       id: `page:${page}`,
       label,
       help,
+      onPress: () => {
+        setSearchSheetVisible(false);
+        setActiveSubPage(page);
+      },
       body: (
-        <Pressable
-          style={pressStyle(
-            styles.toggleGroupRowItem,
-            styles.toggleGroupCardPressed,
-          )}
-          onPress={() => {
-            setSearchSheetVisible(false);
-            setActiveSubPage(page);
-          }}
-        >
-          <View style={styles.toggleGroupRow}>
-            <View style={styles.toggleGroupContent}>
-              <Text style={styles.settingLabel}>{label}</Text>
-              <Text style={styles.helpText}>{help}</Text>
-            </View>
-            <Image
-              source={rightArrowIcon}
-              style={[styles.menuIcon, { marginRight: Spacing.md }]}
-              tintColor={Colors.textMuted}
-            />
+        <View style={styles.toggleGroupRow}>
+          <View style={styles.toggleGroupContent}>
+            <Text style={styles.settingLabel}>{label}</Text>
+            <Text style={styles.helpText}>{help}</Text>
           </View>
-        </Pressable>
+          <AppIcon
+            source={arrowIcon}
+            style={[styles.menuIcon, { marginRight: Spacing.md }]}
+            tintColor={Colors.textMuted}
+          />
+        </View>
       ),
     });
 
@@ -8556,7 +8531,7 @@ export default function SettingsDrawer({
               "ttsSpeed",
               t("settings.tts.speed"),
               <Slider
-                icon={timeIcon}
+                icon={time2Icon}
                 options={TTS_SPEEDS.map((id) => ({ id, label: `${id}×` }))}
                 selectedValue={ttsSpeed}
                 onSelect={(v) => {
@@ -8674,6 +8649,45 @@ export default function SettingsDrawer({
     return matches.sort((a, b) => a.rank - b.rank).map((m) => m.entry);
   })();
 
+  const searchTopics = [
+    {
+      id: "providers",
+      icon: server2Icon,
+      label: t("settings.nav.service.title"),
+      query: t("settings.nav.service.title"),
+    },
+    {
+      id: "sync",
+      icon: providerCloudIcon,
+      label: t("settings.nav.search.topicSync"),
+      query: t("settings.nav.search.topicSyncQuery"),
+    },
+    {
+      id: "data",
+      icon: exportIcon,
+      label: t("settings.nav.search.topicData"),
+      query: t("settings.nav.search.topicData"),
+    },
+    {
+      id: "mcp",
+      icon: tool2Icon,
+      label: t("settings.nav.search.topicMcp"),
+      query: t("settings.nav.search.topicMcp"),
+    },
+    {
+      id: "maestro",
+      icon: operaIcon,
+      label: t("settings.nav.maestro.title"),
+      query: t("settings.nav.maestro.title"),
+    },
+    {
+      id: "voice",
+      icon: micIcon,
+      label: t("settings.maestro.voice"),
+      query: t("settings.maestro.voice"),
+    },
+  ];
+
   const settingsSearchSheet = (
     <DrawerSheet
       visible={searchSheetVisible}
@@ -8699,11 +8713,12 @@ export default function SettingsDrawer({
         <View style={styles.sheetCard}>
           <Group>
             <TextInputField
-              icon={searchIcon}
+              icon={search2Icon}
               placeholder={t("settings.nav.search.title")}
               value={settingsSearchQuery}
               onChangeText={setSettingsSearchQuery}
               rightIcon={settingsSearchQuery ? cancelIcon : undefined}
+              rightIconTint={Colors.textPrimary}
               onRightIconPress={() => setSettingsSearchQuery("")}
               autoFocus
             />
@@ -8723,19 +8738,70 @@ export default function SettingsDrawer({
               />
             </View>
           )}
-        {settingsSearchResults.map((entry) => (
-          <View
-            key={entry.id}
-            style={styles.sheetCard}
-            //record touch without responding
-            onStartShouldSetResponderCapture={() => {
-              touchSearchEntry(entry.id);
-              return false;
-            }}
-          >
-            {entry.body}
-          </View>
-        ))}
+        {settingsSearchResults.map((entry) =>
+          entry.onPress ? (
+            <Pressable
+              key={entry.id}
+              style={pressStyle(styles.sheetCard, styles.toggleGroupCardPressed)}
+              onPress={() => {
+                touchSearchEntry(entry.id);
+                entry.onPress?.();
+              }}
+            >
+              {entry.body}
+            </Pressable>
+          ) : (
+            <View
+              key={entry.id}
+              style={styles.sheetCard}
+              //record touch without responding
+              onStartShouldSetResponderCapture={() => {
+                touchSearchEntry(entry.id);
+                return false;
+              }}
+            >
+              {entry.body}
+            </View>
+          ),
+        )}
+        {settingsSearchQuery.trim() === "" && (
+          <>
+            <View style={styles.searchRecentHeader}>
+              <Text style={styles.searchRecentTitle}>
+                {t("settings.nav.search.topics")}
+              </Text>
+            </View>
+            <View style={[styles.sheetCard, styles.searchTopicGrid]}>
+              {Array.from(
+                { length: Math.ceil(searchTopics.length / 2) },
+                (_, rowIndex) => {
+                  const row = searchTopics.slice(
+                    rowIndex * 2,
+                    rowIndex * 2 + 2,
+                  );
+                  return (
+                    <View key={rowIndex} style={styles.searchTopicRow}>
+                      {row.map((topic) => (
+                        <View key={topic.id} style={styles.searchTopicCell}>
+                          <Group>
+                            <ActionButton
+                              icon={topic.icon}
+                              label={topic.label}
+                              onPress={() => setSettingsSearchQuery(topic.query)}
+                            />
+                          </Group>
+                        </View>
+                      ))}
+                      {row.length === 1 && (
+                        <View style={styles.searchTopicCell} />
+                      )}
+                    </View>
+                  );
+                },
+              )}
+            </View>
+          </>
+        )}
         {deferredSearchQuery.trim() !== "" &&
           settingsSearchResults.length === 0 && (
             <Text style={[styles.helpText, { textAlign: "center" }]}>
@@ -9198,6 +9264,17 @@ const makeStyles = (Colors: ThemeColors) =>
       fontFamily: Fonts.mono,
       color: Colors.textMuted,
       textTransform: "uppercase",
+    },
+    searchTopicGrid: {
+      gap: Spacing.md,
+    },
+    searchTopicRow: {
+      flexDirection: "row",
+      gap: Spacing.md,
+    },
+    searchTopicCell: {
+      flex: 1,
+      minWidth: 0,
     },
     searchSheetDesktop: {
       width: 720,

@@ -1,15 +1,15 @@
 import { useEffect, useMemo } from "react";
-import { Animated, Easing, Image, Pressable, StyleSheet, View } from "react-native";
+import { Animated, Easing, Pressable, StyleSheet, View } from "react-native";
 import { Radius, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useShadowShift } from "../../hooks/useShadowShift";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import AppIcon from "../ui/AppIcon";
 import { pressStyle } from "../ui/pressStyle";
 import { DRAWER_NATIVE_DRIVER } from "./drawerAnimation";
-
-const arrowIcon = require("../../../assets/icons/arrow.png");
-const cancelIcon = require("../../../assets/icons/cancel.png");
-const informationIcon = require("../../../assets/icons/information.png");
+import arrowIcon from "../../../assets/icons/arrow.svg";
+import cancelIcon from "../../../assets/icons/cancel.svg";
+import informationIcon from "../../../assets/icons/info.svg";
 
 type DrawerBackButtonProps = {
   kind: "back" | "close" | "more";
@@ -86,7 +86,7 @@ export default function DrawerBackButton({
           hitSlop={12}
           style={pressStyle(styles.button, scrolled ? "surface" : "fade")}
         >
-          <Image
+          <AppIcon
             source={
               kind === "close"
                 ? cancelIcon

@@ -17,6 +17,7 @@ import { useT } from "../../i18n";
 import { MIN_SEARCH_LENGTH } from "../../services/ai/providers/huggingFaceCatalog";
 import { McpFolders, McpListing, McpSource, hubErrorText } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
+import AppIcon from "../ui/AppIcon";
 import Group from "../ui/Group";
 import NotificationCard from "../ui/NotificationCard";
 import NotificationModal from "../ui/NotificationModal";
@@ -27,17 +28,16 @@ import DrawerBackButton from "./DrawerBackButton";
 import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
 import { McpFieldRows } from "./HubMcpSection";
 import PageStack from "./PageStack";
-
-const searchIcon = require("../../../assets/icons/search.png");
-const downloadIcon = require("../../../assets/icons/download.png");
-const addIcon = require("../../../assets/icons/add.png");
-const fileIcon = require("../../../assets/icons/file.png");
-const backIcon = require("../../../assets/icons/back.png");
-const toolIcon = require("../../../assets/icons/tool.png");
-const pencilIcon = require("../../../assets/icons/pencil.png");
-const linkIcon = require("../../../assets/icons/link.png");
-const errorIcon = require("../../../assets/icons/error.png");
-const validIcon = require("../../../assets/icons/valid.png");
+import searchIcon from "../../../assets/icons/search2.svg";
+import downloadIcon from "../../../assets/icons/download2.svg";
+import addIcon from "../../../assets/icons/add2.svg";
+import fileIcon from "../../../assets/icons/file.svg";
+import pencilIcon from "../../../assets/icons/edit2.svg";
+import linkIcon from "../../../assets/icons/link2.svg";
+import errorIcon from "../../../assets/icons/error2.svg";
+import validIcon from "../../../assets/icons/valid2.svg";
+import toolIcon from "../../../assets/icons/tool.svg";
+import backIcon from "../../../assets/icons/arrow2.svg";
 
 const DESKTOP_CARD_WIDTH = 840;
 const DESKTOP_FOLDER_CARD_WIDTH = 720;
@@ -74,7 +74,12 @@ export function McpFolderList({ folders, onOpen, onUse }: FolderListProps) {
       </Group>
       <Group>
         {!!folders.parent && (
-          <ActionButton icon={backIcon} label={t("hubMcp.parentFolder")} onPress={() => onOpen(folders.parent!)} />
+          <ActionButton
+            icon={backIcon}
+            iconStyle={{ transform: [{ rotate: "180deg" }] }}
+            label={t("hubMcp.parentFolder")}
+            onPress={() => onOpen(folders.parent!)}
+          />
         )}
         {folders.folders.map((name) => (
           <ActionButton
@@ -293,7 +298,7 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
         {avatar ? (
           <Image source={{ uri: avatar }} style={styles.tileImage} />
         ) : (
-          <Image source={toolIcon} style={styles.tileIcon} tintColor={Colors.textPrimary} />
+          <AppIcon source={toolIcon} style={styles.tileIcon} tintColor={Colors.textPrimary} />
         )}
       </View>
     );

@@ -1,7 +1,5 @@
 import {
   Animated as RNAnimated,
-  Image,
-  ImageSourcePropType,
   Pressable,
   StyleSheet,
   Vibration,
@@ -17,10 +15,11 @@ import Animated, {
 import { Radius, ThemeColors } from "../../../constants/theme";
 import { useShadowShift } from "../../hooks/useShadowShift";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import AppIcon, { IconSource } from "./AppIcon";
 import { pressStyle } from "./pressStyle";
 
 type FloatingButtonProps = {
-  icon: ImageSourcePropType;
+  icon: IconSource;
   onPress: () => void;
 };
 
@@ -99,7 +98,7 @@ export default function FloatingButton({ icon, onPress }: FloatingButtonProps) {
               onPress();
             }}
             style={pressStyle(styles.button, "primary")}>
-            <Image source={icon} style={styles.icon} tintColor={Colors.textOnPrimary} />
+            <AppIcon source={icon} style={styles.icon} tintColor={Colors.textOnPrimary} />
           </Pressable>
         </Animated.View>
       </GestureDetector>

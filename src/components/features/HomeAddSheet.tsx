@@ -1,7 +1,8 @@
-import { ImageSourcePropType, StyleSheet, useWindowDimensions, View } from "react-native";
+import { StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
+import { type IconSource } from "../ui/AppIcon";
 import CardGrid from "../ui/CardGrid";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
@@ -10,7 +11,7 @@ const TILE_ICON = 24;
 
 export type HomeSectionChoice = {
   id: string;
-  icon: ImageSourcePropType;
+  icon: IconSource;
   label: string;
 };
 

@@ -36,8 +36,8 @@ import DrawerBackButton from "./DrawerBackButton";
 import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
 import PageStack from "./PageStack";
 
-const searchIcon = require("../../../assets/icons/search.png");
-const downloadIcon = require("../../../assets/icons/download.png");
+import searchIcon from "../../../assets/icons/search2.svg";
+import downloadIcon from "../../../assets/icons/download2.svg";
 
 const DESKTOP_CARD_WIDTH = 840;
 const OTHER_FAMILY = "other";

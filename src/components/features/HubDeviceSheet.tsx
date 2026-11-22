@@ -1,26 +1,30 @@
 import { useState } from "react";
-import { Image, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { HubDevice, SamplerHub, PairedHub } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
+import AppIcon, { type IconSource } from "../ui/AppIcon";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
+import pencilIcon from "../../../assets/icons/edit2.svg";
+import binIcon from "../../../assets/icons/delete2.svg";
+import activateIcon from "../../../assets/icons/check2.svg";
+import cancelIcon from "../../../assets/icons/cancel2.svg";
+import phoneIcon from "../../../assets/icons/phone2.svg";
+import laptopIcon from "../../../assets/icons/laptop2.svg";
+import webIcon from "../../../assets/icons/website2.svg";
+import operaIcon from "../../../assets/icons/operaicon.svg";
 
-const pencilIcon = require("../../../assets/icons/pencil.png");
-const binIcon = require("../../../assets/icons/bin.png");
-const activateIcon = require("../../../assets/icons/activate.png");
-const cancelIcon = require("../../../assets/icons/cancel.png");
-
-const KIND_ICONS = {
-  phone: require("../../../assets/icons/phone.png"),
-  desktop: require("../../../assets/icons/laptop.png"),
-  web: require("../../../assets/icons/website.png"),
-  other: require("../../../assets/icons/operaicon.png"),
+const KIND_ICONS: Record<"phone" | "desktop" | "web" | "other", IconSource> = {
+  phone: phoneIcon,
+  desktop: laptopIcon,
+  web: webIcon,
+  other: operaIcon,
 };
 
 const DESKTOP_CARD_WIDTH = 720;
@@ -140,7 +144,7 @@ export default function HubDeviceSheet({
           <Text style={styles.headerName} numberOfLines={2}>
             {device?.name}
           </Text>
-          <Image source={KIND_ICONS[kind]} style={styles.headerIcon} tintColor={Colors.textPrimary} />
+          <AppIcon source={KIND_ICONS[kind]} style={styles.headerIcon} tintColor={Colors.textPrimary} />
         </View>
 
         {/* name */}

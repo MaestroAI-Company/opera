@@ -22,7 +22,7 @@ import { pressStyle } from "../ui/pressStyle";
 import { butterflyForPersonality } from "./maestroButterfly";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
-const activateIcon = require("../../../assets/icons/activate.png");
+import activateIcon from "../../../assets/icons/check2.svg";
 
 const DESKTOP_CARD_WIDTH = 560;
 

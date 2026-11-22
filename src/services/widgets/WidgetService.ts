@@ -44,8 +44,8 @@ async function sync(): Promise<void> {
     const directory = widgetsDirectory;
     const [addIcon, cameraIcon, image] = directory
       ? await Promise.all([
-          copyToWidgets(directory, require("../../../assets/icons/add.png"), "add.png"),
-          copyToWidgets(directory, require("../../../assets/icons/camera.png"), "camera.png"),
+          copyToWidgets(directory, require("../../../assets/images/widgets/add.png"), "add.png"),
+          copyToWidgets(directory, require("../../../assets/images/widgets/camera.png"), "camera.png"),
           //new name so the old cached art is not reused
           copyToWidgets(directory, MAESTRO_BUTTERFLIES[butterflyId].base as number, `butterfly-${butterflyId}-squares.png`),
         ])

@@ -7,6 +7,7 @@ import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { getLocale, useT } from "../../i18n";
 import { Settings } from "../../services/settings/SettingsService";
 import AsciiButterfly from "./AsciiButterfly";
+import AppIcon from "../ui/AppIcon";
 import { MAESTRO_BUTTERFLIES, MaestroButterflyId, useMaestroButterfly, usePersonalityCode, useVoiceColor, DEFAULT_PERSONALITY_CODE } from "./maestroButterfly";
 
 const CARD_CREATED_AT_KEY = "profileCardCreatedAt";
@@ -165,7 +166,7 @@ export default function ProfileCard({
             >
               {trimmed || t("profileCard.placeholder")}
             </Text>
-            <Image source={butterfly.icon} style={styles.logoCompact} tintColor={`${Colors.textOnPrimary}99`} />
+            <AppIcon source={butterfly.icon} style={styles.logoCompact} tintColor={`${Colors.textOnPrimary}99`} />
           </View>
           <View style={styles.butterflyCompact}>
             <AsciiButterfly frames={butterfly.frames} accentColor={accentColor} playKey={0} />
@@ -190,7 +191,7 @@ export default function ProfileCard({
             <Text style={styles.meta}>{`Opera - ${formatDate(shownCreatedAt)}`}</Text>
           )}
 
-          <Image source={butterfly.icon} style={styles.logo} tintColor={`${Colors.textOnPrimary}99`} />
+          <AppIcon source={butterfly.icon} style={styles.logo} tintColor={`${Colors.textOnPrimary}99`} />
         </View>
       )}
       {/* a hairline above the thick stripe, a thinner one below */}

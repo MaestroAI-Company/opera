@@ -230,10 +230,10 @@
         "expo-quick-actions",
         {
           "androidIcons": {
-            "new_chat": "./assets/icons/add.png"
+            "new_chat": "./assets/images/widgets/add.png"
           },
           "iosIcons": {
-            "new_chat": "./assets/icons/add.png"
+            "new_chat": "./assets/images/widgets/add.png"
           },
           "iosActions": [
             {

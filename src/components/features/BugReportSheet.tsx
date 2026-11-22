@@ -19,8 +19,8 @@ import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
-const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
-const arrowIcon = require("../../../assets/icons/arrow.png");
+import penPlaceholderIcon from "../../../assets/icons/edit2.svg";
+import arrowIcon from "../../../assets/icons/arrow2.svg";
 
 const DESKTOP_CARD_WIDTH = 720;
 

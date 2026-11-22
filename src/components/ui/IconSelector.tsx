@@ -1,13 +1,13 @@
-import { ImageSourcePropType, Image, Pressable, StyleSheet, Vibration, View } from "react-native";
+import { Pressable, StyleSheet, Vibration, View } from "react-native";
 import { Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
+import AppIcon, { IconSource } from "./AppIcon";
 import { pressStyle } from "./pressStyle";
-
-const dotIcon = require("../../../assets/icons/dot.png");
+import dotIcon from "../../../assets/icons/dotcolor.svg";
 
 export type IconSelectorOption = {
   id: string;
-  icon?: ImageSourcePropType;
+  icon?: IconSource;
   //dot icon tinted with this color instead of an icon
   color?: string;
 };
@@ -43,15 +43,17 @@ export default function IconSelector({ options, selectedValue, onSelect }: IconS
               option.color ? "fadeLight" : selected ? "primary" : "surface",
             )}
           >
-            <Image
-              source={option.color ? dotIcon : option.icon}
-              style={[
-                styles.icon,
-                selected && styles.iconSelected,
-                //unselected dot shows its own color
-                !!option.color && !selected && { tintColor: option.color },
-              ]}
-            />
+            {(option.color || option.icon) && (
+              <AppIcon
+                source={option.color ? dotIcon : option.icon!}
+                style={[
+                  styles.icon,
+                  selected && styles.iconSelected,
+                  //unselected dot shows its own color
+                  !!option.color && !selected && { tintColor: option.color },
+                ]}
+              />
+            )}
           </Pressable>
         );
       })}

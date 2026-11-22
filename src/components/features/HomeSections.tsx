@@ -30,7 +30,7 @@ import { useT } from "../../i18n";
 import IconButton from "../ui/IconButton";
 import { setHomeEditing, useHomeEditing } from "./homeEditing";
 
-const deleteIcon = require("../../../assets/icons/delete.png");
+import deleteIcon from "../../../assets/icons/delete2.svg";
 
 //sections shrink to this while editing, the sides hold the buttons
 const EDIT_SCALE = 0.7;

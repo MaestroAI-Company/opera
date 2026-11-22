@@ -1,10 +1,12 @@
 import { ReactNode } from "react";
-import { Image, ImageSourcePropType, Pressable, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from "react-native";
+import { ImageStyle, Pressable, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from "react-native";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import AppIcon, { IconSource } from "./AppIcon";
 
 export type ActionButtonProps = {
-  icon?: ImageSourcePropType;
+  icon?: IconSource;
+  iconStyle?: StyleProp<ImageStyle>;
   label: string;
   labelStyle?: StyleProp<TextStyle>;
   rightElement?: ReactNode;
@@ -20,6 +22,7 @@ export type ActionButtonProps = {
 //action button for settings actions and lists, wrap in <Group> to get a shared frame
 export default function ActionButton({
   icon,
+  iconStyle,
   label,
   labelStyle,
   rightElement,
@@ -45,10 +48,10 @@ export default function ActionButton({
     >
       {icon && (iconBadge ? (
         <View style={styles.menuIconWrap}>
-          <Image source={icon} style={styles.menuIcon} tintColor={Colors.textOnPrimary} />
+          <AppIcon source={icon} style={[styles.menuIcon, iconStyle]} tintColor={Colors.textOnPrimary} />
         </View>
       ) : (
-        <Image source={icon} style={styles.menuIcon} tintColor={isHighlight ? Colors.textOnPrimary : Colors.textPrimary} />
+        <AppIcon source={icon} style={[styles.menuIcon, iconStyle]} tintColor={isHighlight ? Colors.textOnPrimary : Colors.textPrimary} />
       ))}
       <Text style={[styles.navLabel, isHighlight && { color: Colors.textOnPrimary }, labelStyle]} numberOfLines={1} ellipsizeMode="tail">{label}</Text>
       {rightElement}

@@ -11,8 +11,8 @@ import { CodeContent, codeLanguageName } from "../ui/MarkdownText";
 import { downloadCodeFile } from "../../services/codeDownload";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
-const copyIcon = require("../../../assets/icons/copy2.png");
-const downloadIcon = require("../../../assets/icons/download.png");
+import copyIcon from "../../../assets/icons/copy2.svg";
+import downloadIcon from "../../../assets/icons/download2.svg";
 
 const DESKTOP_CARD_WIDTH = 840;
 

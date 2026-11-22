@@ -2,8 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
-  Image,
-  ImageSourcePropType,
   Platform,
   Pressable,
   StyleSheet,
@@ -15,6 +13,8 @@ import {
 import { FontSizes, Fonts, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { type IconSource } from "../ui/AppIcon";
+import AppIcon from "../ui/AppIcon";
 import { pressStyle } from "../ui/pressStyle";
 import { useHomeEditing } from "./homeEditing";
 
@@ -42,14 +42,14 @@ const TAP_SLOP = 6;
 export type OrbitNode = {
   key: string;
   name: string;
-  icon: ImageSourcePropType;
+  icon: IconSource;
   //red and linked to the hub
   connected: boolean;
   onPress?: () => void;
 };
 
 type HubOrbitProps = {
-  hubIcon: ImageSourcePropType;
+  hubIcon: IconSource;
   nodes: OrbitNode[];
   onHubPress?: () => void;
   //turns only while shown
@@ -258,7 +258,7 @@ export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true }: 
                       node.connected ? "primary" : "surface",
                     )({ pressed: pressedKey === node.key && !!node.onPress, hovered: false })}
                   >
-                    <Image
+                    <AppIcon
                       source={node.icon}
                       style={{ width: ICON_SIZE * scale, height: ICON_SIZE * scale }}
                       tintColor={node.connected ? Colors.textOnPrimary : Colors.textPrimary}
@@ -309,7 +309,7 @@ export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true }: 
               onHubPress?.();
             }}
           >
-            <Image source={hubIcon} style={{ width: HUB_ICON_SIZE * scale, height: HUB_ICON_SIZE * scale }} tintColor={Colors.textOnPrimary} />
+            <AppIcon source={hubIcon} style={{ width: HUB_ICON_SIZE * scale, height: HUB_ICON_SIZE * scale }} tintColor={Colors.textOnPrimary} />
           </Pressable>
         </View>
       </View>

@@ -1,0 +1,9 @@
+{
+  "replaceAttrValues": {
+    "#000": "currentColor",
+    "#000000": "currentColor",
+    "black": "currentColor",
+    "#1C1B1F": "currentColor",
+    "#1c1b1f": "currentColor"
+  }
+}

@@ -2,7 +2,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Animated,
-  Image,
   Keyboard,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -29,6 +28,7 @@ import { useT, type TranslationFn } from "../../i18n";
 import { CloudSync } from "../../services/CloudSyncService";
 import { Conversation, DB } from "../../services/db/DatabaseService";
 import ActionButton from "../ui/ActionButton";
+import AppIcon from "../ui/AppIcon";
 import Group from "../ui/Group";
 import IconButton from "../ui/IconButton";
 import NotificationModal from "../ui/NotificationModal";
@@ -46,12 +46,12 @@ import {
 import DrawerBackButton from "./DrawerBackButton";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
-const searchIcon = require("../../../assets/icons/search.png");
-const newIcon = require("../../../assets/icons/add.png");
-const deleteIcon = require("../../../assets/icons/delete.png");
-const shareIcon = require("../../../assets/icons/share.png");
-const pinIcon = require("../../../assets/icons/pin.png");
-const unpinIcon = require("../../../assets/icons/unpin.png");
+import search2Icon from "../../../assets/icons/search2.svg";
+import newIcon from "../../../assets/icons/add.svg";
+import deleteIcon from "../../../assets/icons/delete2.svg";
+import shareIcon from "../../../assets/icons/share2.svg";
+import pinIcon from "../../../assets/icons/pin2.svg";
+import unpinIcon from "../../../assets/icons/unpin2.svg";
 
 const DRAWER_SYNC_DELAY_MS = 1500;
 const DESKTOP_SEARCH_WIDTH = 720;
@@ -271,7 +271,7 @@ export default function ConversationsDrawer({
             </>
           ) : conv.pinned ? (
             <View style={styles.pinnedIndicator}>
-              <Image
+              <AppIcon
                 source={pinIcon}
                 style={styles.pinnedIcon}
                 tintColor={Colors.textMuted}
@@ -401,8 +401,8 @@ export default function ConversationsDrawer({
               )}
               onPress={onOpenSearch}
             >
-              <Image
-                source={searchIcon}
+              <AppIcon
+                source={search2Icon}
                 style={styles.floatingSearchIcon}
                 tintColor={Colors.textPrimary}
               />
@@ -610,7 +610,7 @@ export function ConversationSearchSheet({
         <View style={styles.contentCard}>
           <Group>
             <TextInputField
-              icon={searchIcon}
+              icon={search2Icon}
               placeholder={t("conversations.search.placeholder")}
               value={searchQuery}
               onChangeText={setSearchQuery}

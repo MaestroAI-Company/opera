@@ -1,8 +1,9 @@
 import { useEffect } from "react";
-import { Animated, Easing, Image, ImageSourcePropType, Pressable, StyleSheet, Text } from "react-native";
+import { Animated, Easing, Pressable, StyleSheet, Text } from "react-native";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import AppIcon, { IconSource } from "./AppIcon";
 import { pressStyle } from "./pressStyle";
 
 const ENTRANCE_DURATION = 320;
@@ -13,7 +14,7 @@ const ENTRANCE_RISE = 8;
 const ENTRANCE_BOUNCE = 1.1;
 
 export type SuggestionPillProps = {
-  icon: ImageSourcePropType;
+  icon: IconSource;
   label: string;
   onPress: () => void;
   width?: number;
@@ -57,7 +58,7 @@ export default function SuggestionPill({ icon, label, onPress, width, index = 0,
         disabled={disabled}
         style={pressStyle([styles.pill, disabled && { opacity: 0.4 }], !disabled && "surface")}
       >
-        <Image source={icon} style={styles.icon} tintColor={Colors.textMuted} />
+        <AppIcon source={icon} style={styles.icon} tintColor={Colors.textMuted} />
         <Text style={styles.label}>{label}</Text>
       </Pressable>
     </Animated.View>

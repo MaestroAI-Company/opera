@@ -11,9 +11,9 @@ import ImageCard from "../ui/ImageCard";
 import { renderMarkdown } from "../ui/MarkdownText";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
-const arrowIcon = require("../../../assets/icons/arrow.png");
-const downloadIcon = require("../../../assets/icons/download.png");
-const githubIcon =require("../../../assets/icons/github.png");
+import arrowIcon from "../../../assets/icons/arrow2.svg";
+import downloadIcon from "../../../assets/icons/download2.svg";
+import githubIcon from "../../../assets/icons/github.svg";
 
 const DESKTOP_CARD_WIDTH = 420;
 const BANNER_SIZE = { width: 1561, height: 800 };

@@ -1,6 +1,6 @@
 import { useCameraPermissions } from "expo-camera";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Animated, BackHandler, Easing, Image, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Animated, BackHandler, Easing, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
@@ -17,14 +17,15 @@ import Group from "../ui/Group";
 import Selector from "../ui/Selector";
 import VoiceGrid from "./VoiceGrid";
 import LiveCamera, { listCameras, type CameraDevice, type LiveCameraHandle } from "./LiveCamera";
+import AppIcon from "../ui/AppIcon";
 import { pressStyle } from "../ui/pressStyle";
+import micIcon from "../../../assets/icons/microphone.svg";
+import cameraIcon from "../../../assets/icons/camera.svg";
+import hangUpIcon from "../../../assets/icons/cancel.svg";
+import micMutedIcon from "../../../assets/icons/microphone_muted2.svg";
 
 //buttons are 28px in a 56px bar, slop fills its height
 const HIT_SLOP = { top: 14, bottom: 14, left: 6, right: 6 };
-const micIcon = require("../../../assets/icons/microphone.png");
-const micMutedIcon = require("../../../assets/icons/microphone-muted.png");
-const cameraIcon = require("../../../assets/icons/camera.png");
-const hangUpIcon = require("../../../assets/icons/cancel.png");
 
 const FRAME_INTERVAL_MS = 1000;
 const FRAME_QUALITY = 0.4;
@@ -225,7 +226,7 @@ export default function LiveScreen({ backend, instructions, incognito, transcrib
             hitSlop={HIT_SLOP}
             style={pressStyle(styles.iconButton, "fadeLight")}
           >
-            <Image source={muted ? micMutedIcon : micIcon} style={styles.icon} tintColor={Colors.textOnPrimary} />
+            <AppIcon source={muted ? micMutedIcon : micIcon} style={styles.icon} tintColor={Colors.textOnPrimary} />
           </Pressable>
 
           {backend.camera && (
@@ -237,7 +238,7 @@ export default function LiveScreen({ backend, instructions, incognito, transcrib
               hitSlop={HIT_SLOP}
               style={pressStyle([styles.iconButton, cameraOn && styles.iconButtonActive], "fadeLight")}
             >
-              <Image source={cameraIcon} style={styles.icon} tintColor={cameraOn ? (incognito ? Colors.incognito : Colors.primary) : Colors.textOnPrimary} />
+              <AppIcon source={cameraIcon} style={styles.icon} tintColor={cameraOn ? (incognito ? Colors.incognito : Colors.primary) : Colors.textOnPrimary} />
             </Pressable>
           )}
 
@@ -262,7 +263,7 @@ export default function LiveScreen({ backend, instructions, incognito, transcrib
             hitSlop={HIT_SLOP}
             style={pressStyle(styles.iconButton, "fadeLight")}
           >
-            <Image source={hangUpIcon} style={styles.icon} tintColor={Colors.textOnPrimary} />
+            <AppIcon source={hangUpIcon} style={styles.icon} tintColor={Colors.textOnPrimary} />
           </Pressable>
         </Animated.View>
         </Pressable>

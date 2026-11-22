@@ -19,8 +19,8 @@ import ProgressBar from "../ui/ProgressBar";
 import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
 import { TTS_ENGINE_KEYS } from "./VoiceEngineCard";
 
-const downloadIcon = require("../../../assets/icons/download.png");
-const cancelIcon = require("../../../assets/icons/cancel.png");
+import downloadIcon from "../../../assets/icons/download2.svg";
+import cancelIcon from "../../../assets/icons/cancel2.svg";
 
 const DESKTOP_CARD_WIDTH = 560;
 

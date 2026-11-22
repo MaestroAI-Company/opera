@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   DeviceEventEmitter,
-  Image,
   Linking,
   Platform,
   Pressable,
@@ -49,11 +48,11 @@ import ThinkingIcon from "../ui/ThinkingIcon";
 import ButterflyCluster from "./ButterflyCluster";
 import { FlashingText } from "./ChatView";
 import VoiceGrid from "./VoiceGrid";
+import AppIcon from "../ui/AppIcon";
 import { ModelSelectorDrawer } from "./ModelSelector";
-
-const micIcon = require("../../../assets/icons/microphone.png");
-const stopIcon = require("../../../assets/icons/stop.png");
-const linkIcon = require("../../../assets/icons/hyperlink.png");
+import micIcon from "../../../assets/icons/microphone.svg";
+import stopIcon from "../../../assets/icons/stop.svg";
+import linkIcon from "../../../assets/icons/hyperlink2.svg";
 
 const STANDBY_SEGMENT = `\n\n---\n\n${SYSTEM_PROMPTS.STANDBY}`;
 const CARD_FENCE = /```widget id="standby_card"[^\n]*\n?([\s\S]*?)(```|$)/;
@@ -657,7 +656,7 @@ function OperaDream() {
         incognito ? { backgroundColor: Colors.incognitoPressed } : "primary"
       )}
     >
-      <Image source={busy ? stopIcon : micIcon} style={styles.micIcon} tintColor={Colors.textOnPrimary} />
+      <AppIcon source={busy ? stopIcon : micIcon} style={styles.micIcon} tintColor={Colors.textOnPrimary} />
     </Pressable>
   );
 
@@ -752,7 +751,7 @@ function OperaDream() {
       onPress={() => Linking.openURL(cardOpen.url).catch(() => { })}
       style={pressStyle([styles.button, styles.surfaceButton, styles.linkButton], { backgroundColor: Colors.surfacePressed })}
     >
-      <Image source={linkIcon} style={styles.micIcon} tintColor={Colors.textSecondary} />
+      <AppIcon source={linkIcon} style={styles.micIcon} tintColor={Colors.textSecondary} />
       <Text style={styles.buttonLabel} numberOfLines={1}>{cardOpen.label}</Text>
     </Pressable>
   );

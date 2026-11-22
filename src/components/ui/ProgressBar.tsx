@@ -1,10 +1,11 @@
-import { Image, ImageSourcePropType, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import AppIcon, { IconSource } from "./AppIcon";
 
 type ProgressBarProps = {
   progress: number;
-  icon?: ImageSourcePropType;
+  icon?: IconSource;
   fillColor?: string;
 };
 
@@ -20,7 +21,7 @@ export default function ProgressBar({
 
   return (
     <View style={[styles.container, !icon && styles.containerNoIcon]}>
-      {icon && <Image source={icon} style={styles.icon} />}
+      {icon && <AppIcon source={icon} style={styles.icon} />}
       <View style={styles.track}>
         {clamped > 0 && (
           <View

@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react";
-import { Image, ImageSourcePropType, Pressable, StyleProp, View, ViewStyle } from "react-native";
+import { Pressable, StyleProp, View, ViewStyle } from "react-native";
 import { Radius } from "../../../constants/theme";
 import { useIconLabel } from "./IconLabel";
+import AppIcon, { IconSource } from "./AppIcon";
 
 export type IconButtonProps = {
-  icon: ImageSourcePropType;
+  icon: IconSource;
   label?: string;
   name?: string;
   onPress?: () => void;
@@ -99,7 +100,7 @@ export default function IconButton({
         style,
       ]}
     >
-      <Image source={icon} style={{ width: size, height: size, tintColor }} />
+      <AppIcon source={icon} size={size} tintColor={tintColor} />
     </Pressable>
   );
 }

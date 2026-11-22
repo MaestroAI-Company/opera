@@ -33,6 +33,7 @@ import { Conversation, Message, MessageSource } from "../../services/db/Database
 import { splitDocumentBlocks } from "../../services/documents/DocumentService";
 import { Settings } from "../../services/settings/SettingsService";
 import { TTS } from "../../services/speech/TTSService";
+import AppIcon, { type IconSource } from "../ui/AppIcon";
 import IconButton from "../ui/IconButton";
 import { deriveChatDisplay, describeToolCall, renderMarkdown } from "../ui/MarkdownText";
 import SuggestionPill from "../ui/SuggestionPill";
@@ -41,20 +42,19 @@ import ButterflyCluster from "./ButterflyCluster";
 import type { PreviewImage } from "./ImagePreviewSheet";
 import type { PreviewDetails } from "./MessageDetailsSheet";
 import { pressStyle } from "../ui/pressStyle";
-
-const speakerIcon = require("../../../assets/icons/speaker.png");
-const videoIcon = require("../../../assets/icons/camera.png");
-const reloadIcon = require("../../../assets/icons/reload.png");
-const copyIcon = require("../../../assets/icons/copy.png");
-const infoIcon = require("../../../assets/icons/info.png");
-const chatIcon = require("../../../assets/icons/chat.png");
-const appSourceIcon = require("../../../assets/icons/tool.png");
-const imageSourceIcon = require("../../../assets/icons/photo.png");
-const linkSourceIcon = require("../../../assets/icons/hyperlink.png");
-const arrowIcon = require("../../../assets/icons/return.png");
-const fileIcon = require("../../../assets/icons/file.png");
-const rightArrowIcon = require("../../../assets/icons/right.png");
-const pencilIcon = require("../../../assets/icons/edit.png");
+import speakerIcon from "../../../assets/icons/speaker2.svg";
+import videoIcon from "../../../assets/icons/camera.svg";
+import reloadIcon from "../../../assets/icons/reload2.svg";
+import copyIcon from "../../../assets/icons/copy2.svg";
+import infoIcon from "../../../assets/icons/info2.svg";
+import chatIcon from "../../../assets/icons/message2.svg";
+import imageSourceIcon from "../../../assets/icons/photo.svg";
+import linkSourceIcon from "../../../assets/icons/hyperlink2.svg";
+import arrowIcon from "../../../assets/icons/return2.svg";
+import fileIcon from "../../../assets/icons/file.svg";
+import rightArrowIcon from "../../../assets/icons/arrow2.svg";
+import pencilIcon from "../../../assets/icons/edit2.svg";
+import appSourceIcon from "../../../assets/icons/tool.svg";
 
 //distance from the bottom that resumes the follow
 const FOLLOW_REGAIN = 60;
@@ -120,7 +120,7 @@ const SourcePill = ({ source }: { source: MessageSource }) => {
 
   const kind = useMemo(() => getSourceKind(source.url), [source.url]);
   const useFavicon = kind === 'url' && !!source.favicon && !faviconFailed;
-  const icon = kind === 'image' ? imageSourceIcon : kind === 'app' ? appSourceIcon : (useFavicon ? { uri: source.favicon } : linkSourceIcon);
+  const fallbackIcon = kind === 'image' ? imageSourceIcon : kind === 'app' ? appSourceIcon : linkSourceIcon;
 
   return (
     <Pressable
@@ -129,11 +129,19 @@ const SourcePill = ({ source }: { source: MessageSource }) => {
       style={pressStyle(styles.sourcePill, canOpen && "surface")}
     >
       <Text style={styles.sourceLabel} numberOfLines={1}>{sourceLabel(source)}</Text>
-      <Image
-        source={icon}
-        style={[styles.sourceFavicon, !useFavicon && { tintColor: Colors.textMuted }]}
-        onError={() => setFaviconFailed(true)}
-      />
+      {useFavicon ? (
+        <Image
+          source={{ uri: source.favicon }}
+          style={styles.sourceFavicon}
+          onError={() => setFaviconFailed(true)}
+        />
+      ) : (
+        <AppIcon
+          source={fallbackIcon}
+          style={styles.sourceFavicon}
+          tintColor={Colors.textMuted}
+        />
+      )}
     </Pressable>
   );
 };
@@ -157,11 +165,11 @@ function attachmentFilename(path: string): string {
 }
 
 //attached file above a user bubble
-const AttachmentChip = ({ icon, label, tinted = true }: { icon: any; label: string; tinted?: boolean }) => {
+const AttachmentChip = ({ icon, label, tinted = true }: { icon: IconSource; label: string; tinted?: boolean }) => {
   const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.attachmentChip}>
-      <Image source={icon} style={[styles.attachmentIcon, tinted && styles.attachmentIconTinted]} />
+      <AppIcon source={icon} style={[styles.attachmentIcon, tinted && styles.attachmentIconTinted]} />
       {!!label && <Text style={styles.attachmentLabel} numberOfLines={2} ellipsizeMode="middle">{label}</Text>}
     </View>
   );
@@ -260,7 +268,9 @@ const ToolsPill = ({ calls }: { calls: ToolCall[] }) => {
       onPress={() => setOpen(prev => !prev)}
       style={pressStyle([styles.thinkingPill, open && styles.thinkingPillOpen], "surface")}
     >
-      <Image source={rightArrowIcon} style={[styles.thinkingArrow, open && styles.thinkingArrowOpen]} />
+      <View style={open && styles.thinkingArrowOpen}>
+        <AppIcon source={rightArrowIcon} style={styles.thinkingArrow} />
+      </View>
       {open ? (
         <View style={styles.toolList}>
           {calls.map((call, i) => (
@@ -429,7 +439,9 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                     style={pressStyle([styles.thinkingPill, reasoningOpen && styles.thinkingPillOpen], hasReasoning && "surface")}
                   >
                     {hasReasoning && (
-                      <Image source={rightArrowIcon} style={[styles.thinkingArrow, reasoningOpen && styles.thinkingArrowOpen]} />
+                      <View style={reasoningOpen && styles.thinkingArrowOpen}>
+                        <AppIcon source={rightArrowIcon} style={styles.thinkingArrow} />
+                      </View>
                     )}
                     {reasoningOpen ? (
                       <Text style={styles.thinkingText}>{disp.thinkingText.replace(/\*\*/g, "")}</Text>

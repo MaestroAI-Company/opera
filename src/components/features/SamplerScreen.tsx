@@ -12,8 +12,6 @@ import {
   AppState,
   BackHandler,
   DeviceEventEmitter,
-  Image,
-  ImageSourcePropType,
   Keyboard,
   PanResponder,
   Pressable,
@@ -116,42 +114,43 @@ import {
   useDockedWidth,
 } from "./drawerAnimation";
 import { setHomeEditing, useHomeEditing } from "./homeEditing";
+import AppIcon, { type IconSource } from "../ui/AppIcon";
+import homeIcon from "../../../assets/icons/home.svg";
+import profilIcon from "../../../assets/icons/profile.svg";
+import profil2Icon from "../../../assets/icons/profile2.svg";
+import botIcon from "../../../assets/icons/bot.svg";
+import bot2Icon from "../../../assets/icons/bot2.svg";
+import toolIcon from "../../../assets/icons/tool.svg";
+import tool2Icon from "../../../assets/icons/tool2.svg";
+import settingsIcon from "../../../assets/icons/settings.svg";
+import addIcon from "../../../assets/icons/add.svg";
+import add2Icon from "../../../assets/icons/add2.svg";
+import downloadIcon from "../../../assets/icons/download2.svg";
+import validIcon from "../../../assets/icons/valid2.svg";
+import sampler2Icon from "../../../assets/icons/sampler2.svg";
+import cancelIcon from "../../../assets/icons/cancel2.svg";
+import binIcon from "../../../assets/icons/delete2.svg";
+import server2Icon from "../../../assets/icons/server2.svg";
+import operaIcon from "../../../assets/icons/operaicon.svg";
+import messageIcon from "../../../assets/icons/message2.svg";
+import timeIcon from "../../../assets/icons/time2.svg";
+import tilesIcon from "../../../assets/icons/tiles.svg";
+import quickIcon from "../../../assets/icons/quick.svg";
+import quick2Icon from "../../../assets/icons/quick2.svg";
+import stopIcon from "../../../assets/icons/stop.svg";
+import activateIcon from "../../../assets/icons/check2.svg";
+import editIcon from "../../../assets/icons/edit2.svg";
+import rightArrowIcon from "../../../assets/icons/arrow2.svg";
+import phoneDeviceIcon from "../../../assets/icons/phone2.svg";
+import desktopDeviceIcon from "../../../assets/icons/laptop2.svg";
+import webDeviceIcon from "../../../assets/icons/website2.svg";
+import reconnectIcon from "../../../assets/icons/reload2.svg";
+import infoIcon from "../../../assets/icons/info2.svg";
 
-const homeIcon = require("../../../assets/icons/home.png");
-const profilIcon = require("../../../assets/icons/profil.png");
-const profil2Icon = require("../../../assets/icons/profil2.png");
-const botIcon = require("../../../assets/icons/bot.png");
-const bot2Icon = require("../../../assets/icons/bot2.png");
-const tool2Icon = require("../../../assets/icons/tool2.png");
-const toolIcon = require("../../../assets/icons/tool.png");
-const settingsIcon = require("../../../assets/icons/settings.png");
-const addIcon = require("../../../assets/icons/add.png");
-const add2Icon = require("../../../assets/icons/add2.png");
-const questionIcon = require("../../../assets/icons/question.png");
-const reconnectIcon = require("../../../assets/icons/reconnect.png");
-const downloadIcon = require("../../../assets/icons/download.png");
-const validIcon = require("../../../assets/icons/valid.png");
-const sampler2Icon = require("../../../assets/icons/sampler2.png");
-const cancelIcon = require("../../../assets/icons/cancel.png");
-const binIcon = require("../../../assets/icons/bin.png");
-const serverIcon = require("../../../assets/icons/server.png");
-const server2Icon = require("../../../assets/icons/server2.png");
-const operaIcon = require("../../../assets/icons/operaicon.png");
-const messageIcon = require("../../../assets/icons/message.png");
-const timeIcon = require("../../../assets/icons/time.png");
-const tilesIcon = require("../../../assets/icons/tiles.png");
-const quickIcon = require("../../../assets/icons/Quick.png");
-const quick2Icon = require("../../../assets/icons/quick2.png");
-const stopIcon = require("../../../assets/icons/stop.png");
-const activateIcon = require("../../../assets/icons/activate.png");
-const pencilIcon = require("../../../assets/icons/pencil.png");
-const editIcon = require("../../../assets/icons/edit.png");
-const rightArrowIcon = require("../../../assets/icons/right.png");
-
-const HUB_DEVICE_ICONS: Record<string, ImageSourcePropType> = {
-  phone: require("../../../assets/icons/phone.png"),
-  desktop: require("../../../assets/icons/laptop.png"),
-  web: require("../../../assets/icons/website.png"),
+const HUB_DEVICE_ICONS: Record<string, IconSource> = {
+  phone: phoneDeviceIcon,
+  desktop: desktopDeviceIcon,
+  web: webDeviceIcon,
 };
 const HUB_INACTIVE_AFTER_S = 30 * 24 * 60 * 60;
 //a device seen this recently counts as connected
@@ -343,7 +342,7 @@ export default function SamplerScreen({
   };
   const renderHelpButton = (topic: "welcome" | "models" | "mcp") => (
     <IconButton
-      icon={questionIcon}
+      icon={infoIcon}
       label={t("settings.help.open")}
       onPress={() => openHelp(topic)}
       tintColor={Colors.textPrimary}
@@ -1049,7 +1048,7 @@ export default function SamplerScreen({
         {isAdmin && (
           <Group style={{ marginTop: Spacing.md }}>
             <ActionButton
-              icon={profilIcon}
+              icon={profil2Icon}
               label={t("settings.hub.pairDevice")}
               onPress={() => setQrMode("invite")}
             />
@@ -1106,7 +1105,7 @@ export default function SamplerScreen({
         {withActions && (
           <Group>
             <ActionButton
-              icon={addIcon}
+              icon={add2Icon}
               label={t("settings.hub.addMyDevice")}
               onPress={() => setQrMode("link")}
             />
@@ -1345,7 +1344,7 @@ export default function SamplerScreen({
         <View style={styles.contentCard}>
           <Group>
             <ActionButton
-              icon={profilIcon}
+              icon={profil2Icon}
               label={
                 nextRole === "admin"
                   ? t("sampler.profile.makeAdmin")
@@ -1546,7 +1545,7 @@ export default function SamplerScreen({
 
   const hostHero = (
     <>
-      <Image
+      <AppIcon
         source={HUB_DEVICE_ICONS.desktop}
         style={styles.hostIcon}
         tintColor={Colors.textPrimary}
@@ -1684,7 +1683,7 @@ export default function SamplerScreen({
   const homeCatalog: Record<
     HomeSection,
     {
-      icon: ImageSourcePropType;
+      icon: IconSource;
       label: string;
       available: boolean;
       render: () => ReactNode;
@@ -1954,7 +1953,7 @@ export default function SamplerScreen({
                     {t("sampler.model.preferencesHelp")}
                   </Text>
                 </View>
-                <Image
+                <AppIcon
                   source={rightArrowIcon}
                   style={[styles.menuIcon, { marginRight: Spacing.md }]}
                   tintColor={Colors.textMuted}
@@ -1995,7 +1994,7 @@ export default function SamplerScreen({
               </Text>
               <Group>
                 <ActionButton
-                  icon={pencilIcon}
+                  icon={editIcon}
                   label={status?.name || t("settings.hub.name")}
                   onPress={() => setHubNameSheet(true)}
                 />
@@ -2063,7 +2062,7 @@ export default function SamplerScreen({
               )}
               <Group>
                 <ActionButton
-                  icon={addIcon}
+                  icon={add2Icon}
                   label={t("sampler.addRegistry")}
                   onPress={() => setRegistrySheet(true)}
                 />
@@ -2089,7 +2088,7 @@ export default function SamplerScreen({
   };
 
   //one group per family, like the settings sidebar
-  type NavItem = { page: Page; icon: ImageSourcePropType };
+  type NavItem = { page: Page; icon: IconSource };
   const navGroups = (
     [
       [
@@ -2295,7 +2294,7 @@ export default function SamplerScreen({
           <View style={styles.welcomeAction}>
             <Group style={[styles.highlightGroup, styles.groupSpacingTight]}>
               <ActionButton
-                icon={profilIcon}
+                icon={profil2Icon}
                 label={t("settings.hub.chooseProfile")}
                 variant="highlight"
                 onPress={() => setProfileSheet("pick")}
@@ -2636,7 +2635,7 @@ export default function SamplerScreen({
             </Text>
             <Group style={styles.groupSpacingTight}>
               <TextInputField
-                icon={serverIcon}
+                icon={editIcon}
                 placeholder={t("settings.hub.name")}
                 value={hubNameDraft ?? status?.name ?? ""}
                 onChangeText={setHubNameDraft}
@@ -2705,7 +2704,7 @@ export default function SamplerScreen({
             </Text>
             <Group style={styles.groupSpacingTight}>
               <TextInputField
-                icon={serverIcon}
+                icon={server2Icon}
                 placeholder="https://registry.example.com"
                 value={registryDraft}
                 onChangeText={setRegistryDraft}
@@ -2721,7 +2720,7 @@ export default function SamplerScreen({
               ]}
             >
               <ActionButton
-                icon={addIcon}
+                icon={add2Icon}
                 label={t("sampler.addRegistry")}
                 variant="highlight"
                 disabled={!registryDraft.trim()}

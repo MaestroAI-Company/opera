@@ -7,7 +7,7 @@ import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
-const cancelIcon = require("../../../assets/icons/cancel.png");
+import cancelIcon from "../../../assets/icons/cancel2.svg";
 
 const DESKTOP_CARD_WIDTH = 720;
 

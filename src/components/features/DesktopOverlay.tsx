@@ -2,7 +2,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { DeviceEventEmitter, Image, Pressable, StyleSheet, View } from 'react-native';
+import { DeviceEventEmitter, Pressable, StyleSheet, View } from 'react-native';
+import AppIcon from '../ui/AppIcon';
+import closeIcon from '../../../assets/icons/cancel.svg';
+import chatIcon from '../../../assets/icons/message.svg';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
 import { Radius, Spacing, type ThemeColors } from '../../../constants/theme';
 import { useAnimatedValue } from '../../hooks/useAnimatedValue';
@@ -27,8 +30,7 @@ import ChatBar, { ChatBarHandle } from './ChatBar';
 import ChatView from './ChatView';
 import { ModelSelectorDrawer, ModelSelectorTrigger } from './ModelSelector';
 
-const closeIcon = require('../../../assets/icons/cancel.png');
-const chatIcon = require('../../../assets/icons/message.png');
+//remove old require lines if still present
 
 //reply card never covers the screen
 const MAX_REPLY_HEIGHT = 360;
@@ -351,12 +353,12 @@ export default function DesktopOverlay() {
         {lastReply && (
           <View style={styles.floatingRow} pointerEvents="box-none">
             <Pressable onPress={() => invoke('overlay_hide')} style={pressStyle(styles.floatingButton, 'surface')}>
-              <Image source={closeIcon} style={styles.floatingIcon} tintColor={Colors.textPrimary} />
+              <AppIcon source={closeIcon} style={styles.floatingIcon} tintColor={Colors.textPrimary} />
             </Pressable>
             <Pressable
               onPress={() => invoke('overlay_open_conversation', { convId: lastReply.conversationId })}
               style={pressStyle(styles.floatingButton, 'surface')}>
-              <Image source={chatIcon} style={styles.floatingIcon} tintColor={Colors.textPrimary} />
+              <AppIcon source={chatIcon} style={styles.floatingIcon} tintColor={Colors.textPrimary} />
             </Pressable>
           </View>
         )}

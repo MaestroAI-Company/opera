@@ -4,7 +4,6 @@ import {
   BackHandler,
   DeviceEventEmitter,
   Easing,
-  Image,
   Keyboard,
   Pressable,
   ScrollView,
@@ -45,10 +44,10 @@ import Toggle from "../ui/Toggle";
 import { pressStyle } from "../ui/pressStyle";
 import ButterflyCluster from "./ButterflyCluster";
 import HubQrSheet, { HubQrContent } from "./HubQrSheet";
-
-const arrowIcon = require("../../../assets/icons/arrow.png");
-const hubIcon = require("../../../assets/icons/server.png");
-const profilIcon = require("../../../assets/icons/profil.png");
+import AppIcon from "../ui/AppIcon";
+import arrowIcon from "../../../assets/icons/arrow.svg";
+import hubIcon from "../../../assets/icons/server2.svg";
+import profilIcon from "../../../assets/icons/profile2.svg";
 
 const BACK_BUTTON_SIZE = 56;
 //kept local so new devices onboard
@@ -609,7 +608,7 @@ export default function HubOnboarding({
                 onPress={() => goTo(index - 1)}
                 style={pressStyle(styles.backButton, styles.backButtonPressed)}
               >
-                <Image source={arrowIcon} style={styles.backIcon} tintColor={Colors.textPrimary} />
+                <AppIcon source={arrowIcon} style={styles.backIcon} tintColor={Colors.textPrimary} />
               </Pressable>
             </Animated.View>
             <View style={styles.ctaWrap}>
@@ -617,7 +616,7 @@ export default function HubOnboarding({
                 <Text style={styles.ctaText}>
                   {currentStep.cta ?? (isLast ? t("hubOnboarding.finish") : t("onboarding.next"))}
                 </Text>
-                <Image source={arrowIcon} style={styles.ctaIcon} tintColor={Colors.textOnPrimary} />
+                <AppIcon source={arrowIcon} style={styles.ctaIcon} tintColor={Colors.textOnPrimary} />
               </Pressable>
             </View>
           </View>

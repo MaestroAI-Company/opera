@@ -21,10 +21,10 @@ import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
-const copyIcon = require("../../../assets/icons/copy2.png");
-const reloadIcon = require("../../../assets/icons/reconnect.png");
-const cancelIcon = require("../../../assets/icons/cancel.png");
-const keyIcon = require("../../../assets/icons/key.png");
+import copyIcon from "../../../assets/icons/copy2.svg";
+import cancelIcon from "../../../assets/icons/cancel2.svg";
+import keyIcon from "../../../assets/icons/key2.svg";
+import reloadIcon from "../../../assets/icons/reload2.svg";
 
 const DESKTOP_CARD_WIDTH = 720;
 const COPIED_NOTICE_MS = 2000;

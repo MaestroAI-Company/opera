@@ -1,22 +1,23 @@
 import { useEffect, useRef, useState } from "react";
-import { Image, ImageSourcePropType, LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Vibration, View } from "react-native";
+import { LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Vibration, View } from "react-native";
 import Animated, { Easing, interpolate, interpolateColor, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import AppIcon, { IconSource } from "./AppIcon";
 import { pressStyle } from "./pressStyle";
 import { lockTextSelection } from "./lockTextSelection";
 
 export type SliderOption = {
   id: string;
   label: string;
-  icon?: ImageSourcePropType;
+  icon?: IconSource;
 };
 
 type SliderProps = {
   selectedValue: string;
   onSelect: (value: string) => void;
   options: SliderOption[];
-  icon?: ImageSourcePropType;
+  icon?: IconSource;
 };
 
 const GAP = 4;
@@ -215,7 +216,7 @@ export default function Slider({
 
   return (
     <View style={[styles.container, !iconSource && styles.containerNoIcon]}>
-      {iconSource && <Image source={iconSource} style={styles.icon} />}
+      {iconSource && <AppIcon source={iconSource} style={styles.icon} />}
       <View style={styles.optionsContainer} onLayout={handleLayout}>
         {options.map((option, index) => (
           <Pressable

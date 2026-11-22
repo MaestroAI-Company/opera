@@ -1,16 +1,17 @@
 import { useState } from "react";
-import { Image, ImageSourcePropType, Pressable, StyleProp, StyleSheet, Text, Vibration, View, ViewStyle } from "react-native";
+import { Pressable, StyleProp, StyleSheet, Text, Vibration, View, ViewStyle } from "react-native";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import AppIcon, { IconSource } from "./AppIcon";
 import { pressStyle } from "./pressStyle";
 
 export type GridCard = {
   key: string;
   title: string;
   status?: string;
-  icon?: ImageSourcePropType;
+  icon?: IconSource;
   //small mark left of the title
-  badge?: ImageSourcePropType;
+  badge?: IconSource;
   error?: boolean;
   //0 to 1, the card itself fills with the primary color
   progress?: number;
@@ -74,14 +75,14 @@ export default function CardGrid({ cards, minCardWidth, singleLineTitle, iconSiz
               />
             )}
             {card.icon && (
-              <Image
+              <AppIcon
                 source={card.icon}
                 style={[styles.icon, iconSize !== undefined && { width: iconSize, height: iconSize }]}
                 tintColor={Colors.textPrimary}
               />
             )}
             <View style={styles.titleRow}>
-              {card.badge && <Image source={card.badge} style={styles.badge} tintColor={Colors.textMuted} />}
+              {card.badge && <AppIcon source={card.badge} style={styles.badge} tintColor={Colors.textMuted} />}
               <Text style={[styles.title, card.selected && styles.titleSelected]} numberOfLines={singleLineTitle ? 1 : 2}>
                 {card.title}
               </Text>

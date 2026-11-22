@@ -259,6 +259,7 @@ function withNativeAndroid(config) {
       copyTemplate('src/AssistantModule.kt', path.join(javaDir, 'AssistantModule.kt'), packageName);
       copyTemplate('src/PredictiveBackModule.kt', path.join(javaDir, 'PredictiveBackModule.kt'), packageName);
       copyTemplate('src/WindowModeModule.kt', path.join(javaDir, 'WindowModeModule.kt'), packageName);
+      copyTemplate('src/DisplayMetricsFix.kt', path.join(javaDir, 'DisplayMetricsFix.kt'), packageName);
       copyTemplate('src/OperaDreamService.kt', path.join(javaDir, 'OperaDreamService.kt'), packageName);
       copyTemplate('src/WakeWordModule.kt', path.join(javaDir, 'WakeWordModule.kt'), packageName);
       copyTemplate('src/WakeWordDetector.kt', path.join(javaDir, 'WakeWordDetector.kt'), packageName);
@@ -328,6 +329,15 @@ function withNativeAndroid(config) {
           contents = contents.replace('return packages;', addLine + '\n          return packages;');
         }
       }
+    }
+
+    //text follows the window display
+    if (isKotlin && !contents.includes('DisplayMetricsFix')) {
+      contents = contents.replace(/(super\.onCreate\(\)\r?\n)/, '$1    DisplayMetricsFix.install(this)\n');
+      contents = contents.replace(
+        '  override fun onConfigurationChanged',
+        '  override fun getSystemService(name: String): Any? =\n    DisplayMetricsFix.wrap(name, super.getSystemService(name))\n\n  override fun onConfigurationChanged'
+      );
     }
 
     config.modResults.contents = contents;

@@ -11,6 +11,7 @@ Live mode lets you have a voice conversation with Maestro, right inside your cha
 - Smoother chat scrolling and card reordering, and suggestions stack on phones.
 - Opera on a computer now finds your Sampler Hub on Wi-Fi networks that hid it before.
 - Opera now fits Chromebooks, Android laptops and a phone in desktop mode: a docked sidebar, a roomy layout, and controls hidden when a camera or microphone is missing.
+- Download an image Maestro sends you, or copy its link, from the image preview.
 - Search your settings, with shortcuts to pages and your recent cards, and a floating search bar in conversations.
 - The update banner in settings now opens the release notes, with a button to see the release on GitHub.
 - Polished settings and sheets, with clearer provider model details and roomier text fields.

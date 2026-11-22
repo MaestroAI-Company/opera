@@ -125,7 +125,10 @@ import {
 import { ITool } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { openExternalUrl } from "../../services/ai/utils/openExternalUrl";
-import { openAssistantSettings } from "../../services/assistant/DefaultAssistant";
+import {
+  isDefaultAssistant,
+  openAssistantSettings,
+} from "../../services/assistant/DefaultAssistant";
 import { BackupService } from "../../services/BackupService";
 import { CloudUserInfo } from "../../services/cloud/CloudProvider";
 import {
@@ -1510,6 +1513,12 @@ export default function SettingsDrawer({
     });
     return () => sub.remove();
   }, [visible, activeSubPage, refreshPermissionStatuses]);
+
+  //hide card without assistant role
+  const [assistantRoleAvailable, setAssistantRoleAvailable] = useState(true);
+  useEffect(() => {
+    isDefaultAssistant().then((held) => setAssistantRoleAvailable(held !== null));
+  }, []);
 
   //hides the open settings card once opera is the screen saver
   const [screenSaverActive, setScreenSaverActive] = useState(false);
@@ -4562,7 +4571,7 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.nav.overlay.title"))}
 
       {/* default assistant card */}
-      {Platform.OS === "android" && (
+      {Platform.OS === "android" && assistantRoleAvailable && (
         <View style={styles.contentCard}>
           <ImageCard
             source={assistantInfoImage}

@@ -19,6 +19,11 @@ class AssistantModule(context: ReactApplicationContext) : ReactContextBaseJavaMo
     try {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         val roles = reactApplicationContext.getSystemService(Context.ROLE_SERVICE) as RoleManager
+        //no assistant role on some pcs
+        if (!roles.isRoleAvailable(RoleManager.ROLE_ASSISTANT)) {
+          promise.resolve(null)
+          return
+        }
         promise.resolve(roles.isRoleHeld(RoleManager.ROLE_ASSISTANT))
         return
       }

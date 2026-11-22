@@ -214,6 +214,7 @@ const failedState = (e: unknown): HubState => {
 type Modal = {
   title: string;
   message?: string;
+  messageAlign?: "left" | "center";
   buttons: ModalButton[];
   loading?: boolean;
 };
@@ -422,7 +423,7 @@ export default function SamplerScreen({
     }));
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<HubState | null> => {
     const hub = await SamplerHub.getPairedHub();
     setPairedHub(hub);
     setProfile(await SamplerHub.getProfile());
@@ -432,7 +433,7 @@ export default function SamplerScreen({
         : null,
     );
     setLoaded(true);
-    if (!hub) return;
+    if (!hub) return null;
     SamplerHub.deviceId()
       .then(setThisDeviceId)
       .catch(() => setThisDeviceId(null));
@@ -453,8 +454,11 @@ export default function SamplerScreen({
       setDevicesAt(Date.now() / 1000);
       setProfiles(nextProfiles);
       setSettings(nextSettings);
+      return "online";
     } catch (e) {
-      setHubState(failedState(e));
+      const next = failedState(e);
+      setHubState(next);
+      return next;
     } finally {
       //the switch follows pairing and role
       onHubChanged?.();
@@ -492,7 +496,7 @@ export default function SamplerScreen({
           if (!live) return;
           if (hubState === "online") return receiveStatus(next);
           //returning hub reloads everything
-          return refresh();
+          return refresh().then(() => {});
         })
         .catch((e) => live && setHubState(failedState(e)))
         //one check at a time
@@ -941,6 +945,42 @@ export default function SamplerScreen({
       ],
     });
 
+  const checkConnection = async () => {
+    const title = pairedHub?.name ?? "Sampler";
+    setHubState("checking");
+    setModal({
+      title,
+      message: t("settings.hub.checking"),
+      messageAlign: "center",
+      buttons: [],
+      loading: true,
+    });
+    const next = await refresh();
+    if (next === "online" || next === null) {
+      setModal((shown) => (shown?.loading ? null : shown));
+      return;
+    }
+    const failedMessage = {
+      offline: t("settings.hub.offline"),
+      revoked: t("settings.hub.revoked"),
+      outdated: t("settings.hub.outdated"),
+      checking: t("settings.hub.offline"),
+      online: "",
+    }[next];
+    setModal((shown) =>
+      shown?.loading
+        ? {
+            title,
+            message: failedMessage,
+            messageAlign: "center",
+            buttons: [
+              { text: t("common.ok"), style: "secondary", onPress: closeModal },
+            ],
+          }
+        : shown,
+    );
+  };
+
   //hub out of reach, a page of its own
   const renderStopped = () => {
     const connection = {
@@ -985,10 +1025,7 @@ export default function SamplerScreen({
               icon={reconnectIcon}
               label={t("settings.hub.check")}
               disabled={hubState === "checking"}
-              onPress={() => {
-                setHubState("checking");
-                refresh();
-              }}
+              onPress={checkConnection}
             />
             <ActionButton
               icon={cancelIcon}
@@ -2641,6 +2678,7 @@ export default function SamplerScreen({
                 onChangeText={setHubNameDraft}
                 onSubmitEditing={saveHubName}
                 autoCorrect={false}
+                autoFocus
               />
             </Group>
             <Group
@@ -2711,6 +2749,7 @@ export default function SamplerScreen({
                 onSubmitEditing={addRegistry}
                 autoCapitalize="none"
                 autoCorrect={false}
+                autoFocus
               />
             </Group>
             <Group
@@ -3016,6 +3055,7 @@ export default function SamplerScreen({
         visible={modal !== null}
         title={modal?.title}
         message={modal?.message}
+        messageAlign={modal?.messageAlign}
         buttons={modal?.buttons}
         loading={modal?.loading}
         onClose={closeModal}

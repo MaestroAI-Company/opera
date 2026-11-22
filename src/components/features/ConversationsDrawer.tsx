@@ -47,7 +47,9 @@ import DrawerBackButton from "./DrawerBackButton";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 import search2Icon from "../../../assets/icons/search2.svg";
+import cancelIcon from "../../../assets/icons/cancel2.svg";
 import newIcon from "../../../assets/icons/add.svg";
+import add2Icon from "../../../assets/icons/add2.svg";
 import deleteIcon from "../../../assets/icons/delete2.svg";
 import shareIcon from "../../../assets/icons/share2.svg";
 import pinIcon from "../../../assets/icons/pin2.svg";
@@ -56,6 +58,7 @@ import unpinIcon from "../../../assets/icons/unpin2.svg";
 const DRAWER_SYNC_DELAY_MS = 1500;
 const DESKTOP_SEARCH_WIDTH = 720;
 const DESKTOP_SEARCH_HEIGHT = 560;
+const SEARCH_PAGE_SIZE = 10;
 
 type ConversationsDrawerProps = {
   visible: boolean;
@@ -245,27 +248,27 @@ export default function ConversationsDrawer({
                 icon={shareIcon}
                 label={t("common.share")}
                 onPress={() => onShareConversation?.(conv)}
-                size={22}
+                size={18}
                 tintColor={Colors.textOnPrimary}
-                containerSize={32}
+                containerSize={28}
                 pressedColor={Colors.overlayHover}
               />
               <IconButton
                 icon={conv.pinned ? unpinIcon : pinIcon}
                 label={conv.pinned ? t("common.unpin") : t("common.pin")}
                 onPress={() => onTogglePinConversation?.(conv.id, !conv.pinned)}
-                size={22}
+                size={18}
                 tintColor={Colors.textOnPrimary}
-                containerSize={32}
+                containerSize={28}
                 pressedColor={Colors.overlayHover}
               />
               <IconButton
                 icon={deleteIcon}
                 label={t("common.delete")}
                 onPress={() => setDeleteConfirmId(conv.id)}
-                size={22}
+                size={18}
                 tintColor={Colors.textOnPrimary}
-                containerSize={32}
+                containerSize={28}
                 pressedColor={Colors.overlayHover}
               />
             </>
@@ -557,6 +560,7 @@ export function ConversationSearchSheet({
   const t = useT();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Conversation[]>([]);
+  const [visibleCount, setVisibleCount] = useState(SEARCH_PAGE_SIZE);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -567,8 +571,14 @@ export function ConversationSearchSheet({
     if (visible) {
       setSearchQuery("");
       setSearchResults([]);
+      setVisibleCount(SEARCH_PAGE_SIZE);
     }
   }
+
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+    setVisibleCount(SEARCH_PAGE_SIZE);
+  };
 
   useEffect(() => {
     if (!visible) return;
@@ -585,7 +595,9 @@ export function ConversationSearchSheet({
   }, [searchQuery, visible]);
 
   const hasQuery = searchQuery.trim().length > 0;
-  const displayed = hasQuery ? searchResults : conversations;
+  const allResults = hasQuery ? searchResults : conversations;
+  const displayed = allResults.slice(0, visibleCount);
+  const hasMore = allResults.length > visibleCount;
 
   return (
     <DrawerSheet
@@ -615,18 +627,25 @@ export function ConversationSearchSheet({
               icon={search2Icon}
               placeholder={t("conversations.search.placeholder")}
               value={searchQuery}
-              onChangeText={setSearchQuery}
+              onChangeText={handleSearchChange}
+              rightIcon={searchQuery ? cancelIcon : undefined}
+              rightIconSize={14}
+              rightIconTint={Colors.textPrimary}
+              onRightIconPress={() => handleSearchChange("")}
               autoFocus
             />
           </Group>
         </View>
 
-        <View style={styles.contentCard}>
-          <Text style={styles.sectionTitle}>
+        <View style={styles.searchResultsHeader}>
+          <Text style={styles.searchResultsTitle}>
             {t("conversations.search.results")}
           </Text>
+        </View>
+
+        <View style={styles.contentCard}>
           {displayed.length === 0 ? (
-            <Text style={styles.emptyText}>
+            <Text style={[styles.emptyText, styles.searchEmptyText]}>
               {hasQuery
                 ? t("conversations.search.empty")
                 : t("conversations.empty")}
@@ -685,9 +704,9 @@ export function ConversationSearchSheet({
                           icon={shareIcon}
                           label={t("common.share")}
                           onPress={() => onShareConversation?.(conv)}
-                          size={22}
+                          size={18}
                           tintColor={Colors.textOnPrimary}
-                          containerSize={32}
+                          containerSize={28}
                           pressedColor={Colors.overlayHover}
                         />
                         <IconButton
@@ -698,18 +717,18 @@ export function ConversationSearchSheet({
                           onPress={() =>
                             onTogglePinConversation?.(conv.id, !conv.pinned)
                           }
-                          size={22}
+                          size={18}
                           tintColor={Colors.textOnPrimary}
-                          containerSize={32}
+                          containerSize={28}
                           pressedColor={Colors.overlayHover}
                         />
                         <IconButton
                           icon={deleteIcon}
                           label={t("common.delete")}
                           onPress={() => setDeleteConfirmId(conv.id)}
-                          size={22}
+                          size={18}
                           tintColor={Colors.textOnPrimary}
-                          containerSize={32}
+                          containerSize={28}
                           pressedColor={Colors.overlayHover}
                         />
                       </>
@@ -718,6 +737,15 @@ export function ConversationSearchSheet({
                 </View>
               );
             })
+          )}
+          {hasMore && (
+            <Group style={styles.showMoreGroup}>
+              <ActionButton
+                icon={add2Icon}
+                label={t("conversations.search.showMore")}
+                onPress={() => setVisibleCount((c) => c + SEARCH_PAGE_SIZE)}
+              />
+            </Group>
           )}
         </View>
       </SheetScrollView>
@@ -1002,5 +1030,24 @@ const makeStyles = (Colors: ThemeColors) =>
       color: Colors.textMuted,
       fontFamily: Fonts.mono,
       marginRight: Spacing.xs,
+    },
+    showMoreGroup: {
+      marginTop: Spacing.md,
+    },
+    searchResultsHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingLeft: Spacing.md,
+    },
+    searchResultsTitle: {
+      fontSize: FontSizes.label,
+      fontFamily: Fonts.mono,
+      color: Colors.textMuted,
+      textTransform: "uppercase",
+    },
+    searchEmptyText: {
+      marginTop: 0,
+      paddingVertical: Spacing.md,
     },
   });

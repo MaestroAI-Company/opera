@@ -23,7 +23,7 @@ import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 import copyIcon from "../../../assets/icons/copy2.svg";
 import cancelIcon from "../../../assets/icons/cancel2.svg";
-import keyIcon from "../../../assets/icons/key2.svg";
+import checkIcon from "../../../assets/icons/check2.svg";
 import reloadIcon from "../../../assets/icons/reload2.svg";
 
 const DESKTOP_CARD_WIDTH = 720;
@@ -261,7 +261,7 @@ export function HubQrContent({ active, onClose, hub, mode, bare = false }: HubQr
             ]}
           >
             <ActionButton
-              icon={keyIcon}
+              icon={checkIcon}
               label={t("hubQr.confirm")}
               variant="highlight"
               disabled={answering}

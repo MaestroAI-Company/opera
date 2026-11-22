@@ -12,6 +12,7 @@ interface TextInputFieldProps extends TextInputProps {
   icon?: IconSource;
   containerStyle?: StyleProp<ViewStyle>;
   rightIcon?: IconSource;
+  rightIconSize?: number;
   rightIconTint?: string;
   rightIconLabel?: string;
   onRightIconPress?: () => void;
@@ -25,6 +26,7 @@ export default function TextInputField({
   onFocus,
   onBlur,
   rightIcon,
+  rightIconSize = 22,
   rightIconTint,
   rightIconLabel,
   onRightIconPress,
@@ -82,7 +84,7 @@ export default function TextInputField({
           icon={rightIcon}
           label={rightIconLabel ?? t("common.clear")}
           onPress={onRightIconPress}
-          size={22}
+          size={rightIconSize}
           tintColor={rightIconTint ?? Colors.error}
           containerSize={32}
           pressedColor={Colors.surfacePressed}

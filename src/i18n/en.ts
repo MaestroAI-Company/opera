@@ -101,6 +101,7 @@ export const en = {
   "conversations.search.placeholder": "Search conversations",
   "conversations.search.results": "RESULTS",
   "conversations.search.empty": "No results found",
+  "conversations.search.showMore": "Show more",
   "conversations.delete.title": "Delete Conversation",
   "conversations.delete.message":
     "Are you sure you want to delete this conversation? This action cannot be undone.",
@@ -339,6 +340,7 @@ export const en = {
   "settings.nav.search.title": "Search",
   "settings.nav.search.empty": "No setting found",
   "settings.nav.search.recent": "Recent",
+  "settings.nav.search.results": "Results",
   "settings.nav.search.topics": "Topics",
   "settings.nav.search.topicSync": "Sync",
   "settings.nav.search.topicSyncQuery": "Sync",

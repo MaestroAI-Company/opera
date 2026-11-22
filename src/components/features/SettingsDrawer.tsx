@@ -342,6 +342,47 @@ const DRAWER_SYNC_DELAY_MS = 1500;
 //hub entry in the account list
 const HUB_SYNC_ID = "hub";
 
+type PermissionKey =
+  | "microphone"
+  | "camera"
+  | "location"
+  | "photos"
+  | "contacts"
+  | "calendar";
+
+const PERMISSION_HANDLERS: Record<
+  PermissionKey,
+  {
+    get: () => Promise<{ status: string; granted: boolean; canAskAgain?: boolean }>;
+    request: () => Promise<{ status: string; granted: boolean; canAskAgain?: boolean }>;
+  }
+> = {
+  microphone: {
+    get: () => ExpoSpeechRecognitionModule.getPermissionsAsync(),
+    request: () => ExpoSpeechRecognitionModule.requestPermissionsAsync(),
+  },
+  camera: {
+    get: () => ImagePicker.getCameraPermissionsAsync(),
+    request: () => ImagePicker.requestCameraPermissionsAsync(),
+  },
+  location: {
+    get: () => Location.getForegroundPermissionsAsync(),
+    request: () => Location.requestForegroundPermissionsAsync(),
+  },
+  photos: {
+    get: () => MediaLibrary.getPermissionsAsync(),
+    request: () => MediaLibrary.requestPermissionsAsync(),
+  },
+  contacts: {
+    get: () => Contacts.getPermissionsAsync(),
+    request: () => Contacts.requestPermissionsAsync(),
+  },
+  calendar: {
+    get: () => Calendar.getCalendarPermissions(),
+    request: () => Calendar.requestCalendarPermissions(),
+  },
+};
+
 //plugin help shows the first sentence only
 function shortDescription(text: string) {
   const first = text
@@ -1025,6 +1066,8 @@ export default function SettingsDrawer({
   //key text saved on blur
   const [openaiKeyDraft, setOpenAIKeyDraft] = useState("");
   const [openaiKeyOpen, setOpenAIKeyOpen] = useState(false);
+  const [mcpHeaderOpen, setMcpHeaderOpen] = useState(false);
+  const [mcpClientIdOpen, setMcpClientIdOpen] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const [lastSyncSize, setLastSyncSize] = useState<number | null>(null);
 
@@ -1466,10 +1509,7 @@ export default function SettingsDrawer({
 
   type PermissionState = "granted" | "denied" | "undetermined";
   const [permissionStatuses, setPermissionStatuses] = useState<
-    Record<
-      "microphone" | "camera" | "location" | "photos" | "contacts" | "calendar",
-      PermissionState
-    >
+    Record<PermissionKey, PermissionState>
   >({
     microphone: "undetermined",
     camera: "undetermined",
@@ -1497,6 +1537,25 @@ export default function SettingsDrawer({
       contacts: (contacts?.status as PermissionState) ?? "undetermined",
       calendar: (calendar?.status as PermissionState) ?? "undetermined",
     });
+  }, []);
+
+  //ask os before opening settings
+  const requestAppPermission = useCallback(async (key: PermissionKey) => {
+    const handler = PERMISSION_HANDLERS[key];
+    try {
+      const current = await handler.get();
+      if (current.granted || current.canAskAgain === false) {
+        Linking.openSettings();
+        return;
+      }
+      const next = await handler.request();
+      setPermissionStatuses((prev) => ({
+        ...prev,
+        [key]: (next.status as PermissionState) ?? "undetermined",
+      }));
+    } catch {
+      Linking.openSettings();
+    }
   }, []);
 
   //keep badges in sync after the user flips a permission in system settings
@@ -2039,6 +2098,8 @@ export default function SettingsDrawer({
       headerValue: "",
       clientId: "",
     });
+    setMcpHeaderOpen(false);
+    setMcpClientIdOpen(false);
     setServerDraftBusy(false);
     setMcpAddVisible(true);
   };
@@ -4802,10 +4863,16 @@ export default function SettingsDrawer({
               label={t("settings.data.importAction")}
               onPress={handleImportData}
             />
+          </Group>
+
+          <Group
+            style={[styles.highlightGroup, { marginTop: Spacing.md }]}
+          >
             <ActionButton
               icon={deleteIcon}
               label={t("settings.data.deleteAllAction")}
               onPress={handleDeleteAllConversations}
+              variant="highlight"
             />
           </Group>
         </View>
@@ -5558,7 +5625,9 @@ export default function SettingsDrawer({
                 icon={micIcon}
                 label={t("permissions.microphone.label")}
                 onPress={
-                  Platform.OS !== "web" ? () => Linking.openSettings() : undefined
+                  Platform.OS !== "web"
+                    ? () => requestAppPermission("microphone")
+                    : undefined
                 }
                 disabled={Platform.OS === "web"}
                 rightElement={
@@ -5573,7 +5642,9 @@ export default function SettingsDrawer({
                 icon={cameraIcon}
                 label={t("permissions.camera.label")}
                 onPress={
-                  Platform.OS !== "web" ? () => Linking.openSettings() : undefined
+                  Platform.OS !== "web"
+                    ? () => requestAppPermission("camera")
+                    : undefined
                 }
                 disabled={Platform.OS === "web"}
                 rightElement={
@@ -5587,7 +5658,9 @@ export default function SettingsDrawer({
               icon={locationIcon}
               label={t("permissions.location.label")}
               onPress={
-                Platform.OS !== "web" ? () => Linking.openSettings() : undefined
+                Platform.OS !== "web"
+                  ? () => requestAppPermission("location")
+                  : undefined
               }
               disabled={Platform.OS === "web"}
               rightElement={
@@ -5600,7 +5673,7 @@ export default function SettingsDrawer({
               <ActionButton
                 icon={photoIcon}
                 label={t("permissions.photos.label")}
-                onPress={() => Linking.openSettings()}
+                onPress={() => requestAppPermission("photos")}
                 rightElement={renderPermissionBadge(permissionStatuses.photos)}
               />
             )}
@@ -5608,7 +5681,7 @@ export default function SettingsDrawer({
               <ActionButton
                 icon={profil2Icon}
                 label={t("permissions.contacts.label")}
-                onPress={() => Linking.openSettings()}
+                onPress={() => requestAppPermission("contacts")}
                 rightElement={renderPermissionBadge(
                   permissionStatuses.contacts,
                 )}
@@ -5618,7 +5691,7 @@ export default function SettingsDrawer({
               <ActionButton
                 icon={calendarIcon}
                 label={t("permissions.calendar.label")}
-                onPress={() => Linking.openSettings()}
+                onPress={() => requestAppPermission("calendar")}
                 rightElement={renderPermissionBadge(
                   permissionStatuses.calendar,
                 )}
@@ -6157,6 +6230,11 @@ export default function SettingsDrawer({
             : formatBytes(entry.sizeBytes)}
         </Text>
       </View>
+      <AppIcon
+        source={arrowIcon}
+        style={styles.menuIcon}
+        tintColor={Colors.textMuted}
+      />
     </Pressable>
   );
 
@@ -6304,14 +6382,22 @@ export default function SettingsDrawer({
 
   //nothing until a query goes out
   const litertSearchList = litertSearchLoading ? (
-    <Text style={styles.helpText}>{t("settings.litert.loading")}</Text>
+    <View style={styles.sheetCard}>
+      <Text style={styles.helpText}>{t("settings.litert.loading")}</Text>
+    </View>
   ) : litertSearchFailed ? (
-    <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
+    <View style={styles.sheetCard}>
+      <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
+    </View>
   ) : litertSearchResults.length > 0 ? (
-    <Group>{litertSearchResults.map(renderLitertSearchResult)}</Group>
+    <View style={[styles.sheetCard, styles.litertSearchResultsCard]}>
+      {litertSearchResults.map(renderLitertSearchResult)}
+    </View>
   ) : (
     isLitertQuerying && (
-      <Text style={styles.helpText}>{t("settings.litert.noResults")}</Text>
+      <View style={styles.sheetCard}>
+        <Text style={styles.helpText}>{t("settings.litert.noResults")}</Text>
+      </View>
     )
   );
 
@@ -6363,9 +6449,7 @@ export default function SettingsDrawer({
             </View>
             {page === "model"
               ? renderLitertDetail()
-              : litertSearchList && (
-                  <View style={styles.sheetCard}>{litertSearchList}</View>
-                )}
+              : litertSearchList}
           </>
         )}
       </SheetScrollView>
@@ -7461,55 +7545,96 @@ export default function SettingsDrawer({
           </View>
 
           <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>
-              {t("settings.mcp.headerLabel")}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.mcp.headerHelp")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={edit2Icon}
-                placeholder={t("settings.mcp.headerName")}
-                autoCapitalize="none"
-                autoCorrect={false}
-                value={serverDraft.headerName}
-                onChangeText={(v) =>
-                  setServerDraft((prev) => ({ ...prev, headerName: v }))
-                }
+            <View style={styles.apiKeyHeader}>
+              <Text style={styles.settingLabel}>
+                {t("settings.mcp.headerLabel")}
+              </Text>
+              <Checkbox
+                checked={mcpHeaderOpen}
+                onToggle={(v) => {
+                  setMcpHeaderOpen(v);
+                  if (!v)
+                    setServerDraft((prev) => ({
+                      ...prev,
+                      headerName: "",
+                      headerValue: "",
+                    }));
+                }}
               />
-              <TextInputField
-                icon={edit2Icon}
-                placeholder={t("settings.mcp.headerValue")}
-                autoCapitalize="none"
-                secureTextEntry
-                value={serverDraft.headerValue}
-                onChangeText={(v) =>
-                  setServerDraft((prev) => ({ ...prev, headerValue: v }))
-                }
-              />
-            </Group>
+            </View>
+            {mcpHeaderOpen ? (
+              <>
+                <Text
+                  style={[
+                    styles.helpText,
+                    { marginTop: Spacing.sm, marginBottom: Spacing.md },
+                  ]}
+                >
+                  {t("settings.mcp.headerHelp")}
+                </Text>
+                <Group>
+                  <TextInputField
+                    icon={edit2Icon}
+                    placeholder={t("settings.mcp.headerName")}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={serverDraft.headerName}
+                    onChangeText={(v) =>
+                      setServerDraft((prev) => ({ ...prev, headerName: v }))
+                    }
+                  />
+                  <TextInputField
+                    icon={edit2Icon}
+                    placeholder={t("settings.mcp.headerValue")}
+                    autoCapitalize="none"
+                    secureTextEntry
+                    value={serverDraft.headerValue}
+                    onChangeText={(v) =>
+                      setServerDraft((prev) => ({ ...prev, headerValue: v }))
+                    }
+                  />
+                </Group>
+              </>
+            ) : null}
           </View>
 
           <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>
-              {t("settings.mcp.clientIdLabel")}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.mcp.clientIdHelp")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={edit2Icon}
-                placeholder={t("settings.mcp.clientId")}
-                autoCapitalize="none"
-                autoCorrect={false}
-                value={serverDraft.clientId}
-                onChangeText={(v) =>
-                  setServerDraft((prev) => ({ ...prev, clientId: v }))
-                }
+            <View style={styles.apiKeyHeader}>
+              <Text style={styles.settingLabel}>
+                {t("settings.mcp.clientIdLabel")}
+              </Text>
+              <Checkbox
+                checked={mcpClientIdOpen}
+                onToggle={(v) => {
+                  setMcpClientIdOpen(v);
+                  if (!v) setServerDraft((prev) => ({ ...prev, clientId: "" }));
+                }}
               />
-            </Group>
+            </View>
+            {mcpClientIdOpen ? (
+              <>
+                <Text
+                  style={[
+                    styles.helpText,
+                    { marginTop: Spacing.sm, marginBottom: Spacing.md },
+                  ]}
+                >
+                  {t("settings.mcp.clientIdHelp")}
+                </Text>
+                <Group>
+                  <TextInputField
+                    icon={edit2Icon}
+                    placeholder={t("settings.mcp.clientId")}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={serverDraft.clientId}
+                    onChangeText={(v) =>
+                      setServerDraft((prev) => ({ ...prev, clientId: v }))
+                    }
+                  />
+                </Group>
+              </>
+            ) : null}
           </View>
 
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -8190,6 +8315,14 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
+  const instructionChanged = instructionDraft.trim() !== instruction.trim();
+
+  const saveInstruction = () => {
+    if (!instructionChanged) return;
+    setInstruction(instructionDraft);
+    setInstructionsSheetVisible(false);
+  };
+
   const instructionsSheet = (
     <DrawerSheet
       visible={instructionsSheetVisible}
@@ -8223,20 +8356,24 @@ export default function SettingsDrawer({
                 value={instructionDraft}
                 onChangeText={setInstructionDraft}
                 variant="large"
+                autoFocus
               />
             </Group>
           </View>
 
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Group style={styles.highlightGroup}>
+            <Group
+              style={[
+                styles.highlightGroup,
+                !instructionChanged && styles.highlightGroupDisabled,
+              ]}
+            >
               <ActionButton
                 icon={activateIcon}
                 label={t("settings.personality.save")}
                 variant="highlight"
-                onPress={() => {
-                  setInstruction(instructionDraft);
-                  setInstructionsSheetVisible(false);
-                }}
+                disabled={!instructionChanged}
+                onPress={saveInstruction}
               />
             </Group>
           </View>
@@ -8245,7 +8382,10 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
+  const nameChanged = nameDraft.trim() !== name.trim();
+
   const saveProfileName = () => {
+    if (!nameChanged) return;
     setName(nameDraft);
     setConfirmedName(nameDraft);
     setProfileEditVisible(false);
@@ -8287,16 +8427,23 @@ export default function SettingsDrawer({
                 value={nameDraft}
                 onChangeText={setNameDraft}
                 onSubmitEditing={saveProfileName}
+                autoFocus
               />
             </Group>
           </View>
 
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Group style={styles.highlightGroup}>
+            <Group
+              style={[
+                styles.highlightGroup,
+                !nameChanged && styles.highlightGroupDisabled,
+              ]}
+            >
               <ActionButton
                 icon={activateIcon}
                 label={t("settings.personality.save")}
                 variant="highlight"
+                disabled={!nameChanged}
                 onPress={saveProfileName}
               />
             </Group>
@@ -8734,26 +8881,30 @@ export default function SettingsDrawer({
               value={settingsSearchQuery}
               onChangeText={setSettingsSearchQuery}
               rightIcon={settingsSearchQuery ? cancelIcon : undefined}
+              rightIconSize={14}
               rightIconTint={Colors.textPrimary}
               onRightIconPress={() => setSettingsSearchQuery("")}
               autoFocus
             />
           </Group>
         </View>
-        {settingsSearchQuery.trim() === "" &&
-          settingsSearchResults.length > 0 && (
-            <View style={styles.searchRecentHeader}>
-              <Text style={styles.searchRecentTitle}>
-                {t("settings.nav.search.recent")}
-              </Text>
+        {settingsSearchResults.length > 0 && (
+          <View style={styles.searchRecentHeader}>
+            <Text style={styles.searchRecentTitle}>
+              {settingsSearchQuery.trim() === ""
+                ? t("settings.nav.search.recent")
+                : t("settings.nav.search.results")}
+            </Text>
+            {settingsSearchQuery.trim() === "" && (
               <IconButton
                 icon={cancelIcon}
                 label={t("common.clear")}
                 onPress={clearSearchRecents}
                 tintColor={Colors.textPrimary}
               />
-            </View>
-          )}
+            )}
+          </View>
+        )}
         {settingsSearchResults.map((entry) =>
           entry.onPress ? (
             <Pressable
@@ -9413,13 +9564,16 @@ const makeStyles = (Colors: ThemeColors) =>
     litertSearchResultRow: {
       flexDirection: "row",
       alignItems: "center",
-      paddingVertical: Spacing.lg2,
-      paddingHorizontal: Spacing.lg2,
+      padding: Spacing.lg2,
       gap: Spacing.lg2,
     },
+    litertSearchResultsCard: {
+      padding: 0,
+      overflow: "hidden",
+    },
     litertSearchResultTile: {
-      width: 44,
-      height: 44,
+      width: 48,
+      height: 48,
       backgroundColor: Colors.logoTile,
       borderWidth: 2,
       borderColor: Colors.logoTileBorder,
@@ -9456,7 +9610,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     addModelSheetContent: {
       paddingHorizontal: Spacing.lg2,
-      paddingBottom: Spacing.lg,
       gap: Spacing.xxl2,
     },
     groupSpacing: {

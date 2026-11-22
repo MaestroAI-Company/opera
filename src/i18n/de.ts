@@ -102,6 +102,7 @@ export const de: Translations = {
   "conversations.search.placeholder": "Unterhaltungen durchsuchen",
   "conversations.search.results": "ERGEBNISSE",
   "conversations.search.empty": "Keine Ergebnisse gefunden",
+  "conversations.search.showMore": "Mehr anzeigen",
   "conversations.delete.title": "Unterhaltung löschen",
   "conversations.delete.message":
     "Möchtest du diese Unterhaltung wirklich löschen? Das kann nicht rückgängig gemacht werden.",
@@ -316,6 +317,7 @@ export const de: Translations = {
   "settings.nav.search.title": "Suchen",
   "settings.nav.search.empty": "Keine Einstellung gefunden",
   "settings.nav.search.recent": "Zuletzt",
+  "settings.nav.search.results": "Ergebnisse",
   "settings.nav.search.topics": "Themen",
   "settings.nav.search.topicSync": "Sync",
   "settings.nav.search.topicSyncQuery": "Sync",

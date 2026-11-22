@@ -19,7 +19,7 @@ import {
   runHubModels,
   useHubModels,
 } from "../../hooks/useHubModels";
-import { useThemedStyles } from "../../hooks/useTheme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import {
   fetchModelDescription,
@@ -28,6 +28,7 @@ import {
 } from "../../services/ai/providers/huggingFaceCatalog";
 import { CatalogModel, ModelFile, ModelRepo } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
+import AppIcon from "../ui/AppIcon";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 import { pressStyle } from "../ui/pressStyle";
@@ -36,6 +37,7 @@ import DrawerBackButton from "./DrawerBackButton";
 import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
 import PageStack from "./PageStack";
 
+import arrowIcon from "../../../assets/icons/arrow2.svg";
 import searchIcon from "../../../assets/icons/search2.svg";
 import downloadIcon from "../../../assets/icons/download2.svg";
 
@@ -72,6 +74,7 @@ export default function HubModelsSheet({
   isLargeScreen = false,
   isDesktop = false,
 }: HubModelsSheetProps) {
+  const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const { height: windowHeight } = useWindowDimensions();
@@ -247,6 +250,7 @@ export default function HubModelsSheet({
             {repo.repo.split("/")[0]} · {t("hubModels.downloads", { count: repo.downloads.toLocaleString() })}
           </Text>
         </View>
+        <AppIcon source={arrowIcon} style={styles.resultArrow} tintColor={Colors.textMuted} />
       </Pressable>
     );
   };
@@ -284,13 +288,21 @@ export default function HubModelsSheet({
 
   //nothing until a query goes out
   const searchList = searchLoading ? (
-    <Text style={styles.helpText}>{t("settings.litert.loading")}</Text>
+    <View style={styles.contentCard}>
+      <Text style={styles.helpText}>{t("settings.litert.loading")}</Text>
+    </View>
   ) : searchFailed ? (
-    <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
+    <View style={styles.contentCard}>
+      <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
+    </View>
   ) : results.length > 0 ? (
-    <Group>{results.map(renderResult)}</Group>
+    <View style={[styles.contentCard, styles.resultsCard]}>{results.map(renderResult)}</View>
   ) : (
-    query.trim().length >= MIN_SEARCH_LENGTH && <Text style={styles.helpText}>{t("hubModels.noResults")}</Text>
+    query.trim().length >= MIN_SEARCH_LENGTH && (
+      <View style={styles.contentCard}>
+        <Text style={styles.helpText}>{t("hubModels.noResults")}</Text>
+      </View>
+    )
   );
 
   const renderDetail = () => {
@@ -424,7 +436,7 @@ export default function HubModelsSheet({
         ) : (
           <>
             <View style={[styles.contentCard, styles.searchWithBack]}>{renderSearchField(p)}</View>
-            {p === "model" ? renderDetail() : searchList && <View style={styles.contentCard}>{searchList}</View>}
+            {p === "model" ? renderDetail() : searchList}
           </>
         )}
       </SheetScrollView>
@@ -628,21 +640,28 @@ const makeStyles = (Colors: ThemeColors) =>
       color: Colors.textSecondary,
       marginTop: Spacing.xs2,
     },
+    resultsCard: {
+      padding: 0,
+      overflow: "hidden",
+    },
     resultRow: {
       flexDirection: "row",
       alignItems: "center",
-      paddingVertical: Spacing.lg2,
-      paddingHorizontal: Spacing.lg2,
+      padding: Spacing.lg2,
       gap: Spacing.lg2,
     },
     resultTile: {
-      width: 44,
-      height: 44,
+      width: 48,
+      height: 48,
       backgroundColor: Colors.logoTile,
       borderWidth: 2,
       borderColor: Colors.logoTileBorder,
       borderRadius: Radius.xxl,
       overflow: "hidden",
+    },
+    resultArrow: {
+      width: 18,
+      height: 18,
     },
     resultInfo: {
       flex: 1,

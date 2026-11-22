@@ -102,6 +102,7 @@ export const pt: Translations = {
   "conversations.search.placeholder": "Pesquisar conversas",
   "conversations.search.results": "RESULTADOS",
   "conversations.search.empty": "Nenhum resultado encontrado",
+  "conversations.search.showMore": "Mostrar mais",
   "conversations.delete.title": "Eliminar conversa",
   "conversations.delete.message":
     "Tens a certeza de que queres eliminar esta conversa? Esta ação não pode ser anulada.",
@@ -316,6 +317,7 @@ export const pt: Translations = {
   "settings.nav.search.title": "Pesquisar",
   "settings.nav.search.empty": "Nenhuma configuração encontrada",
   "settings.nav.search.recent": "Recentes",
+  "settings.nav.search.results": "Resultados",
   "settings.nav.search.topics": "Tópicos",
   "settings.nav.search.topicSync": "Sync",
   "settings.nav.search.topicSyncQuery": "Sincronizar",

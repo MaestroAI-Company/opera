@@ -417,7 +417,8 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                 icon={pencilIcon}
                 label={t("common.edit")}
                 onPress={() => onEditMessage?.(item)}
-                containerSize={32}
+                size={18}
+                containerSize={28}
                 pressedColor={Colors.surfacePressed}
                 tintColor={dark ? Colors.surface : Colors.textMuted}
               />
@@ -474,7 +475,8 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                   icon={speakerIcon}
                   label={isSpeaking ? t("common.stop") : t("common.listen")}
                   onPress={() => onSpeak?.(item)}
-                  containerSize={32}
+                  size={18}
+                  containerSize={28}
                   pressedColor={Colors.surfacePressed}
                   tintColor={isSpeaking ? (incognito ? Colors.incognito : Colors.primary) : (dark ? Colors.surface : Colors.textMuted)}
                 />
@@ -484,7 +486,8 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                 label={t("common.regenerate")}
                 onPress={() => onRegenerate?.(item.id)}
                 disabled={isChatGenerating}
-                containerSize={32}
+                size={18}
+                containerSize={28}
                 pressedColor={Colors.surfacePressed}
                 tintColor={dark ? Colors.surface : Colors.textMuted}
               />
@@ -494,7 +497,8 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                 onPress={() => copyToClipboard(false)}
                 onLongPress={() => copyToClipboard(true)}
                 delayLongPress={500}
-                containerSize={32}
+                size={18}
+                containerSize={28}
                 pressedColor={Colors.surfacePressed}
                 tintColor={dark ? Colors.surface : Colors.textMuted}
               />
@@ -503,7 +507,8 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                   icon={chatIcon}
                   label={t("common.openInApp")}
                   onPress={() => onOpenInApp(item)}
-                  containerSize={32}
+                  size={18}
+                  containerSize={28}
                   pressedColor={Colors.surfacePressed}
                   tintColor={dark ? Colors.surface : Colors.textMuted}
                 />
@@ -514,7 +519,8 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                   label={t("common.edit")}
                   onPress={() => onEditMessage(item)}
                   disabled={isChatGenerating}
-                  containerSize={32}
+                  size={18}
+                  containerSize={28}
                   pressedColor={Colors.surfacePressed}
                   tintColor={dark ? Colors.surface : Colors.textMuted}
                 />
@@ -529,7 +535,8 @@ const MessageItem = React.memo(({ item, incognito, onRegenerate, speakerEnabled,
                     thinkingText: disp.thinkingText,
                     toolCalls: disp.toolCalls,
                   })}
-                  containerSize={32}
+                  size={18}
+                  containerSize={28}
                   pressedColor={Colors.surfacePressed}
                   tintColor={dark ? Colors.surface : Colors.textMuted}
                 />
@@ -1180,9 +1187,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   messageImage: {
     width: 120,
     height: 120,
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
+    borderRadius: Radius.window,
     backgroundColor: Colors.surfaceSubtle,
   },
   sourcesRow: {
@@ -1227,9 +1232,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.surface,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: Radius.xxl,
+    borderRadius: Radius.window,
     padding: Spacing.lg,
     gap: Spacing.md,
   },

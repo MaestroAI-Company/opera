@@ -61,7 +61,7 @@ import quickIcon from "../../../assets/icons/quick2.svg";
 import lowIcon from "../../../assets/icons/weak2.svg";
 import visionIcon from "../../../assets/icons/vision2.svg";
 import micIcon from "../../../assets/icons/microphone2.svg";
-import videoIcon from "../../../assets/icons/camera.svg";
+import videoIcon from "../../../assets/icons/camera2.svg";
 import toolIcon from "../../../assets/icons/tool2.svg";
 import brainIcon from "../../../assets/icons/brain2.svg";
 

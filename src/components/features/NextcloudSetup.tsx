@@ -65,7 +65,7 @@ export default function NextcloudSetup({ onDone }: NextcloudSetupProps) {
   return (
     <>
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("settings.server.link")}</Text>
+        <Text style={styles.settingLabel}>Nextcloud</Text>
         <Text style={[styles.helpText, !isBrowser && styles.helpTextSpaced]}>
           {t("nextcloud.help")}
         </Text>
@@ -83,6 +83,7 @@ export default function NextcloudSetup({ onDone }: NextcloudSetupProps) {
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
+            autoFocus
             editable={!connecting}
           />
         </Group>

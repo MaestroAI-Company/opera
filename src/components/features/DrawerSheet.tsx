@@ -7,6 +7,7 @@ import {
     useContext,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from "react";
 import {
@@ -14,7 +15,10 @@ import {
     BackHandler,
     Keyboard,
     LayoutChangeEvent,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
     PanResponder,
+    PanResponderGestureState,
     Platform,
     Pressable,
     ScrollView,
@@ -116,16 +120,48 @@ function SheetFade() {
   );
 }
 
+//scroll at top hands drag to sheet
+type SheetPull = {
+  move: (gestureState: PanResponderGestureState) => void;
+  release: (gestureState: PanResponderGestureState) => void;
+  cancel: () => void;
+};
+const SheetPullContext = createContext<SheetPull | null>(null);
+
 //wrapper clips scroll edges, android ignores radius
 function useSheetScroll(
   style: StyleProp<ViewStyle>,
   contentContainerStyle: StyleProp<ViewStyle>,
+  onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void,
 ) {
   const { bottom, fade, bled, roundedBottom } = useContext(SheetInsetsContext);
+  const pull = useContext(SheetPullContext);
+  const offsetY = useRef(0);
   const content = StyleSheet.flatten(contentContainerStyle) ?? {};
   //margin so the clip matches the cards
   const side = Number(content.paddingHorizontal ?? 0);
+  const pullResponder = useMemo(
+    () =>
+      pull &&
+      PanResponder.create({
+        //capture before the scroll swallows it, android scroll takes over at 8
+        onMoveShouldSetPanResponderCapture: (_, gestureState) =>
+          offsetY.current <= 0 &&
+          gestureState.dy > 4 &&
+          Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderMove: (_, gestureState) => pull.move(gestureState),
+        onPanResponderRelease: (_, gestureState) => pull.release(gestureState),
+        onPanResponderTerminate: () => pull.cancel(),
+      }),
+    [pull],
+  );
   return {
+    panHandlers: pullResponder?.panHandlers,
+    onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      offsetY.current = event.nativeEvent.contentOffset.y;
+      onScroll?.(event);
+    },
     wrapStyle: [
       style,
       scrollWrap,
@@ -177,14 +213,12 @@ export function SheetBody({ style, ...props }: ViewProps) {
 //drop-in ScrollView for a sheet body
 export const SheetScrollView = forwardRef<ScrollView, ScrollViewProps>(
   function SheetScrollView(props, ref) {
-    const { wrapStyle, contentContainerStyle } = useSheetScroll(
-      props.style,
-      props.contentContainerStyle,
-    );
+    const { wrapStyle, contentContainerStyle, panHandlers, onScroll } =
+      useSheetScroll(props.style, props.contentContainerStyle, props.onScroll);
     const { bled } = useContext(SheetInsetsContext);
     return (
       <>
-        <View style={wrapStyle}>
+        <View style={wrapStyle} {...panHandlers}>
           <ScrollView
             showsVerticalScrollIndicator={false}
             showsHorizontalScrollIndicator={false}
@@ -192,6 +226,8 @@ export const SheetScrollView = forwardRef<ScrollView, ScrollViewProps>(
             ref={ref}
             style={scrollFill}
             contentContainerStyle={contentContainerStyle}
+            onScroll={onScroll}
+            scrollEventThrottle={props.scrollEventThrottle ?? 16}
           />
         </View>
         {!bled && <SheetFade />}
@@ -204,14 +240,12 @@ export const SheetKeyboardAwareScrollView = forwardRef<
   KeyboardAwareScrollViewRef,
   KeyboardAwareScrollViewProps
 >(function SheetKeyboardAwareScrollView(props, ref) {
-  const { wrapStyle, contentContainerStyle } = useSheetScroll(
-    props.style,
-    props.contentContainerStyle,
-  );
+  const { wrapStyle, contentContainerStyle, panHandlers, onScroll } =
+    useSheetScroll(props.style, props.contentContainerStyle, props.onScroll);
   const { bled } = useContext(SheetInsetsContext);
   return (
     <>
-      <View style={wrapStyle}>
+      <View style={wrapStyle} {...panHandlers}>
         <KeyboardAwareScrollView
           showsVerticalScrollIndicator={false}
           showsHorizontalScrollIndicator={false}
@@ -219,6 +253,8 @@ export const SheetKeyboardAwareScrollView = forwardRef<
           ref={ref}
           style={scrollFill}
           contentContainerStyle={contentContainerStyle}
+          onScroll={onScroll}
+          scrollEventThrottle={props.scrollEventThrottle ?? 16}
         />
       </View>
       {!bled && <SheetFade />}
@@ -339,26 +375,34 @@ export default function DrawerSheet({
   );
 
   //pull down moves the sheet with the finger
+  const pull = useMemo<SheetPull>(
+    () => ({
+      move: (gestureState) => {
+        dragDrawer(progress, 1 - gestureState.dy / travel);
+      },
+      release: (gestureState) => {
+        const velocity = -gestureVelocity(gestureState.vy, travel);
+        if (releaseOpens(1 - gestureState.dy / travel, -gestureState.vy)) {
+          settle(true, velocity);
+        } else {
+          dismiss(velocity);
+        }
+      },
+      cancel: () => settle(true),
+    }),
+    [dismiss, settle, progress, travel],
+  );
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gestureState) =>
           gestureState.dy > 8 &&
           Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
-        onPanResponderMove: (_, gestureState) => {
-          dragDrawer(progress, 1 - gestureState.dy / travel);
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          const velocity = -gestureVelocity(gestureState.vy, travel);
-          if (releaseOpens(1 - gestureState.dy / travel, -gestureState.vy)) {
-            settle(true, velocity);
-          } else {
-            dismiss(velocity);
-          }
-        },
-        onPanResponderTerminate: () => settle(true),
+        onPanResponderMove: (_, gestureState) => pull.move(gestureState),
+        onPanResponderRelease: (_, gestureState) => pull.release(gestureState),
+        onPanResponderTerminate: () => pull.cancel(),
       }),
-    [dismiss, settle, progress, travel],
+    [pull],
   );
 
   //android back gesture pulls the sheet down, release closes it
@@ -431,7 +475,9 @@ export default function DrawerSheet({
             ({ dataSet: { drawerSheet: true } } as any))}
         >
           {handle}
-          {children}
+          <SheetPullContext.Provider value={pull}>
+            {children}
+          </SheetPullContext.Provider>
         </View>
       </Animated.View>
     );
@@ -503,9 +549,11 @@ export default function DrawerSheet({
           {...panResponder.panHandlers}
         >
           {handle}
-          <SheetInsetsContext.Provider value={insets}>
-            {children}
-          </SheetInsetsContext.Provider>
+          <SheetPullContext.Provider value={pull}>
+            <SheetInsetsContext.Provider value={insets}>
+              {children}
+            </SheetInsetsContext.Provider>
+          </SheetPullContext.Provider>
           {avoidKeyboard && <KeyboardSpacer />}
         </Animated.View>
       )}
@@ -550,6 +598,7 @@ const makeStyles = (Colors: ThemeColors) =>
       //content scrolls instead of leaving the screen
       maxWidth: "100%",
       maxHeight: "100%",
+      //the card leaves room under the scroll
       paddingBottom: Spacing.lg,
     },
     desktopHeader: {

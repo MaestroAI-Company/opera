@@ -24,6 +24,13 @@ Put the tag you are about to push in the URL (`v1.2.3-beta.1` for a beta), and r
 
 Write it for users, not as a commit list. The sheet supports `##` headings, `-` lists, **bold** and links.
 
+What the file lists depends on the kind of release:
+
+- **Production**: everything new since the previous production release, betas included. Read the previous notes and the beta notes, then merge them into one text.
+- **Beta**: only what is new in this beta, nothing already listed in an earlier beta or in the last release. The second line points to the earlier notes, so testers know the rest is there, for example `Everything from the previous betas still applies, see [v1.2.3-beta.1](https://github.com/MaestroAI-Company/opera/releases/tag/v1.2.3-beta.1).` The first beta of a version has no previous beta, it lists what is new since the last release.
+
+Never copy the text of the previous beta into the next one. To know what to write, diff against the previous tag: `git log --oneline v1.2.3-beta.1..HEAD`.
+
 ## whatsnew-en-US
 
 Plain text, no Markdown. The Play Console accepts up to 500 characters, a longer text is refused and the upload fails.
@@ -32,7 +39,7 @@ Plain text, no Markdown. The Play Console accepts up to 500 characters, a longer
 
 1. Merge the work into `main`. A release is always tagged on `main`, so the release matches the published code and the workflows are the ones `main` carries.
 2. On `main`, bump `version` in `app.json`. The `versionCode` is set by the workflow, see [versionCode](#versioncode).
-3. Write new `release-notes.md` and `whatsnew/whatsnew-en-US` texts, then commit and push `main`.
+3. Write new `release-notes.md` and `whatsnew/whatsnew-en-US` texts covering everything since the last production release, see [release-notes.md](#release-notesmd), then commit and push `main`.
 4. Tag the `main` commit and push the tag, it must match `app.json`:
 
    ```bash
@@ -50,7 +57,7 @@ Plain text, no Markdown. The Play Console accepts up to 500 characters, a longer
 A beta can come from any branch, no need to merge into `main` first.
 
 1. Set `version` in `app.json` to the version the beta leads to, `1.2.3` for the betas of `1.2.3`.
-2. Write new `release-notes.md` and `whatsnew/whatsnew-en-US` texts, then commit and push the branch. Beta testers see the release notes in the **What's new** sheet. When that version ships, they get the production notes too.
+2. Write new `release-notes.md` and `whatsnew/whatsnew-en-US` texts with only what is new in this beta and a link to the previous beta, see [release-notes.md](#release-notesmd), then commit and push the branch. Beta testers see the release notes in the **What's new** sheet. When that version ships, they get the production notes too.
 3. Tag the commit `v<version>-beta.<n>` and push the tag, counting `n` up from 1 for each beta of the same version:
 
    ```bash

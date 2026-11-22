@@ -1,6 +1,7 @@
 import { CameraView } from "expo-camera";
 import { forwardRef, useImperativeHandle, useRef } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
+import { hasPlatformFeature } from "../../services/platform";
 
 export type LiveCameraHandle = {
   //base64 jpeg without data uri prefix
@@ -23,7 +24,9 @@ const LiveCamera = forwardRef<LiveCameraHandle, { style: StyleProp<ViewStyle>; d
         return photo?.base64 ?? null;
       },
     }));
-    return <CameraView ref={cameraRef} style={style} facing="back" animateShutter={false} />;
+    //pc webcams have no back camera
+    const facing = hasPlatformFeature("android.hardware.camera") ? "back" : "front";
+    return <CameraView ref={cameraRef} style={style} facing={facing} animateShutter={false} />;
   },
 );
 

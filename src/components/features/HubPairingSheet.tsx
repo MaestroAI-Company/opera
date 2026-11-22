@@ -42,6 +42,7 @@ import keyIcon from "../../../assets/icons/key2.svg";
 import laptopIcon from "../../../assets/icons/laptop2.svg";
 import reconnectIcon from "../../../assets/icons/reload2.svg";
 import cameraIcon from "../../../assets/icons/camera2.svg";
+import { hasPlatformFeature } from "../../services/platform";
 
 //searching turns into the results, manual is pushed from both
 type Page = "searching" | "discover" | "manual";
@@ -171,7 +172,12 @@ export default function HubPairingSheet({
   };
 
   //desktop and web have no camera to scan with
-  const mode = link ? "confirm" : Platform.OS === "web" ? "code" : "scan";
+  //code row without camera
+  const mode = link
+    ? "confirm"
+    : Platform.OS === "web" || !hasPlatformFeature("android.hardware.camera.any")
+      ? "code"
+      : "scan";
 
   //discovery page only leads to the manual ones
   const paged = discover && mode !== "confirm" && !pairedHub && SamplerHub.canDiscover();
@@ -381,7 +387,7 @@ export default function HubPairingSheet({
               shownPage === "manual" && (
                 <CameraView
                   style={styles.camera}
-                  facing="back"
+                  facing={hasPlatformFeature("android.hardware.camera") ? "back" : "front"}
                   barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
                   onBarcodeScanned={handleScan}
                 />

@@ -23,6 +23,7 @@ import micIcon from "../../../assets/icons/microphone.svg";
 import cameraIcon from "../../../assets/icons/camera.svg";
 import hangUpIcon from "../../../assets/icons/cancel.svg";
 import micMutedIcon from "../../../assets/icons/microphone_muted2.svg";
+import { hasPlatformFeature } from "../../services/platform";
 
 //buttons are 28px in a 56px bar, slop fills its height
 const HIT_SLOP = { top: 14, bottom: 14, left: 6, right: 6 };
@@ -229,7 +230,7 @@ export default function LiveScreen({ backend, instructions, incognito, transcrib
             <AppIcon source={muted ? micMutedIcon : micIcon} style={styles.icon} tintColor={Colors.textOnPrimary} />
           </Pressable>
 
-          {backend.camera && (
+          {backend.camera && hasPlatformFeature("android.hardware.camera.any") && (
             <Pressable
               accessibilityLabel={t("live.camera")}
               onPress={toggleCamera}

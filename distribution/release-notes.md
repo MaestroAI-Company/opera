@@ -10,6 +10,8 @@ Live mode lets you have a voice conversation with Maestro, right inside your cha
 - Choose and reorder the cards on the Sampler home. Your layout follows you on every device paired with your hub.
 - Smoother chat scrolling and card reordering, and suggestions stack on phones.
 - Opera on a computer now finds your Sampler Hub on Wi-Fi networks that hid it before.
+- Search your settings, with shortcuts to pages and your recent cards, and a floating search bar in conversations.
+- The update banner in settings now opens the release notes, with a button to see the release on GitHub.
 - Polished settings and sheets, with clearer provider model details and roomier text fields.
 
 This version also hardens tools and widgets: Opera asks before each MCP tool runs, and HTML, Mermaid and math widgets run apart from the app.

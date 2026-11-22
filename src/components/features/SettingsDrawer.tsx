@@ -5544,32 +5544,36 @@ export default function SettingsDrawer({
           </Text>
 
           <Group>
-            <ActionButton
-              icon={micIcon}
-              label={t("permissions.microphone.label")}
-              onPress={
-                Platform.OS !== "web" ? () => Linking.openSettings() : undefined
-              }
-              disabled={Platform.OS === "web"}
-              rightElement={
-                Platform.OS !== "web"
-                  ? renderPermissionBadge(permissionStatuses.microphone)
-                  : undefined
-              }
-            />
-            <ActionButton
-              icon={cameraIcon}
-              label={t("permissions.camera.label")}
-              onPress={
-                Platform.OS !== "web" ? () => Linking.openSettings() : undefined
-              }
-              disabled={Platform.OS === "web"}
-              rightElement={
-                Platform.OS !== "web"
-                  ? renderPermissionBadge(permissionStatuses.camera)
-                  : undefined
-              }
-            />
+            {hasPlatformFeature("android.hardware.microphone") && (
+              <ActionButton
+                icon={micIcon}
+                label={t("permissions.microphone.label")}
+                onPress={
+                  Platform.OS !== "web" ? () => Linking.openSettings() : undefined
+                }
+                disabled={Platform.OS === "web"}
+                rightElement={
+                  Platform.OS !== "web"
+                    ? renderPermissionBadge(permissionStatuses.microphone)
+                    : undefined
+                }
+              />
+            )}
+            {hasPlatformFeature("android.hardware.camera.any") && (
+              <ActionButton
+                icon={cameraIcon}
+                label={t("permissions.camera.label")}
+                onPress={
+                  Platform.OS !== "web" ? () => Linking.openSettings() : undefined
+                }
+                disabled={Platform.OS === "web"}
+                rightElement={
+                  Platform.OS !== "web"
+                    ? renderPermissionBadge(permissionStatuses.camera)
+                    : undefined
+                }
+              />
+            )}
             <ActionButton
               icon={locationIcon}
               label={t("permissions.location.label")}

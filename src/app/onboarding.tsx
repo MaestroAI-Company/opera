@@ -57,6 +57,7 @@ import { HubProfile, SamplerHub, PairedHub, NearbyHub } from "../services/hub/Sa
 import { TTS_SPEEDS, supportedEngineIds } from "../services/speech/engines";
 import { STT } from "../services/speech/STTService";
 import { TTS } from "../services/speech/TTSService";
+import { hasPlatformFeature } from "../services/platform";
 import { pressStyle } from "../components/ui/pressStyle";
 import AppIcon, { type IconSource } from "../components/ui/AppIcon";
 import arrowIcon from "../../assets/icons/arrow.svg";
@@ -817,7 +818,13 @@ export default function OnboardingPage() {
             )}
           </Text>
           <Group>
-            {PERMISSIONS.map((perm) => {
+            {PERMISSIONS.filter(
+              (perm) =>
+                (perm.id !== "microphone" ||
+                  hasPlatformFeature("android.hardware.microphone")) &&
+                (perm.id !== "camera" ||
+                  hasPlatformFeature("android.hardware.camera.any")),
+            ).map((perm) => {
               const status = statuses[perm.id];
               return (
                 <ActionButton

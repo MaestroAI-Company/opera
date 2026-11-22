@@ -903,7 +903,7 @@ export default function Index() {
         setDrawerVisible(false);
         return true;
       }
-      if (!isDesktop && inSamplerRef.current) {
+      if (inSamplerRef.current) {
         setSamplerMode(false);
         return true;
       }
@@ -915,7 +915,7 @@ export default function Index() {
       handleBackButton,
     );
     return () => backHandler.remove();
-  }, [closeSettings, isDesktop]);
+  }, [closeSettings]);
 
   const openDrawerSafely = useCallback((openFn: () => void) => {
     //skip pointless native round trip

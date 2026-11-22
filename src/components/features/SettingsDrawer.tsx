@@ -3996,7 +3996,7 @@ export default function SettingsDrawer({
               }}
             />
             {/* export ends in the mobile share sheet */}
-            {!isDesktop && (
+            {(!isDesktop || Platform.OS === "android") && (
               <ActionButton
                 icon={exportIcon}
                 label={t("settings.profile.exportCard")}
@@ -4127,7 +4127,7 @@ export default function SettingsDrawer({
       {/* overlay and screen saver links */}
       {(!isDesktop || isTauri || Platform.OS === "android") && (
         <Group style={styles.groupSpacing}>
-          {(!isDesktop || isTauri) &&
+          {(!isDesktop || isTauri || Platform.OS === "android") &&
             renderToolsNavRow(
               "assistantoverlay",
               t("settings.nav.overlay.title"),
@@ -5778,7 +5778,7 @@ export default function SettingsDrawer({
       <View style={styles.contentCard}>{renderToolToggles(generalTools)}</View>
 
       {/* mobile actions card, phone only */}
-      {!isDesktop && (
+      {(!isDesktop || Platform.OS === "android") && (
         <View style={styles.contentCard}>{renderToolToggles(mobileTools)}</View>
       )}
     </View>
@@ -8410,7 +8410,7 @@ export default function SettingsDrawer({
         t("settings.nav.general.title"),
         t("settings.nav.general.subtitle"),
       ),
-      ...(!isDesktop || isTauri
+      ...(!isDesktop || isTauri || Platform.OS === "android"
         ? [
             nav(
               "assistantoverlay",

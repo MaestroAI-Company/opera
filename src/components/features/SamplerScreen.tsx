@@ -2132,7 +2132,7 @@ export default function SamplerScreen({
 
   //android back pops nested subpages before leaving sampler
   useEffect(() => {
-    if (!visible || isDesktop || drawerVisible || sheetOpen) return;
+    if (!visible || drawerVisible || sheetOpen) return;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       if (parentOf(shownPage)) {
         handleBack();
@@ -2741,6 +2741,7 @@ export default function SamplerScreen({
             style={[
               styles.nav,
               {
+                paddingTop: (isTauri ? 32 : 0) + insets.top,
                 width: dockedWidth,
                 opacity: navOpacity,
                 transform: [{ translateX: navTranslateX }],

@@ -1,0 +1,111 @@
+name: Build Mac App Store
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # apple silicon arm64 runner
+    runs-on: macos-latest
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+      MAS_CERTIFICATES_P12_BASE64: ${{ secrets.MAS_CERTIFICATES_P12_BASE64 }}
+      MAS_CERTIFICATES_PASSWORD: ${{ secrets.MAS_CERTIFICATES_PASSWORD }}
+      MAS_PROVISION_PROFILE_BASE64: ${{ secrets.MAS_PROVISION_PROFILE_BASE64 }}
+      # gives a beta its number
+      EXPO_PUBLIC_RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the secrets
+        run: |
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64 MAS_CERTIFICATES_P12_BASE64 MAS_CERTIFICATES_PASSWORD MAS_PROVISION_PROFILE_BASE64; do
+            if [ -z "${!name}" ]; then
+              echo "$name secret is required" >&2
+              exit 1
+            fi
+          done
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # apple refuses beta suffixes
+      - name: Read the version
+        run: |
+          app_version=$(node -p "require('./app.json').expo.version")
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag_version="${GITHUB_REF_NAME#v}"
+            # strip the beta suffix
+            tag_version="${tag_version%%-beta*}"
+            if [ "$app_version" != "$tag_version" ]; then
+              echo "tag $GITHUB_REF_NAME does not match app.json version $app_version" >&2
+              exit 1
+            fi
+          fi
+          echo "APP_VERSION=$app_version" >> "$GITHUB_ENV"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          # separate from the dmg cache
+          key: mas
+
+      - name: Install dependencies
+        run: npm install
+
+      # p12 holds both certificates
+      - name: Import the signing certificates
+        run: |
+          keychain="$RUNNER_TEMP/mas.keychain-db"
+          password="$(openssl rand -hex 16)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          echo "$MAS_CERTIFICATES_P12_BASE64" | base64 -d > "$RUNNER_TEMP/mas.p12"
+          security import "$RUNNER_TEMP/mas.p12" -k "$keychain" -P "$MAS_CERTIFICATES_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productbuild
+          # skips the codesign prompt
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain"
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          app_identity=$(security find-identity -v -p codesigning "$keychain" | grep -E '"(Apple Distribution|3rd Party Mac Developer Application):' | head -n 1 | sed -E 's/.*"(.*)".*/\1/')
+          installer_identity=$(security find-identity -v "$keychain" | grep -E '"(3rd Party Mac Developer Installer|Mac Installer Distribution):' | head -n 1 | sed -E 's/.*"(.*)".*/\1/')
+          if [ -z "$app_identity" ] || [ -z "$installer_identity" ]; then
+            echo "the p12 needs the apple distribution and mac installer certificates" >&2
+            security find-identity -v "$keychain" >&2
+            exit 1
+          fi
+          echo "APP_IDENTITY=$app_identity" >> "$GITHUB_ENV"
+          echo "INSTALLER_IDENTITY=$installer_identity" >> "$GITHUB_ENV"
+
+      - name: Write the provisioning profile
+        run: echo "$MAS_PROVISION_PROFILE_BASE64" | base64 -d > src-tauri/embedded.provisionprofile
+
+      # altool reads keys here
+      - name: Write the App Store Connect key
+        run: |
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          echo "$ASC_KEY_P8_BASE64" | base64 -d > "$HOME/.appstoreconnect/private_keys/AuthKey_$ASC_KEY_ID.p8"
+
+      # no apple env skips notarization
+      - name: Build the app
+        run: |
+          # reused build numbers are refused
+          config=$(printf '{"version":"%s","bundle":{"macOS":{"bundleVersion":"%s","signingIdentity":"%s"}}}' "$APP_VERSION" "${{ github.run_number }}" "$APP_IDENTITY")
+          npm run build:desktop -- --bundles app --config src-tauri/tauri.appstore.conf.json --config "$config" -- --no-default-features
+          codesign -d --entitlements - src-tauri/target/release/bundle/macos/Opera.app
+
+      - name: Package and upload to TestFlight
+        run: |
+          xcrun productbuild --sign "$INSTALLER_IDENTITY" --component src-tauri/target/release/bundle/macos/Opera.app /Applications "$RUNNER_TEMP/Opera.pkg"
+          xcrun altool --upload-app --type macos --file "$RUNNER_TEMP/Opera.pkg" --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"

@@ -148,6 +148,7 @@
             "NSExtensionActivationSupportsFileWithMaxCount": 10,
             "NSExtensionActivationSupportsText": true
           },
+          "iosAppGroupIdentifier": "group.ai.maestro.opera.app",
           "androidIntentFilters": ["text/*", "image/*", "*/*"],
           "androidMultiIntentFilters": ["image/*", "*/*"]
         }

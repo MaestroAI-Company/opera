@@ -74,10 +74,11 @@ export default function HubSheet({
 
         {canStop && (
           <View style={styles.contentCard}>
-            <Group>
+            <Group style={[styles.highlightGroup, busy && styles.highlightGroupDisabled]}>
               <ActionButton
                 icon={cancelIcon}
                 label={t("settings.hub.stopHosting")}
+                variant="highlight"
                 disabled={busy}
                 onPress={onStop}
               />
@@ -116,7 +117,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     content: {
       paddingHorizontal: Spacing.lg2,
-      paddingBottom: Spacing.lg,
       gap: Spacing.xxl2,
     },
     contentCard: {
@@ -127,6 +127,13 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     infoGroup: {
       borderWidth: 0,
+    },
+    highlightGroup: {
+      backgroundColor: Colors.primary,
+      borderColor: Colors.borderOnPrimary,
+    },
+    highlightGroupDisabled: {
+      opacity: 0.5,
     },
     infoValue: {
       flexShrink: 1,

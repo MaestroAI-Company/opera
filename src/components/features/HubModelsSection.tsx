@@ -244,10 +244,11 @@ function HubInstalledPage({ file, onDeleted }: { file: string; onDeleted: () => 
       <View style={styles.sheetCard}>
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           {!!error && <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{error}</Text>}
-          <Group>
+          <Group style={[styles.highlightGroup, busy && styles.highlightGroupDisabled]}>
             <ActionButton
               icon={binIcon}
               label={t("settings.litert.deleteModel")}
+              variant="highlight"
               disabled={busy}
               onPress={() => setConfirmDelete(true)}
             />

@@ -3415,7 +3415,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     sheetContent: {
       paddingHorizontal: Spacing.lg2,
-      paddingBottom: Spacing.lg,
       gap: Spacing.xxl2,
     },
   });

@@ -27,6 +27,7 @@ import checkIcon from "../../../assets/icons/check2.svg";
 import reloadIcon from "../../../assets/icons/reload2.svg";
 
 const DESKTOP_CARD_WIDTH = 720;
+const HORIZONTAL_QR_WIDTH = 300;
 const COPIED_NOTICE_MS = 2000;
 
 type HubQrSheetProps = {
@@ -64,7 +65,13 @@ export default function HubQrSheet({
       desktopStyle={styles.desktopCard}
     >
       <SheetScrollView contentContainerStyle={styles.content}>
-        <HubQrContent active={visible} onClose={onClose} hub={hub} mode={mode} />
+        <HubQrContent
+          active={visible}
+          onClose={onClose}
+          hub={hub}
+          mode={mode}
+          horizontal={isLargeScreen || isDesktop}
+        />
       </SheetScrollView>
     </DrawerSheet>
   );
@@ -77,10 +84,19 @@ type HubQrContentProps = {
   mode: "invite" | "link";
   //host page explains the code
   bare?: boolean;
+  //qr left and buttons right
+  horizontal?: boolean;
 };
 
 //code card for sheet or page
-export function HubQrContent({ active, onClose, hub, mode, bare = false }: HubQrContentProps) {
+export function HubQrContent({
+  active,
+  onClose,
+  hub,
+  mode,
+  bare = false,
+  horizontal = false,
+}: HubQrContentProps) {
   const styles = useThemedStyles(makeStyles);
   const colors = useColors();
   const t = useT();
@@ -232,6 +248,71 @@ export function HubQrContent({ active, onClose, hub, mode, bare = false }: HubQr
     setTimeout(() => setCopied(false), COPIED_NOTICE_MS);
   };
 
+  const heading = (
+    <>
+      {!bare && (
+        <Text style={styles.settingLabel}>
+          {mode === "link" ? t("hubQr.linkTitle") : t("hubQr.title")}
+        </Text>
+      )}
+      {(!bare || failed) && (
+        <Text style={[styles.helpText, !horizontal && { marginBottom: Spacing.md }]}>
+          {failed
+            ? t("hubQr.failed")
+            : mode === "link"
+              ? t("hubQr.linkHelp")
+              : t("hubQr.help")}
+        </Text>
+      )}
+    </>
+  );
+
+  //no frame beside the text, the qr sits on the card
+  const qrBlock = horizontal ? (
+    <View style={[styles.rowQr, styles.qrFlat, loading && styles.qrLoading]}>
+      {loading ? (
+        <ActivityIndicator color={colors.textMuted} />
+      ) : (
+        invite && svg && <SvgXml xml={svg} width="100%" height="100%" />
+      )}
+    </View>
+  ) : loading ? (
+    <Group style={styles.groupSpacingTight}>
+      <View style={[styles.qr, styles.qrLoading]}>
+        <ActivityIndicator color={colors.textMuted} />
+      </View>
+    </Group>
+  ) : (
+    invite &&
+    svg && (
+      <Group style={styles.groupSpacingTight}>
+        <View style={styles.qr}>
+          <SvgXml xml={svg} width="100%" height="100%" />
+        </View>
+        <Text style={styles.code} selectable>
+          {invite.code}
+        </Text>
+      </Group>
+    )
+  );
+
+  const buttons = (
+    <Group>
+      <ActionButton
+        icon={copyIcon}
+        label={copied ? t("hubQr.copied") : t("hubQr.copy")}
+        disabled={!invite || loading}
+        onPress={copy}
+      />
+      <ActionButton
+        icon={reloadIcon}
+        label={t("hubQr.refresh")}
+        disabled={loading}
+        onPress={refresh}
+      />
+    </Group>
+  );
+
   return (
     <>
       {joining ? (
@@ -271,53 +352,28 @@ export function HubQrContent({ active, onClose, hub, mode, bare = false }: HubQr
         </View>
       ) : (
         <View style={styles.contentCard}>
-          {!bare && (
-            <Text style={styles.settingLabel}>
-              {mode === "link" ? t("hubQr.linkTitle") : t("hubQr.title")}
-            </Text>
-          )}
-          {(!bare || failed) && (
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {failed
-                ? t("hubQr.failed")
-                : mode === "link"
-                  ? t("hubQr.linkHelp")
-                  : t("hubQr.help")}
-            </Text>
-          )}
-          {loading ? (
-            <Group style={styles.groupSpacingTight}>
-              <View style={[styles.qr, styles.qrLoading]}>
-                <ActivityIndicator color={colors.textMuted} />
+          {horizontal ? (
+            <View style={styles.row}>
+              {qrBlock}
+              <View style={styles.rowSide}>
+                {heading}
+                <View style={styles.codeSlot}>
+                  {invite && (
+                    <Text style={[styles.code, styles.codeSide]} selectable>
+                      {invite.code}
+                    </Text>
+                  )}
+                </View>
+                {buttons}
               </View>
-            </Group>
+            </View>
           ) : (
-            invite &&
-            svg && (
-            <Group style={styles.groupSpacingTight}>
-              <View style={styles.qr}>
-                <SvgXml xml={svg} width="100%" height="100%" />
-              </View>
-              <Text style={styles.code} selectable>
-                {invite.code}
-              </Text>
-            </Group>
-            )
+            <>
+              {heading}
+              {qrBlock}
+              {buttons}
+            </>
           )}
-          <Group>
-            <ActionButton
-              icon={copyIcon}
-              label={copied ? t("hubQr.copied") : t("hubQr.copy")}
-              disabled={!invite || loading}
-              onPress={copy}
-            />
-            <ActionButton
-              icon={reloadIcon}
-              label={t("hubQr.refresh")}
-              disabled={loading}
-              onPress={refresh}
-            />
-          </Group>
         </View>
       )}
     </>
@@ -352,7 +408,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     content: {
       paddingHorizontal: Spacing.lg2,
-      paddingBottom: Spacing.lg,
     },
     contentCard: {
       backgroundColor: Colors.surface,
@@ -395,9 +450,36 @@ const makeStyles = (Colors: ThemeColors) =>
       padding: Spacing.xl2,
       paddingBottom: Spacing.md,
     },
+    qrFlat: {
+      aspectRatio: 1,
+      padding: Spacing.md,
+    },
+    row: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      gap: Spacing.lg2,
+    },
+    rowQr: {
+      width: HORIZONTAL_QR_WIDTH,
+    },
+    //text on top, buttons level with the qr
+    rowSide: {
+      flex: 1,
+      justifyContent: "space-between",
+      //level with the qr inside its padding
+      paddingVertical: Spacing.md,
+    },
     qrLoading: {
       alignItems: "center",
       justifyContent: "center",
+    },
+    //code under the text, level with the qr
+    codeSlot: {
+      flex: 1,
+      justifyContent: "center",
+    },
+    codeSide: {
+      paddingBottom: 0,
     },
     //typed on devices without a camera
     code: {

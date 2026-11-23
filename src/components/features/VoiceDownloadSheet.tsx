@@ -139,7 +139,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     content: {
       paddingHorizontal: Spacing.lg2,
-      paddingBottom: Spacing.lg,
     },
     card: {
       backgroundColor: Colors.surface,

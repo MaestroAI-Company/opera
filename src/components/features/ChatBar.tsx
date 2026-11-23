@@ -2,13 +2,14 @@
 import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { TextInputWrapper } from "expo-paste-input";
-import { Fragment, forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { Fragment, forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   BackHandler,
   Easing,
   Image,
   Keyboard,
+  LayoutChangeEvent,
   NativeSyntheticEvent,
   Platform,
   Pressable,
@@ -352,6 +353,9 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const sampleRateRef = useRef<number>(16000);
   const pulseAnim = useAnimatedValue(1);
   const pressAnim = useAnimatedValue(0);
+  //input slot height follows the text lines
+  const inputHeightAnim = useAnimatedValue(Platform.OS === 'web' ? 22 : 32);
+  const inputMeasuredRef = useRef(false);
   const incognitoAnim = useAnimatedValue(incognito ? 1 : 0);
 
   useEffect(() => {
@@ -645,6 +649,47 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       pulseAnim.setValue(1);
     }
   }, [isRecording, pulseAnim]);
+
+  //pinned textarea never reports a smaller content height
+  const fitWebInput = () => {
+    const node = inputRef.current as any;
+    if (Platform.OS !== 'web' || !node?.style) return;
+    const pinned = node.style.height;
+    node.style.height = '0px';
+    const natural = node.scrollHeight;
+    node.style.height = pinned;
+    if (natural > 0) setWebInputHeight(Math.min(132, Math.max(22, natural)));
+  };
+  useLayoutEffect(() => {
+    if (text) fitWebInput();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+  //window resize rewraps the lines
+  const inputWidthRef = useRef(0);
+
+  //input remounts after recording, first height snaps
+  useEffect(() => {
+    inputMeasuredRef.current = false;
+  }, [isRecording]);
+
+  const handleInputLayout = (e: LayoutChangeEvent) => {
+    const { height, width } = e.nativeEvent.layout;
+    if (width !== inputWidthRef.current) {
+      inputWidthRef.current = width;
+      if (text) fitWebInput();
+    }
+    if (!inputMeasuredRef.current) {
+      inputMeasuredRef.current = true;
+      inputHeightAnim.setValue(height);
+      return;
+    }
+    Animated.timing(inputHeightAnim, {
+      toValue: height,
+      duration: 160,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  };
 
   const handlePressIn = () => {
     Vibration.vibrate(10);
@@ -1220,6 +1265,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                         </Text>
                       </View>
                     )}
+                    <Animated.View style={{ height: inputHeightAnim, overflow: 'hidden' }}>
                     <TextInputWrapper
                       onPaste={(payload) => {
                         if (payload.type !== "images") return;
@@ -1277,6 +1323,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                           }
                         } : undefined}
                         editable={!isTranscribing}
+                        onLayout={handleInputLayout}
                         onTouchStart={handlePressIn}
                         onTouchEnd={handlePressOut}
                         onKeyPress={handleKeyPress}
@@ -1286,6 +1333,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                         {Platform.OS !== 'web' && <Text>{renderInputText()}</Text>}
                       </TextInput>
                     </TextInputWrapper>
+                    </Animated.View>
                   </View>
                 )}
 

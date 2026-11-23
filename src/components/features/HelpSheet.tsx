@@ -93,7 +93,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   content: {
     paddingHorizontal: Spacing.lg2,
-    paddingBottom: Spacing.lg,
     gap: Spacing.xxl2,
   },
   image: {

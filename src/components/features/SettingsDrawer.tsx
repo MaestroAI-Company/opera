@@ -193,6 +193,7 @@ import DrawerSheet, {
 import HelpSheet, { type HelpSection } from "./HelpSheet";
 import { selectVoice, useVoice, VOICE_OPTIONS } from "./maestroButterfly";
 import MaestroCard from "./MaestroCard";
+import BugReportSheet from "./BugReportSheet";
 import PersonalitySheet, {
     personalityParts,
     readPersonality,
@@ -249,7 +250,6 @@ import {
 } from "../../services/updates/UpdateService";
 
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
-import { useBugReport } from "../../hooks/useBugReport";
 import { setThemeMode, useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT, type TranslationKey } from "../../i18n";
 import { pressStyle } from "../ui/pressStyle";
@@ -1372,7 +1372,7 @@ export default function SettingsDrawer({
       .then(setUpdateChecksState)
       .catch(() => {});
   }, [visible]);
-  const report = useBugReport(showAlert);
+  const [bugReportSheetVisible, setBugReportSheetVisible] = useState(false);
   const [instruction, setInstructionState] = useState("");
   const [name, setNameState] = useState("");
   //only feeds the card's look, so it doesn't redesign on every keystroke
@@ -5703,11 +5703,6 @@ export default function SettingsDrawer({
     </View>
   );
 
-  //fresh draft on every visit
-  useEffect(() => {
-    if (activeSubPage === "reports") report.reset();
-  }, [activeSubPage]);
-
   // reports subpage content
   const renderReportsSubPage = () => (
     <View style={styles.subPageContainer}>
@@ -5722,40 +5717,11 @@ export default function SettingsDrawer({
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
             {t("settings.support.reportHelp")}
           </Text>
-          <Group style={styles.groupSpacingTight}>
-            <TextInputField
-              icon={edit2Icon}
-              placeholder={t("bugReport.placeholder")}
-              value={report.text}
-              onChangeText={report.setText}
-              variant="large"
-            />
-          </Group>
-
-          <View style={styles.toggleRow}>
-            <Checkbox
-              label={t("bugReport.attachLogs")}
-              checked={report.logs !== null}
-              onToggle={report.toggleLogs}
-              labelFirst
-              style={styles.checkboxRow}
-            />
-          </View>
-
-          <Text
-            style={[
-              styles.helpText,
-              { marginTop: Spacing.md, marginBottom: Spacing.md },
-            ]}
-          >
-            {t("bugReport.consent")}
-          </Text>
-
           <Group style={styles.highlightGroup}>
             <ActionButton
               icon={arrowIcon}
               label={t("bugReport.send")}
-              onPress={() => report.send()}
+              onPress={() => setBugReportSheetVisible(true)}
               variant="highlight"
             />
           </Group>
@@ -6966,6 +6932,16 @@ export default function SettingsDrawer({
       visible={personalitySheetVisible}
       onClose={() => setPersonalitySheetVisible(false)}
       onSaved={setPersonality}
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+    />
+  );
+
+  const bugReportSheet = (
+    <BugReportSheet
+      visible={bugReportSheetVisible}
+      onClose={() => setBugReportSheetVisible(false)}
+      autoFocus
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
     />
@@ -8294,10 +8270,11 @@ export default function SettingsDrawer({
 
             <View style={styles.sheetCard}>
               <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-                <Group>
+                <Group style={styles.highlightGroup}>
                   <ActionButton
                     icon={deleteIcon}
                     label={t("settings.litert.deleteModel")}
+                    variant="highlight"
                     onPress={() =>
                       handleDeleteLitert({
                         id: installedEntry.repoId,
@@ -8992,6 +8969,7 @@ export default function SettingsDrawer({
           {ollamaModelSheet}
           {hubServerSheet}
           {personalitySheet}
+          {bugReportSheet}
           {hubModelSheet}
           {openaiAddServerSheet}
           {openaiServerSheet}
@@ -9116,6 +9094,7 @@ export default function SettingsDrawer({
             {ollamaModelSheet}
             {hubServerSheet}
             {personalitySheet}
+            {bugReportSheet}
             {hubModelSheet}
             {openaiAddServerSheet}
             {openaiServerSheet}
@@ -9179,6 +9158,7 @@ export default function SettingsDrawer({
       {ollamaModelSheet}
       {hubServerSheet}
       {personalitySheet}
+      {bugReportSheet}
       {hubModelSheet}
       {openaiAddServerSheet}
       {openaiServerSheet}

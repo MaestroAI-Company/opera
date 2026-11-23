@@ -31,6 +31,8 @@ type BugReportSheetProps = {
   screenshot?: string | null;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
+  //raises the keyboard when the sheet opens
+  autoFocus?: boolean;
 };
 
 //opens on shake or after crash
@@ -41,6 +43,7 @@ export default function BugReportSheet({
   screenshot = null,
   isLargeScreen = false,
   isDesktop = false,
+  autoFocus = false,
 }: BugReportSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
@@ -109,6 +112,7 @@ export default function BugReportSheet({
                   value={report.text}
                   onChangeText={report.setText}
                   variant="large"
+                  autoFocus={autoFocus}
                 />
               </Group>
             </View>
@@ -207,7 +211,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     content: {
       paddingHorizontal: Spacing.lg2,
-      paddingBottom: Spacing.lg,
     },
     contentCard: {
       backgroundColor: Colors.surface,

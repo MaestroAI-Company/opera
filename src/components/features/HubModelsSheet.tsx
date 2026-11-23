@@ -296,7 +296,12 @@ export default function HubModelsSheet({
       <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
     </View>
   ) : results.length > 0 ? (
-    <View style={[styles.contentCard, styles.resultsCard]}>{results.map(renderResult)}</View>
+    <>
+      <View style={styles.searchResultsHeader}>
+        <Text style={styles.searchResultsTitle}>{t("conversations.search.results")}</Text>
+      </View>
+      <View style={[styles.contentCard, styles.resultsCard]}>{results.map(renderResult)}</View>
+    </>
   ) : (
     query.trim().length >= MIN_SEARCH_LENGTH && (
       <View style={styles.contentCard}>
@@ -537,7 +542,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     content: {
       paddingHorizontal: Spacing.lg2,
-      paddingBottom: Spacing.lg,
       gap: Spacing.xxl2,
     },
     backWrapper: {
@@ -551,6 +555,18 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     searchWithBack: {
       marginLeft: 40 + Spacing.md,
+    },
+    searchResultsHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingLeft: Spacing.md,
+    },
+    searchResultsTitle: {
+      fontSize: FontSizes.label,
+      fontFamily: Fonts.mono,
+      color: Colors.textMuted,
+      textTransform: "uppercase",
     },
     contentCard: {
       backgroundColor: Colors.surface,

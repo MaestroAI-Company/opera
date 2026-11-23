@@ -860,6 +860,8 @@ export const fr: Translations = {
   "settings.overlay.desktopEnabled": "Raccourci clavier",
   "settings.overlay.desktopEnabledHelp":
     "Ouvre Maestro par-dessus n'importe quelle app avec un raccourci clavier.",
+  "settings.overlay.appStoreUnavailable":
+    "L'overlay de Maestro n'est disponible que dans la version d'Opera téléchargée en dehors de l'App Store.",
   "settings.overlay.shortcut": "Raccourci",
   "settings.overlay.selectShortcut": "Choisir un raccourci",
   "settings.overlay.closeToTray": "Rester ouvert en arrière-plan",

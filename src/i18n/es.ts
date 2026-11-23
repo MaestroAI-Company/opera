@@ -857,6 +857,8 @@ export const es: Translations = {
   "settings.overlay.desktopEnabled": "Atajo de teclado",
   "settings.overlay.desktopEnabledHelp":
     "Abre Maestro sobre cualquier app con un atajo de teclado.",
+  "settings.overlay.appStoreUnavailable":
+    "El overlay de Maestro solo está disponible en la versión de Opera descargada fuera de la App Store.",
   "settings.overlay.shortcut": "Atajo",
   "settings.overlay.selectShortcut": "Selecciona un atajo",
   "settings.overlay.closeToTray": "Seguir en segundo plano",

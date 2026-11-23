@@ -854,6 +854,8 @@ export const en = {
   "settings.overlay.desktopEnabled": "Keyboard shortcut",
   "settings.overlay.desktopEnabledHelp":
     "Open Maestro over any app with a keyboard shortcut.",
+  "settings.overlay.appStoreUnavailable":
+    "The Maestro overlay is only available in the version of Opera downloaded outside the App Store.",
   "settings.overlay.shortcut": "Shortcut",
   "settings.overlay.selectShortcut": "Select a shortcut",
   "settings.overlay.closeToTray": "Keep running in the background",

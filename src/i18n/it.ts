@@ -857,6 +857,8 @@ export const it: Translations = {
   "settings.overlay.desktopEnabled": "Scorciatoia da tastiera",
   "settings.overlay.desktopEnabledHelp":
     "Apri Maestro sopra qualsiasi app con una scorciatoia da tastiera.",
+  "settings.overlay.appStoreUnavailable":
+    "L'overlay di Maestro è disponibile solo nella versione di Opera scaricata al di fuori dell'App Store.",
   "settings.overlay.shortcut": "Scorciatoia",
   "settings.overlay.selectShortcut": "Seleziona una scorciatoia",
   "settings.overlay.closeToTray": "Resta attiva in background",

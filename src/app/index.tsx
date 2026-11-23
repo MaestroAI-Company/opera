@@ -142,7 +142,9 @@ import {
   subscribeToNotificationPress,
   takePendingNotificationConvId,
 } from "../services/notifications/NotificationService";
+import { pushDesktopOverlayConfig } from "../services/overlay/desktopOverlay";
 import { OverlayPresence } from "../services/overlay/overlayPresence";
+import { isAppStore } from "../services/platform";
 import { PluginRegistry } from "../services/plugins/PluginRegistry";
 import { NEW_CHAT_ACTION_ID } from "../services/quickActions/QuickActionsService";
 import { Settings } from "../services/settings/SettingsService";
@@ -1214,6 +1216,8 @@ export default function Index() {
           .then(setReleaseNotes)
           .catch((e) => console.warn("Could not load release notes:", e));
         if (isTauri) {
+          //no overlay window pushes it
+          if (isAppStore) pushDesktopOverlayConfig(s);
           applyLaunchAtStartupDefault().catch((e) =>
             console.warn("Could not set launch at startup:", e),
           );

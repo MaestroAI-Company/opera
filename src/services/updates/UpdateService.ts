@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 import { invoke } from '@tauri-apps/api/core';
 import { universalFetch } from '../ai/utils/universalFetch';
 import { Settings } from '../settings/SettingsService';
-import { isTauri } from '../platform';
+import { isAppStore, isTauri } from '../platform';
 
 const LATEST_RELEASE_URL = 'https://api.github.com/repos/MaestroAI-Company/opera/releases/latest';
 const RELEASE_TAG_URL = 'https://api.github.com/repos/MaestroAI-Company/opera/releases/tags/';
@@ -138,6 +138,8 @@ export async function setBetaChannel(enabled: boolean): Promise<void> {
 //latest release when newer than build
 //force skips setting and cache
 export async function getAvailableUpdate(force = false): Promise<AppRelease | null> {
+  //the app store ships updates itself
+  if (isAppStore) return null;
   const current = getBuildVersion();
   //no github call when turned off
   if (!force && !(await getUpdateChecks())) return null;

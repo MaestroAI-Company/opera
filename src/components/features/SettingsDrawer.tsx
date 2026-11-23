@@ -205,6 +205,7 @@ import {
   getLaunchAtStartup,
   setLaunchAtStartup,
 } from "../../services/desktop/launchAtStartup";
+import { isAppStore } from "../../services/platform";
 import {
   getBetaChannel,
   setBetaChannel,
@@ -3828,7 +3829,7 @@ export default function SettingsDrawer({
         </View>
       </View>
 
-      {isTauri && (
+      {isTauri && !isAppStore && (
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: Spacing.md }]}>
             <View style={styles.toggleGroupRow}>
@@ -4450,8 +4451,19 @@ export default function SettingsDrawer({
         </View>
       )}
 
+      {/* app store build has no overlay */}
+      {isAppStore && (
+        <View style={styles.contentCard}>
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Text style={styles.helpText}>
+              {t("settings.overlay.appStoreUnavailable")}
+            </Text>
+          </View>
+        </View>
+      )}
+
       {/* desktop shortcut card */}
-      {isTauri && (
+      {isTauri && !isAppStore && (
         <View style={styles.contentCard}>
           <View
             style={[

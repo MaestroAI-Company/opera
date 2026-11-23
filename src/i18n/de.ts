@@ -857,6 +857,8 @@ export const de: Translations = {
   "settings.overlay.desktopEnabled": "Tastenkürzel",
   "settings.overlay.desktopEnabledHelp":
     "Öffne Maestro mit einem Tastenkürzel über jeder App.",
+  "settings.overlay.appStoreUnavailable":
+    "Das Maestro-Overlay ist nur in der Version von Opera verfügbar, die außerhalb des App Store heruntergeladen wurde.",
   "settings.overlay.shortcut": "Tastenkürzel",
   "settings.overlay.selectShortcut": "Tastenkürzel auswählen",
   "settings.overlay.closeToTray": "Im Hintergrund weiterlaufen",

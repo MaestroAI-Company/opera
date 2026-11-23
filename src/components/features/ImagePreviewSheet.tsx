@@ -1,12 +1,17 @@
+import * as Clipboard from "expo-clipboard";
 import { useEffect, useState } from "react";
 import { Image, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+import { downloadImage } from "../../services/imageDownload";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
+
+const copyIcon = require("../../../assets/icons/copy.png");
+const downloadIcon = require("../../../assets/icons/download.png");
 
 const DESKTOP_CARD_WIDTH = 840;
 
@@ -61,7 +66,22 @@ export default function ImagePreviewSheet({ image, onClose, isLargeScreen = fals
     Image.getSize(image.uri, (width, height) => setMeasured({ uri: image.uri, width, height }), () => {});
   }, [image]);
 
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  const copyLink = async () => {
+    if (!shown) return;
+    await Clipboard.setStringAsync(shown.uri);
+    setCopied(true);
+  };
+
   const info = shown ? describeUri(shown.uri) : null;
+  //only web urls are shareable
+  const hasLink = !!shown && /^https?:\/\//i.test(shown.uri);
   const rows = [
     info?.name ? { label: t("imagePreview.name"), value: info.name } : null,
     info?.format ? { label: t("imagePreview.format"), value: info.format } : null,
@@ -83,6 +103,7 @@ export default function ImagePreviewSheet({ image, onClose, isLargeScreen = fals
     >
       <SheetScrollView contentContainerStyle={styles.content}>
         {shown && (
+          <>
           <Group style={styles.infoGroup}>
             <View style={styles.imageContainer}>
               <Image
@@ -109,6 +130,21 @@ export default function ImagePreviewSheet({ image, onClose, isLargeScreen = fals
               />
             ))}
           </Group>
+          <Group>
+            {hasLink && (
+              <ActionButton
+                icon={copyIcon}
+                label={copied ? t("chat.copied") : t("imagePreview.copyLink")}
+                onPress={copyLink}
+              />
+            )}
+            <ActionButton
+              icon={downloadIcon}
+              label={t("imagePreview.download")}
+              onPress={() => downloadImage(shown.uri).catch(() => {})}
+            />
+          </Group>
+          </>
         )}
       </SheetScrollView>
     </DrawerSheet>
@@ -141,6 +177,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   content: {
     paddingHorizontal: Spacing.lg2,
     paddingBottom: Spacing.lg,
+    gap: Spacing.xxl2,
   },
   imageContainer: {
     padding: Spacing.md,

@@ -169,6 +169,8 @@ export const it: Translations = {
   "imagePreview.format": "Formato",
   "imagePreview.dimensions": "Dimensioni",
   "imagePreview.size": "Peso",
+  "imagePreview.copyLink": "Copia link",
+  "imagePreview.download": "Scarica",
   "messageDetails.model": "Modello",
   "messageDetails.time": "Tempo",
   "messageDetails.tokens": "Token",

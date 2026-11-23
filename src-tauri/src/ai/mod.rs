@@ -1,4 +1,5 @@
 pub mod bridge;
+#[cfg(feature = "direct")]
 pub mod detector;
 pub mod files;
 mod model;
@@ -40,6 +41,7 @@ pub fn watch_idle() {
         std::thread::spawn(|| loop {
             std::thread::sleep(Duration::from_secs(30));
             whisper::unload_if_idle();
+            #[cfg(feature = "direct")]
             detector::unload_if_idle();
         });
     });

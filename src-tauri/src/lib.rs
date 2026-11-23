@@ -2,15 +2,18 @@
 mod ai;
 #[cfg(desktop)]
 mod hub;
-#[cfg(desktop)]
+//sandbox allows only this login api
+#[cfg(all(target_os = "macos", not(feature = "direct")))]
+mod login_item;
+#[cfg(all(desktop, feature = "direct"))]
 mod overlay_window;
-#[cfg(desktop)]
+#[cfg(all(desktop, feature = "direct"))]
 mod overlay_stage;
 #[cfg(desktop)]
 mod settings_window;
 #[cfg(desktop)]
 mod tray;
-#[cfg(desktop)]
+#[cfg(all(desktop, feature = "direct"))]
 mod updater;
 mod webview_task;
 
@@ -37,7 +40,7 @@ fn webview_data_dir(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
     Some(dir)
 }
 
-#[cfg(all(desktop, target_os = "linux"))]
+#[cfg(all(desktop, feature = "direct", target_os = "linux"))]
 pub use updater::install_appimage;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -54,13 +57,19 @@ pub fn run() {
     {
         builder = builder
             .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| tray::show_main(app)))
+            .manage(hub::HubState::default());
+    }
+
+    //app store build skips these
+    #[cfg(all(desktop, feature = "direct"))]
+    {
+        builder = builder
             .plugin(tauri_plugin_global_shortcut::Builder::new().build())
             .plugin(tauri_plugin_updater::Builder::new().build())
             .plugin(tauri_plugin_autostart::init(
                 tauri_plugin_autostart::MacosLauncher::LaunchAgent,
                 Some(vec![HIDDEN_ARG]),
-            ))
-            .manage(hub::HubState::default());
+            ));
     }
 
     builder = builder
@@ -73,31 +82,33 @@ pub fn run() {
             webview_task::webview_task,
             #[cfg(desktop)]
             settings_window::open_settings_window,
-            #[cfg(desktop)]
+            #[cfg(all(desktop, feature = "direct"))]
             overlay_window::overlay_resize,
-            #[cfg(desktop)]
+            #[cfg(all(desktop, feature = "direct"))]
             overlay_window::overlay_hide,
-            #[cfg(desktop)]
+            #[cfg(all(desktop, feature = "direct"))]
             overlay_window::overlay_hold,
-            #[cfg(desktop)]
+            #[cfg(all(desktop, feature = "direct"))]
             overlay_window::overlay_configure,
-            #[cfg(desktop)]
+            #[cfg(all(desktop, not(feature = "direct")))]
+            tray::overlay_configure,
+            #[cfg(all(desktop, feature = "direct"))]
             overlay_window::overlay_forward_notice,
-            #[cfg(desktop)]
+            #[cfg(all(desktop, feature = "direct"))]
             overlay_window::overlay_set_pinned,
-            #[cfg(desktop)]
+            #[cfg(all(desktop, feature = "direct"))]
             overlay_window::overlay_drag,
-            #[cfg(desktop)]
+            #[cfg(all(desktop, feature = "direct"))]
             overlay_window::overlay_open_conversation,
-            #[cfg(desktop)]
+            #[cfg(all(desktop, feature = "direct"))]
             overlay_window::overlay_show_main,
-            #[cfg(desktop)]
+            #[cfg(all(desktop, feature = "direct"))]
             overlay_stage::stage_select,
-            #[cfg(desktop)]
+            #[cfg(all(desktop, feature = "direct"))]
             overlay_stage::stage_crop,
-            #[cfg(desktop)]
+            #[cfg(all(desktop, feature = "direct"))]
             ai::detector::stage_prepare_detector,
-            #[cfg(desktop)]
+            #[cfg(all(desktop, feature = "direct"))]
             ai::detector::stage_detect,
             #[cfg(desktop)]
             ai::bridge::ort_load,
@@ -123,9 +134,9 @@ pub fn run() {
             ai::whisper::whisper_release,
             #[cfg(desktop)]
             ai::whisper::whisper_transcribe,
-            #[cfg(desktop)]
+            #[cfg(all(desktop, feature = "direct"))]
             overlay_stage::stage_screen_access,
-            #[cfg(desktop)]
+            #[cfg(all(desktop, feature = "direct"))]
             overlay_stage::stage_open_screen_settings,
             #[cfg(desktop)]
             hub::hub_device_id,
@@ -245,8 +256,12 @@ pub fn run() {
             hub::hub_install_update,
             #[cfg(desktop)]
             hub::hub_computer_name,
-            #[cfg(desktop)]
+            #[cfg(all(desktop, feature = "direct"))]
             updater::app_update_install,
+            #[cfg(all(target_os = "macos", not(feature = "direct")))]
+            login_item::login_item_is_enabled,
+            #[cfg(all(target_os = "macos", not(feature = "direct")))]
+            login_item::login_item_set,
         ])
         .setup(|app| {
             //built here to choose where its data lives
@@ -280,7 +295,7 @@ pub fn run() {
                 main_window.on_window_event(move |event| {
                     //tray keeps the overlay shortcut alive
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                        if overlay_window::CLOSE_TO_TRAY.load(std::sync::atomic::Ordering::SeqCst) {
+                        if tray::CLOSE_TO_TRAY.load(std::sync::atomic::Ordering::SeqCst) {
                             api.prevent_close();
                             let _ = guard.hide();
                         }
@@ -303,6 +318,7 @@ pub fn run() {
                     tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
                     let _ = settings_window::warmup_settings_window(&warmup_handle);
                     //shortcut may be taken by another app
+                    #[cfg(feature = "direct")]
                     if let Err(e) = overlay_window::setup(&warmup_handle) {
                         log::warn!("overlay unavailable: {e}");
                     }

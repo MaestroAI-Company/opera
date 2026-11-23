@@ -21,9 +21,6 @@
     "oauth:allow-start",
     "oauth:allow-cancel",
     "opener:default",
-    "autostart:allow-enable",
-    "autostart:allow-disable",
-    "autostart:allow-is-enabled",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",
     {

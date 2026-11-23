@@ -1,6 +1,17 @@
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use std::sync::atomic::AtomicBool;
 use tauri::{AppHandle, Manager};
+
+//close hides the main window
+pub static CLOSE_TO_TRAY: AtomicBool = AtomicBool::new(true);
+
+//front end still calls this
+#[cfg(not(feature = "direct"))]
+#[tauri::command]
+pub fn overlay_configure(close_to_tray: bool) {
+    CLOSE_TO_TRAY.store(close_to_tray, std::sync::atomic::Ordering::SeqCst);
+}
 
 pub fn show_main(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {

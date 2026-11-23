@@ -10,5 +10,14 @@ fn main() {
     {
         println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN:$ORIGIN/../lib/Opera");
     }
-    tauri_build::build()
+    //app store build lacks autostart
+    let capabilities = if std::env::var_os("CARGO_FEATURE_DIRECT").is_some() {
+        "./capabilities/**/*"
+    } else {
+        "./capabilities/default.json"
+    };
+    //custom pattern skips tauri rerun
+    println!("cargo:rerun-if-changed=capabilities");
+    tauri_build::try_build(tauri_build::Attributes::new().capabilities_path_pattern(capabilities))
+        .expect("tauri build failed");
 }

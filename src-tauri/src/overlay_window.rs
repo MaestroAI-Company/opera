@@ -171,9 +171,6 @@ fn on_release(app: &AppHandle) {
     }
 }
 
-//close hides the main window
-pub static CLOSE_TO_TRAY: AtomicBool = AtomicBool::new(true);
-
 //wayland shortcuts only come via portal
 #[cfg(target_os = "linux")]
 mod portal {
@@ -360,7 +357,7 @@ pub fn overlay_configure(
     close_to_tray: bool,
     screen_selection: bool,
 ) -> Result<(), String> {
-    CLOSE_TO_TRAY.store(close_to_tray, Ordering::SeqCst);
+    crate::tray::CLOSE_TO_TRAY.store(close_to_tray, Ordering::SeqCst);
     crate::overlay_stage::ENABLED.store(screen_selection, Ordering::SeqCst);
     app.global_shortcut()
         .unregister_all()

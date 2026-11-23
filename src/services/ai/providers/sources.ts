@@ -28,7 +28,7 @@ const PROVIDER_PLATFORMS: Record<ProviderId, readonly ProviderPlatform[]> = {
   ollama: ['android', 'ios', 'web', 'desktop'],
   openai: ['android', 'ios', 'web', 'desktop'],
   //platforms that ship the hub client
-  samplerhub: ['android', 'desktop', 'web'],
+  samplerhub: ['android', 'ios', 'desktop', 'web'],
 };
 
 export function currentPlatform(): ProviderPlatform {

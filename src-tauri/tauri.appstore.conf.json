@@ -1,0 +1,24 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "build": {
+    "beforeBuildCommand": "EXPO_PUBLIC_APP_STORE=1 npx expo export -p web"
+  },
+  "app": {
+    "macOSPrivateApi": false
+  },
+  "bundle": {
+    "category": "Productivity",
+    "resources": null,
+    "macOS": {
+      "minimumSystemVersion": "13.0",
+      "entitlements": "./Entitlements.appstore.plist",
+      "infoPlist": "./Info.appstore.plist",
+      "files": {
+        "embedded.provisionprofile": "./embedded.provisionprofile"
+      }
+    }
+  },
+  "plugins": {
+    "updater": null
+  }
+}

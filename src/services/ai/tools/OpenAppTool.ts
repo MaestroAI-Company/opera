@@ -1,9 +1,16 @@
+import { Platform } from 'react-native';
 import { ITool, ToolDefinition } from './ITool';
 import { openExternalUrl } from '../utils/openExternalUrl';
 
 //never open these schemes
 //handled by the send_message tool
 const BLOCKED_SCHEME = /^\s*(javascript|data|file|vbscript|tel|sms|mailto):/i;
+
+//geo: only exists on android
+const MAP_PIN =
+  Platform.OS === 'android'
+    ? 'geo:<lat>,<lon>?q=<lat>,<lon>(<label>)'
+    : 'https://www.google.com/maps/search/?api=1&query=<lat>,<lon>';
 
 export class OpenAppTool implements ITool {
   displayName = 'Open App or Link';
@@ -16,7 +23,7 @@ export class OpenAppTool implements ITool {
       name: 'open_app',
       description:
         'Open a URL, which launches the appropriate app: ' +
-        'https:// or http:// for websites, geo:<lat>,<lon>?q=<lat>,<lon>(<label>) to drop a map pin, ' +
+        `https:// or http:// for websites, ${MAP_PIN} to drop a map pin, ` +
         'https://www.google.com/maps/dir/?api=1&destination=<query> for turn-by-turn directions. ' +
         'Custom app schemes (e.g. spotify:, whatsapp://) may also be attempted, but fail gracefully if the app is not installed. ' +
         'To call, text, or email someone, use the send_message tool instead.',

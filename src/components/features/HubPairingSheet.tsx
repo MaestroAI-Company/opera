@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   AppState,
   Image,
+  Linking,
   Platform,
   StyleSheet,
   Text,
@@ -224,6 +225,11 @@ export default function HubPairingSheet({
   }, [visible, paged, noWifi, page]);
 
   const openWifiSettings = () => {
+    //ios has no wifi settings link
+    if (Platform.OS === "ios") {
+      Linking.openSettings().catch(() => {});
+      return;
+    }
     IntentLauncher.startActivityAsync(
       IntentLauncher.ActivityAction.WIFI_SETTINGS,
     ).catch(() => {});

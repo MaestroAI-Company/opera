@@ -37,6 +37,7 @@ RCT_EXTERN_METHOD(renameProfile:(NSString *)deviceKey hub:(NSDictionary *)hub na
 RCT_EXTERN_METHOD(lockedKey:(NSString *)deviceKey hub:(NSDictionary *)hub resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(openLockedKey:(NSDictionary *)lock password:(NSString *)password resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(profileBackupKey:(NSString *)key resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(localNetworkAvailable:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(linkStart:(NSString *)deviceKey hub:(NSDictionary *)hub resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(linkWatch:(NSString *)deviceKey hub:(NSDictionary *)hub resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(linkApprove:(NSString *)deviceKey hub:(NSDictionary *)hub resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)

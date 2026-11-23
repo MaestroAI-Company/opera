@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import React
 import UIKit
 
@@ -263,6 +264,16 @@ class SamplerHubModule: NSObject {
 
   @objc func profileBackupKey(_ key: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
     run(resolve, reject) { try SamplerHubClient.profileBackupKey(key: key) }
+  }
+
+  //mobile data cannot reach local hubs
+  @objc func localNetworkAvailable(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    let monitor = NWPathMonitor()
+    monitor.pathUpdateHandler = { path in
+      monitor.cancel()
+      resolve(path.status == .satisfied && (path.usesInterfaceType(.wifi) || path.usesInterfaceType(.wiredEthernet)))
+    }
+    monitor.start(queue: DispatchQueue(label: "hub.network"))
   }
 
   @objc func linkStart(_ deviceKey: String, hub: [String: Any], resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {

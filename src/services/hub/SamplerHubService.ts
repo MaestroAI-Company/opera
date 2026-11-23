@@ -782,10 +782,10 @@ class SamplerHubServiceImpl {
     return nearby ? nearby(await this.deviceKey(), waitMs) : [];
   }
 
-  //false on android without wifi
+  //false on mobile without wifi
   async localNetworkAvailable(): Promise<boolean> {
     const check = native?.localNetworkAvailable;
-    return check && Platform.OS === 'android' ? check() : true;
+    return check ? check() : true;
   }
 
   canSignIn(): boolean {

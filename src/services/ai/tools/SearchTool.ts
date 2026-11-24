@@ -1,8 +1,5 @@
 import { ITool, ToolContext, ToolDefinition, ToolPlatform } from './ITool';
 import { SearchBridge } from '../../search/SearchBridge';
-import { Platform } from 'react-native';
-import { universalFetch } from '../utils/universalFetch';
-import { isTauri } from '../../platform';
 
 export class SearchTool implements ITool {
   displayName = 'Web Search';
@@ -37,47 +34,7 @@ export class SearchTool implements ITool {
     }
 
     try {
-      let results: any[] = [];
-
-      //web hidden because of cors
-      if (Platform.OS === 'web' && !isTauri) {
-        const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-        const res = await universalFetch(url, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
-          }
-        });
-
-        //202 returns the anti-bot page
-        if (res.status !== 200) {
-          throw new Error(`blocked or rate-limited by DuckDuckGo (HTTP ${res.status})`);
-        }
-        
-        const html = await res.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        
-        const links = doc.querySelectorAll('.result__a');
-        const snippets = doc.querySelectorAll('.result__snippet');
-        
-        for (let i = 0; i < links.length && results.length < 5; i++) {
-          const a = links[i] as HTMLAnchorElement;
-          let href = a.href;
-          if (href && href.includes('duckduckgo.com/l/?')) {
-            try {
-              const u = new URL(href);
-              const uddg = u.searchParams.get('uddg');
-              if (uddg) href = uddg;
-            } catch {}
-          }
-          if (href && href.startsWith('http') && href.indexOf('duckduckgo.com') === -1) {
-            const snippetText = snippets[i] && snippets[i].textContent ? snippets[i].textContent.trim() : '';
-            results.push({ title: a.textContent?.trim() || '', url: href, snippet: snippetText });
-          }
-        }
-      } else {
-        results = await SearchBridge.search(query);
-      }
+      const results = await SearchBridge.search(query);
 
       if (results.length === 0) {
         return 'No search results found.';

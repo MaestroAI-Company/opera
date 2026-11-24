@@ -1,4 +1,3 @@
-import React from 'react';
 import { View, StyleSheet, Text, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { IWidget } from '../../services/widgets/WidgetManager';

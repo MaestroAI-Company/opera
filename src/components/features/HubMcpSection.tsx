@@ -120,7 +120,6 @@ type HubMcpSectionProps = {
 //mcp servers the sampler runs, admins only
 export default function HubMcpSection({ onOpenServer }: HubMcpSectionProps) {
   const styles = useThemedStyles(makeStyles);
-  const t = useT();
   const stateLabel = useMcpStateLabel();
   const { status } = useHubMcp();
   const servers = status?.servers ?? [];

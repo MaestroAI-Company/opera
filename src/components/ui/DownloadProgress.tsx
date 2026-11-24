@@ -1,4 +1,4 @@
-import React, { Dispatch, SetStateAction } from 'react';
+import { Dispatch, SetStateAction } from 'react';
 import { View, Text } from 'react-native';
 import { FontSizes, Fonts, Radius } from "../../../constants/theme";
 import { useColors } from "../../hooks/useTheme";

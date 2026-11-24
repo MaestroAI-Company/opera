@@ -38,6 +38,17 @@ final class HighRefreshRate: NSObject {
 `;
 
 function withNativeIOS(config) {
+  //official pod host is down, nuget ships the same binary
+  config = withPodfile(config, (config) => {
+    const contents = config.modResults.contents;
+    if (contents.includes("pod 'onnxruntime-c'")) return config;
+    config.modResults.contents = contents.replace(
+      /^(\s*use_expo_modules!.*\n)/m,
+      "$1  pod 'onnxruntime-c', :podspec => '../native/ios/onnxruntime-c.podspec'\n"
+    );
+    return config;
+  });
+
   //pod install fetches the client like the android prebuild task
   config = withPodfile(config, (config) => {
     const contents = config.modResults.contents;

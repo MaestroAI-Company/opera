@@ -67,28 +67,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/asc"
           echo "$ASC_KEY_P8_BASE64" | base64 -d > "$RUNNER_TEMP/asc/AuthKey_$ASC_KEY_ID.p8"
 
-      # key lets xcode manage signing
-      - name: Archive
-        run: |
-          workspace=$(ls -d ios/*.xcworkspace | head -n 1)
-          scheme=$(basename "$workspace" .xcworkspace)
-          echo "WORKSPACE=$workspace" >> "$GITHUB_ENV"
-          echo "SCHEME=$scheme" >> "$GITHUB_ENV"
-          # reused build numbers are refused
-          xcodebuild archive \
-            -workspace "$workspace" \
-            -scheme "$scheme" \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath "$RUNNER_TEMP/Opera.xcarchive" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey_$ASC_KEY_ID.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            DEVELOPMENT_TEAM=646R946C79 \
-            CURRENT_PROJECT_VERSION=${{ github.run_number }}
-
-      # the key cannot sign in the cloud so the export signs with our own certificate and profiles
+      # the key cannot sign in the cloud and automatic signing makes a new certificate per run, so we sign with our own certificate and profiles
       - name: Install the distribution certificate and profiles
         env:
           MAS_CERTIFICATES_P12_BASE64: ${{ secrets.MAS_CERTIFICATES_P12_BASE64 }}
@@ -122,6 +101,52 @@ jobs:
             uuid=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/profile.plist")
             cp "$RUNNER_TEMP/profile.mobileprovision" "$profiles/$uuid.mobileprovision"
           done
+
+      # each target needs its own profile so the project cannot keep automatic signing
+      - name: Sign the targets manually
+        run: |
+          gem install xcodeproj --user-install --no-document
+          ruby <<'RUBY'
+          require 'xcodeproj'
+          profiles = {
+            'Opera' => 'Opera iOS opera',
+            'ExpoWidgetsTarget' => 'Opera iOS ExpoWidgetsTarget',
+            'ShareExtension' => 'Opera iOS share-extension'
+          }
+          project_path = Dir['ios/*.xcodeproj'].first
+          project = Xcodeproj::Project.open(project_path)
+          done = []
+          project.targets.each do |target|
+            profile = profiles[target.name]
+            next unless profile
+            target.build_configurations.each do |config|
+              settings = config.build_settings
+              settings['CODE_SIGN_STYLE'] = 'Manual'
+              settings['CODE_SIGN_IDENTITY'] = 'Apple Distribution'
+              settings['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = 'Apple Distribution'
+              settings['DEVELOPMENT_TEAM'] = '646R946C79'
+              settings['PROVISIONING_PROFILE_SPECIFIER'] = profile
+            end
+            done << target.name
+          end
+          missing = profiles.keys - done
+          abort("targets not found: #{missing.join(', ')}") unless missing.empty?
+          project.save
+          puts "signed manually: #{done.join(', ')}"
+          RUBY
+
+      - name: Archive
+        run: |
+          workspace=$(ls -d ios/*.xcworkspace | head -n 1)
+          scheme=$(basename "$workspace" .xcworkspace)
+          # reused build numbers are refused
+          xcodebuild archive \
+            -workspace "$workspace" \
+            -scheme "$scheme" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Opera.xcarchive" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }}
 
       # upload destination sends to testflight
       - name: Export and upload to TestFlight

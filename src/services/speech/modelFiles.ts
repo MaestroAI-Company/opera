@@ -35,6 +35,21 @@ export async function downloadFiles(sources: string[], onProgress: (progress: nu
   await requireExecutorch().ResourceFetcher.fetch(onProgress, ...sources);
 }
 
+//only the expo fetcher can stop a running download
+export function canCancelDownload(): boolean {
+  return !!executorch();
+}
+
+export async function cancelDownload(sources: string[]): Promise<void> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { ExpoResourceFetcher } = require('react-native-executorch-expo-resource-fetcher');
+    await ExpoResourceFetcher.cancelFetching(...sources);
+  } catch {
+    //nothing running anymore
+  }
+}
+
 export async function removeFiles(sources: string[]): Promise<void> {
   if (!executorch()) return;
   for (const source of sources) {

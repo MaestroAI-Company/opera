@@ -17,7 +17,6 @@ import {
   BackHandler,
   DeviceEventEmitter,
   Easing,
-  Image,
   ImageBackground,
   PanResponder,
   Platform,
@@ -28,10 +27,7 @@ import {
   View,
 } from "react-native";
 import { KeyboardController } from "react-native-keyboard-controller";
-import Reanimated, {
-  useAnimatedStyle,
-  useSharedValue,
-} from "react-native-reanimated";
+import Reanimated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import HeadlessWebView from "../../components/HeadlessWebView";
 import { SYSTEM_PROMPTS } from "../../constants/prompts";
@@ -71,6 +67,7 @@ import { sheetTravel } from "../components/features/DrawerSheet";
 import ImagePreviewSheet, {
   PreviewImage,
 } from "../components/features/ImagePreviewSheet";
+import LiveScreen from "../components/features/LiveScreen";
 import MessageDetailsSheet, {
   PreviewDetails,
 } from "../components/features/MessageDetailsSheet";
@@ -91,16 +88,18 @@ import { pressStyle } from "../components/ui/pressStyle";
 import SliderToggle from "../components/ui/SliderToggle";
 import { isWidgetTouchActive } from "../components/widgets/WidgetTouchArea";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
-import { useShadowShift } from "../hooks/useShadowShift";
 import { useBugReportTrigger } from "../hooks/useBugReportTrigger";
 import { useDesktopUpdate } from "../hooks/useDesktopUpdate";
 import { useKeyboardLift } from "../hooks/useKeyboardLift";
 import { useResponsive } from "../hooks/useResponsive";
+import { useShadowShift } from "../hooks/useShadowShift";
 import { useColors, useThemedStyles } from "../hooks/useTheme";
 import { t, useT, type TranslationFn } from "../i18n";
 import { AIModule } from "../services/ai/AIModule";
 import {
   buildSystemPrompt,
+  LIVE_PROMPT_SEGMENT,
+  livePromptLabel,
   screenContextSegment,
 } from "../services/ai/generation/chatGeneration";
 import { GenerationService } from "../services/ai/generation/GenerationService";
@@ -120,7 +119,12 @@ import {
   shouldOfferAssistantRole,
 } from "../services/assistant/DefaultAssistant";
 import { CloudSync } from "../services/CloudSyncService";
-import { Conversation, DB, Message } from "../services/db/DatabaseService";
+import {
+  Conversation,
+  DB,
+  Message,
+  type MessageMetrics,
+} from "../services/db/DatabaseService";
 import {
   getInitialDeepLink,
   subscribeToDeepLinks,
@@ -131,6 +135,11 @@ import { splitDocumentBlocks } from "../services/documents/DocumentService";
 import { AppEvents } from "../services/events";
 import { HubSync } from "../services/hub/HubSync";
 import { PairedHub, SamplerHub } from "../services/hub/SamplerHubService";
+import { liveBackend } from "../services/live/liveBackend";
+import {
+  hasLiveCallPermission,
+  requestLiveCallPermission,
+} from "../services/live/LiveCall";
 import { LocationService } from "../services/location/LocationService";
 import {
   takePendingCrash,
@@ -148,6 +157,7 @@ import { isAppStore } from "../services/platform";
 import { PluginRegistry } from "../services/plugins/PluginRegistry";
 import { NEW_CHAT_ACTION_ID } from "../services/quickActions/QuickActionsService";
 import { Settings } from "../services/settings/SettingsService";
+import { hasPlatformFeature, loadPlatformFeatures } from "../services/platform";
 import {
   openSettingsWindow,
   settingsInWindow,
@@ -162,21 +172,22 @@ import {
   usesDefaultPasteHost,
 } from "../services/share/ShareService";
 import { speakReplyLive } from "../services/speech/liveReply";
-import { TTS } from "../services/speech/TTSService";
 import { STT, WhisperSTT } from "../services/speech/STTService";
+import { TTS } from "../services/speech/TTSService";
 import {
   getAvailableUpdate,
   ReleaseNotes,
   takeReleaseNotes,
 } from "../services/updates/UpdateService";
 import { vibrate } from "@/services/haptics";
+import AppIcon from "../components/ui/AppIcon";
+import settingsIcon from "../../assets/icons/settings.svg";
+import addIcon from "../../assets/icons/add2.svg";
+import chatIcon from "../../assets/icons/message.svg";
+import nextIcon from "../../assets/icons/arrow2.svg";
+import samplerIcon from "../../assets/icons/sampler.svg";
 
 const texture2 = require("../../assets/images/texture/texture2.png");
-const settingsIcon = require("../../assets/icons/settings.png");
-const addIcon = require("../../assets/icons/add.png");
-const chatIcon = require("../../assets/icons/message.png");
-const nextIcon = require("../../assets/icons/right.png");
-const samplerIcon = require("../../assets/icons/sampler.png");
 
 function shareConsentMessage(): string {
   const host = resolvePasteHost()
@@ -224,11 +235,11 @@ function WelcomeText({
 
   useEffect(() => {
     progress.setValue(0);
-    //let the butterfly intro land first
+    //fade in while the butterfly lands
     const anim = Animated.timing(progress, {
       toValue: 1,
       duration: 420,
-      delay: 1500,
+      delay: 700,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     });
@@ -584,9 +595,6 @@ export default function Index() {
   useEffect(() => {
     editSessionRef.current = editSession;
   }, [editSession]);
-  //home butterfly flies to the chat header
-  const homeButterflyRef = useRef<View>(null);
-  const [butterflyFrom, setButterflyFrom] = useState<DOMRect | null>(null);
   //per conversation, tied to their reply
   const [suggestionsByConv, setSuggestionsByConv] = useState<
     Record<string, { msgId: string; items: Suggestion[] }>
@@ -677,6 +685,192 @@ export default function Index() {
     activeConversationRef.current = activeConversation;
   }, [activeConversation]);
 
+  //live mode for models that speak
+  const [liveOpen, setLiveOpen] = useState(false);
+  const liveConvRef = useRef<Conversation | null>(null);
+  //turns saved in order so one conversation is created
+  const liveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  //reply slot a spoken question opened, waiting for its answer
+  const livePendingRef = useRef<{ convId: string; id: string } | null>(null);
+  const [livePending, setLivePending] = useState<{
+    convId: string;
+    id: string;
+  } | null>(null);
+  const setLivePendingSlot = useCallback(
+    (next: { convId: string; id: string } | null) => {
+      livePendingRef.current = next;
+      setLivePending(next);
+    },
+    [],
+  );
+  //a slot still empty belongs to an answer that never came
+  const dropLiveSlot = useCallback(async () => {
+    const pending = livePendingRef.current;
+    if (!pending) return;
+    setLivePendingSlot(null);
+    if (!pending.convId.startsWith("incognito_"))
+      await DB.deleteMessage(pending.id);
+    setMessages((prev) => prev.filter((m) => m.id !== pending.id));
+  }, [setLivePendingSlot]);
+  const currentLiveBackend = useMemo(
+    () => liveBackend(aiService, ollamaUrl, selectedModel, modelCapabilities),
+    [aiService, ollamaUrl, selectedModel, modelCapabilities],
+  );
+  const liveInstructions = useMemo(
+    () =>
+      buildSystemPrompt(selectedModel, userInstruction, LIVE_PROMPT_SEGMENT),
+    [selectedModel, userInstruction],
+  );
+
+  const [liveAskVisible, setLiveAskVisible] = useState(false);
+  const [liveTranscribe, setLiveTranscribe] = useState(false);
+  const [liveNotifVisible, setLiveNotifVisible] = useState(false);
+  const [liveLockedVisible, setLiveLockedVisible] = useState(false);
+  //read by callbacks that must not change identity
+  const liveOpenRef = useRef(false);
+  useEffect(() => {
+    liveOpenRef.current = liveOpen;
+  }, [liveOpen]);
+  const openLive = useCallback(async () => {
+    //no call card without notifications
+    if (!(await hasLiveCallPermission())) {
+      setLiveNotifVisible(true);
+      return;
+    }
+    liveConvRef.current = activeConversationRef.current;
+    const choice = Settings.getCached().liveTranscription;
+    //transcription costs extra
+    if (
+      currentLiveBackend &&
+      currentLiveBackend.kind !== "gemini" &&
+      choice === "ask"
+    ) {
+      setLiveAskVisible(true);
+      return;
+    }
+    setLiveTranscribe(choice === "on");
+    setLiveOpen(true);
+  }, [currentLiveBackend]);
+  const allowLiveNotif = useCallback(async () => {
+    setLiveNotifVisible(false);
+    if (await requestLiveCallPermission()) openLive();
+  }, [openLive]);
+  const answerLiveAsk = useCallback((transcribe: boolean) => {
+    Settings.set("liveTranscription", transcribe ? "on" : "off");
+    setLiveAskVisible(false);
+    setLiveTranscribe(transcribe);
+    setLiveOpen(true);
+  }, []);
+
+  //each live message joins the conversation
+  const handleLiveTurn = useCallback(
+    (role: "user" | "assistant", content: string, metrics?: MessageMetrics) => {
+      liveQueueRef.current = liveQueueRef.current
+        .then(async () => {
+          let conv = liveConvRef.current;
+          const isNew = !conv;
+          const isIncognitoTask = conv
+            ? conv.id.startsWith("incognito_")
+            : incognitoMode;
+          if (!dbReady && !isIncognitoTask) return;
+          if (!conv) {
+            const name = (role === "user" ? content : t("chatbar.live")).slice(
+              0,
+              30,
+            );
+            if (isIncognitoTask) {
+              conv = {
+                id: "incognito_" + Date.now(),
+                name,
+                model: selectedModel || "unknown",
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+              };
+            } else {
+              conv = await DB.createConversation(
+                selectedModel || "unknown",
+                name,
+              );
+              setConversations((prev) => [conv!, ...prev]);
+            }
+            liveConvRef.current = conv;
+            setActiveConversation(conv);
+          }
+          const convId = conv.id;
+          const save = async (
+            role: "user" | "assistant",
+            content: string,
+          ): Promise<Message> =>
+            isIncognitoTask
+              ? {
+                  id:
+                    "msg_" +
+                    Date.now() +
+                    "_" +
+                    Math.random().toString(36).slice(2, 7),
+                  conversationId: convId,
+                  role,
+                  content,
+                  createdAt: Date.now(),
+                }
+              : DB.addMessage(convId, role, content);
+          const shown = isNew || activeConversationRef.current?.id === convId;
+          const replyMetrics = {
+            ...metrics,
+            systemPrompt: livePromptLabel(selectedModel),
+          };
+
+          //an answer fills the slot its question opened
+          const pending = livePendingRef.current;
+          if (role === "assistant" && pending?.convId === convId) {
+            setLivePendingSlot(null);
+            if (!isIncognitoTask) {
+              await DB.updateMessageContent(pending.id, content);
+              await DB.updateMessageMetrics(pending.id, replyMetrics);
+            }
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === pending.id
+                  ? { ...m, content, metrics: replyMetrics }
+                  : m,
+              ),
+            );
+            return;
+          }
+
+          const msg = await save(role, content);
+          if (role === "assistant") {
+            msg.metrics = replyMetrics;
+            if (!isIncognitoTask)
+              await DB.updateMessageMetrics(msg.id, msg.metrics);
+            if (shown) setMessages((prev) => [...prev, msg]);
+            return;
+          }
+
+          //the slot opens with the question, so the view moves once
+          await dropLiveSlot();
+          const slot = await save("assistant", "…");
+          setLivePendingSlot({ convId, id: slot.id });
+          if (shown) setMessages((prev) => [...prev, msg, slot]);
+        })
+        .catch((e) => console.error("Failed to save live turn:", e));
+    },
+    [
+      dbReady,
+      incognitoMode,
+      selectedModel,
+      t,
+      dropLiveSlot,
+      setLivePendingSlot,
+    ],
+  );
+
+  //the slot streams like a typed reply, so the chat pins it the same way
+  const liveSlotId =
+    livePending && livePending.convId === activeConversation?.id
+      ? livePending.id
+      : null;
+
   //every close path must pick up what changed in settings
   const closeSettings = useCallback(() => {
     setSettingsDrawerVisible(false);
@@ -712,7 +906,7 @@ export default function Index() {
         setDrawerVisible(false);
         return true;
       }
-      if (!isDesktop && inSamplerRef.current) {
+      if (inSamplerRef.current) {
         setSamplerMode(false);
         return true;
       }
@@ -724,7 +918,7 @@ export default function Index() {
       handleBackButton,
     );
     return () => backHandler.remove();
-  }, [closeSettings, isDesktop]);
+  }, [closeSettings]);
 
   const openDrawerSafely = useCallback((openFn: () => void) => {
     //skip pointless native round trip
@@ -809,16 +1003,6 @@ export default function Index() {
   const keyboardLiftStyle = useAnimatedStyle(() => ({
     //bar's safe area spacer sits under the keyboard
     paddingBottom: Math.max(keyboardLift.value - insets.bottom, 0),
-  }));
-  //lift at send, -1 when not sending
-  const sendLift = useSharedValue(-1);
-  const homeFreezeStyle = useAnimatedStyle(() => ({
-    //home keeps its height while keyboard closes
-    marginBottom:
-      sendLift.value < 0
-        ? 0
-        : Math.max(sendLift.value - insets.bottom, 0) -
-          Math.max(keyboardLift.value - insets.bottom, 0),
   }));
 
   const openBugReport = useCallback(async () => {
@@ -1182,6 +1366,7 @@ export default function Index() {
       //load and apply settings
       try {
         await Settings.init();
+        await loadPlatformFeatures();
         const s = migrateModelSources(await Settings.load());
         //defer heavy integrity scan after startup
         if (!s.dataWarningDismissed) {
@@ -1408,12 +1593,21 @@ export default function Index() {
 
   //load messages when a conversation is selected
   const selectConversation = useCallback(async (conv: Conversation) => {
+    if (liveOpenRef.current) {
+      setLiveLockedVisible(true);
+      return;
+    }
     setActiveConversation(conv);
     const msgs = await DB.getMessages(conv.id);
 
     //back to the level of the last reply
-    const lastThinking = [...msgs].reverse().find((m) => m.metrics?.thinking)?.metrics?.thinking;
-    if (lastThinking === "none" || lastThinking === "low" || lastThinking === "high") {
+    const lastThinking = [...msgs].reverse().find((m) => m.metrics?.thinking)
+      ?.metrics?.thinking;
+    if (
+      lastThinking === "none" ||
+      lastThinking === "low" ||
+      lastThinking === "high"
+    ) {
       setSelectedReflection(lastThinking);
     }
 
@@ -1433,9 +1627,16 @@ export default function Index() {
   const startNewConversation = useCallback(() => {
     setActiveConversation(null);
     setMessages([]);
-    setButterflyFrom(null);
-    sendLift.set(-1);
-  }, [sendLift]);
+  }, []);
+
+  //same as above but refused during a live call
+  const requestNewConversation = useCallback(() => {
+    if (liveOpenRef.current) {
+      setLiveLockedVisible(true);
+      return;
+    }
+    startNewConversation();
+  }, [startNewConversation]);
 
   //desktop shells open settings in their own os window instead of the drawer
   const settingsWindowOpenRef = useRef(false);
@@ -1564,6 +1765,10 @@ export default function Index() {
       }
       if (route.type === "new-chat") {
         startNewConversation();
+      } else if (route.type === "camera") {
+        //photo goes to the new chat
+        startNewConversation();
+        attachmentsRef.current.openCamera();
       } else if (route.type === "shared") {
         openSharedConversation(route.pasteId, route.secret);
       } else if (route.type === "conversation") {
@@ -1643,7 +1848,7 @@ export default function Index() {
   //open a new chat when the home screen shortcut is pressed
   useQuickActionCallback((action) => {
     if (action.id === NEW_CHAT_ACTION_ID) {
-      startNewConversation();
+      requestNewConversation();
     }
   });
 
@@ -1780,11 +1985,6 @@ export default function Index() {
       //create conversation if this is the first message
       if (!conv) {
         isFirstMessage = true;
-        //chatbar dismisses the keyboard right after
-        sendLift.set(keyboardLift.get());
-        //read before the home screen unmounts
-        const homeButterfly =
-          homeButterflyRef.current?.getBoundingClientRect() ?? null;
         const name = text.length > 30 ? text.slice(0, 30) + "…" : text;
         if (isIncognitoTask) {
           conv = {
@@ -1796,10 +1996,7 @@ export default function Index() {
           };
         } else {
           conv = await DB.createConversation(selectedModel || "unknown", name);
-          setConversations((prev) => [conv!, ...prev]);
         }
-        setButterflyFrom(homeButterfly);
-        setActiveConversation(conv);
       }
 
       //save user message immediately
@@ -1820,10 +2017,6 @@ export default function Index() {
       //attach images to incognito message as well if needed
       if (images && images.length > 0) {
         userMsg.images = images;
-      }
-
-      if (isFirstMessage || activeConversationRef.current?.id === conv.id) {
-        setMessages((prev) => [...prev, userMsg]);
       }
 
       //build history for this task
@@ -1856,8 +2049,15 @@ export default function Index() {
         assistantMsg = await DB.addMessage(conv.id, "assistant", "…");
       }
 
+      //the chat opens with its question already in
+      if (isFirstMessage) {
+        if (!isIncognitoTask) setConversations((prev) => [taskConv, ...prev]);
+        setActiveConversation(taskConv);
+      }
+
+      //both land together, so the view moves once on send
       if (isFirstMessage || activeConversationRef.current?.id === conv.id) {
-        setMessages((prev) => [...prev, assistantMsg]);
+        setMessages((prev) => [...prev, userMsg, assistantMsg]);
       }
 
       const task = async () => {
@@ -1948,8 +2148,6 @@ export default function Index() {
       userInstruction,
       aiService,
       ollamaUrl,
-      sendLift,
-      keyboardLift,
     ],
   );
 
@@ -2273,7 +2471,6 @@ export default function Index() {
           original.screenContext,
         );
       }
-      setMessages((prev) => [...prev, userMsg]);
       taskHistory.push({ role: "user", content: text, images: newImages });
 
       let assistantMsg: Message;
@@ -2289,7 +2486,8 @@ export default function Index() {
       } else {
         assistantMsg = await DB.addMessage(conv.id, "assistant", "…");
       }
-      setMessages((prev) => [...prev, assistantMsg]);
+      //both land together, so the view moves once on send
+      setMessages((prev) => [...prev, userMsg, assistantMsg]);
       setEditSession(null);
 
       const taskSelectedModel = selectedModel;
@@ -2512,7 +2710,7 @@ export default function Index() {
           });
         }}
       >
-        <Image
+        <AppIcon
           source={settingsIcon}
           style={[styles.settingsIcon, !isDesktop && { marginRight: 0 }]}
         />
@@ -2532,7 +2730,7 @@ export default function Index() {
       conversations={conversations}
       selectedConversationId={activeConversation?.id ?? null}
       onSelectConversation={selectConversation}
-      onNewConversation={startNewConversation}
+      onNewConversation={requestNewConversation}
       onDeleteConversation={deleteConversation}
       onTogglePinConversation={togglePinConversation}
       onShareConversation={askToShareConversation}
@@ -2541,22 +2739,25 @@ export default function Index() {
     />
   );
 
-  const settingsDrawer = settingsInWindow ? null : (
-    <SettingsDrawer
-      isLargeScreen={isLargeScreen}
-      isDesktop={isDesktop}
-      visible={settingsDrawerVisible}
-      initialSubPage={settingsInitialSubPage}
-      initialSheet={settingsInitialSheet}
-      hubPairLink={hubPairLink}
-      onHubPairLinkHandled={() => setHubPairLink(null)}
-      onClose={closeSettings}
-      onDataChanged={async () => {
-        await loadConversations();
-        startNewConversation();
-      }}
-    />
-  );
+  //the sheet host stays out of the way until a provider is picked
+  const settingsDrawer =
+    settingsInWindow && !settingsInitialSheet ? null : (
+      <SettingsDrawer
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+        visible={settingsDrawerVisible}
+        initialSubPage={settingsInitialSubPage}
+        initialSheet={settingsInitialSheet}
+        sheetOnly={!settingsDrawerVisible && !!settingsInitialSheet}
+        hubPairLink={hubPairLink}
+        onHubPairLinkHandled={() => setHubPairLink(null)}
+        onClose={closeSettings}
+        onDataChanged={async () => {
+          await loadConversations();
+          startNewConversation();
+        }}
+      />
+    );
 
   return (
     <View style={styles.container} ref={rootRef} collapsable={false}>
@@ -2640,7 +2841,7 @@ export default function Index() {
                         : t("modelSelector.none"),
                     )}
                   </Text>
-                  <Image
+                  <AppIcon
                     source={nextIcon}
                     style={styles.modelInfoArrow}
                     resizeMode="contain"
@@ -2649,11 +2850,9 @@ export default function Index() {
                 </Pressable>
               )}
               {!activeConversation && (
-                <Reanimated.View
-                  style={[styles.centerContent, homeFreezeStyle]}
-                >
+                <Reanimated.View style={styles.centerContent}>
                   <ButterflyCluster
-                    ref={homeButterflyRef}
+                    flap
                     incognito={incognitoMode}
                     style={styles.butterfly}
                   />
@@ -2713,7 +2912,7 @@ export default function Index() {
                   generatingMessageId={
                     generatingConvId === activeConversation.id
                       ? streamingMsgId
-                      : null
+                      : liveSlotId
                   }
                   queuedMessageIds={pendingMsgIds}
                   hideGradients={isDesktop}
@@ -2729,7 +2928,6 @@ export default function Index() {
                   }
                   onImagePress={setPreviewImage}
                   onDetailsPress={setPreviewDetails}
-                  butterflyFrom={butterflyFrom}
                 />
               )}
 
@@ -2765,49 +2963,125 @@ export default function Index() {
                     <View style={{ width: "100%", height: insets.bottom }} />
                   </View>
                 ) : (
-                  <ChatBar
-                    ref={chatBarRef}
-                    onSend={(text, images, viaVoice) =>
-                      editSession
-                        ? confirmEdit(text, images)
-                        : handleSend(text, images, viaVoice)
-                    }
-                    editing={!!editSession}
-                    onEditCancel={handleEditCancel}
-                    editDraft={editDraft}
-                    editFiles={editFiles}
-                    incognito={
-                      activeConversation
-                        ? activeConversation.id.startsWith("incognito_")
-                        : incognitoMode
-                    }
-                    isGenerating={
-                      activeConversation
-                        ? generatingConvId === activeConversation.id ||
-                          pendingConvIds.includes(activeConversation.id)
-                        : false
-                    }
-                    onStop={handleStop}
-                    onTranscribe={handleTranscribe}
-                    canTranscribeRemotely={
-                      !alwaysWhisper &&
-                      modelCapabilities.includes("audio") &&
-                      !!selectedModel
-                    }
-                    modelCapabilities={modelCapabilities}
-                    onOpenSettings={() => {
-                      openDrawerSafely(() => {
-                        setSettingsInitialSubPage("main");
-                        setSettingsDrawerVisible(true);
-                      });
-                    }}
-                    picker={attachments}
-                    leadingElement={isDesktop ? modelTrigger : undefined}
-                  />
+                  <>
+                    {liveOpen && currentLiveBackend && (
+                      <LiveScreen
+                        backend={currentLiveBackend}
+                        instructions={liveInstructions}
+                        incognito={
+                          activeConversation
+                            ? activeConversation.id.startsWith("incognito_")
+                            : incognitoMode
+                        }
+                        transcribe={liveTranscribe}
+                        onTurn={handleLiveTurn}
+                        onClose={() => {
+                          setLiveOpen(false);
+                          //hanging up leaves no empty reply behind
+                          liveQueueRef.current =
+                            liveQueueRef.current.then(dropLiveSlot);
+                        }}
+                      />
+                    )}
+                    {/* stays mounted so the draft survives the call */}
+                    <View style={liveOpen ? { display: "none" } : undefined}>
+                      <ChatBar
+                        ref={chatBarRef}
+                        onSend={(text, images, viaVoice) =>
+                          editSession
+                            ? confirmEdit(text, images)
+                            : handleSend(text, images, viaVoice)
+                        }
+                        editing={!!editSession}
+                        onEditCancel={handleEditCancel}
+                        editDraft={editDraft}
+                        editFiles={editFiles}
+                        incognito={
+                          activeConversation
+                            ? activeConversation.id.startsWith("incognito_")
+                            : incognitoMode
+                        }
+                        isGenerating={
+                          activeConversation
+                            ? generatingConvId === activeConversation.id ||
+                              pendingConvIds.includes(activeConversation.id)
+                            : false
+                        }
+                        onStop={handleStop}
+                        onTranscribe={handleTranscribe}
+                        canTranscribeRemotely={
+                          !alwaysWhisper &&
+                          modelCapabilities.includes("audio") &&
+                          !!selectedModel
+                        }
+                        modelCapabilities={modelCapabilities}
+                        onOpenSettings={() => {
+                          openDrawerSafely(() => {
+                            setSettingsInitialSubPage("main");
+                            setSettingsDrawerVisible(true);
+                          });
+                        }}
+                        picker={attachments}
+                        leadingElement={isDesktop ? modelTrigger : undefined}
+                        onOpenLive={
+                          currentLiveBackend &&
+                          !editSession &&
+                          hasPlatformFeature("android.hardware.microphone")
+                            ? openLive
+                            : undefined
+                        }
+                      />
+                    </View>
+                  </>
                 )}
               </View>
             </Animated.View>
           </View>
+
+          <NotificationModal
+            visible={liveNotifVisible}
+            title={t("live.notifPerm.title")}
+            message={t("live.notifPerm.message")}
+            buttons={[
+              {
+                text: t("live.notifPerm.cancel"),
+                style: "secondary",
+                onPress: () => setLiveNotifVisible(false),
+              },
+              {
+                text: t("live.notifPerm.allow"),
+                style: "primary",
+                onPress: allowLiveNotif,
+              },
+            ]}
+            onClose={() => setLiveNotifVisible(false)}
+          />
+
+          <NotificationModal
+            visible={liveLockedVisible}
+            title={t("live.locked.title")}
+            message={t("live.locked.message")}
+            onClose={() => setLiveLockedVisible(false)}
+          />
+
+          <NotificationModal
+            visible={liveAskVisible}
+            title={t("live.transcribe.title")}
+            message={t("live.transcribe.message")}
+            buttons={[
+              {
+                text: t("live.transcribe.skip"),
+                style: "secondary",
+                onPress: () => answerLiveAsk(false),
+              },
+              {
+                text: t("live.transcribe.enable"),
+                style: "primary",
+                onPress: () => answerLiveAsk(true),
+              },
+            ]}
+            onClose={() => setLiveAskVisible(false)}
+          />
 
           {(showSamplerSwitch || !isDesktop) && (
             <SamplerScreen
@@ -2851,8 +3125,11 @@ export default function Index() {
               showNewButton={!inSampler && !!activeConversation}
               isDesktop={isDesktop}
               middleElement={samplerSwitch}
+              middleOnly={inSampler && !isDesktop && !samplerReady}
               rightElement={settingsButton}
-              showIncognitoButton={!isDesktop && !inSampler && !activeConversation}
+              showIncognitoButton={
+                !isDesktop && !inSampler && !activeConversation
+              }
               incognito={incognitoMode}
               onIncognitoPress={() => {
                 vibrate(10);
@@ -2980,11 +3257,13 @@ export default function Index() {
         messages={messages}
         onOpenProviderSettings={(source) => {
           setModelSelectorVisible(false);
-          openDrawerSafely(() => {
-            setSettingsInitialSubPage("service");
-            setSettingsInitialSheet({ service: source.service, url: source.url });
-            setSettingsDrawerVisible(true);
-          });
+          //provider sheet opens over home, settings stay closed
+          openDrawerSafely(() =>
+            setSettingsInitialSheet({
+              service: source.service,
+              url: source.url,
+            }),
+          );
         }}
       />
 

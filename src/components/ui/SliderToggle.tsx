@@ -1,22 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Image, ImageSourcePropType, LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Text, View } from "react-native";
+import { LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { Easing, interpolate, interpolateColor, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+import AppIcon, { IconSource } from "./AppIcon";
 import { pressStyle } from "./pressStyle";
 import { lockTextSelection } from "./lockTextSelection";
 import { vibrate } from "@/services/haptics";
-
-//load theme icons
-const autoIcon = require("../../../assets/icons/auto.png");
-const lightIcon = require("../../../assets/icons/light.png");
-const darkIcon = require("../../../assets/icons/dark.png");
+import autoIcon from "../../../assets/icons/auto2.svg";
+import lightIcon from "../../../assets/icons/light2.svg";
+import darkIcon from "../../../assets/icons/dark2.svg";
 
 export type SliderToggleOption = {
   id: string;
   label: string;
-  icon?: ImageSourcePropType;
+  icon?: IconSource;
 };
 
 type SliderToggleProps = {
@@ -221,7 +220,7 @@ export default function SliderToggle({
 
   return (
     <View style={[styles.container, !iconSource && styles.containerNoIcon]}>
-      {iconSource && <Image source={iconSource} style={styles.icon} />}
+      {iconSource && <AppIcon source={iconSource} style={styles.icon} />}
       <View style={styles.optionsContainer} onLayout={handleLayout}>
         {options.map((option) => (
           <Pressable
@@ -232,9 +231,9 @@ export default function SliderToggle({
             }}
             style={pressStyle([styles.optionButton, radius !== undefined && { borderRadius: radius }], "surface")}
           >
-            {iconOnly ? (
+            {iconOnly && option.icon ? (
               <View style={styles.iconLabel}>
-                <Image source={option.icon} style={styles.optionIcon} resizeMode="contain" tintColor={Colors.textPrimary} />
+                <AppIcon source={option.icon} style={styles.optionIcon} resizeMode="contain" tintColor={Colors.textPrimary} />
                 {withLabel && <Text style={styles.optionText}>{option.label}</Text>}
               </View>
             ) : (
@@ -244,9 +243,9 @@ export default function SliderToggle({
         ))}
         {buttonWidth > 0 && activeOption && (
           <Animated.View style={[styles.pill, { width: buttonWidth }, radius !== undefined && { borderRadius: radius }, pillAnimatedStyle]} {...panResponder.panHandlers}>
-            {iconOnly ? (
+            {iconOnly && activeOption.icon ? (
               <Animated.View style={[styles.iconLabel, labelPulseStyle]}>
-                <Image source={activeOption.icon} style={styles.optionIcon} resizeMode="contain" tintColor={Colors.textOnPrimary} />
+                <AppIcon source={activeOption.icon} style={styles.optionIcon} resizeMode="contain" tintColor={Colors.textOnPrimary} />
                 {withLabel && <Text style={styles.pillText}>{activeOption.label}</Text>}
               </Animated.View>
             ) : (

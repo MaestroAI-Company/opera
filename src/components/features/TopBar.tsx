@@ -1,8 +1,6 @@
 import { ReactNode } from "react";
 import {
   Animated,
-  Image,
-  ImageSourcePropType,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -12,11 +10,12 @@ import {
 import { Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useShadowShift } from "../../hooks/useShadowShift";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import AppIcon, { type IconSource } from "../ui/AppIcon";
 import { pressStyle } from "../ui/pressStyle";
+import moreIcon from "../../../assets/icons/more.svg";
+import addIcon from "../../../assets/icons/add.svg";
+import incognitoOffIcon from "../../../assets/icons/operaicon.svg";
 
-const moreIcon = require("../../../assets/icons/More.png");
-const addIcon = require("../../../assets/icons/add.png");
-const incognitoOffIcon = require("../../../assets/icons/operaicon.png");
 const incognitoOnIcon = require("../../../assets/icons/operaiconEgg.png");
 
 type TopBarProps = {
@@ -123,14 +122,14 @@ function BarButton({
   icon,
   onPress,
 }: {
-  icon: ImageSourcePropType;
+  icon: IconSource;
   onPress: () => void;
 }) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   return (
     <Pressable onPress={onPress} style={pressStyle(styles.button, "surface")}>
-      <Image
+      <AppIcon
         source={icon}
         style={styles.buttonIcon}
         resizeMode="contain"

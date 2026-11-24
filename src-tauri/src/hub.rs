@@ -203,6 +203,12 @@ pub async fn hub_install_update(version: String) -> Result<bool, String> {
     if !cfg!(windows) {
         return Ok(false);
     }
+    //the version ends up in the url
+    let numbers = version.strip_prefix('v').unwrap_or(&version);
+    let parts: Vec<_> = numbers.split('.').collect();
+    if parts.len() != 3 || parts.iter().any(|p| p.is_empty() || !p.bytes().all(|b| b.is_ascii_digit())) {
+        return Err("invalid version, expected x.y.z".into());
+    }
     let http = sampler_hub::secrets::http_client().map_err(host_error)?;
     let installer = sampler_hub::update::download_installer(&http, &version)
         .await

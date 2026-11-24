@@ -22,6 +22,8 @@ export const en = {
   "common.openInApp": "Open in app",
   "common.info": "Info",
   "common.clear": "Clear",
+  "common.showPassword": "Show password",
+  "common.hidePassword": "Hide password",
 
   "onboarding.next": "Continue",
   "onboarding.back": "Back",
@@ -99,6 +101,7 @@ export const en = {
   "conversations.search.placeholder": "Search conversations",
   "conversations.search.results": "RESULTS",
   "conversations.search.empty": "No results found",
+  "conversations.search.showMore": "Show more",
   "conversations.delete.title": "Delete Conversation",
   "conversations.delete.message":
     "Are you sure you want to delete this conversation? This action cannot be undone.",
@@ -177,6 +180,8 @@ export const en = {
   "messageDetails.prompt": "System prompt",
   "messageDetails.standbyNote":
     "Answered in Standby: short spoken replies and a card on screen. These rules only apply in Standby, so continuing this conversation in Opera uses the usual prompt.",
+  "messageDetails.liveNote":
+    "Answered in live mode: short spoken replies, widgets shown on screen. These rules only apply in live mode, so continuing this conversation by text uses the usual prompt.",
   "messageDetails.thinking": "Reflection",
   "messageDetails.tools": "Tools",
   "messageDetails.reasoning": "Reasoning",
@@ -184,6 +189,8 @@ export const en = {
 
   "whatsNew.title": "What's new in Opera {version}",
   "whatsNew.close": "Got it",
+  "whatsNew.openGithub": "Open on GitHub",
+  "whatsNew.storeDelay": "Store distribution can take several days, but release is simultaneous.",
 
   "bugReport.title": "Report a bug",
   "bugReport.crashTitle": "Opera closed unexpectedly",
@@ -281,6 +288,25 @@ export const en = {
   "chatbar.micPermission.title": "Microphone Permission",
   "chatbar.micPermission.message":
     "Microphone access is required for voice input. Please enable it in your device settings.",
+  "chatbar.live": "Live mode",
+
+  "live.mute": "Mute the microphone",
+  "live.unmute": "Unmute the microphone",
+  "live.camera": "Camera",
+  "live.selectCamera": "Select a camera",
+  "live.hangUp": "Hang up",
+  "live.notifPerm.title": "Allow notifications",
+  "live.notifPerm.message": "Opera needs notifications to show your ongoing call with Maestro and let you hang up or mute from the status bar.",
+  "live.notifPerm.allow": "Allow",
+  "live.notifPerm.cancel": "Not now",
+  "live.locked.title": "Call in progress",
+  "live.locked.message": "Hang up live mode before switching conversations.",
+  "live.voiceMessage": "Voice message",
+  "live.transcribe.title": "Write down what you say?",
+  "live.transcribe.message":
+    "Writing your words in the chat needs extra work: a second session on your server for local models, or a billed transcription model with OpenAI. You can change this in Settings.",
+  "live.transcribe.enable": "Transcribe",
+  "live.transcribe.skip": "Not now",
 
   "whisper.notConfigured.title": "Whisper Not Configured",
   "whisper.notConfigured.message":
@@ -311,6 +337,15 @@ export const en = {
   "update.checkFailed": "The update check failed. Check your connection.",
   "settings.update.checkNow": "Check now",
 
+  "settings.nav.search.title": "Search",
+  "settings.nav.search.empty": "No setting found",
+  "settings.nav.search.recent": "Recent",
+  "settings.nav.search.results": "Results",
+  "settings.nav.search.topics": "Topics",
+  "settings.nav.search.topicSync": "Sync",
+  "settings.nav.search.topicSyncQuery": "Sync",
+  "settings.nav.search.topicData": "Data",
+  "settings.nav.search.topicMcp": "MCP",
   "settings.nav.profile.title": "Profile",
   "settings.nav.profile.subtitle": "Name",
   "settings.nav.cloud.title": "Sync & backup",
@@ -517,6 +552,13 @@ export const en = {
   "sampler.helpLink": "Linking is automatic on the local network, or manual with a QR code or a code.",
   "sampler.nav.home": "Home",
   "sampler.nav.homeHelp": "Your Sampler Hub at a glance",
+  "sampler.home.orbit": "Orbit",
+  "sampler.home.models": "AI Model",
+  "sampler.home.mcp": "MCP servers",
+  "sampler.home.hub": "Hub information",
+  "sampler.home.edit": "Edit the home",
+  "sampler.home.add": "Add",
+  "sampler.home.remove": "Remove",
   "sampler.nav.profiles": "Profiles",
   "sampler.nav.profilesHelp": "People and their devices",
   "sampler.nav.modelsHelp": "Models served by Sampler Hub",
@@ -613,6 +655,7 @@ export const en = {
   "hubModels.deleteTitle": "Delete {name}?",
   "hubModels.deleteMessage": "The model is removed from Sampler Hub and no longer available on your devices.",
   "hubModels.failed": "The action failed: {error}",
+  "hubModels.current": "Current models",
   "hubMcp.pageTitle": "MCP servers",
   "hubMcp.navHelp": "Install tools for Maestro, hosted and isolated on Sampler Hub.",
   "hubMcp.title": "Sampler Hub MCP servers",
@@ -688,6 +731,7 @@ export const en = {
   "hubDevice.nameHelp": "The name your other devices see in the list.",
   "hubDevice.rename": "Rename",
   "hubDevice.kind": "Type",
+  "hubDevice.profile": "Profile",
   "hubDevice.kinds.phone": "Phone",
   "hubDevice.kinds.desktop": "Computer",
   "hubDevice.kinds.web": "Browser",
@@ -705,6 +749,9 @@ export const en = {
   "settings.nav.maestro.subtitle": "Voice, preferences",
   "settings.nav.maestro.subtitleDesktop": "Instructions",
   "settings.maestro.voice": "Voice",
+  "settings.maestro.applyColor": "Apply the Maestro color across the app",
+  "settings.maestro.applyColorHelp":
+    "Buttons, toggles, links and the chat bar take the color of your Maestro voice.",
   "settings.personality.title": "Personality",
   "settings.personality.edit": "Edit",
   "settings.personality.save": "Save",
@@ -768,7 +815,7 @@ export const en = {
   "settings.nav.support.title": "Support",
   "settings.nav.support.subtitle": "Send an issue, contact support",
   "settings.nav.info.title": "Informations",
-  "settings.nav.info.subtitle": "Version App, Github, Instagram, TikTok",
+  "settings.nav.info.subtitle": "Version App, Github",
   "settings.screenSaver.help":
     "Put your phone on its dock or charger: Opera turns it into a smart display, with the time and Maestro by voice. To turn it on, pick Opera as the screen saver in Android settings.",
   "settings.screenSaver.open": "Open settings",
@@ -783,6 +830,7 @@ export const en = {
     "Ask Maestro hands free on the smart display. Listening happens on this device.",
 
   "settings.info.version": "Version",
+  "settings.info.changelogUnavailable": "Release notes unavailable. Check your connection.",
   "settings.info.links": "Links",
   "settings.info.linksHelp":
     "Find Opera online, follow our updates, and contribute to the project.",
@@ -806,6 +854,9 @@ export const en = {
   "settings.general.detectionBoxes": "Show detection boxes",
   "settings.general.detectionBoxesHelp":
     "Outline the screen elements the overlay selection snaps to.",
+  "settings.general.liveTranscription": "Transcribe your voice in live mode",
+  "settings.general.liveTranscriptionHelp":
+    "Writes your words in the chat. Uses a second session on the server with local models, and a billed transcription model with OpenAI. Gemini always transcribes.",
   "settings.general.autoRead": "Auto-read replies",
   "settings.general.autoReadHelp":
     "Speak the answer aloud when you ask by voice.",
@@ -952,6 +1003,7 @@ export const en = {
   "settings.model.capThinking": "Thinking",
   "settings.model.capAudio": "Audio",
   "settings.model.capVideo": "Video",
+  "settings.model.capLive": "Live voice",
 
   "settings.service.litert": "On-Device",
   "settings.service.litertHelp":
@@ -1122,6 +1174,9 @@ export const en = {
   "tools.consent.allow": "Allow",
   "tools.consent.decline": "Decline",
   "tools.consent.expired": "This request was interrupted. Ask again to retry.",
+  "tools.consent.always": "Always allow",
+  "tools.consent.mcp.title": "Use {tool}?",
+  "tools.consent.mcp.message": "Maestro wants to run {tool} from the MCP server {server}. It can send data to that server.",
 
   "settings.mcp.connecting": "Connecting...",
   "settings.mcp.noTools": "No tools",

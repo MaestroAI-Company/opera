@@ -9,9 +9,8 @@ import { downloadImage } from "../../services/imageDownload";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
-
-const copyIcon = require("../../../assets/icons/copy.png");
-const downloadIcon = require("../../../assets/icons/download.png");
+import copyIcon from "../../../assets/icons/copy2.svg";
+import downloadIcon from "../../../assets/icons/download2.svg";
 
 const DESKTOP_CARD_WIDTH = 840;
 
@@ -130,20 +129,22 @@ export default function ImagePreviewSheet({ image, onClose, isLargeScreen = fals
               />
             ))}
           </Group>
-          <Group>
-            {hasLink && (
+          <View style={styles.sheetCard}>
+            <Group>
+              {hasLink && (
+                <ActionButton
+                  icon={copyIcon}
+                  label={copied ? t("chat.copied") : t("imagePreview.copyLink")}
+                  onPress={copyLink}
+                />
+              )}
               <ActionButton
-                icon={copyIcon}
-                label={copied ? t("chat.copied") : t("imagePreview.copyLink")}
-                onPress={copyLink}
+                icon={downloadIcon}
+                label={t("imagePreview.download")}
+                onPress={() => downloadImage(shown.uri).catch(() => {})}
               />
-            )}
-            <ActionButton
-              icon={downloadIcon}
-              label={t("imagePreview.download")}
-              onPress={() => downloadImage(shown.uri).catch(() => {})}
-            />
-          </Group>
+            </Group>
+          </View>
           </>
         )}
       </SheetScrollView>
@@ -178,6 +179,11 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: Spacing.lg2,
     paddingBottom: Spacing.lg,
     gap: Spacing.xxl2,
+  },
+  sheetCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xxl + Spacing.md,
+    padding: Spacing.md,
   },
   imageContainer: {
     padding: Spacing.md,

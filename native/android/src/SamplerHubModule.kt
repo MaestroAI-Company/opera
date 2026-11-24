@@ -520,7 +520,8 @@ class SamplerHubModule(context: ReactApplicationContext) : ReactContextBaseJavaM
         promise.resolve(block())
       } catch (e: HubException) {
         promise.reject(e.javaClass.simpleName, e.message, e)
-      } catch (e: Exception) {
+      } catch (e: Throwable) {
+        //jna link errors are not exceptions
         promise.reject("Internal", e.message, e)
       }
     }

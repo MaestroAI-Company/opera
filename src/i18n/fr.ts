@@ -23,6 +23,8 @@ export const fr: Translations = {
   "common.openInApp": "Ouvrir dans l'application",
   "common.info": "Info",
   "common.clear": "Effacer",
+  "common.showPassword": "Afficher le mot de passe",
+  "common.hidePassword": "Masquer le mot de passe",
 
   "onboarding.next": "Continuer",
   "onboarding.back": "Retour",
@@ -100,6 +102,7 @@ export const fr: Translations = {
   "conversations.search.placeholder": "Rechercher des conversations",
   "conversations.search.results": "RÉSULTATS",
   "conversations.search.empty": "Aucun résultat",
+  "conversations.search.showMore": "Afficher plus",
   "conversations.delete.title": "Supprimer la conversation",
   "conversations.delete.message":
     "Veux-tu vraiment supprimer cette conversation ? Cette action est irréversible.",
@@ -179,6 +182,8 @@ export const fr: Translations = {
   "messageDetails.prompt": "Prompt système",
   "messageDetails.standbyNote":
     "Répondu en Standby : réponses courtes à l'oral et carte à l'écran. Ces règles ne valent qu'en Standby, si tu continues cette conversation dans Opera, c'est le prompt habituel qui s'applique.",
+  "messageDetails.liveNote":
+    "Répondu en mode live : réponses courtes à l'oral, widgets affichés à l'écran. Ces règles ne valent qu'en mode live, si tu continues cette conversation à l'écrit, c'est le prompt habituel qui s'applique.",
   "messageDetails.thinking": "Réflexion",
   "messageDetails.tools": "Outils",
   "messageDetails.reasoning": "Raisonnement",
@@ -186,6 +191,8 @@ export const fr: Translations = {
 
   "whatsNew.title": "Nouveautés d'Opera {version}",
   "whatsNew.close": "C'est noté",
+  "whatsNew.openGithub": "Ouvrir sur GitHub",
+  "whatsNew.storeDelay": "Distribution sur les stores : plusieurs jours possibles, publication simultanée.",
 
   "bugReport.title": "Signaler un bug",
   "bugReport.crashTitle": "Opera s'est fermé de manière inattendue",
@@ -284,6 +291,25 @@ export const fr: Translations = {
   "chatbar.micPermission.title": "Autorisation du microphone",
   "chatbar.micPermission.message":
     "L'accès au microphone est nécessaire pour la saisie vocale. Active-le dans les réglages de ton appareil.",
+  "chatbar.live": "Mode live",
+
+  "live.mute": "Couper le micro",
+  "live.unmute": "Réactiver le micro",
+  "live.camera": "Caméra",
+  "live.selectCamera": "Choisir une caméra",
+  "live.hangUp": "Raccrocher",
+  "live.notifPerm.title": "Autoriser les notifications",
+  "live.notifPerm.message": "Opera a besoin des notifications pour afficher ton appel en cours avec Maestro et te laisser raccrocher ou couper le micro depuis la barre d'état.",
+  "live.notifPerm.allow": "Autoriser",
+  "live.notifPerm.cancel": "Plus tard",
+  "live.locked.title": "Appel en cours",
+  "live.locked.message": "Raccroche le mode live avant de changer de conversation.",
+  "live.voiceMessage": "Message vocal",
+  "live.transcribe.title": "Écrire ce que tu dis ?",
+  "live.transcribe.message":
+    "Écrire tes paroles dans le chat demande un traitement en plus : une deuxième session sur ton serveur avec les modèles locaux, ou un modèle de transcription facturé chez OpenAI. Tu pourras changer ça dans les réglages.",
+  "live.transcribe.enable": "Transcrire",
+  "live.transcribe.skip": "Pas maintenant",
 
   "whisper.notConfigured.title": "Whisper non configuré",
   "whisper.notConfigured.message":
@@ -314,6 +340,15 @@ export const fr: Translations = {
   "update.checkFailed": "La recherche de mise à jour a échoué. Vérifie ta connexion.",
   "settings.update.checkNow": "Vérifier maintenant",
 
+  "settings.nav.search.title": "Rechercher",
+  "settings.nav.search.empty": "Aucun réglage trouvé",
+  "settings.nav.search.recent": "Récents",
+  "settings.nav.search.results": "Résultats",
+  "settings.nav.search.topics": "Sujets",
+  "settings.nav.search.topicSync": "Sync",
+  "settings.nav.search.topicSyncQuery": "Sync",
+  "settings.nav.search.topicData": "Données",
+  "settings.nav.search.topicMcp": "MCP",
   "settings.nav.profile.title": "Profil",
   "settings.nav.profile.subtitle": "Nom",
   "settings.nav.cloud.title": "Sync & sauvegarde",
@@ -520,6 +555,13 @@ export const fr: Translations = {
   "sampler.helpLink": "La liaison est automatique en local, ou manuelle avec un QR code ou un code.",
   "sampler.nav.home": "Accueil",
   "sampler.nav.homeHelp": "Ton Sampler Hub en un coup d'œil",
+  "sampler.home.orbit": "Orbite",
+  "sampler.home.models": "Modèle IA",
+  "sampler.home.mcp": "Serveurs MCP",
+  "sampler.home.hub": "Informations du hub",
+  "sampler.home.edit": "Modifier l'accueil",
+  "sampler.home.add": "Ajouter",
+  "sampler.home.remove": "Retirer",
   "sampler.nav.profiles": "Profils",
   "sampler.nav.profilesHelp": "Les personnes et leurs appareils",
   "sampler.nav.modelsHelp": "Les modèles servis par Sampler Hub",
@@ -616,6 +658,7 @@ export const fr: Translations = {
   "hubModels.deleteTitle": "Supprimer {name} ?",
   "hubModels.deleteMessage": "Le modèle est effacé de Sampler Hub et n'est plus disponible sur vos appareils.",
   "hubModels.failed": "L'action a échoué : {error}",
+  "hubModels.current": "Modèles actuels",
   "hubMcp.pageTitle": "Serveurs MCP",
   "hubMcp.navHelp": "Installez des outils pour Maestro, hébergés et isolés sur Sampler Hub.",
   "hubMcp.title": "Serveurs MCP de Sampler Hub",
@@ -691,6 +734,7 @@ export const fr: Translations = {
   "hubDevice.nameHelp": "Le nom que vos autres appareils voient dans la liste.",
   "hubDevice.rename": "Renommer",
   "hubDevice.kind": "Type",
+  "hubDevice.profile": "Profil",
   "hubDevice.kinds.phone": "Téléphone",
   "hubDevice.kinds.desktop": "Ordinateur",
   "hubDevice.kinds.web": "Navigateur",
@@ -708,6 +752,9 @@ export const fr: Translations = {
   "settings.nav.maestro.subtitle": "Voix, préférences",
   "settings.nav.maestro.subtitleDesktop": "Instructions",
   "settings.maestro.voice": "Voix",
+  "settings.maestro.applyColor": "Appliquer la couleur de Maestro à toute l'app",
+  "settings.maestro.applyColorHelp":
+    "Les boutons, interrupteurs, liens et la barre de chat prennent la couleur de la voix de Maestro.",
   "settings.personality.title": "Personnalité",
   "settings.personality.edit": "Modifier",
   "settings.personality.save": "Enregistrer",
@@ -773,7 +820,7 @@ export const fr: Translations = {
   "settings.nav.support.title": "Support",
   "settings.nav.support.subtitle": "Signaler un problème, contacter le support",
   "settings.nav.info.title": "Informations",
-  "settings.nav.info.subtitle": "Version de l'app, Github, Instagram, TikTok",
+  "settings.nav.info.subtitle": "Version de l'app, Github",
   "settings.screenSaver.help":
     "Pose ton téléphone sur son dock ou en charge : Opera le transforme en écran connecté, avec l'heure et Maestro à la voix. Pour l'activer, choisis Opera comme écran de veille dans les réglages Android.",
   "settings.screenSaver.open": "Ouvrir les réglages",
@@ -788,6 +835,7 @@ export const fr: Translations = {
     "Parle à Maestro sans les mains sur l'écran connecté. L'écoute reste sur l'appareil.",
 
   "settings.info.version": "Version",
+  "settings.info.changelogUnavailable": "Notes de version indisponibles. Vérifie ta connexion.",
   "settings.info.links": "Liens",
   "settings.info.linksHelp":
     "Retrouve Opera en ligne, suis nos actualités et contribue au projet.",
@@ -811,6 +859,9 @@ export const fr: Translations = {
   "settings.general.detectionBoxes": "Afficher les boxes de détection",
   "settings.general.detectionBoxesHelp":
     "Entoure les éléments de l'écran sur lesquels la sélection de l'overlay s'aimante.",
+  "settings.general.liveTranscription": "Transcrire ta voix en live",
+  "settings.general.liveTranscriptionHelp":
+    "Écrit tes paroles dans le chat. Utilise une deuxième session sur le serveur avec les modèles locaux, et un modèle de transcription facturé chez OpenAI. Gemini transcrit toujours.",
   "settings.general.autoRead": "Lecture automatique des réponses",
   "settings.general.autoReadHelp":
     "Lit la réponse à voix haute quand tu demandes à la voix.",
@@ -961,6 +1012,7 @@ export const fr: Translations = {
   "settings.model.capThinking": "Réflexion",
   "settings.model.capAudio": "Audio",
   "settings.model.capVideo": "Vidéo",
+  "settings.model.capLive": "Voix en direct",
 
   "settings.service.litert": "Sur l'appareil",
   "settings.service.litertHelp":
@@ -1141,6 +1193,9 @@ export const fr: Translations = {
   "tools.consent.allow": "Autoriser",
   "tools.consent.decline": "Refuser",
   "tools.consent.expired": "Cette demande a été interrompue. Redemande pour réessayer.",
+  "tools.consent.always": "Toujours autoriser",
+  "tools.consent.mcp.title": "Utiliser {tool} ?",
+  "tools.consent.mcp.message": "Maestro veut lancer {tool} du serveur MCP {server}. Il peut envoyer des données à ce serveur.",
 
   "settings.mcp.connecting": "Connexion...",
   "settings.mcp.noTools": "Aucun outil",

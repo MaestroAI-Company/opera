@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import {
+    Fonts,
+    FontSizes,
+    Radius,
+    Spacing,
+    ThemeColors,
+} from "../../../constants/theme";
 import { useBugReport } from "../../hooks/useBugReport";
-import { useT } from "../../i18n";
 import { useThemedStyles } from "../../hooks/useTheme";
+import { useT } from "../../i18n";
 import type { Crash } from "../../services/logging/CrashReporter";
 import ActionButton from "../ui/ActionButton";
 import Checkbox from "../ui/Checkbox";
@@ -13,8 +19,8 @@ import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
-const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
-const arrowIcon = require("../../../assets/icons/arrow.png");
+import penPlaceholderIcon from "../../../assets/icons/edit2.svg";
+import arrowIcon from "../../../assets/icons/arrow2.svg";
 
 const DESKTOP_CARD_WIDTH = 720;
 
@@ -25,21 +31,38 @@ type BugReportSheetProps = {
   screenshot?: string | null;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
+  //raises the keyboard when the sheet opens
+  autoFocus?: boolean;
 };
 
 //opens on shake or after crash
-export default function BugReportSheet({ visible, onClose, crash = null, screenshot = null, isLargeScreen = false, isDesktop = false }: BugReportSheetProps) {
+export default function BugReportSheet({
+  visible,
+  onClose,
+  crash = null,
+  screenshot = null,
+  isLargeScreen = false,
+  isDesktop = false,
+  autoFocus = false,
+}: BugReportSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const [alertVisible, setAlertVisible] = useState(false);
-  const [alertConfig, setAlertConfig] = useState<{ title: string; message: string; buttons?: ModalButton[] }>({ title: "", message: "" });
+  const [alertConfig, setAlertConfig] = useState<{
+    title: string;
+    message: string;
+    buttons?: ModalButton[];
+  }>({ title: "", message: "" });
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
-  const notify = useCallback((title: string, message: string, buttons?: ModalButton[]) => {
-    setAlertConfig({ title, message, buttons });
-    setAlertVisible(true);
-  }, []);
+  const notify = useCallback(
+    (title: string, message: string, buttons?: ModalButton[]) => {
+      setAlertConfig({ title, message, buttons });
+      setAlertVisible(true);
+    },
+    [],
+  );
 
   const report = useBugReport(notify);
   const { reset } = report;
@@ -64,29 +87,47 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
         ]}
         desktopStyle={styles.desktopCard}
       >
-        <SheetScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <SheetScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.contentCard}>
-            <Text style={styles.title}>{crash ? t("bugReport.crashTitle") : t("bugReport.title")}</Text>
+            <Text style={styles.title}>
+              {crash ? t("bugReport.crashTitle") : t("bugReport.title")}
+            </Text>
 
             {crash && (
-              <Text style={styles.help}>
-                {t("bugReport.crashHelp")}
-              </Text>
+              <Text style={styles.help}>{t("bugReport.crashHelp")}</Text>
             )}
 
             <View style={styles.inputGroup}>
               <Group>
                 <TextInputField
                   icon={penPlaceholderIcon}
-                  placeholder={crash ? t("bugReport.crashPlaceholder") : t("bugReport.placeholder")}
+                  placeholder={
+                    crash
+                      ? t("bugReport.crashPlaceholder")
+                      : t("bugReport.placeholder")
+                  }
                   value={report.text}
                   onChangeText={report.setText}
+                  variant="large"
+                  autoFocus={autoFocus}
                 />
               </Group>
             </View>
 
-            <View style={isDesktop && screenshot ? styles.togglesRowDesktop : undefined}>
-              <View style={[styles.toggleRow, isDesktop && screenshot ? styles.toggleColDesktop : undefined]}>
+            <View
+              style={
+                isDesktop && screenshot ? styles.togglesRowDesktop : undefined
+              }
+            >
+              <View
+                style={[
+                  styles.toggleRow,
+                  isDesktop && screenshot ? styles.toggleColDesktop : undefined,
+                ]}
+              >
                 <Checkbox
                   label={t("bugReport.attachLogs")}
                   checked={report.logs !== null}
@@ -97,11 +138,18 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
               </View>
 
               {screenshot && (
-                <View style={[styles.toggleRow, isDesktop && styles.toggleColDesktop]}>
+                <View
+                  style={[
+                    styles.toggleRow,
+                    isDesktop && styles.toggleColDesktop,
+                  ]}
+                >
                   <Checkbox
                     label={t("bugReport.attachScreenshot")}
                     checked={report.screenshot !== null}
-                    onToggle={(v) => report.setScreenshot(v ? screenshot : null)}
+                    onToggle={(v) =>
+                      report.setScreenshot(v ? screenshot : null)
+                    }
                     labelFirst
                     style={styles.checkboxRow}
                   />
@@ -137,82 +185,82 @@ export default function BugReportSheet({ visible, onClose, crash = null, screens
   );
 }
 
-const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
-  sheet: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: Colors.groupedBackground,
-    borderTopLeftRadius: Radius.huge2,
-    borderTopRightRadius: Radius.huge2,
-    paddingTop: Spacing.xxl,
-  },
-  desktopCard: {
-    width: DESKTOP_CARD_WIDTH,
-  },
-  sheetHandleContainer: {
-    //floats so top edge matches sides
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-    paddingVertical: Spacing.md,
-  },
-  content: {
-    paddingHorizontal: Spacing.lg2,
-    paddingBottom: Spacing.lg,
-  },
-  contentCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xxl + Spacing.md,
-    borderWidth: 0,
-    padding: Spacing.md,
-  },
-  title: {
-    fontSize: FontSizes.body,
-    color: Colors.textPrimary,
-    fontFamily: Fonts.mono,
-    paddingTop: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.sm,
-  },
-  help: {
-    fontSize: FontSizes.bodyMd,
-    lineHeight: 20,
-    color: Colors.textMuted,
-    fontFamily: Fonts.body,
-    paddingHorizontal: Spacing.md,
-  },
-  inputGroup: {
-    marginBottom: Spacing.md,
-    marginTop: Spacing.sm,
-  },
-  consent: {
-    marginTop: Spacing.lg2,
-    marginBottom: Spacing.lg2,
-  },
-  togglesRowDesktop: {
-    flexDirection: "row",
-    gap: Spacing.lg2,
-  },
-  toggleColDesktop: {
-    flex: 1,
-  },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: Spacing.md,
-    paddingHorizontal: Spacing.md,
-  },
-  checkboxRow: {
-    flex: 1,
-    justifyContent: "space-between",
-  },
-  highlightGroup: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.borderOnPrimary,
-  },
-});
+const makeStyles = (Colors: ThemeColors) =>
+  StyleSheet.create({
+    sheet: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: Colors.groupedBackground,
+      borderTopLeftRadius: Radius.huge2,
+      borderTopRightRadius: Radius.huge2,
+      paddingTop: Spacing.xxl,
+    },
+    desktopCard: {
+      width: DESKTOP_CARD_WIDTH,
+    },
+    sheetHandleContainer: {
+      //floats so top edge matches sides
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      alignItems: "center",
+      paddingVertical: Spacing.md,
+    },
+    content: {
+      paddingHorizontal: Spacing.lg2,
+    },
+    contentCard: {
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.xxl + Spacing.md,
+      borderWidth: 0,
+      padding: Spacing.md,
+    },
+    title: {
+      fontSize: FontSizes.body,
+      color: Colors.textPrimary,
+      fontFamily: Fonts.mono,
+      paddingTop: Spacing.xs,
+      paddingHorizontal: Spacing.md,
+      marginBottom: Spacing.sm,
+    },
+    help: {
+      fontSize: FontSizes.caption,
+      lineHeight: 18,
+      color: Colors.textMuted,
+      fontFamily: Fonts.body,
+      paddingHorizontal: Spacing.md,
+    },
+    inputGroup: {
+      marginBottom: Spacing.md,
+      marginTop: Spacing.sm,
+    },
+    consent: {
+      marginTop: Spacing.lg2,
+      marginBottom: Spacing.lg2,
+    },
+    togglesRowDesktop: {
+      flexDirection: "row",
+      gap: Spacing.lg2,
+    },
+    toggleColDesktop: {
+      flex: 1,
+    },
+    toggleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginTop: Spacing.md,
+      paddingHorizontal: Spacing.md,
+    },
+    checkboxRow: {
+      flex: 1,
+      justifyContent: "space-between",
+    },
+    highlightGroup: {
+      backgroundColor: Colors.primary,
+      borderColor: Colors.borderOnPrimary,
+    },
+  });

@@ -2,13 +2,14 @@
 import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { TextInputWrapper } from "expo-paste-input";
-import { Fragment, forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { Fragment, forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   BackHandler,
   Easing,
   Image,
   Keyboard,
+  LayoutChangeEvent,
   NativeSyntheticEvent,
   Platform,
   Pressable,
@@ -38,20 +39,25 @@ import { Settings } from "../../services/settings/SettingsService";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { TTS } from "../../services/speech/TTSService";
 import { buildWavBuffer } from "../../services/speech/wav";
+import AppIcon from "../ui/AppIcon";
+import { hasPlatformFeature } from "../../services/platform";
 import IconButton from "../ui/IconButton";
 import NotificationModal from "../ui/NotificationModal";
 import { classifyAttachment, type AttachmentKind, type Attachments, type SelectedFile } from "./AttachmentSheet";
 import { pressStyle } from "../ui/pressStyle";
 import VoiceGrid from "./VoiceGrid";
 import { vibrate } from "@/services/haptics";
+import nextWhiteIcon from "../../../assets/icons/arrow.svg";
+import micIcon from "../../../assets/icons/microphone.svg";
+import addIcon from "../../../assets/icons/add.svg";
+import stopIcon from "../../../assets/icons/stop.svg";
+import fileIcon from "../../../assets/icons/file.svg";
+import pencilIcon from "../../../assets/icons/edit2.svg";
+import cancelIcon from "../../../assets/icons/cancel2.svg";
+import liveIcon from "../../../assets/icons/live.svg";
 
-const nextWhiteIcon = require("../../../assets/icons/arrow.png");
-const micIcon = require("../../../assets/icons/microphone.png");
-const addIcon = require("../../../assets/icons/add.png");
-const stopIcon = require("../../../assets/icons/stop.png");
-const fileIcon = require("../../../assets/icons/file.png");
-const pencilIcon = require("../../../assets/icons/pencil.png");
-const cancelIcon = require("../../../assets/icons/cancel2.png");
+//buttons are 28px in a 56px bar, slop fills its height
+const HIT_SLOP = { top: 14, bottom: 14, left: 6, right: 6 };
 
 const IMAGE_MAX_WIDTH = 1280;
 const IMAGE_COMPRESS_QUALITY = 0.7;
@@ -109,6 +115,8 @@ type ChatInputBarProps = {
   editFiles?: SelectedFile[] | null;
   //host frame already spaces the bar
   flush?: boolean;
+  //set only for models that speak live
+  onOpenLive?: () => void;
 };
 
 export type ChatBarHandle = {
@@ -231,6 +239,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   editDraft = null,
   editFiles = null,
   flush = false,
+  onOpenLive,
 }, ref) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
@@ -344,6 +353,9 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
   const sampleRateRef = useRef<number>(16000);
   const pulseAnim = useAnimatedValue(1);
   const pressAnim = useAnimatedValue(0);
+  //input slot height follows the text lines
+  const inputHeightAnim = useAnimatedValue(Platform.OS === 'web' ? 22 : 32);
+  const inputMeasuredRef = useRef(false);
   const incognitoAnim = useAnimatedValue(incognito ? 1 : 0);
 
   useEffect(() => {
@@ -637,6 +649,47 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
       pulseAnim.setValue(1);
     }
   }, [isRecording, pulseAnim]);
+
+  //pinned textarea never reports a smaller content height
+  const fitWebInput = () => {
+    const node = inputRef.current as any;
+    if (Platform.OS !== 'web' || !node?.style) return;
+    const pinned = node.style.height;
+    node.style.height = '0px';
+    const natural = node.scrollHeight;
+    node.style.height = pinned;
+    if (natural > 0) setWebInputHeight(Math.min(132, Math.max(22, natural)));
+  };
+  useLayoutEffect(() => {
+    if (text) fitWebInput();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+  //window resize rewraps the lines
+  const inputWidthRef = useRef(0);
+
+  //input remounts after recording, first height snaps
+  useEffect(() => {
+    inputMeasuredRef.current = false;
+  }, [isRecording]);
+
+  const handleInputLayout = (e: LayoutChangeEvent) => {
+    const { height, width } = e.nativeEvent.layout;
+    if (width !== inputWidthRef.current) {
+      inputWidthRef.current = width;
+      if (text) fitWebInput();
+    }
+    if (!inputMeasuredRef.current) {
+      inputMeasuredRef.current = true;
+      inputHeightAnim.setValue(height);
+      return;
+    }
+    Animated.timing(inputHeightAnim, {
+      toValue: height,
+      duration: 160,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  };
 
   const handlePressIn = () => {
     vibrate(10);
@@ -1125,7 +1178,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                     <View style={styles.fileChipsContainer}>
                       {editing && (
                         <View style={styles.editTrayRow}>
-                          <Image source={pencilIcon} style={styles.filePreviewDocumentIconTop} tintColor={Colors.textMuted} />
+                          <AppIcon source={pencilIcon} style={styles.filePreviewDocumentIconTop} tintColor={Colors.textMuted} />
                           <Text style={styles.editTrayText} numberOfLines={1}>{t("chatbar.editingMessage")}</Text>
                           <IconButton
                             icon={cancelIcon}
@@ -1154,7 +1207,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                           ) : (
                             <View style={styles.filePreviewAudioTop}>
                               {chip.kind === 'document' ? (
-                                <Image source={fileIcon} style={styles.filePreviewDocumentIconTop} tintColor={Colors.textOnPrimary} />
+                                <AppIcon source={fileIcon} style={styles.filePreviewDocumentIconTop} tintColor={Colors.textOnPrimary} />
                               ) : (
                                 <Text style={styles.filePreviewAudioTextTop} numberOfLines={1}>{chip.name}</Text>
                               )}
@@ -1170,9 +1223,11 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 </Animated.View>
               ) : null}
 
+              <View style={styles.barRow}>
               <Animated.View
                 style={[
                   styles.container,
+                  styles.containerFill,
                   incognito && styles.containerIncognito,
                   isDesktop && { paddingHorizontal: 8, paddingVertical: 6, minHeight: 48 },
                   { backgroundColor: backgroundColor }
@@ -1181,15 +1236,15 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 {leadingElement && <View style={{ marginRight: 8 }}>{leadingElement}</View>}
 
                 {supportsFiles && !isRecording && (
-                  <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={isDesktop ? 8 : undefined} style={pressStyle(styles.plusButton, "fadeLight")}>
-                    <Image source={addIcon} style={styles.plusIcon} tintColor={Colors.textOnPrimary} />
+                  <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.plusButton, "fadeLight")}>
+                    <AppIcon source={addIcon} style={styles.plusIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 )}
 
-                {(Platform.OS !== 'web' || Settings.getCached().whisperModel !== 'none' || canTranscribeRemotely) && !isGenerating && (
-                  <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={isDesktop ? 8 : undefined} style={pressStyle(styles.micButton, "fadeLight")}>
+                {(Platform.OS !== 'web' || Settings.getCached().whisperModel !== 'none' || canTranscribeRemotely) && hasPlatformFeature('android.hardware.microphone') && !isGenerating && (
+                  <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.micButton, "fadeLight")}>
                     <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
-                      <Image source={isRecording ? stopIcon : micIcon} style={styles.micIcon} tintColor={Colors.textOnPrimary} />
+                      <AppIcon source={isRecording ? stopIcon : micIcon} style={styles.micIcon} tintColor={Colors.textOnPrimary} />
                     </Animated.View>
                   </Pressable>
                 )}
@@ -1210,6 +1265,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                         </Text>
                       </View>
                     )}
+                    <Animated.View style={{ height: inputHeightAnim, overflow: 'hidden' }}>
                     <TextInputWrapper
                       onPaste={(payload) => {
                         if (payload.type !== "images") return;
@@ -1267,6 +1323,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                           }
                         } : undefined}
                         editable={!isTranscribing}
+                        onLayout={handleInputLayout}
                         onTouchStart={handlePressIn}
                         onTouchEnd={handlePressOut}
                         onKeyPress={handleKeyPress}
@@ -1276,19 +1333,26 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                         {Platform.OS !== 'web' && <Text>{renderInputText()}</Text>}
                       </TextInput>
                     </TextInputWrapper>
+                    </Animated.View>
                   </View>
                 )}
 
                 {isGenerating ? (
-                  <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={isDesktop ? 8 : undefined} style={pressStyle(styles.sendButton, "fadeLight")}>
-                    <Image source={stopIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
+                  <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.sendButton, "fadeLight")}>
+                    <AppIcon source={stopIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
+                  </Pressable>
+                ) : onOpenLive && !isRecording && !text.trim() && attachments.length === 0 ? (
+                  <Pressable accessibilityLabel={t("chatbar.live")} onPress={onOpenLive} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.sendButton, "fadeLight")}>
+                    <AppIcon source={liveIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 ) : (
-                  <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={isDesktop ? 8 : undefined} style={pressStyle(styles.sendButton, "fadeLight")}>
-                    <Image source={nextWhiteIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
+                  <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.sendButton, "fadeLight")}>
+                    <AppIcon source={nextWhiteIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 )}
               </Animated.View>
+
+              </View>
             </Animated.View>
           </Pressable>
 
@@ -1332,6 +1396,14 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     minHeight: 56,
     boxShadow: `2px 6px 22px ${Colors.primary}`,
     elevation: 8,
+  },
+  barRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: Spacing.md,
+  },
+  containerFill: {
+    flex: 1,
   },
   containerIncognito: {
     boxShadow: `2px 6px 15px ${Colors.incognito}`,

@@ -131,6 +131,17 @@ function withNativeAndroid(config) {
       });
     }
 
+    //ongoing call notification of live mode
+    if (!application.service.some(s => s.$['android:name'] === '.LiveCallService')) {
+      application.service.push({
+        $: {
+          'android:name': '.LiveCallService',
+          'android:exported': 'false',
+          'android:foregroundServiceType': 'microphone',
+        },
+      });
+    }
+
     //offer opera as a system screensaver
     if (!application.service.some(s => s.$['android:name'] === '.OperaDreamService')) {
       application.service.push({
@@ -159,6 +170,14 @@ function withNativeAndroid(config) {
     manifestDoc.manifest['uses-permission'].push({
       $: { 'android:name': 'android.permission.ACTIVITY_RECOGNITION', 'tools:node': 'remove' },
     });
+
+    //play filters on implied features
+    manifestDoc.manifest['uses-feature'] = manifestDoc.manifest['uses-feature'] || [];
+    for (const feature of ['android.hardware.screen.portrait', 'android.hardware.wifi', 'android.hardware.camera', 'android.hardware.camera.autofocus', 'android.hardware.microphone', 'android.hardware.type.pc']) {
+      if (!manifestDoc.manifest['uses-feature'].some(f => f.$['android:name'] === feature)) {
+        manifestDoc.manifest['uses-feature'].push({ $: { 'android:name': feature, 'android:required': 'false' } });
+      }
+    }
 
     //expose app settings to the system
     if (!application.activity.some(a => a.$['android:name'] === '.SettingsActivity')) {
@@ -239,9 +258,13 @@ function withNativeAndroid(config) {
       copyTemplate('src/MaestroOverlayPackage.kt', path.join(javaDir, 'MaestroOverlayPackage.kt'), packageName);
       copyTemplate('src/AssistantModule.kt', path.join(javaDir, 'AssistantModule.kt'), packageName);
       copyTemplate('src/PredictiveBackModule.kt', path.join(javaDir, 'PredictiveBackModule.kt'), packageName);
+      copyTemplate('src/WindowModeModule.kt', path.join(javaDir, 'WindowModeModule.kt'), packageName);
+      copyTemplate('src/DisplayMetricsFix.kt', path.join(javaDir, 'DisplayMetricsFix.kt'), packageName);
       copyTemplate('src/OperaDreamService.kt', path.join(javaDir, 'OperaDreamService.kt'), packageName);
       copyTemplate('src/WakeWordModule.kt', path.join(javaDir, 'WakeWordModule.kt'), packageName);
       copyTemplate('src/WakeWordDetector.kt', path.join(javaDir, 'WakeWordDetector.kt'), packageName);
+      copyTemplate('src/LiveCallService.kt', path.join(javaDir, 'LiveCallService.kt'), packageName);
+      copyTemplate('src/LiveCallModule.kt', path.join(javaDir, 'LiveCallModule.kt'), packageName);
 
       // AICore (ML Kit GenAI) modules
       copyTemplate('src/AICorePackage.kt', path.join(javaDir, 'AICorePackage.kt'), packageName);
@@ -306,6 +329,15 @@ function withNativeAndroid(config) {
           contents = contents.replace('return packages;', addLine + '\n          return packages;');
         }
       }
+    }
+
+    //text follows the window display
+    if (isKotlin && !contents.includes('DisplayMetricsFix')) {
+      contents = contents.replace(/(super\.onCreate\(\)\r?\n)/, '$1    DisplayMetricsFix.install(this)\n');
+      contents = contents.replace(
+        '  override fun onConfigurationChanged',
+        '  override fun getSystemService(name: String): Any? =\n    DisplayMetricsFix.wrap(name, super.getSystemService(name))\n\n  override fun onConfigurationChanged'
+      );
     }
 
     config.modResults.contents = contents;

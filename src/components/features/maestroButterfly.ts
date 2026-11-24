@@ -1,75 +1,75 @@
 import { useSyncExternalStore } from "react";
 import { DeviceEventEmitter, ImageSourcePropType } from "react-native";
 import { DEFAULT_PERSONALITY, PERSONALITY_DEPTHS, PERSONALITY_MOODS, PERSONALITY_STYLES, type PersonalitySettings } from "../../../constants/personality";
-import { VoiceColors } from "../../../constants/theme";
+import { VoiceAccents } from "../../../constants/theme";
 import { getLocale, t, type TranslationKey } from "../../i18n";
 import { AppEvents } from "../../services/events";
 import { Settings } from "../../services/settings/SettingsService";
 import { getVoice, setVoice } from "../../services/speech/engines";
 import { TTS } from "../../services/speech/TTSService";
+import type { AsciiFrames } from "./AsciiButterfly";
+import { ASCII_BUTTERFLY1 } from "./asciiButterfly1Frames";
+import { ASCII_BUTTERFLY2 } from "./asciiButterfly2Frames";
+import { ASCII_BUTTERFLY3 } from "./asciiButterfly3Frames";
+import { ASCII_BUTTERFLY4 } from "./asciiButterfly4Frames";
+import { ASCII_BUTTERFLY5 } from "./asciiButterfly5Frames";
+
+import type { IconSource } from "../ui/AppIcon";
+import operaicon1 from "../../../assets/icons/operaicon.svg";
+import operaicon2 from "../../../assets/icons/operaicon2.svg";
+import operaicon3 from "../../../assets/icons/operaicon3.svg";
+import operaicon4 from "../../../assets/icons/operaicon4.svg";
+import operaicon5 from "../../../assets/icons/operaicon5.svg";
 
 export type MaestroButterfly = {
-  //black/white only, red accent cut out
+  //square grid that flaps
+  frames: AsciiFrames;
+  //still rest pose for widgets and the call card, black/white only, accent cut out
   base: ImageSourcePropType;
-  //red accent only, tinted to recolor it live
+  //accent squares of the rest pose, tinted to recolor it live
   accent: ImageSourcePropType;
-  icon: ImageSourcePropType;
+  icon: IconSource;
 };
 
-export type MaestroButterflyId =
-  | "butterfly1"
-  | "butterfly2"
-  | "butterfly3"
-  | "butterfly4"
-  | "butterfly5"
-  | "butterflyEgg";
+export type MaestroButterflyId = "butterfly1" | "butterfly2" | "butterfly3" | "butterfly4" | "butterfly5";
 
 const DEFAULT_BUTTERFLY: MaestroButterflyId = "butterfly1";
 
-const butterfly2: MaestroButterfly = {
-  base: require("../../../assets/images/butterflies/butterfly2_base.png"),
-  accent: require("../../../assets/images/butterflies/butterfly2_accent.png"),
-  icon: require("../../../assets/icons/operaicon2.png"),
+export const MAESTRO_BUTTERFLIES: Record<MaestroButterflyId, MaestroButterfly> = {
+  butterfly1: {
+    frames: ASCII_BUTTERFLY1,
+    base: require("../../../assets/images/butterflies/butterfly1_base.png"),
+    accent: require("../../../assets/images/butterflies/butterfly1_accent.png"),
+    icon: operaicon1,
+  },
+  butterfly2: {
+    frames: ASCII_BUTTERFLY2,
+    base: require("../../../assets/images/butterflies/butterfly2_base.png"),
+    accent: require("../../../assets/images/butterflies/butterfly2_accent.png"),
+    icon: operaicon2,
+  },
+  butterfly3: {
+    frames: ASCII_BUTTERFLY3,
+    base: require("../../../assets/images/butterflies/butterfly3_base.png"),
+    accent: require("../../../assets/images/butterflies/butterfly3_accent.png"),
+    icon: operaicon3,
+  },
+  butterfly4: {
+    frames: ASCII_BUTTERFLY4,
+    base: require("../../../assets/images/butterflies/butterfly4_base.png"),
+    accent: require("../../../assets/images/butterflies/butterfly4_accent.png"),
+    icon: operaicon4,
+  },
+  butterfly5: {
+    frames: ASCII_BUTTERFLY5,
+    base: require("../../../assets/images/butterflies/butterfly5_base.png"),
+    accent: require("../../../assets/images/butterflies/butterfly5_accent.png"),
+    icon: operaicon5,
+  },
 };
 
-export const MAESTRO_BUTTERFLIES: Record<MaestroButterflyId, MaestroButterfly> =
-  {
-    butterfly1: {
-      base: require("../../../assets/images/butterflies/butterfly1_base.png"),
-      accent: require("../../../assets/images/butterflies/butterfly1_accent.png"),
-      icon: require("../../../assets/icons/operaicon.png"),
-    },
-    butterfly2,
-    butterfly3: {
-      base: require("../../../assets/images/butterflies/butterfly3_base.png"),
-      accent: require("../../../assets/images/butterflies/butterfly3_accent.png"),
-      icon: require("../../../assets/icons/operaicon3.png"),
-    },
-    butterfly4: {
-      base: require("../../../assets/images/butterflies/butterfly4_base.png"),
-      accent: require("../../../assets/images/butterflies/butterfly4_accent.png"),
-      icon: require("../../../assets/icons/operaicon4.png"),
-    },
-    butterfly5: {
-      base: require("../../../assets/images/butterflies/butterfly5_base.png"),
-      accent: require("../../../assets/images/butterflies/butterfly5_accent.png"),
-      icon: require("../../../assets/icons/operaicon5.png"),
-    },
-    //hidden one, no tile in the selector
-    butterflyEgg: {
-      base: require("../../../assets/images/butterflies/butterflyEgg_base.png"),
-      accent: require("../../../assets/images/butterflies/butterflyEgg_accent.png"),
-      icon: require("../../../assets/icons/operaiconEgg.png"),
-    },
-  };
-
 //each supertonic voice owns an accent color
-export const VOICE_OPTIONS = [
-  { id: "F1", color: VoiceColors.red },
-  { id: "F2", color: VoiceColors.pink },
-  { id: "M1", color: VoiceColors.amber },
-  { id: "M2", color: VoiceColors.blue },
-];
+export const VOICE_OPTIONS = Object.entries(VoiceAccents).map(([id, color]) => ({ id, color }));
 
 const PREVIEW_COUNT = 8;
 let previewIndex = 0;
@@ -81,7 +81,7 @@ export function selectVoice(id: string): void {
   TTS.speak(t(key), { language: getLocale() });
 }
 
-const BUTTERFLY_IDS = Object.keys(MAESTRO_BUTTERFLIES).filter((id) => id !== "butterflyEgg");
+const BUTTERFLY_IDS = Object.keys(MAESTRO_BUTTERFLIES);
 
 //one number per answer combination, mood*9 + style*3 + depth
 export function personalityCode(p: PersonalitySettings): number {
@@ -106,6 +106,9 @@ function getSnapshot(): MaestroButterflyId {
   if (Object.keys(MAESTRO_BUTTERFLIES).includes(id)) return id as MaestroButterflyId;
   return butterflyForPersonality({ maestroMood, maestroStyle, maestroDepth });
 }
+
+//widgets read it outside react
+export { getSnapshot as getMaestroButterflyId };
 
 function subscribe(callback: () => void): () => void {
   //settings page writes through Settings.set

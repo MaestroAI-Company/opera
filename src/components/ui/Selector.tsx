@@ -7,10 +7,11 @@ import { useT } from "../../i18n";
 import { pressStyle } from "./pressStyle";
 import { lockTextSelection } from "./lockTextSelection";
 import { vibrate } from "@/services/haptics";
+import AppIcon, { IconSource } from "./AppIcon";
+import arrowIcon from "../../../assets/icons/arrow2.svg";
+import downloadIcon from "../../../assets/icons/download2.svg";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-const arrowDownIcon = require("../../../assets/icons/down_arrow.png");
-const downloadIcon = require("../../../assets/icons/download.png");
 
 const LONG_PRESS_DELAY = 180;
 const BREAK_RATIO = 0.85;
@@ -26,7 +27,7 @@ const rubberBand = (d: number, dim: number) => {
 export type SelectorOption = {
   id: string;
   label: string;
-  rightIcon?: any;
+  rightIcon?: IconSource;
   rightIconTintColor?: string;
   onRightIconPress?: () => void;
   isDownload?: boolean;
@@ -230,7 +231,7 @@ export default function Selector({
 
   const iconStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ rotate: `${progress.value * 180}deg` }],
+      transform: [{ rotate: `${90 + progress.value * 180}deg` }],
     };
   });
 
@@ -316,7 +317,9 @@ export default function Selector({
         style={pressStyle([styles.trigger, fullWidth && styles.triggerFullWidth], "surface")}
         ref={triggerRef}
       >
-        <Animated.Image source={arrowDownIcon} style={[styles.icon, iconStyle]} />
+        <Animated.View style={iconStyle}>
+          <AppIcon source={arrowIcon} style={styles.icon} />
+        </Animated.View>
         <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
           {selectedOption ? selectedOption.label : placeholder ?? t("selector.placeholder")}
         </Text>
@@ -358,13 +361,13 @@ export default function Selector({
                       )}
                     >
                       {option.isDownload && (
-                        <Animated.Image source={downloadIcon} style={[styles.downloadIcon, { tintColor: Colors.primary }]} />
+                        <AppIcon source={downloadIcon} style={styles.downloadIcon} tintColor={Colors.primary} />
                       )}
                       <Text
                         style={[
                           option.isDownload ? styles.downloadText : styles.optionText,
                           isSpecialActive && styles.optionTextSelected,
-                          !option.isDownload && option.rightIcon && { flex: 1 },
+                          !option.isDownload && !!option.rightIcon && { flex: 1 },
                         ]}
                       >
                         {option.label}
@@ -380,15 +383,17 @@ export default function Selector({
                             hitSlop={8}
                             style={pressStyle(styles.rightIconPressable, "subtle")}
                           >
-                            <Animated.Image
+                            <AppIcon
                               source={option.rightIcon}
-                              style={[styles.rightIcon, option.rightIconTintColor ? { tintColor: option.rightIconTintColor } : null]}
+                              style={styles.rightIcon}
+                              tintColor={option.rightIconTintColor}
                             />
                           </Pressable>
                         ) : (
-                          <Animated.Image
+                          <AppIcon
                             source={option.rightIcon}
-                            style={[styles.rightIcon, option.rightIconTintColor ? { tintColor: option.rightIconTintColor } : null]}
+                            style={styles.rightIcon}
+                            tintColor={option.rightIconTintColor}
                           />
                         )
                       )}
@@ -455,9 +460,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   menu: {
     position: "absolute",
     backgroundColor: Colors.surface,
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.border,
+    borderRadius: Radius.huge,
     padding: 0,
     width: 220,
     boxShadow: `0px 4px 12px ${Colors.overlay}`,
@@ -483,7 +486,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
-    borderRadius: Radius.md,
+    borderRadius: Radius.xl,
     borderWidth: 2,
     borderColor: Colors.borderOnPrimary,
   },
@@ -492,7 +495,7 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: Radius.md,
+    borderRadius: Radius.xl,
     marginBottom: 4,
     borderWidth: 2,
     borderColor: "transparent",

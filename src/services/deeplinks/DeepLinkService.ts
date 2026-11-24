@@ -3,6 +3,7 @@ import { SHARE_QUERY_PARAM } from "../share/shareLink";
 
 export type DeepLinkRoute =
   | { type: "new-chat" }
+  | { type: "camera" }
   | { type: "conversation"; convId: string }
   | { type: "shared"; pasteId: string; secret: string }
   | { type: "settings" }
@@ -26,6 +27,7 @@ export function parseDeepLink(url: string): DeepLinkRoute {
     const convId = params.get("convId");
     const pasteId = params.get(SHARE_QUERY_PARAM);
     if (target === "new") return { type: "new-chat" };
+    if (target === "camera") return { type: "camera" };
     if (target === "settings") return { type: "settings" };
     //rebuilt so web urls work too
     if (path.endsWith("hub/pair") && params.get("h") && secret) {

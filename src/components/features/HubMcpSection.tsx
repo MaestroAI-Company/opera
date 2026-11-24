@@ -7,19 +7,20 @@ import { useT } from "../../i18n";
 import { formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
 import { HostedMcpServer, McpField, hubErrorText } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
+import AppIcon from "../ui/AppIcon";
 import CardGrid from "../ui/CardGrid";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
-
-const binIcon = require("../../../assets/icons/bin.png");
-const fileIcon = require("../../../assets/icons/file.png");
-const keyIcon = require("../../../assets/icons/key.png");
-const pencilIcon = require("../../../assets/icons/pencil.png");
-const reconnectIcon = require("../../../assets/icons/reconnect.png");
-const downloadIcon = require("../../../assets/icons/download.png");
-const toolIcon = require("../../../assets/icons/tool.png");
+import binIcon from "../../../assets/icons/delete2.svg";
+import fileIcon from "../../../assets/icons/file.svg";
+import keyIcon from "../../../assets/icons/key2.svg";
+import edit2Icon from "../../../assets/icons/edit2.svg";
+import downloadIcon from "../../../assets/icons/download2.svg";
+import toolIcon from "../../../assets/icons/tool.svg";
+import tool2Icon from "../../../assets/icons/tool2.svg";
+import reconnectIcon from "../../../assets/icons/reload2.svg";
 
 //lines of the log shown on the page
 const LOG_LINES = 20;
@@ -95,7 +96,7 @@ export function McpFieldRows({ fields, drafts, secretsSet = [], onChange, onPick
                 />
               ) : (
                 <TextInputField
-                  icon={field.secret ? keyIcon : pencilIcon}
+                  icon={field.secret ? keyIcon : edit2Icon}
                   placeholder={field.default ?? ""}
                   value={value}
                   onChangeText={(text) => onChange(field.key, text)}
@@ -225,7 +226,7 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
             {avatar ? (
               <Image source={{ uri: avatar }} style={styles.tileImage} />
             ) : (
-              <Image source={toolIcon} style={styles.tileIcon} tintColor={Colors.textPrimary} />
+              <AppIcon source={toolIcon} style={styles.tileIcon} tintColor={Colors.textPrimary} />
             )}
           </View>
           <View style={styles.detailInfo}>
@@ -267,7 +268,7 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
             ]}
           >
             <ActionButton
-              icon={pencilIcon}
+              icon={edit2Icon}
               label={t("hubMcp.save")}
               variant="highlight"
               disabled={!changed || busy || server.state === "installing"}
@@ -300,7 +301,7 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("hubMcp.tools")}</Text>
             <Group style={styles.infoGroup}>
               {server.tools.map((tool) => (
-                <ActionButton key={tool} icon={toolIcon} label={tool} />
+                <ActionButton key={tool} icon={tool2Icon} label={tool} />
               ))}
             </Group>
           </View>

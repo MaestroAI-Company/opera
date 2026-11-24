@@ -1,8 +1,10 @@
 import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { FontSizes, Fonts, Radius, ThemeColors } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
+import AppIcon from "./AppIcon";
 import { pressStyle } from "./pressStyle";
 import { vibrate } from "@/services/haptics";
+import checkIcon from "../../../assets/icons/check2.svg";
 
 type CheckboxProps = {
   label?: string;
@@ -29,7 +31,12 @@ export default function Checkbox({ label, checked, onToggle, disabled = false, l
       }}
       disabled={disabled}
     >
-      {checked}
+      {checked ? (
+        <AppIcon
+          source={checkIcon}
+          style={styles.check}
+        />
+      ) : null}
     </Pressable>
   );
 
@@ -72,6 +79,11 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   boxChecked: {
     backgroundColor: Colors.primary,
     borderColor: Colors.borderOnPrimary,
+  },
+  check: {
+    width: 20,
+    height: 20,
+    tintColor: Colors.textOnPrimary,
   },
   boxActive: {
     backgroundColor: Colors.surfacePressed,

@@ -1,0 +1,26 @@
+diff --git a/node_modules/expo-widgets/android/src/main/java/expo/modules/widgets/WidgetInteractionAction.kt b/node_modules/expo-widgets/android/src/main/java/expo/modules/widgets/WidgetInteractionAction.kt
+index b0b6479..707268a 100644
+--- a/node_modules/expo-widgets/android/src/main/java/expo/modules/widgets/WidgetInteractionAction.kt
++++ b/node_modules/expo-widgets/android/src/main/java/expo/modules/widgets/WidgetInteractionAction.kt
+@@ -5,6 +5,7 @@ import android.content.Intent
+ import android.net.Uri
+ import androidx.glance.action.Action
+ import androidx.glance.appwidget.action.actionSendBroadcast
++import androidx.glance.appwidget.action.actionStartActivity
+ import expo.modules.widgets.notifications.ExpoWidgetsNotificationReceiver
+ 
+ internal const val WIDGET_INTERACTION_ACTION = "expo.modules.widgets.ACTION_WIDGET_INTERACTION"
+@@ -27,6 +28,13 @@ internal data class WidgetInteraction(
+ )
+ 
+ internal fun WidgetInteraction.toGlanceAction(context: Context): Action {
++  //url targets open the app
++  if (source is InteractionSource.Widget && target.contains("://")) {
++    val viewIntent = Intent(Intent.ACTION_VIEW, Uri.parse(target))
++      .setPackage(context.packageName)
++      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++    return actionStartActivity(viewIntent)
++  }
+   val intent = when (source) {
+     is InteractionSource.Widget -> Intent(WIDGET_INTERACTION_ACTION)
+       .setComponent(widgetProviderComponentName(context, source.name))

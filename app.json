@@ -2,7 +2,7 @@
   "expo": {
     "name": "Opera",
     "slug": "opera",
-    "version": "1.0.4",
+    "version": "1.1.0",
     "orientation": "default",
     "icon": "./assets/icons/opera.png",
     "scheme": [
@@ -12,7 +12,7 @@
     ],
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/icon.png",
+      "icon": "./assets/images/app-icons/ios-red.png",
       "supportsTablet": true,
       "bundleIdentifier": "ai.maestro.opera",
       "deploymentTarget": "17.0",
@@ -38,6 +38,7 @@
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.CAMERA",
@@ -57,7 +58,7 @@
       ]
     },
     "web": {
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/icon_nobg.png"
     },
     "plugins": [
@@ -172,7 +173,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Opera needs access to your camera to scan the Sampler pairing code.",
+          "cameraPermission": "Opera needs access to your camera to scan the Sampler pairing code and to show what you see to Maestro in live mode.",
           "recordAudioAndroid": false
         }
       ],
@@ -195,6 +196,38 @@
           "locationWhenInUsePermission": "Opera uses your location to give the assistant local context for better answers."
         }
       ],
+      [
+        "expo-alternate-app-icons",
+        [
+          {
+            "name": "Pink",
+            "ios": "./assets/images/app-icons/ios-pink.png",
+            "android": {
+              "foregroundImage": "./assets/images/app-icons/android-foreground-pink.png",
+              "backgroundColor": "#EE8695",
+              "monochromeImage": "./assets/images/android-icon-monochrome.png"
+            }
+          },
+          {
+            "name": "Amber",
+            "ios": "./assets/images/app-icons/ios-amber.png",
+            "android": {
+              "foregroundImage": "./assets/images/app-icons/android-foreground-amber.png",
+              "backgroundColor": "#E49D22",
+              "monochromeImage": "./assets/images/android-icon-monochrome.png"
+            }
+          },
+          {
+            "name": "Blue",
+            "ios": "./assets/images/app-icons/ios-blue.png",
+            "android": {
+              "foregroundImage": "./assets/images/app-icons/android-foreground-blue.png",
+              "backgroundColor": "#1A6DD2",
+              "monochromeImage": "./assets/images/android-icon-monochrome.png"
+            }
+          }
+        ]
+      ],
       "./plugins/withNotifeeRepo.js",
       "./plugins/withNativeAndroid",
       "./plugins/withDebugVariant",
@@ -204,10 +237,10 @@
         "expo-quick-actions",
         {
           "androidIcons": {
-            "new_chat": "./assets/icons/add.png"
+            "new_chat": "./assets/images/widgets/add.png"
           },
           "iosIcons": {
-            "new_chat": "./assets/icons/add.png"
+            "new_chat": "./assets/images/widgets/add.png"
           },
           "iosActions": [
             {
@@ -236,7 +269,63 @@
       "expo-image",
       "expo-secure-store",
       "expo-web-browser",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-widgets",
+        {
+          "enableAndroid": true,
+          "widgets": [
+            {
+              "name": "QuickActions",
+              "displayName": "Quick actions",
+              "description": "Start a discussion or open the camera",
+              "ios": {
+                "supportedFamilies": ["systemSmall", "systemMedium"],
+                "initialLayout": "./src/widgets/QuickActions.ios.tsx"
+              },
+              "android": {
+                "targetCellWidth": 2,
+                "targetCellHeight": 2,
+                "minWidth": 110,
+                "minHeight": 110,
+                "resizeMode": "none",
+                "initialLayout": "./src/widgets/QuickActions.android.tsx"
+              }
+            },
+            {
+              "name": "QuickActionsWide",
+              "displayName": "Quick actions (wide)",
+              "description": "Start a discussion or open the camera",
+              "ios": null,
+              "android": {
+                "targetCellWidth": 4,
+                "targetCellHeight": 2,
+                "minWidth": 250,
+                "minHeight": 110,
+                "resizeMode": "none",
+                "initialLayout": "./src/widgets/QuickActions.android.tsx"
+              }
+            },
+            {
+              "name": "Butterfly",
+              "displayName": "Butterfly",
+              "description": "Your Maestro butterfly",
+              "ios": {
+                "supportedFamilies": ["systemSmall", "systemLarge"],
+                "initialLayout": "./src/widgets/Butterfly.ios.tsx"
+              },
+              "android": {
+                "targetCellWidth": 2,
+                "targetCellHeight": 2,
+                "minWidth": 110,
+                "minHeight": 110,
+                "resizeMode": "both",
+                "initialLayout": "./src/widgets/Butterfly.android.tsx"
+              }
+            }
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

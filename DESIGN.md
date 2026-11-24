@@ -29,6 +29,10 @@ colors:
   incognito-pressed: "#3E4157"
   incognito-bright: "#70748E"
   incognito-surface: "#2A2A35"
+  voice-red: "#FF1A1A"
+  voice-pink: "#EE8695"
+  voice-amber: "#E49D22"
+  voice-blue: "#1A6DD2"
 typography:
   display-hero:
     fontFamily: Petrona
@@ -169,18 +173,24 @@ components:
 
 Opera is a local, on-device, privacy-respecting AI assistant. The app is **Opera**; the assistant persona inside it is **Maestro**. The UI reads as warm, editorial, and slightly technical: a cream canvas, a single bold red accent, serif display headings, and monospace UI chrome that evokes a terminal. Everything runs locally (Ollama, Whisper, Gemini Nano) and the copy consistently reinforces privacy ("no trace", "disappears forever"). The tagline is "AI for all, privacy for freedom", and a butterfly is the visual mascot.
 
-Emotionally the app should feel trustworthy and calm — like a premium broadsheet, not a loud consumer app. Red is the only interaction color and must stay rare and intentional.
+Emotionally the app should feel trustworthy and calm — like a premium broadsheet, not a loud consumer app. One accent is the only interaction color and must stay rare and intentional. It is Opera Red by default, and the user can hand it over to the color of their Maestro voice (see Maestro accent).
 
 ## Colors
 
-The palette is rooted in a warm cream foundation, a single red accent, and a full purple-gray recolor for incognito mode.
+The palette is rooted in a warm cream foundation, a single red accent, and a full purple-gray recolor for incognito mode. Everywhere this document says "red", read "primary": it is Opera Red by default and the Maestro accent when that option is on.
 
 - **Primary — Opera Red (#FF1A1A):** The sole interaction color. Drives primary actions, the chat composer, user chat bubbles, CTAs, and text selection. It also marks the active state of controls (checked Toggle and Checkbox, selected pill, selected IconSelector tile, granted permission badge) and the icon badges of top-level navigation (settings home, conversations quick actions). Use it for the single most important action per screen; never for decoration.
-- **Primary bright (#FF4D4D):** The pressed color. Every pressed, hovered or lit red surface goes to this lighter red, never to a darker one. Incognito does the same with its own bright tone (#70748E).
+- **Primary bright (#FF4D4D):** The pressed color. Every pressed, hovered or lit red surface goes to this lighter red, never to a darker one. Incognito does the same with its own bright tone (#70748E). With a Maestro accent it is derived, never picked by hand (see Maestro accent).
+- **Maestro accent (optional):** Each Maestro voice owns a color: F1 red `#FF1A1A`, F2 pink `#EE8695`, M1 amber `#E49D22`, M2 blue `#1A6DD2` (`VoiceColors` and `VoiceAccents` in `constants/theme.ts`, shown as `voice-*` above). Settings › Maestro › Preferences has a toggle, "Apply the Maestro color across the app" (`applyMaestroColor`, off by default). When it is on, the primary family takes the color of the selected voice on every screen, window, notification and overlay. The default voice is red, so it looks the same as off.
+  - **What follows:** `primary`, `primaryBright` (the accent mixed 22% toward white, which gives exactly `#FF4D4D` for red), `primarySelection` (40% alpha), `primaryHeader` (7%), `overlayHalo` (45%) and `overlayHaloClear` (0%). `withAccent` in `constants/theme.ts` builds them. The accent layer of every Maestro butterfly follows too (`useAccent()`), as it always did on the Maestro card.
+  - **What stays:** every neutral, `error` (a failure is never pink or blue), `window-close`, and the incognito family, which wins over the accent. The native splash screen stays red, it is baked at build time.
+  - **Launcher icon:** the same toggle swaps the home-screen icon on Android and iOS. The voice color becomes the icon background and the accent pixels of the butterfly take the same color; red keeps the default icon. `app.json` declares one alternate icon per non-red voice (Pink, Amber, Blue, through `expo-alternate-app-icons`) and `src/services/appIcon.ts` switches it once the setting settles. Never export the icons by hand: after changing a voice color or the butterfly art, run `node scripts/generate-app-icons.mjs`. A native rebuild is needed when an icon is added.
+  - **In code:** `useTheme.ts` keeps one palette object per base palette and accent, so style caches still hit. Read `primary*` through `useColors()`, `useThemedStyles()` or `getColors()`, never from a static `Colors` import, and test dark with `useIsDark()` instead of comparing palettes. A screen pinned to the dark palette (Standby) uses `useDarkColors()` to keep the accent.
+  - **Contrast:** white text on the accent is about 3.9:1 on red, 5.0:1 on blue, 2.5:1 on pink and 2.3:1 on amber. The rule for red holds, and harder for pink and amber: red-surface text stays large or bold chrome, never small body copy.
 - **Background (#FEFBF6):** A warm cream canvas, softer than white, giving the editorial feel. Every screen sits on it.
 - **Surfaces (#FFFFFF + muted/subtle/pressed):** White cards and fields on the cream canvas; muted grays for pressed rows and subtle fills.
 - **Text ramp (#000000 → #888888):** Three neutral steps — primary (#000000), secondary (#444444) and muted (#888888) — plus white on colored surfaces. Full-black text on cream keeps maximum readability. Do not introduce intermediate greys outside these tokens.
-- **Incognito (#565A75):** A purple-gray identity that swaps out every red element when ephemeral mode is on. Base #565A75 acts like the red's role, with a dark surface #2A2A35 for the composer.
+- **Incognito (#565A75):** A purple-gray identity that swaps out every red element (or Maestro accent) when ephemeral mode is on. Base #565A75 acts like the red's role, with a dark surface #2A2A35 for the composer.
 - **Links:** Opera Red with an underline, in markdown and onboarding. There is no separate link blue.
 - **Code (host surface / #D63384 inline):** Code blocks share the background of their host (white widget card, drawer surface); pink inline code.
 
@@ -196,7 +206,7 @@ Three fonts with strict roles — never swap them.
 
 An 8px-based spacing scale with a 2px micro-step keeps rhythm consistent. Chat content is centered in a column capped at **840px**; messages and cards stay airy.
 
-- Breakpoints are mobile <768px, large screen ≥768px, desktop ≥1024px (web and desktop apps). Drawer layouts per breakpoint are in Drawers.
+- Breakpoints are mobile <768px, large screen ≥768px, desktop ≥1024px (web, desktop apps, Android PCs and desktop windows). Drawer layouts per breakpoint are in Drawers.
 - The chat composer is a full-width **56px** pill pinned at the bottom.
 - Phones lock to portrait.
 - Group related controls in section cards rather than dividers (see Page Structure).
@@ -229,7 +239,7 @@ The shape language is **sticker-like**: 2px outlines on nearly every interactive
 - **Drawers & modals:** Drawers and sheets sit on the grouped background with a drawer scrim (rgba(0,0,0,0.25)), modals are white windows on a modal scrim (rgba(0,0,0,0.4)); desktop sheet cards use the sticker shadow (see Drawers). Confirmation/info modals (`NotificationModal`) use a 15px window radius, with their buttons and text input kept at the 10px default.
 - **Top bar:** white 44px pills (`Radius.xxl`) with the offset sticker shadow, floating over the content. Discussions and new chat on the left (one shared pill on mobile, labeled pills on desktop), an optional centered middle pill, the settings button on the right.
 - **Snackbar:** A dark pill (`snackbar-bg`: #444444 in light, #3A3A3A in dark) floating above the composer, white mono text.
-- **Pressed state:** any element with a pressed or hover feedback lightens its main color, never darkens it. Red surfaces (buttons, checked checkbox, selected rows, banner, call-to-action) go to `primary-bright` (#FF4D4D), incognito surfaces go to `incognito-bright` (#70748E), and the chat composer and the Selector, Slider and model pills already do. An icon button on a red row lifts it with a white tint. Neutral surfaces keep their gray fill (`surface-pressed`), since white cannot get lighter. In code, use `pressStyle(base, "primary")` or `Colors.primaryBright`; never hardcode a darker red.
+- **Pressed state:** any element with a pressed or hover feedback lightens its main color, never darkens it. Red surfaces (buttons, checked checkbox, selected rows, banner, call-to-action) go to `primary-bright` (#FF4D4D), incognito surfaces go to `incognito-bright` (#70748E), and the chat composer and the Selector, Slider and model pills already do. An icon button on a red row lifts it with a white tint. Neutral surfaces keep their gray fill (`surface-pressed`), since white cannot get lighter. In code, use `pressStyle(base, "primary")` or `Colors.primaryBright` from the live palette; never hardcode a darker red, nor a red at all.
 
 ## Page Structure
 
@@ -638,6 +648,7 @@ Layouts used across pages that are not components:
 - **Usage card**: live processor and memory of the Sampler or one of its features. A row with label and help, then a Group holding a `ProgressBar` (processor) followed by info rows (processor, memory, counts).
 - **Empty state** (Sampler welcome, Sampler stopped): no nav, the content centered on the screen. A Petrona `FontSizes.displayLg` title like the chat greeting, a centered help line (Figtree `FontSizes.bodyMd`, muted, max 420 wide), then a 260 wide column of Groups (the highlight Group first).
 - **Detail header** (`litertDetailHeader`): the first block of an item page or sheet. A 120px logo tile, then the name (Fragment Mono `FontSizes.lg`), Figtree meta lines and capability icons. Related items follow as horizontal carousels of 96px tiles.
+- **Search results** (model search in `HubModelsSheet` and `SettingsDrawer`): one section card with `padding: 0` and `overflow: "hidden"` (`litertSearchResultsCard`, `resultsCard`) holding the rows edge to edge. A row is `Spacing.lg2` padding with a 48px logo tile (`logoTile`, 2px `logoTileBorder`, `Radius.xxl`), a two-line info block and a muted 18px arrow on the right. Loading, error and empty messages sit in their own section card.
 - **Hero** (`MaestroCard`, `ProfileCard`, the cloud account avatar): an illustration that introduces a page, centered above its sections or at the top of its section.
 - **Actions section**: the reconnect, delete and remove actions of an item page close it in their own section, as one Group with no label.
 - **Conversation list**: rows sit straight on the grouped background under Fragment Mono uppercase titles (`sectionTitle`). The selected row turns into the red pill and shows its actions (share, pin, delete) as white IconButtons.
@@ -646,11 +657,11 @@ Layouts used across pages that are not components:
 
 Three containers hold pages. All sit on `Colors.groupedBackground`, pad their content by `Spacing.lg2` and use the same floating `DrawerBackButton`.
 
-| Container             | Mobile (<768)                            | Large screen (≥768)   | Desktop (≥1024, web and desktop apps)                                                                                                        |
-| --------------------- | ---------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ConversationsDrawer` | full width, slides from the left, scrim  | panel `min(90%, 360)` | docked flush left, resizable 240–480 (320 default), no scrim, no radius, no close button                                                     |
-| `SettingsDrawer`      | full width, slides from the right, scrim | panel `min(90%, 360)` | desktop app: its own OS window (`SettingsWindow`, `windowed`), sidebar on the left and the page on the right. Desktop browser: centered window max 960, `Radius.window`, the main page as the 320px nav column, close button top left of the nav, no title |
-| `DrawerSheet`         | bottom sheet                             | centered card         | centered card                                                                                                                                |
+| Container             | Mobile (<768)                            | Large screen (≥768)   | Desktop (≥1024, web, apps, Android PCs)                                                                                                                                                                                                                      |
+| --------------------- | ---------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ConversationsDrawer` | full width, slides from the left, scrim  | panel `min(90%, 360)` | docked flush left, resizable 240–480 (320 default), no scrim, no radius, no close button                                                                                                                                                                   |
+| `SettingsDrawer`      | full width, slides from the right, scrim | panel `min(90%, 360)` | desktop app: its own OS window (`SettingsWindow`, `windowed`), sidebar on the left and the page on the right. Desktop browser and Android: centered window max 960, `Radius.window`, the main page as the 320px nav column, close button top left of the nav, no title |
+| `DrawerSheet`         | bottom sheet                             | centered card         | centered card                                                                                                                                                                                                                                              |
 
 ### Side drawers
 
@@ -690,13 +701,14 @@ To add a settings subpage:
 
 - `mode="overlay"`: above everything on a scrim, slides up its own measured height, closes on pull down or flick, on Android back and on Escape.
 - `mode="lift"`: inside the layout, pushes the content above instead of covering it (attachment sheet under the chat bar). The parent screen handles back.
-- Large screen and desktop: a centered card (`Radius.window`, 2px outline, sticker shadow `-6px 6px 0px shadowInk`) with a close button top left. The card look lives only in DrawerSheet; consumers pass nothing but a width through `desktopStyle`, plus `height: "100%"` when the sheet holds a PageStack, since stacked pages cannot size it. `anchored` hangs the card under its trigger with no close button (model selector on tablet).
+- Large screen and desktop: a centered card (`Radius.huge2`, sticker shadow `-6px 6px 0px shadowInk`) with a close button top left. The card look lives only in DrawerSheet; consumers pass nothing but a width through `desktopStyle`, plus `height: "100%"` when the sheet holds a PageStack, since stacked pages cannot size it. `anchored` hangs the card under its trigger with no close button (model selector on tablet).
 - `avoidKeyboard` when it holds a TextInputField; it then needs a `maxHeight` in `sheetStyle`. A sheet too tall to ride the keyboard scrolls in a `SheetKeyboardAwareScrollView` instead (MCP add server).
 - `onBackPress` returns `true` when the sheet popped one of its own pages instead of closing.
 - Content: a `SheetScrollView` padded `Spacing.lg2` on the sides, then sections, rows and Groups like a page, without the Petrona header. The first row label acts as the title.
 - Spacing is owned by containers, nothing is computed. The sheet content spaces its sections with `gap: Spacing.xxl2` and the section cards inside a sheet carry no `marginBottom` (`sheetCard`, not the page's `contentCard`), so the last card needs no override and a conditional card never leaves a hole. Rows inside a card keep `settingRowVertical`, with `0` on the last one.
-- The bottom band belongs to `DrawerSheet`. It adds the safe area to a base band (20 on iOS, 10 elsewhere) and drops the safe area while the keyboard is open. A sheet never passes a `paddingBottom` or a bottom inset in `sheetStyle`, only `maxHeight` or `height`.
-- Edge scroll: on mobile the scroll runs to the bottom edge of the sheet under a `LinearGradient` fade (grouped background to clear, eased stops), same as the drawers. The top edge sits in a 20px band (`paddingTop: Spacing.xxl`) with the handle floating in it (`sheetHandleContainer` is absolute) and the scroll sits in a wrapping view clipped by a rounded top (`Radius.xxl + Spacing.md`, like the cards; android scrolls ignore the radius themselves), so `SheetScrollView` (or `SheetKeyboardAwareScrollView`) turns its content's side padding into margin. It reads the bottom band of the sheet plus `FADE_EXTRA` and moves them into its content padding, so rows sit clear of the fade at rest. Never a plain `ScrollView` as a sheet body. Desktop cards and `lift` mode keep their own padding.
+- The bottom band belongs to `DrawerSheet`. It adds the safe area to a base band (20 on iOS, 10 elsewhere) and drops the safe area while the keyboard is open. A sheet never passes a `paddingBottom` or a bottom inset in `sheetStyle`, only `maxHeight` or `height`. Its scroll content never has a `paddingBottom` either (no `paddingBottom` in `content`): the scroll adds the band and the fade itself on mobile, and the desktop card pads its own bottom (`Spacing.lg`), so an extra one only widens the gap under the last card.
+- Pull down: a drag down on a `SheetScrollView` (or `SheetKeyboardAwareScrollView`) that is already at the top hands the gesture to the sheet, which follows the finger and closes on release like a pull on the handle. Scrolled content scrolls first. Never a plain `ScrollView` in a sheet, it would swallow the pull.
+- Edge scroll: on mobile the scroll runs to the bottom edge of the sheet under a `LinearGradient` fade (grouped background to clear, eased stops), same as the drawers. The top edge sits in a 20px band (`paddingTop: Spacing.xxl`) with the handle floating in it (`sheetHandleContainer` is absolute) and the scroll sits in a wrapping view clipped by a rounded top (and bottom on large screen and desktop, `Radius.xxl + Spacing.md`, like the cards; android scrolls ignore the radius themselves), so `SheetScrollView` (or `SheetKeyboardAwareScrollView`) turns its content's side padding into margin. It reads the bottom band of the sheet plus `FADE_EXTRA` and moves them into its content padding, so rows sit clear of the fade at rest. Never a plain `ScrollView` as a sheet body. On desktop cards the band and the fade are 0 and the card carries the bottom padding; `lift` mode keeps its own padding.
 - A sheet with several pages puts a `PageStack` in a `SheetBody` (the block bleeds into the bottom band and owns the fade, each page's `SheetScrollView` then only pads and rounds its content), a floating `DrawerBackButton kind="back"` on non-root pages, and pops pages in `onBackPress` (add model sheet). A `SheetBody` also wraps a `SheetScrollView` that sits inside another view, so the scroll never reaches outside its parent's bounds.
 
 ```tsx
@@ -759,7 +771,6 @@ desktopCard: {
 },
 content: {
   paddingHorizontal: Spacing.lg2,
-  paddingBottom: Spacing.lg,
   gap: Spacing.xxl2,
 },
 sheetCard: {
@@ -778,6 +789,7 @@ sheetCard: {
 - Pages use the Page, Section, Row and Group structure, with the same `makeStyles` values as `SettingsDrawer.tsx`. Each feature page (models, MCP) opens with a toggle card that turns the feature off for every profile. The feature's content shows inline below it, only while the feature is on.
 - Item pages (a profile, an MCP server) pushed from a tile: info rows in an `infoGroup`, then the actions section.
 - Home gathers the cards of the other pages without their main action (the red Group stays on its own page). From 760px of page width it splits in two columns that fill independently.
+- Home is editable: the pencil `IconButton` in the page header (a check while editing) shrinks the sections to 70% in place (`HomeSections`), each with a grip on its left and a bin on its right, in the margins the shrink leaves. The grip drags a section to reorder it: it grows by 8% around its middle, the others slide aside, a pull past the first or last slot resists like a rubber band, and on release it springs into its slot. While editing, an add `IconButton` sits beside the check and opens `HomeAddSheet`, a DrawerSheet with the hidden sections as a `CardGrid` (24px icons), one tap adds one at the end. The layout is an ordered list of section ids kept on the device (`Settings.setLocal`), so it never syncs. A section the role or the hub cannot show stays saved but hidden.
 - No hub yet, no profile, hub stopped or out of reach: an empty state instead of the sidebar and pages (see Other patterns).
 
 ## Widgets
@@ -793,13 +805,16 @@ Structured results (weather, contact lookup, calendar events, timers, math) shar
 
 ## Do's and Don'ts
 
-- Do keep Opera Red for the main action of a screen, the active state of controls and top-level navigation badges; never for decoration.
+- Do keep Opera Red for the main action of a screen, the active state of controls and top-level navigation badges; never for decoration. It stands for the primary family, so it may be the Maestro accent.
+- Do read `primary`, `primaryBright`, `primarySelection`, `primaryHeader` and `overlayHalo` from the live palette (`useColors`, `useThemedStyles`, `getColors`) so the Maestro accent reaches them.
 - Do always pull values from the design tokens in `constants/theme.ts` (Colors, Fonts, FontSizes, Spacing, Radius) — never hardcode colors, fonts, or radii.
 - Do use Petrona for display headings, Figtree for reading, and Fragment Mono for UI chrome.
 - Do keep the incognito recolor coherent: swap every red element to the purple-gray #565A75 family.
 - Do lighten the main color on press and hover (`primary-bright`, `incognito-bright` in incognito), the same way on every element.
 
 - Don't darken the main color for a pressed state.
+- Don't hardcode `#FF1A1A`, `#FF4D4D` or `rgba(255,26,26,…)`, and don't compute a pressed color by hand: it would stay red when the user picked another Maestro color.
+- Don't use the primary family to show an error state: use `error`, which never follows the Maestro accent. A `danger` modal button is only a solid primary button, so it follows the accent like any other.
 - Don't add heavy drop shadows; prefer sticker shadows and 2px outlines.
 - Don't mix serif display and monospace in the same heading.
 - Don't exceed the 10px default radius on data-dense cards, except widget cards, markdown tables and modal windows (15px).

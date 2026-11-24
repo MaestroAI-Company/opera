@@ -6,6 +6,8 @@ import { FontSizes, Fonts, Radius, Spacing, ThemeColors, VoiceColors } from "../
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { getLocale, useT } from "../../i18n";
 import { Settings } from "../../services/settings/SettingsService";
+import AsciiButterfly from "./AsciiButterfly";
+import AppIcon from "../ui/AppIcon";
 import { MAESTRO_BUTTERFLIES, MaestroButterflyId, useMaestroButterfly, usePersonalityCode, useVoiceColor, DEFAULT_PERSONALITY_CODE } from "./maestroButterfly";
 
 const CARD_CREATED_AT_KEY = "profileCardCreatedAt";
@@ -164,19 +166,17 @@ export default function ProfileCard({
             >
               {trimmed || t("profileCard.placeholder")}
             </Text>
-            <Image source={butterfly.icon} style={styles.logoCompact} tintColor={`${Colors.textOnPrimary}99`} />
+            <AppIcon source={butterfly.icon} style={styles.logoCompact} tintColor={`${Colors.textOnPrimary}99`} />
           </View>
           <View style={styles.butterflyCompact}>
-            <Image source={butterfly.base} style={styles.stackFill} resizeMode="contain" resizeMethod="resize" />
-            <Image source={butterfly.accent} tintColor={accentColor} style={styles.stackFill} resizeMode="contain" resizeMethod="resize" />
+            <AsciiButterfly frames={butterfly.frames} accentColor={accentColor} playKey={0} />
           </View>
         </View>
       ) : (
         <View style={styles.content}>
           <View style={styles.tile}>
             <View style={styles.tileButterfly}>
-              <Image source={butterfly.base} style={styles.stackFill} resizeMode="contain" resizeMethod="resize" />
-              <Image source={butterfly.accent} tintColor={accentColor} style={styles.stackFill} resizeMode="contain" resizeMethod="resize" />
+              <AsciiButterfly frames={butterfly.frames} accentColor={accentColor} playKey={0} />
             </View>
           </View>
 
@@ -191,7 +191,7 @@ export default function ProfileCard({
             <Text style={styles.meta}>{`Opera - ${formatDate(shownCreatedAt)}`}</Text>
           )}
 
-          <Image source={butterfly.icon} style={styles.logo} tintColor={`${Colors.textOnPrimary}99`} />
+          <AppIcon source={butterfly.icon} style={styles.logo} tintColor={`${Colors.textOnPrimary}99`} />
         </View>
       )}
       {/* a hairline above the thick stripe, a thinner one below */}
@@ -275,14 +275,6 @@ const makeStyles = (Colors: ThemeColors) =>
     tileButterfly: {
       width: "75%",
       height: "75%",
-    },
-    //accent layer sits exactly over the base layer
-    stackFill: {
-      position: "absolute",
-      top: 0,
-      left: 0,
-      width: "100%",
-      height: "100%",
     },
     name: {
       fontFamily: Fonts.display,

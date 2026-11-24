@@ -1,3 +1,4 @@
+import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { t } from '../../../i18n';
 import { AppSettings, Settings } from '../../settings/SettingsService';
@@ -40,6 +41,8 @@ export function currentPlatform(): ProviderPlatform {
 //unsupported providers stay out of ui
 export function isProviderSupported(id: string): boolean {
   const platforms = PROVIDER_PLATFORMS[id as ProviderId];
+  //litert ships arm64 native code only
+  if (id === 'litert' && Platform.OS === 'android' && Device.supportedCpuArchitectures?.[0] !== 'arm64-v8a') return false;
   return !!platforms && platforms.includes(currentPlatform());
 }
 
@@ -247,8 +250,26 @@ export function getCapabilityOverride(service: string, url: string, model: strin
   return findServer(service, url)?.capabilities?.[model];
 }
 
+function litertPromptTiers(): Record<string, PromptTier> {
+  try {
+    return JSON.parse(Settings.getCached().litertPromptTiers) || {};
+  } catch {
+    return {};
+  }
+}
+
 export function getPromptTierOverride(service: string, url: string, model: string): PromptTier | undefined {
+  //on-device models have no server entry
+  if (service === 'litert') {
+    const tier = litertPromptTiers()[model];
+    return PROMPT_TIERS.includes(tier) ? tier : undefined;
+  }
   return findServer(service, url)?.promptTiers?.[model];
+}
+
+export function setLitertPromptTier(model: string, tier: PromptTier | undefined): void {
+  const { [model]: _removed, ...rest } = litertPromptTiers();
+  Settings.set('litertPromptTiers', JSON.stringify(tier ? { ...rest, [model]: tier } : rest));
 }
 
 //undefined falls back to global

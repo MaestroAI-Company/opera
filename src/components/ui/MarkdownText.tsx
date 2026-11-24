@@ -17,10 +17,18 @@ import WidgetWrapper from "../widgets/WidgetWrapper";
 import IconButton from "./IconButton";
 import MarkdownImage from "./MarkdownImage";
 import { ensureKatexStylesheet, getKatexCss, KATEX_STYLESHEET_NAME } from "./katexStylesheet";
+import copyIcon from "../../../assets/icons/copy2.svg";
+import fullIcon from "../../../assets/icons/full2.svg";
+import downloadIcon from "../../../assets/icons/download2.svg";
 
-const copyIcon = require("../../../assets/icons/copy.png");
-const fullIcon = require("../../../assets/icons/full.png");
-const downloadIcon = require("../../../assets/icons/download2.png");
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 const makeS = (Colors: ThemeColors) => StyleSheet.create({
   base: { fontSize: FontSizes.xl, lineHeight: 28, color: Colors.textPrimary, fontFamily: Fonts.body },
@@ -471,7 +479,7 @@ const MathView = React.memo(function MathView({ latex, displayMode, width, incog
       return katex.renderToString(latex, { displayMode, throwOnError: false });
     } catch {
       //malformed latex shows as text
-      return latex;
+      return escapeHtml(latex);
     }
   }, [latex, displayMode]);
 

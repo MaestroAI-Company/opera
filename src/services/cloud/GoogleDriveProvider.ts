@@ -217,11 +217,15 @@ export class GoogleDriveProvider implements CloudProvider {
       const port = await oauth.start({ ports: [OAUTH_LOOPBACK_PORT] });
       const redirectUri = `http://localhost:${port}/oauth2redirect/google`;
 
+      const stateBytes = crypto.getRandomValues(new Uint8Array(16));
+      const state = Array.from(stateBytes, (b) => b.toString(16).padStart(2, '0')).join('');
+
       const params = new URLSearchParams({
         client_id: this.getClientId(),
         redirect_uri: redirectUri,
         response_type: 'token',
         scope: 'https://www.googleapis.com/auth/drive.appdata email profile',
+        state,
       });
       if (forcePrompt) params.set('prompt', 'select_account');
 
@@ -236,6 +240,8 @@ export class GoogleDriveProvider implements CloudProvider {
 
         oauth.onUrl((url) => {
           if (settled) return;
+          //ignore callbacks from other senders
+          if (new URLSearchParams(new URL(url).hash.slice(1)).get('state') !== state) return;
           settled = true;
           clearTimeout(timeout);
           oauth.cancel(port).catch(() => {});

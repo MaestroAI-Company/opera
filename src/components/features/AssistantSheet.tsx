@@ -9,7 +9,7 @@ import Group from "../ui/Group";
 import ImageCard from "../ui/ImageCard";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
-const operaIcon = require("../../../assets/icons/operaicon.png");
+import operaIcon from "../../../assets/icons/operaicon.svg";
 const assistantInfoImage = require("../../../assets/images/ImageCard/AssistantInfo.png");
 
 const DESKTOP_CARD_WIDTH = 380;

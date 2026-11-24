@@ -1,4 +1,5 @@
 import { useCallback, useSyncExternalStore } from "react";
+import { useHomeEditing } from "../components/features/homeEditing";
 import { modelAvatarUrl } from "../services/ai/providers/huggingFaceCatalog";
 import { CatalogModel, HubModels, LlamaStatus, SamplerHub } from "../services/hub/SamplerHubService";
 
@@ -85,9 +86,11 @@ const noop = () => () => {};
 
 //one poller shared by the page, the sheet and the model page
 export function useHubModels(active = true): HubModelsSnapshot {
+  //the home sections are frozen while editing, no need to poll for them
+  const paused = useHomeEditing();
   const subscribeActive = useCallback(
-    (listener: () => void) => (active ? subscribe(listener) : noop()),
-    [active],
+    (listener: () => void) => (active && !paused ? subscribe(listener) : noop()),
+    [active, paused],
   );
   return useSyncExternalStore(subscribeActive, getSnapshot);
 }

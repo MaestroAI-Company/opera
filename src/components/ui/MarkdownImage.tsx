@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   DeviceEventEmitter,
-  Image as RNImage,
   Pressable,
   StyleSheet,
   Text,
@@ -15,9 +14,9 @@ import { AppEvents } from "../../services/events";
 import { RemoteImages } from "../../services/net/remoteImages";
 import { BROWSER_UA } from "../../services/net/userAgent";
 import { Settings } from "../../services/settings/SettingsService";
+import AppIcon from "./AppIcon";
 import { pressStyle } from "./pressStyle";
-
-const photoIcon = require("../../../assets/icons/photo.png");
+import photoIcon from "../../../assets/icons/photo.svg";
 
 //hosts reject the default agent
 const IMAGE_HEADERS = { "User-Agent": BROWSER_UA };
@@ -181,12 +180,12 @@ export default function MarkdownImage({
               { backgroundColor: badgeBg, aspectRatio: aspectRatio ?? 16 / 9 },
             ]}
           >
-            <RNImage source={photoIcon} style={styles.placeholderIcon} tintColor={mutedColor} />
+            <AppIcon source={photoIcon} style={styles.placeholderIcon} tintColor={mutedColor} />
           </View>
         )}
         {hasError ? (
           <View style={[styles.errorBox, { aspectRatio: 16 / 9 }]}>
-            <RNImage source={photoIcon} style={styles.placeholderIcon} tintColor={Colors.error} />
+            <AppIcon source={photoIcon} style={styles.placeholderIcon} tintColor={Colors.error} />
             <Text style={[styles.errorText, { color: mutedColor }]}>
               {t("markdown.image.failed")}
             </Text>

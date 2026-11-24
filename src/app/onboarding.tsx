@@ -8,7 +8,6 @@ import {
   Animated,
   BackHandler,
   Easing,
-  Image,
   ImageBackground,
   Keyboard,
   Linking,
@@ -20,7 +19,6 @@ import {
   Vibration,
   View,
   useWindowDimensions,
-  type ImageSourcePropType,
   type StyleProp,
   type TextStyle,
 } from "react-native";
@@ -32,6 +30,7 @@ import DrawerSheet, { SheetScrollView } from "../components/features/DrawerSheet
 import HubOnboarding, { isHubOnboardingDone } from "../components/features/HubOnboarding";
 import HubPairingSheet from "../components/features/HubPairingSheet";
 import HubProfileSheet from "../components/features/HubProfileSheet";
+import VoiceDownloadSheet from "../components/features/VoiceDownloadSheet";
 import { PersonalityPicker } from "../components/features/PersonalitySheet";
 import VoiceEngineCard from "../components/features/VoiceEngineCard";
 import { VOICE_OPTIONS, selectVoice, useVoice } from "../components/features/maestroButterfly";
@@ -58,21 +57,23 @@ import { HubProfile, SamplerHub, PairedHub, NearbyHub } from "../services/hub/Sa
 import { TTS_SPEEDS, supportedEngineIds } from "../services/speech/engines";
 import { STT } from "../services/speech/STTService";
 import { TTS } from "../services/speech/TTSService";
+import { hasPlatformFeature } from "../services/platform";
 import { pressStyle } from "../components/ui/pressStyle";
+import AppIcon, { type IconSource } from "../components/ui/AppIcon";
+import arrowIcon from "../../assets/icons/arrow.svg";
+import pencilIcon from "../../assets/icons/edit2.svg";
+import micIcon from "../../assets/icons/microphone2.svg";
+import photoIcon from "../../assets/icons/photo.svg";
+import timeIcon from "../../assets/icons/time2.svg";
+import cloudIcon from "../../assets/icons/cloud2.svg";
+import fileIcon from "../../assets/icons/file.svg";
+import hubIcon from "../../assets/icons/server2.svg";
+import cameraIcon from "../../assets/icons/camera2.svg";
+import locationIcon from "../../assets/icons/location2.svg";
 
 const texture2 = require("../../assets/images/texture/texture2.png");
 const wordmarkAnimation = require("../../assets/animations/wordmark.json");
 const startupSound = require("../../assets/sounds/startup.m4a");
-const arrowIcon = require("../../assets/icons/arrow.png");
-const pencilIcon = require("../../assets/icons/pencil.png");
-const micIcon = require("../../assets/icons/microphone.png");
-const cameraIcon = require("../../assets/icons/camera.png");
-const photoIcon = require("../../assets/icons/photo.png");
-const locationIcon = require("../../assets/icons/location.png");
-const timeIcon = require("../../assets/icons/time.png");
-const cloudIcon = require("../../assets/icons/cloud.png");
-const fileIcon = require("../../assets/icons/file.png");
-const hubIcon = require("../../assets/icons/server.png");
 
 const isWeb = Platform.OS === "web";
 
@@ -158,7 +159,7 @@ type PermissionId = "microphone" | "camera" | "photos" | "location";
 type PermissionStatus = "granted" | "denied";
 type PermissionDef = {
   id: PermissionId;
-  icon: ImageSourcePropType;
+  icon: IconSource;
   request: () => Promise<boolean>;
 };
 
@@ -314,6 +315,7 @@ export default function OnboardingPage() {
   const { height: windowHeight } = useWindowDimensions();
 
   const [step, setStep] = useState(0);
+  const [voiceDownloadVisible, setVoiceDownloadVisible] = useState(false);
   //no neural engine on this platform, nothing to pick
   const [hasVoiceEngines] = useState(() => supportedEngineIds().length > 0);
   const [name, setName] = useState(() => Settings.getCached().name);
@@ -770,7 +772,7 @@ export default function OnboardingPage() {
         <ButterflyCluster parallax={false} intro={false} style={styles.voiceButterfly} />
       </Reveal>
       <Reveal delay={200}>
-        <VoiceEngineCard />
+        <VoiceEngineCard onOpenDownload={() => setVoiceDownloadVisible(true)} />
         {voicePackInstalled && (
           <View style={styles.contentCard}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("settings.maestro.voice")}</Text>
@@ -816,7 +818,13 @@ export default function OnboardingPage() {
             )}
           </Text>
           <Group>
-            {PERMISSIONS.map((perm) => {
+            {PERMISSIONS.filter(
+              (perm) =>
+                (perm.id !== "microphone" ||
+                  hasPlatformFeature("android.hardware.microphone")) &&
+                (perm.id !== "camera" ||
+                  hasPlatformFeature("android.hardware.camera.any")),
+            ).map((perm) => {
               const status = statuses[perm.id];
               return (
                 <ActionButton
@@ -949,7 +957,7 @@ export default function OnboardingPage() {
                 onPress={() => goTo(step - 1)}
                 style={pressStyle(styles.backButton, styles.backButtonPressed)}
               >
-                <Image source={arrowIcon} style={styles.backIcon} tintColor={Colors.textPrimary} />
+                <AppIcon source={arrowIcon} style={styles.backIcon} tintColor={Colors.textPrimary} />
               </Pressable>
             </Animated.View>
             <Animated.View pointerEvents={launchCtaReady ? "auto" : "none"} style={[styles.ctaWrap, { opacity: launchCtaOpacity }]}>
@@ -958,7 +966,7 @@ export default function OnboardingPage() {
                 style={pressStyle(styles.cta, styles.ctaPressed)}
               >
                 <Text style={styles.ctaText}>{ctaLabel}</Text>
-                <Image source={arrowIcon} style={styles.ctaIcon} tintColor={Colors.textOnPrimary} />
+                <AppIcon source={arrowIcon} style={styles.ctaIcon} tintColor={Colors.textOnPrimary} />
               </Pressable>
             </Animated.View>
           </View>
@@ -1037,6 +1045,12 @@ export default function OnboardingPage() {
         </SheetScrollView>
       </DrawerSheet>
 
+      <VoiceDownloadSheet
+        visible={voiceDownloadVisible}
+        onClose={() => setVoiceDownloadVisible(false)}
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
       <HubPairingSheet
         visible={hubPairingVisible}
         onClose={() => setHubPairingVisible(false)}

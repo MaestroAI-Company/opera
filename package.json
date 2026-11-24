@@ -15,6 +15,7 @@
     "@tauri-apps/plugin-opener": "^2.5.4",
     "buffer": "^6.0.3",
     "expo": "^58.0.22",
+    "expo-alternate-app-icons": "^11.0.0",
     "expo-asset": "~58.0.19",
     "expo-audio": "~58.0.11",
     "expo-auth-session": "~58.0.16",
@@ -54,6 +55,7 @@
     "expo-symbols": "~58.0.4",
     "expo-system-ui": "~58.0.7",
     "expo-web-browser": "~58.0.7",
+    "expo-widgets": "~58.0.28",
     "fflate": "^0.8.3",
     "katex": "^0.18.2",
     "lottie-react-native": "~7.5.0",
@@ -89,6 +91,7 @@
     "eslint": "^9.0.0",
     "eslint-config-expo": "~58.0.4",
     "patch-package": "^8.0.1",
+    "react-native-svg-transformer": "^1.5.3",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -108,5 +111,9 @@
     "desktop:hub": "node scripts/local-hub.mjs desktop",
     "build:desktop": "tauri build"
   },
-  "private": true
+  "private": true,
+  "allowScripts": {
+    "react-native-litert-lm@0.8.2": true,
+    "unrs-resolver@1.12.2": true
+  }
 }

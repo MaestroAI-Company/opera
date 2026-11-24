@@ -1,13 +1,36 @@
+import { useMemo } from "react";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+import { useColors } from "../../hooks/useTheme";
 
 const loadingAnimation = require("../../../assets/animations/loading.json");
 const searchingAnimation = require("../../../assets/animations/searching.json");
 
+type Shape = { ty: string; it?: Shape[]; c?: { k: number[] } };
+
+//lottie colors are 0-1 rgba
+const toLottieColor = (hex: string) =>
+  [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).concat(1);
+
+const paint = (shapes: Shape[], color: number[]) => {
+  for (const shape of shapes) {
+    if (shape.ty === "gr" && shape.it) paint(shape.it, color);
+    if (shape.ty === "fl" && shape.c) shape.c.k = color;
+  }
+};
+
 //searching swaps the butterfly for a pixel circle with the same pulse
 export default function ThinkingIcon({ searching, size = 35 }: { searching?: boolean; size?: number }) {
+  const { primary } = useColors();
+  //tinted copy so the maestro accent reaches the pixels
+  const data = useMemo(() => {
+    const copy = JSON.parse(JSON.stringify(searching ? searchingAnimation : loadingAnimation));
+    const color = toLottieColor(primary);
+    for (const layer of copy.layers) if (layer.shapes) paint(layer.shapes, color);
+    return copy;
+  }, [searching, primary]);
   return (
     <DotLottieReact
-      data={searching ? searchingAnimation : loadingAnimation}
+      data={data}
       autoplay
       loop
       layout={{ fit: "contain" }}

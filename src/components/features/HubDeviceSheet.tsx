@@ -2,18 +2,30 @@ import { useState } from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
-import { useThemedStyles } from "../../hooks/useTheme";
+import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { HubDevice, SamplerHub, PairedHub } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
+import AppIcon, { type IconSource } from "../ui/AppIcon";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 import TextInputField from "../ui/TextInputField";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
+import pencilIcon from "../../../assets/icons/edit2.svg";
+import binIcon from "../../../assets/icons/delete2.svg";
+import activateIcon from "../../../assets/icons/check2.svg";
+import cancelIcon from "../../../assets/icons/cancel2.svg";
+import phoneIcon from "../../../assets/icons/phone2.svg";
+import laptopIcon from "../../../assets/icons/laptop2.svg";
+import webIcon from "../../../assets/icons/website2.svg";
+import operaIcon from "../../../assets/icons/operaicon.svg";
 
-const pencilIcon = require("../../../assets/icons/pencil.png");
-const binIcon = require("../../../assets/icons/bin.png");
-const cancelIcon = require("../../../assets/icons/cancel.png");
+const KIND_ICONS: Record<"phone" | "desktop" | "web" | "other", IconSource> = {
+  phone: phoneIcon,
+  desktop: laptopIcon,
+  web: webIcon,
+  other: operaIcon,
+};
 
 const DESKTOP_CARD_WIDTH = 720;
 const KINDS = ["phone", "desktop", "web"] as const;
@@ -22,6 +34,8 @@ type HubDeviceSheetProps = {
   device: HubDevice | null;
   hub: PairedHub | null;
   isSelf: boolean;
+  //profile the device belongs to
+  ownerName: string;
   //admins manage every device
   canManage: boolean;
   onClose: () => void;
@@ -37,6 +51,7 @@ export default function HubDeviceSheet({
   device,
   hub,
   isSelf,
+  ownerName,
   canManage,
   onClose,
   onChanged,
@@ -45,6 +60,7 @@ export default function HubDeviceSheet({
   isDesktop = false,
 }: HubDeviceSheetProps) {
   const styles = useThemedStyles(makeStyles);
+  const Colors = useColors();
   const t = useT();
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -94,6 +110,7 @@ export default function HubDeviceSheet({
   const rows = device
     ? [
         { label: t("hubDevice.kind"), value: t(`hubDevice.kinds.${kind}`) },
+        { label: t("hubDevice.profile"), value: ownerName },
         { label: t("hubDevice.pairedAt"), value: date(device.pairedAt) },
         {
           label: t("hubDevice.lastSeen"),
@@ -122,6 +139,14 @@ export default function HubDeviceSheet({
       desktopStyle={styles.desktopCard}
     >
       <SheetScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {/* device header */}
+        <View style={styles.header}>
+          <Text style={styles.headerName} numberOfLines={2}>
+            {device?.name}
+          </Text>
+          <AppIcon source={KIND_ICONS[kind]} style={styles.headerIcon} tintColor={Colors.textPrimary} />
+        </View>
+
         {/* name */}
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -140,7 +165,7 @@ export default function HubDeviceSheet({
             </Group>
             <Group style={[styles.highlightGroup, (busy || unchanged) && styles.highlightGroupDisabled]}>
               <ActionButton
-                icon={pencilIcon}
+                icon={activateIcon}
                 label={t("hubDevice.rename")}
                 variant="highlight"
                 disabled={busy || unchanged}
@@ -237,7 +262,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     content: {
       paddingHorizontal: Spacing.lg2,
-      paddingBottom: Spacing.lg,
       gap: Spacing.xxl2,
     },
     contentCard: {
@@ -275,6 +299,21 @@ const makeStyles = (Colors: ThemeColors) =>
       opacity: 0.5,
     },
     //static rows on the white card
+    header: {
+      alignItems: "center",
+      gap: Spacing.xl2,
+      paddingTop: Spacing.lg2,
+    },
+    headerName: {
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.lg,
+      color: Colors.textPrimary,
+      textAlign: "center",
+    },
+    headerIcon: {
+      width: 96,
+      height: 96,
+    },
     infoGroup: {
       borderWidth: 0,
     },

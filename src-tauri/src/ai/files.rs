@@ -13,6 +13,10 @@ pub struct Progress {
 pub fn path_for(app: &AppHandle, url: &str) -> Result<PathBuf, String> {
     let hash = url.bytes().fold(0xcbf29ce484222325u64, |h, b| (h ^ b as u64).wrapping_mul(0x100000001b3));
     let name = url.rsplit('/').next().unwrap_or("model");
+    //windows separators would leave the folder
+    if name.contains(['\\', ':', '\0']) {
+        return Err("bad model file name".into());
+    }
     Ok(super::models_dir(app)?.join("files").join(format!("{hash:016x}-{name}")))
 }
 
@@ -21,6 +25,9 @@ pub async fn fetch(files: &[(String, PathBuf)], on_progress: &Channel<Progress>)
     let client = tauri_plugin_http::reqwest::Client::new();
     let mut total = 0;
     for (url, _) in files {
+        if !(url.starts_with("https://") || url.starts_with("http://")) {
+            return Err("only http and https downloads are allowed".into());
+        }
         total += client.head(url).send().await.map_err(err)?.content_length().unwrap_or(0);
     }
     let mut loaded = 0;

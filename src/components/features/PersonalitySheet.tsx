@@ -22,7 +22,7 @@ import { pressStyle } from "../ui/pressStyle";
 import { butterflyForPersonality } from "./maestroButterfly";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
-const activateIcon = require("../../../assets/icons/activate.png");
+import activateIcon from "../../../assets/icons/check2.svg";
 
 const DESKTOP_CARD_WIDTH = 560;
 
@@ -124,7 +124,7 @@ function PersonalityEditor({
   };
 
   const save = () => {
-    //butterfly pick clears the easter egg
+    //personality picks the butterfly
     Settings.setMany({ ...draft, maestroButterfly: butterflyForPersonality(draft) });
     onSaved(draft);
     onClose();
@@ -201,7 +201,7 @@ export function PersonalityPicker({
     Vibration.vibrate(10);
     const next = { ...draft, [SLOT_KEY[slot]]: value };
     setDraft(next);
-    //butterfly pick clears the easter egg
+    //personality picks the butterfly
     Settings.setMany({ ...next, maestroButterfly: butterflyForPersonality(next) });
     onChange?.(next);
     const nextSlot = SLOT_ORDER[SLOT_ORDER.indexOf(slot) + 1];
@@ -281,7 +281,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     content: {
       paddingHorizontal: Spacing.lg2,
-      paddingBottom: Spacing.lg,
       gap: Spacing.xxl2,
     },
     sheetCard: {

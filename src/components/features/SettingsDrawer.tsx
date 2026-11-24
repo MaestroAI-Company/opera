@@ -8,151 +8,165 @@ import * as Location from "expo-location";
 import * as MediaLibrary from "expo-media-library/legacy";
 import * as Sharing from "expo-sharing";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
-import { memo, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Animated,
-  AppState,
-  BackHandler,
-  DeviceEventEmitter,
-  Image,
-  ImageSourcePropType,
-  Keyboard,
-  Linking,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  PanResponder,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleProp,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-  ViewStyle,
+    memo,
+    ReactNode,
+    useCallback,
+    useEffect,
+    useMemo,
+    useDeferredValue,
+    useRef,
+    useState,
+} from "react";
+import {
+    Animated,
+    AppState,
+    BackHandler,
+    DeviceEventEmitter,
+    Image,
+    ImageSourcePropType,
+    Keyboard,
+    Linking,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    PanResponder,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleProp,
+    StyleSheet,
+    Text,
+    useWindowDimensions,
+    View,
+    ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { captureRef, releaseCapture } from "react-native-view-shot";
 import {
-  MODEL_CAPABILITY_KEYS,
-  type ModelCapabilityId,
+    MODEL_CAPABILITY_KEYS,
+    type ModelCapabilityId,
 } from "../../../constants/modelCapabilities";
 import {
-  Fonts,
-  FontSizes,
-  Radius,
-  Spacing,
-  ThemeColors,
+    Fonts,
+    FontSizes,
+    Radius,
+    Spacing,
+    ThemeColors,
 } from "../../../constants/theme";
 import { AIModule } from "../../services/ai/AIModule";
 import {
-  autoPromptTier,
-  contextFloorTokens,
+    autoPromptTier,
+    contextFloorTokens,
 } from "../../services/ai/generation/chatGeneration";
 import {
-  CatalogEntry,
-  familyPublisher,
-  fetchCatalogEntry,
-  fetchFamilies,
-  fetchModelDescription,
-  formatBytes,
-  getCachedFamilies,
-  getCatalogEntry,
-  hydrateLiteRTCatalog,
-  MIN_SEARCH_LENGTH,
-  modelAvatarUrl,
-  ModelFamily,
-  OTHER_FAMILY_ID,
-  sameFamilyModels,
-  searchModels,
-  similarModels,
+    CatalogEntry,
+    familyPublisher,
+    fetchCatalogEntry,
+    fetchFamilies,
+    fetchModelDescription,
+    formatBytes,
+    getCachedFamilies,
+    getCatalogEntry,
+    hydrateLiteRTCatalog,
+    MIN_SEARCH_LENGTH,
+    modelAvatarUrl,
+    ModelFamily,
+    OTHER_FAMILY_ID,
+    sameFamilyModels,
+    searchModels,
+    similarModels,
 } from "../../services/ai/providers/huggingFaceCatalog";
 import {
-  cancelLiteRTDownload,
-  deleteLiteRTModel,
-  downloadLiteRTModel,
-  getInstalledLiteRTModels,
-  getLiteRTModelLabel,
-  getPendingLiteRTDownload,
-  isLiteRTModelDownloaded,
-  LiteRTDownloadCancelled,
-  LiteRTDownloadSnapshot,
-  LiteRTModelInfo,
-  subscribeLiteRTDownload,
+    cancelLiteRTDownload,
+    deleteLiteRTModel,
+    downloadLiteRTModel,
+    getInstalledLiteRTModels,
+    getLiteRTModelLabel,
+    getPendingLiteRTDownload,
+    isLiteRTModelDownloaded,
+    LiteRTDownloadCancelled,
+    LiteRTDownloadSnapshot,
+    LiteRTModelInfo,
+    subscribeLiteRTDownload,
 } from "../../services/ai/providers/LiteRTProvider";
 import { LocalModelSheet } from "../../services/ai/providers/LocalProvider";
 import { OpenAIProvider } from "../../services/ai/providers/OpenAIProvider";
 import {
-  buildSources,
-  getEnabledProviders,
-  getHubServers,
-  hubModelKeyOf,
-  hubProviderKind,
-  getOllamaServers,
-  getOllamaTuning,
-  getOpenAIApiKeyById,
-  getOpenAIServers,
-  getPromptTierOverride,
-  HUB_PROVIDER_ID,
-  isLocalUrl,
-  isProviderSupported,
-  newOpenAIServerId,
-  OllamaServer,
-  OPENAI_PROVIDER_ID,
-  openAIServerNames,
-  patchHubServer,
-  PROMPT_TIERS,
-  serializeProviders,
-  splitHubModelKey,
-  serializeServers,
-  setOpenAIApiKey,
-  type PromptTier,
+    buildSources,
+    getEnabledProviders,
+    getHubServers,
+    getOllamaServers,
+    getOllamaTuning,
+    getOpenAIApiKeyById,
+    getOpenAIServers,
+    getPromptTierOverride,
+    HUB_PROVIDER_ID,
+    hubModelKeyOf,
+    hubProviderKind,
+    isLocalUrl,
+    isProviderSupported,
+    newOpenAIServerId,
+    OllamaServer,
+    OPENAI_PROVIDER_ID,
+    openAIServerNames,
+    patchHubServer,
+    PROMPT_TIERS,
+    serializeProviders,
+    serializeServers,
+    setLitertPromptTier,
+    setOpenAIApiKey,
+    splitHubModelKey,
+    type PromptTier,
 } from "../../services/ai/providers/sources";
 import {
-  parseQuickFlowOptionId,
-  quickFlowOptionId,
+    parseQuickFlowOptionId,
+    quickFlowOptionId,
 } from "../../services/ai/quickFlow";
 import { ITool } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { openExternalUrl } from "../../services/ai/utils/openExternalUrl";
-import { openAssistantSettings } from "../../services/assistant/DefaultAssistant";
+import {
+  isDefaultAssistant,
+  openAssistantSettings,
+} from "../../services/assistant/DefaultAssistant";
 import { BackupService } from "../../services/BackupService";
 import { CloudUserInfo } from "../../services/cloud/CloudProvider";
 import {
-  CLOUD_PROVIDERS,
-  getCloudProviderDefinition,
+    CLOUD_PROVIDERS,
+    getCloudProviderDefinition,
 } from "../../services/cloud/registry";
 import { CloudSync } from "../../services/CloudSyncService";
 import { AppEvents } from "../../services/events";
 import { HubSync } from "../../services/hub/HubSync";
 import {
-  CTX_SIZE_OPTIONS,
-  KEEP_ALIVE_OPTIONS,
-  LLAMA_SERVER_URL,
-  optionLabel,
-  PARALLEL_OPTIONS,
+    CTX_SIZE_OPTIONS,
+    KEEP_ALIVE_OPTIONS,
+    LLAMA_SERVER_URL,
+    optionLabel,
+    PARALLEL_OPTIONS,
 } from "../../services/hub/modelOptions";
 import {
-  HubProfile,
-  HubStatus,
-  PairedHub,
-  SamplerHub,
+    HubProfile,
+    HubStatus,
+    PairedHub,
+    SamplerHub,
 } from "../../services/hub/SamplerHubService";
 import { McpService } from "../../services/mcp/McpService";
 import { McpServerConfig } from "../../services/mcp/types";
 import {
-  OVERLAY_SHORTCUTS,
-  pushDesktopOverlayConfig,
+    OVERLAY_SHORTCUTS,
+    pushDesktopOverlayConfig,
 } from "../../services/overlay/desktopOverlay";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import {
-  isScreenSaverActive,
-  openScreenSaverSettings,
+    isScreenSaverActive,
+    openScreenSaverSettings,
 } from "../../services/screensaver/ScreenSaver";
 import { AppSettings, Settings } from "../../services/settings/SettingsService";
 import { TTS_SPEEDS } from "../../services/speech/engines";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { TTS } from "../../services/speech/TTSService";
+import { hasPlatformFeature } from "../../services/platform";
 import { SyncPrefs, SyncPrefsStore } from "../../services/SyncPrefs";
 import ActionButton from "../ui/ActionButton";
 import CardGrid, { type GridCard } from "../ui/CardGrid";
@@ -162,6 +176,7 @@ import FloatingButton from "../ui/FloatingButton";
 import Group from "../ui/Group";
 import IconButton from "../ui/IconButton";
 import IconSelector from "../ui/IconSelector";
+import ImageCard from "../ui/ImageCard";
 import NotificationBanner from "../ui/NotificationBanner";
 import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import ProgressBar from "../ui/ProgressBar";
@@ -171,73 +186,137 @@ import SliderToggle from "../ui/SliderToggle";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 import DrawerSheet, {
-  SheetBody,
-  SheetKeyboardAwareScrollView,
-  SheetScrollView,
+    SheetBody,
+    SheetKeyboardAwareScrollView,
+    SheetScrollView,
 } from "./DrawerSheet";
 import HelpSheet, { type HelpSection } from "./HelpSheet";
-import {
-  VOICE_OPTIONS,
-  selectVoice,
-  useVoice,
-} from "./maestroButterfly";
+import { selectVoice, useVoice, VOICE_OPTIONS } from "./maestroButterfly";
 import MaestroCard from "./MaestroCard";
+import BugReportSheet from "./BugReportSheet";
 import PersonalitySheet, {
-  personalityParts,
-  readPersonality,
-  slotWord,
+    personalityParts,
+    readPersonality,
+    slotWord,
 } from "./PersonalitySheet";
 import ProfileCard from "./ProfileCard";
+import VoiceDownloadSheet from "./VoiceDownloadSheet";
 import VoiceEngineCard from "./VoiceEngineCard";
+import WhatsNewSheet from "./WhatsNewSheet";
 
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+//ignore accents and case
+const normalizeSearch = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+
+const SEARCH_RECENTS_KEY = "settingsSearchRecents";
+const MAX_SEARCH_RECENTS = 5;
+
+type SettingsSearchEntry = {
+  id: string;
+  label: string;
+  help?: string;
+  body: ReactNode;
+  onPress?: () => void;
+};
+
 import {
-  KeyboardAwareScrollView,
-  type KeyboardAwareScrollViewRef,
+    KeyboardAwareScrollView,
+    type KeyboardAwareScrollViewRef,
 } from "react-native-keyboard-controller";
 import { useDesktopUpdate } from "../../hooks/useDesktopUpdate";
 import { useResponsive } from "../../hooks/useResponsive";
 import { useSettingsNotices } from "../../hooks/useSettingsNotices";
+import { useShadowShift } from "../../hooks/useShadowShift";
 import { useVoicePackInstalled } from "../../hooks/useVoicePackInstalled";
 import {
-  getLaunchAtStartup,
-  setLaunchAtStartup,
+    getLaunchAtStartup,
+    setLaunchAtStartup,
 } from "../../services/desktop/launchAtStartup";
 import { isAppStore } from "../../services/platform";
 import {
-  getBetaChannel,
-  setBetaChannel,
-  getUpdateChecks,
-  setUpdateChecks,
-  getAvailableUpdate,
+    getAvailableUpdate,
+    getBetaChannel,
+    getCurrentReleaseNotes,
+    getUpdateChecks,
+    setBetaChannel,
+    setUpdateChecks,
+    type AppRelease,
+    type ReleaseNotes,
 } from "../../services/updates/UpdateService";
 
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
-import { useBugReport } from "../../hooks/useBugReport";
 import { setThemeMode, useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT, type TranslationKey } from "../../i18n";
 import { pressStyle } from "../ui/pressStyle";
 import {
-  dragDrawer,
-  drawerWidthFor,
-  gestureVelocity,
-  releaseOpens,
-  settingsProgress,
-  settleDrawer,
-  settleLayoutDrawer,
+    dragDrawer,
+    drawerWidthFor,
+    gestureVelocity,
+    releaseOpens,
+    settingsProgress,
+    settleDrawer,
+    settleLayoutDrawer,
 } from "./drawerAnimation";
 import DrawerBackButton from "./DrawerBackButton";
 import PageStack from "./PageStack";
 
-const linkIcon = require("../../../assets/icons/link.png");
-const addIcon = require("../../../assets/icons/add.png");
-const questionIcon = require("../../../assets/icons/question.png");
-const downloadIcon = require("../../../assets/icons/download.png");
-const deleteIcon = require("../../../assets/icons/delete.png");
-const penPlaceholderIcon = require("../../../assets/icons/pencil.png");
-const keyIcon = require("../../../assets/icons/key.png");
+import AppIcon, { type IconSource } from "../ui/AppIcon";
+import linkIcon from "../../../assets/icons/link2.svg";
+import addIcon from "../../../assets/icons/add.svg";
+import add2Icon from "../../../assets/icons/add2.svg";
+import download2Icon from "../../../assets/icons/download2.svg";
+import deleteIcon from "../../../assets/icons/delete2.svg";
+import edit2Icon from "../../../assets/icons/edit2.svg";
+import keyIcon from "../../../assets/icons/key2.svg";
+import search2Icon from "../../../assets/icons/search2.svg";
+import profilIcon from "../../../assets/icons/profile.svg";
+import profil2Icon from "../../../assets/icons/profile2.svg";
+import cloudIcon from "../../../assets/icons/cloud.svg";
+import providerCloudIcon from "../../../assets/icons/cloud2.svg";
+import phoneIcon from "../../../assets/icons/phone2.svg";
+import sampler2Icon from "../../../assets/icons/sampler2.svg";
+import cloudUploadIcon from "../../../assets/icons/cloudupload2.svg";
+import cloudDownloadIcon from "../../../assets/icons/clouddownload2.svg";
+import arrowIcon from "../../../assets/icons/arrow2.svg";
+import cancelIcon from "../../../assets/icons/cancel2.svg";
+import activateIcon from "../../../assets/icons/check2.svg";
+import generalIcon from "../../../assets/icons/general.svg";
+import advancedIcon from "../../../assets/icons/settings.svg";
+import server2Icon from "../../../assets/icons/server2.svg";
+import toolIcon from "../../../assets/icons/tool.svg";
+import tool2Icon from "../../../assets/icons/tool2.svg";
+import confidentialityIcon from "../../../assets/icons/confidentiality.svg";
+import reportsIcon from "../../../assets/icons/bug.svg";
+import supportIcon from "../../../assets/icons/support2.svg";
+import informationIcon from "../../../assets/icons/info.svg";
+import githubIcon from "../../../assets/icons/github.svg";
+import operaIcon from "../../../assets/icons/operaicon.svg";
+import micIcon from "../../../assets/icons/microphone2.svg";
+import visionIcon from "../../../assets/icons/vision2.svg";
+import brainIcon from "../../../assets/icons/brain2.svg";
+import photoIcon from "../../../assets/icons/photo.svg";
+import calendarIcon from "../../../assets/icons/calendar2.svg";
+import exportIcon from "../../../assets/icons/export2.svg";
+import message2Icon from "../../../assets/icons/message2.svg";
+import time2Icon from "../../../assets/icons/time2.svg";
+import errorIcon from "../../../assets/icons/error2.svg";
+import infoIcon from "../../../assets/icons/info2.svg";
+import hyperlinkIcon from "../../../assets/icons/hyperlink2.svg";
+import samplerNavIcon from "../../../assets/icons/sampler.svg";
+import reconnectIcon from "../../../assets/icons/reload2.svg";
+import cameraIcon from "../../../assets/icons/camera2.svg";
+import locationIcon from "../../../assets/icons/location2.svg";
+import ollamaIcon from "../../../assets/icons/ollama.svg";
+import videocamIcon from "../../../assets/icons/video2.svg";
+import websiteIcon from "../../../assets/icons/website2.svg";
+
+const samplerIcon = require("../../../assets/icons/operaiconEgg.png");
 
 //tools and video stay hidden here
 const LITERT_CAPABILITY_IDS: readonly ModelCapabilityId[] = [
@@ -245,64 +324,65 @@ const LITERT_CAPABILITY_IDS: readonly ModelCapabilityId[] = [
   "audio",
   "thinking",
 ];
-const searchIcon = require("../../../assets/icons/search.png");
-const profilIcon = require("../../../assets/icons/profil.png");
-const cloudIcon = require("../../../assets/icons/cloud.png");
-const providerCloudIcon = require("../../../assets/icons/cloud2.png");
-const ollamaIcon = require("../../../assets/icons/ollama.png");
-const phoneIcon = require("../../../assets/icons/phone.png");
-const sampler2Icon = require("../../../assets/icons/sampler2.png");
-const samplerNavIcon = require("../../../assets/icons/sampler.png");
-const cloudUploadIcon = require("../../../assets/icons/cloudupload.png");
-const cloudDownloadIcon = require("../../../assets/icons/clouddownload.png");
-const arrowIcon = require("../../../assets/icons/arrow.png");
-const rightArrowIcon = require("../../../assets/icons/right.png");
-const cancelIcon = require("../../../assets/icons/cancel.png");
-const activateIcon = require("../../../assets/icons/activate.png");
-const generalIcon = require("../../../assets/icons/general.png");
-const advancedIcon = require("../../../assets/icons/settings.png");
-const serverIcon = require("../../../assets/icons/server.png");
-const toolIcon = require("../../../assets/icons/tool.png");
-const tool2Icon = require("../../../assets/icons/tool2.png");
-const confidentialityIcon = require("../../../assets/icons/confidentiality.png");
-const reportsIcon = require("../../../assets/icons/bug.png");
-const supportIcon = require("../../../assets/icons/support.png");
-const informationIcon = require("../../../assets/icons/information.png");
-const githubIcon = require("../../../assets/icons/github.png");
-const operaIcon = require("../../../assets/icons/operaicon.png");
-const samplerIcon = require("../../../assets/icons/operaiconEgg.png");
-const instagramIcon = require("../../../assets/icons/instagram.png");
-const tiktokIcon = require("../../../assets/icons/tiktok.png");
-const micIcon = require("../../../assets/icons/microphone.png");
-const cameraIcon = require("../../../assets/icons/camera.png");
-const videocamIcon = require("../../../assets/icons/videocam.png");
-const visionIcon = require("../../../assets/icons/vision.png");
-const microIcon = require("../../../assets/icons/micro.png");
-const brainIcon = require("../../../assets/icons/brain.png");
 //icon set differs from the sheet
 const MODEL_CAPABILITY_ICONS = {
   tools: tool2Icon,
   vision: visionIcon,
   thinking: brainIcon,
-  audio: microIcon,
+  audio: micIcon,
   video: videocamIcon,
-} as const satisfies Record<ModelCapabilityId, ImageSourcePropType>;
-const photoIcon = require("../../../assets/icons/photo.png");
-const locationIcon = require("../../../assets/icons/location.png");
-const calendarIcon = require("../../../assets/icons/calendar.png");
-const binIcon = require("../../../assets/icons/bin.png");
-const exportIcon = require("../../../assets/icons/export.png");
-const messageIcon = require("../../../assets/icons/message.png");
-const timeIcon = require("../../../assets/icons/time.png");
-const errorIcon = require("../../../assets/icons/error.png");
+  live: phoneIcon,
+} as const satisfies Record<ModelCapabilityId, IconSource>;
+const cloudInfoImage = require("../../../assets/images/ImageCard/CloudInfo.png");
+const toolInfoImage = require("../../../assets/images/ImageCard/ToolInfo.png");
+const assistantInfoImage = require("../../../assets/images/ImageCard/AssistantInfo.png");
+const standbyInfoImage = require("../../../assets/images/ImageCard/StandbyInfo.png");
 const errorImage = require("../../../assets/images/ImageCard/error.png");
-const infoIcon = require("../../../assets/icons/info.png");
-const reconnectIcon = require("../../../assets/icons/reconnect.png");
-const hyperlinkIcon = require("../../../assets/icons/hyperlink2.png");
 
 const DRAWER_SYNC_DELAY_MS = 1500;
 //hub entry in the account list
 const HUB_SYNC_ID = "hub";
+
+type PermissionKey =
+  | "microphone"
+  | "camera"
+  | "location"
+  | "photos"
+  | "contacts"
+  | "calendar";
+
+const PERMISSION_HANDLERS: Record<
+  PermissionKey,
+  {
+    get: () => Promise<{ status: string; granted: boolean; canAskAgain?: boolean }>;
+    request: () => Promise<{ status: string; granted: boolean; canAskAgain?: boolean }>;
+  }
+> = {
+  microphone: {
+    get: () => ExpoSpeechRecognitionModule.getPermissionsAsync(),
+    request: () => ExpoSpeechRecognitionModule.requestPermissionsAsync(),
+  },
+  camera: {
+    get: () => ImagePicker.getCameraPermissionsAsync(),
+    request: () => ImagePicker.requestCameraPermissionsAsync(),
+  },
+  location: {
+    get: () => Location.getForegroundPermissionsAsync(),
+    request: () => Location.requestForegroundPermissionsAsync(),
+  },
+  photos: {
+    get: () => MediaLibrary.getPermissionsAsync(),
+    request: () => MediaLibrary.requestPermissionsAsync(),
+  },
+  contacts: {
+    get: () => Contacts.getPermissionsAsync(),
+    request: () => Contacts.requestPermissionsAsync(),
+  },
+  calendar: {
+    get: () => Calendar.getCalendarPermissions(),
+    request: () => Calendar.requestCalendarPermissions(),
+  },
+};
 
 //plugin help shows the first sentence only
 function shortDescription(text: string) {
@@ -336,6 +416,8 @@ type SettingsDrawerProps = {
   initialSubPage?: SubPage;
   //provider whose sheet opens on show
   initialSheet?: { service: string; url: string } | null;
+  //opens the sheet alone, the drawer stays closed
+  sheetOnly?: boolean;
   //an opera://hub/pair link to confirm
   hubPairLink?: string | null;
   onHubPairLinkHandled?: () => void;
@@ -413,8 +495,6 @@ const MODEL_PAGE_SIZE = 50;
 //cloud page previews before the full sheet
 const MODEL_PREVIEW_SIZE = 10;
 const NO_DISABLED_MODELS: string[] = [];
-const NO_CAPABILITY_OVERRIDES: Record<string, string[]> = {};
-const NO_PROMPT_TIERS: Record<string, PromptTier> = {};
 const PROMPT_TIER_KEYS = {
   small: "settings.model.promptSmall",
   medium: "settings.model.promptMedium",
@@ -426,32 +506,26 @@ const MODEL_CAPABILITY_ROWS = [
   "thinking",
   "audio",
   "video",
+  "live",
 ] as const satisfies readonly ModelCapabilityId[];
 
-//override wins over server caps
-const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
+//prompt size row of model details
+const PromptTierSelector = memo(function PromptTierSelector({
   model,
   service,
   url,
-  onCapabilitiesChange,
   onPromptTierChange,
-  style,
-  labelStyle,
-  checkboxes = false,
+  first,
 }: {
   model: string;
   service: string;
   url: string;
-  onCapabilitiesChange: (model: string, capabilities: string[]) => void;
   onPromptTierChange: (model: string, tier: PromptTier | undefined) => void;
-  style?: StyleProp<ViewStyle>;
-  labelStyle?: StyleProp<ViewStyle>;
-  checkboxes?: boolean;
+  //drops the gap above
+  first?: boolean;
 }) {
-  const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const t = useT();
-  const [capabilities, setCapabilities] = useState<string[] | null>(null);
   const [promptTier, setPromptTier] = useState<string>(
     () => getPromptTierOverride(service, url, model) ?? "auto",
   );
@@ -465,6 +539,53 @@ const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
       label: t(PROMPT_TIER_KEYS[tier]),
     })),
   ];
+
+  return (
+    <>
+      <Text style={[styles.settingLabel, !first && styles.litertDetailSection]}>
+        {t("settings.model.promptSize")}
+      </Text>
+      <Group>
+        <Selector
+          options={promptOptions}
+          selectedValue={promptTier}
+          onSelect={(v) => {
+            setPromptTier(v);
+            onPromptTierChange(
+              model,
+              v === "auto" ? undefined : (v as PromptTier),
+            );
+          }}
+          title={t("settings.model.promptSize")}
+          fullWidth
+        />
+      </Group>
+    </>
+  );
+});
+
+//override wins over server caps
+const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
+  model,
+  service,
+  url,
+  onCapabilitiesChange,
+  onPromptTierChange,
+  style,
+  labelStyle,
+}: {
+  model: string;
+  service: string;
+  url: string;
+  onCapabilitiesChange: (model: string, capabilities: string[]) => void;
+  onPromptTierChange: (model: string, tier: PromptTier | undefined) => void;
+  style?: StyleProp<ViewStyle>;
+  labelStyle?: StyleProp<ViewStyle>;
+}) {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
+  const t = useT();
+  const [capabilities, setCapabilities] = useState<string[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -493,7 +614,7 @@ const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
       {MODEL_CAPABILITY_ROWS.map((c) => (
         <View key={c} style={styles.toggleGroupRow}>
           <View style={[styles.litertCapability, labelStyle]}>
-            <Image
+            <AppIcon
               source={MODEL_CAPABILITY_ICONS[c]}
               style={styles.litertCapabilityIcon}
               tintColor={Colors.textSecondary}
@@ -502,37 +623,18 @@ const ModelCapabilityToggles = memo(function ModelCapabilityToggles({
               {t(MODEL_CAPABILITY_KEYS[c])}
             </Text>
           </View>
-          {checkboxes ? (
-            <Checkbox
-              checked={capabilities.includes(c)}
-              onToggle={(v) => toggleCapability(c, v)}
-            />
-          ) : (
-            <Toggle
-              checked={capabilities.includes(c)}
-              onToggle={(v) => toggleCapability(c, v)}
-            />
-          )}
+          <Checkbox
+            checked={capabilities.includes(c)}
+            onToggle={(v) => toggleCapability(c, v)}
+          />
         </View>
       ))}
-      <Text style={[styles.settingLabel, styles.litertDetailSection]}>
-        {t("settings.model.promptSize")}
-      </Text>
-      <Group>
-        <Selector
-          options={promptOptions}
-          selectedValue={promptTier}
-          onSelect={(v) => {
-            setPromptTier(v);
-            onPromptTierChange(
-              model,
-              v === "auto" ? undefined : (v as PromptTier),
-            );
-          }}
-          title={t("settings.model.promptSize")}
-          fullWidth
-        />
-      </Group>
+      <PromptTierSelector
+        model={model}
+        service={service}
+        url={url}
+        onPromptTierChange={onPromptTierChange}
+      />
     </View>
   );
 });
@@ -545,78 +647,65 @@ const hubModelIcon = (key: string) => {
   return hubProviderKind(url) === "openai" ? providerCloudIcon : ollamaIcon;
 };
 
-const ModelToggleRow = memo(function ModelToggleRow({
+//shared detail card for server models
+const ProviderModelDetail = memo(function ProviderModelDetail({
   model,
-  enabled,
-  last,
-  expanded,
+  serverLabel,
+  icon,
   service,
   url,
+  enabled,
   onToggle,
-  onExpand,
   onCapabilitiesChange,
   onPromptTierChange,
-  label,
-  icon,
 }: {
   model: string;
-  label?: string;
-  //server the model comes from
-  icon?: ImageSourcePropType;
-  enabled: boolean;
-  last: boolean;
-  expanded: boolean;
+  serverLabel: string;
+  icon?: IconSource;
   service: string;
   url: string;
-  onToggle: (model: string, enabled: boolean) => void;
-  onExpand: (model: string) => void;
+  enabled: boolean;
+  onToggle: (enabled: boolean) => void;
   onCapabilitiesChange: (model: string, capabilities: string[]) => void;
   onPromptTierChange: (model: string, tier: PromptTier | undefined) => void;
 }) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const t = useT();
 
   return (
-    <View style={!last && { marginBottom: Spacing.lg }}>
+    <View style={styles.sheetCard}>
       <View style={styles.toggleGroupRow}>
-        <Pressable
-          style={pressStyle(styles.modelToggleName, "fadeLight")}
-          onPress={() => onExpand(model)}
-        >
-          {icon && (
-            <Image
-              source={icon}
-              style={[styles.litertCapabilityIcon, styles.modelToggleIcon]}
-              tintColor={Colors.textSecondary}
-            />
+        <View style={[styles.toggleGroupContent, styles.cloudModelText]}>
+          <Text style={styles.litertDetailName}>{model}</Text>
+          {icon ? (
+            <View style={styles.litertCapability}>
+              <AppIcon
+                source={icon}
+                style={styles.litertCapabilityIcon}
+                tintColor={Colors.textSecondary}
+              />
+              <Text style={styles.litertDetailMeta}>{serverLabel}</Text>
+            </View>
+          ) : (
+            <Text style={styles.litertDetailMeta}>{serverLabel}</Text>
           )}
-          <Text
-            style={[styles.settingLabel, styles.modelToggleLabel]}
-            numberOfLines={1}
-          >
-            {label ?? model}
-          </Text>
-          <Image
-            source={rightArrowIcon}
-            style={[
-              styles.litertCapabilityIcon,
-              expanded && styles.modelToggleArrowOpen,
-            ]}
-            tintColor={Colors.textMuted}
-          />
-        </Pressable>
-        <Checkbox checked={enabled} onToggle={(v) => onToggle(model, v)} />
+        </View>
+        <Toggle checked={enabled} onToggle={onToggle} />
       </View>
-      {expanded && (
-        <ModelCapabilityToggles
-          model={model}
-          service={service}
-          url={url}
-          onCapabilitiesChange={onCapabilitiesChange}
-          onPromptTierChange={onPromptTierChange}
-          style={styles.modelCapabilities}
-        />
-      )}
+      <Text style={[styles.settingLabel, styles.litertDetailSection]}>
+        {t("settings.ollama.capabilities")}
+      </Text>
+      <ModelCapabilityToggles
+        key={`${url}|${model}`}
+        model={model}
+        service={service}
+        url={url}
+        onCapabilitiesChange={onCapabilitiesChange}
+        onPromptTierChange={onPromptTierChange}
+        style={styles.cloudModelCapabilities}
+        labelStyle={styles.cloudModelCapabilityLabel}
+      />
     </View>
   );
 });
@@ -625,14 +714,8 @@ const ModelToggleRow = memo(function ModelToggleRow({
 const ModelToggleList = memo(function ModelToggleList({
   models,
   loading,
-  service,
-  url,
   disabled = NO_DISABLED_MODELS,
-  capabilities = NO_CAPABILITY_OVERRIDES,
   onChange,
-  onCapabilitiesChange,
-  promptTiers = NO_PROMPT_TIERS,
-  onPromptTiersChange,
   onShowAll,
   onOpenModel,
   onOpenSearch,
@@ -648,21 +731,13 @@ const ModelToggleList = memo(function ModelToggleList({
   models: string[];
   //models are keys here, these show them
   labelOf?: (model: string) => string;
-  iconOf?: (model: string) => ImageSourcePropType | undefined;
+  iconOf?: (model: string) => IconSource | undefined;
   loading: boolean;
-  service: string;
-  url: string;
   disabled?: string[];
-  capabilities?: Record<string, string[]>;
   onChange: (next: string[]) => void;
-  //only the inline expand edits capabilities
-  onCapabilitiesChange?: (next: Record<string, string[]>) => void;
-  promptTiers?: Record<string, PromptTier>;
-  onPromptTiersChange?: (next: Record<string, PromptTier>) => void;
   //show more opens the full list instead of paging
   onShowAll?: (search: string) => void;
-  //rows open a model page instead of expanding
-  onOpenModel?: (model: string) => void;
+  onOpenModel: (model: string) => void;
   //search opens full models sheet
   onOpenSearch?: () => void;
   showAll?: boolean;
@@ -688,55 +763,10 @@ const ModelToggleList = memo(function ModelToggleList({
   const shown = useMemo(() => {
     const query = search.trim().toLowerCase();
     return query
-      ? models.filter((m) =>
-          (labelOf?.(m) ?? m).toLowerCase().includes(query),
-        )
+      ? models.filter((m) => (labelOf?.(m) ?? m).toLowerCase().includes(query))
       : models;
   }, [models, search, labelOf]);
   const enabledCount = models.filter((m) => !disabledSet.has(m)).length;
-
-  //stable handler keeps memo rows still
-  const latest = useRef({
-    disabled,
-    onChange,
-    capabilities,
-    onCapabilitiesChange,
-    promptTiers,
-    onPromptTiersChange,
-  });
-  useEffect(() => {
-    latest.current = {
-      disabled,
-      onChange,
-      capabilities,
-      onCapabilitiesChange,
-      promptTiers,
-      onPromptTiersChange,
-    };
-  });
-  const toggleModel = useCallback((model: string, enabled: boolean) => {
-    const { disabled: current, onChange: save } = latest.current;
-    save(enabled ? current.filter((m) => m !== model) : [...current, model]);
-  }, []);
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const toggleExpanded = useCallback((model: string) => {
-    setExpanded((current) => (current === model ? null : model));
-  }, []);
-  const setModelCapabilities = useCallback((model: string, caps: string[]) => {
-    const { capabilities: current, onCapabilitiesChange: save } =
-      latest.current;
-    save?.({ ...current, [model]: caps });
-  }, []);
-  const setModelPromptTier = useCallback(
-    (model: string, tier: PromptTier | undefined) => {
-      const { promptTiers: current, onPromptTiersChange: save } =
-        latest.current;
-      //auto removes the override
-      const { [model]: _removed, ...rest } = current;
-      save?.(tier ? { ...rest, [model]: tier } : rest);
-    },
-    [],
-  );
 
   //bulk buttons act on the filtered rows
   const setShown = (enabled: boolean) => {
@@ -772,13 +802,13 @@ const ModelToggleList = memo(function ModelToggleList({
               <Group style={styles.groupSpacingTight}>
                 {onOpenSearch ? (
                   <ActionButton
-                    icon={searchIcon}
+                    icon={search2Icon}
                     label={t("settings.ollama.searchModels")}
                     onPress={onOpenSearch}
                   />
                 ) : (
                   <TextInputField
-                    icon={searchIcon}
+                    icon={search2Icon}
                     placeholder={t("settings.ollama.searchModels")}
                     value={search}
                     onChangeText={(v) => {
@@ -793,7 +823,7 @@ const ModelToggleList = memo(function ModelToggleList({
                 )}
               </Group>
             )}
-            <Group style={{ marginBottom: Spacing.xxl }}>
+            <Group>
               <ActionButton
                 icon={activateIcon}
                 label={t("settings.ollama.enableAll")}
@@ -808,32 +838,29 @@ const ModelToggleList = memo(function ModelToggleList({
               />
             </Group>
             {shown.length === 0 ? (
-              <Text style={styles.helpText}>
+              <Text style={[styles.helpText, { marginTop: Spacing.md }]}>
                 {t("settings.ollama.noMatch")}
               </Text>
             ) : (
-              visible.map((model, index) => (
-                <ModelToggleRow
-                  key={model}
-                  model={model}
-                  label={labelOf?.(model)}
-                  icon={iconOf?.(model)}
-                  enabled={!disabledSet.has(model)}
-                  last={index === visible.length - 1}
-                  expanded={expanded === model}
-                  service={service}
-                  url={url}
-                  onToggle={toggleModel}
-                  onExpand={onOpenModel ?? toggleExpanded}
-                  onCapabilitiesChange={setModelCapabilities}
-                  onPromptTierChange={setModelPromptTier}
-                />
-              ))
+              <CardGrid
+                cards={visible.map((model) => ({
+                  key: model,
+                  title: labelOf?.(model) ?? model,
+                  badge: iconOf?.(model),
+                  status: t(
+                    disabledSet.has(model)
+                      ? "settings.service.off"
+                      : "settings.service.on",
+                  ),
+                  onPress: () => onOpenModel(model),
+                }))}
+                style={{ marginTop: Spacing.md }}
+              />
             )}
             {shown.length > limit && (
-              <Group style={{ marginTop: Spacing.xxl }}>
+              <Group style={{ marginTop: Spacing.md }}>
                 <ActionButton
-                  icon={addIcon}
+                  icon={add2Icon}
                   label={t("settings.ollama.showMore", {
                     count: shown.length - limit,
                   })}
@@ -861,6 +888,7 @@ export default function SettingsDrawer({
   windowed = false,
   initialSubPage,
   initialSheet,
+  sheetOnly = false,
   hubPairLink = null,
   onHubPairLinkHandled,
 }: SettingsDrawerProps) {
@@ -1000,6 +1028,12 @@ export default function SettingsDrawer({
   const [ollamaDetailIndex, setOllamaDetailIndex] = useState<number | null>(
     null,
   );
+  //ollama model opened in its info sheet
+  const [ollamaModel, setOllamaModel] = useState<string | null>(null);
+  const [shownOllamaModel, setShownOllamaModel] = useState<string | null>(null);
+  if (ollamaModel !== null && ollamaModel !== shownOllamaModel) {
+    setShownOllamaModel(ollamaModel);
+  }
   const [sheetWidth, setSheetWidth] = useState(0);
   const isSheetWide = isDesktop && sheetWidth >= WIDE_SETTINGS_WIDTH;
   //raw text of the tuning fields
@@ -1015,9 +1049,7 @@ export default function SettingsDrawer({
   }
   //hub model opened in its info sheet
   const [hubModelKey, setHubModelKey] = useState<string | null>(null);
-  const [shownHubModelKey, setShownHubModelKey] = useState<string | null>(
-    null,
-  );
+  const [shownHubModelKey, setShownHubModelKey] = useState<string | null>(null);
   if (hubModelKey !== null && hubModelKey !== shownHubModelKey) {
     setShownHubModelKey(hubModelKey);
   }
@@ -1034,6 +1066,9 @@ export default function SettingsDrawer({
   const openaiModelsRequest = useRef(0);
   //key text saved on blur
   const [openaiKeyDraft, setOpenAIKeyDraft] = useState("");
+  const [openaiKeyOpen, setOpenAIKeyOpen] = useState(false);
+  const [mcpHeaderOpen, setMcpHeaderOpen] = useState(false);
+  const [mcpClientIdOpen, setMcpClientIdOpen] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const [lastSyncSize, setLastSyncSize] = useState<number | null>(null);
 
@@ -1058,7 +1093,39 @@ export default function SettingsDrawer({
   //query typed in the inline list before show more
   const [mcpAddVisible, setMcpAddVisible] = useState(false);
   const [profileEditVisible, setProfileEditVisible] = useState(false);
+  const [searchSheetVisible, setSearchSheetVisible] = useState(false);
+  const [settingsSearchQuery, setSettingsSearchQuery] = useState("");
+  //keeps typing instant
+  const deferredSearchQuery = useDeferredValue(settingsSearchQuery);
+  //recently touched card ids
+  const searchRecentsRef = useRef<string[]>([]);
+  const [recentSearchIds, setRecentSearchIds] = useState<string[]>([]);
+  useEffect(() => {
+    Settings.getLocal(SEARCH_RECENTS_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        const ids = JSON.parse(raw);
+        if (Array.isArray(ids)) searchRecentsRef.current = ids.map(String);
+      })
+      .catch(() => {});
+  }, []);
+  const clearSearchRecents = () => {
+    searchRecentsRef.current = [];
+    setRecentSearchIds([]);
+    Settings.setLocal(SEARCH_RECENTS_KEY, "[]").catch(() => {});
+  };
+  //ref avoids reordering under finger
+  const touchSearchEntry = (id: string) => {
+    const next = [id, ...searchRecentsRef.current.filter((r) => r !== id)].slice(
+      0,
+      MAX_SEARCH_RECENTS,
+    );
+    searchRecentsRef.current = next;
+    Settings.setLocal(SEARCH_RECENTS_KEY, JSON.stringify(next)).catch(() => {});
+  };
+  const [nameDraft, setNameDraft] = useState("");
   const [litertDownloadVisible, setLitertDownloadVisible] = useState(false);
+  const [voiceDownloadVisible, setVoiceDownloadVisible] = useState(false);
   //id outlives the close so the sheet keeps its content
   const [cloudSetupVisible, setCloudSetupVisible] = useState(false);
   const [cloudSetupId, setCloudSetupId] = useState("");
@@ -1125,8 +1192,10 @@ export default function SettingsDrawer({
   }, [windowed, refreshHub]);
 
   const [personality, setPersonality] = useState(readPersonality);
-  const [personalitySheetVisible, setPersonalitySheetVisible] =
+  const [personalitySheetVisible, setPersonalitySheetVisible] = useState(false);
+  const [instructionsSheetVisible, setInstructionsSheetVisible] =
     useState(false);
+  const [instructionDraft, setInstructionDraft] = useState("");
   //open sheets keep the back press for themselves
   const [helpVisible, setHelpVisible] = useState(false);
   //topic stays through the close animation
@@ -1138,7 +1207,7 @@ export default function SettingsDrawer({
   //question button for a page header
   const renderHelpButton = (topic: HelpTopic) => (
     <IconButton
-      icon={questionIcon}
+      icon={infoIcon}
       label={t("settings.help.open")}
       onPress={() => openHelp(topic)}
       tintColor={Colors.textPrimary}
@@ -1147,16 +1216,20 @@ export default function SettingsDrawer({
   const sheetOpen =
     helpVisible ||
     personalitySheetVisible ||
+    instructionsSheetVisible ||
     profileEditVisible ||
+    searchSheetVisible ||
     addModelSheetVisible ||
     litertSheetVisible ||
     ollamaDetailIndex !== null ||
+    ollamaModel !== null ||
     hubDetailUrl !== null ||
     hubModelKey !== null ||
     openaiAddVisible ||
     openaiDetailIndex !== null ||
     mcpAddVisible ||
     litertDownloadVisible ||
+    voiceDownloadVisible ||
     cloudSetupVisible ||
     selectedLocalModel !== null ||
     installedModel !== null;
@@ -1186,6 +1259,7 @@ export default function SettingsDrawer({
   const [litertSearchFailed, setLitertSearchFailed] = useState(false);
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const shadowShift = useShadowShift();
   //sheet may grow up to just under the status bar
   const sheetMaxHeight = windowHeight - insets.top - Spacing.xl2;
   const [alertModalVisible, setAlertModalVisible] = useState(false);
@@ -1197,7 +1271,7 @@ export default function SettingsDrawer({
   const [alertConfig, setAlertConfig] = useState<{
     title: string;
     message: string;
-    icon?: ImageSourcePropType;
+    icon?: IconSource;
     image?: ImageSourcePropType;
     messageAlign?: "left" | "center";
     buttons?: ModalButton[];
@@ -1209,6 +1283,36 @@ export default function SettingsDrawer({
     inputKeyboardType?: any;
     loading?: boolean;
   }>({ title: "", message: "" });
+
+  const [changelog, setChangelog] = useState<ReleaseNotes | null>(null);
+  const openChangelog = async () => {
+    try {
+      const notes = await getCurrentReleaseNotes();
+      if (notes) {
+        setChangelogFromUpdate(false);
+        setChangelog(notes);
+      }
+      else
+        showAlert(t("common.error"), t("settings.info.changelogUnavailable"));
+    } catch {
+      showAlert(t("common.error"), t("settings.info.changelogUnavailable"));
+    }
+  };
+
+  //true when opened from banner
+  const [changelogFromUpdate, setChangelogFromUpdate] = useState(false);
+  const openUpdateNotes = async (update: AppRelease) => {
+    try {
+      const notes = await getCurrentReleaseNotes(update.version);
+      if (notes) {
+        setChangelogFromUpdate(true);
+        setChangelog(notes);
+        return;
+      }
+    } catch {}
+    //fallback to release page
+    notices.openUpdate();
+  };
 
   const showAlert = (
     title: string,
@@ -1269,13 +1373,15 @@ export default function SettingsDrawer({
       .then(setUpdateChecksState)
       .catch(() => {});
   }, [visible]);
-  const report = useBugReport(showAlert);
+  const [bugReportSheetVisible, setBugReportSheetVisible] = useState(false);
   const [instruction, setInstructionState] = useState("");
   const [name, setNameState] = useState("");
   //only feeds the card's look, so it doesn't redesign on every keystroke
   const [confirmedName, setConfirmedName] = useState("");
   const [alwaysWhisper, setAlwaysWhisperState] = useState(false);
   const [autoSpeak, setAutoSpeakState] = useState(true);
+  const [applyMaestroColor, setApplyMaestroColorState] = useState(false);
+  const [liveTranscription, setLiveTranscriptionState] = useState(false);
   const [dreamIncognitoButton, setDreamIncognitoButtonState] = useState(true);
   const [dreamAntiBurnIn, setDreamAntiBurnInState] = useState(true);
   const [dreamWakeWord, setDreamWakeWordState] = useState(true);
@@ -1404,10 +1510,7 @@ export default function SettingsDrawer({
 
   type PermissionState = "granted" | "denied" | "undetermined";
   const [permissionStatuses, setPermissionStatuses] = useState<
-    Record<
-      "microphone" | "camera" | "location" | "photos" | "contacts" | "calendar",
-      PermissionState
-    >
+    Record<PermissionKey, PermissionState>
   >({
     microphone: "undetermined",
     camera: "undetermined",
@@ -1437,6 +1540,25 @@ export default function SettingsDrawer({
     });
   }, []);
 
+  //ask os before opening settings
+  const requestAppPermission = useCallback(async (key: PermissionKey) => {
+    const handler = PERMISSION_HANDLERS[key];
+    try {
+      const current = await handler.get();
+      if (current.granted || current.canAskAgain === false) {
+        Linking.openSettings();
+        return;
+      }
+      const next = await handler.request();
+      setPermissionStatuses((prev) => ({
+        ...prev,
+        [key]: (next.status as PermissionState) ?? "undetermined",
+      }));
+    } catch {
+      Linking.openSettings();
+    }
+  }, []);
+
   //keep badges in sync after the user flips a permission in system settings
   useEffect(() => {
     if (
@@ -1451,6 +1573,12 @@ export default function SettingsDrawer({
     });
     return () => sub.remove();
   }, [visible, activeSubPage, refreshPermissionStatuses]);
+
+  //hide card without assistant role
+  const [assistantRoleAvailable, setAssistantRoleAvailable] = useState(true);
+  useEffect(() => {
+    isDefaultAssistant().then((held) => setAssistantRoleAvailable(held !== null));
+  }, []);
 
   //hides the open settings card once opera is the screen saver
   const [screenSaverActive, setScreenSaverActive] = useState(false);
@@ -1676,6 +1804,8 @@ export default function SettingsDrawer({
       setConfirmedName(s.name || "");
       setAlwaysWhisperState(s.alwaysWhisper);
       setAutoSpeakState(s.autoSpeak);
+      setApplyMaestroColorState(s.applyMaestroColor);
+      setLiveTranscriptionState(s.liveTranscription === "on");
       setDreamIncognitoButtonState(s.dreamIncognitoButton);
       setDreamAntiBurnInState(s.dreamAntiBurnIn);
       setDreamWakeWordState(s.dreamWakeWord);
@@ -1969,6 +2099,8 @@ export default function SettingsDrawer({
       headerValue: "",
       clientId: "",
     });
+    setMcpHeaderOpen(false);
+    setMcpClientIdOpen(false);
     setServerDraftBusy(false);
     setMcpAddVisible(true);
   };
@@ -2006,6 +2138,7 @@ export default function SettingsDrawer({
       clientId: "",
     });
     setOpenAIKeyDraft("");
+    setOpenAIKeyOpen(false);
     setServerDraftBusy(false);
     setOpenAIAddVisible(true);
   };
@@ -2013,7 +2146,9 @@ export default function SettingsDrawer({
   //answering protocol picks the provider
   const submitServerDraft = async () => {
     const url = serverDraft.url.trim();
-    if ([...ollamaServers, ...openaiServers].some((s) => s.url.trim() === url)) {
+    if (
+      [...ollamaServers, ...openaiServers].some((s) => s.url.trim() === url)
+    ) {
       showAlert(t("settings.server.addFailed"), t("settings.server.duplicate"));
       return;
     }
@@ -2226,6 +2361,7 @@ export default function SettingsDrawer({
 
   const openOllamaServer = (index: number) => {
     const server = ollamaServers[index];
+    setOllamaModel(null);
     setOllamaDetailIndex(index);
     setOllamaContextDraft(
       server?.contextLength != null ? String(server.contextLength) : "",
@@ -2302,6 +2438,7 @@ export default function SettingsDrawer({
           onPress: () => {
             setAlertModalVisible(false);
             saveOllamaServers(ollamaServers.filter((_, i) => i !== index));
+            setOllamaModel(null);
             setOllamaDetailIndex(null);
           },
         },
@@ -2314,6 +2451,7 @@ export default function SettingsDrawer({
     const url = ollamaServers[index]?.url.trim() ?? "";
     if (!url) {
       saveOllamaServers(ollamaServers.filter((_, i) => i !== index));
+      setOllamaModel(null);
       setOllamaDetailIndex(null);
       return;
     }
@@ -2654,13 +2792,14 @@ export default function SettingsDrawer({
   ];
 
   //opens the picked provider sheet once its servers load
-  const initialSheetDone = useRef(false);
+  const initialSheetDone = useRef<typeof initialSheet>(null);
   useEffect(() => {
-    if (!visible || !initialSheet) {
-      initialSheetDone.current = false;
+    if (!(visible || sheetOnly) || !initialSheet) {
+      initialSheetDone.current = null;
       return;
     }
-    if (initialSheetDone.current) return;
+    //each request is a new object, so the same provider can reopen
+    if (initialSheetDone.current === initialSheet) return;
     const { service, url } = initialSheet;
     if (service === "local" || service === "litert") {
       setLitertSheetVisible(true);
@@ -2679,9 +2818,9 @@ export default function SettingsDrawer({
       if (!server) return;
       openHubServer(server);
     }
-    initialSheetDone.current = true;
+    initialSheetDone.current = initialSheet;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- openers are plain functions over these lists
-  }, [visible, initialSheet, ollamaServers, openaiServers]);
+  }, [visible, sheetOnly, initialSheet, ollamaServers, openaiServers]);
 
   //dead downloads resume from disk
   useEffect(() => {
@@ -2779,6 +2918,16 @@ export default function SettingsDrawer({
   const setAutoSpeak = (v: boolean) => {
     setAutoSpeakState(v);
     Settings.set("autoSpeak", v);
+  };
+
+  const setApplyMaestroColor = (v: boolean) => {
+    setApplyMaestroColorState(v);
+    Settings.set("applyMaestroColor", v);
+  };
+
+  const setLiveTranscription = (v: boolean) => {
+    setLiveTranscriptionState(v);
+    Settings.set("liveTranscription", v ? "on" : "off");
   };
 
   const setDreamIncognitoButton = (v: boolean) => {
@@ -2900,11 +3049,19 @@ export default function SettingsDrawer({
         return;
       }
       showAlert(t("update.title"), t("update.upToDate"), [
-        { text: t("common.ok"), onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: t("common.ok"),
+          onPress: () => setAlertModalVisible(false),
+          style: "secondary",
+        },
       ]);
     } catch (e) {
       showAlert(t("update.title"), t("update.checkFailed"), [
-        { text: t("common.ok"), onPress: () => setAlertModalVisible(false), style: "secondary" },
+        {
+          text: t("common.ok"),
+          onPress: () => setAlertModalVisible(false),
+          style: "secondary",
+        },
       ]);
     }
   };
@@ -3401,6 +3558,9 @@ export default function SettingsDrawer({
   //closed overlay leaves the tree, a live page layer would still catch clicks on the web
   const [desktopMounted, setDesktopMounted] = useState(visible);
   if (visible && !desktopMounted) setDesktopMounted(true);
+  //sheets outlive their request so they can slide out
+  const [sheetHostMounted, setSheetHostMounted] = useState(sheetOnly);
+  if (sheetOnly && !sheetHostMounted) setSheetHostMounted(true);
   const [navScrolled, setNavScrolled] = useState(false);
   const [desktopPageWidth, setDesktopPageWidth] = useState(0);
   //initial page width before layout
@@ -3534,7 +3694,7 @@ export default function SettingsDrawer({
     return (
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: Spacing.lg, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingTop: Spacing.lg, paddingBottom: 96 }}
       >
         {groups.map((items, index) => (
           <Group key={index} style={styles.sidebarActions}>
@@ -3577,12 +3737,12 @@ export default function SettingsDrawer({
 
       {!!notices.update && (
         <NotificationBanner
-          icon={downloadIcon}
+          icon={download2Icon}
           label={t("settings.notice.update", {
             version: notices.update.version,
           })}
           onPress={() =>
-            isTauri ? promptUpdate(notices.update!) : notices.openUpdate()
+            openUpdateNotes(notices.update!)
           }
           style={[styles.groupSpacing, styles.mainPageGroup]}
         />
@@ -3595,7 +3755,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("profile")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={profilIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3613,7 +3773,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("cloud")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={cloudIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3629,7 +3789,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("maestro")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={operaIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3649,7 +3809,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("general")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={generalIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3667,7 +3827,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("service")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={samplerNavIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3685,7 +3845,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("tools")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={toolIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3702,7 +3862,7 @@ export default function SettingsDrawer({
             onPress={() => setActiveSubPage("advanced")}
           >
             <View style={styles.menuIconWrap}>
-              <Image
+              <AppIcon
                 source={advancedIcon}
                 style={styles.menuIcon}
                 tintColor={Colors.textOnPrimary}
@@ -3723,7 +3883,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("confidentiality")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={confidentialityIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3741,7 +3901,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("reports")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={reportsIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3759,7 +3919,7 @@ export default function SettingsDrawer({
           onPress={() => setActiveSubPage("sociallinks")}
         >
           <View style={styles.menuIconWrap}>
-            <Image
+            <AppIcon
               source={informationIcon}
               style={styles.menuIcon}
               tintColor={Colors.textOnPrimary}
@@ -3779,10 +3939,10 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.nav.info.title"))}
 
       <View style={styles.contentCard}>
-        <View style={styles.settingRowVertical}>
+        <Pressable style={styles.settingRowVertical} onPress={openChangelog}>
           <Text style={styles.settingLabel}>{t("settings.info.version")}</Text>
           <Text style={styles.helpText}>Opera Beta v{appVersion}</Text>
-        </View>
+        </Pressable>
 
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={styles.settingLabel}>{t("settings.info.links")}</Text>
@@ -3792,7 +3952,7 @@ export default function SettingsDrawer({
 
           <Group>
             <ActionButton
-              icon={operaIcon}
+              icon={websiteIcon}
               label={t("settings.info.website")}
               onPress={() =>
                 openExternalUrl("https://maestroai.company").catch(() => {})
@@ -3807,31 +3967,15 @@ export default function SettingsDrawer({
                 ).catch(() => {})
               }
             />
-            <ActionButton
-              icon={instagramIcon}
-              label="Instagram"
-              onPress={() =>
-                openExternalUrl(
-                  "https://www.instagram.com/maestroai.company?igsh=MWF4dmZvMXl1ZmdzeA==",
-                ).catch(() => {})
-              }
-            />
-            <ActionButton
-              icon={tiktokIcon}
-              label="TikTok"
-              onPress={() =>
-                openExternalUrl(
-                  "https://www.tiktok.com/@maestroai.company?_r=1&_t=ZG-99DGujxTPEn",
-                ).catch(() => {})
-              }
-            />
           </Group>
         </View>
       </View>
 
       {isTauri && !isAppStore && (
         <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: Spacing.md }]}>
+          <View
+            style={[styles.settingRowVertical, { marginBottom: Spacing.md }]}
+          >
             <View style={styles.toggleGroupRow}>
               <View style={styles.toggleGroupContent}>
                 <Text style={styles.settingLabel}>
@@ -3844,7 +3988,9 @@ export default function SettingsDrawer({
               <Toggle checked={betaChannel} onToggle={setBetaChannelValue} />
             </View>
           </View>
-          <View style={[styles.settingRowVertical, { marginBottom: Spacing.md }]}>
+          <View
+            style={[styles.settingRowVertical, { marginBottom: Spacing.md }]}
+          >
             <View style={styles.toggleGroupRow}>
               <View style={styles.toggleGroupContent}>
                 <Text style={styles.settingLabel}>
@@ -3859,7 +4005,7 @@ export default function SettingsDrawer({
           </View>
           <Group>
             <ActionButton
-              icon={downloadIcon}
+              icon={download2Icon}
               label={t("settings.update.checkNow")}
               onPress={checkUpdateNow}
             />
@@ -3914,12 +4060,15 @@ export default function SettingsDrawer({
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Group>
             <ActionButton
-              icon={penPlaceholderIcon}
+              icon={edit2Icon}
               label={t("settings.profile.personalize")}
-              onPress={() => setProfileEditVisible(true)}
+              onPress={() => {
+                setNameDraft(name);
+                setProfileEditVisible(true);
+              }}
             />
             {/* export ends in the mobile share sheet */}
-            {!isDesktop && (
+            {(!isDesktop || Platform.OS === "android") && (
               <ActionButton
                 icon={exportIcon}
                 label={t("settings.profile.exportCard")}
@@ -4050,7 +4199,7 @@ export default function SettingsDrawer({
       {/* overlay and screen saver links */}
       {(!isDesktop || isTauri || Platform.OS === "android") && (
         <Group style={styles.groupSpacing}>
-          {(!isDesktop || isTauri) &&
+          {(!isDesktop || isTauri || Platform.OS === "android") &&
             renderToolsNavRow(
               "assistantoverlay",
               t("settings.nav.overlay.title"),
@@ -4076,6 +4225,11 @@ export default function SettingsDrawer({
       {/* screen saver settings card */}
       {Platform.OS === "android" && !screenSaverActive && (
         <View style={styles.contentCard}>
+          <ImageCard
+            source={standbyInfoImage}
+            width="100%"
+            style={{ marginBottom: Spacing.lg2 }}
+          />
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>
               {t("settings.nav.screenSaver.title")}
@@ -4097,6 +4251,13 @@ export default function SettingsDrawer({
       {/* anti burn-in and incognito card */}
       {Platform.OS === "android" && (
         <View style={styles.contentCard}>
+          {screenSaverActive && (
+            <ImageCard
+              source={standbyInfoImage}
+              width="100%"
+              style={{ marginBottom: Spacing.lg2 }}
+            />
+          )}
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <View style={styles.toggleGroupRow}>
               <View style={styles.toggleGroupContent}>
@@ -4123,17 +4284,19 @@ export default function SettingsDrawer({
                 onToggle={setDreamIncognitoButton}
               />
             </View>
-            <View style={[styles.toggleGroupRow, { marginTop: Spacing.lg }]}>
-              <View style={styles.toggleGroupContent}>
-                <Text style={styles.settingLabel}>
-                  {t("settings.screenSaver.wakeWord")}
-                </Text>
-                <Text style={styles.helpText}>
-                  {t("settings.screenSaver.wakeWordHelp")}
-                </Text>
+            {hasPlatformFeature("android.hardware.microphone") && (
+              <View style={[styles.toggleGroupRow, { marginTop: Spacing.lg }]}>
+                <View style={styles.toggleGroupContent}>
+                  <Text style={styles.settingLabel}>
+                    {t("settings.screenSaver.wakeWord")}
+                  </Text>
+                  <Text style={styles.helpText}>
+                    {t("settings.screenSaver.wakeWordHelp")}
+                  </Text>
+                </View>
+                <Toggle checked={dreamWakeWord} onToggle={setDreamWakeWord} />
               </View>
-              <Toggle checked={dreamWakeWord} onToggle={setDreamWakeWord} />
-            </View>
+            )}
           </View>
         </View>
       )}
@@ -4240,7 +4403,7 @@ export default function SettingsDrawer({
 
           <Group>
             <TextInputField
-              icon={serverIcon}
+              icon={server2Icon}
               placeholder="https://privatebin.net/"
               value={shareInstanceUrl}
               onChangeText={setShareInstanceUrl}
@@ -4317,7 +4480,7 @@ export default function SettingsDrawer({
           </Text>
           <Group>
             <ActionButton
-              icon={penPlaceholderIcon}
+              icon={edit2Icon}
               label={t("settings.personality.edit")}
               onPress={() => setPersonalitySheetVisible(true)}
             />
@@ -4356,7 +4519,7 @@ export default function SettingsDrawer({
               </Text>
               <Group style={isWide && styles.sliderGroup}>
                 <Slider
-                  icon={timeIcon}
+                  icon={time2Icon}
                   options={TTS_SPEEDS.map((id) => ({ id, label: `${id}×` }))}
                   selectedValue={ttsSpeed}
                   onSelect={(v) => {
@@ -4371,7 +4534,7 @@ export default function SettingsDrawer({
       )}
 
       {/* voice engine card */}
-      <VoiceEngineCard />
+      <VoiceEngineCard onOpenDownload={() => setVoiceDownloadVisible(true)} />
 
       {/* navigation to maestro subpages */}
       <Group style={styles.groupSpacing}>
@@ -4395,20 +4558,25 @@ export default function SettingsDrawer({
           <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
             {t("settings.profile.instructions")}
           </Text>
+          {instruction.trim() ? (
+            <Text style={styles.personalitySentence}>{instruction.trim()}</Text>
+          ) : null}
           <Group>
-            <TextInputField
-              icon={penPlaceholderIcon}
-              placeholder={t("settings.profile.instructionsPlaceholder")}
-              value={instruction}
-              onChangeText={setInstruction}
+            <ActionButton
+              icon={edit2Icon}
+              label={t("settings.personality.edit")}
+              onPress={() => {
+                setInstructionDraft(instruction);
+                setInstructionsSheetVisible(true);
+              }}
             />
           </Group>
         </View>
       </View>
 
-      {/* auto read card */}
+      {/* voice and appearance preferences card */}
       <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+        <View style={styles.settingRowVertical}>
           <View style={styles.toggleGroupRow}>
             <View style={styles.toggleGroupContent}>
               <Text style={styles.settingLabel}>
@@ -4421,6 +4589,40 @@ export default function SettingsDrawer({
             <Toggle checked={autoSpeak} onToggle={setAutoSpeak} />
           </View>
         </View>
+
+        <View style={styles.settingRowVertical}>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.general.liveTranscription")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.general.liveTranscriptionHelp")}
+              </Text>
+            </View>
+            <Toggle
+              checked={liveTranscription}
+              onToggle={setLiveTranscription}
+            />
+          </View>
+        </View>
+
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={styles.toggleGroupRow}>
+            <View style={styles.toggleGroupContent}>
+              <Text style={styles.settingLabel}>
+                {t("settings.maestro.applyColor")}
+              </Text>
+              <Text style={styles.helpText}>
+                {t("settings.maestro.applyColorHelp")}
+              </Text>
+            </View>
+            <Toggle
+              checked={applyMaestroColor}
+              onToggle={setApplyMaestroColor}
+            />
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -4431,8 +4633,13 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.nav.overlay.title"))}
 
       {/* default assistant card */}
-      {Platform.OS === "android" && (
+      {Platform.OS === "android" && assistantRoleAvailable && (
         <View style={styles.contentCard}>
+          <ImageCard
+            source={assistantInfoImage}
+            width="100%"
+            style={{ marginBottom: Spacing.lg2 }}
+          />
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>
               {t("settings.overlay.default")}
@@ -4465,6 +4672,11 @@ export default function SettingsDrawer({
       {/* desktop shortcut card */}
       {isTauri && !isAppStore && (
         <View style={styles.contentCard}>
+          <ImageCard
+            source={assistantInfoImage}
+            width="100%"
+            style={{ marginBottom: Spacing.lg2 }}
+          />
           <View
             style={[
               styles.settingRowVertical,
@@ -4612,7 +4824,10 @@ export default function SettingsDrawer({
 
     return (
       <View style={styles.subPageContainer}>
-        {renderSubPageHeader(t("settings.nav.syncChoices.title"), renderHelpButton("syncchoices"))}
+        {renderSubPageHeader(
+          t("settings.nav.syncChoices.title"),
+          renderHelpButton("syncchoices"),
+        )}
 
         {/* sync choices card */}
         {syncAccount !== "none" && syncPrefs && (
@@ -4656,14 +4871,20 @@ export default function SettingsDrawer({
               onPress={handleExportData}
             />
             <ActionButton
-              icon={downloadIcon}
+              icon={download2Icon}
               label={t("settings.data.importAction")}
               onPress={handleImportData}
             />
+          </Group>
+
+          <Group
+            style={[styles.highlightGroup, { marginTop: Spacing.md }]}
+          >
             <ActionButton
-              icon={binIcon}
+              icon={deleteIcon}
               label={t("settings.data.deleteAllAction")}
               onPress={handleDeleteAllConversations}
+              variant="highlight"
             />
           </Group>
         </View>
@@ -4705,7 +4926,7 @@ export default function SettingsDrawer({
               />
             ) : (
               <View style={styles.cloudAvatar}>
-                <Image
+                <AppIcon
                   source={profilIcon}
                   style={styles.cloudAvatarIcon}
                   tintColor={Colors.textMuted}
@@ -4804,7 +5025,10 @@ export default function SettingsDrawer({
 
     return (
       <View style={styles.subPageContainer}>
-        {renderSubPageHeader(t("settings.nav.cloud.title"), renderHelpButton("cloud"))}
+        {renderSubPageHeader(
+          t("settings.nav.cloud.title"),
+          renderHelpButton("cloud"),
+        )}
 
         {/* sync account card, red while a sync account is active */}
         <View
@@ -4869,7 +5093,7 @@ export default function SettingsDrawer({
                   {CLOUD_PROVIDERS.map((def) => (
                     <ActionButton
                       key={def.id}
-                      icon={cloudIcon}
+                      icon={providerCloudIcon}
                       label={def.label}
                       onPress={() => pickBackupCloud(def.id)}
                     />
@@ -5145,8 +5369,6 @@ export default function SettingsDrawer({
           key={url}
           models={ollamaModels}
           loading={ollamaModelsLoading}
-          service={HUB_PROVIDER_ID}
-          url={url}
           disabled={disabledKeys}
           labelOf={hubModelLabel}
           iconOf={hubModelIcon}
@@ -5251,7 +5473,7 @@ export default function SettingsDrawer({
               ]}
             >
               <ActionButton
-                icon={addIcon}
+                icon={add2Icon}
                 label={t("settings.litert.addModel")}
                 variant="highlight"
                 disabled={!!downloadingLitert}
@@ -5282,6 +5504,7 @@ export default function SettingsDrawer({
                           (litertDownloadProgress?.progress ?? 0) * 100,
                         ),
                       }),
+                      progress: litertDownloadProgress?.progress ?? 0,
                       onPress: () => setLitertDownloadVisible(true),
                     },
                   ]
@@ -5321,7 +5544,7 @@ export default function SettingsDrawer({
             </View>
             <Group style={isWide && styles.sliderGroup}>
               <Slider
-                icon={messageIcon}
+                icon={message2Icon}
                 options={litertContextLengthOptions}
                 selectedValue={litertContextLength}
                 onSelect={setLitertContextLength}
@@ -5409,37 +5632,47 @@ export default function SettingsDrawer({
           </Text>
 
           <Group>
-            <ActionButton
-              icon={micIcon}
-              label={t("permissions.microphone.label")}
-              onPress={
-                Platform.OS !== "web" ? () => Linking.openSettings() : undefined
-              }
-              disabled={Platform.OS === "web"}
-              rightElement={
-                Platform.OS !== "web"
-                  ? renderPermissionBadge(permissionStatuses.microphone)
-                  : undefined
-              }
-            />
-            <ActionButton
-              icon={cameraIcon}
-              label={t("permissions.camera.label")}
-              onPress={
-                Platform.OS !== "web" ? () => Linking.openSettings() : undefined
-              }
-              disabled={Platform.OS === "web"}
-              rightElement={
-                Platform.OS !== "web"
-                  ? renderPermissionBadge(permissionStatuses.camera)
-                  : undefined
-              }
-            />
+            {hasPlatformFeature("android.hardware.microphone") && (
+              <ActionButton
+                icon={micIcon}
+                label={t("permissions.microphone.label")}
+                onPress={
+                  Platform.OS !== "web"
+                    ? () => requestAppPermission("microphone")
+                    : undefined
+                }
+                disabled={Platform.OS === "web"}
+                rightElement={
+                  Platform.OS !== "web"
+                    ? renderPermissionBadge(permissionStatuses.microphone)
+                    : undefined
+                }
+              />
+            )}
+            {hasPlatformFeature("android.hardware.camera.any") && (
+              <ActionButton
+                icon={cameraIcon}
+                label={t("permissions.camera.label")}
+                onPress={
+                  Platform.OS !== "web"
+                    ? () => requestAppPermission("camera")
+                    : undefined
+                }
+                disabled={Platform.OS === "web"}
+                rightElement={
+                  Platform.OS !== "web"
+                    ? renderPermissionBadge(permissionStatuses.camera)
+                    : undefined
+                }
+              />
+            )}
             <ActionButton
               icon={locationIcon}
               label={t("permissions.location.label")}
               onPress={
-                Platform.OS !== "web" ? () => Linking.openSettings() : undefined
+                Platform.OS !== "web"
+                  ? () => requestAppPermission("location")
+                  : undefined
               }
               disabled={Platform.OS === "web"}
               rightElement={
@@ -5452,15 +5685,15 @@ export default function SettingsDrawer({
               <ActionButton
                 icon={photoIcon}
                 label={t("permissions.photos.label")}
-                onPress={() => Linking.openSettings()}
+                onPress={() => requestAppPermission("photos")}
                 rightElement={renderPermissionBadge(permissionStatuses.photos)}
               />
             )}
             {Platform.OS !== "web" && (
               <ActionButton
-                icon={profilIcon}
+                icon={profil2Icon}
                 label={t("permissions.contacts.label")}
-                onPress={() => Linking.openSettings()}
+                onPress={() => requestAppPermission("contacts")}
                 rightElement={renderPermissionBadge(
                   permissionStatuses.contacts,
                 )}
@@ -5470,7 +5703,7 @@ export default function SettingsDrawer({
               <ActionButton
                 icon={calendarIcon}
                 label={t("permissions.calendar.label")}
-                onPress={() => Linking.openSettings()}
+                onPress={() => requestAppPermission("calendar")}
                 rightElement={renderPermissionBadge(
                   permissionStatuses.calendar,
                 )}
@@ -5481,11 +5714,6 @@ export default function SettingsDrawer({
       </View>
     </View>
   );
-
-  //fresh draft on every visit
-  useEffect(() => {
-    if (activeSubPage === "reports") report.reset();
-  }, [activeSubPage]);
 
   // reports subpage content
   const renderReportsSubPage = () => (
@@ -5501,39 +5729,11 @@ export default function SettingsDrawer({
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
             {t("settings.support.reportHelp")}
           </Text>
-          <Group style={styles.groupSpacingTight}>
-            <TextInputField
-              icon={penPlaceholderIcon}
-              placeholder={t("bugReport.placeholder")}
-              value={report.text}
-              onChangeText={report.setText}
-            />
-          </Group>
-
-          <View style={styles.toggleRow}>
-            <Checkbox
-              label={t("bugReport.attachLogs")}
-              checked={report.logs !== null}
-              onToggle={report.toggleLogs}
-              labelFirst
-              style={styles.checkboxRow}
-            />
-          </View>
-
-          <Text
-            style={[
-              styles.helpText,
-              { marginTop: Spacing.md, marginBottom: Spacing.md },
-            ]}
-          >
-            {t("bugReport.consent")}
-          </Text>
-
           <Group style={styles.highlightGroup}>
             <ActionButton
               icon={arrowIcon}
               label={t("bugReport.send")}
-              onPress={() => report.send()}
+              onPress={() => setBugReportSheetVisible(true)}
               variant="highlight"
             />
           </Group>
@@ -5578,8 +5778,8 @@ export default function SettingsDrawer({
           <Text style={styles.settingLabel}>{title}</Text>
           <Text style={styles.helpText}>{help}</Text>
         </View>
-        <Image
-          source={rightArrowIcon}
+        <AppIcon
+          source={arrowIcon}
           style={[styles.menuIcon, { marginRight: Spacing.md }]}
           tintColor={Colors.textMuted}
         />
@@ -5627,7 +5827,10 @@ export default function SettingsDrawer({
 
   const renderToolsSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.nav.tools.title"), renderHelpButton("tools"))}
+      {renderSubPageHeader(
+        t("settings.nav.tools.title"),
+        renderHelpButton("tools"),
+      )}
 
       {/* mcp link on top */}
       <Group style={styles.groupSpacing}>
@@ -5642,7 +5845,7 @@ export default function SettingsDrawer({
       <View style={styles.contentCard}>{renderToolToggles(generalTools)}</View>
 
       {/* mobile actions card, phone only */}
-      {!isDesktop && (
+      {(!isDesktop || Platform.OS === "android") && (
         <View style={styles.contentCard}>{renderToolToggles(mobileTools)}</View>
       )}
     </View>
@@ -5651,7 +5854,10 @@ export default function SettingsDrawer({
   //mcp list page
   const renderMcpServersSubPage = () => (
     <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.tools.mcp.title"), renderHelpButton("mcp"))}
+      {renderSubPageHeader(
+        t("settings.tools.mcp.title"),
+        renderHelpButton("mcp"),
+      )}
 
       {mcpServers.length === 0 && McpService.getHubServers().length === 0 && (
         <Text style={styles.helpText}>{t("settings.tools.mcp.empty")}</Text>
@@ -5735,6 +5941,43 @@ export default function SettingsDrawer({
         ? openMcpAddSheet
         : null;
 
+  const renderFloatingSearchBar = () => (
+    <View
+      style={[
+        styles.floatingSearchWrapper,
+        { bottom: Spacing.xl2 + (isDesktop ? 0 : insets.bottom) },
+      ]}
+      pointerEvents="box-none"
+    >
+      <View style={styles.floatingSearchShadowLayer}>
+        <Animated.View
+          style={[
+            styles.floatingSearchShadow,
+            { transform: shadowShift.getTranslateTransform() },
+          ]}
+          pointerEvents="none"
+        />
+        <Pressable
+          style={pressStyle(styles.floatingSearchBar, styles.navItemPressed)}
+          onPress={() => {
+            setSettingsSearchQuery("");
+            setRecentSearchIds(searchRecentsRef.current);
+            setSearchSheetVisible(true);
+          }}
+        >
+          <AppIcon
+            source={search2Icon}
+            style={styles.menuIcon}
+            tintColor={Colors.textPrimary}
+          />
+          <Text style={styles.floatingSearchLabel} numberOfLines={1}>
+            {t("settings.nav.search.title")}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
   const renderScrollPage = (page: SubPage, active: boolean) => {
     const onAdd = pageAddAction(page);
     return (
@@ -5747,7 +5990,8 @@ export default function SettingsDrawer({
           scrollEventThrottle={16}
           contentContainerStyle={{
             paddingTop: isDesktop ? Spacing.xxl2 : 60,
-            paddingBottom: 40,
+            paddingBottom:
+              page === "main" ? 96 + (isDesktop ? 0 : insets.bottom) : 40,
             flexGrow: 1,
           }}
           showsVerticalScrollIndicator={false}
@@ -5766,6 +6010,7 @@ export default function SettingsDrawer({
             pointerEvents="none"
           />
         )}
+        {page === "main" && renderFloatingSearchBar()}
         {onAdd && (
           <View
             style={[
@@ -5815,13 +6060,27 @@ export default function SettingsDrawer({
         style={styles.gradientTop}
         pointerEvents="none"
       />
-
     </View>
   );
 
   const notificationModal = (
     <>
       <NotificationModal {...updateModalProps} />
+      <WhatsNewSheet
+        release={changelog}
+        onClose={() => setChangelog(null)}
+        onOpenGithub={changelogFromUpdate ? notices.openUpdate : undefined}
+        onInstall={
+          changelogFromUpdate && isTauri && notices.update
+            ? () => {
+              setChangelog(null);
+              promptUpdate(notices.update!);
+            }
+            : undefined
+        }
+        isLargeScreen={isLargeScreen}
+        isDesktop={isDesktop}
+      />
       <NotificationModal
         visible={alertModalVisible}
         title={alertConfig.title}
@@ -5949,6 +6208,11 @@ export default function SettingsDrawer({
             : formatBytes(entry.sizeBytes)}
         </Text>
       </View>
+      <AppIcon
+        source={arrowIcon}
+        style={styles.menuIcon}
+        tintColor={Colors.textMuted}
+      />
     </Pressable>
   );
 
@@ -6006,7 +6270,7 @@ export default function SettingsDrawer({
               </Text>
               {capabilities.map((capability) => (
                 <View key={capability.id} style={styles.litertCapability}>
-                  <Image
+                  <AppIcon
                     source={capability.icon}
                     style={styles.litertCapabilityIcon}
                     tintColor={Colors.textSecondary}
@@ -6027,7 +6291,7 @@ export default function SettingsDrawer({
             ]}
           >
             <ActionButton
-              icon={downloadIcon}
+              icon={download2Icon}
               label={
                 installed
                   ? t("settings.litert.installed")
@@ -6096,21 +6360,29 @@ export default function SettingsDrawer({
 
   //nothing until a query goes out
   const litertSearchList = litertSearchLoading ? (
-    <Text style={styles.helpText}>{t("settings.litert.loading")}</Text>
+    <View style={styles.sheetCard}>
+      <Text style={styles.helpText}>{t("settings.litert.loading")}</Text>
+    </View>
   ) : litertSearchFailed ? (
-    <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
+    <View style={styles.sheetCard}>
+      <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
+    </View>
   ) : litertSearchResults.length > 0 ? (
-    <Group>{litertSearchResults.map(renderLitertSearchResult)}</Group>
+    <View style={[styles.sheetCard, styles.litertSearchResultsCard]}>
+      {litertSearchResults.map(renderLitertSearchResult)}
+    </View>
   ) : (
     isLitertQuerying && (
-      <Text style={styles.helpText}>{t("settings.litert.noResults")}</Text>
+      <View style={styles.sheetCard}>
+        <Text style={styles.helpText}>{t("settings.litert.noResults")}</Text>
+      </View>
     )
   );
 
   const renderLitertSearchField = (page: LitertPage) => (
     <Group>
       <TextInputField
-        icon={searchIcon}
+        icon={search2Icon}
         placeholder={t("settings.litert.addModelPlaceholder")}
         //other pages only lead to the search page
         value={page === "search" ? hfModelInput : ""}
@@ -6155,9 +6427,7 @@ export default function SettingsDrawer({
             </View>
             {page === "model"
               ? renderLitertDetail()
-              : litertSearchList && (
-                  <View style={styles.sheetCard}>{litertSearchList}</View>
-                )}
+              : litertSearchList}
           </>
         )}
       </SheetScrollView>
@@ -6202,28 +6472,50 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
-  const helpCards: Record<HelpTopic, { title: string; cards: HelpSection[][] }> = {
+  const helpCards: Record<
+    HelpTopic,
+    { title: string; image?: ImageSourcePropType; cards: HelpSection[][] }
+  > = {
     providers: {
       title: t("settings.nav.service.title"),
       cards: [
         [
           { body: t("settings.service.helpIntro") },
-          { title: t("settings.service.helpTypesTitle"), body: t("settings.service.helpTypes") },
+          {
+            title: t("settings.service.helpTypesTitle"),
+            body: t("settings.service.helpTypes"),
+          },
         ],
         [
-          { title: t("settings.service.helpAddTitle"), body: t("settings.service.helpAdd") },
-          { title: t("settings.service.helpUseTitle"), body: t("settings.service.helpUse") },
+          {
+            title: t("settings.service.helpAddTitle"),
+            body: t("settings.service.helpAdd"),
+          },
+          {
+            title: t("settings.service.helpUseTitle"),
+            body: t("settings.service.helpUse"),
+          },
         ],
       ],
     },
     cloud: {
       title: t("settings.nav.cloud.title"),
+      image: cloudInfoImage,
       cards: [
         [{ body: t("settings.cloud.helpIntro") }],
         [
-          { title: t("settings.cloud.helpSamplerTitle"), body: t("settings.cloud.helpSampler") },
-          { title: t("settings.cloud.helpCloudTitle"), body: t("settings.cloud.helpCloud") },
-          { title: t("settings.cloud.helpPinTitle"), body: t("settings.cloud.helpPin") },
+          {
+            title: t("settings.cloud.helpSamplerTitle"),
+            body: t("settings.cloud.helpSampler"),
+          },
+          {
+            title: t("settings.cloud.helpCloudTitle"),
+            body: t("settings.cloud.helpCloud"),
+          },
+          {
+            title: t("settings.cloud.helpPinTitle"),
+            body: t("settings.cloud.helpPin"),
+          },
         ],
       ],
     },
@@ -6232,19 +6524,35 @@ export default function SettingsDrawer({
       cards: [
         [{ body: t("settings.syncChoices.helpIntro") }],
         [
-          { title: t("settings.hub.syncData"), body: t("settings.hub.syncDataHelp") },
-          { title: t("settings.hub.syncSettings"), body: t("settings.hub.syncSettingsHelpCloud") },
-          { title: t("settings.hub.syncProviders"), body: t("settings.syncChoices.helpProviders") },
+          {
+            title: t("settings.hub.syncData"),
+            body: t("settings.hub.syncDataHelp"),
+          },
+          {
+            title: t("settings.hub.syncSettings"),
+            body: t("settings.hub.syncSettingsHelpCloud"),
+          },
+          {
+            title: t("settings.hub.syncProviders"),
+            body: t("settings.syncChoices.helpProviders"),
+          },
         ],
       ],
     },
     tools: {
       title: t("settings.nav.tools.title"),
+      image: toolInfoImage,
       cards: [
         [{ body: t("settings.tools.helpIntro") }],
         [
-          { title: t("settings.tools.helpBuiltinTitle"), body: t("settings.tools.helpBuiltin") },
-          { title: t("settings.tools.mcp.title"), body: t("settings.tools.helpMcp") },
+          {
+            title: t("settings.tools.helpBuiltinTitle"),
+            body: t("settings.tools.helpBuiltin"),
+          },
+          {
+            title: t("settings.tools.mcp.title"),
+            body: t("settings.tools.helpMcp"),
+          },
         ],
       ],
     },
@@ -6252,7 +6560,12 @@ export default function SettingsDrawer({
       title: t("settings.tools.mcp.title"),
       cards: [
         [{ body: t("settings.tools.helpMcpWhat") }],
-        [{ title: t("settings.service.helpAddTitle"), body: t("settings.tools.helpMcpAdd") }],
+        [
+          {
+            title: t("settings.service.helpAddTitle"),
+            body: t("settings.tools.helpMcpAdd"),
+          },
+        ],
       ],
     },
   };
@@ -6264,6 +6577,7 @@ export default function SettingsDrawer({
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
       title={helpCards[helpTopic].title}
+      image={helpCards[helpTopic].image}
       cards={helpCards[helpTopic].cards}
     />
   );
@@ -6372,7 +6686,7 @@ export default function SettingsDrawer({
                 </Text>
                 <Group>
                   <TextInputField
-                    icon={penPlaceholderIcon}
+                    icon={edit2Icon}
                     placeholder={t("settings.server.namePlaceholder")}
                     value={ollamaDetailServer.name}
                     onChangeText={(v) =>
@@ -6443,7 +6757,7 @@ export default function SettingsDrawer({
                 <Group style={isSheetWide && styles.sliderGroup}>
                   {advancedMode ? (
                     <TextInputField
-                      icon={messageIcon}
+                      icon={message2Icon}
                       placeholder="8192"
                       value={ollamaContextDraft}
                       onChangeText={(v) =>
@@ -6453,7 +6767,7 @@ export default function SettingsDrawer({
                     />
                   ) : (
                     <Slider
-                      icon={messageIcon}
+                      icon={message2Icon}
                       options={ollamaContextLengthOptions}
                       selectedValue={String(
                         serverContextLength(ollamaDetailServer),
@@ -6491,7 +6805,7 @@ export default function SettingsDrawer({
                 <Group style={isSheetWide && styles.sliderGroup}>
                   {advancedMode ? (
                     <TextInputField
-                      icon={timeIcon}
+                      icon={time2Icon}
                       placeholder="300"
                       value={ollamaKeepAliveDraft}
                       onChangeText={(v) =>
@@ -6501,7 +6815,7 @@ export default function SettingsDrawer({
                     />
                   ) : (
                     <Slider
-                      icon={timeIcon}
+                      icon={time2Icon}
                       options={ollamaKeepAliveOptions}
                       selectedValue={String(
                         serverKeepAlive(ollamaDetailServer),
@@ -6519,20 +6833,11 @@ export default function SettingsDrawer({
               key={ollamaDetailUrl}
               models={ollamaModels}
               loading={ollamaModelsLoading}
-              service="ollama"
-              url={ollamaDetailUrl}
               disabled={ollamaDetailServer.disabledModels}
-              capabilities={ollamaDetailServer.capabilities}
               onChange={(next) =>
                 patchOllamaServer(shownOllamaIndex, { disabledModels: next })
               }
-              onCapabilitiesChange={(next) =>
-                patchOllamaServer(shownOllamaIndex, { capabilities: next })
-              }
-              promptTiers={ollamaDetailServer.promptTiers}
-              onPromptTiersChange={(next) =>
-                patchOllamaServer(shownOllamaIndex, { promptTiers: next })
-              }
+              onOpenModel={setOllamaModel}
             />
 
             <View style={styles.sheetCard}>
@@ -6553,7 +6858,7 @@ export default function SettingsDrawer({
                     />
                   )}
                   <ActionButton
-                    icon={binIcon}
+                    icon={deleteIcon}
                     label={t("settings.ollama.remove.action")}
                     onPress={() => removeOllamaServer(shownOllamaIndex)}
                   />
@@ -6566,6 +6871,72 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
+  //ollama model info over the ollama sheet
+  const ollamaModelSheet = (
+    <DrawerSheet
+      visible={
+        ollamaModel !== null && ollamaDetailIndex !== null && !!liveOllamaServer
+      }
+      onClose={() => setOllamaModel(null)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.addModelSheetDesktop}
+    >
+      <SheetScrollView
+        contentContainerStyle={styles.addModelSheetContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {ollamaDetailServer &&
+          shownOllamaIndex !== null &&
+          shownOllamaModel && (
+            <ProviderModelDetail
+              model={shownOllamaModel}
+              serverLabel={ollamaServerLabel(ollamaDetailServer)}
+              service="ollama"
+              url={ollamaDetailUrl}
+              enabled={
+                !(
+                  ollamaDetailServer.disabledModels ?? NO_DISABLED_MODELS
+                ).includes(shownOllamaModel)
+              }
+              onToggle={(on) => {
+                const disabled =
+                  ollamaDetailServer.disabledModels ?? NO_DISABLED_MODELS;
+                patchOllamaServer(shownOllamaIndex, {
+                  disabledModels: on
+                    ? disabled.filter((m) => m !== shownOllamaModel)
+                    : [...disabled, shownOllamaModel],
+                });
+              }}
+              onCapabilitiesChange={(m, caps) =>
+                patchOllamaServer(shownOllamaIndex, {
+                  capabilities: {
+                    ...ollamaDetailServer.capabilities,
+                    [m]: caps,
+                  },
+                })
+              }
+              onPromptTierChange={(m, tier) => {
+                const { [m]: _removed, ...rest } =
+                  ollamaDetailServer.promptTiers ?? {};
+                patchOllamaServer(shownOllamaIndex, {
+                  promptTiers: tier ? { ...rest, [m]: tier } : rest,
+                });
+              }}
+            />
+          )}
+      </SheetScrollView>
+    </DrawerSheet>
+  );
+
   const shownHubServer = getHubServers().find((s) => s.url === shownHubUrl);
 
   const personalitySheet = (
@@ -6573,6 +6944,16 @@ export default function SettingsDrawer({
       visible={personalitySheetVisible}
       onClose={() => setPersonalitySheetVisible(false)}
       onSaved={setPersonality}
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+    />
+  );
+
+  const bugReportSheet = (
+    <BugReportSheet
+      visible={bugReportSheetVisible}
+      onClose={() => setBugReportSheetVisible(false)}
+      autoFocus
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
     />
@@ -6621,56 +7002,32 @@ export default function SettingsDrawer({
     const disabled = server.disabledModels ?? NO_DISABLED_MODELS;
     const icon = hubModelIcon(hubModelKeyOf(server.url, model));
     return (
-      <View style={styles.sheetCard}>
-        <View style={styles.toggleGroupRow}>
-          <View style={[styles.toggleGroupContent, styles.cloudModelText]}>
-            <Text style={styles.litertDetailName}>{model}</Text>
-            <View style={styles.litertCapability}>
-              {icon && (
-                <Image
-                  source={icon}
-                  style={styles.litertCapabilityIcon}
-                  tintColor={Colors.textSecondary}
-                />
-              )}
-              <Text style={styles.litertDetailMeta}>{server.name}</Text>
-            </View>
-          </View>
-          <Toggle
-            checked={!disabled.includes(model)}
-            onToggle={(on) =>
-              patchHubServerPrefs(server.url, {
-                disabledModels: on
-                  ? disabled.filter((m) => m !== model)
-                  : [...disabled, model],
-              })
-            }
-          />
-        </View>
-        <Text style={[styles.settingLabel, styles.litertDetailSection]}>
-          {t("settings.ollama.capabilities")}
-        </Text>
-        <ModelCapabilityToggles
-          key={`${server.url}|${model}`}
-          model={model}
-          service={HUB_PROVIDER_ID}
-          url={server.url}
-          onCapabilitiesChange={(m, caps) =>
-            patchHubServerPrefs(server.url, {
-              capabilities: { ...server.capabilities, [m]: caps },
-            })
-          }
-          onPromptTierChange={(m, tier) => {
-            const { [m]: _removed, ...rest } = server.promptTiers ?? {};
-            patchHubServerPrefs(server.url, {
-              promptTiers: tier ? { ...rest, [m]: tier } : rest,
-            });
-          }}
-          style={styles.cloudModelCapabilities}
-          labelStyle={styles.cloudModelCapabilityLabel}
-          checkboxes
-        />
-      </View>
+      <ProviderModelDetail
+        model={model}
+        serverLabel={server.name}
+        icon={icon}
+        service={HUB_PROVIDER_ID}
+        url={server.url}
+        enabled={!disabled.includes(model)}
+        onToggle={(on) =>
+          patchHubServerPrefs(server.url, {
+            disabledModels: on
+              ? disabled.filter((m) => m !== model)
+              : [...disabled, model],
+          })
+        }
+        onCapabilitiesChange={(m, caps) =>
+          patchHubServerPrefs(server.url, {
+            capabilities: { ...server.capabilities, [m]: caps },
+          })
+        }
+        onPromptTierChange={(m, tier) => {
+          const { [m]: _removed, ...rest } = server.promptTiers ?? {};
+          patchHubServerPrefs(server.url, {
+            promptTiers: tier ? { ...rest, [m]: tier } : rest,
+          });
+        }}
+      />
     );
   };
 
@@ -6714,7 +7071,7 @@ export default function SettingsDrawer({
   const renderOpenAISearchField = (page: CloudModelsPage) => (
     <Group>
       <TextInputField
-        icon={searchIcon}
+        icon={search2Icon}
         placeholder={t("settings.ollama.searchModels")}
         //only list page edits the search
         value={page === "list" ? openaiSearchQuery : ""}
@@ -6776,7 +7133,7 @@ export default function SettingsDrawer({
                 </Text>
                 <Group>
                   <TextInputField
-                    icon={penPlaceholderIcon}
+                    icon={edit2Icon}
                     placeholder={t("settings.server.namePlaceholder")}
                     value={server.name}
                     onChangeText={(v) => patchOpenAIServer(index, { name: v })}
@@ -6845,8 +7202,6 @@ export default function SettingsDrawer({
               key={url}
               models={openaiModels}
               loading={openaiModelsLoading}
-              service={OPENAI_PROVIDER_ID}
-              url={url}
               disabled={server.disabledModels}
               onChange={(next) =>
                 patchOpenAIServer(index, { disabledModels: next })
@@ -6876,7 +7231,7 @@ export default function SettingsDrawer({
                     />
                   )}
                   <ActionButton
-                    icon={binIcon}
+                    icon={deleteIcon}
                     label={t("settings.ollama.remove.action")}
                     onPress={() => removeOpenAIServer(index)}
                   />
@@ -6904,8 +7259,6 @@ export default function SettingsDrawer({
                 key={url}
                 models={openaiModels}
                 loading={openaiModelsLoading}
-                service={OPENAI_PROVIDER_ID}
-                url={url}
                 disabled={server.disabledModels}
                 onChange={(next) =>
                   patchOpenAIServer(index, { disabledModels: next })
@@ -6917,54 +7270,31 @@ export default function SettingsDrawer({
               />
             ) : (
               model && (
-                <View style={styles.sheetCard}>
-                  <View style={styles.toggleGroupRow}>
-                    <View
-                      style={[styles.toggleGroupContent, styles.cloudModelText]}
-                    >
-                      <Text style={styles.litertDetailName}>{model}</Text>
-                      <Text style={styles.litertDetailMeta}>
-                        {openAIServerLabel(index)}
-                      </Text>
-                    </View>
-                    <Toggle
-                      checked={!disabled.includes(model)}
-                      onToggle={(on) =>
-                        patchOpenAIServer(index, {
-                          disabledModels: on
-                            ? disabled.filter((m) => m !== model)
-                            : [...disabled, model],
-                        })
-                      }
-                    />
-                  </View>
-                  <Text
-                    style={[styles.settingLabel, styles.litertDetailSection]}
-                  >
-                    {t("settings.ollama.capabilities")}
-                  </Text>
-                  <ModelCapabilityToggles
-                    key={model}
-                    model={model}
-                    service={OPENAI_PROVIDER_ID}
-                    url={url}
-                    onCapabilitiesChange={(m, caps) =>
-                      patchOpenAIServer(index, {
-                        capabilities: { ...server.capabilities, [m]: caps },
-                      })
-                    }
-                    onPromptTierChange={(m, tier) => {
-                      const { [m]: _removed, ...rest } =
-                        server.promptTiers ?? {};
-                      patchOpenAIServer(index, {
-                        promptTiers: tier ? { ...rest, [m]: tier } : rest,
-                      });
-                    }}
-                    style={styles.cloudModelCapabilities}
-                    labelStyle={styles.cloudModelCapabilityLabel}
-                    checkboxes
-                  />
-                </View>
+                <ProviderModelDetail
+                  model={model}
+                  serverLabel={openAIServerLabel(index)}
+                  service={OPENAI_PROVIDER_ID}
+                  url={url}
+                  enabled={!disabled.includes(model)}
+                  onToggle={(on) =>
+                    patchOpenAIServer(index, {
+                      disabledModels: on
+                        ? disabled.filter((m) => m !== model)
+                        : [...disabled, model],
+                    })
+                  }
+                  onCapabilitiesChange={(m, caps) =>
+                    patchOpenAIServer(index, {
+                      capabilities: { ...server.capabilities, [m]: caps },
+                    })
+                  }
+                  onPromptTierChange={(m, tier) => {
+                    const { [m]: _removed, ...rest } = server.promptTiers ?? {};
+                    patchOpenAIServer(index, {
+                      promptTiers: tier ? { ...rest, [m]: tier } : rest,
+                    });
+                  }}
+                />
               )
             )}
           </SheetScrollView>
@@ -7051,7 +7381,7 @@ export default function SettingsDrawer({
             </Text>
             <Group>
               <TextInputField
-                icon={penPlaceholderIcon}
+                icon={edit2Icon}
                 placeholder={t("settings.server.namePlaceholder")}
                 value={serverDraft.name}
                 onChangeText={(v) =>
@@ -7081,23 +7411,41 @@ export default function SettingsDrawer({
           </View>
 
           <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>
-              {t("settings.cloudapi.apiKey")}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.cloudapi.apiKeyHelp")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={keyIcon}
-                placeholder={t("settings.cloudapi.apiKeyPlaceholder")}
-                autoCapitalize="none"
-                autoCorrect={false}
-                secureTextEntry
-                value={openaiKeyDraft}
-                onChangeText={setOpenAIKeyDraft}
+            <View style={styles.apiKeyHeader}>
+              <Text style={styles.settingLabel}>
+                {t("settings.cloudapi.apiKey")}
+              </Text>
+              <Checkbox
+                checked={openaiKeyOpen}
+                onToggle={(v) => {
+                  setOpenAIKeyOpen(v);
+                  if (!v) setOpenAIKeyDraft("");
+                }}
               />
-            </Group>
+            </View>
+            {openaiKeyOpen ? (
+              <>
+                <Text
+                  style={[
+                    styles.helpText,
+                    { marginTop: Spacing.sm, marginBottom: Spacing.md },
+                  ]}
+                >
+                  {t("settings.cloudapi.apiKeyHelp")}
+                </Text>
+                <Group>
+                  <TextInputField
+                    icon={keyIcon}
+                    placeholder={t("settings.cloudapi.apiKeyPlaceholder")}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    secureTextEntry
+                    value={openaiKeyDraft}
+                    onChangeText={setOpenAIKeyDraft}
+                  />
+                </Group>
+              </>
+            ) : null}
           </View>
 
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -7109,7 +7457,7 @@ export default function SettingsDrawer({
               ]}
             >
               <ActionButton
-                icon={addIcon}
+                icon={add2Icon}
                 label={
                   serverDraftBusy
                     ? t("settings.server.checking")
@@ -7155,7 +7503,7 @@ export default function SettingsDrawer({
             </Text>
             <Group>
               <TextInputField
-                icon={penPlaceholderIcon}
+                icon={edit2Icon}
                 placeholder={t("settings.server.namePlaceholder")}
                 value={serverDraft.name}
                 onChangeText={(v) =>
@@ -7185,55 +7533,96 @@ export default function SettingsDrawer({
           </View>
 
           <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>
-              {t("settings.mcp.headerLabel")}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.mcp.headerHelp")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={penPlaceholderIcon}
-                placeholder={t("settings.mcp.headerName")}
-                autoCapitalize="none"
-                autoCorrect={false}
-                value={serverDraft.headerName}
-                onChangeText={(v) =>
-                  setServerDraft((prev) => ({ ...prev, headerName: v }))
-                }
+            <View style={styles.apiKeyHeader}>
+              <Text style={styles.settingLabel}>
+                {t("settings.mcp.headerLabel")}
+              </Text>
+              <Checkbox
+                checked={mcpHeaderOpen}
+                onToggle={(v) => {
+                  setMcpHeaderOpen(v);
+                  if (!v)
+                    setServerDraft((prev) => ({
+                      ...prev,
+                      headerName: "",
+                      headerValue: "",
+                    }));
+                }}
               />
-              <TextInputField
-                icon={penPlaceholderIcon}
-                placeholder={t("settings.mcp.headerValue")}
-                autoCapitalize="none"
-                secureTextEntry
-                value={serverDraft.headerValue}
-                onChangeText={(v) =>
-                  setServerDraft((prev) => ({ ...prev, headerValue: v }))
-                }
-              />
-            </Group>
+            </View>
+            {mcpHeaderOpen ? (
+              <>
+                <Text
+                  style={[
+                    styles.helpText,
+                    { marginTop: Spacing.sm, marginBottom: Spacing.md },
+                  ]}
+                >
+                  {t("settings.mcp.headerHelp")}
+                </Text>
+                <Group>
+                  <TextInputField
+                    icon={edit2Icon}
+                    placeholder={t("settings.mcp.headerName")}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={serverDraft.headerName}
+                    onChangeText={(v) =>
+                      setServerDraft((prev) => ({ ...prev, headerName: v }))
+                    }
+                  />
+                  <TextInputField
+                    icon={edit2Icon}
+                    placeholder={t("settings.mcp.headerValue")}
+                    autoCapitalize="none"
+                    secureTextEntry
+                    value={serverDraft.headerValue}
+                    onChangeText={(v) =>
+                      setServerDraft((prev) => ({ ...prev, headerValue: v }))
+                    }
+                  />
+                </Group>
+              </>
+            ) : null}
           </View>
 
           <View style={styles.settingRowVertical}>
-            <Text style={styles.settingLabel}>
-              {t("settings.mcp.clientIdLabel")}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.mcp.clientIdHelp")}
-            </Text>
-            <Group>
-              <TextInputField
-                icon={penPlaceholderIcon}
-                placeholder={t("settings.mcp.clientId")}
-                autoCapitalize="none"
-                autoCorrect={false}
-                value={serverDraft.clientId}
-                onChangeText={(v) =>
-                  setServerDraft((prev) => ({ ...prev, clientId: v }))
-                }
+            <View style={styles.apiKeyHeader}>
+              <Text style={styles.settingLabel}>
+                {t("settings.mcp.clientIdLabel")}
+              </Text>
+              <Checkbox
+                checked={mcpClientIdOpen}
+                onToggle={(v) => {
+                  setMcpClientIdOpen(v);
+                  if (!v) setServerDraft((prev) => ({ ...prev, clientId: "" }));
+                }}
               />
-            </Group>
+            </View>
+            {mcpClientIdOpen ? (
+              <>
+                <Text
+                  style={[
+                    styles.helpText,
+                    { marginTop: Spacing.sm, marginBottom: Spacing.md },
+                  ]}
+                >
+                  {t("settings.mcp.clientIdHelp")}
+                </Text>
+                <Group>
+                  <TextInputField
+                    icon={edit2Icon}
+                    placeholder={t("settings.mcp.clientId")}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={serverDraft.clientId}
+                    onChangeText={(v) =>
+                      setServerDraft((prev) => ({ ...prev, clientId: v }))
+                    }
+                  />
+                </Group>
+              </>
+            ) : null}
           </View>
 
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -7245,7 +7634,7 @@ export default function SettingsDrawer({
               ]}
             >
               <ActionButton
-                icon={addIcon}
+                icon={add2Icon}
                 label={
                   serverDraftBusy
                     ? t("settings.server.checking")
@@ -7425,7 +7814,7 @@ export default function SettingsDrawer({
                     </Text>
                     <Group>
                       <TextInputField
-                        icon={penPlaceholderIcon}
+                        icon={edit2Icon}
                         placeholder={t("settings.mcp.headerName")}
                         autoCapitalize="none"
                         autoCorrect={false}
@@ -7444,7 +7833,7 @@ export default function SettingsDrawer({
                         }
                       />
                       <TextInputField
-                        icon={penPlaceholderIcon}
+                        icon={edit2Icon}
                         placeholder={t("settings.mcp.headerValue")}
                         autoCapitalize="none"
                         secureTextEntry
@@ -7478,7 +7867,7 @@ export default function SettingsDrawer({
                     </Text>
                     <Group>
                       <TextInputField
-                        icon={penPlaceholderIcon}
+                        icon={edit2Icon}
                         placeholder={t("settings.mcp.clientId")}
                         autoCapitalize="none"
                         autoCorrect={false}
@@ -7524,7 +7913,7 @@ export default function SettingsDrawer({
                       }
                       {!hosted && (
                         <ActionButton
-                          icon={binIcon}
+                          icon={deleteIcon}
                           label={t("settings.mcp.remove.action")}
                           onPress={() =>
                             removeMcpServer(server.id, server.name)
@@ -7675,7 +8064,7 @@ export default function SettingsDrawer({
                     ]}
                   >
                     <ActionButton
-                      icon={downloadIcon}
+                      icon={download2Icon}
                       label={t("settings.local.download")}
                       variant="highlight"
                       disabled={!!localDownload}
@@ -7733,7 +8122,7 @@ export default function SettingsDrawer({
                 <Group style={styles.groupSpacingTight}>
                   <ProgressBar
                     progress={litertDownloadProgress?.progress ?? 0}
-                    icon={downloadIcon}
+                    icon={download2Icon}
                   />
                   <ActionButton
                     label={t("settings.litert.downloaded")}
@@ -7778,6 +8167,16 @@ export default function SettingsDrawer({
         </SheetBody>
       )}
     </DrawerSheet>
+  );
+
+  //voice pack download detail sheet
+  const voiceDownloadSheet = (
+    <VoiceDownloadSheet
+      visible={voiceDownloadVisible}
+      onClose={() => setVoiceDownloadVisible(false)}
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+    />
   );
 
   const installedEntry = installedModel
@@ -7846,7 +8245,7 @@ export default function SettingsDrawer({
                   </Text>
                   {installedCapabilities.map((capability) => (
                     <View key={capability.id} style={styles.litertCapability}>
-                      <Image
+                      <AppIcon
                         source={capability.icon}
                         style={styles.litertCapabilityIcon}
                         tintColor={Colors.textSecondary}
@@ -7871,11 +8270,23 @@ export default function SettingsDrawer({
             </View>
 
             <View style={styles.sheetCard}>
+              <PromptTierSelector
+                key={installedEntry.repoId}
+                model={installedEntry.repoId}
+                service="litert"
+                url=""
+                first
+                onPromptTierChange={setLitertPromptTier}
+              />
+            </View>
+
+            <View style={styles.sheetCard}>
               <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-                <Group>
+                <Group style={styles.highlightGroup}>
                   <ActionButton
-                    icon={binIcon}
+                    icon={deleteIcon}
                     label={t("settings.litert.deleteModel")}
+                    variant="highlight"
                     onPress={() =>
                       handleDeleteLitert({
                         id: installedEntry.repoId,
@@ -7893,16 +8304,18 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
-  const profileEditSheet = (
+  const instructionChanged = instructionDraft.trim() !== instruction.trim();
+
+  const saveInstruction = () => {
+    if (!instructionChanged) return;
+    setInstruction(instructionDraft);
+    setInstructionsSheetVisible(false);
+  };
+
+  const instructionsSheet = (
     <DrawerSheet
-      visible={profileEditVisible}
-      onClose={() => {
-        setConfirmedName(name);
-        setProfileEditVisible(false);
-        HubSync.renameProfile(name).catch((e) =>
-          console.warn("[HubSync] profile rename failed:", e),
-        );
-      }}
+      visible={instructionsSheetVisible}
+      onClose={() => setInstructionsSheetVisible(false)}
       mode="overlay"
       isLargeScreen={isLargeScreen}
       isDesktop={isDesktop}
@@ -7921,17 +8334,35 @@ export default function SettingsDrawer({
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.sheetCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <View style={styles.settingRowVertical}>
             <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
-              {t("settings.profile.name")}
+              {t("settings.profile.instructions")}
             </Text>
             <Group>
               <TextInputField
-                icon={penPlaceholderIcon}
-                placeholder={t("onboarding.name.placeholder")}
-                value={name}
-                onChangeText={setName}
-                onSubmitEditing={() => setConfirmedName(name)}
+                icon={edit2Icon}
+                placeholder={t("settings.profile.instructionsPlaceholder")}
+                value={instructionDraft}
+                onChangeText={setInstructionDraft}
+                variant="large"
+                autoFocus
+              />
+            </Group>
+          </View>
+
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Group
+              style={[
+                styles.highlightGroup,
+                !instructionChanged && styles.highlightGroupDisabled,
+              ]}
+            >
+              <ActionButton
+                icon={activateIcon}
+                label={t("settings.personality.save")}
+                variant="highlight"
+                disabled={!instructionChanged}
+                onPress={saveInstruction}
               />
             </Group>
           </View>
@@ -7940,8 +8371,632 @@ export default function SettingsDrawer({
     </DrawerSheet>
   );
 
+  const nameChanged = nameDraft.trim() !== name.trim();
+
+  const saveProfileName = () => {
+    if (!nameChanged) return;
+    setName(nameDraft);
+    setConfirmedName(nameDraft);
+    setProfileEditVisible(false);
+    HubSync.renameProfile(nameDraft).catch((e) =>
+      console.warn("[HubSync] profile rename failed:", e),
+    );
+  };
+
+  const profileEditSheet = (
+    <DrawerSheet
+      visible={profileEditVisible}
+      onClose={() => setProfileEditVisible(false)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      avoidKeyboard
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          maxHeight: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.addModelSheetDesktop}
+    >
+      <SheetScrollView
+        contentContainerStyle={styles.addModelSheetContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.sheetCard}>
+          <View style={styles.settingRowVertical}>
+            <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+              {t("settings.profile.name")}
+            </Text>
+            <Group>
+              <TextInputField
+                icon={edit2Icon}
+                placeholder={t("onboarding.name.placeholder")}
+                value={nameDraft}
+                onChangeText={setNameDraft}
+                onSubmitEditing={saveProfileName}
+                autoFocus
+              />
+            </Group>
+          </View>
+
+          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+            <Group
+              style={[
+                styles.highlightGroup,
+                !nameChanged && styles.highlightGroupDisabled,
+              ]}
+            >
+              <ActionButton
+                icon={activateIcon}
+                label={t("settings.personality.save")}
+                variant="highlight"
+                disabled={!nameChanged}
+                onPress={saveProfileName}
+              />
+            </Group>
+          </View>
+        </View>
+      </SheetScrollView>
+    </DrawerSheet>
+  );
+
+  //rows matching the query
+  const settingsSearchResults = (() => {
+    const tokens = normalizeSearch(deferredSearchQuery).split(/\s+/).filter(Boolean);
+    if (!searchSheetVisible) return [];
+
+    const toggle = (
+      id: string,
+      label: string,
+      help: string,
+      checked: boolean,
+      onToggle: (v: boolean) => void,
+    ): SettingsSearchEntry => ({
+      id,
+      label,
+      help,
+      body: (
+        <View style={styles.toggleGroupRow}>
+          <View style={styles.toggleGroupContent}>
+            <Text style={styles.settingLabel}>{label}</Text>
+            <Text style={styles.helpText}>{help}</Text>
+          </View>
+          <Toggle checked={checked} onToggle={onToggle} />
+        </View>
+      ),
+    });
+
+    //side by side on wide
+    const control = (
+      id: string,
+      label: string,
+      node: ReactNode,
+      framed = true,
+    ): SettingsSearchEntry => ({
+      id,
+      label,
+      body: (
+        <View style={isWide && framed ? styles.toggleGroupRow : undefined}>
+          <Text
+            style={[
+              styles.settingLabel,
+              isWide && framed
+                ? styles.toggleGroupContent
+                : { marginBottom: Spacing.md },
+            ]}
+          >
+            {label}
+          </Text>
+          {framed ? (
+            <Group style={isWide && styles.sliderGroup}>{node}</Group>
+          ) : (
+            node
+          )}
+        </View>
+      ),
+    });
+
+    //opens the page from search
+    const nav = (
+      page: SubPage,
+      label: string,
+      help: string,
+    ): SettingsSearchEntry => ({
+      id: `page:${page}`,
+      label,
+      help,
+      onPress: () => {
+        setSearchSheetVisible(false);
+        setActiveSubPage(page);
+      },
+      body: (
+        <View style={styles.toggleGroupRow}>
+          <View style={styles.toggleGroupContent}>
+            <Text style={styles.settingLabel}>{label}</Text>
+            <Text style={styles.helpText}>{help}</Text>
+          </View>
+          <AppIcon
+            source={arrowIcon}
+            style={[styles.menuIcon, { marginRight: Spacing.md }]}
+            tintColor={Colors.textMuted}
+          />
+        </View>
+      ),
+    });
+
+    const entries: SettingsSearchEntry[] = [
+      nav(
+        "profile",
+        name || t("settings.nav.profile.title"),
+        t("settings.nav.profile.subtitle"),
+      ),
+      nav(
+        "cloud",
+        t("settings.nav.cloud.title"),
+        t("settings.nav.cloud.subtitle"),
+      ),
+      nav(
+        "syncchoices",
+        t("settings.nav.syncChoices.title"),
+        t("settings.nav.syncChoices.subtitle"),
+      ),
+      nav(
+        "datamanagement",
+        t("settings.data.management"),
+        t("settings.nav.dataManagement.subtitle"),
+      ),
+      nav(
+        "maestro",
+        t("settings.nav.maestro.title"),
+        t("settings.nav.maestro.subtitle"),
+      ),
+      nav(
+        "maestropreferences",
+        t("settings.nav.maestroPreferences.title"),
+        t("settings.nav.maestroPreferences.subtitle"),
+      ),
+      nav(
+        "general",
+        t("settings.nav.general.title"),
+        t("settings.nav.general.subtitle"),
+      ),
+      ...(!isDesktop || isTauri || Platform.OS === "android"
+        ? [
+            nav(
+              "assistantoverlay",
+              t("settings.nav.overlay.title"),
+              t("settings.nav.overlay.subtitle"),
+            ),
+          ]
+        : []),
+      ...(Platform.OS === "android"
+        ? [
+            nav(
+              "screensaver",
+              t("settings.nav.screenSaver.title"),
+              t("settings.nav.screenSaver.subtitle"),
+            ),
+          ]
+        : []),
+      nav(
+        "service",
+        t("settings.nav.service.title"),
+        t("settings.nav.service.subtitle"),
+      ),
+      nav(
+        "tools",
+        t("settings.nav.tools.title"),
+        t("settings.nav.tools.subtitle"),
+      ),
+      nav(
+        "mcpservers",
+        t("settings.tools.mcp.title"),
+        t("settings.tools.mcp.help"),
+      ),
+      ...(advancedMode
+        ? [
+            nav(
+              "advanced",
+              t("settings.nav.advanced.title"),
+              t("settings.nav.advanced.subtitle"),
+            ),
+          ]
+        : []),
+      nav(
+        "confidentiality",
+        t("settings.nav.privacy.title"),
+        t("settings.nav.privacy.subtitle"),
+      ),
+      nav(
+        "reports",
+        t("settings.nav.support.title"),
+        t("settings.nav.support.subtitle"),
+      ),
+      nav(
+        "sociallinks",
+        t("settings.nav.info.title"),
+        t("settings.nav.info.subtitle"),
+      ),
+      control(
+        "language",
+        t("settings.general.language"),
+        <Selector
+          options={languageOptions}
+          selectedValue={language}
+          onSelect={setLanguage}
+          title={t("settings.general.selectLanguage")}
+          fullWidth
+        />,
+      ),
+      control(
+        "theme",
+        t("settings.general.theme"),
+        <SliderToggle selectedValue={theme} onSelect={setTheme} />,
+      ),
+      toggle(
+        "remoteImages",
+        t("settings.privacy.remoteImages"),
+        t("settings.privacy.remoteImagesHelp"),
+        showRemoteImages,
+        setShowRemoteImages,
+      ),
+      toggle(
+        "advancedMode",
+        t("settings.general.advancedMode"),
+        t("settings.general.advancedModeHelp"),
+        advancedMode,
+        setAdvancedMode,
+      ),
+      ...(isTauri
+        ? [
+            toggle(
+              "closeToTray",
+              t("settings.overlay.closeToTray"),
+              t("settings.overlay.closeToTrayHelp"),
+              closeToTray,
+              (v) => setOverlayConfig({ closeToTray: v }),
+            ),
+            toggle(
+              "launchAtStartup",
+              t("settings.startup.launch"),
+              t("settings.startup.launchHelp"),
+              launchAtStartup,
+              setLaunchAtStartupValue,
+            ),
+          ]
+        : []),
+      ...(voicePackInstalled
+        ? [
+            control(
+              "voice",
+              t("settings.maestro.voice"),
+              <IconSelector
+                options={VOICE_OPTIONS}
+                selectedValue={voice}
+                onSelect={selectVoice}
+              />,
+              false,
+            ),
+            control(
+              "ttsSpeed",
+              t("settings.tts.speed"),
+              <Slider
+                icon={time2Icon}
+                options={TTS_SPEEDS.map((id) => ({ id, label: `${id}×` }))}
+                selectedValue={ttsSpeed}
+                onSelect={(v) => {
+                  setTtsSpeedState(v);
+                  Settings.set("ttsSpeed", v);
+                }}
+              />,
+            ),
+          ]
+        : []),
+      toggle(
+        "autoRead",
+        t("settings.general.autoRead"),
+        t("settings.general.autoReadHelp"),
+        autoSpeak,
+        setAutoSpeak,
+      ),
+      toggle(
+        "liveTranscription",
+        t("settings.general.liveTranscription"),
+        t("settings.general.liveTranscriptionHelp"),
+        liveTranscription,
+        setLiveTranscription,
+      ),
+      toggle(
+        "applyColor",
+        t("settings.maestro.applyColor"),
+        t("settings.maestro.applyColorHelp"),
+        applyMaestroColor,
+        setApplyMaestroColor,
+      ),
+      //advanced page needs advanced mode
+      ...(advancedMode
+        ? [
+            toggle(
+              "transcribeLocally",
+              t("settings.transcribeLocally.label"),
+              Platform.OS === "web"
+                ? t("settings.transcribeLocally.helpWeb")
+                : t("settings.transcribeLocally.help"),
+              alwaysWhisper,
+              setAlwaysWhisper,
+            ),
+            toggle(
+              "technicalDetails",
+              t("settings.general.technicalDetails"),
+              t("settings.general.technicalDetailsHelp"),
+              showTechnicalDetails,
+              setShowTechnicalDetails,
+            ),
+            toggle(
+              "editAiMessages",
+              t("settings.general.editAiMessages"),
+              t("settings.general.editAiMessagesHelp"),
+              editAiMessages,
+              setEditAiMessages,
+            ),
+            ...(Platform.OS === "android" || isTauri
+              ? [
+                  toggle(
+                    "detectionBoxes",
+                    t("settings.general.detectionBoxes"),
+                    t("settings.general.detectionBoxesHelp"),
+                    showDetectionBoxes,
+                    setShowDetectionBoxes,
+                  ),
+                ]
+              : []),
+            toggle(
+              "forceLoad",
+              t("settings.litert.forceLoad"),
+              t("settings.litert.forceLoadHelp"),
+              litertForceLoad,
+              setLitertForceLoad,
+            ),
+            control(
+              "quickFlow",
+              t("settings.quickFlow.label"),
+              <Selector
+                options={quickFlowOptions}
+                selectedValue={quickFlowId}
+                onSelect={handleSelectQuickFlow}
+                title={t("settings.quickFlow.select")}
+                fullWidth
+              />,
+            ),
+          ]
+        : []),
+    ];
+
+    //empty query shows recents
+    if (tokens.length === 0) {
+      return recentSearchIds
+        .map((id) => entries.find((e) => e.id === id))
+        .filter((e): e is SettingsSearchEntry => !!e);
+    }
+
+    //label hits rank before help hits
+    const matches: { entry: SettingsSearchEntry; rank: number }[] = [];
+    for (const entry of entries) {
+      const label = normalizeSearch(entry.label);
+      const help = entry.help ? normalizeSearch(entry.help) : "";
+      let rank = 0;
+      let found = true;
+      for (const token of tokens) {
+        if (label.includes(token)) continue;
+        if (help.includes(token)) rank = 1;
+        else {
+          found = false;
+          break;
+        }
+      }
+      if (found) matches.push({ entry, rank });
+    }
+    return matches.sort((a, b) => a.rank - b.rank).map((m) => m.entry);
+  })();
+
+  const searchTopics = [
+    {
+      id: "providers",
+      icon: server2Icon,
+      label: t("settings.nav.service.title"),
+      query: t("settings.nav.service.title"),
+    },
+    {
+      id: "sync",
+      icon: providerCloudIcon,
+      label: t("settings.nav.search.topicSync"),
+      query: t("settings.nav.search.topicSyncQuery"),
+    },
+    {
+      id: "data",
+      icon: exportIcon,
+      label: t("settings.nav.search.topicData"),
+      query: t("settings.nav.search.topicData"),
+    },
+    {
+      id: "mcp",
+      icon: tool2Icon,
+      label: t("settings.nav.search.topicMcp"),
+      query: t("settings.nav.search.topicMcp"),
+    },
+    {
+      id: "maestro",
+      icon: operaIcon,
+      label: t("settings.nav.maestro.title"),
+      query: t("settings.nav.maestro.title"),
+    },
+    {
+      id: "voice",
+      icon: micIcon,
+      label: t("settings.maestro.voice"),
+      query: t("settings.maestro.voice"),
+    },
+  ];
+
+  const settingsSearchSheet = (
+    <DrawerSheet
+      visible={searchSheetVisible}
+      onClose={() => setSearchSheetVisible(false)}
+      mode="overlay"
+      isLargeScreen={isLargeScreen}
+      isDesktop={isDesktop}
+      handleContainerStyle={styles.sheetHandleContainer}
+      avoidKeyboard
+      sheetStyle={[
+        styles.addModelSheet,
+        {
+          //fixed so typing never resizes the sheet
+          height: sheetMaxHeight,
+        },
+      ]}
+      desktopStyle={styles.searchSheetDesktop}
+    >
+      <SheetScrollView
+        contentContainerStyle={styles.addModelSheetContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.sheetCard}>
+          <Group>
+            <TextInputField
+              icon={search2Icon}
+              placeholder={t("settings.nav.search.title")}
+              value={settingsSearchQuery}
+              onChangeText={setSettingsSearchQuery}
+              rightIcon={settingsSearchQuery ? cancelIcon : undefined}
+              rightIconSize={14}
+              rightIconTint={Colors.textPrimary}
+              onRightIconPress={() => setSettingsSearchQuery("")}
+              autoFocus
+            />
+          </Group>
+        </View>
+        {settingsSearchResults.length > 0 && (
+          <View style={styles.searchRecentHeader}>
+            <Text style={styles.searchRecentTitle}>
+              {settingsSearchQuery.trim() === ""
+                ? t("settings.nav.search.recent")
+                : t("settings.nav.search.results")}
+            </Text>
+            {settingsSearchQuery.trim() === "" && (
+              <IconButton
+                icon={cancelIcon}
+                label={t("common.clear")}
+                onPress={clearSearchRecents}
+                tintColor={Colors.textPrimary}
+              />
+            )}
+          </View>
+        )}
+        {settingsSearchResults.map((entry) =>
+          entry.onPress ? (
+            <Pressable
+              key={entry.id}
+              style={pressStyle(styles.sheetCard, styles.toggleGroupCardPressed)}
+              onPress={() => {
+                touchSearchEntry(entry.id);
+                entry.onPress?.();
+              }}
+            >
+              {entry.body}
+            </Pressable>
+          ) : (
+            <View
+              key={entry.id}
+              style={styles.sheetCard}
+              //record touch without responding
+              onStartShouldSetResponderCapture={() => {
+                touchSearchEntry(entry.id);
+                return false;
+              }}
+            >
+              {entry.body}
+            </View>
+          ),
+        )}
+        {settingsSearchQuery.trim() === "" && (
+          <>
+            <View style={styles.searchRecentHeader}>
+              <Text style={styles.searchRecentTitle}>
+                {t("settings.nav.search.topics")}
+              </Text>
+            </View>
+            <View style={[styles.sheetCard, styles.searchTopicGrid]}>
+              {Array.from(
+                { length: Math.ceil(searchTopics.length / 2) },
+                (_, rowIndex) => {
+                  const row = searchTopics.slice(
+                    rowIndex * 2,
+                    rowIndex * 2 + 2,
+                  );
+                  return (
+                    <View key={rowIndex} style={styles.searchTopicRow}>
+                      {row.map((topic) => (
+                        <View key={topic.id} style={styles.searchTopicCell}>
+                          <Group>
+                            <ActionButton
+                              icon={topic.icon}
+                              label={topic.label}
+                              onPress={() => setSettingsSearchQuery(topic.query)}
+                            />
+                          </Group>
+                        </View>
+                      ))}
+                      {row.length === 1 && (
+                        <View style={styles.searchTopicCell} />
+                      )}
+                    </View>
+                  );
+                },
+              )}
+            </View>
+          </>
+        )}
+        {deferredSearchQuery.trim() !== "" &&
+          settingsSearchResults.length === 0 && (
+            <Text style={[styles.helpText, { textAlign: "center" }]}>
+              {t("settings.nav.search.empty")}
+            </Text>
+          )}
+      </SheetScrollView>
+    </DrawerSheet>
+  );
+
   if (isDesktop) {
-    if (!desktopMounted) return null;
+    if (!desktopMounted) {
+      if (!sheetHostMounted) return null;
+      //drawer closed, only the provider sheets show
+      return (
+        <View style={styles.root} pointerEvents="box-none">
+          {litertSheet}
+          {helpSheet}
+          {addModelSheet}
+          {ollamaServerSheet}
+          {ollamaModelSheet}
+          {hubServerSheet}
+          {personalitySheet}
+          {bugReportSheet}
+          {hubModelSheet}
+          {openaiAddServerSheet}
+          {openaiServerSheet}
+          {mcpAddServerSheet}
+          {mcpDetailSheet}
+          {cloudSetupSheet}
+          {localModelDetailSheet}
+          {litertDownloadSheet}
+          {voiceDownloadSheet}
+          {litertModelDetailSheet}
+          {instructionsSheet}
+          {profileEditSheet}
+        </View>
+      );
+    }
     const windowTranslateY = largeScreenAnim.interpolate({
       inputRange: [0, 1],
       outputRange: [-10, 0],
@@ -7959,6 +9014,8 @@ export default function SettingsDrawer({
           style={[
             styles.desktopWindowWrapper,
             windowed && styles.windowedWrapper,
+            //clears the android caption bar
+            { top: insets.top },
           ]}
           pointerEvents="box-none"
         >
@@ -8000,13 +9057,14 @@ export default function SettingsDrawer({
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{
                       paddingTop: Spacing.xxl2,
-                      paddingBottom: 40,
+                      paddingBottom: 96,
                     }}
                   >
                     {renderMainPage()}
                   </ScrollView>
                 </View>
               )}
+              {renderFloatingSearchBar()}
             </View>
 
             <View
@@ -8045,8 +9103,10 @@ export default function SettingsDrawer({
             {helpSheet}
             {addModelSheet}
             {ollamaServerSheet}
+            {ollamaModelSheet}
             {hubServerSheet}
             {personalitySheet}
+            {bugReportSheet}
             {hubModelSheet}
             {openaiAddServerSheet}
             {openaiServerSheet}
@@ -8055,8 +9115,11 @@ export default function SettingsDrawer({
             {cloudSetupSheet}
             {localModelDetailSheet}
             {litertDownloadSheet}
+            {voiceDownloadSheet}
             {litertModelDetailSheet}
+            {instructionsSheet}
             {profileEditSheet}
+            {settingsSearchSheet}
           </Animated.View>
         </View>
         {notificationModal}
@@ -8076,8 +9139,14 @@ export default function SettingsDrawer({
   };
 
   const mobileDrawer = (
-    <View style={styles.root} pointerEvents={visible ? "auto" : "none"}>
-      <Animated.View style={[styles.overlay, { opacity: progress }]}>
+    <View
+      style={styles.root}
+      pointerEvents={visible ? "auto" : sheetOnly ? "box-none" : "none"}
+    >
+      <Animated.View
+        style={[styles.overlay, { opacity: progress }]}
+        pointerEvents={visible ? "auto" : "none"}
+      >
         <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
       </Animated.View>
 
@@ -8087,6 +9156,7 @@ export default function SettingsDrawer({
           { width: drawerWidth },
           { transform: [{ translateX }] },
         ]}
+        pointerEvents={visible ? "auto" : "none"}
         {...panResponder.panHandlers}
       >
         {innerContent}
@@ -8097,8 +9167,10 @@ export default function SettingsDrawer({
       {helpSheet}
       {addModelSheet}
       {ollamaServerSheet}
+      {ollamaModelSheet}
       {hubServerSheet}
       {personalitySheet}
+      {bugReportSheet}
       {hubModelSheet}
       {openaiAddServerSheet}
       {openaiServerSheet}
@@ -8107,8 +9179,11 @@ export default function SettingsDrawer({
       {cloudSetupSheet}
       {localModelDetailSheet}
       {litertDownloadSheet}
+      {voiceDownloadSheet}
       {litertModelDetailSheet}
+      {instructionsSheet}
       {profileEditSheet}
+      {settingsSearchSheet}
     </View>
   );
 
@@ -8199,6 +9274,45 @@ const makeStyles = (Colors: ThemeColors) =>
       right: 0,
       zIndex: 100,
       elevation: 10,
+    },
+    floatingSearchWrapper: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      alignItems: "center",
+      zIndex: 100,
+      elevation: 10,
+    },
+    floatingSearchShadowLayer: {
+      position: "relative",
+      width: "70%",
+      maxWidth: 230,
+    },
+    floatingSearchShadow: {
+      position: "absolute",
+      top: 4,
+      left: -4,
+      right: 4,
+      bottom: -4,
+      backgroundColor: Colors.shadowInk,
+      borderRadius: Radius.window,
+    },
+    floatingSearchBar: {
+      height: 44,
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: Spacing.xl,
+      gap: Spacing.md,
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.window,
+      position: "relative",
+      zIndex: 1,
+    },
+    floatingSearchLabel: {
+      flex: 1,
+      fontSize: FontSizes.bodyMd,
+      fontFamily: Fonts.mono,
+      color: Colors.textMuted,
     },
     fixedBackWrapper: {
       position: "absolute",
@@ -8300,6 +9414,33 @@ const makeStyles = (Colors: ThemeColors) =>
     addModelSheetDesktop: {
       width: 560,
     },
+    searchRecentHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingLeft: Spacing.md,
+    },
+    searchRecentTitle: {
+      fontSize: FontSizes.label,
+      fontFamily: Fonts.mono,
+      color: Colors.textMuted,
+      textTransform: "uppercase",
+    },
+    searchTopicGrid: {
+      gap: Spacing.md,
+    },
+    searchTopicRow: {
+      flexDirection: "row",
+      gap: Spacing.md,
+    },
+    searchTopicCell: {
+      flex: 1,
+      minWidth: 0,
+    },
+    searchSheetDesktop: {
+      width: 720,
+      height: 560,
+    },
     //rows like the chat details sheet
     infoGroup: {
       borderWidth: 0,
@@ -8352,26 +9493,6 @@ const makeStyles = (Colors: ThemeColors) =>
     litertCapabilityIcon: {
       width: 14,
       height: 14,
-    },
-    modelToggleName: {
-      flex: 1,
-      flexDirection: "row",
-      alignItems: "center",
-      marginRight: Spacing.lg2,
-    },
-    modelToggleLabel: {
-      flexShrink: 1,
-    },
-    modelToggleIcon: {
-      marginRight: Spacing.sm,
-    },
-    modelToggleArrowOpen: {
-      transform: [{ rotate: "90deg" }],
-    },
-    modelCapabilities: {
-      gap: Spacing.md,
-      marginTop: Spacing.lg,
-      paddingLeft: Spacing.xxl,
     },
     litertDetailDownload: {
       marginTop: Spacing.lg2,
@@ -8435,13 +9556,16 @@ const makeStyles = (Colors: ThemeColors) =>
     litertSearchResultRow: {
       flexDirection: "row",
       alignItems: "center",
-      paddingVertical: Spacing.lg2,
-      paddingHorizontal: Spacing.lg2,
+      padding: Spacing.lg2,
       gap: Spacing.lg2,
     },
+    litertSearchResultsCard: {
+      padding: 0,
+      overflow: "hidden",
+    },
     litertSearchResultTile: {
-      width: 44,
-      height: 44,
+      width: 48,
+      height: 48,
       backgroundColor: Colors.logoTile,
       borderWidth: 2,
       borderColor: Colors.logoTileBorder,
@@ -8478,7 +9602,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     addModelSheetContent: {
       paddingHorizontal: Spacing.lg2,
-      paddingBottom: Spacing.lg,
       gap: Spacing.xxl2,
     },
     groupSpacing: {
@@ -8632,6 +9755,11 @@ const makeStyles = (Colors: ThemeColors) =>
       height: 34,
       backgroundColor: Colors.border,
       marginRight: Spacing.lg2,
+    },
+    apiKeyHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
     },
     checkboxRow: {
       flex: 1,

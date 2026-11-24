@@ -49,6 +49,17 @@ export function isDownloaded(sources: string[]): boolean {
   return sources.every(marked);
 }
 
+//desktop runtime has no way to stop its download
+export function canCancelDownload(): boolean {
+  return !nativeOrt;
+}
+
+let controller: AbortController | null = null;
+
+export async function cancelDownload(_sources: string[]): Promise<void> {
+  controller?.abort();
+}
+
 //cached files are skipped
 export async function downloadFiles(sources: string[], onProgress: (progress: number) => void): Promise<void> {
   if (nativeOrt) {
@@ -63,6 +74,8 @@ export async function downloadFiles(sources: string[], onProgress: (progress: nu
   const cache = await caches.open(CACHE_NAME);
   //browser may evict without it
   await navigator.storage?.persist?.().catch(() => false);
+  controller = new AbortController();
+  const { signal } = controller;
   const missing: string[] = [];
   for (const source of sources) {
     if (await cache.match(source)) mark(source, true);
@@ -73,7 +86,7 @@ export async function downloadFiles(sources: string[], onProgress: (progress: nu
   let received = 0;
 
   for (const source of missing) {
-    const response = await fetch(source);
+    const response = await fetch(source, { signal });
     if (!response.ok || !response.body) throw new Error(`Failed to download ${source}: ${response.status}`);
     const chunks: Uint8Array[] = [];
     const reader = response.body.getReader();

@@ -2,6 +2,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useMemo, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Colors, Fonts, FontSizes, Radius, Spacing } from '../../../constants/theme';
+import { useColors } from '../../hooks/useTheme';
 import { ScreenCode } from '../../services/overlay/screenCapture';
 
 type Size = { w: number; h: number };
@@ -35,6 +36,7 @@ function truncate(value: string) {
 
 //qr only ocr text is native
 export default function TextLayer({ codes, onVibrate }: Props) {
+  const { primary, primaryHeader } = useColors();
   const [size, setSize] = useState<Size>({ w: 1, h: 1 });
 
   const codeRects = useMemo(() => codes.map(code => toRect(code, size)), [codes, size]);
@@ -56,7 +58,7 @@ export default function TextLayer({ codes, onVibrate }: Props) {
       onLayout={e => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
     >
       {codeRects.map((rect, i) => (
-        <Pressable key={`code-${i}`} style={[styles.code, frame(rect)]} onPress={() => openCode(codes[i].value)}>
+        <Pressable key={`code-${i}`} style={[styles.code, { borderColor: primary, backgroundColor: primaryHeader }, frame(rect)]} onPress={() => openCode(codes[i].value)}>
           <View style={styles.badgeWrapper} pointerEvents="none">
             <View style={styles.badge}>
               <Text style={styles.label}>
@@ -74,9 +76,7 @@ const styles = StyleSheet.create({
   code: {
     position: 'absolute',
     borderWidth: 2,
-    borderColor: Colors.primary,
     borderRadius: Radius.xxl,
-    backgroundColor: Colors.primaryHeader,
     overflow: 'visible',
   },
   badgeWrapper: {

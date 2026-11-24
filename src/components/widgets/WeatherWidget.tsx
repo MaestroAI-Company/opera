@@ -1,9 +1,19 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from '../../../constants/theme';
 import { useColors, useThemedStyles } from '../../hooks/useTheme';
 import { useResponsive } from '../../hooks/useResponsive';
 import { IWidget } from '../../services/widgets/WidgetManager';
+import AppIcon, { IconSource } from '../ui/AppIcon';
 import { Block, BlockContainer, Caption } from '../toolwidgets/ToolWidgetBlocks';
+import clearDayIcon from '../../../assets/icons/weather/clear_day.svg';
+import moonStarsIcon from '../../../assets/icons/weather/moon_stars.svg';
+import partlyCloudyDayIcon from '../../../assets/icons/weather/partly_cloudy_day.svg';
+import partlyCloudyNightIcon from '../../../assets/icons/weather/partly_cloudy_night.svg';
+import cloudIcon from '../../../assets/icons/weather/cloud.svg';
+import rainyIcon from '../../../assets/icons/weather/rainy.svg';
+import thunderstormIcon from '../../../assets/icons/weather/thunderstorm.svg';
+import foggyIcon from '../../../assets/icons/weather/foggy.svg';
+import weatherHailIcon from '../../../assets/icons/weather/weather_hail.svg';
 
 export interface WeatherItem {
   label?: string;
@@ -20,16 +30,16 @@ export interface WeatherWidgetData {
   forecast: WeatherItem[];
 }
 
-const ICONS: Record<string, any> = {
-  clear_day: require('../../../assets/icons/weather/clear_day.png'),
-  moon_stars: require('../../../assets/icons/weather/moon_stars.png'),
-  partly_cloudy_day: require('../../../assets/icons/weather/partly_cloudy_day.png'),
-  partly_cloudy_night: require('../../../assets/icons/weather/partly_cloudy_night.png'),
-  cloud: require('../../../assets/icons/weather/cloud.png'),
-  rainy: require('../../../assets/icons/weather/rainy.png'),
-  thunderstorm: require('../../../assets/icons/weather/thunderstorm.png'),
-  foggy: require('../../../assets/icons/weather/foggy.png'),
-  weather_hail: require('../../../assets/icons/weather/weather_hail.png'),
+const ICONS: Record<string, IconSource> = {
+  clear_day: clearDayIcon,
+  moon_stars: moonStarsIcon,
+  partly_cloudy_day: partlyCloudyDayIcon,
+  partly_cloudy_night: partlyCloudyNightIcon,
+  cloud: cloudIcon,
+  rainy: rainyIcon,
+  thunderstorm: thunderstormIcon,
+  foggy: foggyIcon,
+  weather_hail: weatherHailIcon,
 };
 
 const formatTemp = (value: number, unit: string) => `${Math.round(value)}°${unit}`;
@@ -81,7 +91,7 @@ export const WeatherWidget: IWidget<WeatherWidgetData> = {
 
         <View style={[styles.nowRow, isDesktop && styles.nowRowLarge]}>
           <View style={[styles.iconTile, incognito && { backgroundColor: Colors.incognito }]}>
-            <Image source={ICONS[now.icon] || ICONS.cloud} style={styles.iconTileImage} resizeMode="contain" />
+            <AppIcon source={ICONS[now.icon] || ICONS.cloud} style={styles.iconTileImage} resizeMode="contain" />
           </View>
           <View style={styles.nowValues}>
             <Block text={formatTemp(now.temp, unit)} />
@@ -99,7 +109,7 @@ export const WeatherWidget: IWidget<WeatherWidgetData> = {
                   <View key={index} style={styles.column}>
                     <Text style={styles.temp}>{formatTemp(item.temp, unit)}</Text>
                     {!!range && <Text style={styles.columnRange}>{range}</Text>}
-                    <Image source={ICONS[item.icon] || ICONS.cloud} style={styles.icon} resizeMode="contain" />
+                    <AppIcon source={ICONS[item.icon] || ICONS.cloud} style={styles.icon} resizeMode="contain" />
                     {!!item.label && <Text style={styles.label}>{item.label}</Text>}
                   </View>
                 );

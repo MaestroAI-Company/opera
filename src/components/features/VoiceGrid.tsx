@@ -10,7 +10,6 @@ const VOICE_ROWS = 5;
 const VOICE_SHIFT_MS = 70;
 //columns fading out per side
 const VOICE_FADE_COLS = 8;
-const VOICE_LEVELS = Array.from({ length: VOICE_ROWS }, (_, i) => i);
 
 function VoiceCell({ col, row, cell, color, heights, cols }: { col: number; row: number; cell: number; color: string; heights: SharedValue<number[]>; cols: SharedValue<number> }) {
   const style = useAnimatedStyle(() => {
@@ -29,7 +28,7 @@ function VoiceCell({ col, row, cell, color, heights, cols }: { col: number; row:
 }
 
 //fills the size of its host
-export default function VoiceGrid({ getVolume, color, style }: { getVolume: () => number; color: string; style?: StyleProp<ViewStyle> }) {
+export default function VoiceGrid({ getVolume, color, style, rows = VOICE_ROWS }: { getVolume: () => number; color: string; style?: StyleProp<ViewStyle>; rows?: number }) {
   const vol = useSharedValue(0);
   const energy = useSharedValue(0);
   const clock = useSharedValue(0);
@@ -40,7 +39,7 @@ export default function VoiceGrid({ getVolume, color, style }: { getVolume: () =
   //even columns keep the center between two
   const handleLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
-    const cell = height / VOICE_ROWS;
+    const cell = height / rows;
     const next = Math.min(VOICE_MAX_COLS, 2 * Math.floor(width / (2 * cell)));
     colsShared.value = next;
     setGrid({ cols: next, cell });
@@ -78,7 +77,7 @@ export default function VoiceGrid({ getVolume, color, style }: { getVolume: () =
       const idle = 0.5 + 0.7 * (0.5 + 0.5 * Math.sin(t * 2.2 + c * 0.8));
       //offset waves avoid repeating columns
       const wobble = 0.7 + 0.3 * Math.sin(t * 4.3 + c * 1.7) * Math.sin(t * 1.9 + c * 0.5);
-      const goal = Math.min(VOICE_ROWS, idle + history.value[dist] * (VOICE_ROWS - 1.2) * wobble);
+      const goal = Math.min(rows, idle + history.value[dist] * (rows - 1.2) * wobble);
       const tau = goal > prev[c] ? 50 : 140;
       next[c] = prev[c] + (goal - prev[c]) * (1 - Math.exp(-dt / tau));
     }
@@ -87,9 +86,9 @@ export default function VoiceGrid({ getVolume, color, style }: { getVolume: () =
 
   return (
     <View onLayout={handleLayout} style={[styles.container, style]}>
-      <View style={{ width: grid.cols * grid.cell, height: VOICE_ROWS * grid.cell }}>
+      <View style={{ width: grid.cols * grid.cell, height: rows * grid.cell }}>
         {Array.from({ length: grid.cols }, (_, col) =>
-          VOICE_LEVELS.map(row => <VoiceCell key={`${col}-${row}`} col={col} row={row} cell={grid.cell} color={color} heights={heights} cols={colsShared} />)
+          Array.from({ length: rows }, (_, row) => <VoiceCell key={`${col}-${row}`} col={col} row={row} cell={grid.cell} color={color} heights={heights} cols={colsShared} />)
         )}
       </View>
     </View>

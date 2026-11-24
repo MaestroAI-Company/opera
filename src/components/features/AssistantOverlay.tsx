@@ -5,7 +5,6 @@ import {
   AppState,
   BackHandler,
   DeviceEventEmitter,
-  Image,
   ImageSourcePropType,
   Keyboard,
   Linking,
@@ -19,9 +18,12 @@ import { KeyboardAvoidingView, KeyboardProvider, useGenericKeyboardHandler } fro
 import Reanimated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SYSTEM_PROMPTS } from '../../../constants/prompts';
-import { Colors, DarkColors, Fonts, FontSizes, Radius, Spacing } from '../../../constants/theme';
+import { DarkColors, Fonts, FontSizes, Radius, Spacing } from '../../../constants/theme';
 import { useColors } from '../../hooks/useTheme';
 import { pressStyle } from '../ui/pressStyle';
+import AppIconComponent from '../ui/AppIcon';
+import nextIcon from '../../../assets/icons/arrow2.svg';
+import chatIcon from '../../../assets/icons/message.svg';
 import { AIModule } from '../../services/ai/AIModule';
 import { getOllamaTuning, migrateModelSources } from '../../services/ai/providers/sources';
 import { buildSystemPrompt, screenContextSegment } from '../../services/ai/generation/chatGeneration';
@@ -67,8 +69,6 @@ import { vibrate } from "@/services/haptics";
 const BAR_ENTRY = 120;
 //thickness of the activation rim
 const HALO_SIZE = 88;
-const nextIcon = require('../../../assets/icons/right.png');
-const chatIcon = require('../../../assets/icons/message.png');
 const assistantInfoImage = require('../../../assets/images/ImageCard/AssistantInfo.png');
 
 //the router layout never mounts here
@@ -904,7 +904,7 @@ function AssistantOverlay() {
                     backgroundColor: themeColors.surface,
                     boxShadow: `-4px 4px 0px ${themeColors.shadowInk}, 0px 8px 20px rgba(0,0,0,0.35)`,
                   }], 'surface')}>
-                  <Image source={chatIcon} style={styles.floatingIcon} tintColor={themeColors.textPrimary} />
+                  <AppIconComponent source={chatIcon} style={styles.floatingIcon} tintColor={themeColors.textPrimary} />
                 </Pressable>
               )}
             </Animated.View>
@@ -924,7 +924,7 @@ function AssistantOverlay() {
               <Text style={styles.modelInfoText} numberOfLines={1}>
                 {truncateModel(selectedModel ? displayName(selectedModel) : t('modelSelector.none'))}
               </Text>
-              <Image source={nextIcon} style={styles.modelInfoArrow} resizeMode="contain" tintColor={DarkColors.textSecondary} />
+              <AppIconComponent source={nextIcon} style={styles.modelInfoArrow} resizeMode="contain" tintColor={DarkColors.textSecondary} />
             </Pressable>
           </Animated.View>
 
@@ -953,10 +953,10 @@ function AssistantOverlay() {
         </Animated.View>
 
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: haloOpacity }]} pointerEvents="none">
-          <LinearGradient colors={[Colors.overlayHalo, Colors.overlayHaloClear]} style={styles.haloTop} />
-          <LinearGradient colors={[Colors.overlayHaloClear, Colors.overlayHalo]} style={styles.haloBottom} />
-          <LinearGradient colors={[Colors.overlayHalo, Colors.overlayHaloClear]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloLeft} />
-          <LinearGradient colors={[Colors.overlayHaloClear, Colors.overlayHalo]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloRight} />
+          <LinearGradient colors={[themeColors.overlayHalo, themeColors.overlayHaloClear]} style={styles.haloTop} />
+          <LinearGradient colors={[themeColors.overlayHaloClear, themeColors.overlayHalo]} style={styles.haloBottom} />
+          <LinearGradient colors={[themeColors.overlayHalo, themeColors.overlayHaloClear]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloLeft} />
+          <LinearGradient colors={[themeColors.overlayHaloClear, themeColors.overlayHalo]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.haloRight} />
         </Animated.View>
 
         <NotificationModal

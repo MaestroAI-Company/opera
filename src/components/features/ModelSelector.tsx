@@ -3,8 +3,6 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import {
   Animated,
   DeviceEventEmitter,
-  Image,
-  ImageSourcePropType,
   LayoutChangeEvent,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -46,29 +44,30 @@ import { buildSources, getOllamaTuning, HUB_PROVIDER_ID, hubModelKeyOf, ModelSou
 import { estimateContextTokens } from "../../services/ai/generation/chatGeneration";
 import { MessageMetrics } from "../../services/db/DatabaseService";
 import { AppEvents } from "../../services/events";
+import { modelContextCap } from "../../services/ai/providers/huggingFaceCatalog";
 import { Settings } from "../../services/settings/SettingsService";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
 import ProgressBar from "../ui/ProgressBar";
 import SliderToggle, { SliderToggleOption } from "../ui/SliderToggle";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
+import AppIcon, { type IconSource } from "../ui/AppIcon";
 import { pressStyle } from "../ui/pressStyle";
 import { vibrate } from "@/services/haptics";
+import botIcon from "../../../assets/icons/bot.svg";
+import downloadIcon from "../../../assets/icons/download2.svg";
+import tokenIcon from "../../../assets/icons/token.svg";
+import quickIcon from "../../../assets/icons/quick2.svg";
+import lowIcon from "../../../assets/icons/weak2.svg";
+import visionIcon from "../../../assets/icons/vision2.svg";
+import micIcon from "../../../assets/icons/microphone2.svg";
+import videoIcon from "../../../assets/icons/camera2.svg";
+import toolIcon from "../../../assets/icons/tool2.svg";
+import brainIcon from "../../../assets/icons/brain2.svg";
 
-const botIcon = require("../../../assets/icons/bot.png");
-const downloadIcon = require("../../../assets/icons/download.png");
-const tokenIcon = require("../../../assets/icons/token.png");
-const quickIcon = require("../../../assets/icons/Quick.png");
-const lowIcon = require("../../../assets/icons/Low.png");
-const highIcon = require("../../../assets/icons/High.png");
-const visionIcon = require("../../../assets/icons/vision.png");
-const micIcon = require("../../../assets/icons/micro.png");
-const videoIcon = require("../../../assets/icons/camera.png");
-const toolIcon = require("../../../assets/icons/tool2.png");
-const brainIcon = require("../../../assets/icons/brain.png");
 const loadingAnimation = require("../../../assets/animations/loading.json");
 
-const REFLECTION_ICONS = { none: quickIcon, low: lowIcon, high: highIcon };
+const REFLECTION_ICONS = { none: quickIcon, low: lowIcon, high: brainIcon };
 //first entry sits far right
 //sheet draws its own icons
 const CAPABILITY_ICONS = [
@@ -79,7 +78,7 @@ const CAPABILITY_ICONS = [
   { id: "tools", icon: toolIcon },
 ] as const satisfies readonly {
   id: ModelCapabilityId;
-  icon: ImageSourcePropType;
+  icon: IconSource;
 }[];
 
 const LONG_PRESS_DELAY = 180;
@@ -99,8 +98,14 @@ const ANCHORED_CARD_WIDTH = 320;
 const CENTERED_CARD_WIDTH = 840;
 
 //context size configured for the active source
-const contextWindowFor = (service: string, ollamaUrl: string) => {
-  if (service === "litert") return Settings.getCached().litertContextLength;
+const contextWindowFor = (service: string, ollamaUrl: string, model: string) => {
+  if (service === "litert") {
+    //model cache caps the setting
+    return Math.min(
+      Settings.getCached().litertContextLength,
+      modelContextCap(model) || Infinity,
+    );
+  }
   if (service === "ollama") return getOllamaTuning(ollamaUrl).contextLength;
   return 0;
 };
@@ -158,7 +163,7 @@ export function ModelSelectorTrigger({
           onPress={onPress}
           style={pressStyle([styles.trigger, flat && styles.triggerFlat], "surface")}
         >
-          {!flat && <Image source={botIcon} style={styles.icon} />}
+          {!flat && <AppIcon source={botIcon} style={styles.icon} />}
           <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
             {selectedModel ? displayName(selectedModel) : t("modelSelector.placeholder")}
           </Text>
@@ -175,7 +180,7 @@ function Capabilities({ caps, onPrimary = false }: { caps: string; onPrimary?: b
   return (
     <View style={styles.capabilitiesRow}>
       {shown.map((c) => (
-        <Image
+        <AppIcon
           key={c.id}
           source={c.icon}
           style={[styles.capabilityIcon, onPrimary && styles.capabilityIconOnPrimary]}
@@ -622,7 +627,7 @@ export function ModelSelectorDrawer({
       .then((sheet) => setLocalContextTokens(sheet?.models.find((m) => m.id === selectedModel)?.contextTokens ?? 0))
       .catch(() => setLocalContextTokens(0));
   }, [visible, aiService, selectedModel]);
-  const contextWindow = aiService === "local" ? localContextTokens : contextWindowFor(aiService, ollamaUrl);
+  const contextWindow = aiService === "local" ? localContextTokens : contextWindowFor(aiService, ollamaUrl, selectedModel);
   const showTokenWindow = messages.length > 0 && contextWindow > 0;
 
   const selectedIndex = isBrowsingActive
@@ -946,7 +951,7 @@ export function ModelSelectorDrawer({
                     onPress={() => setDownloadModalVisible(true)}
                     style={pressStyle(styles.downloadOption, "surface")}
                   >
-                    <Image source={downloadIcon} style={styles.downloadIcon} />
+                    <AppIcon source={downloadIcon} style={styles.downloadIcon} />
                     <Text style={styles.downloadText}>
                       {isDownloading
                         ? `${t("modelSelector.downloading")} ${downloadPercent}%`

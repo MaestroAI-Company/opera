@@ -1,18 +1,21 @@
 import { useState } from "react";
-import { Image, ImageSourcePropType, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import AppIcon, { IconSource } from "./AppIcon";
 import { pressStyle } from "./pressStyle";
 import { vibrate } from "@/services/haptics";
 
 export type GridCard = {
   key: string;
   title: string;
-  status: string;
-  icon?: ImageSourcePropType;
+  status?: string;
+  icon?: IconSource;
   //small mark left of the title
-  badge?: ImageSourcePropType;
+  badge?: IconSource;
   error?: boolean;
+  //0 to 1, the card itself fills with the primary color
+  progress?: number;
   //red tile of a picked choice
   selected?: boolean;
   disabled?: boolean;
@@ -25,11 +28,13 @@ type CardGridProps = {
   minCardWidth?: number;
   //one-line title cut with an ellipsis
   singleLineTitle?: boolean;
+  //side of the card icon, 32 by default
+  iconSize?: number;
   style?: StyleProp<ViewStyle>;
 };
 
 //framed tiles of the items a user added or installed
-export default function CardGrid({ cards, minCardWidth, singleLineTitle, style }: CardGridProps) {
+export default function CardGrid({ cards, minCardWidth, singleLineTitle, iconSize, style }: CardGridProps) {
   const styles = useThemedStyles(makeStyles);
   const Colors = useColors();
   const [width, setWidth] = useState(0);
@@ -64,16 +69,30 @@ export default function CardGrid({ cards, minCardWidth, singleLineTitle, style }
               card.onPress?.();
             }}
           >
-            {card.icon && <Image source={card.icon} style={styles.icon} tintColor={Colors.textPrimary} />}
+            {card.progress !== undefined && (
+              <View
+                pointerEvents="none"
+                style={[styles.fill, { width: `${Math.max(0, Math.min(1, card.progress)) * 100}%` }]}
+              />
+            )}
+            {card.icon && (
+              <AppIcon
+                source={card.icon}
+                style={[styles.icon, iconSize !== undefined && { width: iconSize, height: iconSize }]}
+                tintColor={Colors.textPrimary}
+              />
+            )}
             <View style={styles.titleRow}>
-              {card.badge && <Image source={card.badge} style={styles.badge} tintColor={Colors.textMuted} />}
+              {card.badge && <AppIcon source={card.badge} style={styles.badge} tintColor={Colors.textMuted} />}
               <Text style={[styles.title, card.selected && styles.titleSelected]} numberOfLines={singleLineTitle ? 1 : 2}>
                 {card.title}
               </Text>
             </View>
-            <Text style={[styles.status, card.error && styles.error, card.selected && styles.titleSelected]} numberOfLines={1}>
-              {card.status}
-            </Text>
+            {!!card.status && (
+              <Text style={[styles.status, card.error && styles.error, card.selected && styles.titleSelected]} numberOfLines={1}>
+                {card.status}
+              </Text>
+            )}
           </Pressable>
         );
       })}
@@ -98,6 +117,15 @@ const makeStyles = (Colors: ThemeColors) =>
       minHeight: 76,
       justifyContent: "center",
       alignItems: "center",
+      overflow: "hidden",
+    },
+    //grows from the left edge behind the content
+    fill: {
+      position: "absolute",
+      left: 0,
+      top: 0,
+      bottom: 0,
+      backgroundColor: Colors.primary,
     },
     cardWide: {
       minHeight: 70,

@@ -21,7 +21,13 @@ export type AppSettings = {
   instruction: string;
   speaker: boolean;
   autoSpeak: boolean;
+  //local live models mode
+  liveTranscription: string;
   maestroButterfly: string;
+  //sampler home cards as a json list
+  samplerHomeSections: string;
+  //primary color follows the maestro voice
+  applyMaestroColor: boolean;
   maestroMood: string;
   maestroStyle: string;
   maestroDepth: string;
@@ -48,6 +54,7 @@ export type AppSettings = {
   shareInstanceUrl: string;
   litertForceLoad: boolean;
   litertContextLength: number;
+  litertPromptTiers: string;
   showRemoteImages: boolean;
   overlayEnabled: boolean;
   overlayShortcut: string;
@@ -84,8 +91,12 @@ export const BASE_DEFAULTS: AppSettings = {
   instruction: '',
   speaker: true,
   autoSpeak: true,
+  liveTranscription: 'ask',
   //empty means the first butterfly
   maestroButterfly: '',
+  //empty means the default cards
+  samplerHomeSections: '',
+  applyMaestroColor: false,
   maestroMood: 'neutral',
   maestroStyle: 'common',
   maestroDepth: 'balanced',
@@ -116,6 +127,8 @@ export const BASE_DEFAULTS: AppSettings = {
   shareInstanceUrl: '',
   litertForceLoad: false,
   litertContextLength: 8192,
+  //model id to prompt tier json
+  litertPromptTiers: '{}',
   showRemoteImages: false,
   overlayEnabled: true,
   overlayShortcut: 'CommandOrControl+Shift+Space',
@@ -128,6 +141,7 @@ const BOOLEAN_KEYS = [
   'modelFailover',
   'speaker',
   'autoSpeak',
+  'applyMaestroColor',
   'alwaysWhisper',
   'autoStartMic',
   'hasSeenOnboarding',
@@ -163,4 +177,13 @@ export function isBooleanKey(key: string): boolean {
 
 export function isNumberKey(key: string): boolean {
   return (NUMBER_KEYS as readonly string[]).includes(key);
+}
+
+//saved voice per engine, unreadable json means none
+export function parseTtsVoices(raw: string): Record<string, string> {
+  try {
+    return JSON.parse(raw) || {};
+  } catch {
+    return {};
+  }
 }

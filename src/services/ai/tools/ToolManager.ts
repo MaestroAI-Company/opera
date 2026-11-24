@@ -158,14 +158,22 @@ class ToolManagerService {
       if (!context.askConsent) {
         return `Tool "${name}" needs the user's approval, which cannot be asked right now. Answer without it.`;
       }
-      const answer = await context.askConsent({ tool: name, ...tool.consent });
+      //names the tool and its server
+      const mcp = tool as Partial<McpTool>;
+      const answer = await context.askConsent({
+        tool: name,
+        always: 'tools.consent.always',
+        params: { tool: tool.displayName ?? name, server: mcp.serverLabel ?? '' },
+        ...tool.consent,
+      });
       //stopped reply is not a refusal
       if (context.signal?.aborted) return `Tool "${name}" was cancelled.`;
       if (answer === 'deny') {
         await PluginRegistry.setEnabled('tool', name, false);
         return `The user declined tool "${name}" and it is now disabled. Do not call it again, answer without it.`;
       }
-      await PluginRegistry.setEnabled('consent', name, true);
+      //one time allow is not remembered
+      if (answer === 'always') await PluginRegistry.setEnabled('consent', name, true);
     }
 
     if (__DEV__) {

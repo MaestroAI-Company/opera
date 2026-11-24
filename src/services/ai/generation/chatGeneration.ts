@@ -11,6 +11,7 @@ import { extractCitedUrls } from './citations';
 import { buildMentionSegment, resolveMentions } from '../mentions';
 import { estimateTokens } from '../tokens';
 import { getPromptTierOverride } from '../providers/sources';
+import { modelContextCap } from '../providers/huggingFaceCatalog';
 
 //marker when user stops generation
 export const INTERRUPTED_MARKER = '\n\n_The user interrupted the response_';
@@ -43,6 +44,9 @@ function parseParamsB(model: string): number | null {
   return match[2].toLowerCase() === 'm' ? value / 1000 : value;
 }
 
+//cache size forcing small prompt
+const SMALL_CACHE_TOKENS = 2048;
+
 //small windows cannot afford full prompt
 function modelTier(model: string): ModelTier {
   //user choice beats detection
@@ -56,6 +60,9 @@ export function autoPromptTier(model: string, service: string): ModelTier {
   //nano full handles the medium prompt
   if (model.startsWith('aicore-nano-full')) return 'medium';
   if (isLocalModel(model)) return 'small';
+  //tiny cache needs the small prompt
+  const cap = service === 'litert' ? modelContextCap(model) : 0;
+  if (cap > 0 && cap <= SMALL_CACHE_TOKENS) return 'small';
   const paramsB = parseParamsB(model);
   if (paramsB === null) {
     //unknown sizes: on-device small, servers large
@@ -202,6 +209,15 @@ function completeMetrics(metrics: MessageMetrics, content: string, think: boolea
 }
 
 export const STANDBY_PROMPT_TAG = 'standby';
+
+//voice rules added to the live mode prompt
+export const LIVE_PROMPT_SEGMENT = `\n\n---\n\n${SYSTEM_PROMPTS.LIVE}`;
+export const LIVE_PROMPT_TAG = 'live';
+
+//prompt label shown in the technical details
+export function livePromptLabel(model: string): string {
+  return `${modelTier(model)} + ${LIVE_PROMPT_TAG}`;
+}
 
 //one streaming path for both screens
 export async function streamAssistantReply(params: {

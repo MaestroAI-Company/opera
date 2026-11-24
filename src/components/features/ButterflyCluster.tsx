@@ -1,13 +1,4 @@
-import {
-  memo,
-  useEffect,
-  useImperativeHandle,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type Ref,
-} from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   AppState,
@@ -15,50 +6,36 @@ import {
   DeviceEventEmitter,
   Easing,
   Platform,
+  Pressable,
   StyleProp,
   StyleSheet,
   View,
   ViewStyle,
 } from "react-native";
 import { Gyroscope } from "expo-sensors";
-import Reanimated, {
-  Easing as ReanimatedEasing,
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
 import { Colors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
+import { useAccent } from "../../hooks/useTheme";
 import { AppEvents } from "../../services/events";
 import { OverlayPresence } from "../../services/overlay/overlayPresence";
+import AsciiButterfly from "./AsciiButterfly";
 import { MAESTRO_BUTTERFLIES, useMaestroButterfly, useVoiceColor } from "./maestroButterfly";
 
 const MAX_SHIFT = 16;
 const DECAY = 0.92;
 const GYRO_SPEED = 3.2;
-//shared by the intro and the flight
 const EASE_OUT = [0.16, 1, 0.3, 1] as const;
-
-type Flight = {
-  top: number;
-  width: number;
-  height: number;
-  toWidth: number;
-  toHeight: number;
-};
 
 export type ButterflyClusterProps = {
   style?: StyleProp<ViewStyle>;
   incognito?: boolean;
   delay?: number;
-  //flies in from this frame, skips intro
-  from?: DOMRect | null;
-  ref?: Ref<View>;
   parallax?: boolean;
   intro?: boolean;
   //accent takes the voice color
   voiceColor?: boolean;
+  //flaps on load and on tap
+  flap?: boolean;
 };
 
 //maestro butterfly with gyro parallax
@@ -66,58 +43,24 @@ function ButterflyCluster({
   style,
   incognito,
   delay = 250,
-  from,
-  ref,
   parallax = true,
   intro = true,
   voiceColor = false,
+  flap = false,
 }: ButterflyClusterProps) {
-  const butterfly = MAESTRO_BUTTERFLIES[useMaestroButterfly()];
+  const butterflyId = useMaestroButterfly();
   const color = useVoiceColor();
-  //flight or no intro starts fully shown
-  const introAnim = useAnimatedValue(from || !intro ? 1 : 0);
+  //every butterfly follows the app accent when it is applied
+  const accent = useAccent();
+  const [flapKey, setFlapKey] = useState(0);
+  const accentColor = incognito ? Colors.incognito : voiceColor ? color : accent;
+  //no intro starts fully shown
+  const introAnim = useAnimatedValue(intro ? 0 : 1);
   const gyro = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-  const flightProgress = useSharedValue(0);
-  //plain numbers, worklets cannot read DOMRect getters
-  const [flight, setFlight] = useState<Flight | null>(null);
-  const viewRef = useRef<View>(null);
-  useImperativeHandle(ref, () => viewRef.current!, []);
-
-  //sync read so the chat never paints unpushed
-  useLayoutEffect(() => {
-    if (!from || !viewRef.current) return;
-    const to = viewRef.current.getBoundingClientRect();
-    setFlight({
-      top: from.y - to.y,
-      width: from.width,
-      height: from.height,
-      toWidth: to.width,
-      toHeight: to.height,
-    });
-  }, [from]);
-
-  //ui thread keeps it smooth while the chat mounts
-  const flightStyle = useAnimatedStyle(() => {
-    if (!flight) return {};
-    const p = flightProgress.value;
-    return {
-      marginTop: interpolate(p, [0, 1], [flight.top, 0]),
-      width: interpolate(p, [0, 1], [flight.width, flight.toWidth]),
-      height: interpolate(p, [0, 1], [flight.height, flight.toHeight]),
-    };
-  });
-
-  //after the style mapper so it starts at zero
-  useEffect(() => {
-    if (!flight) return;
-    flightProgress.set(
-      withTiming(1, { duration: 700, easing: ReanimatedEasing.bezier(...EASE_OUT) }),
-    );
-  }, [flight, flightProgress]);
 
   //reveal butterfly on screen load
   useEffect(() => {
-    if (from || !intro) return;
+    if (!intro) return;
     const timer = setTimeout(() => {
       Animated.timing(introAnim, {
         toValue: 1,
@@ -128,7 +71,15 @@ function ButterflyCluster({
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [introAnim, delay, from, intro]);
+  }, [introAnim, delay, intro]);
+
+  //flap while the butterfly rises
+  useEffect(() => {
+    if (!flap) return;
+    //start with the intro scaling
+    const timer = setTimeout(() => setFlapKey((key) => key + 1), delay);
+    return () => clearTimeout(timer);
+  }, [delay, flap]);
 
   useEffect(() => {
     if (Platform.OS === "web" || !parallax) {
@@ -268,36 +219,26 @@ function ButterflyCluster({
   );
 
   return (
-    <Reanimated.View
-      ref={viewRef}
-      pointerEvents="none"
-      style={[
-        style,
-        //hidden until measured
-        from && !flight && styles.hidden,
-        //starts at home size, pushes chat down
-        flight && { marginTop: flight.top, width: flight.width, height: flight.height },
-        flightStyle,
-      ]}
-    >
+    <View pointerEvents="box-none" style={style}>
       <Animated.View
         style={[styles.imageFill, { opacity: introOpacity, transform: introTransform }]}
       >
-        <Animated.Image
-          source={butterfly.base}
-          style={[styles.imageFill, { transform: gyroTransform }]}
-          resizeMode="contain"
-          resizeMethod="resize"
-        />
-        <Animated.Image
-          source={butterfly.accent}
-          tintColor={incognito ? Colors.incognito : voiceColor ? color : undefined}
-          style={[styles.imageFill, styles.imageOverlay, { transform: gyroTransform }]}
-          resizeMode="contain"
-          resizeMethod="resize"
-        />
+        <Animated.View style={[styles.imageFill, { transform: gyroTransform }]}>
+          <Pressable
+            style={styles.imageFill}
+            disabled={!flap}
+            onPress={() => setFlapKey((key) => key + 1)}
+          >
+            <AsciiButterfly
+              key={butterflyId}
+              frames={MAESTRO_BUTTERFLIES[butterflyId].frames}
+              accentColor={accentColor ?? Colors.primary}
+              playKey={flapKey}
+            />
+          </Pressable>
+        </Animated.View>
       </Animated.View>
-    </Reanimated.View>
+    </View>
   );
 }
 
@@ -305,15 +246,6 @@ const styles = StyleSheet.create({
   imageFill: {
     width: "100%",
     height: "100%",
-  },
-  //stacks the accent layer exactly over the base layer
-  imageOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-  },
-  hidden: {
-    opacity: 0,
   },
 });
 

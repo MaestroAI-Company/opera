@@ -18,6 +18,7 @@ import { ToolCall, ToolDefinition } from '../tools/ITool';
 import {
   backendForFile,
   CatalogEntry,
+  fetchCatalogEntry,
   formatBytes,
   getCatalogEntry,
   hydrateLiteRTCatalog,
@@ -37,8 +38,14 @@ function modelsDirectory(): Directory {
   return new Directory(Paths.document, MODELS_DIR);
 }
 
-//repo id keeps filenames unique
 function localFile(entry: CatalogEntry): File {
+  //remote names must stay in models dir
+  const segments = entry.file.split('/');
+  if (!entry.file || entry.file.includes('\\') || entry.file.startsWith('/')
+    || segments.some((s) => s === '' || s === '.' || s === '..')) {
+    throw new Error(`Invalid model file name: ${entry.file}`);
+  }
+  //repo id keeps filenames unique
   const name = `${entry.repoId.replace(/\//g, '__')}__${entry.file}`;
   return new File(modelsDirectory(), name);
 }
@@ -445,7 +452,11 @@ export class LiteRTProvider implements IAIProvider {
 
   private async load(modelName: string, multimodal: boolean, onProgress?: ProgressCallback): Promise<LiteRTLMInstance> {
     if (!isProviderSupported('litert')) throw new Error('LiteRT-LM is not available on this platform');
-    const model = getCatalogEntry(modelName);
+    let model = getCatalogEntry(modelName);
+    //backfill the cache size of old entries
+    if (model?.url && model.contextLength === undefined) {
+      model = (await fetchCatalogEntry(modelName).catch(() => null)) ?? model;
+    }
     if (!model?.url) throw new Error(`Unknown LiteRT model: ${modelName}`);
 
     if (!this.llm) this.llm = createLLM();
@@ -467,7 +478,11 @@ export class LiteRTProvider implements IAIProvider {
     await downloadLiteRTModel(modelName, onProgress);
 
     const forceLoad = settings.litertForceLoad;
-    const configuredContext = settings.litertContextLength || DEFAULT_CONTEXT_TOKENS;
+    //compiled cache cannot grow
+    const configuredContext = Math.min(
+      settings.litertContextLength || DEFAULT_CONTEXT_TOKENS,
+      model.contextLength || Infinity,
+    );
     const backend: Backend = backendForFile(model.file);
 
     console.log(`[LiteRT] backend: ${backend}`);

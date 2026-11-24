@@ -1,11 +1,12 @@
-import { Image, ImageSourcePropType, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { FontSizes, Fonts, Spacing, ThemeColors } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
+import AppIcon, { IconSource } from "./AppIcon";
 import Group from "./Group";
 import { pressStyle } from "./pressStyle";
 
 export type NotificationCardProps = {
-  image: ImageSourcePropType;
+  image: IconSource;
   tintColor?: string;
   title: string;
   description?: string;
@@ -33,7 +34,7 @@ export default function NotificationCard({
         onPress={onPress}
         disabled={!onPress}
       >
-        <Image source={image} style={styles.image} tintColor={tintColor} resizeMode="contain" />
+        <AppIcon source={image} style={styles.image} tintColor={tintColor} resizeMode="contain" />
         <View style={styles.textContainer}>
           <Text style={styles.title} numberOfLines={2}>{title}</Text>
           {!!description && <Text style={styles.description} numberOfLines={3}>{description}</Text>}

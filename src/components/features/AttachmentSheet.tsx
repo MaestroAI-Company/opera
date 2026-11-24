@@ -19,11 +19,12 @@ import {
 import Group from "../ui/Group";
 import DrawerSheet from "./DrawerSheet";
 import { pressStyle } from "../ui/pressStyle";
+import { hasPlatformFeature } from "../../services/platform";
 import { DOCUMENT_MIME_TYPES, classifyDocument } from "../../services/documents/DocumentService";
-
-const cameraIcon = require("../../../assets/icons/camera.png");
-const fileIcon = require("../../../assets/icons/file.png");
-const photoIcon = require("../../../assets/icons/photo.png");
+import AppIcon from "../ui/AppIcon";
+import cameraIcon from "../../../assets/icons/camera.svg";
+import fileIcon from "../../../assets/icons/file.svg";
+import photoIcon from "../../../assets/icons/photo.svg";
 
 //seconds to m:ss
 function formatDuration(seconds: number): string {
@@ -125,6 +126,7 @@ export function useAttachments(modelCapabilities: string[]) {
   }, [sheetVisible, supportsVideo]);
 
   const openCamera = async () => {
+    if (!hasPlatformFeature("android.hardware.camera.any")) return;
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
     if (permissionResult.granted === false) {
       setNotice({ title: t("chatbar.permissionDenied"), message: t("chatbar.cameraDenied") });
@@ -313,15 +315,15 @@ export default function AttachmentSheet({
       <View style={styles.sheetButtonsWrapper}>
         <Group style={[styles.sheetButtonsRow, incognito && styles.sheetButtonsRowIncognito]}>
           {[
-            { icon: cameraIcon, label: t("attachment.camera"), onPress: onCamera },
+            { icon: cameraIcon, label: t("attachment.camera"), onPress: onCamera, hidden: !hasPlatformFeature("android.hardware.camera.any") },
             { icon: fileIcon, label: t("attachment.file"), onPress: onPickFiles },
             { icon: photoIcon, label: t("attachment.photos"), onPress: onPhotos },
-          ].map(({ icon, label, onPress }) => (
+          ].filter((item) => !item.hidden).map(({ icon, label, onPress }) => (
             //flex on cell since group adds a layer
             <View key={label} style={styles.sheetIconButtonCell}>
               <Group style={incognito && styles.sheetIconButtonGroupIncognito}>
                 <Pressable style={pressStyle(styles.sheetIconButton, { backgroundColor: incognito ? Colors.incognito : Colors.surfacePressed })} onPress={onPress}>
-                  <Image source={icon} style={[styles.sheetIcon, incognito && styles.sheetIconIncognito]} />
+                  <AppIcon source={icon} style={[styles.sheetIcon, incognito && styles.sheetIconIncognito]} />
                   <Text style={[styles.sheetIconText, incognito && styles.sheetTextIncognito]}>{label}</Text>
                 </Pressable>
               </Group>

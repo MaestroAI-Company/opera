@@ -58,7 +58,14 @@ function encodeSecret(keyBytes: Uint8Array, host: string): string {
 function decodeSecret(fragment: string): { keyBytes: Uint8Array; host: string } {
   const secret: ShareSecret = JSON.parse(base64UrlDecode(fragment));
   if (!secret?.k) throw new Error('This share link is missing its key');
-  return { keyBytes: base58Decode(secret.k), host: secret.h || DEFAULT_PASTE_HOST };
+  const host = secret.h || DEFAULT_PASTE_HOST;
+  //http only for the configured host
+  let isHttps = false;
+  try {
+    isHttps = new URL(host).protocol === 'https:';
+  } catch {}
+  if (!isHttps && host !== resolvePasteHost()) throw new Error('This share link has an invalid host');
+  return { keyBytes: base58Decode(secret.k), host };
 }
 
 function shareableImages(images?: string[]): string[] | undefined {

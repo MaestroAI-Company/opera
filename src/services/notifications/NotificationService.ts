@@ -1,6 +1,6 @@
 import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
 import { Platform } from 'react-native';
-import { Colors } from "../../../constants/theme";
+import { getColors } from "../../hooks/useTheme";
 
 const progressId = (convId: string) => `gen-${convId}`;
 const doneId = (convId: string) => `gen-done-${convId}`;
@@ -96,7 +96,7 @@ class NotificationServiceImpl {
         onlyAlertOnce: true,
         asForegroundService: true, //keep app alive in background
         smallIcon: 'ic_launcher',
-        color: Colors.primary,
+        color: getColors().primary,
         progress: {
           max: 100,
           current: Math.round(progress * 100),
@@ -132,7 +132,7 @@ class NotificationServiceImpl {
         onlyAlertOnce: true,
         ongoing: true,
         smallIcon: 'ic_launcher',
-        color: Colors.primary,
+        color: getColors().primary,
         //reply length is unknown while it streams
         progress: { indeterminate: true },
         pressAction: { id: 'default', launchActivity: 'default' },
@@ -163,7 +163,7 @@ class NotificationServiceImpl {
       android: {
         channelId: channelId || 'default',
         smallIcon: 'ic_launcher',
-        color: Colors.primary,
+        color: getColors().primary,
         autoCancel: true,
         pressAction: { id: 'default', launchActivity: 'default' },
       },

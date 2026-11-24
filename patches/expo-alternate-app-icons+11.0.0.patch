@@ -1,0 +1,30 @@
+diff --git a/node_modules/expo-alternate-app-icons/plugin/build/ios/generateUniversalIcon.js b/node_modules/expo-alternate-app-icons/plugin/build/ios/generateUniversalIcon.js
+index 36d80c3..09fd2ad 100644
+--- a/node_modules/expo-alternate-app-icons/plugin/build/ios/generateUniversalIcon.js
++++ b/node_modules/expo-alternate-app-icons/plugin/build/ios/generateUniversalIcon.js
+@@ -13,17 +13,14 @@ async function generateUniversalIcon(name, projectRoot, src, options) {
+     const appIconSetPath = (0, path_1.join)(iosProjectPath, `Images.xcassets/${name}.appiconset`);
+     const appIconPath = (0, path_1.join)(appIconSetPath, filename);
+     const iconPath = (0, path_1.join)(projectRoot, src);
+-    const source = await (0, jimp_1.jimpAsync)({
+-        input: iconPath,
+-        originalInput: iconPath,
+-    }, [
+-        {
+-            operation: 'resize',
+-            fit: 'cover',
+-            width: options.width,
+-            height: options.height,
+-        },
+-    ]);
++    const image = await (0, jimp_1.resize)({ input: iconPath, quality: 100 }, {
++        fit: 'cover',
++        width: options.width,
++        height: options.height,
++    });
++    // the store rejects an alpha channel on app icons
++    image.colorType(2);
++    const source = await image.getBufferAsync('image/png');
+     try {
+         await (0, promises_1.mkdir)(appIconSetPath, { recursive: true });
+         await (0, promises_1.writeFile)(appIconPath, source);

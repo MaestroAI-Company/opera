@@ -1,7 +1,8 @@
-import { Image, ImageSourcePropType, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { ImageSourcePropType, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import AppIcon, { IconSource } from "./AppIcon";
 import Checkbox from "./Checkbox";
 import Group from "./Group";
 import ImageCard from "./ImageCard";
@@ -28,7 +29,7 @@ export type ModalOption = {
 export type NotificationModalProps = {
   visible: boolean;
   title?: string;
-  icon?: ImageSourcePropType;
+  icon?: IconSource;
   image?: ImageSourcePropType;
   message?: string;
   messageAlign?: "left" | "center";
@@ -106,7 +107,7 @@ export default function NotificationModal({
 
             {(title || icon) && (
               <View style={styles.header}>
-                {icon && <Image source={icon} style={styles.icon} tintColor={Colors.textPrimary} />}
+                {icon && <AppIcon source={icon} style={styles.icon} tintColor={Colors.textPrimary} />}
                 {title && <Text style={styles.title}>{title}</Text>}
               </View>
             )}

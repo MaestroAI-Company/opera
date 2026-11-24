@@ -17,6 +17,8 @@ export class McpTool implements ITool {
   displayName: string;
   displayDescription?: string;
   enabledByDefault = true;
+  //remote code runs outside the device
+  consent = { title: 'tools.consent.mcp.title', message: 'tools.consent.mcp.message' } as const;
 
   constructor(
     public serverId: string,

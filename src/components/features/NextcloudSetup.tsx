@@ -8,9 +8,9 @@ import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import TextInputField from "../ui/TextInputField";
 
-const linkIcon = require("../../../assets/icons/link.png");
-const cloudIcon = require("../../../assets/icons/cloud.png");
-const cancelIcon = require("../../../assets/icons/cancel.png");
+import linkIcon from "../../../assets/icons/link2.svg";
+import cloudIcon from "../../../assets/icons/cloud2.svg";
+import cancelIcon from "../../../assets/icons/cancel2.svg";
 
 type NextcloudSetupProps = {
   onDone: () => void;
@@ -65,7 +65,7 @@ export default function NextcloudSetup({ onDone }: NextcloudSetupProps) {
   return (
     <>
       <View style={styles.settingRowVertical}>
-        <Text style={styles.settingLabel}>{t("settings.server.link")}</Text>
+        <Text style={styles.settingLabel}>Nextcloud</Text>
         <Text style={[styles.helpText, !isBrowser && styles.helpTextSpaced]}>
           {t("nextcloud.help")}
         </Text>
@@ -83,6 +83,7 @@ export default function NextcloudSetup({ onDone }: NextcloudSetupProps) {
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
+            autoFocus
             editable={!connecting}
           />
         </Group>

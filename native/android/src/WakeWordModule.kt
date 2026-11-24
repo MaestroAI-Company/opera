@@ -111,7 +111,8 @@ class WakeWordModule(context: ReactApplicationContext) : ReactContextBaseJavaMod
         record.stop()
         record.release()
       }
-    } catch (e: Exception) {
+    } catch (e: Throwable) {
+      //onnx load errors are not exceptions
       Log.w(TAG, "listening stopped", e)
       running = false
     }

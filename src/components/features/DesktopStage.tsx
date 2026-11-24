@@ -3,8 +3,9 @@ import { listen } from '@tauri-apps/api/event';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
-import { Colors, Radius } from '../../../constants/theme';
+import { Radius, ThemeColors } from '../../../constants/theme';
 import { useAnimatedValue } from '../../hooks/useAnimatedValue';
+import { useColors, useThemedStyles } from '../../hooks/useTheme';
 import { DesktopDetector } from '../../services/overlay/desktopDetector';
 import type { CaptureRegion } from '../../services/overlay/screenCapture';
 import { DB } from '../../services/db/DatabaseService';
@@ -37,6 +38,8 @@ function hit(rects: Rect[], x: number, y: number): Rect | null {
 
 //click through layer under the bar
 export default function DesktopStage() {
+  const Colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const haloOpacity = useAnimatedValue(0);
   const boxesOpacity = useAnimatedValue(0);
   const dimOpacity = useAnimatedValue(0);
@@ -241,7 +244,7 @@ export default function DesktopStage() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: 'transparent',

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  ImageSourcePropType,
   Keyboard,
   Pressable,
   ScrollView,
@@ -28,6 +27,7 @@ import {
   PairedHub,
 } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
+import { type IconSource } from "../ui/AppIcon";
 import CardGrid, { GridCard } from "../ui/CardGrid";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
@@ -38,17 +38,17 @@ import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
 import PageStack from "./PageStack";
 import ProfileCard from "./ProfileCard";
 
-const keyIcon = require("../../../assets/icons/key.png");
-const newIcon = require("../../../assets/icons/add.png");
-const penIcon = require("../../../assets/icons/pencil.png");
-const binIcon = require("../../../assets/icons/bin.png");
-const profilIcon = require("../../../assets/icons/profil.png");
-const phoneIcon = require("../../../assets/icons/phone.png");
-const laptopIcon = require("../../../assets/icons/laptop.png");
-const webIcon = require("../../../assets/icons/website.png");
-const operaIcon = require("../../../assets/icons/operaicon.png");
+import keyIcon from "../../../assets/icons/key2.svg";
+import newIcon from "../../../assets/icons/add2.svg";
+import penIcon from "../../../assets/icons/edit2.svg";
+import binIcon from "../../../assets/icons/delete2.svg";
+import profilIcon from "../../../assets/icons/profile2.svg";
+import phoneIcon from "../../../assets/icons/phone2.svg";
+import laptopIcon from "../../../assets/icons/laptop2.svg";
+import webIcon from "../../../assets/icons/website2.svg";
+import operaIcon from "../../../assets/icons/operaicon.svg";
 
-const HUB_DEVICE_ICONS: Record<string, ImageSourcePropType> = {
+const HUB_DEVICE_ICONS: Record<string, IconSource> = {
   phone: phoneIcon,
   desktop: laptopIcon,
   web: webIcon,
@@ -358,7 +358,7 @@ export default function HubProfileSheet({
 
   const renderHighlight = (
     label: string,
-    icon: number,
+    icon: IconSource,
     disabled: boolean,
     onPress: () => void,
   ) => (
@@ -767,7 +767,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     content: {
       paddingHorizontal: Spacing.lg2,
-      paddingBottom: Spacing.lg,
       gap: Spacing.xxl2,
     },
     //room for the floating back button

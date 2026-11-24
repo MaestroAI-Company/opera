@@ -29,6 +29,8 @@ function getDockedWidth() {
 
 //cursor holds outside the thin handle
 function setPageCursor(cursor: string) {
+  //no document on native
+  if (Platform.OS !== "web") return;
   document.body.style.cursor = cursor;
 }
 

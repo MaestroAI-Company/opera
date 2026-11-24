@@ -1,12 +1,12 @@
 import { useSyncExternalStore } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from '../../../constants/theme';
 import { useColors, useIsDark, useThemedStyles } from '../../hooks/useTheme';
 import { useT } from '../../i18n';
 import { ToolConsent } from '../../services/ai/tools/ToolConsent';
+import AppIcon from '../ui/AppIcon';
 import { pressStyle } from '../ui/pressStyle';
-
-const consentIcon = require('../../../assets/icons/confidentiality.png');
+import consentIcon from '../../../assets/icons/confidentiality.svg';
 
 //inline approval for a waiting tool
 export default function ToolConsentCard({ data, incognito }: { data: { id: string }; incognito?: boolean }) {
@@ -40,7 +40,7 @@ export default function ToolConsentCard({ data, incognito }: { data: { id: strin
   return (
     <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
       <View style={styles.titleRow}>
-        <Image source={consentIcon} style={styles.icon} tintColor={incognito ? Colors.incognito : Colors.primary} />
+        <AppIcon source={consentIcon} style={styles.icon} tintColor={incognito ? Colors.incognito : Colors.primary} />
         <Text style={[styles.title, { color: titleColor }]}>{t(prompt.title, prompt.params)}</Text>
       </View>
       <Text style={[styles.message, { color: bodyColor }]}>{t(prompt.message, prompt.params)}</Text>

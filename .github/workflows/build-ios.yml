@@ -108,7 +108,8 @@ jobs:
           mkdir -p "$profiles"
           for encoded in "$IOS_PROFILE_APP_BASE64" "$IOS_PROFILE_WIDGET_BASE64" "$IOS_PROFILE_SHARE_BASE64"; do
             echo "$encoded" | base64 -d > "$RUNNER_TEMP/profile.mobileprovision"
-            uuid=$(security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" | /usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin)
+            security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" > "$RUNNER_TEMP/profile.plist"
+            uuid=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/profile.plist")
             cp "$RUNNER_TEMP/profile.mobileprovision" "$profiles/$uuid.mobileprovision"
           done
 

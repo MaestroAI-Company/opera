@@ -46,7 +46,8 @@
     "publisher": "Maestro AI",
     "copyright": "© Maestro AI",
     "macOS": {
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "entitlements": "./Entitlements.plist"
     },
     "windows": {
       "nsis": {

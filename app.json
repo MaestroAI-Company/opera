@@ -274,6 +274,7 @@
         "expo-widgets",
         {
           "enableAndroid": true,
+          "groupIdentifier": "group.ai.maestro.opera.app",
           "widgets": [
             {
               "name": "QuickActions",

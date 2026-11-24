@@ -36,3 +36,55 @@ index c2bd3c0..0000000
 -  "name": "onnxruntime-react-native",
 -  "platforms": ["ios", "android"]
 -}
+diff --git a/node_modules/onnxruntime-react-native/ios/OnnxruntimeModule.h b/node_modules/onnxruntime-react-native/ios/OnnxruntimeModule.h
+index 288876c..7063ac0 100644
+--- a/node_modules/onnxruntime-react-native/ios/OnnxruntimeModule.h
++++ b/node_modules/onnxruntime-react-native/ios/OnnxruntimeModule.h
+@@ -5,8 +5,9 @@
+ #define OnnxruntimeModule_h
+ 
+ #import <React/RCTBridgeModule.h>
++#import <ReactCommon/RCTTurboModuleWithJSIBindings.h>
+ 
+-@interface OnnxruntimeModule : NSObject <RCTBridgeModule>
++@interface OnnxruntimeModule : NSObject <RCTBridgeModule, RCTTurboModuleWithJSIBindings>
+ 
+ @end
+ 
+diff --git a/node_modules/onnxruntime-react-native/ios/OnnxruntimeModule.mm b/node_modules/onnxruntime-react-native/ios/OnnxruntimeModule.mm
+index 8155f92..fa4398f 100644
+--- a/node_modules/onnxruntime-react-native/ios/OnnxruntimeModule.mm
++++ b/node_modules/onnxruntime-react-native/ios/OnnxruntimeModule.mm
+@@ -26,25 +26,13 @@ RCT_EXPORT_MODULE(Onnxruntime)
+  * React native binding API to install onnxruntime JSI API
+  */
+ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(install) {
+-  @try {
+-    RCTCxxBridge* cxxBridge = (RCTCxxBridge*)_bridge;
+-    if (cxxBridge == nil) {
+-      return @false;
+-    }
+-
+-    auto jsiRuntime = (facebook::jsi::Runtime*)cxxBridge.runtime;
+-    if (jsiRuntime == nil) {
+-      return @false;
+-    }
+-    auto& runtime = *jsiRuntime;
+-    auto jsiInvoker = _bridge.jsCallInvoker;
+-
+-    env = onnxruntimejsi::install(runtime, jsiInvoker);
+-
+-    return @true;
+-  } @catch (...) {
+-    return @false;
+-  }
++  //bridgeless has no cxx bridge, the runtime arrives through the jsi bindings hook
++  return env != nullptr ? @true : @false;
++}
++
++- (void)installJSIBindingsWithRuntime:(facebook::jsi::Runtime&)runtime
++                          callInvoker:(const std::shared_ptr<facebook::react::CallInvoker>&)callInvoker {
++  env = onnxruntimejsi::install(runtime, callInvoker);
+ }
+ 
+ - (void)dealloc {

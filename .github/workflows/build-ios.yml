@@ -52,6 +52,16 @@ jobs:
       - name: Prebuild iOS project
         run: npx expo prebuild --platform ios
 
+      # expo writes a fixed build number in each info.plist so the build setting is ignored
+      - name: Set the build number
+        run: |
+          find ios -name Info.plist -not -path 'ios/Pods/*' -not -path '*/build/*' | while read -r plist; do
+            if /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist" >/dev/null 2>&1; then
+              /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" "$plist"
+              echo "$plist"
+            fi
+          done
+
       - name: Write the App Store Connect key
         run: |
           mkdir -p "$RUNNER_TEMP/asc"

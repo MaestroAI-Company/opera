@@ -71,7 +71,8 @@ class SamplerHubModule: NSObject {
         modelsNightly: settings["modelsNightly"] as? Bool ?? false,
         ctxSize: UInt32(settings["ctxSize"] as? Double ?? 0),
         keepAlive: UInt32(settings["keepAlive"] as? Double ?? 0),
-        parallel: UInt32(settings["parallel"] as? Double ?? 0)
+        parallel: UInt32(settings["parallel"] as? Double ?? 0),
+        updateChecks: settings["updateChecks"] as? Bool ?? false
       )
       return self.settingsToMap(try await self.client(deviceKey).setHubSettings(hub: self.hubFromMap(hub), settings: wanted))
     }
@@ -441,6 +442,7 @@ class SamplerHubModule: NSObject {
       "ctxSize": Double(settings.ctxSize),
       "keepAlive": Double(settings.keepAlive),
       "parallel": Double(settings.parallel),
+      "updateChecks": settings.updateChecks,
     ]
   }
 

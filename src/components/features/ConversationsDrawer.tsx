@@ -47,7 +47,6 @@ import DrawerBackButton from "./DrawerBackButton";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 import search2Icon from "../../../assets/icons/search2.svg";
-import cancelIcon from "../../../assets/icons/cancel2.svg";
 import newIcon from "../../../assets/icons/add.svg";
 import add2Icon from "../../../assets/icons/add2.svg";
 import deleteIcon from "../../../assets/icons/delete2.svg";
@@ -624,130 +623,128 @@ export function ConversationSearchSheet({
         <View style={styles.contentCard}>
           <Group>
             <TextInputField
-              icon={search2Icon}
+              variant="search"
               placeholder={t("conversations.search.placeholder")}
               value={searchQuery}
               onChangeText={handleSearchChange}
-              rightIcon={searchQuery ? cancelIcon : undefined}
-              rightIconSize={14}
-              rightIconTint={Colors.textPrimary}
-              onRightIconPress={() => handleSearchChange("")}
               autoFocus
             />
           </Group>
         </View>
 
-        <View style={styles.searchResultsHeader}>
-          <Text style={styles.searchResultsTitle}>
-            {t("conversations.search.results")}
+        {displayed.length === 0 ? (
+          <Text style={[styles.emptyText, styles.searchEmptyText]}>
+            {hasQuery
+              ? t("conversations.search.empty")
+              : t("conversations.empty")}
           </Text>
-        </View>
+        ) : (
+          <>
+            <View style={styles.searchResultsHeader}>
+              <Text style={styles.searchResultsTitle}>
+                {t("conversations.search.results")}
+              </Text>
+            </View>
 
-        <View style={styles.contentCard}>
-          {displayed.length === 0 ? (
-            <Text style={[styles.emptyText, styles.searchEmptyText]}>
-              {hasQuery
-                ? t("conversations.search.empty")
-                : t("conversations.empty")}
-            </Text>
-          ) : (
-            displayed.map((conv) => {
-              const isSelected = conv.id === selectedConversationId;
-              const formattedDate = new Intl.DateTimeFormat("en-GB", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-              }).format(new Date(conv.updatedAt));
+            <View style={styles.contentCard}>
+              {displayed.map((conv) => {
+                const isSelected = conv.id === selectedConversationId;
+                const formattedDate = new Intl.DateTimeFormat("en-GB", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                }).format(new Date(conv.updatedAt));
 
-              return (
-                <View
-                  key={conv.id}
-                  style={[
-                    styles.discussionRow,
-                    isSelected && styles.discussionRowSelected,
-                  ]}
-                >
-                  <Pressable
-                    style={pressStyle(styles.discussionTextContainer, "fade")}
-                    onPress={() => {
-                      Keyboard.dismiss();
-                      onSelectConversation(
-                        conv,
-                        hasQuery ? searchQuery : undefined,
-                      );
-                      onClose();
-                    }}
+                return (
+                  <View
+                    key={conv.id}
+                    style={[
+                      styles.discussionRow,
+                      isSelected && styles.discussionRowSelected,
+                    ]}
                   >
-                    <Text
-                      style={[
-                        styles.discussionText,
-                        isSelected && styles.discussionTextSelected,
-                      ]}
-                      numberOfLines={1}
+                    <Pressable
+                      style={pressStyle(styles.discussionTextContainer, "fade")}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        onSelectConversation(
+                          conv,
+                          hasQuery ? searchQuery : undefined,
+                        );
+                        onClose();
+                      }}
                     >
-                      {conv.name}
-                    </Text>
-                  </Pressable>
+                      <Text
+                        style={[
+                          styles.discussionText,
+                          isSelected && styles.discussionTextSelected,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {conv.name}
+                      </Text>
+                    </Pressable>
 
-                  <View style={styles.rowActions}>
-                    <Text
-                      style={[
-                        styles.searchDateText,
-                        isSelected && { color: Colors.textOnPrimary },
-                      ]}
-                    >
-                      {formattedDate}
-                    </Text>
-                    {isSelected && (
-                      <>
-                        <IconButton
-                          icon={shareIcon}
-                          label={t("common.share")}
-                          onPress={() => onShareConversation?.(conv)}
-                          size={18}
-                          tintColor={Colors.textOnPrimary}
-                          containerSize={28}
-                          pressedColor={Colors.overlayHover}
-                        />
-                        <IconButton
-                          icon={conv.pinned ? unpinIcon : pinIcon}
-                          label={
-                            conv.pinned ? t("common.unpin") : t("common.pin")
-                          }
-                          onPress={() =>
-                            onTogglePinConversation?.(conv.id, !conv.pinned)
-                          }
-                          size={18}
-                          tintColor={Colors.textOnPrimary}
-                          containerSize={28}
-                          pressedColor={Colors.overlayHover}
-                        />
-                        <IconButton
-                          icon={deleteIcon}
-                          label={t("common.delete")}
-                          onPress={() => setDeleteConfirmId(conv.id)}
-                          size={18}
-                          tintColor={Colors.textOnPrimary}
-                          containerSize={28}
-                          pressedColor={Colors.overlayHover}
-                        />
-                      </>
-                    )}
+                    <View style={styles.rowActions}>
+                      <Text
+                        style={[
+                          styles.searchDateText,
+                          isSelected && { color: Colors.textOnPrimary },
+                        ]}
+                      >
+                        {formattedDate}
+                      </Text>
+                      {isSelected && (
+                        <>
+                          <IconButton
+                            icon={shareIcon}
+                            label={t("common.share")}
+                            onPress={() => onShareConversation?.(conv)}
+                            size={18}
+                            tintColor={Colors.textOnPrimary}
+                            containerSize={28}
+                            pressedColor={Colors.overlayHover}
+                          />
+                          <IconButton
+                            icon={conv.pinned ? unpinIcon : pinIcon}
+                            label={
+                              conv.pinned ? t("common.unpin") : t("common.pin")
+                            }
+                            onPress={() =>
+                              onTogglePinConversation?.(conv.id, !conv.pinned)
+                            }
+                            size={18}
+                            tintColor={Colors.textOnPrimary}
+                            containerSize={28}
+                            pressedColor={Colors.overlayHover}
+                          />
+                          <IconButton
+                            icon={deleteIcon}
+                            label={t("common.delete")}
+                            onPress={() => setDeleteConfirmId(conv.id)}
+                            size={18}
+                            tintColor={Colors.textOnPrimary}
+                            containerSize={28}
+                            pressedColor={Colors.overlayHover}
+                          />
+                        </>
+                      )}
+                    </View>
                   </View>
-                </View>
-              );
-            })
-          )}
-          {hasMore && (
-            <Group style={styles.showMoreGroup}>
-              <ActionButton
-                icon={add2Icon}
-                label={t("conversations.search.showMore")}
-                onPress={() => setVisibleCount((c) => c + SEARCH_PAGE_SIZE)}
-              />
-            </Group>
-          )}
-        </View>
+                );
+              })}
+              {hasMore && (
+                <Group style={styles.showMoreGroup}>
+                  <ActionButton
+                    icon={add2Icon}
+                    label={t("conversations.search.showMore")}
+                    onPress={() => setVisibleCount((c) => c + SEARCH_PAGE_SIZE)}
+                  />
+                </Group>
+              )}
+            </View>
+          </>
+        )}
       </SheetScrollView>
 
       <NotificationModal
@@ -1022,7 +1019,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     searchSheetContent: {
       paddingHorizontal: Spacing.lg2,
-      paddingBottom: Spacing.lg,
       gap: Spacing.xxl2,
     },
     searchDateText: {
@@ -1046,8 +1042,10 @@ const makeStyles = (Colors: ThemeColors) =>
       color: Colors.textMuted,
       textTransform: "uppercase",
     },
+    //same as the settings search empty text
     searchEmptyText: {
-      marginTop: 0,
-      paddingVertical: Spacing.md,
+      marginTop: Spacing.xs,
+      lineHeight: 20,
+      paddingHorizontal: Spacing.md,
     },
   });

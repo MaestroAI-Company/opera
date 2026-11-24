@@ -101,7 +101,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     content: {
       paddingHorizontal: Spacing.lg2,
-      paddingBottom: Spacing.lg,
       gap: Spacing.xxl2,
     },
     sheetCard: {

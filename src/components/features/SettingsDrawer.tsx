@@ -12,9 +12,9 @@ import {
     memo,
     ReactNode,
     useCallback,
+    useDeferredValue,
     useEffect,
     useMemo,
-    useDeferredValue,
     useRef,
     useState,
 } from "react";
@@ -126,8 +126,8 @@ import { ITool } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { openExternalUrl } from "../../services/ai/utils/openExternalUrl";
 import {
-  isDefaultAssistant,
-  openAssistantSettings,
+    isDefaultAssistant,
+    openAssistantSettings,
 } from "../../services/assistant/DefaultAssistant";
 import { BackupService } from "../../services/BackupService";
 import { CloudUserInfo } from "../../services/cloud/CloudProvider";
@@ -157,6 +157,7 @@ import {
     OVERLAY_SHORTCUTS,
     pushDesktopOverlayConfig,
 } from "../../services/overlay/desktopOverlay";
+import { hasPlatformFeature } from "../../services/platform";
 import { PluginRegistry } from "../../services/plugins/PluginRegistry";
 import {
     isScreenSaverActive,
@@ -166,7 +167,6 @@ import { AppSettings, Settings } from "../../services/settings/SettingsService";
 import { TTS_SPEEDS } from "../../services/speech/engines";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { TTS } from "../../services/speech/TTSService";
-import { hasPlatformFeature } from "../../services/platform";
 import { SyncPrefs, SyncPrefsStore } from "../../services/SyncPrefs";
 import ActionButton from "../ui/ActionButton";
 import CardGrid, { type GridCard } from "../ui/CardGrid";
@@ -185,6 +185,7 @@ import Slider from "../ui/Slider";
 import SliderToggle from "../ui/SliderToggle";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
+import BugReportSheet from "./BugReportSheet";
 import DrawerSheet, {
     SheetBody,
     SheetKeyboardAwareScrollView,
@@ -193,7 +194,6 @@ import DrawerSheet, {
 import HelpSheet, { type HelpSection } from "./HelpSheet";
 import { selectVoice, useVoice, VOICE_OPTIONS } from "./maestroButterfly";
 import MaestroCard from "./MaestroCard";
-import BugReportSheet from "./BugReportSheet";
 import PersonalitySheet, {
     personalityParts,
     readPersonality,
@@ -209,10 +209,7 @@ const isTauri =
 
 //ignore accents and case
 const normalizeSearch = (text: string) =>
-  text
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase();
+  text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 const SEARCH_RECENTS_KEY = "settingsSearchRecents";
 const MAX_SEARCH_RECENTS = 5;
@@ -265,55 +262,53 @@ import {
 import DrawerBackButton from "./DrawerBackButton";
 import PageStack from "./PageStack";
 
-import AppIcon, { type IconSource } from "../ui/AppIcon";
-import linkIcon from "../../../assets/icons/link2.svg";
 import addIcon from "../../../assets/icons/add.svg";
 import add2Icon from "../../../assets/icons/add2.svg";
-import download2Icon from "../../../assets/icons/download2.svg";
-import deleteIcon from "../../../assets/icons/delete2.svg";
-import edit2Icon from "../../../assets/icons/edit2.svg";
-import keyIcon from "../../../assets/icons/key2.svg";
-import search2Icon from "../../../assets/icons/search2.svg";
-import profilIcon from "../../../assets/icons/profile.svg";
-import profil2Icon from "../../../assets/icons/profile2.svg";
-import cloudIcon from "../../../assets/icons/cloud.svg";
-import providerCloudIcon from "../../../assets/icons/cloud2.svg";
-import phoneIcon from "../../../assets/icons/phone2.svg";
-import sampler2Icon from "../../../assets/icons/sampler2.svg";
-import cloudUploadIcon from "../../../assets/icons/cloudupload2.svg";
-import cloudDownloadIcon from "../../../assets/icons/clouddownload2.svg";
 import arrowIcon from "../../../assets/icons/arrow2.svg";
+import brainIcon from "../../../assets/icons/brain2.svg";
+import reportsIcon from "../../../assets/icons/bug.svg";
+import calendarIcon from "../../../assets/icons/calendar2.svg";
+import cameraIcon from "../../../assets/icons/camera2.svg";
 import cancelIcon from "../../../assets/icons/cancel2.svg";
 import activateIcon from "../../../assets/icons/check2.svg";
+import cloudIcon from "../../../assets/icons/cloud.svg";
+import providerCloudIcon from "../../../assets/icons/cloud2.svg";
+import confidentialityIcon from "../../../assets/icons/confidentiality.svg";
+import deleteIcon from "../../../assets/icons/delete2.svg";
+import download2Icon from "../../../assets/icons/import2.svg";
+import edit2Icon from "../../../assets/icons/edit2.svg";
+import errorIcon from "../../../assets/icons/error2.svg";
+import exportIcon from "../../../assets/icons/export2.svg";
 import generalIcon from "../../../assets/icons/general.svg";
-import advancedIcon from "../../../assets/icons/settings.svg";
+import githubIcon from "../../../assets/icons/github.svg";
+import hyperlinkIcon from "../../../assets/icons/hyperlink2.svg";
+import informationIcon from "../../../assets/icons/info.svg";
+import infoIcon from "../../../assets/icons/info2.svg";
+import keyIcon from "../../../assets/icons/key2.svg";
+import linkIcon from "../../../assets/icons/link2.svg";
+import locationIcon from "../../../assets/icons/location2.svg";
+import message2Icon from "../../../assets/icons/message2.svg";
+import micIcon from "../../../assets/icons/microphone2.svg";
+import ollamaIcon from "../../../assets/icons/ollama.svg";
+import operaIcon from "../../../assets/icons/operaicon.svg";
+import phoneIcon from "../../../assets/icons/phone2.svg";
+import photoIcon from "../../../assets/icons/photo.svg";
+import profilIcon from "../../../assets/icons/profile.svg";
+import profil2Icon from "../../../assets/icons/profile2.svg";
+import reconnectIcon from "../../../assets/icons/reload2.svg";
+import samplerNavIcon from "../../../assets/icons/sampler.svg";
+import sampler2Icon from "../../../assets/icons/sampler2.svg";
+import search2Icon from "../../../assets/icons/search2.svg";
 import server2Icon from "../../../assets/icons/server2.svg";
+import advancedIcon from "../../../assets/icons/settings.svg";
+import supportIcon from "../../../assets/icons/support2.svg";
+import time2Icon from "../../../assets/icons/time2.svg";
 import toolIcon from "../../../assets/icons/tool.svg";
 import tool2Icon from "../../../assets/icons/tool2.svg";
-import confidentialityIcon from "../../../assets/icons/confidentiality.svg";
-import reportsIcon from "../../../assets/icons/bug.svg";
-import supportIcon from "../../../assets/icons/support2.svg";
-import informationIcon from "../../../assets/icons/info.svg";
-import githubIcon from "../../../assets/icons/github.svg";
-import operaIcon from "../../../assets/icons/operaicon.svg";
-import micIcon from "../../../assets/icons/microphone2.svg";
-import visionIcon from "../../../assets/icons/vision2.svg";
-import brainIcon from "../../../assets/icons/brain2.svg";
-import photoIcon from "../../../assets/icons/photo.svg";
-import calendarIcon from "../../../assets/icons/calendar2.svg";
-import exportIcon from "../../../assets/icons/export2.svg";
-import message2Icon from "../../../assets/icons/message2.svg";
-import time2Icon from "../../../assets/icons/time2.svg";
-import errorIcon from "../../../assets/icons/error2.svg";
-import infoIcon from "../../../assets/icons/info2.svg";
-import hyperlinkIcon from "../../../assets/icons/hyperlink2.svg";
-import samplerNavIcon from "../../../assets/icons/sampler.svg";
-import reconnectIcon from "../../../assets/icons/reload2.svg";
-import cameraIcon from "../../../assets/icons/camera2.svg";
-import locationIcon from "../../../assets/icons/location2.svg";
-import ollamaIcon from "../../../assets/icons/ollama.svg";
 import videocamIcon from "../../../assets/icons/video2.svg";
+import visionIcon from "../../../assets/icons/visibility2.svg";
 import websiteIcon from "../../../assets/icons/website2.svg";
+import AppIcon, { type IconSource } from "../ui/AppIcon";
 
 const samplerIcon = require("../../../assets/icons/operaiconEgg.png");
 
@@ -353,8 +348,16 @@ type PermissionKey =
 const PERMISSION_HANDLERS: Record<
   PermissionKey,
   {
-    get: () => Promise<{ status: string; granted: boolean; canAskAgain?: boolean }>;
-    request: () => Promise<{ status: string; granted: boolean; canAskAgain?: boolean }>;
+    get: () => Promise<{
+      status: string;
+      granted: boolean;
+      canAskAgain?: boolean;
+    }>;
+    request: () => Promise<{
+      status: string;
+      granted: boolean;
+      canAskAgain?: boolean;
+    }>;
   }
 > = {
   microphone: {
@@ -807,7 +810,7 @@ const ModelToggleList = memo(function ModelToggleList({
                   />
                 ) : (
                   <TextInputField
-                    icon={search2Icon}
+                    variant="search"
                     placeholder={t("settings.ollama.searchModels")}
                     value={search}
                     onChangeText={(v) => {
@@ -816,8 +819,6 @@ const ModelToggleList = memo(function ModelToggleList({
                     }}
                     autoFocus={autoFocusSearch}
                     onFocus={onSearchFocus}
-                    autoCapitalize="none"
-                    autoCorrect={false}
                   />
                 )}
               </Group>
@@ -837,7 +838,7 @@ const ModelToggleList = memo(function ModelToggleList({
               />
             </Group>
             {shown.length === 0 ? (
-              <Text style={[styles.helpText, { marginTop: Spacing.md }]}>
+              <Text style={[styles.helpText, { textAlign: "center" }]}>
                 {t("settings.ollama.noMatch")}
               </Text>
             ) : (
@@ -1115,10 +1116,10 @@ export default function SettingsDrawer({
   };
   //ref avoids reordering under finger
   const touchSearchEntry = (id: string) => {
-    const next = [id, ...searchRecentsRef.current.filter((r) => r !== id)].slice(
-      0,
-      MAX_SEARCH_RECENTS,
-    );
+    const next = [
+      id,
+      ...searchRecentsRef.current.filter((r) => r !== id),
+    ].slice(0, MAX_SEARCH_RECENTS);
     searchRecentsRef.current = next;
     Settings.setLocal(SEARCH_RECENTS_KEY, JSON.stringify(next)).catch(() => {});
   };
@@ -1290,8 +1291,7 @@ export default function SettingsDrawer({
       if (notes) {
         setChangelogFromUpdate(false);
         setChangelog(notes);
-      }
-      else
+      } else
         showAlert(t("common.error"), t("settings.info.changelogUnavailable"));
     } catch {
       showAlert(t("common.error"), t("settings.info.changelogUnavailable"));
@@ -1576,7 +1576,9 @@ export default function SettingsDrawer({
   //hide card without assistant role
   const [assistantRoleAvailable, setAssistantRoleAvailable] = useState(true);
   useEffect(() => {
-    isDefaultAssistant().then((held) => setAssistantRoleAvailable(held !== null));
+    isDefaultAssistant().then((held) =>
+      setAssistantRoleAvailable(held !== null),
+    );
   }, []);
 
   //hides the open settings card once opera is the screen saver
@@ -3047,21 +3049,31 @@ export default function SettingsDrawer({
         promptUpdate(release);
         return;
       }
-      showAlert(t("update.title"), t("update.upToDate"), [
-        {
-          text: t("common.ok"),
-          onPress: () => setAlertModalVisible(false),
-          style: "secondary",
-        },
-      ]);
+      showAlert(
+        t("update.checkTitle"),
+        t("update.upToDate"),
+        [
+          {
+            text: t("common.ok"),
+            onPress: () => setAlertModalVisible(false),
+            style: "secondary",
+          },
+        ],
+        { icon: reconnectIcon },
+      );
     } catch (e) {
-      showAlert(t("update.title"), t("update.checkFailed"), [
-        {
-          text: t("common.ok"),
-          onPress: () => setAlertModalVisible(false),
-          style: "secondary",
-        },
-      ]);
+      showAlert(
+        t("update.checkTitle"),
+        t("update.checkFailed"),
+        [
+          {
+            text: t("common.ok"),
+            onPress: () => setAlertModalVisible(false),
+            style: "secondary",
+          },
+        ],
+        { icon: reconnectIcon },
+      );
     }
   };
 
@@ -3740,9 +3752,7 @@ export default function SettingsDrawer({
           label={t("settings.notice.update", {
             version: notices.update.version,
           })}
-          onPress={() =>
-            openUpdateNotes(notices.update!)
-          }
+          onPress={() => openUpdateNotes(notices.update!)}
           style={[styles.groupSpacing, styles.mainPageGroup]}
         />
       )}
@@ -4004,7 +4014,7 @@ export default function SettingsDrawer({
           </View>
           <Group>
             <ActionButton
-              icon={download2Icon}
+              icon={reconnectIcon}
               label={t("settings.update.checkNow")}
               onPress={checkUpdateNow}
             />
@@ -4865,9 +4875,7 @@ export default function SettingsDrawer({
             />
           </Group>
 
-          <Group
-            style={[styles.highlightGroup, { marginTop: Spacing.md }]}
-          >
+          <Group style={[styles.highlightGroup, { marginTop: Spacing.md }]}>
             <ActionButton
               icon={deleteIcon}
               label={t("settings.data.deleteAllAction")}
@@ -4968,7 +4976,7 @@ export default function SettingsDrawer({
               ]}
             >
               <ActionButton
-                icon={hasCloudBackup ? cloudDownloadIcon : cloudUploadIcon}
+                icon={hasCloudBackup ? download2Icon : exportIcon}
                 label={
                   hasCloudBackup
                     ? t("cloudSync.enterPin")
@@ -6061,9 +6069,9 @@ export default function SettingsDrawer({
         onInstall={
           changelogFromUpdate && isTauri && notices.update
             ? () => {
-              setChangelog(null);
-              promptUpdate(notices.update!);
-            }
+                setChangelog(null);
+                promptUpdate(notices.update!);
+              }
             : undefined
         }
         isLargeScreen={isLargeScreen}
@@ -6348,29 +6356,29 @@ export default function SettingsDrawer({
 
   //nothing until a query goes out
   const litertSearchList = litertSearchLoading ? (
-    <View style={styles.sheetCard}>
-      <Text style={styles.helpText}>{t("settings.litert.loading")}</Text>
-    </View>
+    <Text style={[styles.helpText, { textAlign: "center" }]}>
+      {t("settings.litert.loading")}
+    </Text>
   ) : litertSearchFailed ? (
-    <View style={styles.sheetCard}>
-      <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
-    </View>
+    <Text style={[styles.helpText, { textAlign: "center" }]}>
+      {t("settings.litert.loadFailed")}
+    </Text>
   ) : litertSearchResults.length > 0 ? (
     <View style={[styles.sheetCard, styles.litertSearchResultsCard]}>
       {litertSearchResults.map(renderLitertSearchResult)}
     </View>
   ) : (
     isLitertQuerying && (
-      <View style={styles.sheetCard}>
-        <Text style={styles.helpText}>{t("settings.litert.noResults")}</Text>
-      </View>
+      <Text style={[styles.helpText, { textAlign: "center" }]}>
+        {t("settings.litert.noResults")}
+      </Text>
     )
   );
 
   const renderLitertSearchField = (page: LitertPage) => (
     <Group>
       <TextInputField
-        icon={search2Icon}
+        variant="search"
         placeholder={t("settings.litert.addModelPlaceholder")}
         //other pages only lead to the search page
         value={page === "search" ? hfModelInput : ""}
@@ -6381,8 +6389,6 @@ export default function SettingsDrawer({
             : openLitertSearch
         }
         autoFocus={page === "search" && litertSearchHandoff}
-        autoCapitalize="none"
-        autoCorrect={false}
       />
     </Group>
   );
@@ -6413,9 +6419,7 @@ export default function SettingsDrawer({
             <View style={[styles.sheetCard, styles.litertSearchWithBack]}>
               {renderLitertSearchField(page)}
             </View>
-            {page === "model"
-              ? renderLitertDetail()
-              : litertSearchList}
+            {page === "model" ? renderLitertDetail() : litertSearchList}
           </>
         )}
       </SheetScrollView>
@@ -6830,8 +6834,8 @@ export default function SettingsDrawer({
 
             <View style={styles.sheetCard}>
               <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-                <Group>
-                  {!ollamaDetailConnected && (
+                {!ollamaDetailConnected && (
+                  <Group style={styles.groupSpacingTight}>
                     <ActionButton
                       icon={reconnectIcon}
                       label={
@@ -6844,10 +6848,13 @@ export default function SettingsDrawer({
                       }
                       onPress={() => reconnectOllamaServer(shownOllamaIndex)}
                     />
-                  )}
+                  </Group>
+                )}
+                <Group style={styles.highlightGroup}>
                   <ActionButton
                     icon={deleteIcon}
                     label={t("settings.ollama.remove.action")}
+                    variant="highlight"
                     onPress={() => removeOllamaServer(shownOllamaIndex)}
                   />
                 </Group>
@@ -7059,7 +7066,7 @@ export default function SettingsDrawer({
   const renderOpenAISearchField = (page: CloudModelsPage) => (
     <Group>
       <TextInputField
-        icon={search2Icon}
+        variant="search"
         placeholder={t("settings.ollama.searchModels")}
         //only list page edits the search
         value={page === "list" ? openaiSearchQuery : ""}
@@ -7074,8 +7081,6 @@ export default function SettingsDrawer({
               }
         }
         autoFocus={page === "list" && openaiModelsSearchHandoff}
-        autoCapitalize="none"
-        autoCorrect={false}
       />
     </Group>
   );
@@ -7175,9 +7180,7 @@ export default function SettingsDrawer({
                   <TextInputField
                     icon={keyIcon}
                     placeholder={t("settings.cloudapi.apiKeyPlaceholder")}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    secureTextEntry
+                    variant="password"
                     value={openaiKeyDraft}
                     onChangeText={setOpenAIKeyDraft}
                     onBlur={() => handleOpenAIKeyBlur(index)}
@@ -7205,8 +7208,8 @@ export default function SettingsDrawer({
 
             <View style={styles.sheetCard}>
               <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-                <Group>
-                  {!openaiDetailConnected && (
+                {!openaiDetailConnected && (
+                  <Group style={styles.groupSpacingTight}>
                     <ActionButton
                       icon={reconnectIcon}
                       label={
@@ -7217,10 +7220,13 @@ export default function SettingsDrawer({
                       disabled={openaiModelsLoading || url.length === 0}
                       onPress={() => reconnectOpenAIServer(index)}
                     />
-                  )}
+                  </Group>
+                )}
+                <Group style={styles.highlightGroup}>
                   <ActionButton
                     icon={deleteIcon}
                     label={t("settings.ollama.remove.action")}
+                    variant="highlight"
                     onPress={() => removeOpenAIServer(index)}
                   />
                 </Group>
@@ -7425,9 +7431,7 @@ export default function SettingsDrawer({
                   <TextInputField
                     icon={keyIcon}
                     placeholder={t("settings.cloudapi.apiKeyPlaceholder")}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    secureTextEntry
+                    variant="password"
                     value={openaiKeyDraft}
                     onChangeText={setOpenAIKeyDraft}
                   />
@@ -7562,8 +7566,7 @@ export default function SettingsDrawer({
                   <TextInputField
                     icon={edit2Icon}
                     placeholder={t("settings.mcp.headerValue")}
-                    autoCapitalize="none"
-                    secureTextEntry
+                    variant="password"
                     value={serverDraft.headerValue}
                     onChangeText={(v) =>
                       setServerDraft((prev) => ({ ...prev, headerValue: v }))
@@ -7823,8 +7826,7 @@ export default function SettingsDrawer({
                       <TextInputField
                         icon={edit2Icon}
                         placeholder={t("settings.mcp.headerValue")}
-                        autoCapitalize="none"
-                        secureTextEntry
+                        variant="password"
                         value={mcpHeaderValues[server.id] ?? ""}
                         onChangeText={(v) =>
                           setMcpHeaderValues((prev) => ({
@@ -8432,7 +8434,9 @@ export default function SettingsDrawer({
 
   //rows matching the query
   const settingsSearchResults = (() => {
-    const tokens = normalizeSearch(deferredSearchQuery).split(/\s+/).filter(Boolean);
+    const tokens = normalizeSearch(deferredSearchQuery)
+      .split(/\s+/)
+      .filter(Boolean);
     if (!searchSheetVisible) return [];
 
     const toggle = (
@@ -8853,14 +8857,10 @@ export default function SettingsDrawer({
         <View style={styles.sheetCard}>
           <Group>
             <TextInputField
-              icon={search2Icon}
+              variant="search"
               placeholder={t("settings.nav.search.title")}
               value={settingsSearchQuery}
               onChangeText={setSettingsSearchQuery}
-              rightIcon={settingsSearchQuery ? cancelIcon : undefined}
-              rightIconSize={14}
-              rightIconTint={Colors.textPrimary}
-              onRightIconPress={() => setSettingsSearchQuery("")}
               autoFocus
             />
           </Group>
@@ -8886,7 +8886,10 @@ export default function SettingsDrawer({
           entry.onPress ? (
             <Pressable
               key={entry.id}
-              style={pressStyle(styles.sheetCard, styles.toggleGroupCardPressed)}
+              style={pressStyle(
+                styles.sheetCard,
+                styles.toggleGroupCardPressed,
+              )}
               onPress={() => {
                 touchSearchEntry(entry.id);
                 entry.onPress?.();
@@ -8931,7 +8934,9 @@ export default function SettingsDrawer({
                             <ActionButton
                               icon={topic.icon}
                               label={topic.label}
-                              onPress={() => setSettingsSearchQuery(topic.query)}
+                              onPress={() =>
+                                setSettingsSearchQuery(topic.query)
+                              }
                             />
                           </Group>
                         </View>

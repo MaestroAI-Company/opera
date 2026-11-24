@@ -22,7 +22,7 @@ import ProgressBar from "../ui/ProgressBar";
 
 import binIcon from "../../../assets/icons/delete2.svg";
 import cloudIcon from "../../../assets/icons/cloud2.svg";
-import downloadIcon from "../../../assets/icons/download2.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
 import cancelIcon from "../../../assets/icons/cancel2.svg";
 
 type HubModelsSectionProps = {

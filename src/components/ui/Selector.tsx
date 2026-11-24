@@ -8,7 +8,7 @@ import { pressStyle } from "./pressStyle";
 import { lockTextSelection } from "./lockTextSelection";
 import AppIcon, { IconSource } from "./AppIcon";
 import arrowIcon from "../../../assets/icons/arrow2.svg";
-import downloadIcon from "../../../assets/icons/download2.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 

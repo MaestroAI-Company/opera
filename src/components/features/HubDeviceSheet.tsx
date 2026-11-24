@@ -161,6 +161,7 @@ export default function HubDeviceSheet({
                 onChangeText={setName}
                 onSubmitEditing={rename}
                 maxLength={64}
+                clearable
               />
             </Group>
             <Group style={[styles.highlightGroup, (busy || unchanged) && styles.highlightGroupDisabled]}>

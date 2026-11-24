@@ -1,21 +1,46 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Image,
-  Keyboard,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
+    Image,
+    Keyboard,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    useWindowDimensions,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
-import { mcpAvatar, mcpSourceLabel, runHubMcp, useHubMcp } from "../../hooks/useHubMcp";
+import addIcon from "../../../assets/icons/add2.svg";
+import backIcon from "../../../assets/icons/arrow2.svg";
+import pencilIcon from "../../../assets/icons/edit2.svg";
+import errorIcon from "../../../assets/icons/error2.svg";
+import fileIcon from "../../../assets/icons/file.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
+import linkIcon from "../../../assets/icons/link2.svg";
+import toolIcon from "../../../assets/icons/tool.svg";
+import validIcon from "../../../assets/icons/check2.svg";
+import {
+    Fonts,
+    FontSizes,
+    Radius,
+    Spacing,
+    ThemeColors,
+} from "../../../constants/theme";
+import {
+    mcpAvatar,
+    mcpSourceLabel,
+    runHubMcp,
+    useHubMcp,
+} from "../../hooks/useHubMcp";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { MIN_SEARCH_LENGTH } from "../../services/ai/providers/huggingFaceCatalog";
-import { McpFolders, McpListing, McpSource, hubErrorText } from "../../services/hub/SamplerHubService";
+import {
+    hubErrorText,
+    McpFolders,
+    McpListing,
+    McpSource,
+} from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
 import AppIcon from "../ui/AppIcon";
 import Group from "../ui/Group";
@@ -28,16 +53,6 @@ import DrawerBackButton from "./DrawerBackButton";
 import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
 import { McpFieldRows } from "./HubMcpSection";
 import PageStack from "./PageStack";
-import searchIcon from "../../../assets/icons/search2.svg";
-import downloadIcon from "../../../assets/icons/download2.svg";
-import addIcon from "../../../assets/icons/add2.svg";
-import fileIcon from "../../../assets/icons/file.svg";
-import pencilIcon from "../../../assets/icons/edit2.svg";
-import linkIcon from "../../../assets/icons/link2.svg";
-import errorIcon from "../../../assets/icons/error2.svg";
-import validIcon from "../../../assets/icons/valid2.svg";
-import toolIcon from "../../../assets/icons/tool.svg";
-import backIcon from "../../../assets/icons/arrow2.svg";
 
 const DESKTOP_CARD_WIDTH = 840;
 const DESKTOP_FOLDER_CARD_WIDTH = 720;
@@ -57,13 +72,18 @@ type FolderListProps = {
 export function McpFolderList({ folders, onOpen, onUse }: FolderListProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
-  if (!folders) return <Text style={styles.helpText}>{t("hubMcp.loading")}</Text>;
+  if (!folders)
+    return <Text style={[styles.helpText, { textAlign: "center" }]}>
+      {t("hubMcp.loading")}
+    </Text>;
   return (
     <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
       <Text style={styles.settingLabel} numberOfLines={2}>
         {folders.path}
       </Text>
-      <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>{t("hubMcp.foldersHelp")}</Text>
+      <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+        {t("hubMcp.foldersHelp")}
+      </Text>
       <Group style={[styles.highlightGroup, styles.groupSpacingTight]}>
         <ActionButton
           icon={validIcon}
@@ -86,7 +106,11 @@ export function McpFolderList({ folders, onOpen, onUse }: FolderListProps) {
             key={name}
             icon={fileIcon}
             label={name}
-            onPress={() => onOpen(`${folders.path}${folders.path.includes("\\") ? "\\" : "/"}${name}`)}
+            onPress={() =>
+              onOpen(
+                `${folders.path}${folders.path.includes("\\") ? "\\" : "/"}${name}`,
+              )
+            }
           />
         ))}
       </Group>
@@ -102,7 +126,12 @@ type HubMcpSheetProps = {
 };
 
 //selection, registry search and manual installs
-export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, isDesktop = false }: HubMcpSheetProps) {
+export default function HubMcpSheet({
+  visible,
+  onClose,
+  isLargeScreen = false,
+  isDesktop = false,
+}: HubMcpSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const Colors = useColors();
   const t = useT();
@@ -265,7 +294,9 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
     else install();
   };
 
-  const missing = (listing?.fields ?? []).some((f) => f.required && !f.default && !drafts[f.key]);
+  const missing = (listing?.fields ?? []).some(
+    (f) => f.required && !f.default && !drafts[f.key],
+  );
 
   const submitManual = () => {
     const id = manualId.trim();
@@ -298,14 +329,22 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
         {avatar ? (
           <Image source={{ uri: avatar }} style={styles.tileImage} />
         ) : (
-          <AppIcon source={toolIcon} style={styles.tileIcon} tintColor={Colors.textPrimary} />
+          <AppIcon
+            source={toolIcon}
+            style={styles.tileIcon}
+            tintColor={Colors.textPrimary}
+          />
         )}
       </View>
     );
   };
 
   const renderCard = (item: McpListing) => (
-    <Pressable key={item.id} onPress={() => openServer(item)} style={pressStyle(styles.card, "fade")}>
+    <Pressable
+      key={item.id}
+      onPress={() => openServer(item)}
+      style={pressStyle(styles.card, "fade")}
+    >
       {renderTile(item, styles.cardTile)}
       <Text style={styles.cardName} numberOfLines={2}>
         {item.title}
@@ -317,7 +356,11 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
   );
 
   const renderResult = (item: McpListing) => (
-    <Pressable key={item.id} onPress={() => openServer(item)} style={pressStyle(styles.resultRow, "surface")}>
+    <Pressable
+      key={item.id}
+      onPress={() => openServer(item)}
+      style={pressStyle(styles.resultRow, "surface")}
+    >
       {renderTile(item, styles.resultTile)}
       <View style={styles.resultInfo}>
         <Text style={styles.resultName} numberOfLines={1}>
@@ -333,43 +376,59 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
   const renderSearchField = (p: Page) => (
     <Group>
       <TextInputField
-        icon={searchIcon}
+        variant="search"
         placeholder={t("hubMcp.searchPlaceholder")}
         //other pages only lead to the search page
         value={p === "search" ? query : ""}
         onChangeText={setQuery}
         onFocus={p === "search" ? () => setHandoff(false) : openSearch}
         autoFocus={p === "search" && handoff}
-        autoCapitalize="none"
-        autoCorrect={false}
       />
     </Group>
   );
 
   const renderServer = () => {
     if (!listing) return null;
-    const folderFields = listing.fields.filter((f) => f.kind === "folder" || f.kind === "file").length;
+    const folderFields = listing.fields.filter(
+      (f) => f.kind === "folder" || f.kind === "file",
+    ).length;
     const sourceText =
-      listing.source.type === "mcpb" ? listing.source.url : `${listing.source.package}@${listing.source.version}`;
+      listing.source.type === "mcpb"
+        ? listing.source.url
+        : `${listing.source.package}@${listing.source.version}`;
     const rows = [
       { label: t("hubMcp.source"), value: sourceText },
-      { label: t("hubMcp.repository"), value: listing.repository ?? t("hubMcp.unknown") },
-      { label: t("hubMcp.license"), value: listing.license ?? t("hubMcp.unknown") },
+      {
+        label: t("hubMcp.repository"),
+        value: listing.repository ?? t("hubMcp.unknown"),
+      },
+      {
+        label: t("hubMcp.license"),
+        value: listing.license ?? t("hubMcp.unknown"),
+      },
       { label: t("hubMcp.network"), value: t("hubMcp.networkOpen") },
-      { label: t("hubMcp.folders"), value: folderFields > 0 ? t("hubMcp.foldersAsked", { count: folderFields }) : t("hubMcp.noFolders") },
+      {
+        label: t("hubMcp.folders"),
+        value:
+          folderFields > 0
+            ? t("hubMcp.foldersAsked", { count: folderFields })
+            : t("hubMcp.noFolders"),
+      },
     ];
-    const next = listing.fields.length > 0 ? () => showPage("configure") : askInstall;
+    const next =
+      listing.fields.length > 0 ? () => showPage("configure") : askInstall;
     return (
       <>
-        {listing.registry === null && !catalog.some((c) => c.id === listing.id) && (
-          <NotificationCard
-            image={errorIcon}
-            tintColor={Colors.textPrimary}
-            title={t("hubMcp.unverified")}
-            description={t("hubMcp.unverifiedHelp")}
-            style={styles.notice}
-          />
-        )}
+        {listing.registry === null &&
+          !catalog.some((c) => c.id === listing.id) && (
+            <NotificationCard
+              image={errorIcon}
+              tintColor={Colors.textPrimary}
+              title={t("hubMcp.unverified")}
+              description={t("hubMcp.unverifiedHelp")}
+              style={styles.notice}
+            />
+          )}
         <View style={styles.contentCard}>
           <View style={styles.detailHeader}>
             {renderTile(listing, styles.detailTile)}
@@ -377,7 +436,9 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
               <Text style={styles.detailName}>{listing.title}</Text>
               <Text style={styles.detailMeta}>{listing.publisher}</Text>
               <Text style={styles.detailMeta}>{mcpSourceLabel(listing)}</Text>
-              {listing.offline && <Text style={styles.detailMeta}>{t("hubMcp.offline")}</Text>}
+              {listing.offline && (
+                <Text style={styles.detailMeta}>{t("hubMcp.offline")}</Text>
+              )}
             </View>
           </View>
           <Group
@@ -395,9 +456,21 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
               onPress={next}
             />
           </Group>
-          {!!error && <Text style={[styles.helpText, styles.detailSection, { color: Colors.error }]}>{error}</Text>}
+          {!!error && (
+            <Text
+              style={[
+                styles.helpText,
+                styles.detailSection,
+                { color: Colors.error },
+              ]}
+            >
+              {error}
+            </Text>
+          )}
           {!!listing.description && (
-            <Text style={[styles.helpText, styles.detailSection]}>{listing.description}</Text>
+            <Text style={[styles.helpText, styles.detailSection]}>
+              {listing.description}
+            </Text>
           )}
         </View>
 
@@ -409,7 +482,11 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
                 key={row.label}
                 label={row.label}
                 rightElement={
-                  <Text style={styles.infoValue} numberOfLines={2} ellipsizeMode="middle">
+                  <Text
+                    style={styles.infoValue}
+                    numberOfLines={2}
+                    ellipsizeMode="middle"
+                  >
                     {row.value}
                   </Text>
                 }
@@ -427,14 +504,22 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
         <McpFieldRows
           fields={listing.fields}
           drafts={drafts}
-          onChange={(key, value) => setDrafts((prev) => ({ ...prev, [key]: value }))}
+          onChange={(key, value) =>
+            setDrafts((prev) => ({ ...prev, [key]: value }))
+          }
           onPickFolder={(key) => {
             setFolderKey(key);
             openFolders(drafts[key] || undefined);
             showPage("folders");
           }}
         />
-        <Group style={[styles.highlightGroup, styles.detailSection, (missing || busy) && styles.highlightGroupDisabled]}>
+        <Group
+          style={[
+            styles.highlightGroup,
+            styles.detailSection,
+            (missing || busy) && styles.highlightGroupDisabled,
+          ]}
+        >
           <ActionButton
             icon={downloadIcon}
             label={t("hubMcp.install")}
@@ -443,7 +528,17 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
             onPress={askInstall}
           />
         </Group>
-        {!!error && <Text style={[styles.helpText, styles.detailSection, { color: Colors.error }]}>{error}</Text>}
+        {!!error && (
+          <Text
+            style={[
+              styles.helpText,
+              styles.detailSection,
+              { color: Colors.error },
+            ]}
+          >
+            {error}
+          </Text>
+        )}
       </View>
     );
 
@@ -461,8 +556,12 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
         />
         <View style={styles.contentCard}>
           <View style={isDesktop && styles.formRow}>
-            <View style={[styles.settingRowVertical, isDesktop && styles.formCol]}>
-              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("hubMcp.manualSource")}</Text>
+            <View
+              style={[styles.settingRowVertical, isDesktop && styles.formCol]}
+            >
+              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+                {t("hubMcp.manualSource")}
+              </Text>
               <Group>
                 <Selector
                   options={[
@@ -477,18 +576,36 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
                 />
               </Group>
             </View>
-            <View style={[styles.settingRowVertical, isDesktop && styles.formCol]}>
-              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>{t("hubMcp.manualName")}</Text>
+            <View
+              style={[styles.settingRowVertical, isDesktop && styles.formCol]}
+            >
+              <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+                {t("hubMcp.manualName")}
+              </Text>
               <Group>
-                <TextInputField icon={pencilIcon} value={manualName} onChangeText={setManualName} />
+                <TextInputField
+                  icon={pencilIcon}
+                  value={manualName}
+                  onChangeText={setManualName}
+                />
               </Group>
             </View>
           </View>
           <View style={isDesktop && styles.formRow}>
-            <View style={[styles.settingRowVertical, isDesktop && styles.formCol, isDesktop && { marginBottom: Spacing.lg2 }]}>
-              <Text style={styles.settingLabel}>{isBundle ? t("hubMcp.manualUrl") : t("hubMcp.manualPackage")}</Text>
+            <View
+              style={[
+                styles.settingRowVertical,
+                isDesktop && styles.formCol,
+                isDesktop && { marginBottom: Spacing.lg2 },
+              ]}
+            >
+              <Text style={styles.settingLabel}>
+                {isBundle ? t("hubMcp.manualUrl") : t("hubMcp.manualPackage")}
+              </Text>
               <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-                {isBundle ? t("hubMcp.manualUrlHelp") : t("hubMcp.manualPackageHelp")}
+                {isBundle
+                  ? t("hubMcp.manualUrlHelp")
+                  : t("hubMcp.manualPackageHelp")}
               </Text>
               <Group>
                 <TextInputField
@@ -500,10 +617,22 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
                 />
               </Group>
             </View>
-            <View style={[styles.settingRowVertical, { marginBottom: Spacing.lg2 }, isDesktop && styles.formCol]}>
-              <Text style={styles.settingLabel}>{isBundle ? t("hubMcp.manualChecksum") : t("hubMcp.manualVersion")}</Text>
+            <View
+              style={[
+                styles.settingRowVertical,
+                { marginBottom: Spacing.lg2 },
+                isDesktop && styles.formCol,
+              ]}
+            >
+              <Text style={styles.settingLabel}>
+                {isBundle
+                  ? t("hubMcp.manualChecksum")
+                  : t("hubMcp.manualVersion")}
+              </Text>
               <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-                {isBundle ? t("hubMcp.manualChecksumHelp") : t("hubMcp.manualVersionHelp")}
+                {isBundle
+                  ? t("hubMcp.manualChecksumHelp")
+                  : t("hubMcp.manualVersionHelp")}
               </Text>
               <Group>
                 <TextInputField
@@ -516,7 +645,12 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
               </Group>
             </View>
           </View>
-          <Group style={[styles.highlightGroup, !ready && styles.highlightGroupDisabled]}>
+          <Group
+            style={[
+              styles.highlightGroup,
+              !ready && styles.highlightGroupDisabled,
+            ]}
+          >
             <ActionButton
               icon={addIcon}
               label={t("hubMcp.manualContinue")}
@@ -535,11 +669,17 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
       <Text style={styles.helpText}>{t("hubMcp.loading")}</Text>
     ) : (
       <View>
-        <Text style={[styles.settingLabel, styles.familyTitle]}>{t("hubMcp.selection")}</Text>
+        <Text style={[styles.settingLabel, styles.familyTitle]}>
+          {t("hubMcp.selection")}
+        </Text>
         {isDesktop ? (
           <View style={styles.carouselWrap}>{catalog.map(renderCard)}</View>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.carousel}
+          >
             {catalog.map(renderCard)}
           </ScrollView>
         )}
@@ -550,11 +690,17 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
   const searchList = searchLoading ? (
     <Text style={styles.helpText}>{t("hubMcp.loading")}</Text>
   ) : searchFailed ? (
-    <Text style={styles.helpText}>{t("hubMcp.searchFailed")}</Text>
+    <Text style={[styles.helpText, { textAlign: "center" }]}>
+      {t("hubMcp.searchFailed")}
+    </Text>
   ) : results.length > 0 ? (
     <Group>{results.map(renderResult)}</Group>
   ) : (
-    query.trim().length >= MIN_SEARCH_LENGTH && <Text style={styles.helpText}>{t("hubMcp.noResults")}</Text>
+    query.trim().length >= MIN_SEARCH_LENGTH && (
+      <Text style={[styles.helpText, { textAlign: "center" }]}>
+        {t("hubMcp.noResults")}
+      </Text>
+    )
   );
 
   //selection, search and server push like settings pages
@@ -564,27 +710,43 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
         ref={active ? scrollRef : undefined}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
-        onScroll={active ? (e) => setScrolled(e.nativeEvent.contentOffset.y > 4) : undefined}
+        onScroll={
+          active
+            ? (e) => setScrolled(e.nativeEvent.contentOffset.y > 4)
+            : undefined
+        }
         scrollEventThrottle={16}
       >
         {p === "browse" ? (
           <>
             <View style={styles.contentCard}>
-              <View style={styles.settingRowVertical}>{renderSearchField(p)}</View>
+              <View style={styles.settingRowVertical}>
+                {renderSearchField(p)}
+              </View>
               {browseList}
             </View>
             {/* page level navigation */}
             <Group style={styles.groupSpacing}>
-              <ActionButton icon={addIcon} label={t("hubMcp.manual")} onPress={() => showPage("manual")} />
+              <ActionButton
+                icon={addIcon}
+                label={t("hubMcp.manual")}
+                onPress={() => showPage("manual")}
+              />
             </Group>
           </>
         ) : (
           <>
             {(p === "search" || p === "server") && (
-              <View style={[styles.contentCard, styles.searchWithBack]}>{renderSearchField(p)}</View>
+              <View style={[styles.contentCard, styles.searchWithBack]}>
+                {renderSearchField(p)}
+              </View>
             )}
-            {p !== "search" && p !== "server" && <View style={styles.backSpacer} />}
-            {p === "search" && searchList && <View style={styles.contentCard}>{searchList}</View>}
+            {p !== "search" && p !== "server" && (
+              <View style={styles.backSpacer} />
+            )}
+            {p === "search" && searchList && (
+              <View style={styles.contentCard}>{searchList}</View>
+            )}
             {p === "server" && renderServer()}
             {p === "configure" && renderConfigure()}
             {p === "manual" && renderManual()}
@@ -594,7 +756,8 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
                   folders={folders}
                   onOpen={openFolders}
                   onUse={(path) => {
-                    if (folderKey) setDrafts((prev) => ({ ...prev, [folderKey]: path }));
+                    if (folderKey)
+                      setDrafts((prev) => ({ ...prev, [folderKey]: path }));
                     showPage("configure");
                   }}
                 />
@@ -607,7 +770,12 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
       {/* floats over the scroll like the settings back button */}
       {p !== "browse" && (
         <View style={styles.backWrapper} pointerEvents="box-none">
-          <DrawerBackButton kind="back" onPress={handleBack} scrolled={scrolled} pulseKey={p} />
+          <DrawerBackButton
+            kind="back"
+            onPress={handleBack}
+            scrolled={scrolled}
+            pulseKey={p}
+          />
         </View>
       )}
     </>
@@ -656,7 +824,11 @@ export default function HubMcpSheet({ visible, onClose, isLargeScreen = false, i
         message={t("hubMcp.partialMessage")}
         onClose={() => setConfirmPartial(false)}
         buttons={[
-          { text: t("common.cancel"), style: "secondary", onPress: () => setConfirmPartial(false) },
+          {
+            text: t("common.cancel"),
+            style: "secondary",
+            onPress: () => setConfirmPartial(false),
+          },
           { text: t("hubMcp.install"), style: "primary", onPress: install },
         ]}
       />
@@ -674,7 +846,14 @@ type HubFolderSheetProps = {
 };
 
 //folder picker for a server already installed
-export function HubFolderSheet({ start, visible, onPick, onClose, isLargeScreen = false, isDesktop = false }: HubFolderSheetProps) {
+export function HubFolderSheet({
+  start,
+  visible,
+  onPick,
+  onClose,
+  isLargeScreen = false,
+  isDesktop = false,
+}: HubFolderSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -684,7 +863,10 @@ export function HubFolderSheet({ start, visible, onPick, onClose, isLargeScreen 
   const open = (path?: string) => {
     if (!api) return;
     setFolders(null);
-    api.folders(path).then(setFolders).catch(() => setFolders(null));
+    api
+      .folders(path)
+      .then(setFolders)
+      .catch(() => setFolders(null));
   };
 
   //each opening clears the last listing

@@ -338,6 +338,7 @@ export const fr: Translations = {
   "update.later": "Plus tard",
   "update.upToDate": "Opera est à jour.",
   "update.checkFailed": "La recherche de mise à jour a échoué. Vérifie ta connexion.",
+  "update.checkTitle": "Mises à jour",
   "settings.update.checkNow": "Vérifier maintenant",
 
   "settings.nav.search.title": "Rechercher",
@@ -1265,7 +1266,7 @@ export const fr: Translations = {
   "settings.ollama.unreachableTitle": "Serveur injoignable",
   "settings.ollama.unreachableInfo":
     "Ce serveur n'a pas pu être joint.\n\n- Vérifie que le serveur est démarré.\n- Vérifie la connexion réseau du serveur.\n- Assure-toi que l'URL et le port sont corrects.",
-  "settings.ollama.remove.action": "Retirer le serveur",
+  "settings.ollama.remove.action": "Retirer le fournisseur",
   "settings.cloudapi.title": "Serveurs compatibles OpenAI",
   "settings.cloudapi.help":
     "Ajoute le lien API de ton service ou serveur, par exemple https://api.mistral.ai/v1 pour Mistral ou http://localhost:1234/v1 pour LM Studio.",

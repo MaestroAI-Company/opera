@@ -5,19 +5,28 @@ import { useRef, useState } from "react";
 import { useT } from "../../i18n";
 import AppIcon, { IconSource } from "./AppIcon";
 import IconButton from "./IconButton";
-import visionIcon from "../../../assets/icons/vision2.svg";
-import visionOffIcon from "../../../assets/icons/vision_off2.svg";
+import cancelIcon from "../../../assets/icons/cancel2.svg";
+import searchIcon from "../../../assets/icons/search2.svg";
+import visionIcon from "../../../assets/icons/visibility2.svg";
+import visionOffIcon from "../../../assets/icons/visibility_off2.svg";
 
 interface TextInputFieldProps extends TextInputProps {
   icon?: IconSource;
   containerStyle?: StyleProp<ViewStyle>;
+  clearable?: boolean;
+  revealable?: boolean;
   rightIcon?: IconSource;
   rightIconSize?: number;
   rightIconTint?: string;
+  rightIconOpacity?: number;
   rightIconLabel?: string;
   onRightIconPress?: () => void;
-  variant?: "default" | "large";
+  variant?: "default" | "large" | "password" | "search";
 }
+
+const RIGHT_CONTAINER_SIZE = 32;
+const ACTION_ICON_SIZE = 18;
+const ACTION_ICON_OPACITY = 0.6;
 
 export default function TextInputField({
   icon,
@@ -25,15 +34,22 @@ export default function TextInputField({
   containerStyle,
   onFocus,
   onBlur,
+  value,
+  onChangeText,
+  clearable,
+  revealable = true,
   rightIcon,
   rightIconSize = 22,
   rightIconTint,
+  rightIconOpacity,
   rightIconLabel,
   onRightIconPress,
   variant = "default",
   multiline,
   textAlignVertical,
   secureTextEntry,
+  autoCapitalize,
+  autoCorrect,
   ...props
 }: TextInputFieldProps) {
   const Colors = useColors();
@@ -43,6 +59,47 @@ export default function TextInputField({
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const isLarge = variant === "large";
+  const isPassword = variant === "password" || Boolean(secureTextEntry);
+  const isSearch = variant === "search";
+  const leadingIcon = icon ?? (isSearch ? searchIcon : undefined);
+  const showReveal = isPassword && revealable && !rightIcon;
+  const showClear = (clearable ?? isSearch) && !isPassword && !rightIcon && typeof value === "string" && value.length > 0;
+  const trailingKind = rightIcon ? "custom" : showReveal ? "reveal" : showClear ? "clear" : null;
+  const trailing = trailingKind === "custom"
+    ? {
+        icon: rightIcon!,
+        label: rightIconLabel ?? t("common.clear"),
+        size: rightIconSize,
+        tintColor: rightIconTint ?? Colors.error,
+        opacity: rightIconOpacity,
+      }
+    : trailingKind === "reveal"
+      ? {
+          icon: revealed ? visionOffIcon : visionIcon,
+          label: revealed ? t("common.hidePassword") : t("common.showPassword"),
+          size: ACTION_ICON_SIZE,
+          tintColor: rightIconTint ?? Colors.textPrimary,
+          opacity: rightIconOpacity ?? ACTION_ICON_OPACITY,
+        }
+      : trailingKind === "clear"
+        ? {
+            icon: cancelIcon,
+            label: rightIconLabel ?? t("common.clear"),
+            size: ACTION_ICON_SIZE,
+            tintColor: rightIconTint ?? Colors.textPrimary,
+            opacity: rightIconOpacity ?? ACTION_ICON_OPACITY,
+          }
+        : null;
+  //offset the 32px touch box so the icon edge matches the left icon padding
+  const rightInsetOffset = (RIGHT_CONTAINER_SIZE - (trailing?.size ?? ACTION_ICON_SIZE)) / 2;
+  const rightButtonStyle = [
+    styles.rightIconButton,
+    { marginLeft: 10 - rightInsetOffset, marginRight: -rightInsetOffset },
+    isLarge && {
+      alignSelf: "flex-start" as const,
+      marginTop: Spacing.xs2 - rightInsetOffset,
+    },
+  ];
 
   return (
     <Pressable
@@ -56,39 +113,42 @@ export default function TextInputField({
       //skip wrapper on web tab navigation
       tabIndex={-1}
     >
-      {icon && <AppIcon source={icon} style={[styles.icon, isLarge && styles.iconLarge]} />}
+      {leadingIcon && <AppIcon source={leadingIcon} style={[styles.icon, isLarge && styles.iconLarge]} />}
       <TextInput
         ref={inputRef}
         style={[styles.input, isLarge && styles.inputLarge, style]}
         placeholderTextColor={Colors.textMuted}
+        value={value}
+        onChangeText={onChangeText}
         multiline={multiline ?? isLarge}
         textAlignVertical={textAlignVertical ?? (isLarge ? "top" : undefined)}
         onFocus={(e) => { setFocused(true); onFocus?.(e); }}
         onBlur={(e) => { setFocused(false); onBlur?.(e); }}
-        secureTextEntry={secureTextEntry && !revealed}
+        secureTextEntry={isPassword && !revealed}
+        autoCapitalize={autoCapitalize ?? (isPassword || isSearch ? "none" : undefined)}
+        autoCorrect={autoCorrect ?? (isPassword || isSearch ? false : undefined)}
         {...props}
       />
-      {secureTextEntry ? (
+      {trailing && (
         <IconButton
-          icon={revealed ? visionOffIcon : visionIcon}
-          label={revealed ? t("common.hidePassword") : t("common.showPassword")}
-          onPress={() => setRevealed((v) => !v)}
-          size={22}
-          tintColor={Colors.textPrimary}
-          containerSize={32}
-          pressedColor={Colors.surfacePressed}
-          style={styles.rightIconButton}
-        />
-      ) : rightIcon && (
-        <IconButton
-          icon={rightIcon}
-          label={rightIconLabel ?? t("common.clear")}
-          onPress={onRightIconPress}
-          size={rightIconSize}
-          tintColor={rightIconTint ?? Colors.error}
-          containerSize={32}
-          pressedColor={Colors.surfacePressed}
-          style={[styles.rightIconButton, isLarge && styles.rightIconButtonLarge]}
+          icon={trailing.icon}
+          label={trailing.label}
+          onPress={
+            trailingKind === "reveal"
+              ? () => setRevealed((v) => !v)
+              : trailingKind === "clear"
+                ? () => {
+                    inputRef.current?.clear();
+                    onChangeText?.("");
+                  }
+                : onRightIconPress
+          }
+          size={trailing.size}
+          tintColor={trailing.tintColor}
+          iconOpacity={trailing.opacity}
+          containerSize={RIGHT_CONTAINER_SIZE}
+          pressedColor={Colors.overlaySubtle}
+          style={rightButtonStyle}
         />
       )}
     </Pressable>
@@ -123,10 +183,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   rightIconButton: {
     alignSelf: "center",
-    marginLeft: 10,
-  },
-  rightIconButtonLarge: {
-    alignSelf: "flex-start",
   },
   input: {
     flex: 1,

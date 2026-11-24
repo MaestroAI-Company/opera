@@ -413,6 +413,7 @@ export const it: Translations = {
   "settings.hub.updateChecksHelp": "Sampler Hub e llama.cpp cercano da soli nuove versioni su GitHub. Disattiva per fermare queste richieste, llama.cpp mantiene allora la versione installata.",
   "update.upToDate": "Opera è aggiornato.",
   "update.checkFailed": "La ricerca degli aggiornamenti non è riuscita. Controlla la connessione.",
+  "update.checkTitle": "Aggiornamenti",
   "settings.update.checkNow": "Controlla ora",
   "hubUpdate.upToDate": "Sampler Hub è aggiornato.",
   "hubUpdate.checkFailed": "La ricerca degli aggiornamenti non è riuscita: {error}",
@@ -1217,7 +1218,7 @@ export const it: Translations = {
   "settings.ollama.unreachableTitle": "Server non raggiungibile",
   "settings.ollama.unreachableInfo":
     "Impossibile raggiungere questo server.\n\n- Verifica che il server sia in esecuzione.\n- Verifica la connessione di rete del server.\n- Assicurati che URL e porta siano corretti.",
-  "settings.ollama.remove.action": "Rimuovi il server",
+  "settings.ollama.remove.action": "Rimuovi il provider",
   "settings.cloudapi.title": "Server compatibili con OpenAI",
   "settings.cloudapi.help":
     "Aggiungi il link API del tuo servizio o server, per esempio https://api.mistral.ai/v1 per Mistral o http://localhost:1234/v1 per LM Studio.",

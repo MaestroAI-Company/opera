@@ -335,6 +335,7 @@ export const en = {
   "update.later": "Later",
   "update.upToDate": "Opera is up to date.",
   "update.checkFailed": "The update check failed. Check your connection.",
+  "update.checkTitle": "Updates",
   "settings.update.checkNow": "Check now",
 
   "settings.nav.search.title": "Search",
@@ -1245,7 +1246,7 @@ export const en = {
   "settings.ollama.unreachableTitle": "Server unreachable",
   "settings.ollama.unreachableInfo":
     "This server could not be reached.\n\n- Check that the server is running.\n- Check the server's network connection.\n- Make sure the URL and port are correct.",
-  "settings.ollama.remove.action": "Remove server",
+  "settings.ollama.remove.action": "Remove Provider",
   "settings.cloudapi.title": "OpenAI-compatible servers",
   "settings.cloudapi.help":
     "Add the API link of your service or server, for example https://api.mistral.ai/v1 for Mistral or http://localhost:1234/v1 for LM Studio.",

@@ -1172,7 +1172,6 @@ const makeStyles = (Colors: ThemeColors) =>
     },
     sheetContent: {
       paddingHorizontal: Spacing.lg2,
-      paddingBottom: Spacing.lg,
     },
     //sits in the hidden cta slot
     credit: {

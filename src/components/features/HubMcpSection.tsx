@@ -17,7 +17,7 @@ import binIcon from "../../../assets/icons/delete2.svg";
 import fileIcon from "../../../assets/icons/file.svg";
 import keyIcon from "../../../assets/icons/key2.svg";
 import edit2Icon from "../../../assets/icons/edit2.svg";
-import downloadIcon from "../../../assets/icons/download2.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
 import toolIcon from "../../../assets/icons/tool.svg";
 import tool2Icon from "../../../assets/icons/tool2.svg";
 import reconnectIcon from "../../../assets/icons/reload2.svg";

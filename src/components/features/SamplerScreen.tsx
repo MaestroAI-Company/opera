@@ -125,8 +125,7 @@ import tool2Icon from "../../../assets/icons/tool2.svg";
 import settingsIcon from "../../../assets/icons/settings.svg";
 import addIcon from "../../../assets/icons/add.svg";
 import add2Icon from "../../../assets/icons/add2.svg";
-import downloadIcon from "../../../assets/icons/download2.svg";
-import validIcon from "../../../assets/icons/valid2.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
 import sampler2Icon from "../../../assets/icons/sampler2.svg";
 import cancelIcon from "../../../assets/icons/cancel2.svg";
 import binIcon from "../../../assets/icons/delete2.svg";
@@ -1893,7 +1892,7 @@ export default function SamplerScreen({
         />
       )}
       <IconButton
-        icon={homeEditing ? validIcon : editIcon}
+        icon={homeEditing ? activateIcon : editIcon}
         label={homeEditing ? t("common.done") : t("sampler.home.edit")}
         containerSize={40}
         tintColor={Colors.textPrimary}

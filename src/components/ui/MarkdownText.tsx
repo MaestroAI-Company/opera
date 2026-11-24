@@ -19,7 +19,7 @@ import MarkdownImage from "./MarkdownImage";
 import { ensureKatexStylesheet, getKatexCss, KATEX_STYLESHEET_NAME } from "./katexStylesheet";
 import copyIcon from "../../../assets/icons/copy2.svg";
 import fullIcon from "../../../assets/icons/full2.svg";
-import downloadIcon from "../../../assets/icons/download2.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
 
 function escapeHtml(text: string): string {
   return text

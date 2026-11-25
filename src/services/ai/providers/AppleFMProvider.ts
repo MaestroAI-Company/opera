@@ -1,5 +1,6 @@
 import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
 import type { LocalBackend, LocalModelSheet, LocalModelStatus } from './LocalProvider';
+import { currentPlatform } from './sources';
 import { MessageMetrics } from '../../db/DatabaseService';
 import { ToolCall, ToolDefinition } from "../tools/ITool";
 import {
@@ -45,8 +46,37 @@ function iosNative(): AppleFMNative | null {
   };
 }
 
+export function isMacDesktop(): boolean {
+  return currentPlatform() === "desktop" && /Mac/.test(navigator.userAgent);
+}
+
+function desktopNative(): AppleFMNative {
+  return {
+    status: async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return invoke<number>("afm_status");
+    },
+    generate: async (requestId, system, prompt, onChunk) => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlisten = await listen<{ requestId: string; chunk: string }>("afm-token", (e) => {
+        if (e.payload.requestId === requestId && e.payload.chunk) onChunk(e.payload.chunk);
+      });
+      try {
+        await invoke("afm_generate", { requestId, system, prompt });
+      } finally {
+        unlisten();
+      }
+    },
+    abort: (requestId) => {
+      import("@tauri-apps/api/core").then(({ invoke }) => invoke("afm_abort", { requestId }));
+    },
+  };
+}
+
 function resolveNative(): AppleFMNative | null {
   if (Platform.OS === "ios") return iosNative();
+  if (isMacDesktop()) return desktopNative();
   return null;
 }
 

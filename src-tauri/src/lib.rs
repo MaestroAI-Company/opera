@@ -1,5 +1,7 @@
 #[cfg(desktop)]
 mod ai;
+#[cfg(target_os = "macos")]
+mod apple_fm;
 #[cfg(desktop)]
 mod hub;
 //sandbox allows only this login api
@@ -256,6 +258,12 @@ pub fn run() {
             hub::hub_install_update,
             #[cfg(desktop)]
             hub::hub_computer_name,
+            #[cfg(target_os = "macos")]
+            apple_fm::afm_status,
+            #[cfg(target_os = "macos")]
+            apple_fm::afm_generate,
+            #[cfg(target_os = "macos")]
+            apple_fm::afm_abort,
             #[cfg(all(desktop, feature = "direct"))]
             updater::app_update_install,
             #[cfg(all(target_os = "macos", not(feature = "direct")))]

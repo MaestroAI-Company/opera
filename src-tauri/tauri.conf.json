@@ -46,6 +46,7 @@
     "publisher": "Maestro AI",
     "copyright": "© Maestro AI",
     "macOS": {
+      "minimumSystemVersion": "12.0",
       "signingIdentity": "-",
       "entitlements": "./Entitlements.plist"
     },

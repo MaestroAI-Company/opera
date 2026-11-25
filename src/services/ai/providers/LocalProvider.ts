@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { IAIProvider } from './IAIProvider';
 import { AICoreProvider, getAICoreModelLabel } from './AICoreProvider';
-import { AppleFMProvider, getAppleFMModelLabel } from './AppleFMProvider';
+import { AppleFMProvider, getAppleFMModelLabel, isMacDesktop } from './AppleFMProvider';
 import { BrowserAIProvider, getBrowserModelLabel, isBrowserModel } from './BrowserAIProvider';
 import { currentPlatform } from './sources';
 import { MessageMetrics } from '../../db/DatabaseService';
@@ -49,9 +49,8 @@ export function getLocalModelLabel(modelName: string, short = false): string {
 function resolveBackend(): LocalBackend | null {
   if (Platform.OS === "android") return new AICoreProvider();
   if (currentPlatform() === "web") return new BrowserAIProvider();
-  if (Platform.OS === "ios") return new AppleFMProvider();
+  if (Platform.OS === "ios" || isMacDesktop()) return new AppleFMProvider();
   //todo: tauri windows -> phi silica
-  //todo: tauri macos -> apple foundation models
   return null;
 }
 

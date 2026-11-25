@@ -14,10 +14,6 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2.6.3", features = [] }
 
-#links the apple foundation models package
-[target.'cfg(target_os = "macos")'.build-dependencies]
-swift-rs = { version = "1.0.7", features = ["build"] }
-
 [features]
 default = ["direct"]
 #off in the mac app store build
@@ -82,3 +78,7 @@ tauri-plugin-wayland-nvidia-quirk = "0.1"
 ashpd = { version = "0.13", default-features = false, features = ["tokio", "global_shortcuts"] }
 futures-util = "0.3"
 webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
+
+#links the apple foundation models package
+[target.'cfg(target_os = "macos")'.build-dependencies]
+swift-rs = { version = "1.0.7", features = ["build"] }

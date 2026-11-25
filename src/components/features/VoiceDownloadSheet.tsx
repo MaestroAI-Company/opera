@@ -19,7 +19,7 @@ import ProgressBar from "../ui/ProgressBar";
 import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
 import { TTS_ENGINE_KEYS } from "./VoiceEngineCard";
 
-import downloadIcon from "../../../assets/icons/download2.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
 import cancelIcon from "../../../assets/icons/cancel2.svg";
 
 const DESKTOP_CARD_WIDTH = 560;

@@ -11,6 +11,7 @@ import {
 } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+import { getHubLabel } from "../../services/ai/providers/sources";
 import {
   HubInvite,
   LinkJoining,
@@ -258,7 +259,7 @@ export function HubQrContent({
       {(!bare || failed) && (
         <Text style={[styles.helpText, !horizontal && { marginBottom: Spacing.md }]}>
           {failed
-            ? t("hubQr.failed")
+            ? t("hubQr.failed", { hub: hub?.name || getHubLabel() })
             : mode === "link"
               ? t("hubQr.linkHelp")
               : t("hubQr.help")}
@@ -277,22 +278,22 @@ export function HubQrContent({
       )}
     </View>
   ) : loading ? (
-    <Group style={styles.groupSpacingTight}>
+    <View style={styles.groupSpacingTight}>
       <View style={[styles.qr, styles.qrLoading]}>
         <ActivityIndicator color={colors.textMuted} />
       </View>
-    </Group>
+    </View>
   ) : (
     invite &&
     svg && (
-      <Group style={styles.groupSpacingTight}>
+      <View style={styles.groupSpacingTight}>
         <View style={styles.qr}>
           <SvgXml xml={svg} width="100%" height="100%" />
         </View>
         <Text style={styles.code} selectable>
           {invite.code}
         </Text>
-      </Group>
+      </View>
     )
   );
 
@@ -322,7 +323,7 @@ export function HubQrContent({
             {t("hubQr.joiningTitle", { device: joining.device })}
           </Text>
           <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-            {failed ? t("hubQr.failed") : t("hubQr.joiningHelp")}
+            {failed ? t("hubQr.failed", { hub: hub?.name || getHubLabel() }) : t("hubQr.joiningHelp")}
           </Text>
           <Group style={styles.groupSpacingTight}>
             <Text style={[styles.code, styles.digits]}>{joining.digits}</Text>
@@ -466,8 +467,8 @@ const makeStyles = (Colors: ThemeColors) =>
     rowSide: {
       flex: 1,
       justifyContent: "space-between",
-      //level with the qr inside its padding
-      paddingVertical: Spacing.md,
+      //buttons keep the same gap below as on the side
+      paddingTop: Spacing.md,
     },
     qrLoading: {
       alignItems: "center",

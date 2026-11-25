@@ -12,9 +12,9 @@ import { downloadCodeFile } from "../../services/codeDownload";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 import copyIcon from "../../../assets/icons/copy2.svg";
-import downloadIcon from "../../../assets/icons/download2.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
 
-const DESKTOP_CARD_WIDTH = 840;
+const DESKTOP_CARD_WIDTH = 560;
 
 export type PreviewCode = { code: string; language?: string; title?: string; incognito?: boolean };
 
@@ -131,7 +131,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   content: {
     paddingHorizontal: Spacing.lg2,
-    paddingBottom: Spacing.lg,
     gap: Spacing.xxl2,
   },
   codeContainer: {

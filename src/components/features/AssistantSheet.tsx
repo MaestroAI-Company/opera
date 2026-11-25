@@ -93,7 +93,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   content: {
     paddingHorizontal: Spacing.lg2,
-    paddingBottom: Spacing.lg,
   },
   contentCard: {
     backgroundColor: Colors.surface,

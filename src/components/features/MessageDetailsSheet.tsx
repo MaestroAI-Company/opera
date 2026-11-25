@@ -12,7 +12,7 @@ import Group from "../ui/Group";
 import { describeToolCall } from "../ui/MarkdownText";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
-const DESKTOP_CARD_WIDTH = 840;
+const DESKTOP_CARD_WIDTH = 560;
 
 const REFLECTION_KEYS = {
   none: "reflection.none",
@@ -25,12 +25,13 @@ export type PreviewDetails = { model?: string; metrics?: MessageMetrics; thinkin
 type MessageDetailsSheetProps = {
   details: PreviewDetails | null;
   onClose: () => void;
+  showAdvanced?: boolean;
   isLargeScreen?: boolean;
   isDesktop?: boolean;
 };
 
 //technical details of an assistant reply
-export default function MessageDetailsSheet({ details, onClose, isLargeScreen = false, isDesktop = false }: MessageDetailsSheetProps) {
+export default function MessageDetailsSheet({ details, onClose, showAdvanced = false, isLargeScreen = false, isDesktop = false }: MessageDetailsSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const { height: windowHeight } = useWindowDimensions();
@@ -45,13 +46,13 @@ export default function MessageDetailsSheet({ details, onClose, isLargeScreen = 
   const rows = [
     shown?.model ? { label: t("messageDetails.model"), value: shown.model } : null,
     metrics?.timeSec != null ? { label: t("messageDetails.time"), value: `${metrics.timeSec.toFixed(1)}s` } : null,
-    metrics?.tokens != null ? { label: t("messageDetails.tokens"), value: String(metrics.tokens) } : null,
-    metrics?.tokensPerSec != null ? { label: t("messageDetails.speed"), value: metrics.tokensPerSec.toFixed(1) } : null,
-    metrics?.systemPrompt ? { label: t("messageDetails.prompt"), value: metrics.systemPrompt } : null,
+    showAdvanced && metrics?.tokens != null ? { label: t("messageDetails.tokens"), value: String(metrics.tokens) } : null,
+    showAdvanced && metrics?.tokensPerSec != null ? { label: t("messageDetails.speed"), value: metrics.tokensPerSec.toFixed(1) } : null,
+    showAdvanced && metrics?.systemPrompt ? { label: t("messageDetails.prompt"), value: metrics.systemPrompt } : null,
     thinking ? { label: t("messageDetails.thinking"), value: reflectionKey ? t(reflectionKey) : thinking } : null,
   ].filter((r): r is { label: string; value: string } => r !== null);
   //reasoning only when the model was asked to think
-  const reasoning = thinking !== "none" ? shown?.thinkingText ?? "" : "";
+  const reasoning = showAdvanced && thinking !== "none" ? shown?.thinkingText ?? "" : "";
   //rows are truncated so errors get their own block
   const error = metrics?.error ?? "";
 
@@ -81,10 +82,10 @@ export default function MessageDetailsSheet({ details, onClose, isLargeScreen = 
                     />
                   ))}
                 </Group>
-                {!!metrics?.systemPrompt?.endsWith(STANDBY_PROMPT_TAG) && (
+                {showAdvanced && !!metrics?.systemPrompt?.endsWith(STANDBY_PROMPT_TAG) && (
                   <Text style={styles.helpText}>{t("messageDetails.standbyNote")}</Text>
                 )}
-                {!!metrics?.systemPrompt?.endsWith(LIVE_PROMPT_TAG) && (
+                {showAdvanced && !!metrics?.systemPrompt?.endsWith(LIVE_PROMPT_TAG) && (
                   <Text style={styles.helpText}>{t("messageDetails.liveNote")}</Text>
                 )}
               </View>
@@ -95,7 +96,7 @@ export default function MessageDetailsSheet({ details, onClose, isLargeScreen = 
                 <Text style={styles.errorText} selectable={true}>{error}</Text>
               </View>
             )}
-            {shown.toolCalls.length > 0 && (
+            {showAdvanced && shown.toolCalls.length > 0 && (
               <View style={styles.card}>
                 <Text style={styles.cardLabel}>{t("messageDetails.tools")}</Text>
                 {shown.toolCalls.map((call, i) => (
@@ -150,7 +151,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   content: {
     paddingHorizontal: Spacing.lg2,
-    paddingBottom: Spacing.lg,
     gap: Spacing.xxl2,
   },
   infoGroup: {

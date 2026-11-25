@@ -12,7 +12,7 @@ import { renderMarkdown } from "../ui/MarkdownText";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 import arrowIcon from "../../../assets/icons/arrow2.svg";
-import downloadIcon from "../../../assets/icons/download2.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
 import githubIcon from "../../../assets/icons/github.svg";
 
 const DESKTOP_CARD_WIDTH = 420;

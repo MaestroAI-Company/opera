@@ -21,6 +21,7 @@ import {
 } from "../../hooks/useHubModels";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+import { getHubLabel } from "../../services/ai/providers/sources";
 import {
   fetchModelDescription,
   formatBytes,
@@ -38,8 +39,7 @@ import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
 import PageStack from "./PageStack";
 
 import arrowIcon from "../../../assets/icons/arrow2.svg";
-import searchIcon from "../../../assets/icons/search2.svg";
-import downloadIcon from "../../../assets/icons/download2.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
 
 const DESKTOP_CARD_WIDTH = 840;
 const OTHER_FAMILY = "other";
@@ -288,13 +288,13 @@ export default function HubModelsSheet({
 
   //nothing until a query goes out
   const searchList = searchLoading ? (
-    <View style={styles.contentCard}>
-      <Text style={styles.helpText}>{t("settings.litert.loading")}</Text>
-    </View>
+    <Text style={[styles.helpText, { textAlign: "center" }]}>
+      {t("settings.litert.loading")}
+    </Text>
   ) : searchFailed ? (
-    <View style={styles.contentCard}>
-      <Text style={styles.helpText}>{t("settings.litert.loadFailed")}</Text>
-    </View>
+    <Text style={[styles.helpText, { textAlign: "center" }]}>
+      {t("settings.litert.loadFailed")}
+    </Text>
   ) : results.length > 0 ? (
     <>
       <View style={styles.searchResultsHeader}>
@@ -304,9 +304,9 @@ export default function HubModelsSheet({
     </>
   ) : (
     query.trim().length >= MIN_SEARCH_LENGTH && (
-      <View style={styles.contentCard}>
-        <Text style={styles.helpText}>{t("hubModels.noResults")}</Text>
-      </View>
+      <Text style={[styles.helpText, { textAlign: "center" }]}>
+        {t("hubModels.noResults")}
+      </Text>
     )
   );
 
@@ -410,15 +410,13 @@ export default function HubModelsSheet({
   const renderSearchField = (p: Page) => (
     <Group>
       <TextInputField
-        icon={searchIcon}
+        variant="search"
         placeholder={t("hubModels.searchPlaceholder")}
         //other pages only lead to the search page
         value={p === "search" ? query : ""}
         onChangeText={setQuery}
         onFocus={p === "search" ? () => setHandoff(false) : openSearch}
         autoFocus={p === "search" && handoff}
-        autoCapitalize="none"
-        autoCorrect={false}
       />
     </Group>
   );
@@ -500,7 +498,7 @@ export default function HubModelsSheet({
       <NotificationModal
         visible={!!pending}
         title={t("hubModels.downloadTitle", { name: pending ? fileStem(pending.file) : "" })}
-        message={t("hubModels.downloadMessage", { size: formatBytes(pending?.size ?? 0) })}
+        message={t("hubModels.downloadMessage", { hub: getHubLabel(), size: formatBytes(pending?.size ?? 0) })}
         onClose={() => setPending(null)}
         buttons={[
           { text: t("common.cancel"), style: "secondary", onPress: () => setPending(null) },

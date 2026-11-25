@@ -1,5 +1,13 @@
 import LottieView from "lottie-react-native";
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Animated,
   DeviceEventEmitter,
@@ -26,6 +34,16 @@ import Reanimated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
+import botIcon from "../../../assets/icons/bot.svg";
+import brainIcon from "../../../assets/icons/brain2.svg";
+import videoIcon from "../../../assets/icons/camera2.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
+import micIcon from "../../../assets/icons/microphone2.svg";
+import quickIcon from "../../../assets/icons/quick2.svg";
+import tokenIcon from "../../../assets/icons/token.svg";
+import toolIcon from "../../../assets/icons/tool2.svg";
+import visionIcon from "../../../assets/icons/visibility2.svg";
+import lowIcon from "../../../assets/icons/weak2.svg";
 import { type ModelCapabilityId } from "../../../constants/modelCapabilities";
 import {
   Fonts,
@@ -37,33 +55,44 @@ import {
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { AIModule } from "../../services/ai/AIModule";
-import { getLocalModelLabel, isLocalModel } from "../../services/ai/providers/LocalProvider";
-import { getLiteRTModelLabel, isLiteRTModel, subscribeLiteRTDownload } from "../../services/ai/providers/LiteRTProvider";
-import { getCachedModels, getLastModel, hydrateModelCache, setCachedModels, setLastModel } from "../../services/ai/providers/modelCache";
-import { buildSources, getOllamaTuning, HUB_PROVIDER_ID, hubModelKeyOf, ModelSource, splitHubModelKey } from "../../services/ai/providers/sources";
 import { estimateContextTokens } from "../../services/ai/generation/chatGeneration";
+import { modelContextCap } from "../../services/ai/providers/huggingFaceCatalog";
+import {
+  getLiteRTModelLabel,
+  isLiteRTModel,
+  subscribeLiteRTDownload,
+} from "../../services/ai/providers/LiteRTProvider";
+import {
+  getLocalModelLabel,
+  isLocalModel,
+} from "../../services/ai/providers/LocalProvider";
+import {
+  getCachedModels,
+  getLastModel,
+  hydrateModelCache,
+  setCachedModels,
+  setLastModel,
+} from "../../services/ai/providers/modelCache";
+import {
+  buildSources,
+  getOllamaTuning,
+  getSamplerLabel,
+  HUB_PROVIDER_ID,
+  hubModelKeyOf,
+  ModelSource,
+  splitHubModelKey,
+} from "../../services/ai/providers/sources";
 import { MessageMetrics } from "../../services/db/DatabaseService";
 import { AppEvents } from "../../services/events";
-import { modelContextCap } from "../../services/ai/providers/huggingFaceCatalog";
 import { Settings } from "../../services/settings/SettingsService";
+import AppIcon, { type IconSource } from "../ui/AppIcon";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
+import { pressStyle } from "../ui/pressStyle";
 import ProgressBar from "../ui/ProgressBar";
 import SliderToggle, { SliderToggleOption } from "../ui/SliderToggle";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
-import AppIcon, { type IconSource } from "../ui/AppIcon";
-import { pressStyle } from "../ui/pressStyle";
 import { vibrate } from "@/services/haptics";
-import botIcon from "../../../assets/icons/bot.svg";
-import downloadIcon from "../../../assets/icons/download2.svg";
-import tokenIcon from "../../../assets/icons/token.svg";
-import quickIcon from "../../../assets/icons/quick2.svg";
-import lowIcon from "../../../assets/icons/weak2.svg";
-import visionIcon from "../../../assets/icons/vision2.svg";
-import micIcon from "../../../assets/icons/microphone2.svg";
-import videoIcon from "../../../assets/icons/camera2.svg";
-import toolIcon from "../../../assets/icons/tool2.svg";
-import brainIcon from "../../../assets/icons/brain2.svg";
 
 const loadingAnimation = require("../../../assets/animations/loading.json");
 
@@ -98,7 +127,11 @@ const ANCHORED_CARD_WIDTH = 320;
 const CENTERED_CARD_WIDTH = 840;
 
 //context size configured for the active source
-const contextWindowFor = (service: string, ollamaUrl: string, model: string) => {
+const contextWindowFor = (
+  service: string,
+  ollamaUrl: string,
+  model: string,
+) => {
   if (service === "litert") {
     //model cache caps the setting
     return Math.min(
@@ -113,8 +146,12 @@ const contextWindowFor = (service: string, ollamaUrl: string, model: string) => 
 type RowLayout = { y: number; height: number } | null;
 
 //clamps centered offset to scroll bounds
-const centeredOffset = (start: number, size: number, viewport: number, content: number) =>
-  Math.max(0, Math.min(start + size / 2 - viewport / 2, content - viewport));
+const centeredOffset = (
+  start: number,
+  size: number,
+  viewport: number,
+  content: number,
+) => Math.max(0, Math.min(start + size / 2 - viewport / 2, content - viewport));
 
 //rubber-band curve for vertical pull
 const rubberBand = (d: number, dim: number) => {
@@ -135,14 +172,18 @@ export type ModelSelectorTriggerProps = {
 };
 
 export const displayName = (model: string) =>
-  isLocalModel(model) ? getLocalModelLabel(model, true)
-    : isLiteRTModel(model) ? getLiteRTModelLabel(model)
+  isLocalModel(model)
+    ? getLocalModelLabel(model, true)
+    : isLiteRTModel(model)
+      ? getLiteRTModelLabel(model)
       : model;
 
 //keeps the model pill narrow
 const MODEL_MAX_CHARS = 16;
 export const truncateModel = (name: string) =>
-  name.length > MODEL_MAX_CHARS ? `${name.slice(0, MODEL_MAX_CHARS - 1)}…` : name;
+  name.length > MODEL_MAX_CHARS
+    ? `${name.slice(0, MODEL_MAX_CHARS - 1)}…`
+    : name;
 
 //button trigger in topbar
 export function ModelSelectorTrigger({
@@ -161,11 +202,16 @@ export function ModelSelectorTrigger({
         {!flat && <View style={styles.shadowBlock} />}
         <Pressable
           onPress={onPress}
-          style={pressStyle([styles.trigger, flat && styles.triggerFlat], "surface")}
+          style={pressStyle(
+            [styles.trigger, flat && styles.triggerFlat],
+            "surface",
+          )}
         >
           {!flat && <AppIcon source={botIcon} style={styles.icon} />}
           <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
-            {selectedModel ? displayName(selectedModel) : t("modelSelector.placeholder")}
+            {selectedModel
+              ? displayName(selectedModel)
+              : t("modelSelector.placeholder")}
           </Text>
         </Pressable>
       </View>
@@ -173,7 +219,13 @@ export function ModelSelectorTrigger({
   );
 }
 
-function Capabilities({ caps, onPrimary = false }: { caps: string; onPrimary?: boolean }) {
+function Capabilities({
+  caps,
+  onPrimary = false,
+}: {
+  caps: string;
+  onPrimary?: boolean;
+}) {
   const styles = useThemedStyles(makeStyles);
   const shown = CAPABILITY_ICONS.filter((c) => caps.split(",").includes(c.id));
   if (shown.length === 0) return null;
@@ -183,7 +235,10 @@ function Capabilities({ caps, onPrimary = false }: { caps: string; onPrimary?: b
         <AppIcon
           key={c.id}
           source={c.icon}
-          style={[styles.capabilityIcon, onPrimary && styles.capabilityIconOnPrimary]}
+          style={[
+            styles.capabilityIcon,
+            onPrimary && styles.capabilityIconOnPrimary,
+          ]}
         />
       ))}
     </View>
@@ -221,7 +276,11 @@ const ModelRow = memo(function ModelRow({
         onSelect(model);
       }}
       style={pressStyle(
-        [styles.option, highlighted && styles.optionSelected, height > 0 && { height }],
+        [
+          styles.option,
+          highlighted && styles.optionSelected,
+          height > 0 && { height },
+        ],
         highlighted ? { backgroundColor: Colors.primaryBright } : "subtle",
       )}
     >
@@ -330,13 +389,20 @@ export function ModelSelectorDrawer({
   const [browsedKey, setBrowsedKey] = useState<string | null>(null);
 
   useEffect(() => {
-    AIModule.isModeAvailable("local").then(setLocalAvailable).catch(() => setLocalAvailable(false));
-    const sub = DeviceEventEmitter.addListener(AppEvents.settingsChanged, () => setSourcesRevision((r) => r + 1));
+    AIModule.isModeAvailable("local")
+      .then(setLocalAvailable)
+      .catch(() => setLocalAvailable(false));
+    const sub = DeviceEventEmitter.addListener(AppEvents.settingsChanged, () =>
+      setSourcesRevision((r) => r + 1),
+    );
     //downloaded models must appear here too
     const unsubscribe = subscribeLiteRTDownload((_, snapshot) => {
       if (!snapshot) setSourcesRevision((r) => r + 1);
     });
-    return () => { sub.remove(); unsubscribe(); };
+    return () => {
+      sub.remove();
+      unsubscribe();
+    };
   }, []);
 
   //settings may have changed while the panel was closed
@@ -349,7 +415,12 @@ export function ModelSelectorDrawer({
     const all = buildSources(localAvailable);
     const hub = all.filter((s) => s.service === HUB_PROVIDER_ID);
     if (hub.length === 0) return { sources: all, hubUrls: [] };
-    const merged: ModelSource = { key: HUB_PROVIDER_ID, service: HUB_PROVIDER_ID, label: "Sampler Hub", url: "" };
+    const merged: ModelSource = {
+      key: HUB_PROVIDER_ID,
+      service: HUB_PROVIDER_ID,
+      label: getSamplerLabel(),
+      url: "",
+    };
     return {
       sources: [...all.filter((s) => s.service !== HUB_PROVIDER_ID), merged],
       hubUrls: hub.map((s) => s.url),
@@ -378,7 +449,9 @@ export function ModelSelectorDrawer({
   const isBrowsingActive = matchesActive(browsedSource);
   //match composite hub row key
   const selectedRow =
-    isHub(browsedSource) && selectedModel ? hubModelKeyOf(ollamaUrl, selectedModel) : selectedModel;
+    isHub(browsedSource) && selectedModel
+      ? hubModelKeyOf(ollamaUrl, selectedModel)
+      : selectedModel;
   //switch server when picking hub row
   const pickRow = (source: ModelSource, row: string) => {
     if (!isHub(source) || !row) {
@@ -387,7 +460,8 @@ export function ModelSelectorDrawer({
       return;
     }
     const { url, model } = splitHubModelKey(row);
-    if (aiService !== source.service || url !== ollamaUrl) onServiceChange(source.service, url);
+    if (aiService !== source.service || url !== ollamaUrl)
+      onServiceChange(source.service, url);
     onModelChange(model);
   };
 
@@ -439,12 +513,14 @@ export function ModelSelectorDrawer({
       const lists = await Promise.all(
         urls.map(async (url) => {
           if (!isHub(source)) {
-            if (!(await AIModule.isSourceAvailable(source.service, url))) return null;
+            if (!(await AIModule.isSourceAvailable(source.service, url)))
+              return null;
             return AIModule.getModelsFor(source.service, url);
           }
           //isolate individual hub server failures
           try {
-            if (!(await AIModule.isSourceAvailable(source.service, url))) return null;
+            if (!(await AIModule.isSourceAvailable(source.service, url)))
+              return null;
             const list = await AIModule.getModelsFor(source.service, url);
             return list.map((m) => hubModelKeyOf(url, m));
           } catch {
@@ -579,9 +655,12 @@ export function ModelSelectorDrawer({
 
   //friendly label for local variants
   const displayName = (model: string) =>
-    isHub(browsedSource) ? splitHubModelKey(model).model
-      : isLocalModel(model) ? getLocalModelLabel(model, true)
-        : isLiteRTModel(model) ? getLiteRTModelLabel(model)
+    isHub(browsedSource)
+      ? splitHubModelKey(model).model
+      : isLocalModel(model)
+        ? getLocalModelLabel(model, true)
+        : isLiteRTModel(model)
+          ? getLiteRTModelLabel(model)
           : model;
 
   const displayModels = useMemo(() => {
@@ -589,7 +668,9 @@ export function ModelSelectorDrawer({
   }, [models]);
 
   //keyed by source and model
-  const [capabilities, setCapabilities] = useState<Record<string, string[]>>({});
+  const [capabilities, setCapabilities] = useState<Record<string, string[]>>(
+    {},
+  );
   const capsKey = (model: string) => `${browsedSource?.key}:${model}`;
   useEffect(() => {
     //confirmed rows, offline would hang
@@ -598,8 +679,14 @@ export function ModelSelectorDrawer({
     const source = browsedSource;
     Promise.all(
       models.map((model) => {
-        const row = isHub(source) ? splitHubModelKey(model) : { url: source.url, model };
-        return AIModule.getModelCapabilitiesFor(source.service, row.url, row.model)
+        const row = isHub(source)
+          ? splitHubModelKey(model)
+          : { url: source.url, model };
+        return AIModule.getModelCapabilitiesFor(
+          source.service,
+          row.url,
+          row.model,
+        )
           .then((caps) => [`${source.key}:${model}`, caps] as const)
           .catch(() => [`${source.key}:${model}`, [] as string[]] as const);
       }),
@@ -610,11 +697,17 @@ export function ModelSelectorDrawer({
   }, [visible, hasFetched, isAvailable, models, browsedSource?.key]);
 
   //joined, memo compares by value
-  const capsOf = (model: string) => (capabilities[capsKey(model)] ?? []).join(",");
+  const capsOf = (model: string) =>
+    (capabilities[capsKey(model)] ?? []).join(",");
 
   //visible refreshes instruction and tools
   const usedTokens = useMemo(
-    () => estimateContextTokens(selectedModel, Settings.getCached().instruction, messages),
+    () =>
+      estimateContextTokens(
+        selectedModel,
+        Settings.getCached().instruction,
+        messages,
+      ),
     //hidden drawer skips streaming updates
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [visible ? messages : null, selectedModel, visible],
@@ -624,10 +717,17 @@ export function ModelSelectorDrawer({
   useEffect(() => {
     if (!visible || aiService !== "local") return;
     AIModule.getLocalModelSheet()
-      .then((sheet) => setLocalContextTokens(sheet?.models.find((m) => m.id === selectedModel)?.contextTokens ?? 0))
+      .then((sheet) =>
+        setLocalContextTokens(
+          sheet?.models.find((m) => m.id === selectedModel)?.contextTokens ?? 0,
+        ),
+      )
       .catch(() => setLocalContextTokens(0));
   }, [visible, aiService, selectedModel]);
-  const contextWindow = aiService === "local" ? localContextTokens : contextWindowFor(aiService, ollamaUrl, selectedModel);
+  const contextWindow =
+    aiService === "local"
+      ? localContextTokens
+      : contextWindowFor(aiService, ollamaUrl, selectedModel);
   const showTokenWindow = messages.length > 0 && contextWindow > 0;
 
   const selectedIndex = isBrowsingActive
@@ -662,14 +762,18 @@ export function ModelSelectorDrawer({
   const [windowState, setWindowState] = useState({ key: "", start: 0 });
   const visibleRows = rowHeight ? Math.ceil(listViewport / rowStride) : 0;
   //stepped so scrolling rerenders rarely
-  const stepStart = (row: number) => Math.max(0, Math.floor(row / WINDOW_STEP) * WINDOW_STEP);
+  const stepStart = (row: number) =>
+    Math.max(0, Math.floor(row / WINDOW_STEP) * WINDOW_STEP);
   //new list opens at its selection
   const windowStart =
     windowState.key === modelsKey
       ? windowState.start
       : stepStart(selectedIndex - Math.floor(visibleRows / 2));
   //shorter list after a source switch
-  const clampedStart = Math.min(windowStart, Math.max(0, displayModels.length - visibleRows));
+  const clampedStart = Math.min(
+    windowStart,
+    Math.max(0, displayModels.length - visibleRows),
+  );
   const firstRow = rowHeight ? Math.max(0, clampedStart - WINDOW_BUFFER) : 0;
   const lastRow = rowHeight
     ? clampedStart + visibleRows + WINDOW_STEP + WINDOW_BUFFER
@@ -679,7 +783,9 @@ export function ModelSelectorDrawer({
     if (!rowHeight) return;
     const start = stepStart(Math.floor((offsetY - MODELS_PADDING) / rowStride));
     setWindowState((prev) =>
-      prev.key === modelsKey && prev.start === start ? prev : { key: modelsKey, start },
+      prev.key === modelsKey && prev.start === start
+        ? prev
+        : { key: modelsKey, start },
     );
   };
 
@@ -688,7 +794,10 @@ export function ModelSelectorDrawer({
 
   //dense snapshot the drag worklet can read
   const rowLayouts = useMemo<RowLayout[]>(
-    () => displayModels.map((_, i) => (rowHeight ? { y: i * rowStride, height: rowHeight } : null)),
+    () =>
+      displayModels.map((_, i) =>
+        rowHeight ? { y: i * rowStride, height: rowHeight } : null,
+      ),
     [displayModels, rowHeight, rowStride],
   );
   //row highlights itself until measured
@@ -699,7 +808,12 @@ export function ModelSelectorDrawer({
     const layout = rowLayouts[index];
     if (!layout || !listViewport) return 0;
     const content = displayModels.length * rowStride + MODELS_PADDING * 2;
-    return centeredOffset(layout.y + MODELS_PADDING, layout.height, listViewport, content);
+    return centeredOffset(
+      layout.y + MODELS_PADDING,
+      layout.height,
+      listViewport,
+      content,
+    );
   };
   //once per source, later moves scrollTo
   const initialOffset = useMemo(
@@ -714,10 +828,12 @@ export function ModelSelectorDrawer({
   //pulse the pill label on each drag swap
   useEffect(() => {
     if (previewIndex === null) return;
-    labelPulse.set(withSequence(
-      withTiming(1, { duration: 120, easing: Easing.out(Easing.quad) }),
-      withTiming(0, { duration: 160, easing: Easing.in(Easing.quad) }),
-    ));
+    labelPulse.set(
+      withSequence(
+        withTiming(1, { duration: 120, easing: Easing.out(Easing.quad) }),
+        withTiming(0, { duration: 160, easing: Easing.in(Easing.quad) }),
+      ),
+    );
   }, [previewIndex, labelPulse]);
 
   //parks pill on selected before paint
@@ -747,7 +863,9 @@ export function ModelSelectorDrawer({
   //tab geometry in refs, no rerender
   const tabsScrollRef = useRef<ScrollView>(null);
   const modelsScrollRef = useRef<ScrollView>(null);
-  const tabLayoutsRef = useRef<Record<string, { x: number; width: number }>>({});
+  const tabLayoutsRef = useRef<Record<string, { x: number; width: number }>>(
+    {},
+  );
   const tabsBox = useRef({ viewport: 0, content: 0 });
   //no glide before layout settles
   const tabsAnimated = useRef(false);
@@ -917,7 +1035,11 @@ export function ModelSelectorDrawer({
             key={modelsKey}
             contentOffset={{ x: 0, y: initialOffset }}
             //fixed on desktop so switching servers never resizes the window
-            style={isDesktop ? { height: DESKTOP_MODELS_HEIGHT } : { maxHeight: MAX_MODELS_HEIGHT }}
+            style={
+              isDesktop
+                ? { height: DESKTOP_MODELS_HEIGHT }
+                : { maxHeight: MAX_MODELS_HEIGHT }
+            }
             contentContainerStyle={styles.modelsScrollContent}
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled={true}
@@ -951,7 +1073,10 @@ export function ModelSelectorDrawer({
                     onPress={() => setDownloadModalVisible(true)}
                     style={pressStyle(styles.downloadOption, "surface")}
                   >
-                    <AppIcon source={downloadIcon} style={styles.downloadIcon} />
+                    <AppIcon
+                      source={downloadIcon}
+                      style={styles.downloadIcon}
+                    />
                     <Text style={styles.downloadText}>
                       {isDownloading
                         ? `${t("modelSelector.downloading")} ${downloadPercent}%`
@@ -965,7 +1090,9 @@ export function ModelSelectorDrawer({
                 style={[
                   styles.optionsList,
                   //last row gap is not space
-                  rowHeight > 0 && { height: displayModels.length * rowStride - ROW_GAP },
+                  rowHeight > 0 && {
+                    height: displayModels.length * rowStride - ROW_GAP,
+                  },
                 ]}
               >
                 <View style={{ height: firstRow * rowStride }} />
@@ -975,7 +1102,9 @@ export function ModelSelectorDrawer({
                     model={model}
                     label={displayName(model)}
                     caps={capsOf(model)}
-                    highlighted={!pillShown && isBrowsingActive && model === selectedRow}
+                    highlighted={
+                      !pillShown && isBrowsingActive && model === selectedRow
+                    }
                     height={rowHeight}
                     onSelect={handleRowSelect}
                     onRowLayout={handleRowLayout}
@@ -984,14 +1113,19 @@ export function ModelSelectorDrawer({
                 {pillShown && (
                   <GestureDetector gesture={pillPan}>
                     <Reanimated.View style={[styles.pill, pillAnimatedStyle]}>
-                      <Reanimated.View style={[styles.pillContent, labelPulseStyle]}>
+                      <Reanimated.View
+                        style={[styles.pillContent, labelPulseStyle]}
+                      >
                         <Text
                           style={[styles.optionText, styles.optionTextSelected]}
                           numberOfLines={1}
                         >
                           {displayName(displayModels[activeIndex])}
                         </Text>
-                        <Capabilities caps={capsOf(displayModels[activeIndex])} onPrimary />
+                        <Capabilities
+                          caps={capsOf(displayModels[activeIndex])}
+                          onPrimary
+                        />
                       </Reanimated.View>
                     </Reanimated.View>
                   </GestureDetector>
@@ -1032,7 +1166,11 @@ export function ModelSelectorDrawer({
       <View style={styles.desktopModels}>{modelsContent}</View>
     </View>
   ) : (
-    <SheetScrollView contentContainerStyle={styles.sheetInner} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+    <SheetScrollView
+      contentContainerStyle={styles.sheetInner}
+      nestedScrollEnabled
+      keyboardShouldPersistTaps="handled"
+    >
       <ScrollView
         ref={tabsScrollRef}
         onLayout={(e) => {
@@ -1081,9 +1219,7 @@ export function ModelSelectorDrawer({
         isDesktop={isDesktop}
         anchored={anchored}
         hideScrim={hideScrim}
-        sheetStyle={[
-          styles.mobileSheet,
-        ]}
+        sheetStyle={[styles.mobileSheet]}
         desktopStyle={
           isDesktop ? styles.centeredCard : [styles.anchoredCard, anchoredStyle]
         }
@@ -1211,7 +1347,6 @@ const makeStyles = (Colors: ThemeColors) =>
       backgroundColor: Colors.textMuted,
     },
     sheetInner: {
-      paddingBottom: Spacing.lg,
       gap: Spacing.lg2,
     },
     tabsScroll: {

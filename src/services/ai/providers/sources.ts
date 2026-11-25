@@ -94,14 +94,25 @@ export function getHubName(): string {
   return hubName;
 }
 
+//product name until the hub is known
+//sampler device label, falls back to the generic name
+export function getSamplerLabel(): string {
+  return hubName ? `Sampler ${hubName}` : 'Sampler Hub';
+}
+
+export function getHubLabel(): string {
+  return hubName || 'Sampler Hub';
+}
+
 export function getHubServers(): (OllamaServer & { kind: HubProvider['kind']; provider: string })[] {
   //hub name avoids clashing with local ollama
   return hubProviders.map((p) => {
-    const providerName = p.id === 'llamacpp' ? 'Sampler Hub' : p.name;
+    const isSampler = p.id === 'llamacpp';
+    const providerName = isSampler ? getSamplerLabel() : p.name;
     return {
       ...hubServerPrefs[`${HUB_URL_SCHEME}${p.id}`],
       url: `${HUB_URL_SCHEME}${p.id}`,
-      name: hubName ? `${providerName} · ${hubName}` : providerName,
+      name: hubName && !isSampler ? `${providerName} · ${hubName}` : providerName,
       provider: providerName,
       id: `hub_${p.id}`,
       kind: p.kind,
@@ -366,7 +377,7 @@ export function buildSources(localAvailable: boolean): ModelSource[] {
     sources.push(...serverSources(OPENAI_PROVIDER_ID, getOpenAIServers(), t('settings.service.cloudapi')));
   }
   if (isProviderSupported(HUB_PROVIDER_ID) && enabled.includes(HUB_PROVIDER_ID)) {
-    sources.push(...serverSources(HUB_PROVIDER_ID, getHubServers(), 'Sampler Hub'));
+    sources.push(...serverSources(HUB_PROVIDER_ID, getHubServers(), getSamplerLabel()));
   }
   return sources;
 }

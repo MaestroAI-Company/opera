@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+import { getHubLabel } from "../../services/ai/providers/sources";
 import { HubDevice, SamplerHub, PairedHub } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
 import AppIcon, { type IconSource } from "../ui/AppIcon";
@@ -161,6 +162,7 @@ export default function HubDeviceSheet({
                 onChangeText={setName}
                 onSubmitEditing={rename}
                 maxLength={64}
+                clearable
               />
             </Group>
             <Group style={[styles.highlightGroup, (busy || unchanged) && styles.highlightGroupDisabled]}>
@@ -219,7 +221,7 @@ export default function HubDeviceSheet({
       <NotificationModal
         visible={confirmRemove}
         title={t("hubDevice.removeTitle", { name: device?.name ?? "" })}
-        message={t("hubDevice.removeMessage")}
+        message={t("hubDevice.removeMessage", { hub: hub?.name || getHubLabel() })}
         onClose={() => setConfirmRemove(false)}
         buttons={[
           {

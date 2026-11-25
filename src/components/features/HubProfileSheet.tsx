@@ -18,6 +18,7 @@ import {
 } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+import { getHubLabel } from "../../services/ai/providers/sources";
 import {
   HubDevice,
   HubProfile,
@@ -39,10 +40,11 @@ import PageStack from "./PageStack";
 import ProfileCard from "./ProfileCard";
 
 import keyIcon from "../../../assets/icons/key2.svg";
+import checkIcon from "../../../assets/icons/check2.svg";
 import newIcon from "../../../assets/icons/add2.svg";
 import penIcon from "../../../assets/icons/edit2.svg";
 import binIcon from "../../../assets/icons/delete2.svg";
-import profilIcon from "../../../assets/icons/profile2.svg";
+import profilIcon from "../../../assets/icons/person_add2.svg";
 import phoneIcon from "../../../assets/icons/phone2.svg";
 import laptopIcon from "../../../assets/icons/laptop2.svg";
 import webIcon from "../../../assets/icons/website2.svg";
@@ -57,7 +59,7 @@ const HUB_DEVICE_ICONS: Record<string, IconSource> = {
 const KINDS = ["phone", "desktop", "web"] as const;
 type DeviceKind = (typeof KINDS)[number] | "other";
 
-const DESKTOP_CARD_WIDTH = 720;
+const DESKTOP_CARD_WIDTH = 880;
 const DESKTOP_CARD_WIDTH_NARROW = 560;
 //shorter passwords fall to a guessing hub
 export const MIN_PASSWORD_LENGTH = 8;
@@ -387,7 +389,7 @@ export default function HubProfileSheet({
             (profiles === null
               ? t("hubProfile.loading")
               : profiles.length === 0
-                ? t("hubProfile.none")
+                ? t("hubProfile.none", { hub: hub?.name || getHubLabel() })
                 : t("hubProfile.pickHelp"))}
         </Text>
         {!!profiles?.length && (
@@ -448,12 +450,10 @@ export default function HubProfileSheet({
               value={password}
               onChangeText={setPassword}
               onSubmitEditing={unlock}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
+              variant="password"
             />
           </Group>
-          {renderHighlight(t("hubProfile.unlock"), keyIcon, !password, unlock)}
+          {renderHighlight(t("hubProfile.unlock"), checkIcon, !password, unlock)}
         </View>
       </View>
     );
@@ -465,9 +465,7 @@ export default function HubProfileSheet({
         placeholder={t("hubProfile.passwordPlaceholder")}
         value={password}
         onChangeText={setPassword}
-        secureTextEntry
-        autoCapitalize="none"
-        autoCorrect={false}
+        variant="password"
       />
       <TextInputField
         icon={keyIcon}
@@ -475,9 +473,7 @@ export default function HubProfileSheet({
         value={confirm}
         onChangeText={setConfirm}
         onSubmitEditing={onSubmit}
-        secureTextEntry
-        autoCapitalize="none"
-        autoCorrect={false}
+        variant="password"
       />
     </Group>
   );
@@ -528,9 +524,7 @@ export default function HubProfileSheet({
             placeholder={t("hubProfile.passwordPlaceholder")}
             value={current}
             onChangeText={setCurrent}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
+            variant="password"
           />
         </Group>
       </View>
@@ -571,19 +565,20 @@ export default function HubProfileSheet({
       };
     });
 
-    return (
-      <>
-        {/* profile card */}
-        <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <ProfileCard
-              name={target.name}
-              createdAt={target.createdAt ? target.createdAt * 1000 : undefined}
-              butterfly={target.butterfly}
-            />
-          </View>
+    const profileCard = (
+      <View style={[styles.contentCard, isDesktop && styles.profileColumn]}>
+        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+          <ProfileCard
+            name={target.name}
+            createdAt={target.createdAt ? target.createdAt * 1000 : undefined}
+            butterfly={target.butterfly}
+          />
         </View>
+      </View>
+    );
 
+    const rest = (
+      <>
         {/* devices section */}
         <View style={styles.contentCard}>
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
@@ -630,6 +625,22 @@ export default function HubProfileSheet({
             </Group>
           </View>
         )}
+      </>
+    );
+
+    //desktop puts the card beside the rest
+    if (isDesktop)
+      return (
+        <View style={styles.profileRow}>
+          {profileCard}
+          <View style={styles.profileRest}>{rest}</View>
+        </View>
+      );
+
+    return (
+      <>
+        {profileCard}
+        {rest}
       </>
     );
   };
@@ -781,6 +792,19 @@ const makeStyles = (Colors: ThemeColors) =>
       height: 40,
       zIndex: 10,
       elevation: 10,
+    },
+    profileRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: Spacing.xxl2,
+    },
+    profileColumn: {
+      width: 260,
+    },
+    profileRest: {
+      flex: 1,
+      minWidth: 0,
+      gap: Spacing.xxl2,
     },
     contentCard: {
       backgroundColor: Colors.surface,

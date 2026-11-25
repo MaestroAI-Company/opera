@@ -14,6 +14,7 @@ export type IconButtonProps = {
   disabled?: boolean;
   size?: number;
   tintColor?: string;
+  iconOpacity?: number;
   hitSlop?: number;
   //fixed touch target with a circular pressed/hover background, eg. chat toolbar buttons
   containerSize?: number;
@@ -31,6 +32,7 @@ export default function IconButton({
   disabled,
   size = 22,
   tintColor,
+  iconOpacity,
   hitSlop = 8,
   containerSize,
   pressedColor,
@@ -100,7 +102,12 @@ export default function IconButton({
         style,
       ]}
     >
-      <AppIcon source={icon} size={size} tintColor={tintColor} />
+      <AppIcon
+        source={icon}
+        size={size}
+        tintColor={tintColor}
+        style={iconOpacity != null ? { opacity: iconOpacity } : undefined}
+      />
     </Pressable>
   );
 }

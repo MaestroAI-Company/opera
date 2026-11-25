@@ -18,7 +18,7 @@ import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import ProgressBar from "../ui/ProgressBar";
 
-import downloadIcon from "../../../assets/icons/download2.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
 
 export const TTS_ENGINE_KEYS = {
   supertonic: "settings.tts.supertonic",

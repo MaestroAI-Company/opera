@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 import { FontSizes, Fonts, Spacing, ThemeColors } from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
@@ -38,6 +39,16 @@ const LABEL_TURNS = Array.from({ length: 121 }, (_, i) => i * 3);
 const TURN_MS = 120000;
 //extra reach around a node
 const TAP_SLOP = 6;
+//one circle going from the hub to its full size
+const RIPPLE_MS = 7500;
+//circles out at the same time
+const RIPPLES = 2;
+//strength of a circle at its peak
+const RIPPLE_OPACITY = 0.45;
+//share of the way out spent fading in
+const RIPPLE_FADE_IN = 0.15;
+//strength from center to edge, evenly spaced
+const RIPPLE_WAVE = [0, 0.8, 0.5, 0.2, 0];
 
 export type OrbitNode = {
   key: string;
@@ -54,7 +65,88 @@ type HubOrbitProps = {
   onHubPress?: () => void;
   //turns only while shown
   active?: boolean;
+  //no path drawn under the devices
+  bareHub?: boolean;
+  //circles leaving the hub or coming back to it
+  ripple?: "out" | "in";
 };
+
+type RipplesProps = {
+  //size of the hub they leave from
+  from: number;
+  //radius where they fade out
+  reach: number;
+  active: boolean;
+  //same circles played backward
+  inward: boolean;
+};
+
+//circles growing from the hub, fading as they go
+function Ripples({ from, reach, active, inward }: RipplesProps) {
+  const styles = useThemedStyles(makeStyles);
+  const Colors = useColors();
+  const clock = useAnimatedValue(0);
+
+  useEffect(() => {
+    if (!active) return;
+    const loop = Animated.loop(
+      Animated.timing(clock, {
+        toValue: 1,
+        duration: RIPPLE_MS,
+        easing: Easing.linear,
+        useNativeDriver: Platform.OS !== "web",
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [active, clock]);
+
+  return (
+    <View style={[styles.ripples, { width: 2 * reach, height: 2 * reach, marginLeft: -reach, marginTop: -reach }]} pointerEvents="none">
+      {Array.from({ length: RIPPLES }, (_, k) => {
+        //each circle starts a share of a loop later
+        const shift = k / RIPPLES;
+        const outward = shift
+          ? clock.interpolate({ inputRange: [0, 1 - shift, 1 - shift + 0.0001, 1], outputRange: [shift, 1, 0, shift] })
+          : clock;
+        const progress = inward ? Animated.subtract(1, outward) : outward;
+        return (
+          <Animated.View
+            key={k}
+            style={[
+              styles.ripple,
+              {
+                //fades in so a new circle never pops
+                opacity: progress.interpolate({ inputRange: [0, RIPPLE_FADE_IN, 1], outputRange: [0, RIPPLE_OPACITY, 0] }),
+                transform: [
+                  {
+                    scale: progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [from / (2 * reach), 1],
+                      easing: Easing.out(Easing.quad),
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            {/* swell near the center easing out to the edge */}
+            <Svg width="100%" height="100%" viewBox="0 0 2 2">
+              <Defs>
+                <RadialGradient id={`ripple-${k}`} cx="1" cy="1" r="1" gradientUnits="userSpaceOnUse">
+                  {RIPPLE_WAVE.map((opacity, i) => (
+                    <Stop key={i} offset={i / (RIPPLE_WAVE.length - 1)} stopColor={Colors.primary} stopOpacity={opacity} />
+                  ))}
+                </RadialGradient>
+              </Defs>
+              <Circle cx="1" cy="1" r="1" fill={`url(#ripple-${k})`} />
+            </Svg>
+          </Animated.View>
+        );
+      })}
+    </View>
+  );
+}
 
 type OrbitLabelProps = {
   name: string;
@@ -120,7 +212,7 @@ function OrbitLabel({ name, angle, turn, nodeSize, gap, width, maxWidth, fontSiz
 }
 
 //the hub at the center, its devices turning around it
-export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true }: HubOrbitProps) {
+export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true, bareHub = false, ripple }: HubOrbitProps) {
   const styles = useThemedStyles(makeStyles);
   const Colors = useColors();
   const turn = useAnimatedValue(0);
@@ -226,12 +318,20 @@ export default function HubOrbit({ hubIcon, nodes, onHubPress, active = true }: 
   return (
     <View style={styles.fit} onLayout={(e) => setAvail(e.nativeEvent.layout.width)}>
       <View style={[styles.stage, { width: stageWidth, height: stageHeight }]}>
+        {ripple && (
+          <View style={[styles.rippleCenter, { left: stageWidth / 2, top: stageHeight / 2 }]} pointerEvents="none">
+            {/* past the devices so it reaches them */}
+            <Ripples from={hubSize} reach={radius + nodeSize} active={active && !editing} inward={ripple === "in"} />
+          </View>
+        )}
         {/* path of the devices, still so the squares stay upright */}
-        <View style={[styles.path, { width: 2 * radius, height: 2 * radius, top: stageHeight / 2 - radius }]} pointerEvents="none">
-          {pixels.map((pixel, i) => (
-            <View key={i} style={[styles.pixel, { width: pixelSize, height: pixelSize }, pixel]} />
-          ))}
-        </View>
+        {!bareHub && (
+          <View style={[styles.path, { width: 2 * radius, height: 2 * radius, top: stageHeight / 2 - radius }]} pointerEvents="none">
+            {pixels.map((pixel, i) => (
+              <View key={i} style={[styles.pixel, { width: pixelSize, height: pixelSize }, pixel]} />
+            ))}
+          </View>
+        )}
         <Animated.View
           pointerEvents="none"
           style={{
@@ -340,6 +440,20 @@ const makeStyles = (Colors: ThemeColors) =>
     path: {
       position: "absolute",
       alignSelf: "center",
+    },
+    rippleCenter: {
+      position: "absolute",
+    },
+    ripples: {
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    ripple: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
     },
     pixel: {
       position: "absolute",

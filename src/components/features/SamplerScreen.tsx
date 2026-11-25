@@ -117,7 +117,8 @@ import { setHomeEditing, useHomeEditing } from "./homeEditing";
 import AppIcon, { type IconSource } from "../ui/AppIcon";
 import homeIcon from "../../../assets/icons/home.svg";
 import profilIcon from "../../../assets/icons/profile.svg";
-import profil2Icon from "../../../assets/icons/profile2.svg";
+import profil2Icon from "../../../assets/icons/person_add2.svg";
+import profilAddIcon from "../../../assets/icons/person_add2.svg";
 import botIcon from "../../../assets/icons/bot.svg";
 import bot2Icon from "../../../assets/icons/bot2.svg";
 import toolIcon from "../../../assets/icons/tool.svg";
@@ -125,8 +126,7 @@ import tool2Icon from "../../../assets/icons/tool2.svg";
 import settingsIcon from "../../../assets/icons/settings.svg";
 import addIcon from "../../../assets/icons/add.svg";
 import add2Icon from "../../../assets/icons/add2.svg";
-import downloadIcon from "../../../assets/icons/download2.svg";
-import validIcon from "../../../assets/icons/valid2.svg";
+import downloadIcon from "../../../assets/icons/import2.svg";
 import sampler2Icon from "../../../assets/icons/sampler2.svg";
 import cancelIcon from "../../../assets/icons/cancel2.svg";
 import binIcon from "../../../assets/icons/delete2.svg";
@@ -290,6 +290,8 @@ export default function SamplerScreen({
   const [pairedHub, setPairedHub] = useState<PairedHub | null>(null);
   const [hubState, setHubState] = useState<HubState>("checking");
   const [status, setStatus] = useState<HubStatus | null>(null);
+  //texts name the hub after its device
+  const hubName = status?.name || pairedHub?.name || "Sampler Hub";
   //last hub answer this session
   const [lastSeen, setLastSeen] = useState<number | null>(null);
   //last usage samples for the performance graphs
@@ -346,6 +348,8 @@ export default function SamplerScreen({
       icon={infoIcon}
       label={t("settings.help.open")}
       onPress={() => openHelp(topic)}
+      containerSize={40}
+      iconOpacity={0.6}
       tintColor={Colors.textPrimary}
     />
   );
@@ -727,7 +731,7 @@ export default function SamplerScreen({
       if (!version) {
         setModal({
           title: t("hubUpdate.title"),
-          message: t("hubUpdate.upToDate"),
+          message: t("hubUpdate.upToDate", { hub: hubName }),
           buttons: [
             { text: t("common.ok"), style: "secondary", onPress: closeModal },
           ],
@@ -738,6 +742,7 @@ export default function SamplerScreen({
         title: t("hubUpdate.title"),
         message: t("hubUpdate.message", {
           version,
+          hub: hubName,
           current: status?.version ?? "",
         }),
         buttons: [
@@ -819,7 +824,7 @@ export default function SamplerScreen({
   const confirmRemoveProfile = (target: HubProfile) =>
     setModal({
       title: t("sampler.profile.removeTitle", { name: target.name }),
-      message: t("sampler.profile.removeMessage"),
+      message: t("sampler.profile.removeMessage", { hub: hubName }),
       buttons: [
         { text: t("common.cancel"), style: "secondary", onPress: closeModal },
         {
@@ -962,8 +967,8 @@ export default function SamplerScreen({
     }
     const failedMessage = {
       offline: t("settings.hub.offline"),
-      revoked: t("settings.hub.revoked"),
-      outdated: t("settings.hub.outdated"),
+      revoked: t("settings.hub.revoked", { hub: hubName }),
+      outdated: t("settings.hub.outdated", { hub: hubName }),
       checking: t("settings.hub.offline"),
       online: "",
     }[next];
@@ -986,8 +991,8 @@ export default function SamplerScreen({
     const connection = {
       checking: t("settings.hub.checking"),
       offline: t("settings.hub.offline"),
-      revoked: t("settings.hub.revoked"),
-      outdated: t("settings.hub.outdated"),
+      revoked: t("settings.hub.revoked", { hub: hubName }),
+      outdated: t("settings.hub.outdated", { hub: hubName }),
       online: "",
     }[hubState];
     const seen =
@@ -1056,7 +1061,7 @@ export default function SamplerScreen({
       <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
         <Text style={styles.settingLabel}>{t("sampler.profiles")}</Text>
         <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-          {t("sampler.profilesHelp")}
+          {t("sampler.profilesHelp", { hub: hubName })}
         </Text>
         <View style={styles.profileTiles}>
           {profileRows.map((row) => (
@@ -1085,7 +1090,7 @@ export default function SamplerScreen({
         {isAdmin && (
           <Group style={{ marginTop: Spacing.md }}>
             <ActionButton
-              icon={profil2Icon}
+              icon={profilAddIcon}
               label={t("settings.hub.pairDevice")}
               onPress={() => setQrMode("invite")}
             />
@@ -1203,7 +1208,7 @@ export default function SamplerScreen({
   const confirmRemoveServer = (server: McpServerSummary, owner: string) =>
     setModal({
       title: t("sampler.mcpRemoveTitle", { name: server.title }),
-      message: t("sampler.mcpRemoveMessage", { owner }),
+      message: t("sampler.mcpRemoveMessage", { owner, hub: hubName }),
       buttons: [
         { text: t("common.cancel"), style: "secondary", onPress: closeModal },
         {
@@ -1599,7 +1604,7 @@ export default function SamplerScreen({
       checking: t("settings.hub.checking"),
       offline: t("settings.hub.offline"),
       revoked: t("settings.hub.offline"),
-      outdated: t("settings.hub.outdated"),
+      outdated: t("settings.hub.outdated", { hub: hubName }),
       online: status?.direct
         ? t("settings.hub.direct")
         : t("settings.hub.relay"),
@@ -1711,6 +1716,8 @@ export default function SamplerScreen({
           nodes={nodes}
           onHubPress={() => setHubSheetVisible(true)}
           active={visible && page === "home"}
+          ripple="in"
+          bareHub
         />
       </View>
     );
@@ -1893,7 +1900,7 @@ export default function SamplerScreen({
         />
       )}
       <IconButton
-        icon={homeEditing ? validIcon : editIcon}
+        icon={homeEditing ? activateIcon : editIcon}
         label={homeEditing ? t("common.done") : t("sampler.home.edit")}
         containerSize={40}
         tintColor={Colors.textPrimary}
@@ -1919,8 +1926,8 @@ export default function SamplerScreen({
       {modelsOn && settings && (
         <View style={styles.contentCard}>
           {renderToggleRow(
-            t("settings.hub.shareProviders"),
-            t("settings.hub.shareProvidersHelp"),
+            t("settings.hub.shareProviders", { hub: hubName }),
+            t("settings.hub.shareProvidersHelp", { hub: hubName }),
             settings.shareProviders,
             (value) => changeSettings({ shareProviders: value }),
             false,
@@ -1967,7 +1974,7 @@ export default function SamplerScreen({
       <>
         {renderFeatureToggle(
           t("sampler.feature.models"),
-          t("sampler.feature.modelsHelp"),
+          t("sampler.feature.modelsHelp", { hub: hubName }),
           modelsOn,
           "models",
         )}
@@ -2044,7 +2051,7 @@ export default function SamplerScreen({
           <View style={styles.contentCard}>
             {renderToggleRow(
               t("settings.hub.lanDiscovery"),
-              t("settings.hub.lanDiscoveryHelp"),
+              t("settings.hub.lanDiscoveryHelp", { hub: hubName }),
               settings.lanDiscovery,
               (value) => changeSettings({ lanDiscovery: value }),
               false,
@@ -2066,7 +2073,7 @@ export default function SamplerScreen({
                 {t("settings.hub.customRelay")}
               </Text>
               <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-                {t("settings.hub.customRelayHelp")}
+                {t("settings.hub.customRelayHelp", { hub: hubName })}
               </Text>
               <Group style={styles.infoGroup}>
                 {status.relays.map((url) => (
@@ -2083,7 +2090,7 @@ export default function SamplerScreen({
             <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
               <Text style={styles.settingLabel}>{t("sampler.registries")}</Text>
               <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-                {registryError ?? t("sampler.registriesHelp")}
+                {registryError ?? t("sampler.registriesHelp", { hub: hubName })}
               </Text>
               {registries.length > 0 && (
                 <Group style={styles.groupSpacingTight}>
@@ -2409,8 +2416,8 @@ export default function SamplerScreen({
         { title: t("sampler.linkHub"), body: t("sampler.helpLink") },
       ],
     ],
-    models: [[{ body: t("sampler.helpModels") }]],
-    mcp: [[{ body: t("sampler.helpMcp") }]],
+    models: [[{ body: t("sampler.helpModels", { hub: hubName }) }]],
+    mcp: [[{ body: t("sampler.helpMcp", { hub: hubName }) }]],
   };
 
   const hubUp = !!pairedHub && !!profile && online && !hubStopped;
@@ -2738,7 +2745,7 @@ export default function SamplerScreen({
           <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>{t("sampler.addRegistry")}</Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {registryError ?? t("sampler.registriesHelp")}
+              {registryError ?? t("sampler.registriesHelp", { hub: hubName })}
             </Text>
             <Group style={styles.groupSpacingTight}>
               <TextInputField

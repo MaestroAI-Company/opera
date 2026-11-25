@@ -2908,7 +2908,6 @@ export default function Index() {
                   onEditMessage={handleEditStart}
                   editAiEnabled={editAiEnabled}
                   speakerEnabled={speakerEnabled}
-                  showMetrics={showTechnicalDetails}
                   generatingMessageId={
                     generatingConvId === activeConversation.id
                       ? streamingMsgId
@@ -3223,6 +3222,7 @@ export default function Index() {
       <MessageDetailsSheet
         details={previewDetails}
         onClose={() => setPreviewDetails(null)}
+        showAdvanced={showTechnicalDetails}
         isLargeScreen={isLargeScreen}
         isDesktop={isDesktop}
       />
@@ -3302,6 +3302,7 @@ export default function Index() {
           hubUpdate
             ? t("hubUpdate.message", {
                 version: hubUpdate.version,
+                hub: hubUpdate.hub.name,
                 current: hubUpdate.current,
               })
             : undefined

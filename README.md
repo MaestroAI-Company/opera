@@ -56,7 +56,7 @@ Pair your phone, tablet and computer with your own [Sampler Hub](https://github.
 
 | | |
 |---|---|
-| Model providers | **Built-in** (Gemini Nano via Android AICore, or the browser's built-in model on web), **On-Device** (Hugging Face `.litertlm` models run with LiteRT-LM), **Ollama**, **OpenAI-compatible** (Mistral, LM Studio…) |
+| Model providers | **Built-in** (Gemini Nano via Android AICore, Apple Foundation Models on iOS and macOS, or the browser's built-in model on web), **On-Device** (Hugging Face `.litertlm` models run with LiteRT-LM), **Ollama**, **OpenAI-compatible** (Mistral, LM Studio…) |
 | Tools | web search (DuckDuckGo), page fetching, math, clipboard, opening apps, sending messages, contacts, calendar, alarms, Android settings panels - each can be toggled on or off |
 | MCP support | any OAuth-aware [Model Context Protocol](https://modelcontextprotocol.io) server plugs in and its tools show up in chat; tools can be `@mentioned` |
 | Attachments | camera, photos, and documents (PDF, DOCX, plain text) |
@@ -78,7 +78,7 @@ Pair your phone, tablet and computer with your own [Sampler Hub](https://github.
 | Desktop | Tauri 2.11 (Rust) |
 | Hub client | `sampler-hub-client` (Rust, prebuilt for Android, iOS and web, version pinned in `sampler-hub-client.json`) |
 | Local database | SQLite (`expo-sqlite`) |
-| On-device AI | LiteRT-LM (`react-native-litert-lm`), Android AICore (Gemini Nano), ExecuTorch (on-screen object detection), Whisper via `@xenova/transformers` (web) |
+| On-device AI | LiteRT-LM (`react-native-litert-lm`), Android AICore (Gemini Nano), Apple Foundation Models, ExecuTorch (on-screen object detection), Whisper via `@xenova/transformers` (web) |
 | Native Android | Kotlin / Java (voice interaction service, overlay, screen capture, text selection, AICore bridge) |
 | Crypto | `react-native-quick-crypto` / WebCrypto |
 | Language | TypeScript 6, strict |

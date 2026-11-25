@@ -16,9 +16,11 @@ export function getAppleFMModelLabel(modelName: string, short = false): string {
   return short ? "On-device" : "Apple Foundation Model";
 }
 
+type AppleFMInfo = { status: number; variant?: string; contextSize?: number };
+
 //status codes from the native side
 type AppleFMNative = {
-  status(): Promise<number>;
+  info(): Promise<AppleFMInfo>;
   generate(requestId: string, system: string, prompt: string, onChunk: (chunk: string) => void): Promise<void>;
   abort(requestId: string): void;
 };
@@ -35,7 +37,7 @@ function iosNative(): AppleFMNative | null {
   if (!module) return null;
   const emitter = new NativeEventEmitter(module);
   return {
-    status: () => module.status(),
+    info: () => module.info(),
     generate: (requestId, system, prompt, onChunk) => {
       const sub = emitter.addListener("AppleFMToken", (e: any) => {
         if (e.requestId === requestId && e.chunk) onChunk(e.chunk);
@@ -52,9 +54,9 @@ export function isMacDesktop(): boolean {
 
 function desktopNative(): AppleFMNative {
   return {
-    status: async () => {
+    info: async () => {
       const { invoke } = await import("@tauri-apps/api/core");
-      return invoke<number>("afm_status");
+      return invoke<AppleFMInfo>("afm_info");
     },
     generate: async (requestId, system, prompt, onChunk) => {
       const { invoke } = await import("@tauri-apps/api/core");
@@ -83,22 +85,22 @@ function resolveNative(): AppleFMNative | null {
 const native = resolveNative();
 
 export class AppleFMProvider implements LocalBackend {
-  private async status(): Promise<number> {
-    if (!native) return 0;
+  private async info(): Promise<AppleFMInfo> {
+    if (!native) return { status: 0 };
     try {
-      return await native.status();
+      return await native.info();
     } catch (e) {
-      console.warn("AppleFM status error:", e);
-      return 0;
+      console.warn("AppleFM info error:", e);
+      return { status: 0 };
     }
   }
 
   async isAvailable(): Promise<boolean> {
-    return (await this.status()) !== 0;
+    return (await this.info()).status !== 0;
   }
 
   async getAvailableModels(): Promise<string[]> {
-    return (await this.status()) !== 0 ? [MODEL_ID] : [];
+    return (await this.info()).status !== 0 ? [MODEL_ID] : [];
   }
 
   async preloadModel(modelName: string): Promise<void> {}
@@ -108,11 +110,11 @@ export class AppleFMProvider implements LocalBackend {
   }
 
   async getModelSheet(): Promise<LocalModelSheet> {
-    const status = await this.status();
+    const { status, variant, contextSize } = await this.info();
     return {
       runtime: "Foundation Models · Apple Intelligence",
       family: "Apple Foundation Model",
-      models: [{ id: MODEL_ID, label: getAppleFMModelLabel(MODEL_ID), status: STATUS[status] }],
+      models: [{ id: MODEL_ID, label: getAppleFMModelLabel(MODEL_ID), status: STATUS[status], version: variant, contextTokens: contextSize }],
     };
   }
 

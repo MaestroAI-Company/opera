@@ -9,7 +9,8 @@ type Callback = extern "C" fn(*const c_char, i32, *const c_char);
 
 //implemented in the swift package
 extern "C" {
-    fn opera_afm_status() -> i32;
+    fn opera_afm_info() -> *mut c_char;
+    fn opera_afm_free(ptr: *mut c_char);
     fn opera_afm_generate(
         id: *const c_char,
         system: *const c_char,
@@ -52,8 +53,14 @@ extern "C" fn on_event(id: *const c_char, kind: i32, payload: *const c_char) {
 }
 
 #[tauri::command]
-pub fn afm_status() -> i32 {
-    unsafe { opera_afm_status() }
+pub fn afm_info() -> serde_json::Value {
+    unsafe {
+        let ptr = opera_afm_info();
+        let info = serde_json::from_str(&CStr::from_ptr(ptr).to_string_lossy())
+            .unwrap_or_else(|_| serde_json::json!({ "status": 0 }));
+        opera_afm_free(ptr);
+        info
+    }
 }
 
 #[tauri::command]

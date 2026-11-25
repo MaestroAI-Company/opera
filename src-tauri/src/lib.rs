@@ -259,7 +259,7 @@ pub fn run() {
             #[cfg(desktop)]
             hub::hub_computer_name,
             #[cfg(target_os = "macos")]
-            apple_fm::afm_status,
+            apple_fm::afm_info,
             #[cfg(target_os = "macos")]
             apple_fm::afm_generate,
             #[cfg(target_os = "macos")]

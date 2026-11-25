@@ -12,18 +12,33 @@ class AppleFMModule: RCTEventEmitter {
 
   override func supportedEvents() -> [String]! { ["AppleFMToken"] }
 
-  //same codes as the js provider
-  @objc func status(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+  //status codes match the js provider
+  @objc func info(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
     guard #available(iOS 26.0, *) else {
-      resolve(0)
+      resolve(["status": 0])
       return
     }
-    switch SystemLanguageModel.default.availability {
-    case .available: resolve(3)
-    case .unavailable(.appleIntelligenceNotEnabled): resolve(1)
-    case .unavailable(.modelNotReady): resolve(2)
-    default: resolve(0)
+    let model = SystemLanguageModel.default
+    switch model.availability {
+    case .available:
+      var result: [String: Any] = ["status": 3, "variant": variantName()]
+      //docs say it may throw
+      if let size = try? model.contextSize { result["contextSize"] = size }
+      resolve(result)
+    case .unavailable(.appleIntelligenceNotEnabled): resolve(["status": 1])
+    case .unavailable(.modelNotReady): resolve(["status": 2])
+    default: resolve(["status": 0])
     }
+  }
+
+  //variant api only exists from ios 27
+  @available(iOS 26.0, *)
+  private func variantName() -> String {
+    #if compiler(>=6.4)
+    if #available(iOS 27.0, *) { return SystemLanguageModel.default.variant.displayName }
+    #endif
+    if #available(iOS 26.4, *) { return "AFM 2.1 Core" }
+    return "AFM 2 Core"
   }
 
   @objc func generate(_ requestId: String, system: String, prompt: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {

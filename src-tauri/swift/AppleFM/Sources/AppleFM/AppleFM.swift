@@ -19,20 +19,44 @@ private func finish(_ id: String) {
   lock.unlock()
 }
 
-//same codes as the js provider
-@_cdecl("opera_afm_status")
-public func operaAfmStatus() -> Int32 {
-  #if canImport(FoundationModels)
-  guard #available(macOS 26.0, *) else { return 0 }
-  switch SystemLanguageModel.default.availability {
-  case .available: return 3
-  case .unavailable(.appleIntelligenceNotEnabled): return 1
-  case .unavailable(.modelNotReady): return 2
-  default: return 0
-  }
-  #else
-  return 0
+//variant api only exists from macos 27
+#if canImport(FoundationModels)
+@available(macOS 26.0, *)
+private func variantName() -> String {
+  #if compiler(>=6.4)
+  if #available(macOS 27.0, *) { return SystemLanguageModel.default.variant.displayName }
   #endif
+  if #available(macOS 26.4, *) { return "AFM 2.1 Core" }
+  return "AFM 2 Core"
+}
+#endif
+
+//json with status like the js provider
+@_cdecl("opera_afm_info")
+public func operaAfmInfo() -> UnsafeMutablePointer<CChar> {
+  var info: [String: Any] = ["status": 0]
+  #if canImport(FoundationModels)
+  if #available(macOS 26.0, *) {
+    let model = SystemLanguageModel.default
+    switch model.availability {
+    case .available:
+      info = ["status": 3, "variant": variantName()]
+      //docs say it may throw
+      if let size = try? model.contextSize { info["contextSize"] = size }
+    case .unavailable(.appleIntelligenceNotEnabled): info = ["status": 1]
+    case .unavailable(.modelNotReady): info = ["status": 2]
+    default: break
+    }
+  }
+  #endif
+  let data = (try? JSONSerialization.data(withJSONObject: info)) ?? Data("{\"status\":0}".utf8)
+  return strdup(String(decoding: data, as: UTF8.self))!
+}
+
+//rust frees the info string
+@_cdecl("opera_afm_free")
+public func operaAfmFree(_ ptr: UnsafeMutablePointer<CChar>) {
+  free(ptr)
 }
 
 @_cdecl("opera_afm_generate")

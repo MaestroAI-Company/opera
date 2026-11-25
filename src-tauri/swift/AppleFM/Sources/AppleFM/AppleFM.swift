@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 #if canImport(FoundationModels)
 import FoundationModels
 #endif
@@ -29,6 +30,35 @@ private func variantName() -> String {
   if #available(macOS 26.4, *) { return "AFM 2.1 Core" }
   return "AFM 2 Core"
 }
+
+//image attachments only exist from macos 27
+@available(macOS 26.0, *)
+private func supportsVision() -> Bool {
+  #if compiler(>=6.4)
+  if #available(macOS 27.0, *) { return SystemLanguageModel.default.capabilities.contains(.vision) }
+  #endif
+  return false
+}
+
+private func decodeImage(_ base64: String) -> CGImage? {
+  //ignore line breaks like android
+  guard let data = Data(base64Encoded: base64, options: .ignoreUnknownCharacters),
+        let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+  return CGImageSourceCreateImageAtIndex(source, 0, nil)
+}
+
+@available(macOS 26.0, *)
+private func stream(_ session: LanguageModelSession, _ prompt: String, _ image: String?) -> LanguageModelSession.ResponseStream<String> {
+  #if compiler(>=6.4)
+  if #available(macOS 27.0, *), let image = image, let cgImage = decodeImage(image) {
+    return session.streamResponse {
+      prompt
+      Attachment(cgImage)
+    }
+  }
+  #endif
+  return session.streamResponse(to: prompt)
+}
 #endif
 
 //json with status like the js provider
@@ -40,7 +70,7 @@ public func operaAfmInfo() -> UnsafeMutablePointer<CChar> {
     let model = SystemLanguageModel.default
     switch model.availability {
     case .available:
-      info = ["status": 3, "variant": variantName()]
+      info = ["status": 3, "variant": variantName(), "vision": supportsVision()]
       //docs say it may throw
       if let size = try? model.contextSize { info["contextSize"] = size }
     case .unavailable(.appleIntelligenceNotEnabled): info = ["status": 1]
@@ -64,12 +94,14 @@ public func operaAfmGenerate(
   _ id: UnsafePointer<CChar>,
   _ system: UnsafePointer<CChar>,
   _ prompt: UnsafePointer<CChar>,
+  _ image: UnsafePointer<CChar>?,
   _ callback: AppleFMCallback
 ) {
   //rust frees its strings after return
   let requestId = String(cString: id)
   let instructions = String(cString: system)
   let text = String(cString: prompt)
+  let encodedImage = image.map { String(cString: $0) }
   #if canImport(FoundationModels)
   guard #available(macOS 26.0, *) else {
     send(callback, requestId, 2, "Apple Foundation Models needs macOS 26")
@@ -81,7 +113,7 @@ public func operaAfmGenerate(
     do {
       let session = LanguageModelSession(instructions: instructions)
       var sent = ""
-      for try await snapshot in session.streamResponse(to: text) {
+      for try await snapshot in stream(session, text, encodedImage) {
         let content = snapshot.content
         //snapshots are cumulative
         let chunk = content.hasPrefix(sent) ? String(content.dropFirst(sent.count)) : content

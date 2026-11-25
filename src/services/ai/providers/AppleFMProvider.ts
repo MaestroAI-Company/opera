@@ -16,12 +16,12 @@ export function getAppleFMModelLabel(modelName: string, short = false): string {
   return short ? "On-device" : "Apple Foundation Model";
 }
 
-type AppleFMInfo = { status: number; variant?: string; contextSize?: number };
+type AppleFMInfo = { status: number; variant?: string; contextSize?: number; vision?: boolean };
 
 //status codes from the native side
 type AppleFMNative = {
   info(): Promise<AppleFMInfo>;
-  generate(requestId: string, system: string, prompt: string, onChunk: (chunk: string) => void): Promise<void>;
+  generate(requestId: string, system: string, prompt: string, image: string | null, onChunk: (chunk: string) => void): Promise<void>;
   abort(requestId: string): void;
 };
 
@@ -38,11 +38,11 @@ function iosNative(): AppleFMNative | null {
   const emitter = new NativeEventEmitter(module);
   return {
     info: () => module.info(),
-    generate: (requestId, system, prompt, onChunk) => {
+    generate: (requestId, system, prompt, image, onChunk) => {
       const sub = emitter.addListener("AppleFMToken", (e: any) => {
         if (e.requestId === requestId && e.chunk) onChunk(e.chunk);
       });
-      return module.generate(requestId, system, prompt).finally(() => sub.remove());
+      return module.generate(requestId, system, prompt, image).finally(() => sub.remove());
     },
     abort: (requestId) => module.abort(requestId),
   };
@@ -58,14 +58,14 @@ function desktopNative(): AppleFMNative {
       const { invoke } = await import("@tauri-apps/api/core");
       return invoke<AppleFMInfo>("afm_info");
     },
-    generate: async (requestId, system, prompt, onChunk) => {
+    generate: async (requestId, system, prompt, image, onChunk) => {
       const { invoke } = await import("@tauri-apps/api/core");
       const { listen } = await import("@tauri-apps/api/event");
       const unlisten = await listen<{ requestId: string; chunk: string }>("afm-token", (e) => {
         if (e.payload.requestId === requestId && e.payload.chunk) onChunk(e.payload.chunk);
       });
       try {
-        await invoke("afm_generate", { requestId, system, prompt });
+        await invoke("afm_generate", { requestId, system, prompt, image });
       } finally {
         unlisten();
       }
@@ -106,7 +106,7 @@ export class AppleFMProvider implements LocalBackend {
   async preloadModel(modelName: string): Promise<void> {}
 
   async getModelCapabilities(modelName: string): Promise<string[]> {
-    return ["tools"];
+    return (await this.info()).vision ? ["vision", "tools"] : ["tools"];
   }
 
   async getModelSheet(): Promise<LocalModelSheet> {
@@ -157,6 +157,11 @@ export class AppleFMProvider implements LocalBackend {
       .map((m) => `[SYSTEM: Automated Tool Execution Result]\n${m.content}`);
     const fullPrompt = buildToolResultsPrompt(prompt, toolResults);
 
+    const firstImage =
+      messages
+        .flatMap((m) => m.images ?? [])
+        .find((img) => img && img.length > 0) ?? null;
+
     const onAbort = () => native.abort(requestId);
     signal?.addEventListener("abort", onAbort);
 
@@ -165,7 +170,7 @@ export class AppleFMProvider implements LocalBackend {
     let streamMode: boolean | null = hasTools ? null : true;
 
     try {
-      await native.generate(requestId, effectiveSystemPrompt, fullPrompt, (chunk) => {
+      await native.generate(requestId, effectiveSystemPrompt, fullPrompt, firstImage, (chunk) => {
         accumulated += chunk;
 
         if (streamMode === true) {

@@ -1,5 +1,6 @@
 import Foundation
 import FoundationModels
+import ImageIO
 import React
 
 //bridges apple foundation models to js
@@ -21,7 +22,7 @@ class AppleFMModule: RCTEventEmitter {
     let model = SystemLanguageModel.default
     switch model.availability {
     case .available:
-      var result: [String: Any] = ["status": 3, "variant": variantName()]
+      var result: [String: Any] = ["status": 3, "variant": variantName(), "vision": supportsVision()]
       //docs say it may throw
       if let size = try? model.contextSize { result["contextSize"] = size }
       resolve(result)
@@ -41,7 +42,36 @@ class AppleFMModule: RCTEventEmitter {
     return "AFM 2 Core"
   }
 
-  @objc func generate(_ requestId: String, system: String, prompt: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+  //image attachments only exist from ios 27
+  @available(iOS 26.0, *)
+  private func supportsVision() -> Bool {
+    #if compiler(>=6.4)
+    if #available(iOS 27.0, *) { return SystemLanguageModel.default.capabilities.contains(.vision) }
+    #endif
+    return false
+  }
+
+  private func decodeImage(_ base64: String) -> CGImage? {
+    //ignore line breaks like android
+    guard let data = Data(base64Encoded: base64, options: .ignoreUnknownCharacters),
+          let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+    return CGImageSourceCreateImageAtIndex(source, 0, nil)
+  }
+
+  @available(iOS 26.0, *)
+  private func stream(_ session: LanguageModelSession, _ prompt: String, _ image: String?) -> LanguageModelSession.ResponseStream<String> {
+    #if compiler(>=6.4)
+    if #available(iOS 27.0, *), let image = image, let cgImage = decodeImage(image) {
+      return session.streamResponse {
+        prompt
+        Attachment(cgImage)
+      }
+    }
+    #endif
+    return session.streamResponse(to: prompt)
+  }
+
+  @objc func generate(_ requestId: String, system: String, prompt: String, image: String?, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
     guard #available(iOS 26.0, *) else {
       reject("apple_fm_unavailable", "Apple Foundation Models needs iOS 26", nil)
       return
@@ -52,7 +82,7 @@ class AppleFMModule: RCTEventEmitter {
       do {
         let session = LanguageModelSession(instructions: system)
         var sent = ""
-        for try await snapshot in session.streamResponse(to: prompt) {
+        for try await snapshot in self.stream(session, prompt, image) {
           let text = snapshot.content
           //snapshots are cumulative
           let chunk = text.hasPrefix(sent) ? String(text.dropFirst(sent.count)) : text

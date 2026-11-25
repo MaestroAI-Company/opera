@@ -15,6 +15,7 @@ extern "C" {
         id: *const c_char,
         system: *const c_char,
         prompt: *const c_char,
+        image: *const c_char,
         callback: Callback,
     );
     fn opera_afm_abort(id: *const c_char);
@@ -69,18 +70,25 @@ pub async fn afm_generate(
     request_id: String,
     system: String,
     prompt: String,
+    image: Option<String>,
 ) -> Result<(), String> {
     let _ = APP.set(app);
     let id = CString::new(request_id.clone()).map_err(|e| e.to_string())?;
     let system = CString::new(system).map_err(|e| e.to_string())?;
     let prompt = CString::new(prompt).map_err(|e| e.to_string())?;
+    let image = image
+        .map(CString::new)
+        .transpose()
+        .map_err(|e| e.to_string())?;
     let (tx, rx) = oneshot::channel();
     //register before the callback fires
     PENDING
         .lock()
         .map_err(|e| e.to_string())?
         .insert(request_id, tx);
-    unsafe { opera_afm_generate(id.as_ptr(), system.as_ptr(), prompt.as_ptr(), on_event) };
+    //null when there is no image
+    let image_ptr = image.as_ref().map_or(std::ptr::null(), |c| c.as_ptr());
+    unsafe { opera_afm_generate(id.as_ptr(), system.as_ptr(), prompt.as_ptr(), image_ptr, on_event) };
     rx.await.map_err(|e| e.to_string())?
 }
 

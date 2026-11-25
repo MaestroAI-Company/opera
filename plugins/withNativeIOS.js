@@ -61,6 +61,16 @@ function withNativeIOS(config) {
     return config;
   });
 
+  config = withPodfile(config, (config) => {
+    const contents = config.modResults.contents;
+    if (contents.includes("pod 'AppleFoundationModels'")) return config;
+    config.modResults.contents = contents.replace(
+      /^(\s*use_expo_modules!.*\n)/m,
+      "$1  pod 'AppleFoundationModels', :path => '../native/ios'\n"
+    );
+    return config;
+  });
+
   config = withAppDelegate(config, (config) => {
     let contents = config.modResults.contents;
     if (contents.includes('HighRefreshRate')) return config;

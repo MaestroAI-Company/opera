@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { IAIProvider } from './IAIProvider';
 import { AICoreProvider, getAICoreModelLabel } from './AICoreProvider';
+import { AppleFMProvider, getAppleFMModelLabel } from './AppleFMProvider';
 import { BrowserAIProvider, getBrowserModelLabel, isBrowserModel } from './BrowserAIProvider';
 import { currentPlatform } from './sources';
 import { MessageMetrics } from '../../db/DatabaseService';
@@ -34,10 +35,11 @@ export interface LocalBackend extends IAIProvider {
 }
 
 export function isLocalModel(modelName: string): boolean {
-  return modelName.startsWith("aicore-") || isBrowserModel(modelName);
+  return modelName.startsWith("aicore-") || modelName.startsWith("apple-fm-") || isBrowserModel(modelName);
 }
 
 export function getLocalModelLabel(modelName: string, short = false): string {
+  if (modelName.startsWith("apple-fm-")) return getAppleFMModelLabel(modelName, short);
   return isBrowserModel(modelName) ? getBrowserModelLabel() : getAICoreModelLabel(modelName, short);
 }
 
@@ -47,7 +49,7 @@ export function getLocalModelLabel(modelName: string, short = false): string {
 function resolveBackend(): LocalBackend | null {
   if (Platform.OS === "android") return new AICoreProvider();
   if (currentPlatform() === "web") return new BrowserAIProvider();
-  //todo: ios -> apple foundation models
+  if (Platform.OS === "ios") return new AppleFMProvider();
   //todo: tauri windows -> phi silica
   //todo: tauri macos -> apple foundation models
   return null;

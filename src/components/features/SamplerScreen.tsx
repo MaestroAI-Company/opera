@@ -117,7 +117,7 @@ import { setHomeEditing, useHomeEditing } from "./homeEditing";
 import AppIcon, { type IconSource } from "../ui/AppIcon";
 import homeIcon from "../../../assets/icons/home.svg";
 import profilIcon from "../../../assets/icons/profile.svg";
-import profil2Icon from "../../../assets/icons/profile2.svg";
+import profil2Icon from "../../../assets/icons/person_add2.svg";
 import profilAddIcon from "../../../assets/icons/person_add2.svg";
 import botIcon from "../../../assets/icons/bot.svg";
 import bot2Icon from "../../../assets/icons/bot2.svg";
@@ -1716,6 +1716,8 @@ export default function SamplerScreen({
           nodes={nodes}
           onHubPress={() => setHubSheetVisible(true)}
           active={visible && page === "home"}
+          ripple="in"
+          bareHub
         />
       </View>
     );

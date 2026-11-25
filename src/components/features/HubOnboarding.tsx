@@ -47,7 +47,7 @@ import HubQrSheet, { HubQrContent } from "./HubQrSheet";
 import AppIcon from "../ui/AppIcon";
 import arrowIcon from "../../../assets/icons/arrow.svg";
 import hubIcon from "../../../assets/icons/server2.svg";
-import profilIcon from "../../../assets/icons/profile2.svg";
+import profilIcon from "../../../assets/icons/person_add2.svg";
 
 const BACK_BUTTON_SIZE = 56;
 //kept local so new devices onboard

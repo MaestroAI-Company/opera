@@ -40,10 +40,11 @@ import PageStack from "./PageStack";
 import ProfileCard from "./ProfileCard";
 
 import keyIcon from "../../../assets/icons/key2.svg";
+import checkIcon from "../../../assets/icons/check2.svg";
 import newIcon from "../../../assets/icons/add2.svg";
 import penIcon from "../../../assets/icons/edit2.svg";
 import binIcon from "../../../assets/icons/delete2.svg";
-import profilIcon from "../../../assets/icons/profile2.svg";
+import profilIcon from "../../../assets/icons/person_add2.svg";
 import phoneIcon from "../../../assets/icons/phone2.svg";
 import laptopIcon from "../../../assets/icons/laptop2.svg";
 import webIcon from "../../../assets/icons/website2.svg";
@@ -452,7 +453,7 @@ export default function HubProfileSheet({
               variant="password"
             />
           </Group>
-          {renderHighlight(t("hubProfile.unlock"), keyIcon, !password, unlock)}
+          {renderHighlight(t("hubProfile.unlock"), checkIcon, !password, unlock)}
         </View>
       </View>
     );

@@ -77,6 +77,7 @@ import {
 import {
   buildSources,
   getOllamaTuning,
+  getSamplerLabel,
   HUB_PROVIDER_ID,
   hubModelKeyOf,
   ModelSource,
@@ -417,7 +418,7 @@ export function ModelSelectorDrawer({
     const merged: ModelSource = {
       key: HUB_PROVIDER_ID,
       service: HUB_PROVIDER_ID,
-      label: "Sampler Hub",
+      label: getSamplerLabel(),
       url: "",
     };
     return {

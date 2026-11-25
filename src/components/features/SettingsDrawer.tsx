@@ -296,7 +296,7 @@ import operaIcon from "../../../assets/icons/operaicon.svg";
 import phoneIcon from "../../../assets/icons/phone2.svg";
 import photoIcon from "../../../assets/icons/photo.svg";
 import profilIcon from "../../../assets/icons/profile.svg";
-import profil2Icon from "../../../assets/icons/profile2.svg";
+import personIcon from "../../../assets/icons/person2.svg";
 import reconnectIcon from "../../../assets/icons/reload2.svg";
 import samplerNavIcon from "../../../assets/icons/sampler.svg";
 import sampler2Icon from "../../../assets/icons/sampler2.svg";
@@ -1482,7 +1482,7 @@ export default function SettingsDrawer({
     { id: "none", label: t("settings.cloud.none") },
     ...CLOUD_PROVIDERS.map((def) => ({ id: def.id, label: def.label })),
     ...(hubSupported && pairedHub
-      ? [{ id: HUB_SYNC_ID, label: t("settings.nav.hub.title") }]
+      ? [{ id: HUB_SYNC_ID, label: hubStatus?.name || pairedHub?.name ? `Sampler ${hubName}` : "Sampler Hub" }]
       : []),
   ];
   //active cloud wins over the hub, a backup cloud does not
@@ -5712,7 +5712,7 @@ export default function SettingsDrawer({
             )}
             {Platform.OS !== "web" && (
               <ActionButton
-                icon={profil2Icon}
+                icon={personIcon}
                 label={t("permissions.contacts.label")}
                 onPress={() => requestAppPermission("contacts")}
                 rightElement={renderPermissionBadge(

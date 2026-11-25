@@ -1,7 +1,7 @@
 import { FontSizes, Fonts, Spacing, ThemeColors } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { Pressable, StyleProp, StyleSheet, TextInput, TextInputProps, ViewStyle } from "react-native";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useT } from "../../i18n";
 import AppIcon, { IconSource } from "./AppIcon";
 import IconButton from "./IconButton";
@@ -27,6 +27,7 @@ interface TextInputFieldProps extends TextInputProps {
 const RIGHT_CONTAINER_SIZE = 32;
 const ACTION_ICON_SIZE = 18;
 const ACTION_ICON_OPACITY = 0.6;
+const BLUR_HIDE_DELAY_MS = 150;
 
 export default function TextInputField({
   icon,
@@ -58,6 +59,9 @@ export default function TextInputField({
   const inputRef = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
+  const [showTrailing, setShowTrailing] = useState(false);
+  const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(hideTimer.current), []);
   const isLarge = variant === "large";
   const isPassword = variant === "password" || Boolean(secureTextEntry);
   const isSearch = variant === "search";
@@ -97,7 +101,7 @@ export default function TextInputField({
     { marginLeft: 10 - rightInsetOffset, marginRight: -rightInsetOffset },
     isLarge && {
       alignSelf: "flex-start" as const,
-      marginTop: Spacing.xs2 - rightInsetOffset,
+      marginTop: -rightInsetOffset,
     },
   ];
 
@@ -113,7 +117,7 @@ export default function TextInputField({
       //skip wrapper on web tab navigation
       tabIndex={-1}
     >
-      {leadingIcon && <AppIcon source={leadingIcon} style={[styles.icon, isLarge && styles.iconLarge]} />}
+      {leadingIcon && <AppIcon source={leadingIcon} style={styles.icon} />}
       <TextInput
         ref={inputRef}
         style={[styles.input, isLarge && styles.inputLarge, style]}
@@ -122,14 +126,24 @@ export default function TextInputField({
         onChangeText={onChangeText}
         multiline={multiline ?? isLarge}
         textAlignVertical={textAlignVertical ?? (isLarge ? "top" : undefined)}
-        onFocus={(e) => { setFocused(true); onFocus?.(e); }}
-        onBlur={(e) => { setFocused(false); onBlur?.(e); }}
+        onFocus={(e) => {
+          clearTimeout(hideTimer.current);
+          setFocused(true);
+          setShowTrailing(true);
+          onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          //let a press on the button land before it unmounts
+          hideTimer.current = setTimeout(() => setShowTrailing(false), BLUR_HIDE_DELAY_MS);
+          onBlur?.(e);
+        }}
         secureTextEntry={isPassword && !revealed}
         autoCapitalize={autoCapitalize ?? (isPassword || isSearch ? "none" : undefined)}
         autoCorrect={autoCorrect ?? (isPassword || isSearch ? false : undefined)}
         {...props}
       />
-      {trailing && (
+      {trailing && showTrailing && (
         <IconButton
           icon={trailing.icon}
           label={trailing.label}
@@ -177,9 +191,6 @@ const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
     height: 18,
     marginRight: 10,
     tintColor: Colors.textPrimary,
-  },
-  iconLarge: {
-    marginTop: Spacing.xs2,
   },
   rightIconButton: {
     alignSelf: "center",

@@ -48,7 +48,7 @@ import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 import search2Icon from "../../../assets/icons/search2.svg";
 import newIcon from "../../../assets/icons/add.svg";
-import add2Icon from "../../../assets/icons/add2.svg";
+import arrowIcon from "../../../assets/icons/arrow2.svg";
 import deleteIcon from "../../../assets/icons/delete2.svg";
 import shareIcon from "../../../assets/icons/share2.svg";
 import pinIcon from "../../../assets/icons/pin2.svg";
@@ -734,13 +734,21 @@ export function ConversationSearchSheet({
                 );
               })}
               {hasMore && (
-                <Group style={styles.showMoreGroup}>
-                  <ActionButton
-                    icon={add2Icon}
-                    label={t("conversations.search.showMore")}
-                    onPress={() => setVisibleCount((c) => c + SEARCH_PAGE_SIZE)}
+                <Pressable
+                  onPress={() => setVisibleCount((c) => c + SEARCH_PAGE_SIZE)}
+                  style={pressStyle(styles.showMoreRow, "surface")}
+                >
+                  <Text style={styles.showMoreText}>
+                    {t("conversations.search.showMore", {
+                      count: allResults.length - visibleCount,
+                    })}
+                  </Text>
+                  <AppIcon
+                    source={arrowIcon}
+                    style={styles.showMoreIcon}
+                    tintColor={Colors.textMuted}
                   />
-                </Group>
+                </Pressable>
               )}
             </View>
           </>
@@ -989,8 +997,8 @@ const makeStyles = (Colors: ThemeColors) =>
       alignItems: "center",
     },
     pinnedIcon: {
-      width: 22,
-      height: 22,
+      width: 18,
+      height: 18,
       opacity: 0.5,
     },
     sheet: {
@@ -1027,8 +1035,26 @@ const makeStyles = (Colors: ThemeColors) =>
       fontFamily: Fonts.mono,
       marginRight: Spacing.xs,
     },
-    showMoreGroup: {
-      marginTop: Spacing.md,
+    //same as the providers show more row
+    showMoreRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Spacing.md,
+      paddingVertical: Spacing.lg,
+      paddingHorizontal: Spacing.md,
+      borderRadius: Radius.xxl,
+    },
+    showMoreText: {
+      flex: 1,
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.body,
+      color: Colors.textMuted,
+    },
+    showMoreIcon: {
+      width: 18,
+      height: 18,
+      //points down since the list grows below
+      transform: [{ rotate: "90deg" }],
     },
     searchResultsHeader: {
       flexDirection: "row",

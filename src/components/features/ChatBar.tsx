@@ -155,6 +155,7 @@ const INPUT_PADDING_VERTICAL = 6;
 const MENTION_LIST_MAX_HEIGHT = 200;
 const INPUT_LINE_HEIGHT = 20;
 const WEB_INPUT_LINE_HEIGHT = 22;
+const INPUT_MAX_HEIGHT = 132;
 
 //mention boxes drawn behind the input
 function MentionBoxes({ text, spans, scrollY }: { text: string; spans: MentionSpan[]; scrollY: number }) {
@@ -1266,6 +1267,8 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                       </View>
                     )}
                     <Animated.View style={{ height: inputHeightAnim, overflow: 'hidden' }}>
+                    {/* fixed box so yoga never caps the input at the animated height */}
+                    <View style={Platform.OS !== 'web' && { height: INPUT_MAX_HEIGHT }}>
                     <TextInputWrapper
                       onPaste={(payload) => {
                         if (payload.type !== "images") return;
@@ -1288,7 +1291,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                         ref={inputRef}
                         style={[
                           styles.input,
-                          { maxHeight: 132, minHeight: Platform.OS === 'web' ? 22 : 32, lineHeight: Platform.OS === 'web' ? WEB_INPUT_LINE_HEIGHT : INPUT_LINE_HEIGHT },
+                          { maxHeight: INPUT_MAX_HEIGHT, minHeight: Platform.OS === 'web' ? 22 : 32, lineHeight: Platform.OS === 'web' ? WEB_INPUT_LINE_HEIGHT : INPUT_LINE_HEIGHT },
                           //default edittext padding offsets the boxes
                           Platform.OS === 'android' && { paddingHorizontal: 0 },
                           Platform.OS === 'web' && ({
@@ -1333,6 +1336,7 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                         {Platform.OS !== 'web' && <Text>{renderInputText()}</Text>}
                       </TextInput>
                     </TextInputWrapper>
+                    </View>
                     </Animated.View>
                   </View>
                 )}

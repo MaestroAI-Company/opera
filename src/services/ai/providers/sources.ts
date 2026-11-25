@@ -94,6 +94,11 @@ export function getHubName(): string {
   return hubName;
 }
 
+//product name until the hub is known
+export function getHubLabel(): string {
+  return hubName || 'Sampler Hub';
+}
+
 export function getHubServers(): (OllamaServer & { kind: HubProvider['kind']; provider: string })[] {
   //hub name avoids clashing with local ollama
   return hubProviders.map((p) => {

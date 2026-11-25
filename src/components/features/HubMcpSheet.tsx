@@ -34,6 +34,7 @@ import {
 } from "../../hooks/useHubMcp";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+import { getHubLabel } from "../../services/ai/providers/sources";
 import { MIN_SEARCH_LENGTH } from "../../services/ai/providers/huggingFaceCatalog";
 import {
     hubErrorText,
@@ -82,7 +83,7 @@ export function McpFolderList({ folders, onOpen, onUse }: FolderListProps) {
         {folders.path}
       </Text>
       <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-        {t("hubMcp.foldersHelp")}
+        {t("hubMcp.foldersHelp", { hub: getHubLabel() })}
       </Text>
       <Group style={[styles.highlightGroup, styles.groupSpacingTight]}>
         <ActionButton
@@ -688,13 +689,17 @@ export default function HubMcpSheet({
 
   //nothing until a query goes out
   const searchList = searchLoading ? (
-    <Text style={styles.helpText}>{t("hubMcp.loading")}</Text>
+    <Text style={[styles.helpText, { textAlign: "center" }]}>
+      {t("hubMcp.loading")}
+    </Text>
   ) : searchFailed ? (
     <Text style={[styles.helpText, { textAlign: "center" }]}>
-      {t("hubMcp.searchFailed")}
+      {t("hubMcp.searchFailed", { hub: getHubLabel() })}
     </Text>
   ) : results.length > 0 ? (
-    <Group>{results.map(renderResult)}</Group>
+    <View style={styles.contentCard}>
+      <Group>{results.map(renderResult)}</Group>
+    </View>
   ) : (
     query.trim().length >= MIN_SEARCH_LENGTH && (
       <Text style={[styles.helpText, { textAlign: "center" }]}>
@@ -725,14 +730,17 @@ export default function HubMcpSheet({
               </View>
               {browseList}
             </View>
-            {/* page level navigation */}
-            <Group style={styles.groupSpacing}>
-              <ActionButton
-                icon={addIcon}
-                label={t("hubMcp.manual")}
-                onPress={() => showPage("manual")}
-              />
-            </Group>
+            <View style={styles.contentCard}>
+              <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
+                <Group>
+                  <ActionButton
+                    icon={addIcon}
+                    label={t("hubMcp.manual")}
+                    onPress={() => showPage("manual")}
+                  />
+                </Group>
+              </View>
+            </View>
           </>
         ) : (
           <>
@@ -744,9 +752,7 @@ export default function HubMcpSheet({
             {p !== "search" && p !== "server" && (
               <View style={styles.backSpacer} />
             )}
-            {p === "search" && searchList && (
-              <View style={styles.contentCard}>{searchList}</View>
-            )}
+            {p === "search" && searchList}
             {p === "server" && renderServer()}
             {p === "configure" && renderConfigure()}
             {p === "manual" && renderManual()}
@@ -821,7 +827,7 @@ export default function HubMcpSheet({
       <NotificationModal
         visible={confirmPartial}
         title={t("hubMcp.partialTitle")}
-        message={t("hubMcp.partialMessage")}
+        message={t("hubMcp.partialMessage", { hub: getHubLabel() })}
         onClose={() => setConfirmPartial(false)}
         buttons={[
           {
@@ -1000,10 +1006,6 @@ const makeStyles = (Colors: ThemeColors) =>
       marginTop: Spacing.xs,
       lineHeight: 20,
       paddingHorizontal: Spacing.md,
-    },
-    groupSpacing: {
-      borderRadius: Radius.xxl + Spacing.md,
-      borderWidth: 0,
     },
     groupSpacingTight: {
       marginBottom: Spacing.lg2,

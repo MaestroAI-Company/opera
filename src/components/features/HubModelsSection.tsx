@@ -12,7 +12,7 @@ import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { AIModule } from "../../services/ai/AIModule";
 import { fetchModelDescription, formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
-import { getHubServers, HUB_PROVIDER_ID } from "../../services/ai/providers/sources";
+import { getHubLabel, getHubServers, HUB_PROVIDER_ID } from "../../services/ai/providers/sources";
 import { LLAMA_SERVER_URL } from "../../services/hub/modelOptions";
 import ActionButton from "../ui/ActionButton";
 import CardGrid, { type GridCard } from "../ui/CardGrid";
@@ -259,7 +259,7 @@ function HubInstalledPage({ file, onDeleted }: { file: string; onDeleted: () => 
       <NotificationModal
         visible={confirmDelete}
         title={t("hubModels.deleteTitle", { name })}
-        message={t("hubModels.deleteMessage")}
+        message={t("hubModels.deleteMessage", { hub: getHubLabel() })}
         onClose={() => setConfirmDelete(false)}
         buttons={[
           { text: t("common.cancel"), style: "secondary", onPress: () => setConfirmDelete(false) },

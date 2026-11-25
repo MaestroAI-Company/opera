@@ -35,11 +35,11 @@ export function useBugReport(notify: NotifyFn) {
     setLogs(crash ? crash.logs : getRelevantLogs(REPORT_LOG_LINES));
   }, [crash]);
 
+  //a crash report is sendable without text
+  const canSend = text.trim().length > 0 || !!crash;
+
   const send = useCallback(async (onSent?: () => void) => {
-    if (!text.trim() && !crash) {
-      notify(t("bugReport.empty.title"), t("bugReport.empty.message"));
-      return;
-    }
+    if (!canSend) return;
     //clipboard set before github opens
     if (screenshot) await copyScreenshot(screenshot);
 
@@ -52,13 +52,13 @@ export function useBugReport(notify: NotifyFn) {
     openExternalUrl(url).catch(() => notify(t("bugReport.githubFailed.title"), t("bugReport.githubFailed.message")));
     reset();
     onSent?.();
-  }, [text, logs, crash, screenshot, notify, reset]);
+  }, [canSend, text, logs, crash, screenshot, notify, reset]);
 
   return {
     text, setText,
     logs, toggleLogs,
     crash,
     screenshot, setScreenshot,
-    send, reset,
+    canSend, send, reset,
   };
 }

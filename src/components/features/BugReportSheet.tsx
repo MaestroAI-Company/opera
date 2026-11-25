@@ -20,7 +20,7 @@ import TextInputField from "../ui/TextInputField";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
 
 import penPlaceholderIcon from "../../../assets/icons/edit2.svg";
-import arrowIcon from "../../../assets/icons/arrow2.svg";
+import sendIcon from "../../../assets/icons/send2.svg";
 
 const DESKTOP_CARD_WIDTH = 720;
 
@@ -162,12 +162,18 @@ export default function BugReportSheet({
               {report.screenshot ? " " + t("bugReport.consentScreenshot") : ""}
             </Text>
 
-            <Group style={styles.highlightGroup}>
+            <Group
+              style={[
+                styles.highlightGroup,
+                !report.canSend && styles.highlightGroupDisabled,
+              ]}
+            >
               <ActionButton
-                icon={arrowIcon}
+                icon={sendIcon}
                 label={t("bugReport.send")}
                 onPress={() => report.send(onClose)}
                 variant="highlight"
+                disabled={!report.canSend}
               />
             </Group>
           </View>
@@ -262,5 +268,8 @@ const makeStyles = (Colors: ThemeColors) =>
     highlightGroup: {
       backgroundColor: Colors.primary,
       borderColor: Colors.borderOnPrimary,
+    },
+    highlightGroupDisabled: {
+      opacity: 0.5,
     },
   });

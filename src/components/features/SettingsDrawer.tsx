@@ -94,6 +94,7 @@ import { OpenAIProvider } from "../../services/ai/providers/OpenAIProvider";
 import {
     buildSources,
     getEnabledProviders,
+    getHubLabel,
     getHubServers,
     getOllamaServers,
     getOllamaTuning,
@@ -265,6 +266,7 @@ import PageStack from "./PageStack";
 import addIcon from "../../../assets/icons/add.svg";
 import add2Icon from "../../../assets/icons/add2.svg";
 import arrowIcon from "../../../assets/icons/arrow2.svg";
+import reportIcon from "../../../assets/icons/report2.svg";
 import brainIcon from "../../../assets/icons/brain2.svg";
 import reportsIcon from "../../../assets/icons/bug.svg";
 import calendarIcon from "../../../assets/icons/calendar2.svg";
@@ -496,6 +498,8 @@ type CloudModelsPage = "server" | "list" | "model";
 const MODEL_PAGE_SIZE = 50;
 //cloud page previews before the full sheet
 const MODEL_PREVIEW_SIZE = 10;
+//short lists need no search
+const MODEL_SEARCH_MIN = 8;
 const NO_DISABLED_MODELS: string[] = [];
 const PROMPT_TIER_KEYS = {
   small: "settings.model.promptSmall",
@@ -750,6 +754,7 @@ const ModelToggleList = memo(function ModelToggleList({
   searchQuery?: string;
   style?: StyleProp<ViewStyle>;
 }) {
+  const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const t = useT();
   const pageSize = showAll
@@ -781,100 +786,119 @@ const ModelToggleList = memo(function ModelToggleList({
   };
 
   const visible = shown.slice(0, limit);
+  const allShownOn = shown.every((m) => !disabledSet.has(m));
+
+  const renderModelRow = (model: string) => {
+    const on = !disabledSet.has(model);
+    const label = labelOf?.(model) ?? model;
+    //ollama tags read as a muted suffix
+    const tagAt = label.lastIndexOf(":");
+    const name = tagAt > 0 ? label.slice(0, tagAt) : label;
+    const tag = tagAt > 0 ? label.slice(tagAt) : "";
+    const badge = iconOf?.(model);
+    return (
+      <Pressable
+        key={model}
+        onPress={() => onOpenModel(model)}
+        style={pressStyle(styles.modelRow, "surface")}
+      >
+        {badge && (
+          <AppIcon
+            source={badge}
+            style={styles.menuIcon}
+            tintColor={Colors.textSecondary}
+          />
+        )}
+        <Text
+          style={[styles.modelRowName, !on && styles.modelRowNameOff]}
+          numberOfLines={1}
+        >
+          {name}
+          {tag !== "" && <Text style={styles.modelRowTag}>{tag}</Text>}
+        </Text>
+        <Checkbox
+          checked={on}
+          onToggle={(v) =>
+            onChange(
+              v ? disabled.filter((m) => m !== model) : [...disabled, model],
+            )
+          }
+        />
+      </Pressable>
+    );
+  };
 
   return (
     <View style={[styles.sheetCard, style]}>
-      <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-        <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
+      <View style={[styles.toggleGroupRow, styles.modelListHeader]}>
+        <Text style={[styles.settingLabel, styles.toggleGroupContent]}>
           {models.length > 0
             ? t("settings.ollama.modelsCount", {
                 count: `${enabledCount}/${models.length}`,
               })
             : t("settings.ollama.models")}
         </Text>
-        {models.length === 0 ? (
-          <Text style={styles.helpText}>
-            {loading
-              ? t("settings.ollama.modelsLoading")
-              : t("settings.ollama.noModels")}
-          </Text>
-        ) : (
-          <>
-            {!hideSearch && (
-              <Group style={styles.groupSpacingTight}>
-                {onOpenSearch ? (
-                  <ActionButton
-                    icon={search2Icon}
-                    label={t("settings.ollama.searchModels")}
-                    onPress={onOpenSearch}
-                  />
-                ) : (
-                  <TextInputField
-                    variant="search"
-                    placeholder={t("settings.ollama.searchModels")}
-                    value={search}
-                    onChangeText={(v) => {
-                      setLocalSearch(v);
-                      setLimit(pageSize);
-                    }}
-                    autoFocus={autoFocusSearch}
-                    onFocus={onSearchFocus}
-                  />
-                )}
-              </Group>
-            )}
-            <Group>
-              <ActionButton
-                icon={activateIcon}
-                label={t("settings.ollama.enableAll")}
-                disabled={shown.every((m) => !disabledSet.has(m))}
-                onPress={() => setShown(true)}
-              />
-              <ActionButton
-                icon={cancelIcon}
-                label={t("settings.ollama.disableAll")}
-                disabled={shown.every((m) => disabledSet.has(m))}
-                onPress={() => setShown(false)}
+        {/* one box replaces enable all and disable all */}
+        {shown.length > 0 && (
+          <Checkbox checked={allShownOn} onToggle={setShown} />
+        )}
+      </View>
+      {models.length === 0 ? (
+        <Text style={styles.helpText}>
+          {loading
+            ? t("settings.ollama.modelsLoading")
+            : t("settings.ollama.noModels")}
+        </Text>
+      ) : (
+        <>
+          {!hideSearch && models.length > MODEL_SEARCH_MIN && (
+            <Group style={styles.modelListSearch}>
+              <TextInputField
+                variant="search"
+                placeholder={t("settings.ollama.searchModels")}
+                //the full list owns the search
+                value={onOpenSearch ? "" : search}
+                onChangeText={(v) => {
+                  setLocalSearch(v);
+                  setLimit(pageSize);
+                }}
+                autoFocus={autoFocusSearch}
+                onFocus={onOpenSearch ?? onSearchFocus}
               />
             </Group>
-            {shown.length === 0 ? (
-              <Text style={[styles.helpText, { textAlign: "center" }]}>
-                {t("settings.ollama.noMatch")}
-              </Text>
-            ) : (
-              <CardGrid
-                cards={visible.map((model) => ({
-                  key: model,
-                  title: labelOf?.(model) ?? model,
-                  badge: iconOf?.(model),
-                  status: t(
-                    disabledSet.has(model)
-                      ? "settings.service.off"
-                      : "settings.service.on",
-                  ),
-                  onPress: () => onOpenModel(model),
-                }))}
-                style={{ marginTop: Spacing.md }}
-              />
-            )}
-            {shown.length > limit && (
-              <Group style={{ marginTop: Spacing.md }}>
-                <ActionButton
-                  icon={add2Icon}
-                  label={t("settings.ollama.showMore", {
-                    count: shown.length - limit,
-                  })}
+          )}
+          {shown.length === 0 ? (
+            <Text style={[styles.helpText, { textAlign: "center" }]}>
+              {t("settings.ollama.noMatch")}
+            </Text>
+          ) : (
+            <View>
+              {visible.map(renderModelRow)}
+              {shown.length > limit && (
+                <Pressable
                   onPress={
                     onShowAll
                       ? () => onShowAll(search)
                       : () => setLimit((l) => l + pageSize)
                   }
-                />
-              </Group>
-            )}
-          </>
-        )}
-      </View>
+                  style={pressStyle(styles.modelRow, "surface")}
+                >
+                  <Text style={[styles.modelRowName, styles.modelRowNameOff]}>
+                    {t("settings.ollama.showMore", {
+                      count: shown.length - limit,
+                    })}
+                  </Text>
+                  <AppIcon
+                    source={arrowIcon}
+                    style={styles.menuIcon}
+                    tintColor={Colors.textMuted}
+                  />
+                </Pressable>
+              )}
+            </View>
+          )}
+        </>
+      )}
     </View>
   );
 });
@@ -1155,6 +1179,7 @@ export default function SettingsDrawer({
   const hubSupported = SamplerHub.isSupported();
   const [pairedHub, setPairedHub] = useState<PairedHub | null>(null);
   const [hubStatus, setHubStatus] = useState<HubStatus | null>(null);
+  const hubName = hubStatus?.name || pairedHub?.name || getHubLabel();
   //null until this device unlocks a profile
   const [hubProfile, setHubProfile] = useState<HubProfile | null>(null);
   const [syncPrefs, setSyncPrefs] = useState<SyncPrefs | null>(null);
@@ -1210,6 +1235,8 @@ export default function SettingsDrawer({
       icon={infoIcon}
       label={t("settings.help.open")}
       onPress={() => openHelp(topic)}
+      containerSize={40}
+      iconOpacity={0.6}
       tintColor={Colors.textPrimary}
     />
   );
@@ -3051,7 +3078,7 @@ export default function SettingsDrawer({
       }
       showAlert(
         t("update.checkTitle"),
-        t("update.upToDate"),
+        t("update.upToDate", { version: appVersion }),
         [
           {
             text: t("common.ok"),
@@ -3059,7 +3086,6 @@ export default function SettingsDrawer({
             style: "secondary",
           },
         ],
-        { icon: reconnectIcon },
       );
     } catch (e) {
       showAlert(
@@ -3072,7 +3098,6 @@ export default function SettingsDrawer({
             style: "secondary",
           },
         ],
-        { icon: reconnectIcon },
       );
     }
   };
@@ -4814,7 +4839,7 @@ export default function SettingsDrawer({
         key: "providers",
         label: t("settings.hub.syncProviders"),
         help: viaHub
-          ? t("settings.hub.syncProvidersHelp")
+          ? t("settings.hub.syncProvidersHelp", { hub: hubName })
           : t("settings.hub.syncHubOnly"),
         hubOnly: true,
       },
@@ -5393,7 +5418,7 @@ export default function SettingsDrawer({
                 {t("sampler.model.title")}
               </Text>
               <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-                {t("sampler.model.readOnly")}
+                {t("sampler.model.readOnly", { hub: hubName })}
               </Text>
               <Group style={styles.infoGroup}>
                 {[
@@ -5727,8 +5752,8 @@ export default function SettingsDrawer({
           </Text>
           <Group style={styles.highlightGroup}>
             <ActionButton
-              icon={arrowIcon}
-              label={t("bugReport.send")}
+              icon={reportIcon}
+              label={t("settings.support.reportButton")}
               onPress={() => setBugReportSheetVisible(true)}
               variant="highlight"
             />
@@ -9544,6 +9569,34 @@ const makeStyles = (Colors: ThemeColors) =>
     litertRowMeta: {
       fontFamily: Fonts.mono,
       fontSize: FontSizes.micro,
+      color: Colors.textMuted,
+    },
+    modelListHeader: {
+      paddingRight: Spacing.md,
+      marginBottom: Spacing.md,
+    },
+    modelListSearch: {
+      marginBottom: Spacing.md,
+    },
+    //pressed fill stays concentric with the card
+    modelRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Spacing.md,
+      paddingVertical: Spacing.lg,
+      paddingHorizontal: Spacing.md,
+      borderRadius: Radius.xxl,
+    },
+    modelRowName: {
+      flex: 1,
+      fontFamily: Fonts.mono,
+      fontSize: FontSizes.body,
+      color: Colors.textPrimary,
+    },
+    modelRowNameOff: {
+      color: Colors.textMuted,
+    },
+    modelRowTag: {
       color: Colors.textMuted,
     },
     litertSearchResultRow: {

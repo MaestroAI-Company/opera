@@ -21,6 +21,7 @@ import {
 } from "../../hooks/useHubModels";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+import { getHubLabel } from "../../services/ai/providers/sources";
 import {
   fetchModelDescription,
   formatBytes,
@@ -497,7 +498,7 @@ export default function HubModelsSheet({
       <NotificationModal
         visible={!!pending}
         title={t("hubModels.downloadTitle", { name: pending ? fileStem(pending.file) : "" })}
-        message={t("hubModels.downloadMessage", { size: formatBytes(pending?.size ?? 0) })}
+        message={t("hubModels.downloadMessage", { hub: getHubLabel(), size: formatBytes(pending?.size ?? 0) })}
         onClose={() => setPending(null)}
         buttons={[
           { text: t("common.cancel"), style: "secondary", onPress: () => setPending(null) },

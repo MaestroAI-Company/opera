@@ -296,24 +296,24 @@ export default function HubOnboarding({
 
   const renderShare = () => (
     <>
-      {renderHead(t("hubOnboarding.share.title"), t("hubOnboarding.share.lead"))}
+      {renderHead(t("hubOnboarding.share.title", { hub: savedName }), t("hubOnboarding.share.lead"))}
       <Reveal delay={100}>
         <View style={styles.contentCard}>
           {renderToggleRow(
             t("hubOnboarding.share.models"),
-            t("hubOnboarding.share.modelsHelp"),
+            t("hubOnboarding.share.modelsHelp", { hub: savedName }),
             !!settings?.models,
             (value) => onChangeSettings?.({ models: value }),
           )}
           {renderToggleRow(
             t("hubOnboarding.share.mcp"),
-            t("hubOnboarding.share.mcpHelp"),
+            t("hubOnboarding.share.mcpHelp", { hub: savedName }),
             !!settings?.mcpServers,
             (value) => onChangeSettings?.({ mcpServers: value }),
           )}
           {renderToggleRow(
             t("hubOnboarding.share.providers"),
-            t("hubOnboarding.share.providersHelp"),
+            t("hubOnboarding.share.providersHelp", { hub: savedName }),
             !!settings?.shareProviders,
             (value) => onChangeSettings?.({ shareProviders: value }),
             true,
@@ -325,7 +325,7 @@ export default function HubOnboarding({
 
   const renderModel = () => (
     <>
-      {renderHead(t("hubOnboarding.model.title"), t("hubOnboarding.model.lead"))}
+      {renderHead(t("hubOnboarding.model.title"), t("hubOnboarding.model.lead", { hub: savedName }))}
       <Reveal delay={100}>
         <View style={styles.contentCard}>
           {modelError && <Text style={styles.helpText}>{modelError}</Text>}
@@ -356,7 +356,7 @@ export default function HubOnboarding({
         <View style={styles.contentCard}>
           {renderToggleRow(
             t("hubOnboarding.reach.lan"),
-            t("hubOnboarding.reach.lanHelp"),
+            t("hubOnboarding.reach.lanHelp", { hub: savedName }),
             !!settings?.lanDiscovery,
             (value) => onChangeSettings?.({ lanDiscovery: value }),
           )}
@@ -420,7 +420,7 @@ export default function HubOnboarding({
 
   const renderOffers = () => (
     <>
-      {renderHead(t("hubOnboarding.offers.title"), t("hubOnboarding.offers.lead", { hub: hubName }))}
+      {renderHead(t("hubOnboarding.offers.title", { hub: hubName }), t("hubOnboarding.offers.lead", { hub: hubName }))}
       <Reveal delay={100}>
         <View style={styles.contentCard}>
           {hubLlama && (

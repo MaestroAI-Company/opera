@@ -18,6 +18,7 @@ import {
 } from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+import { getHubLabel } from "../../services/ai/providers/sources";
 import {
   HubDevice,
   HubProfile,
@@ -387,7 +388,7 @@ export default function HubProfileSheet({
             (profiles === null
               ? t("hubProfile.loading")
               : profiles.length === 0
-                ? t("hubProfile.none")
+                ? t("hubProfile.none", { hub: hub?.name || getHubLabel() })
                 : t("hubProfile.pickHelp"))}
         </Text>
         {!!profiles?.length && (

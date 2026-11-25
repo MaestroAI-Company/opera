@@ -4,6 +4,7 @@ import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constan
 import { mcpAvatar, mcpSourceLabel, runHubMcp, useHubMcp } from "../../hooks/useHubMcp";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+import { getHubLabel } from "../../services/ai/providers/sources";
 import { formatBytes } from "../../services/ai/providers/huggingFaceCatalog";
 import { HostedMcpServer, McpField, hubErrorText } from "../../services/hub/SamplerHubService";
 import ActionButton from "../ui/ActionButton";
@@ -61,7 +62,7 @@ export function McpFieldRows({ fields, drafts, secretsSet = [], onChange, onPick
         const help = [
           field.description,
           field.required ? t("hubMcp.required") : "",
-          field.secret ? t("hubMcp.secretOnHub") : "",
+          field.secret ? t("hubMcp.secretOnHub", { hub: getHubLabel() }) : "",
         ]
           .filter(Boolean)
           .join(" ");
@@ -85,7 +86,7 @@ export function McpFieldRows({ fields, drafts, secretsSet = [], onChange, onPick
           <View key={field.key} style={[styles.settingRowVertical, last && { marginBottom: 0 }]}>
             <Text style={styles.settingLabel}>{field.label}</Text>
             <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {field.secret && secretsSet.includes(field.key) ? `${t("hubMcp.secretSet")} ${t("hubMcp.secretOnHub")}` : help}
+              {field.secret && secretsSet.includes(field.key) ? `${t("hubMcp.secretSet")} ${t("hubMcp.secretOnHub", { hub: getHubLabel() })}` : help}
             </Text>
             <Group>
               {field.kind === "folder" || field.kind === "file" ? (
@@ -368,7 +369,7 @@ export function HubMcpServerPage({ id, onRemoved, onPickFolder }: HubMcpServerPa
       <NotificationModal
         visible={confirmRemove}
         title={t("hubMcp.removeTitle", { name: listing.title })}
-        message={t("hubMcp.removeMessage")}
+        message={t("hubMcp.removeMessage", { hub: getHubLabel() })}
         onClose={() => setConfirmRemove(false)}
         buttons={[
           { text: t("common.cancel"), style: "secondary", onPress: () => setConfirmRemove(false) },

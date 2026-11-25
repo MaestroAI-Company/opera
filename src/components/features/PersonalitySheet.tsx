@@ -1,26 +1,27 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
-  Fonts,
-  FontSizes,
-  Radius,
-  Spacing,
-  ThemeColors,
-} from "../../../constants/theme";
-import {
-  PERSONALITY_DEPTHS,
-  PERSONALITY_MOODS,
-  PERSONALITY_STYLES,
-  type PersonalitySettings,
+    PERSONALITY_DEPTHS,
+    PERSONALITY_MOODS,
+    PERSONALITY_STYLES,
+    type PersonalitySettings,
 } from "../../../constants/personality";
-import { useT, type TranslationKey } from "../../i18n";
+import {
+    Fonts,
+    FontSizes,
+    Radius,
+    Spacing,
+    ThemeColors,
+} from "../../../constants/theme";
 import { useThemedStyles } from "../../hooks/useTheme";
+import { useT, type TranslationKey } from "../../i18n";
+import { vibrate } from "../../services/haptics";
 import { Settings } from "../../services/settings/SettingsService";
 import ActionButton from "../ui/ActionButton";
 import Group from "../ui/Group";
 import { pressStyle } from "../ui/pressStyle";
-import { butterflyForPersonality } from "./maestroButterfly";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
+import { butterflyForPersonality } from "./maestroButterfly";
 
 import activateIcon from "../../../assets/icons/check2.svg";
 
@@ -54,7 +55,8 @@ export function readPersonality(): PersonalitySettings {
 //sentence split around the slot placeholders
 export function personalityParts(template: string): (string | Slot)[] {
   return template.split(/\{(mood|style|depth)\}/).filter(Boolean) as (
-    string | Slot
+    | string
+    | Slot
   )[];
 }
 
@@ -117,7 +119,7 @@ function PersonalityEditor({
 
   //picking a value moves to the next slot
   const pick = (value: string) => {
-    Vibration.vibrate(10);
+    vibrate(10);
     setDraft((d) => ({ ...d, [SLOT_KEY[slot]]: value }));
     const next = SLOT_ORDER[SLOT_ORDER.indexOf(slot) + 1];
     if (next) setSlot(next);
@@ -125,7 +127,10 @@ function PersonalityEditor({
 
   const save = () => {
     //personality picks the butterfly
-    Settings.setMany({ ...draft, maestroButterfly: butterflyForPersonality(draft) });
+    Settings.setMany({
+      ...draft,
+      maestroButterfly: butterflyForPersonality(draft),
+    });
     onSaved(draft);
     onClose();
   };
@@ -138,7 +143,7 @@ function PersonalityEditor({
             <Text
               key={i}
               onPress={() => {
-                Vibration.vibrate(10);
+                vibrate(10);
                 setSlot(part);
               }}
               style={[styles.slot, slot === part && styles.slotActive]}
@@ -198,11 +203,14 @@ export function PersonalityPicker({
   const [slot, setSlot] = useState<Slot>("mood");
 
   const pick = (value: string) => {
-    Vibration.vibrate(10);
+    vibrate(10);
     const next = { ...draft, [SLOT_KEY[slot]]: value };
     setDraft(next);
     //personality picks the butterfly
-    Settings.setMany({ ...next, maestroButterfly: butterflyForPersonality(next) });
+    Settings.setMany({
+      ...next,
+      maestroButterfly: butterflyForPersonality(next),
+    });
     onChange?.(next);
     const nextSlot = SLOT_ORDER[SLOT_ORDER.indexOf(slot) + 1];
     if (nextSlot) setSlot(nextSlot);
@@ -216,7 +224,7 @@ export function PersonalityPicker({
             <Text
               key={i}
               onPress={() => {
-                Vibration.vibrate(10);
+                vibrate(10);
                 setSlot(part);
               }}
               style={[styles.slot, slot === part && styles.slotActive]}

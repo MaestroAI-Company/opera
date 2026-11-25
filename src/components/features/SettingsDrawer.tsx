@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import * as Calendar from "expo-calendar";
 import Constants from "expo-constants";
 import * as Contacts from "expo-contacts";
@@ -126,10 +125,6 @@ import {
 import { ITool } from "../../services/ai/tools/ITool";
 import { ToolManager } from "../../services/ai/tools/ToolManager";
 import { openExternalUrl } from "../../services/ai/utils/openExternalUrl";
-import {
-    isDefaultAssistant,
-    openAssistantSettings,
-} from "../../services/assistant/DefaultAssistant";
 import { BackupService } from "../../services/BackupService";
 import { CloudUserInfo } from "../../services/cloud/CloudProvider";
 import {
@@ -267,7 +262,6 @@ import PageStack from "./PageStack";
 import addIcon from "../../../assets/icons/add.svg";
 import add2Icon from "../../../assets/icons/add2.svg";
 import arrowIcon from "../../../assets/icons/arrow2.svg";
-import reportIcon from "../../../assets/icons/report2.svg";
 import brainIcon from "../../../assets/icons/brain2.svg";
 import reportsIcon from "../../../assets/icons/bug.svg";
 import calendarIcon from "../../../assets/icons/calendar2.svg";
@@ -278,13 +272,13 @@ import cloudIcon from "../../../assets/icons/cloud.svg";
 import providerCloudIcon from "../../../assets/icons/cloud2.svg";
 import confidentialityIcon from "../../../assets/icons/confidentiality.svg";
 import deleteIcon from "../../../assets/icons/delete2.svg";
-import download2Icon from "../../../assets/icons/import2.svg";
 import edit2Icon from "../../../assets/icons/edit2.svg";
 import errorIcon from "../../../assets/icons/error2.svg";
 import exportIcon from "../../../assets/icons/export2.svg";
 import generalIcon from "../../../assets/icons/general.svg";
 import githubIcon from "../../../assets/icons/github.svg";
 import hyperlinkIcon from "../../../assets/icons/hyperlink2.svg";
+import download2Icon from "../../../assets/icons/import2.svg";
 import informationIcon from "../../../assets/icons/info.svg";
 import infoIcon from "../../../assets/icons/info2.svg";
 import keyIcon from "../../../assets/icons/key2.svg";
@@ -294,11 +288,12 @@ import message2Icon from "../../../assets/icons/message2.svg";
 import micIcon from "../../../assets/icons/microphone2.svg";
 import ollamaIcon from "../../../assets/icons/ollama.svg";
 import operaIcon from "../../../assets/icons/operaicon.svg";
+import personIcon from "../../../assets/icons/person2.svg";
 import phoneIcon from "../../../assets/icons/phone2.svg";
 import photoIcon from "../../../assets/icons/photo.svg";
 import profilIcon from "../../../assets/icons/profile.svg";
-import personIcon from "../../../assets/icons/person2.svg";
 import reconnectIcon from "../../../assets/icons/reload2.svg";
+import reportIcon from "../../../assets/icons/report2.svg";
 import samplerNavIcon from "../../../assets/icons/sampler.svg";
 import sampler2Icon from "../../../assets/icons/sampler2.svg";
 import search2Icon from "../../../assets/icons/search2.svg";
@@ -332,7 +327,6 @@ const MODEL_CAPABILITY_ICONS = {
 } as const satisfies Record<ModelCapabilityId, IconSource>;
 const cloudInfoImage = require("../../../assets/images/ImageCard/CloudInfo.png");
 const toolInfoImage = require("../../../assets/images/ImageCard/ToolInfo.png");
-const assistantInfoImage = require("../../../assets/images/ImageCard/AssistantInfo.png");
 const standbyInfoImage = require("../../../assets/images/ImageCard/StandbyInfo.png");
 const errorImage = require("../../../assets/images/ImageCard/error.png");
 
@@ -434,7 +428,6 @@ export type SubPage =
   | "advanced"
   | "maestro"
   | "maestropreferences"
-  | "assistantoverlay"
   | "screensaver"
   | "service"
   | "confidentiality"
@@ -458,7 +451,6 @@ const SUB_PAGE_PARENT: Record<SubPage, SubPage> = {
   advanced: "main",
   maestro: "main",
   maestropreferences: "maestro",
-  assistantoverlay: "general",
   screensaver: "general",
   service: "main",
   confidentiality: "main",
@@ -923,10 +915,31 @@ export default function SettingsDrawer({
   const { width } = useResponsive();
   const drawerWidth = drawerWidthFor(width);
   const progress = settingsProgress;
+  const [activeSubPage, setActiveSubPage] = useState<SubPage>(
+    initialSubPage ?? "main",
+  );
+
+  //entry page swaps in before paint, never while sliding out
+  const [prevVisible, setPrevVisible] = useState(visible);
+  const [prevInitialSubPage, setPrevInitialSubPage] = useState(initialSubPage);
+  if (visible !== prevVisible || initialSubPage !== prevInitialSubPage) {
+    setPrevVisible(visible);
+    setPrevInitialSubPage(initialSubPage);
+    if (visible) setActiveSubPage(initialSubPage ?? "main");
+  }
+
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gestureState) => {
+          //yield left edge back swipes
+          if (
+            Platform.OS === "ios" &&
+            activeSubPage !== "main" &&
+            gestureState.x0 - (width - drawerWidth) < 40
+          ) {
+            return false;
+          }
           return (
             gestureState.dx > 10 &&
             Math.abs(gestureState.dx) > Math.abs(gestureState.dy)
@@ -951,21 +964,8 @@ export default function SettingsDrawer({
           settleDrawer(progress, true);
         },
       }),
-    [onClose, drawerWidth, progress],
+    [onClose, drawerWidth, progress, activeSubPage, width],
   );
-
-  const [activeSubPage, setActiveSubPage] = useState<SubPage>(
-    initialSubPage ?? "main",
-  );
-
-  //entry page swaps in before paint, never while sliding out
-  const [prevVisible, setPrevVisible] = useState(visible);
-  const [prevInitialSubPage, setPrevInitialSubPage] = useState(initialSubPage);
-  if (visible !== prevVisible || initialSubPage !== prevInitialSubPage) {
-    setPrevVisible(visible);
-    setPrevInitialSubPage(initialSubPage);
-    if (visible) setActiveSubPage(initialSubPage ?? "main");
-  }
 
   const wasVisibleRef = useRef(visible);
   useEffect(() => {
@@ -1416,8 +1416,6 @@ export default function SettingsDrawer({
   const [editAiMessages, setEditAiMessagesState] = useState(false);
   const [showDetectionBoxes, setShowDetectionBoxesState] = useState(false);
   const [advancedMode, setAdvancedModeState] = useState(false);
-  const [useAppContext, setUseAppContextState] = useState(true);
-  const [autoStartMic, setAutoStartMicState] = useState(true);
   const [overlayEnabled, setOverlayEnabledState] = useState(true);
   const [overlayShortcut, setOverlayShortcutState] = useState(
     OVERLAY_SHORTCUTS[0].id,
@@ -1483,7 +1481,15 @@ export default function SettingsDrawer({
     { id: "none", label: t("settings.cloud.none") },
     ...CLOUD_PROVIDERS.map((def) => ({ id: def.id, label: def.label })),
     ...(hubSupported && pairedHub
-      ? [{ id: HUB_SYNC_ID, label: hubStatus?.name || pairedHub?.name ? `Sampler ${hubName}` : "Sampler Hub" }]
+      ? [
+          {
+            id: HUB_SYNC_ID,
+            label:
+              hubStatus?.name || pairedHub?.name
+                ? `Sampler ${hubName}`
+                : "Sampler Hub",
+          },
+        ]
       : []),
   ];
   //active cloud wins over the hub, a backup cloud does not
@@ -1600,14 +1606,6 @@ export default function SettingsDrawer({
     });
     return () => sub.remove();
   }, [visible, activeSubPage, refreshPermissionStatuses]);
-
-  //hide card without assistant role
-  const [assistantRoleAvailable, setAssistantRoleAvailable] = useState(true);
-  useEffect(() => {
-    isDefaultAssistant().then((held) =>
-      setAssistantRoleAvailable(held !== null),
-    );
-  }, []);
 
   //hides the open settings card once opera is the screen saver
   const [screenSaverActive, setScreenSaverActive] = useState(false);
@@ -1842,8 +1840,6 @@ export default function SettingsDrawer({
       setEditAiMessagesState(s.editAiMessages);
       setShowDetectionBoxesState(s.showDetectionBoxes);
       setAdvancedModeState(s.advancedMode);
-      setUseAppContextState(s.useAppContext);
-      setAutoStartMicState(s.autoStartMic);
       setOverlayEnabledState(s.overlayEnabled);
       setOverlayShortcutState(s.overlayShortcut);
       setCloseToTrayState(s.closeToTray);
@@ -3004,16 +3000,6 @@ export default function SettingsDrawer({
     Settings.set("modelFailover", v);
   };
 
-  const setUseAppContext = (v: boolean) => {
-    setUseAppContextState(v);
-    Settings.set("useAppContext", v);
-  };
-
-  const setAutoStartMic = (v: boolean) => {
-    setAutoStartMicState(v);
-    Settings.set("autoStartMic", v);
-  };
-
   //each change reaches the native shortcut at once
   const setOverlayConfig = (patch: {
     overlayEnabled?: boolean;
@@ -3034,34 +3020,6 @@ export default function SettingsDrawer({
     setOverlayScreenSelectionState(next.overlayScreenSelection);
     Settings.setMany(patch);
     pushDesktopOverlayConfig(next);
-  };
-
-  //macos blanks captures without permission
-  const setScreenSelection = async (v: boolean) => {
-    setOverlayConfig({ overlayScreenSelection: v });
-    if (!v) return;
-    const granted = await invoke<boolean>("stage_screen_access", {
-      request: true,
-    }).catch(() => true);
-    if (granted) return;
-    showAlert(
-      t("settings.overlay.screenAccessTitle"),
-      t("settings.overlay.screenAccessMessage"),
-      [
-        {
-          text: t("settings.overlay.screenAccessOpen"),
-          onPress: () => {
-            setAlertModalVisible(false);
-            invoke("stage_open_screen_settings").catch(() => {});
-          },
-        },
-        {
-          text: t("common.cancel"),
-          onPress: () => setAlertModalVisible(false),
-          style: "secondary",
-        },
-      ],
-    );
   };
 
   const setLaunchAtStartupValue = (v: boolean) => {
@@ -3089,17 +3047,13 @@ export default function SettingsDrawer({
         ],
       );
     } catch (e) {
-      showAlert(
-        t("update.checkTitle"),
-        t("update.checkFailed"),
-        [
-          {
-            text: t("common.ok"),
-            onPress: () => setAlertModalVisible(false),
-            style: "secondary",
-          },
-        ],
-      );
+      showAlert(t("update.checkTitle"), t("update.checkFailed"), [
+        {
+          text: t("common.ok"),
+          onPress: () => setAlertModalVisible(false),
+          style: "secondary",
+        },
+      ]);
     }
   };
 
@@ -4231,22 +4185,14 @@ export default function SettingsDrawer({
         )}
       </View>
 
-      {/* overlay and screen saver links */}
-      {(!isDesktop || isTauri || Platform.OS === "android") && (
+      {/* standby is android dream service */}
+      {Platform.OS === "android" && (
         <Group style={styles.groupSpacing}>
-          {(!isDesktop || isTauri || Platform.OS === "android") &&
-            renderToolsNavRow(
-              "assistantoverlay",
-              t("settings.nav.overlay.title"),
-              t("settings.nav.overlay.subtitle"),
-            )}
-          {/* standby is android dream service */}
-          {Platform.OS === "android" &&
-            renderToolsNavRow(
-              "screensaver",
-              t("settings.nav.screenSaver.title"),
-              t("settings.nav.screenSaver.subtitle"),
-            )}
+          {renderToolsNavRow(
+            "screensaver",
+            t("settings.nav.screenSaver.title"),
+            t("settings.nav.screenSaver.subtitle"),
+          )}
         </Group>
       )}
     </View>
@@ -4659,171 +4605,6 @@ export default function SettingsDrawer({
           </View>
         </View>
       </View>
-    </View>
-  );
-
-  // assistant overlay subpage
-  const renderAssistantOverlaySubPage = () => (
-    <View style={styles.subPageContainer}>
-      {renderSubPageHeader(t("settings.nav.overlay.title"))}
-
-      {/* default assistant card */}
-      {Platform.OS === "android" && assistantRoleAvailable && (
-        <View style={styles.contentCard}>
-          <ImageCard
-            source={assistantInfoImage}
-            width="100%"
-            style={{ marginBottom: Spacing.lg2 }}
-          />
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={styles.settingLabel}>
-              {t("settings.overlay.default")}
-            </Text>
-            <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
-              {t("settings.overlay.defaultHelp")}
-            </Text>
-            <Group>
-              <ActionButton
-                icon={hyperlinkIcon}
-                label={t("settings.overlay.setDefault")}
-                onPress={openAssistantSettings}
-              />
-            </Group>
-          </View>
-        </View>
-      )}
-
-      {/* app store build has no overlay */}
-      {isAppStore && (
-        <View style={styles.contentCard}>
-          <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-            <Text style={styles.helpText}>
-              {t("settings.overlay.appStoreUnavailable")}
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {/* desktop shortcut card */}
-      {isTauri && !isAppStore && (
-        <View style={styles.contentCard}>
-          <ImageCard
-            source={assistantInfoImage}
-            width="100%"
-            style={{ marginBottom: Spacing.lg2 }}
-          />
-          <View
-            style={[
-              styles.settingRowVertical,
-              !overlayEnabled && { marginBottom: 0 },
-            ]}
-          >
-            <View style={styles.toggleGroupRow}>
-              <View style={styles.toggleGroupContent}>
-                <Text style={styles.settingLabel}>
-                  {t("settings.overlay.desktopEnabled")}
-                </Text>
-                <Text style={styles.helpText}>
-                  {t("settings.overlay.desktopEnabledHelp")}
-                </Text>
-              </View>
-              <Toggle
-                checked={overlayEnabled}
-                onToggle={(v) => setOverlayConfig({ overlayEnabled: v })}
-              />
-            </View>
-          </View>
-
-          {overlayEnabled && (
-            <View style={styles.settingRowVertical}>
-              <View style={styles.toggleGroupRow}>
-                <View style={styles.toggleGroupContent}>
-                  <Text style={styles.settingLabel}>
-                    {t("settings.overlay.screenSelection")}
-                  </Text>
-                  <Text style={styles.helpText}>
-                    {t("settings.overlay.screenSelectionHelp")}
-                  </Text>
-                </View>
-                <Toggle
-                  checked={overlayScreenSelection}
-                  onToggle={setScreenSelection}
-                />
-              </View>
-            </View>
-          )}
-
-          {overlayEnabled && (
-            <View
-              style={[
-                styles.settingRowVertical,
-                isWide && styles.toggleGroupRow,
-                { marginBottom: 0 },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.settingLabel,
-                  isWide
-                    ? styles.toggleGroupContent
-                    : { marginBottom: Spacing.md },
-                ]}
-              >
-                {t("settings.overlay.shortcut")}
-              </Text>
-              <Group style={isWide && styles.sliderGroup}>
-                <Selector
-                  options={OVERLAY_SHORTCUTS}
-                  selectedValue={overlayShortcut}
-                  onSelect={(v) => setOverlayConfig({ overlayShortcut: v })}
-                  title={t("settings.overlay.selectShortcut")}
-                  fullWidth
-                />
-              </Group>
-            </View>
-          )}
-        </View>
-      )}
-
-      {/* mobile overlay options card */}
-      {!isTauri && (
-        <View style={styles.contentCard}>
-          <View
-            style={[
-              styles.settingRowVertical,
-              Platform.OS !== "android" && { marginBottom: 0 },
-            ]}
-          >
-            <View style={styles.toggleGroupRow}>
-              <View style={styles.toggleGroupContent}>
-                <Text style={styles.settingLabel}>
-                  {t("settings.overlay.autoMic")}
-                </Text>
-                <Text style={styles.helpText}>
-                  {t("settings.overlay.autoMicHelp")}
-                </Text>
-              </View>
-              <Toggle checked={autoStartMic} onToggle={setAutoStartMic} />
-            </View>
-          </View>
-
-          {Platform.OS === "android" && (
-            <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-              <View style={styles.toggleGroupRow}>
-                <View style={styles.toggleGroupContent}>
-                  <Text style={styles.settingLabel}>
-                    {t("settings.overlay.appContext")}
-                  </Text>
-                  <Text style={styles.helpText}>
-                    {t("settings.overlay.appContextHelp")}
-                  </Text>
-                </View>
-                <Toggle checked={useAppContext} onToggle={setUseAppContext} />
-              </View>
-            </View>
-          )}
-        </View>
-      )}
     </View>
   );
 
@@ -5938,8 +5719,6 @@ export default function SettingsDrawer({
         return renderMaestroSubPage();
       case "maestropreferences":
         return renderMaestroPreferencesSubPage();
-      case "assistantoverlay":
-        return renderAssistantOverlaySubPage();
       case "screensaver":
         return renderScreenSaverSubPage();
       case "service":
@@ -6025,6 +5804,7 @@ export default function SettingsDrawer({
             paddingTop: isDesktop ? Spacing.xxl2 : 60,
             paddingBottom:
               page === "main" ? 96 + (isDesktop ? 0 : insets.bottom) : 40,
+            ...(isDesktop ? null : { paddingHorizontal: Spacing.lg2 }),
             flexGrow: 1,
           }}
           showsVerticalScrollIndicator={false}
@@ -6039,7 +5819,7 @@ export default function SettingsDrawer({
               Colors.groupedBackgroundFade,
               Colors.groupedBackground,
             ]}
-            style={styles.gradientBottom}
+            style={[styles.gradientBottom, { left: 0, right: 0 }]}
             pointerEvents="none"
           />
         )}
@@ -6049,6 +5829,7 @@ export default function SettingsDrawer({
             style={[
               styles.addButtonWrapper,
               { bottom: Spacing.xl2 + (isDesktop ? 0 : insets.bottom) },
+              !isDesktop && { right: Spacing.lg2 },
             ]}
             pointerEvents="box-none"
           >
@@ -6062,7 +5843,7 @@ export default function SettingsDrawer({
   const innerContent = (
     <View style={styles.innerContainer}>
       <View
-        style={[styles.fixedBackWrapper, { top: 60 }]}
+        style={[styles.fixedBackWrapper, { top: 60, left: Spacing.lg2 }]}
         pointerEvents="box-none"
       >
         <DrawerBackButton
@@ -6090,7 +5871,7 @@ export default function SettingsDrawer({
           Colors.groupedBackgroundFade,
           Colors.groupedBackgroundClear,
         ]}
-        style={styles.gradientTop}
+        style={[styles.gradientTop, { left: 0, right: 0 }]}
         pointerEvents="none"
       />
     </View>
@@ -8591,15 +8372,6 @@ export default function SettingsDrawer({
         t("settings.nav.general.title"),
         t("settings.nav.general.subtitle"),
       ),
-      ...(!isDesktop || isTauri || Platform.OS === "android"
-        ? [
-            nav(
-              "assistantoverlay",
-              t("settings.nav.overlay.title"),
-              t("settings.nav.overlay.subtitle"),
-            ),
-          ]
-        : []),
       ...(Platform.OS === "android"
         ? [
             nav(
@@ -9123,6 +8895,7 @@ export default function SettingsDrawer({
                   width={desktopPageWidth || DESKTOP_WINDOW_MAX_WIDTH}
                   parentOf={subPageParent}
                   gestureEnabled={!sheetOpen}
+                  edgeSwipeEnabled={false}
                   onBack={handleBack}
                   renderPage={renderScrollPage}
                 />
@@ -9237,7 +9010,6 @@ const makeStyles = (Colors: ThemeColors) =>
       bottom: 0,
       right: 0,
       backgroundColor: Colors.groupedBackground,
-      paddingHorizontal: Spacing.lg2,
       overflow: "hidden",
     },
     desktopWindowWrapper: {

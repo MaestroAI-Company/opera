@@ -1,29 +1,60 @@
 import { useCameraPermissions } from "expo-camera";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Animated, BackHandler, Easing, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import {
+    Animated,
+    BackHandler,
+    Easing,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../../constants/theme";
+import cameraIcon from "../../../assets/icons/camera.svg";
+import hangUpIcon from "../../../assets/icons/cancel.svg";
+import micIcon from "../../../assets/icons/microphone.svg";
+import micMutedIcon from "../../../assets/icons/microphone_muted2.svg";
+import {
+    FontSizes,
+    Fonts,
+    Radius,
+    Spacing,
+    ThemeColors,
+} from "../../../constants/theme";
 import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useResponsive } from "../../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import type { MessageMetrics } from "../../services/db/DatabaseService";
-import { MAESTRO_BUTTERFLIES, useMaestroButterfly, useVoiceColor } from "./maestroButterfly";
-import { loadLiveCallAvatar, showLiveCall, startLiveCall } from "../../services/live/LiveCall";
+import { vibrate } from "../../services/haptics";
 import type { LiveBackend } from "../../services/live/liveBackend";
-import { startLiveSession, type LiveSession, type LiveState } from "../../services/live/LiveSession";
-import Group from "../ui/Group";
-import Selector from "../ui/Selector";
-import VoiceGrid from "./VoiceGrid";
-import LiveCamera, { listCameras, type CameraDevice, type LiveCameraHandle } from "./LiveCamera";
-import AppIcon from "../ui/AppIcon";
-import { pressStyle } from "../ui/pressStyle";
-import micIcon from "../../../assets/icons/microphone.svg";
-import cameraIcon from "../../../assets/icons/camera.svg";
-import hangUpIcon from "../../../assets/icons/cancel.svg";
-import micMutedIcon from "../../../assets/icons/microphone_muted2.svg";
+import {
+    loadLiveCallAvatar,
+    showLiveCall,
+    startLiveCall,
+} from "../../services/live/LiveCall";
+import {
+    startLiveSession,
+    type LiveSession,
+    type LiveState,
+} from "../../services/live/LiveSession";
 import { hasPlatformFeature } from "../../services/platform";
+import AppIcon from "../ui/AppIcon";
+import Group from "../ui/Group";
+import { pressStyle } from "../ui/pressStyle";
+import Selector from "../ui/Selector";
+import LiveCamera, {
+    listCameras,
+    type CameraDevice,
+    type LiveCameraHandle,
+} from "./LiveCamera";
+import {
+    MAESTRO_BUTTERFLIES,
+    useMaestroButterfly,
+    useVoiceColor,
+} from "./maestroButterfly";
+import VoiceGrid from "./VoiceGrid";
 
 //buttons are 28px in a 56px bar, slop fills its height
 const HIT_SLOP = { top: 14, bottom: 14, left: 6, right: 6 };
@@ -40,12 +71,23 @@ type LiveScreenProps = {
   incognito: boolean;
   //second session transcribes local models
   transcribe: boolean;
-  onTurn: (role: "user" | "assistant", content: string, metrics?: MessageMetrics) => void;
+  onTurn: (
+    role: "user" | "assistant",
+    content: string,
+    metrics?: MessageMetrics,
+  ) => void;
   onClose: () => void;
 };
 
 //replaces the composer while live, turns land in the chat above
-export default function LiveScreen({ backend, instructions, incognito, transcribe, onTurn, onClose }: LiveScreenProps) {
+export default function LiveScreen({
+  backend,
+  instructions,
+  incognito,
+  transcribe,
+  onTurn,
+  onClose,
+}: LiveScreenProps) {
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const t = useT();
@@ -75,17 +117,23 @@ export default function LiveScreen({ backend, instructions, incognito, transcrib
 
   useEffect(() => {
     let cancelled = false;
-    startLiveSession(backend, instructions, {
-      onState: setState,
-      onVolume: (level) => {
-        voiceRef.current = level * VOICE_GRID_GAIN;
+    startLiveSession(
+      backend,
+      instructions,
+      {
+        onState: setState,
+        onVolume: (level) => {
+          voiceRef.current = level * VOICE_GRID_GAIN;
+        },
+        onTranscript: () => {},
+        onWidgets: () => {},
+        onTool: () => {},
+        onMessage: (role, content, metrics) =>
+          onTurnRef.current(role, content, metrics),
+        onError: setError,
       },
-      onTranscript: () => {},
-      onWidgets: () => {},
-      onTool: () => {},
-      onMessage: (role, content, metrics) => onTurnRef.current(role, content, metrics),
-      onError: setError,
-    }, { transcribe, voicePlaceholder: t("live.voiceMessage") })
+      { transcribe, voicePlaceholder: t("live.voiceMessage") },
+    )
       .then((session) => {
         if (cancelled) session.stop();
         else sessionRef.current = session;
@@ -106,7 +154,10 @@ export default function LiveScreen({ backend, instructions, incognito, transcrib
   }, [onClose]);
   const toggleMuteRef = useRef(() => {});
   useEffect(
-    () => startLiveCall((action) => (action === "hangup" ? onCloseRef.current() : toggleMuteRef.current())),
+    () =>
+      startLiveCall((action) =>
+        action === "hangup" ? onCloseRef.current() : toggleMuteRef.current(),
+      ),
     [],
   );
   //label follows the mute state
@@ -114,12 +165,23 @@ export default function LiveScreen({ backend, instructions, incognito, transcrib
   const voiceColor = useVoiceColor();
   useEffect(() => {
     let cancelled = false;
-    const labels = { title: "Maestro", text: backend.model, hangUp: t("live.hangUp"), mute: t(muted ? "live.unmute" : "live.mute") };
+    const labels = {
+      title: "Maestro",
+      text: backend.model,
+      hangUp: t("live.hangUp"),
+      mute: t(muted ? "live.unmute" : "live.mute"),
+    };
     //butterfly follows personality and voice
-    loadLiveCallAvatar(butterfly.base, butterfly.accent, incognito ? Colors.incognito : voiceColor).then((avatar) => {
+    loadLiveCallAvatar(
+      butterfly.base,
+      butterfly.accent,
+      incognito ? Colors.incognito : voiceColor,
+    ).then((avatar) => {
       if (!cancelled) showLiveCall({ ...labels, avatar });
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [backend, t, muted, butterfly, voiceColor, incognito, Colors]);
 
   useEffect(() => {
@@ -162,7 +224,14 @@ export default function LiveScreen({ backend, instructions, incognito, transcrib
   useEffect(() => {
     if (!waiting) return;
     spin.setValue(0);
-    const loop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 1200, easing: Easing.linear, useNativeDriver: true }));
+    const loop = Animated.loop(
+      Animated.timing(spin, {
+        toValue: 1,
+        duration: 1200,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
     loop.start();
     return () => loop.stop();
   }, [waiting, spin]);
@@ -176,33 +245,62 @@ export default function LiveScreen({ backend, instructions, incognito, transcrib
   });
 
   const toggleCamera = async () => {
-    if (!cameraOn && !permission?.granted && !(await requestPermission()).granted) return;
+    if (
+      !cameraOn &&
+      !permission?.granted &&
+      !(await requestPermission()).granted
+    )
+      return;
     setCameraOn(!cameraOn);
   };
 
   //same touch feedback as the composer
   const handlePressIn = () => {
-    Vibration.vibrate(10);
-    Animated.timing(pressAnim, { toValue: 1, duration: 150, useNativeDriver: false }).start();
+    vibrate(10);
+    Animated.timing(pressAnim, {
+      toValue: 1,
+      duration: 150,
+      useNativeDriver: false,
+    }).start();
   };
   const handlePressOut = () => {
-    Animated.timing(pressAnim, { toValue: 0, duration: 150, useNativeDriver: false }).start();
+    Animated.timing(pressAnim, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: false,
+    }).start();
   };
-  const scale = pressAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] });
+  const scale = pressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.05],
+  });
   const barColor = pressAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: incognito ? [Colors.incognito, Colors.incognitoBright] : [Colors.primary, Colors.primaryBright],
+    outputRange: incognito
+      ? [Colors.incognito, Colors.incognitoBright]
+      : [Colors.primary, Colors.primaryBright],
   });
-  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
+  const rotate = spin.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
 
   return (
     <View style={styles.root}>
       <View style={styles.column}>
-        {error && <Text style={styles.error} numberOfLines={3}>{error}</Text>}
+        {error && (
+          <Text style={styles.error} numberOfLines={3}>
+            {error}
+          </Text>
+        )}
 
         {cameraOn && (
           <View style={styles.cameraBox}>
-            <LiveCamera ref={cameraRef} style={styles.camera} deviceId={cameraId || undefined} />
+            <LiveCamera
+              ref={cameraRef}
+              style={styles.camera}
+              deviceId={cameraId || undefined}
+            />
             {cameras.length > 1 && (
               <Group>
                 <Selector
@@ -218,55 +316,90 @@ export default function LiveScreen({ backend, instructions, incognito, transcrib
         )}
 
         <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut}>
-        <Animated.View style={[styles.bar, incognito && styles.barIncognito, isDesktop && styles.barDesktop, { backgroundColor: barColor, transform: [{ scale }] }]}>
-          <Pressable
-            accessibilityLabel={t(muted ? "live.unmute" : "live.mute")}
-            onPress={toggleMute}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            hitSlop={HIT_SLOP}
-            style={pressStyle(styles.iconButton, "fadeLight")}
+          <Animated.View
+            style={[
+              styles.bar,
+              incognito && styles.barIncognito,
+              isDesktop && styles.barDesktop,
+              { backgroundColor: barColor, transform: [{ scale }] },
+            ]}
           >
-            <AppIcon source={muted ? micMutedIcon : micIcon} style={styles.icon} tintColor={Colors.textOnPrimary} />
-          </Pressable>
-
-          {backend.camera && hasPlatformFeature("android.hardware.camera.any") && (
             <Pressable
-              accessibilityLabel={t("live.camera")}
-              onPress={toggleCamera}
+              accessibilityLabel={t(muted ? "live.unmute" : "live.mute")}
+              onPress={toggleMute}
               onPressIn={handlePressIn}
               onPressOut={handlePressOut}
               hitSlop={HIT_SLOP}
-              style={pressStyle([styles.iconButton, cameraOn && styles.iconButtonActive], "fadeLight")}
+              style={pressStyle(styles.iconButton, "fadeLight")}
             >
-              <AppIcon source={cameraIcon} style={styles.icon} tintColor={cameraOn ? (incognito ? Colors.incognito : Colors.primary) : Colors.textOnPrimary} />
+              <AppIcon
+                source={muted ? micMutedIcon : micIcon}
+                style={styles.icon}
+                tintColor={Colors.textOnPrimary}
+              />
             </Pressable>
-          )}
 
-          {/* tap stops the reply */}
-          <Pressable
-            onPress={() => sessionRef.current?.interrupt()}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            style={[styles.center, { marginVertical: isDesktop ? -6 : -10 }]}
-          >
-            {waiting && (
-              <Animated.View style={[styles.spinner, { transform: [{ rotate }] }]} />
-            )}
-            <VoiceGrid getVolume={getVoice} color={muted ? Colors.whiteSoft : Colors.textOnPrimary} style={styles.grid} />
-          </Pressable>
+            {backend.camera &&
+              hasPlatformFeature("android.hardware.camera.any") && (
+                <Pressable
+                  accessibilityLabel={t("live.camera")}
+                  onPress={toggleCamera}
+                  onPressIn={handlePressIn}
+                  onPressOut={handlePressOut}
+                  hitSlop={HIT_SLOP}
+                  style={pressStyle(
+                    [styles.iconButton, cameraOn && styles.iconButtonActive],
+                    "fadeLight",
+                  )}
+                >
+                  <AppIcon
+                    source={cameraIcon}
+                    style={styles.icon}
+                    tintColor={
+                      cameraOn
+                        ? incognito
+                          ? Colors.incognito
+                          : Colors.primary
+                        : Colors.textOnPrimary
+                    }
+                  />
+                </Pressable>
+              )}
 
-          <Pressable
-            accessibilityLabel={t("live.hangUp")}
-            onPress={onClose}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            hitSlop={HIT_SLOP}
-            style={pressStyle(styles.iconButton, "fadeLight")}
-          >
-            <AppIcon source={hangUpIcon} style={styles.icon} tintColor={Colors.textOnPrimary} />
-          </Pressable>
-        </Animated.View>
+            {/* tap stops the reply */}
+            <Pressable
+              onPress={() => sessionRef.current?.interrupt()}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              style={[styles.center, { marginVertical: isDesktop ? -6 : -10 }]}
+            >
+              {waiting && (
+                <Animated.View
+                  style={[styles.spinner, { transform: [{ rotate }] }]}
+                />
+              )}
+              <VoiceGrid
+                getVolume={getVoice}
+                color={muted ? Colors.whiteSoft : Colors.textOnPrimary}
+                style={styles.grid}
+              />
+            </Pressable>
+
+            <Pressable
+              accessibilityLabel={t("live.hangUp")}
+              onPress={onClose}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              hitSlop={HIT_SLOP}
+              style={pressStyle(styles.iconButton, "fadeLight")}
+            >
+              <AppIcon
+                source={hangUpIcon}
+                style={styles.icon}
+                tintColor={Colors.textOnPrimary}
+              />
+            </Pressable>
+          </Animated.View>
         </Pressable>
       </View>
       {/* keeps the bar clear of the safe area */}
@@ -275,97 +408,98 @@ export default function LiveScreen({ backend, instructions, incognito, transcrib
   );
 }
 
-const makeStyles = (Colors: ThemeColors) => StyleSheet.create({
-  root: {
-    width: "100%",
-    maxWidth: 840,
-    alignSelf: "center",
-  },
-  column: {
-    width: "100%",
-    maxWidth: 800,
-    alignSelf: "center",
-    paddingHorizontal: Spacing.xl2,
-    paddingBottom: Spacing.xl2,
-    gap: Spacing.md,
-  },
-  error: {
-    fontFamily: Fonts.body,
-    fontSize: FontSizes.caption,
-    color: Colors.error,
-    textAlign: "center",
-  },
-  cameraBox: {
-    width: 180,
-    alignSelf: "flex-end",
-    gap: Spacing.md,
-  },
-  camera: {
-    width: "100%",
-    aspectRatio: 3 / 4,
-    borderRadius: Radius.window,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    overflow: "hidden",
-  },
-  //same pill as the composer
-  bar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-    minHeight: 56,
-    paddingHorizontal: Spacing.lg2,
-    paddingVertical: Spacing.lg,
-    borderRadius: Radius.window,
-    borderWidth: 2,
-    borderColor: Colors.borderOnPrimary,
-    backgroundColor: Colors.primary,
-    boxShadow: `2px 6px 22px ${Colors.primary}`,
-    elevation: 8,
-  },
-  barIncognito: {
-    boxShadow: `2px 6px 15px ${Colors.incognito}`,
-  },
-  barDesktop: {
-    minHeight: 48,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-  },
-  iconButton: {
-    width: 28,
-    height: 28,
-    borderRadius: Radius.xl,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  iconButtonActive: {
-    backgroundColor: Colors.textOnPrimary,
-  },
-  icon: {
-    width: 18,
-    height: 18,
-  },
-  center: {
-    flex: 1,
-    alignSelf: "stretch",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.md,
-    overflow: "hidden",
-  },
-  grid: {
-    flex: 1,
-    alignSelf: "stretch",
-    alignItems: "center",
-    justifyContent: "flex-end",
-  },
-  spinner: {
-    width: SPINNER_SIZE,
-    height: SPINNER_SIZE,
-    borderRadius: SPINNER_SIZE / 2,
-    borderWidth: 2,
-    borderColor: Colors.borderOnPrimary,
-    borderTopColor: Colors.textOnPrimary,
-  },
-});
+const makeStyles = (Colors: ThemeColors) =>
+  StyleSheet.create({
+    root: {
+      width: "100%",
+      maxWidth: 840,
+      alignSelf: "center",
+    },
+    column: {
+      width: "100%",
+      maxWidth: 800,
+      alignSelf: "center",
+      paddingHorizontal: Spacing.xl2,
+      paddingBottom: Spacing.xl2,
+      gap: Spacing.md,
+    },
+    error: {
+      fontFamily: Fonts.body,
+      fontSize: FontSizes.caption,
+      color: Colors.error,
+      textAlign: "center",
+    },
+    cameraBox: {
+      width: 180,
+      alignSelf: "flex-end",
+      gap: Spacing.md,
+    },
+    camera: {
+      width: "100%",
+      aspectRatio: 3 / 4,
+      borderRadius: Radius.window,
+      borderWidth: 2,
+      borderColor: Colors.border,
+      overflow: "hidden",
+    },
+    //same pill as the composer
+    bar: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Spacing.md,
+      minHeight: 56,
+      paddingHorizontal: Spacing.lg2,
+      paddingVertical: Spacing.lg,
+      borderRadius: Radius.window,
+      borderWidth: 2,
+      borderColor: Colors.borderOnPrimary,
+      backgroundColor: Colors.primary,
+      boxShadow: `2px 6px 22px ${Colors.primary}`,
+      elevation: 8,
+    },
+    barIncognito: {
+      boxShadow: `2px 6px 15px ${Colors.incognito}`,
+    },
+    barDesktop: {
+      minHeight: 48,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.sm,
+    },
+    iconButton: {
+      width: 28,
+      height: 28,
+      borderRadius: Radius.xl,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    iconButtonActive: {
+      backgroundColor: Colors.textOnPrimary,
+    },
+    icon: {
+      width: 18,
+      height: 18,
+    },
+    center: {
+      flex: 1,
+      alignSelf: "stretch",
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: Spacing.md,
+      overflow: "hidden",
+    },
+    grid: {
+      flex: 1,
+      alignSelf: "stretch",
+      alignItems: "center",
+      justifyContent: "flex-end",
+    },
+    spinner: {
+      width: SPINNER_SIZE,
+      height: SPINNER_SIZE,
+      borderRadius: SPINNER_SIZE / 2,
+      borderWidth: 2,
+      borderColor: Colors.borderOnPrimary,
+      borderTopColor: Colors.textOnPrimary,
+    },
+  });

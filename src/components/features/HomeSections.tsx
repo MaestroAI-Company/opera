@@ -1,11 +1,5 @@
 import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
-import {
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Vibration,
-    View,
-} from "react-native";
+import { Platform, ScrollView, StyleSheet, View } from "react-native";
 import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
 import Animated, {
     AnimatedRef,
@@ -27,6 +21,7 @@ import { Radius, Spacing, ThemeColors } from "../../../constants/theme";
 import { useResponsive } from "../../hooks/useResponsive";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
+import { vibrate } from "../../services/haptics";
 import IconButton from "../ui/IconButton";
 import { setHomeEditing, useHomeEditing } from "./homeEditing";
 
@@ -106,7 +101,7 @@ const follow = (sizes: number[], from: number, dy: number) => {
   return { offset: inside + rubberBand(dy - inside, RUBBER_RANGE), to };
 };
 
-const buzz = () => Vibration.vibrate(10);
+const buzz = () => vibrate(10);
 
 export type HomeSection = { id: string; content: ReactNode };
 

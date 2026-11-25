@@ -7,7 +7,7 @@ import { ShareIntentProvider } from "expo-share-intent";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState, type ReactNode } from "react";
-import { Platform } from "react-native";
+import { Platform, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-get-random-values";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -21,7 +21,6 @@ import SettingsWindow from "../components/features/SettingsWindow";
 import TauriTitleBar from "../components/features/TauriTitleBar";
 import VoicePackHost from "../components/features/VoicePackHost";
 import { IconLabelProvider } from "../components/ui/IconLabel";
-import SplashScreenComponent from "../components/ui/SplashScreen";
 import { initTheme, useColors, useIsDark } from "../hooks/useTheme";
 import { initI18n } from "../i18n";
 import { initAppIcon } from "../services/appIcon";
@@ -101,10 +100,6 @@ const screenLayout = ({ children }: { children: ReactNode }) => (
 export default function RootLayout() {
   const isDark = useIsDark();
   const colors = useColors();
-  const [showLottie, setShowLottie] = useState(
-    Platform.OS !== "web" ||
-      (isTauri && !isSettingsWindow && !isOverlayWindow && !isStageWindow),
-  );
   //android links fonts natively via app.json
   const [fontsLoaded, setFontsLoaded] = useState(Platform.OS === "android");
 
@@ -115,7 +110,7 @@ export default function RootLayout() {
   }, [fontsLoaded]);
 
   useEffect(() => {
-    //rounds the window during splash, before TauriTitleBar mounts
+    //rounds the window before TauriTitleBar mounts
     if (!isLinux) return;
     const style = document.createElement("style");
     style.textContent = `#root{border-radius:${Radius.window}px;overflow:hidden}`;
@@ -170,14 +165,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
     setupQuickActions();
   }, []);
 
-  if (showLottie || !fontsLoaded) {
+  if (!fontsLoaded) {
     return (
-      <>
-        {Platform.OS !== "android" && !fontsLoaded && (
-          <WebFontLoader onLoaded={() => setFontsLoaded(true)} />
-        )}
-        <SplashScreenComponent onFinish={() => setShowLottie(false)} />
-      </>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <WebFontLoader onLoaded={() => setFontsLoaded(true)} />
+      </View>
     );
   }
 

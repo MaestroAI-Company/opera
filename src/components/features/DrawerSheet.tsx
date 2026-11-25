@@ -377,34 +377,45 @@ export default function DrawerSheet({
     [settle, onClose],
   );
 
+  //disable swipe down to close on ios
+  const allowSwipeDown = Platform.OS !== "ios";
+
   //pull down moves the sheet with the finger
-  const pull = useMemo<SheetPull>(
-    () => ({
-      move: (gestureState) => {
-        dragDrawer(progress, 1 - gestureState.dy / travel);
-      },
-      release: (gestureState) => {
-        const velocity = -gestureVelocity(gestureState.vy, travel);
-        if (releaseOpens(1 - gestureState.dy / travel, -gestureState.vy)) {
-          settle(true, velocity);
-        } else {
-          dismiss(velocity);
-        }
-      },
-      cancel: () => settle(true),
-    }),
-    [dismiss, settle, progress, travel],
+  const pull = useMemo<SheetPull | null>(
+    () =>
+      allowSwipeDown
+        ? {
+            move: (gestureState) => {
+              dragDrawer(progress, 1 - gestureState.dy / travel);
+            },
+            release: (gestureState) => {
+              const velocity = -gestureVelocity(gestureState.vy, travel);
+              if (
+                releaseOpens(1 - gestureState.dy / travel, -gestureState.vy)
+              ) {
+                settle(true, velocity);
+              } else {
+                dismiss(velocity);
+              }
+            },
+            cancel: () => settle(true),
+          }
+        : null,
+    [allowSwipeDown, dismiss, settle, progress, travel],
   );
   const panResponder = useMemo(
     () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) =>
-          gestureState.dy > 8 &&
-          Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
-        onPanResponderMove: (_, gestureState) => pull.move(gestureState),
-        onPanResponderRelease: (_, gestureState) => pull.release(gestureState),
-        onPanResponderTerminate: () => pull.cancel(),
-      }),
+      pull
+        ? PanResponder.create({
+            onMoveShouldSetPanResponder: (_, gestureState) =>
+              gestureState.dy > 8 &&
+              Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+            onPanResponderMove: (_, gestureState) => pull.move(gestureState),
+            onPanResponderRelease: (_, gestureState) =>
+              pull.release(gestureState),
+            onPanResponderTerminate: () => pull.cancel(),
+          })
+        : null,
     [pull],
   );
 
@@ -473,7 +484,7 @@ export default function DrawerSheet({
       >
         <View
           style={sheetBox}
-          {...panResponder.panHandlers}
+          {...panResponder?.panHandlers}
           {...(Platform.OS === "web" &&
             ({ dataSet: { drawerSheet: true } } as any))}
         >
@@ -549,7 +560,7 @@ export default function DrawerSheet({
             { transform: [{ translateY: translateYMobile }] },
             !measured && styles.hidden,
           ]}
-          {...panResponder.panHandlers}
+          {...panResponder?.panHandlers}
         >
           {handle}
           <SheetPullContext.Provider value={pull}>

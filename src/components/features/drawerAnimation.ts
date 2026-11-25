@@ -45,7 +45,10 @@ const resizeResponder = PanResponder.create({
     setPageCursor("col-resize");
   },
   onPanResponderMove: (_, gestureState) => {
-    const next = Math.min(DOCKED_MAX_WIDTH, Math.max(DOCKED_MIN_WIDTH, gestureState.moveX));
+    const next = Math.min(
+      DOCKED_MAX_WIDTH,
+      Math.max(DOCKED_MIN_WIDTH, gestureState.moveX),
+    );
     if (next === currentDockedWidth) return;
     currentDockedWidth = next;
     dockedWidthListeners.forEach((fn) => fn());
@@ -55,7 +58,10 @@ const resizeResponder = PanResponder.create({
 });
 
 export function useDockedWidth() {
-  const dockedWidth = useSyncExternalStore(subscribeDockedWidth, getDockedWidth);
+  const dockedWidth = useSyncExternalStore(
+    subscribeDockedWidth,
+    getDockedWidth,
+  );
   return { dockedWidth, resizeResponder };
 }
 
@@ -64,7 +70,7 @@ export function drawerWidthFor(windowWidth: number): number {
   if (windowWidth < 768) {
     return windowWidth;
   }
-  return Math.min(windowWidth * 0.90, 360);
+  return Math.min(windowWidth * 0.9, 360);
 }
 
 //pan speed to spring units
@@ -100,7 +106,7 @@ export function settleDrawer(
   open: boolean,
   velocity = 0,
   nativeDriver = DRAWER_NATIVE_DRIVER,
-  onComplete?: () => void
+  onComplete?: () => void,
 ) {
   const toValue = open ? 1 : 0;
   if (settledTarget.get(progress) === toValue) {
@@ -133,7 +139,7 @@ export function settleDrawer(
 export function settleLayoutDrawer(
   progress: Animated.Value,
   open: boolean,
-  onComplete?: () => void
+  onComplete?: () => void,
 ) {
   Animated.timing(progress, {
     toValue: open ? 1 : 0,
@@ -149,10 +155,12 @@ export function settleLayoutDrawer(
 export function settlePage(
   progress: Animated.Value,
   toValue: number,
-  onComplete: () => void
+  onComplete: () => void,
+  velocity = 0,
 ) {
   Animated.spring(progress, {
     toValue,
+    velocity,
     stiffness: 500,
     damping: 45,
     overshootClamping: true,
@@ -165,7 +173,7 @@ export function settlePage(
   //presses read the js pose
   //one frame later, native owns it
   requestAnimationFrame(() =>
-    (progress as unknown as JsValue)._updateValue(toValue, true)
+    (progress as unknown as JsValue)._updateValue(toValue, true),
   );
 }
 

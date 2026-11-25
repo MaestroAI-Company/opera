@@ -1,38 +1,39 @@
+import { vibrate } from "@/services/haptics";
 import LottieView from "lottie-react-native";
 import {
-  memo,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
+    memo,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  Animated,
-  DeviceEventEmitter,
-  LayoutChangeEvent,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  Pressable,
-  ScrollView,
-  StyleProp,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-  ViewStyle,
+    Animated,
+    DeviceEventEmitter,
+    LayoutChangeEvent,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    Pressable,
+    ScrollView,
+    StyleProp,
+    StyleSheet,
+    Text,
+    useWindowDimensions,
+    View,
+    ViewStyle,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Reanimated, {
-  Easing,
-  interpolate,
-  interpolateColor,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withTiming,
+    Easing,
+    interpolate,
+    interpolateColor,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withSequence,
+    withTiming,
 } from "react-native-reanimated";
 import botIcon from "../../../assets/icons/bot.svg";
 import brainIcon from "../../../assets/icons/brain2.svg";
@@ -46,11 +47,11 @@ import visionIcon from "../../../assets/icons/visibility2.svg";
 import lowIcon from "../../../assets/icons/weak2.svg";
 import { type ModelCapabilityId } from "../../../constants/modelCapabilities";
 import {
-  Fonts,
-  FontSizes,
-  Radius,
-  Spacing,
-  ThemeColors,
+    Fonts,
+    FontSizes,
+    Radius,
+    Spacing,
+    ThemeColors,
 } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
@@ -58,29 +59,29 @@ import { AIModule } from "../../services/ai/AIModule";
 import { estimateContextTokens } from "../../services/ai/generation/chatGeneration";
 import { modelContextCap } from "../../services/ai/providers/huggingFaceCatalog";
 import {
-  getLiteRTModelLabel,
-  isLiteRTModel,
-  subscribeLiteRTDownload,
+    getLiteRTModelLabel,
+    isLiteRTModel,
+    subscribeLiteRTDownload,
 } from "../../services/ai/providers/LiteRTProvider";
 import {
-  getLocalModelLabel,
-  isLocalModel,
+    getLocalModelLabel,
+    isLocalModel,
 } from "../../services/ai/providers/LocalProvider";
 import {
-  getCachedModels,
-  getLastModel,
-  hydrateModelCache,
-  setCachedModels,
-  setLastModel,
+    getCachedModels,
+    getLastModel,
+    hydrateModelCache,
+    setCachedModels,
+    setLastModel,
 } from "../../services/ai/providers/modelCache";
 import {
-  buildSources,
-  getOllamaTuning,
-  getSamplerLabel,
-  HUB_PROVIDER_ID,
-  hubModelKeyOf,
-  ModelSource,
-  splitHubModelKey,
+    buildSources,
+    getOllamaTuning,
+    getSamplerLabel,
+    HUB_PROVIDER_ID,
+    hubModelKeyOf,
+    ModelSource,
+    splitHubModelKey,
 } from "../../services/ai/providers/sources";
 import { MessageMetrics } from "../../services/db/DatabaseService";
 import { AppEvents } from "../../services/events";
@@ -92,7 +93,6 @@ import { pressStyle } from "../ui/pressStyle";
 import ProgressBar from "../ui/ProgressBar";
 import SliderToggle, { SliderToggleOption } from "../ui/SliderToggle";
 import DrawerSheet, { SheetScrollView } from "./DrawerSheet";
-import { vibrate } from "@/services/haptics";
 
 const loadingAnimation = require("../../../assets/animations/loading.json");
 

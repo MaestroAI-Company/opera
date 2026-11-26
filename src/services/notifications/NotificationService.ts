@@ -1,6 +1,9 @@
-import notifee, { AndroidImportance, AuthorizationStatus, EventType } from '@notifee/react-native';
+import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
 import { Platform } from 'react-native';
 import { getColors } from "../../hooks/useTheme";
+import type { LiveActivity } from 'expo-widgets';
+import { downloadActivity } from '../../widgets/LiveActivities';
+import { activityStyle, type DownloadActivityProps } from '../../widgets/liveActivityProps';
 
 const progressId = (convId: string) => `gen-${convId}`;
 const doneId = (convId: string) => `gen-done-${convId}`;
@@ -68,11 +71,7 @@ class NotificationServiceImpl {
     if (this.fgOwners.size === 0) await notifee.stopForegroundService();
   }
 
-  async displayDownloadProgress(id: string, modelName: string, progress: number, etaSeconds?: number, speedStr?: string, sizeStr?: string) {
-    //only holds the android service
-    if (Platform.OS !== 'android') return;
-    const channelId = await this.ensureChannel('downloads', 'Model Downloads', AndroidImportance.LOW);
-
+  private downloadDetails(etaSeconds?: number, speedStr?: string, sizeStr?: string) {
     let details = [];
     if (sizeStr) details.push(sizeStr);
     if (speedStr) details.push(speedStr);
@@ -85,6 +84,40 @@ class NotificationServiceImpl {
         details.push(`${m}m ${s}s left`);
       }
     }
+    return details;
+  }
+
+  //one activity per download
+  private downloadActivities = new Map<string, LiveActivity<DownloadActivityProps>>();
+
+  private updateDownloadActivity(id: string, modelName: string, progress: number, details: string[]) {
+    try {
+      const props: DownloadActivityProps = {
+        ...activityStyle(getColors().primary),
+        title: `Downloading ${modelName}`,
+        progress,
+        detail: details.join(' • '),
+      };
+      const running = this.downloadActivities.get(id);
+      if (running) running.update(props).catch(() => {});
+      else if (downloadActivity) this.downloadActivities.set(id, downloadActivity.start(props));
+    } catch {
+      //activities disabled in settings
+    }
+  }
+
+  private async endDownloadActivity(id: string) {
+    const running = this.downloadActivities.get(id);
+    this.downloadActivities.delete(id);
+    await running?.end('immediate').catch(() => {});
+  }
+
+  async displayDownloadProgress(id: string, modelName: string, progress: number, etaSeconds?: number, speedStr?: string, sizeStr?: string) {
+    const details = this.downloadDetails(etaSeconds, speedStr, sizeStr);
+    if (Platform.OS === 'ios') return this.updateDownloadActivity(id, modelName, progress, details);
+    //only holds the android service
+    if (Platform.OS !== 'android') return;
+    const channelId = await this.ensureChannel('downloads', 'Model Downloads', AndroidImportance.LOW);
 
     const detailText = details.length > 0 ? `\n${details.join(' • ')}` : '';
 
@@ -108,19 +141,7 @@ class NotificationServiceImpl {
   }
 
   async displayDownloadFinished(id: string, modelName: string) {
-    if (Platform.OS === 'ios') {
-      //a refusal must not fail the download
-      try {
-        const settings = await notifee.requestPermission();
-        if (settings.authorizationStatus < AuthorizationStatus.AUTHORIZED) return;
-        await notifee.displayNotification({
-          id,
-          title: `Model ready`,
-          body: `${modelName} has been successfully downloaded.`,
-        });
-      } catch {}
-      return;
-    }
+    if (Platform.OS === 'ios') return this.endDownloadActivity(id);
     if (Platform.OS !== 'android') return;
     const channelId = await this.ensureChannel('downloads', 'Model Downloads', AndroidImportance.LOW);
     await this.releaseForegroundService(id);
@@ -194,6 +215,7 @@ class NotificationServiceImpl {
   }
 
   async cancelNotification(id: string) {
+    await this.endDownloadActivity(id);
     await this.releaseForegroundService(id);
     await notifee.cancelNotification(id);
   }

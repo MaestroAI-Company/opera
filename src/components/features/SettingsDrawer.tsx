@@ -163,6 +163,7 @@ import { AppSettings, Settings } from "../../services/settings/SettingsService";
 import { TTS_SPEEDS } from "../../services/speech/engines";
 import { STT, WhisperSTT } from "../../services/speech/STTService";
 import { TTS } from "../../services/speech/TTSService";
+import { syncAppIcon } from "../../services/appIcon";
 import { SyncPrefs, SyncPrefsStore } from "../../services/SyncPrefs";
 import ActionButton from "../ui/ActionButton";
 import CardGrid, { type GridCard } from "../ui/CardGrid";
@@ -973,6 +974,7 @@ export default function SettingsDrawer({
     //page stays mounted while closing, its input would keep the keyboard
     if (!visible && wasVisibleRef.current) {
       Keyboard.dismiss();
+      syncAppIcon();
       //keep chat message playback
       if (!TTS.getSpeakingId()) TTS.stop();
     }
@@ -981,7 +983,10 @@ export default function SettingsDrawer({
 
   //stop voice test leaving maestro
   useEffect(() => {
-    if (activeSubPage !== "maestro" && !TTS.getSpeakingId()) TTS.stop();
+    if (activeSubPage !== "maestro") {
+      syncAppIcon();
+      if (!TTS.getSpeakingId()) TTS.stop();
+    }
   }, [activeSubPage]);
 
   useEffect(

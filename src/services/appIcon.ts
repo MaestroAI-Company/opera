@@ -1,21 +1,18 @@
 import { getAppIconName, setAlternateAppIcon, supportsAlternateIcons } from "expo-alternate-app-icons";
-import { DeviceEventEmitter } from "react-native";
-import { AppEvents } from "./events";
+import { AppState } from "react-native";
 import { AppSettings, parseTtsVoices } from "./settings/schema";
 import { Settings } from "./settings/SettingsService";
 
 //alternate icon names declared in app.json, the red voice keeps the default icon
 const ICON_BY_VOICE: Record<string, string> = { F2: "Pink", M1: "Amber", M2: "Blue" };
 
-//voice picker taps through colors, wait for the last one
-const SETTLE_MS = 1000;
-
 function wantedIcon(settings: AppSettings): string | null {
   if (!settings.applyMaestroColor) return null;
   return ICON_BY_VOICE[parseTtsVoices(settings.ttsVoices).supertonic] ?? null;
 }
 
-async function sync(): Promise<void> {
+//ios alert interrupts audio, so callers wait for the user to leave settings
+export async function syncAppIcon(): Promise<void> {
   const wanted = wantedIcon(Settings.getCached());
   //ios asks the user on every change
   if (getAppIconName() === wanted) return;
@@ -42,11 +39,10 @@ export function initAppIcon(): void {
       return;
     }
 
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    DeviceEventEmitter.addListener(AppEvents.settingsChanged, () => {
-      clearTimeout(timer);
-      timer = setTimeout(sync, SETTLE_MS);
+    //leaving the app applies the pending icon too
+    AppState.addEventListener("change", (state) => {
+      if (state !== "active") syncAppIcon();
     });
-    sync();
+    syncAppIcon();
   })();
 }

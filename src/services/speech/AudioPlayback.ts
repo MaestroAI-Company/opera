@@ -42,9 +42,8 @@ export function createPlayback(sampleRate: number): AudioPlayback {
   activeCounts.set(sampleRate, (activeCounts.get(sampleRate) ?? 0) + 1);
 
   const context = contextFor(sampleRate);
-  if (context.state === 'suspended') {
-    context.resume().catch(() => {});
-  }
+  //ios icon alert can stop the engine while the state stays running
+  context.resume().catch(() => {});
   const node = context.createBufferQueueSource();
   node.connect(context.destination);
 

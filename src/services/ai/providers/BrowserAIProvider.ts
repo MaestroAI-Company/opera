@@ -101,9 +101,12 @@ export class BrowserAIProvider implements LocalBackend {
     onMetrics?: (metrics: MessageMetrics) => void
   ): Promise<{ toolCalls?: ToolCall[], content?: string }> {
     const api = languageModel();
-    if (!api) throw new Error('This browser has no built-in AI model');
+    if (!api) throw new Error(t('settings.local.browserNone'));
     //a session here downloads silently
-    if ((await this.availability()) !== 'available') throw new Error(t('settings.local.notDownloaded'));
+    const status = await this.availability();
+    if (status === 'unavailable') throw new Error(t('settings.local.browserUnsupported'));
+    if (status === 'downloading') throw new Error(t('settings.local.browserDownloading'));
+    if (status !== 'available') throw new Error(t('settings.local.notDownloaded'));
     const startTime = Date.now();
 
     //history seeds, last turn prompts

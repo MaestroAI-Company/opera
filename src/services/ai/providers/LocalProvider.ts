@@ -4,6 +4,7 @@ import { AICoreProvider, getAICoreModelLabel } from './AICoreProvider';
 import { AppleFMProvider, getAppleFMModelLabel, isMacDesktop } from './AppleFMProvider';
 import { BrowserAIProvider, getBrowserModelLabel, isBrowserModel } from './BrowserAIProvider';
 import { currentPlatform } from './sources';
+import { t } from '../../../i18n';
 import { MessageMetrics } from '../../db/DatabaseService';
 import { ToolCall, ToolDefinition } from "../tools/ITool";
 
@@ -100,7 +101,7 @@ export class LocalProvider implements IAIProvider {
     options?: { think?: boolean | string; tools?: ToolDefinition[] },
     onMetrics?: (metrics: MessageMetrics) => void
   ): Promise<{ toolCalls?: ToolCall[], content?: string }> {
-    if (!this.backend) throw new Error("No on-device AI backend on this platform");
+    if (!this.backend) throw new Error(t('settings.local.noBackend'));
     return this.backend.sendMessage(modelName, systemPrompt, messages, onChunk, signal, options, onMetrics);
   }
 }

@@ -1,6 +1,7 @@
 import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
 import type { LocalBackend, LocalModelSheet, LocalModelStatus } from './LocalProvider';
 import { currentPlatform } from './sources';
+import { t } from '../../../i18n';
 import { MessageMetrics } from '../../db/DatabaseService';
 import { ToolCall, ToolDefinition } from "../tools/ITool";
 import {
@@ -133,6 +134,10 @@ export class AppleFMProvider implements LocalBackend {
     onMetrics?: (metrics: MessageMetrics) => void
   ): Promise<{ toolCalls?: ToolCall[], content?: string }> {
     if (!native) throw new Error('Apple Foundation Models not available on this device');
+    //say why the model refuses instead of a native error
+    const { status } = await this.info();
+    if (status === 1) throw new Error(t('settings.local.appleIntelligenceOff'));
+    if (status === 2) throw new Error(t('settings.local.appleModelNotReady'));
     const requestId = `applefm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const startTime = Date.now();
 

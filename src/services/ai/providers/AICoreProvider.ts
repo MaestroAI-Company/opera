@@ -1,5 +1,6 @@
 import { DeviceEventEmitter, NativeModules, Platform } from 'react-native';
 import type { LocalBackend, LocalModelSheet, LocalModelStatus } from './LocalProvider';
+import { t } from '../../../i18n';
 import { MessageMetrics } from '../../db/DatabaseService';
 import { ToolCall, ToolDefinition } from "../tools/ITool";
 import {
@@ -126,6 +127,10 @@ export class AICoreProvider implements LocalBackend {
     onMetrics?: (metrics: MessageMetrics) => void
   ): Promise<{ toolCalls?: ToolCall[], content?: string }> {
     if (!this.supported()) throw new Error('AICore not available on this device');
+    //say why the model refuses instead of a native error
+    const status = await MODULE.checkStatus(modelName).catch(() => 3);
+    if (STATUS[status] === 'unavailable') throw new Error(t('settings.local.aicoreUnavailable'));
+    if (STATUS[status] === 'downloading') throw new Error(t('settings.local.aicoreDownloading'));
     try {
       return await this.sendMessageOnce(modelName, systemPrompt, messages, onChunk, signal, options, onMetrics);
     } catch (e: any) {

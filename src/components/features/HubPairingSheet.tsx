@@ -2,58 +2,60 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import * as IntentLauncher from "expo-intent-launcher";
 import { useEffect, useRef, useState } from "react";
 import {
-    AppState,
-    Platform,
-    StyleSheet,
-    Text,
-    useWindowDimensions,
-    View,
+  Platform,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  Vibration,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import addIcon from "../../../assets/icons/add2.svg";
-import cameraIcon from "../../../assets/icons/camera2.svg";
-import keyIcon from "../../../assets/icons/key2.svg";
-import laptopIcon from "../../../assets/icons/laptop2.svg";
-import linkIcon from "../../../assets/icons/link2.svg";
-import reconnectIcon from "../../../assets/icons/reload2.svg";
-import wifiIcon from "../../../assets/icons/wifi2.svg";
 import {
-    Fonts,
-    FontSizes,
-    Radius,
-    Spacing,
-    ThemeColors,
+  Fonts,
+  FontSizes,
+  Radius,
+  Spacing,
+  ThemeColors,
 } from "../../../constants/theme";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
-import { vibrate } from "../../services/haptics";
 import {
-    hubErrorCode,
-    NearbyHub,
-    PairedHub,
-    SamplerHub,
+  hubErrorCode,
+  SamplerHub,
+  PairedHub,
+  NearbyHub,
 } from "../../services/hub/SamplerHubService";
-import { hasPlatformFeature } from "../../services/platform";
 import ActionButton from "../ui/ActionButton";
-import AppIcon, { type IconSource } from "../ui/AppIcon";
-import CardGrid from "../ui/CardGrid";
+import AppIcon from "../ui/AppIcon";
 import Group from "../ui/Group";
 import NotificationModal from "../ui/NotificationModal";
+import SliderToggle from "../ui/SliderToggle";
 import TextInputField from "../ui/TextInputField";
-import ThinkingIcon from "../ui/ThinkingIcon";
 import DrawerBackButton from "./DrawerBackButton";
 import DrawerSheet, { SheetBody, SheetScrollView } from "./DrawerSheet";
+import HubOrbit, { type OrbitNode } from "./HubOrbit";
 import PageStack from "./PageStack";
+import addIcon from "../../../assets/icons/add2.svg";
+import linkIcon from "../../../assets/icons/link2.svg";
+import keyIcon from "../../../assets/icons/key2.svg";
+import laptopIcon from "../../../assets/icons/laptop2.svg";
+import phoneIcon from "../../../assets/icons/phone2.svg";
+import cameraIcon from "../../../assets/icons/camera2.svg";
+import codeIcon from "../../../assets/icons/code2.svg";
+import qrcodeIcon from "../../../assets/icons/qrcode2.svg";
+import wifiIcon from "../../../assets/icons/wifi2.svg";
+import { hasPlatformFeature } from "../../services/platform";
 
-//searching turns into the results, manual is pushed from both
-type Page = "searching" | "discover" | "manual";
+//manual and nearby are pushed from the orbit
+type Page = "orbit" | "manual" | "nearby";
 
 const DESKTOP_CARD_WIDTH = 720;
 //delay before rescanning a failed code
 const RESCAN_DELAY_MS = 3000;
-//the animation stays long enough to be seen
-const MIN_SEARCH_MS = 2200;
-const SEARCH_HERO_SIZE = 120;
+//pause before checking the network again
+const OFFLINE_RETRY_MS = 2000;
+//missed hubs leave the orbit
+const LOST_AFTER_MS = 10000;
 
 type HubPairingSheetProps = {
   visible: boolean;
@@ -97,11 +99,12 @@ export default function HubPairingSheet({
   const [found, setFound] = useState<PairedHub | null>(null);
   //scanner fires on every frame
   const lastScan = useRef<{ data: string; at: number } | null>(null);
-  const [page, setPage] = useState<Page>("searching");
+  const [page, setPage] = useState<Page>("orbit");
   const [codeMode, setCodeMode] = useState(false);
-  const [nearby, setNearby] = useState<NearbyHub[] | null>(null);
+  const [nearby, setNearby] = useState<NearbyHub[]>([]);
+  //hub shown before its profiles
+  const [picked, setPicked] = useState<NearbyHub | null>(null);
   const [noWifi, setNoWifi] = useState(false);
-  const [wifiModal, setWifiModal] = useState(false);
   const [bodyWidth, setBodyWidth] = useState(0);
   const [scrolled, setScrolled] = useState(false);
 
@@ -113,9 +116,10 @@ export default function HubPairingSheet({
       setError(null);
       setTypedLink("");
       setFound(null);
-      setPage(startWithCode ? "manual" : "searching");
+      setPage(startWithCode ? "manual" : "orbit");
       setCodeMode(startWithCode);
-      setNearby(null);
+      setNearby([]);
+      setNoWifi(false);
     }
   }
   useEffect(() => {
@@ -123,7 +127,7 @@ export default function HubPairingSheet({
   }, [visible]);
 
   const showFound = (hub: PairedHub) => {
-    vibrate(40);
+    Vibration.vibrate(40);
     setFound(hub);
   };
 
@@ -176,74 +180,57 @@ export default function HubPairingSheet({
   //code row without camera
   const mode = link
     ? "confirm"
-    : Platform.OS === "web" ||
-        !hasPlatformFeature("android.hardware.camera.any")
+    : Platform.OS === "web" || !hasPlatformFeature("android.hardware.camera.any")
       ? "code"
       : "scan";
 
   //discovery page only leads to the manual ones
-  const paged =
-    discover && mode !== "confirm" && !pairedHub && SamplerHub.canDiscover();
+  const paged = discover && mode !== "confirm" && !pairedHub && SamplerHub.canDiscover();
   const shownPage: Page = paged ? page : "manual";
 
+  //searches round after round while the sheet is open
   useEffect(() => {
-    if (!visible || !paged || page !== "searching") return;
+    if (!visible || !paged) return;
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- starts the network scan
-    setNearby(null);
-    const minimum = new Promise((resolve) =>
-      setTimeout(resolve, MIN_SEARCH_MS),
-    );
-    SamplerHub.localNetworkAvailable()
-      .catch(() => true)
-      //no network means nothing to search
-      .then((online) =>
-        online ? SamplerHub.nearbyHubs().catch(() => [] as NearbyHub[]) : null,
-      )
-      .then(async (hubs) => {
-        if (hubs) await minimum;
+    const seen = new Map<string, { hub: NearbyHub; at: number }>();
+    (async () => {
+      while (!cancelled) {
+        const online = await SamplerHub.localNetworkAvailable().catch(
+          () => true,
+        );
         if (cancelled) return;
-        setNoWifi(!hubs);
-        setNearby(hubs ?? []);
-        //tell the user a hub is nearby
-        if (hubs?.length) vibrate(30);
-        setScrolled(false);
-        setPage("discover");
-      });
+        setNoWifi(!online);
+        //no network means nothing to search
+        if (!online) {
+          seen.clear();
+          setNearby([]);
+          await new Promise((resolve) => setTimeout(resolve, OFFLINE_RETRY_MS));
+          continue;
+        }
+        const hubs = await SamplerHub.nearbyHubs().catch(
+          () => [] as NearbyHub[],
+        );
+        if (cancelled) return;
+        const now = Date.now();
+        const fresh = hubs.some((hub) => !seen.has(hub.id));
+        hubs.forEach((hub) => seen.set(hub.id, { hub, at: now }));
+        for (const [id, entry] of seen) {
+          if (now - entry.at > LOST_AFTER_MS) seen.delete(id);
+        }
+        //tell the user a hub joined the orbit
+        if (fresh) Vibration.vibrate(30);
+        setNearby([...seen.values()].map((entry) => entry.hub));
+      }
+    })();
     return () => {
       cancelled = true;
     };
-  }, [visible, paged, page]);
-
-  //back from settings restarts the search
-  useEffect(() => {
-    if (!visible || !paged || !noWifi || page !== "discover") return;
-    const sub = AppState.addEventListener("change", (state) => {
-      if (state !== "active") return;
-      SamplerHub.localNetworkAvailable()
-        .then((online) => {
-          if (!online) return;
-          setScrolled(false);
-          setPage("searching");
-        })
-        .catch(() => {});
-    });
-    return () => sub.remove();
-  }, [visible, paged, noWifi, page]);
+  }, [visible, paged]);
 
   const openWifiSettings = () => {
     IntentLauncher.startActivityAsync(
       IntentLauncher.ActivityAction.WIFI_SETTINGS,
     ).catch(() => {});
-  };
-
-  //still offline so no search
-  const rescan = async () => {
-    if (await SamplerHub.localNetworkAvailable().catch(() => true)) {
-      showPage("searching");
-    } else {
-      setWifiModal(true);
-    }
   };
 
   const showPage = (next: Page) => {
@@ -253,15 +240,17 @@ export default function HubPairingSheet({
 
   //android back steps up before the sheet closes
   const handleBack = () => {
-    if (!paged || page !== "manual" || found) return false;
-    showPage(nearby === null ? "searching" : "discover");
+    if (!paged || page === "orbit" || found) return false;
+    showPage("orbit");
     return true;
   };
 
   const pickNearby = (hub: NearbyHub) => {
     //older clients still pair with a code
     if (!SamplerHub.canSignIn()) return showPage("manual");
-    onNearby?.(hub);
+    Vibration.vibrate(40);
+    setPicked(hub);
+    showPage("nearby");
   };
 
   const renderPairButton = (
@@ -312,7 +301,10 @@ export default function HubPairingSheet({
     </View>
   );
 
-  const renderFound = (hub: PairedHub) => (
+  const renderFound = (
+    hub: { id: string; name: string },
+    onLink: () => void,
+  ) => (
     <>
       <Text style={styles.foundTitle} numberOfLines={1}>
         {hub.name}
@@ -331,14 +323,14 @@ export default function HubPairingSheet({
           icon={linkIcon}
           label={t("hubPairing.link", { name: hub.name })}
           variant="highlight"
-          onPress={() => onPaired(hub)}
+          onPress={onLink}
         />
       </Group>
     </>
   );
 
   const renderContent = () => {
-    if (found) return renderFound(found);
+    if (found) return renderFound(found, () => onPaired(found));
     if (pairedHub) {
       return (
         <>
@@ -361,19 +353,20 @@ export default function HubPairingSheet({
       );
     }
     if (mode === "code") {
-      return <>{renderCodeRow()}</>;
-    }
-    if (paged && codeMode) {
       return (
         <>
           {renderCodeRow()}
-          {renderModeButton(t("hubPairing.scan"), cameraIcon, false)}
         </>
       );
     }
+    if (paged && codeMode) {
+      return <>{renderCodeRow()}</>;
+    }
     return (
       <>
-        <View style={[styles.settingRowVertical, paged && { marginBottom: 0 }]}>
+        <View
+          style={[styles.settingRowVertical, paged && { marginBottom: 0 }]}
+        >
           <Text style={[styles.settingLabel, { marginBottom: Spacing.md }]}>
             {t("hubPairing.scan")}
           </Text>
@@ -384,11 +377,7 @@ export default function HubPairingSheet({
               shownPage === "manual" && (
                 <CameraView
                   style={styles.camera}
-                  facing={
-                    hasPlatformFeature("android.hardware.camera")
-                      ? "back"
-                      : "front"
-                  }
+                  facing={hasPlatformFeature("android.hardware.camera") ? "back" : "front"}
                   barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
                   onBarcodeScanned={handleScan}
                 />
@@ -402,62 +391,53 @@ export default function HubPairingSheet({
             )}
           </Group>
         </View>
-        {paged
-          ? renderModeButton(t("hubPairing.useCode"), keyIcon, true)
-          : renderCodeRow()}
+        {!paged && renderCodeRow()}
       </>
     );
   };
 
   //switches between the camera and the code row
-  const renderModeButton = (label: string, icon: IconSource, code: boolean) => (
-    <Group style={{ marginTop: Spacing.xxl }}>
-      <ActionButton
-        icon={icon}
-        label={label}
-        onPress={() => setCodeMode(code)}
-      />
-    </Group>
-  );
-
-  //centered like the other empty states
-  const renderSearching = () => (
-    <View style={styles.searchPage}>
-      <ThinkingIcon searching size={SEARCH_HERO_SIZE} />
-      <Text style={styles.searchTitle}>{t("hubPairing.searching")}</Text>
-      <Text style={styles.searchHelp}>{t("hubPairing.scanning")}</Text>
+  const renderModeSwitch = () => (
+    <View style={[styles.contentCard, styles.switchWithBack]}>
+      <Group>
+        <SliderToggle
+          selectedValue={codeMode ? "code" : "qr"}
+          onSelect={(id) => setCodeMode(id === "code")}
+          options={[
+            { id: "qr", label: t("hubPairing.tabQr"), icon: qrcodeIcon },
+            { id: "code", label: t("hubPairing.tabCode"), icon: codeIcon },
+          ]}
+        />
+      </Group>
     </View>
   );
 
-  const renderDiscover = () => (
+  //this device at the center, the hubs found turning around it
+  const renderOrbit = () => (
     <>
-      <View style={styles.contentCard}>
-        <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
-          <Text style={styles.settingLabel}>{t("hubPairing.discover")}</Text>
-          <Text
-            style={[
-              styles.helpText,
-              nearby?.length ? { marginBottom: Spacing.md } : null,
-            ]}
-          >
-            {noWifi
-              ? t("hubPairing.noWifi")
-              : nearby?.length
-                ? t("hubPairing.discoverHelp")
-                : t("hubPairing.noneFound")}
-          </Text>
-          {!!nearby?.length && (
-            <CardGrid
-              singleLineTitle
-              cards={nearby.map((hub) => ({
-                key: hub.id,
-                title: hub.name,
-                status: hub.addrs[0] ?? "",
-                icon: laptopIcon,
-                onPress: () => pickNearby(hub),
-              }))}
-            />
-          )}
+      <View style={styles.orbitPage}>
+        <Text style={styles.searchTitle}>{t("hubPairing.searching")}</Text>
+        <Text style={styles.searchHelp}>
+          {noWifi
+            ? t("hubPairing.noWifi")
+            : nearby.length
+              ? t("hubPairing.discoverHelp")
+              : t("hubPairing.scanning")}
+        </Text>
+        <View style={styles.orbitStage}>
+          <HubOrbit
+            hubIcon={Platform.OS === "android" ? phoneIcon : laptopIcon}
+            nodes={nearby.map((hub): OrbitNode => ({
+              key: hub.id,
+              name: hub.name,
+              icon: laptopIcon,
+              connected: false,
+              onPress: () => pickNearby(hub),
+            }))}
+            active={visible && page === "orbit"}
+            ripple={noWifi ? undefined : "out"}
+            bareHub
+          />
         </View>
       </View>
       {/* actions section, one group with no label */}
@@ -471,11 +451,6 @@ export default function HubPairingSheet({
             />
           )}
           <ActionButton
-            icon={reconnectIcon}
-            label={t("hubPairing.rescan")}
-            onPress={rescan}
-          />
-          <ActionButton
             icon={addIcon}
             label={t("hubPairing.manual")}
             onPress={() => showPage("manual")}
@@ -486,43 +461,47 @@ export default function HubPairingSheet({
   );
 
   //pages push like settings pages
-  const renderPage = (p: Page, active: boolean) => (
-    <>
-      <SheetScrollView
-        contentContainerStyle={[
-          styles.content,
-          p === "manual" && styles.contentWithBack,
-          p === "searching" && styles.contentCentered,
-        ]}
-        keyboardShouldPersistTaps="handled"
-        onScroll={
-          active
-            ? (e) => setScrolled(e.nativeEvent.contentOffset.y > 4)
-            : undefined
-        }
-        scrollEventThrottle={16}
-      >
-        {p === "searching" ? (
-          renderSearching()
-        ) : p === "discover" ? (
-          renderDiscover()
-        ) : (
-          <View style={styles.contentCard}>{renderContent()}</View>
-        )}
-      </SheetScrollView>
+  const renderPage = (p: Page, active: boolean) => {
+    //switch beside the back button
+    const showSwitch = p === "manual" && paged && mode !== "code" && !found;
+    return (
+      <>
+        <SheetScrollView
+          contentContainerStyle={[
+            styles.content,
+            p !== "orbit" && styles.contentWithBack,
+            showSwitch && styles.contentWithSwitch,
+            p === "orbit" && styles.contentFill,
+          ]}
+          keyboardShouldPersistTaps="handled"
+          onScroll={
+            active ? (e) => setScrolled(e.nativeEvent.contentOffset.y > 4) : undefined
+          }
+          scrollEventThrottle={16}
+        >
+          {showSwitch && renderModeSwitch()}
+          {p === "orbit" ? (
+            renderOrbit()
+          ) : p === "nearby" ? (
+            picked && (
+              <View style={styles.contentCard}>
+                {renderFound(picked, () => onNearby?.(picked))}
+              </View>
+            )
+          ) : (
+            <View style={styles.contentCard}>{renderContent()}</View>
+          )}
+        </SheetScrollView>
 
-      {/* floats like the settings back button */}
-      {p === "manual" && !found && (
-        <View style={styles.backWrapper} pointerEvents="box-none">
-          <DrawerBackButton
-            kind="back"
-            onPress={handleBack}
-            scrolled={scrolled}
-          />
-        </View>
-      )}
-    </>
-  );
+        {/* floats like the settings back button */}
+        {p !== "orbit" && !found && (
+          <View style={styles.backWrapper} pointerEvents="box-none">
+            <DrawerBackButton kind="back" onPress={handleBack} scrolled={scrolled} />
+          </View>
+        )}
+      </>
+    );
+  };
 
   return (
     <>
@@ -558,13 +537,7 @@ export default function HubPairingSheet({
               page={shownPage}
               visible={visible}
               width={bodyWidth}
-              parentOf={(p) =>
-                p === "manual"
-                  ? nearby === null
-                    ? "searching"
-                    : "discover"
-                  : null
-              }
+              parentOf={(p) => (p === "orbit" ? null : "orbit")}
               onBack={handleBack}
               renderPage={renderPage}
             />
@@ -578,27 +551,6 @@ export default function HubPairingSheet({
           </SheetScrollView>
         )}
       </DrawerSheet>
-      <NotificationModal
-        visible={visible && wifiModal}
-        title={t("hubPairing.wifiOffTitle")}
-        message={t("hubPairing.wifiOffMessage")}
-        buttons={[
-          {
-            text: t("common.cancel"),
-            style: "secondary",
-            onPress: () => setWifiModal(false),
-          },
-          {
-            text: t("hubPairing.wifiSettings"),
-            style: "primary",
-            onPress: () => {
-              setWifiModal(false);
-              openWifiSettings();
-            },
-          },
-        ]}
-        onClose={() => setWifiModal(false)}
-      />
       <NotificationModal
         visible={visible && (pairing || !!error)}
         message={pairing ? t("hubPairing.pairing") : (error ?? undefined)}
@@ -644,6 +596,12 @@ const makeStyles = (Colors: ThemeColors) =>
     contentWithBack: {
       paddingTop: 40 + Spacing.xxl,
     },
+    contentWithSwitch: {
+      paddingTop: 0,
+    },
+    switchWithBack: {
+      marginLeft: 40 + Spacing.md,
+    },
     backWrapper: {
       position: "absolute",
       top: Spacing.md + 4,
@@ -681,20 +639,25 @@ const makeStyles = (Colors: ThemeColors) =>
     settingRowVertical: {
       marginBottom: Spacing.xxl,
     },
-    contentCentered: {
+    //actions stay at the bottom of the sheet
+    contentFill: {
       flexGrow: 1,
-      justifyContent: "center",
     },
-    searchPage: {
+    orbitPage: {
+      flex: 1,
       alignItems: "center",
-      paddingBottom: Spacing.xxxl,
+      paddingTop: Spacing.xxl,
+    },
+    orbitStage: {
+      flex: 1,
+      width: "100%",
+      justifyContent: "center",
     },
     searchTitle: {
       fontSize: FontSizes.displayMd,
       color: Colors.textPrimary,
       fontFamily: Fonts.display,
       textAlign: "center",
-      marginTop: Spacing.xxl,
     },
     searchHelp: {
       fontSize: FontSizes.bodyMd,
@@ -704,6 +667,7 @@ const makeStyles = (Colors: ThemeColors) =>
       textAlign: "center",
       maxWidth: 420,
       marginTop: Spacing.md,
+      marginBottom: Spacing.xxxl,
     },
     foundTitle: {
       fontSize: FontSizes.displayMd,

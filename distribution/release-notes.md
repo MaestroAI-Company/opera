@@ -1,4 +1,4 @@
-![](https://raw.githubusercontent.com/MaestroAI-Company/opera/v1.1.0-beta.8/distribution/updatebanner.png)
+![](https://raw.githubusercontent.com/MaestroAI-Company/opera/v1.1.0-beta.9/distribution/updatebanner.png)
 Everything from the previous betas still applies, see [v1.1.0-beta.7](https://github.com/MaestroAI-Company/opera/releases/tag/v1.1.0-beta.7).
 
 ## Live Activities on iPhone
@@ -8,4 +8,5 @@ Everything from the previous betas still applies, see [v1.1.0-beta.7](https://gi
 
 ## Fixes
 
+- Changing the assistant voice on iPhone no longer crashes the app.
 - Downloading a model on iPhone no longer fails with a notification error.

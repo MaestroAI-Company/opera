@@ -223,6 +223,33 @@ class SamplerHubModule: NSObject {
     run(resolve, reject) { try await self.client(deviceKey).profiles(hub: self.hubFromMap(hub)).map(self.profileToMap) }
   }
 
+  //nwbrowser needs no multicast entitlement
+  @objc func nearbyHubs(_ deviceKey: String, waitMs: Double, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    run(resolve, reject) {
+      await self.browse(wait: waitMs / 1000).map { hub in
+        ["id": hub.id, "name": hub.name, "addrs": hub.addrs] as [String: Any]
+      }
+    }
+  }
+
+  @objc func nearbyProfiles(_ deviceKey: String, hub: [String: Any], resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    run(resolve, reject) { try await self.client(deviceKey).nearbyProfiles(hub: self.nearbyFromMap(hub)).map(self.profileToMap) }
+  }
+
+  @objc func signIn(_ deviceKey: String, hub: [String: Any], profileId: String, password: String, deviceName: String, kind: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    run(resolve, reject) {
+      let signed = try await self.client(deviceKey).signIn(
+        hub: self.nearbyFromMap(hub),
+        profileId: profileId,
+        password: password,
+        deviceName: deviceName,
+        kind: kind,
+        machine: await self.machineId()
+      )
+      return ["hub": self.hubToMap(signed.hub), "profile": self.unlockedToMap(signed.profile)] as [String: Any]
+    }
+  }
+
   @objc func createProfile(_ deviceKey: String, hub: [String: Any], name: String, password: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
     run(resolve, reject) {
       self.unlockedToMap(try await self.client(deviceKey).createProfile(hub: self.hubFromMap(hub), name: name, password: password))
@@ -391,6 +418,57 @@ class SamplerHubModule: NSObject {
 
   private func opt(_ value: Any?) -> Any { value ?? NSNull() }
 
+  //same results as the rust mdns browse
+  private func browse(wait: Double) async -> [NearbyHub] {
+    await withCheckedContinuation { continuation in
+      let queue = DispatchQueue(label: "hub.browse")
+      let browser = NWBrowser(for: .bonjourWithTXTRecord(type: "_sampler-hub._udp", domain: "local."), using: NWParameters())
+      var found: [String: (name: String, connection: NWConnection)] = [:]
+      browser.browseResultsChangedHandler = { results, _ in
+        for result in results {
+          guard case let .service(name, _, _, _) = result.endpoint,
+                case let .bonjour(txt) = result.metadata,
+                let id = txt["id"], found[id] == nil else { continue }
+          //udp resolves the address without sending
+          let connection = NWConnection(to: result.endpoint, using: .udp)
+          connection.start(queue: queue)
+          found[id] = (name, connection)
+        }
+      }
+      browser.start(queue: queue)
+      //returns after the wait like android
+      queue.asyncAfter(deadline: .now() + wait) {
+        browser.cancel()
+        continuation.resume(returning: found.map { id, hub in
+          let addr = self.socketAddr(hub.connection.currentPath?.remoteEndpoint)
+          hub.connection.cancel()
+          return NearbyHub(id: id, name: hub.name, addrs: addr.map { [$0] } ?? [])
+        })
+      }
+    }
+  }
+
+  //formatted for the rust socketaddr parser
+  private func socketAddr(_ endpoint: NWEndpoint?) -> String? {
+    guard case let .hostPort(host, port)? = endpoint else { return nil }
+    switch host {
+    case .ipv4(let ip):
+      return "\(ntop(AF_INET, ip.rawValue)):\(port.rawValue)"
+    case .ipv6(let ip):
+      //rust only takes numeric scope ids
+      let scope = ip.interface.map { "%\($0.index)" } ?? ""
+      return "[\(ntop(AF_INET6, ip.rawValue))\(scope)]:\(port.rawValue)"
+    default:
+      return nil
+    }
+  }
+
+  private func ntop(_ family: Int32, _ raw: Data) -> String {
+    var buffer = [CChar](repeating: 0, count: Int(INET6_ADDRSTRLEN))
+    raw.withUnsafeBytes { _ = inet_ntop(family, $0.baseAddress, &buffer, socklen_t(buffer.count)) }
+    return String(cString: buffer)
+  }
+
   private func fileToMap(_ file: ModelFile) -> [String: Any] {
     ["file": file.file, "size": Double(file.size)]
   }
@@ -455,6 +533,14 @@ class SamplerHubModule: NSObject {
       id: map["id"] as? String ?? "",
       name: map["name"] as? String ?? "",
       relays: (map["relays"] as? [Any] ?? []).map { "\($0)" }
+    )
+  }
+
+  private func nearbyFromMap(_ map: [String: Any]) -> NearbyHub {
+    NearbyHub(
+      id: map["id"] as? String ?? "",
+      name: map["name"] as? String ?? "",
+      addrs: (map["addrs"] as? [Any] ?? []).map { "\($0)" }
     )
   }
 }

@@ -235,6 +235,7 @@ import { isAppStore } from "../../services/platform";
 import {
     getAvailableUpdate,
     getBetaChannel,
+    getBuildVersion,
     getCurrentReleaseNotes,
     getUpdateChecks,
     setBetaChannel,
@@ -3928,10 +3929,19 @@ export default function SettingsDrawer({
       {renderSubPageHeader(t("settings.nav.info.title"))}
 
       <View style={styles.contentCard}>
-        <Pressable style={styles.settingRowVertical} onPress={openChangelog}>
+        <View style={styles.settingRowVertical}>
           <Text style={styles.settingLabel}>{t("settings.info.version")}</Text>
-          <Text style={styles.helpText}>Opera Beta v{appVersion}</Text>
-        </Pressable>
+          <Text style={[styles.helpText, { marginBottom: Spacing.md }]}>
+            Opera v{getBuildVersion().replace("-beta.", " beta ")}
+          </Text>
+          <Group>
+            <ActionButton
+              icon={infoIcon}
+              label={t("settings.info.changelog")}
+              onPress={openChangelog}
+            />
+          </Group>
+        </View>
 
         <View style={[styles.settingRowVertical, { marginBottom: 0 }]}>
           <Text style={styles.settingLabel}>{t("settings.info.links")}</Text>

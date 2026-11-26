@@ -810,6 +810,7 @@ export const it: Translations = {
     "Chiedi a Maestro a mani libere sullo smart display. L'ascolto avviene su questo dispositivo.",
 
   "settings.info.version": "Versione",
+  "settings.info.changelog": "Novità di questa versione",
   "settings.info.changelogUnavailable": "Note di rilascio non disponibili. Controlla la connessione.",
   "settings.info.links": "Link",
   "settings.info.linksHelp":

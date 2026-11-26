@@ -810,6 +810,7 @@ export const de: Translations = {
     "Frag Maestro freihändig auf dem Smart Display. Das Zuhören geschieht auf diesem Gerät.",
 
   "settings.info.version": "Version",
+  "settings.info.changelog": "Neuigkeiten in dieser Version",
   "settings.info.changelogUnavailable": "Versionshinweise nicht verfügbar. Prüfe deine Verbindung.",
   "settings.info.links": "Links",
   "settings.info.linksHelp":

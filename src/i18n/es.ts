@@ -810,6 +810,7 @@ export const es: Translations = {
     "Pregunta a Maestro sin manos en la pantalla inteligente. La escucha se hace en este dispositivo.",
 
   "settings.info.version": "Versión",
+  "settings.info.changelog": "Novedades de esta versión",
   "settings.info.changelogUnavailable": "Notas de la versión no disponibles. Revisa tu conexión.",
   "settings.info.links": "Enlaces",
   "settings.info.linksHelp":

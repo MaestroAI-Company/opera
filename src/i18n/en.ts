@@ -831,6 +831,7 @@ export const en = {
     "Ask Maestro hands free on the smart display. Listening happens on this device.",
 
   "settings.info.version": "Version",
+  "settings.info.changelog": "What's new in this version",
   "settings.info.changelogUnavailable": "Release notes unavailable. Check your connection.",
   "settings.info.links": "Links",
   "settings.info.linksHelp":

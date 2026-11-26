@@ -836,6 +836,7 @@ export const fr: Translations = {
     "Parle à Maestro sans les mains sur l'écran connecté. L'écoute reste sur l'appareil.",
 
   "settings.info.version": "Version",
+  "settings.info.changelog": "Nouveautés de cette version",
   "settings.info.changelogUnavailable": "Notes de version indisponibles. Vérifie ta connexion.",
   "settings.info.links": "Liens",
   "settings.info.linksHelp":

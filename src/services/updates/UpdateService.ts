@@ -79,7 +79,7 @@ function isBetaVersion(version: string): boolean {
 }
 
 //ci injects tag with beta suffix
-function getBuildVersion(): string {
+export function getBuildVersion(): string {
   const version = Constants.expoConfig?.version ?? '0.0.0';
   const tag = process.env.EXPO_PUBLIC_RELEASE_TAG?.trim().replace(/^v/i, '');
   return tag && tag.startsWith(`${version}-beta`) ? tag : version;
@@ -221,7 +221,9 @@ export async function takeReleaseNotes(firstRun: boolean): Promise<ReleaseNotes 
 //notes on demand, never marked seen
 export async function getCurrentReleaseNotes(version?: string): Promise<ReleaseNotes | null> {
   const current = version ?? Constants.expoConfig?.version ?? '0.0.0';
-  const data = (await fetchRelease(`v${current}`)) ?? (await fetchBetaRelease(current));
+  //a beta build reads its own release first
+  const exact = !version && getBuildVersion() !== current ? await fetchRelease(`v${getBuildVersion()}`) : null;
+  const data = exact ?? (await fetchRelease(`v${current}`)) ?? (await fetchBetaRelease(current));
   const notes = typeof data?.body === 'string' ? data.body.trim() : '';
   if (!notes) return null;
   return { version: current, url: data.html_url ?? LATEST_RELEASE_URL, notes, tag: data.tag_name };

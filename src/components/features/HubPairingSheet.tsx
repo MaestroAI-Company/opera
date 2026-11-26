@@ -16,7 +16,7 @@ import keyIcon from "../../../assets/icons/key2.svg";
 import laptopIcon from "../../../assets/icons/laptop2.svg";
 import linkIcon from "../../../assets/icons/link2.svg";
 import reconnectIcon from "../../../assets/icons/reload2.svg";
-import wifiIcon from "../../../assets/icons/wifi.svg";
+import wifiIcon from "../../../assets/icons/wifi2.svg";
 import {
     Fonts,
     FontSizes,

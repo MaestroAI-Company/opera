@@ -3,6 +3,7 @@ import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { useColors } from "../../hooks/useTheme";
 
 const loadingAnimation = require("../../../assets/animations/loading.json");
+const searchingAnimation = require("../../../assets/animations/searching.json");
 
 type Shape = { ty: string; it?: Shape[]; c?: { k: number[] } };
 
@@ -17,15 +18,16 @@ const paint = (shapes: Shape[], color: number[]) => {
   }
 };
 
-export default function ThinkingIcon({ size = 35 }: { size?: number }) {
+//searching swaps the butterfly for a pixel circle with the same pulse
+export default function ThinkingIcon({ searching, size = 35 }: { searching?: boolean; size?: number }) {
   const { primary } = useColors();
   //tinted copy so the maestro accent reaches the pixels
   const data = useMemo(() => {
-    const copy = JSON.parse(JSON.stringify(loadingAnimation));
+    const copy = JSON.parse(JSON.stringify(searching ? searchingAnimation : loadingAnimation));
     const color = toLottieColor(primary);
     for (const layer of copy.layers) if (layer.shapes) paint(layer.shapes, color);
     return copy;
-  }, [primary]);
+  }, [searching, primary]);
   return (
     <DotLottieReact
       data={data}

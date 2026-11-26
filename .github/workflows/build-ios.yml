@@ -4,7 +4,11 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Beta tag that numbers the build, like v1.1.0-beta.8
+        required: false
 
 permissions:
   contents: read
@@ -17,7 +21,7 @@ jobs:
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
       # gives a beta its number
-      EXPO_PUBLIC_RELEASE_TAG: ${{ github.ref_name }}
+      EXPO_PUBLIC_RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
 

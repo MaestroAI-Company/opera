@@ -1,4 +1,4 @@
-import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
+import notifee, { AndroidImportance, AuthorizationStatus, EventType } from '@notifee/react-native';
 import { Platform } from 'react-native';
 import { getColors } from "../../hooks/useTheme";
 
@@ -108,7 +108,19 @@ class NotificationServiceImpl {
   }
 
   async displayDownloadFinished(id: string, modelName: string) {
-    //ios never asked notification permission
+    if (Platform.OS === 'ios') {
+      //a refusal must not fail the download
+      try {
+        const settings = await notifee.requestPermission();
+        if (settings.authorizationStatus < AuthorizationStatus.AUTHORIZED) return;
+        await notifee.displayNotification({
+          id,
+          title: `Model ready`,
+          body: `${modelName} has been successfully downloaded.`,
+        });
+      } catch {}
+      return;
+    }
     if (Platform.OS !== 'android') return;
     const channelId = await this.ensureChannel('downloads', 'Model Downloads', AndroidImportance.LOW);
     await this.releaseForegroundService(id);

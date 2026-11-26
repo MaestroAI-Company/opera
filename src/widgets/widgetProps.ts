@@ -43,7 +43,7 @@ export type ButterflyProps = {
   radius: number;
 };
 
-const toPalette = (c: ThemeColors): WidgetPalette => ({
+export const toPalette =(c: ThemeColors): WidgetPalette => ({
   background: c.background,
   ring: c.surfacePressed,
   text: c.textPrimary,

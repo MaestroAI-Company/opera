@@ -13,7 +13,7 @@ import { Settings } from "../settings/SettingsService";
 const SETTLE_MS = 1000;
 
 //widgets cannot read the app sandbox
-async function copyToWidgets(directory: string, source: number, name: string): Promise<string> {
+export async function copyToWidgets(directory: string, source: number, name: string): Promise<string> {
   const target = new File(directory, name);
   //name already encodes the content
   if (target.exists) return target.uri;

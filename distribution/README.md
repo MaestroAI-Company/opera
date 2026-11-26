@@ -74,9 +74,9 @@ The Play uploads only run when the `PLAY_SERVICE_ACCOUNT_JSON` secret is set, an
 
 Every `v*` tag, beta included, also starts `build-ios.yml` and `build-mas.yml`. They upload to App Store Connect and attach nothing to the GitHub release.
 
-1. The builds are processed by Apple, then show up in TestFlight. Add the iOS build to the public TestFlight beta group by hand in App Store Connect, it is the one the French users join.
+1. The builds are processed by Apple, then show up in TestFlight. Add the iOS and Mac builds to the public TestFlight beta group by hand in App Store Connect, it is the one the French users join.
 2. To release on the App Store, pick the processed build in App Store Connect, fill in the version notes and send it for review. Do the same for the Mac App Store version.
-3. The French App Store stays closed until the encryption declaration is approved.
+3. The French App Store, iOS and Mac, stays closed until the encryption declaration is approved.
 
 Apple refuses a `-beta` suffix, so both workflows strip it before checking the tag against `app.json`. The full tag (`v1.2.3-beta.2`) still numbers the build in the app, through `EXPO_PUBLIC_RELEASE_TAG`. `build-ios.yml` can also be run by hand with a `release_tag` input to number a beta build.
 

@@ -124,7 +124,7 @@ assets/                icons, images, fonts, animations, on-device models
 
 Android ([Play Store](https://play.google.com/store/apps/details?id=ai.maestro.opera) or APK), Windows, macOS (`.dmg`) and Linux builds are on the [releases page](https://github.com/MaestroAI-Company/opera/releases/latest).
 
-iPhone and iPad are on the [App Store](https://apps.apple.com/app/id6838481351), and Mac also has a [Mac App Store](https://apps.apple.com/app/id6838481351) version without the assistant overlay. Until the French encryption declaration is approved, the iOS app is not offered in France: join the [public TestFlight beta](https://testflight.apple.com/join/dUG3QU2F) instead. The iOS and Mac App Store builds are not attached to the GitHub releases.
+iPhone and iPad are on the [App Store](https://apps.apple.com/app/id6838481351), and Mac also has a [Mac App Store](https://apps.apple.com/app/id6838481351) version without the assistant overlay. Until the French encryption declaration is approved, the iOS and Mac App Store apps are not offered in France: join the [public TestFlight beta](https://testflight.apple.com/join/dUG3QU2F) instead, it has the iPhone, iPad and Mac builds. The iOS and Mac App Store builds are not attached to the GitHub releases.
 
 ## Getting started
 

@@ -248,7 +248,8 @@ export async function downloadLiteRTModel(modelName: string, onProgress?: Progre
     broadcastLiteRTDownload(modelName, { progress, etaSeconds, speedStr, sizeStr });
   });
 
-  const options = { onProgress: (p: { bytesWritten: number }) => reporter.report(p.bytesWritten) };
+  //ios hands int64 back as bigint
+  const options = { onProgress: (p: { bytesWritten: number }) => reporter.report(Number(p.bytesWritten)) };
   const task = resumeState
     ? DownloadTask.fromSavable(resumeState, options)
     : new DownloadTask(model.url, file, options);

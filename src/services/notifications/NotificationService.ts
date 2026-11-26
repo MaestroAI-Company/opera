@@ -69,6 +69,8 @@ class NotificationServiceImpl {
   }
 
   async displayDownloadProgress(id: string, modelName: string, progress: number, etaSeconds?: number, speedStr?: string, sizeStr?: string) {
+    //only holds the android service
+    if (Platform.OS !== 'android') return;
     const channelId = await this.ensureChannel('downloads', 'Model Downloads', AndroidImportance.LOW);
 
     let details = [];
@@ -106,6 +108,8 @@ class NotificationServiceImpl {
   }
 
   async displayDownloadFinished(id: string, modelName: string) {
+    //ios never asked notification permission
+    if (Platform.OS !== 'android') return;
     const channelId = await this.ensureChannel('downloads', 'Model Downloads', AndroidImportance.LOW);
     await this.releaseForegroundService(id);
     await notifee.displayNotification({

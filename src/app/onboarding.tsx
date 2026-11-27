@@ -40,6 +40,7 @@ import Reveal from "../components/ui/Reveal";
 import IconSelector from "../components/ui/IconSelector";
 import NotificationModal, { type ModalButton } from "../components/ui/NotificationModal";
 import Slider from "../components/ui/Slider";
+import { useSliderDragging } from "../components/ui/lockTextSelection";
 import TextInputField from "../components/ui/TextInputField";
 import LottieView from "lottie-react-native";
 import { useAnimatedValue } from "../hooks/useAnimatedValue";
@@ -306,6 +307,7 @@ function IntroStage({ phase, onLogoGone }: IntroStageProps) {
 }
 
 export default function OnboardingPage() {
+  const sliderDragging = useSliderDragging();
   const Colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const t = useT();
@@ -912,6 +914,7 @@ export default function OnboardingPage() {
             ) : (
               <ScrollView
                 key={step}
+                scrollEnabled={!sliderDragging}
                 contentContainerStyle={[styles.scrollContent, step > 0 && !isLast && styles.scrollContentTop]}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}

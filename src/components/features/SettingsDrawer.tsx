@@ -179,6 +179,7 @@ import NotificationModal, { ModalButton } from "../ui/NotificationModal";
 import ProgressBar from "../ui/ProgressBar";
 import Selector, { SelectorOption } from "../ui/Selector";
 import Slider from "../ui/Slider";
+import { useSliderDragging } from "../ui/lockTextSelection";
 import SliderToggle from "../ui/SliderToggle";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
@@ -929,6 +930,8 @@ export default function SettingsDrawer({
     setPrevInitialSubPage(initialSubPage);
     if (visible) setActiveSubPage(initialSubPage ?? "main");
   }
+
+  const sliderDragging = useSliderDragging();
 
   const panResponder = useMemo(
     () =>
@@ -5813,6 +5816,7 @@ export default function SettingsDrawer({
         <KeyboardAwareScrollView
           ref={active ? scrollRef : undefined}
           bottomOffset={Spacing.xl2}
+          scrollEnabled={!sliderDragging}
           onScroll={active ? handleScroll : undefined}
           scrollEventThrottle={16}
           contentContainerStyle={{

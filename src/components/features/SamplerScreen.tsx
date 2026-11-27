@@ -77,6 +77,7 @@ import IconButton from "../ui/IconButton";
 import MetricChart, { CHART_POINTS } from "../ui/MetricChart";
 import NotificationModal, { type ModalButton } from "../ui/NotificationModal";
 import Slider from "../ui/Slider";
+import { useSliderDragging } from "../ui/lockTextSelection";
 import TextInputField from "../ui/TextInputField";
 import Toggle from "../ui/Toggle";
 import { pressStyle } from "../ui/pressStyle";
@@ -284,6 +285,7 @@ export default function SamplerScreen({
   const [scrolled, setScrolled] = useState(false);
   //the home page scrolls itself while a section is dragged near an edge
   const homeScrollRef = useAnimatedRef<ScrollView>();
+  const sliderDragging = useSliderDragging();
   const [drawerScrolled, setDrawerScrolled] = useState(false);
   const [stackWidth, setStackWidth] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -2263,6 +2265,7 @@ export default function SamplerScreen({
             ? (homeScrollRef as unknown as Ref<KeyboardAwareScrollViewRef>)
             : undefined
         }
+        scrollEnabled={!sliderDragging}
         bottomOffset={Spacing.xl2}
         contentContainerStyle={[
           styles.scroll,

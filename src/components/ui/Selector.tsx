@@ -5,7 +5,7 @@ import { Fonts, FontSizes, Radius, Spacing, ThemeColors } from "../../../constan
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
 import { useT } from "../../i18n";
 import { pressStyle } from "./pressStyle";
-import { lockTextSelection } from "./lockTextSelection";
+import { lockTextSelection, useSliderDragging } from "./lockTextSelection";
 import { vibrate } from "@/services/haptics";
 import AppIcon, { IconSource } from "./AppIcon";
 import arrowIcon from "../../../assets/icons/arrow2.svg";
@@ -56,6 +56,7 @@ export default function Selector({
   const [visible, setVisible] = useState(false);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const progress = useSharedValue(0);
+  const sliderDragging = useSliderDragging();
   const triggerRef = useRef<View>(null);
   const [triggerLayout, setTriggerLayout] = useState<LayoutRectangle | null>(null);
 
@@ -341,7 +342,7 @@ export default function Selector({
               menuAnimatedStyle,
             ]}
           >
-            <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled={true} contentContainerStyle={{ paddingBottom: 4, paddingHorizontal: 8 }}>
+            <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled={true} scrollEnabled={!sliderDragging} contentContainerStyle={{ paddingBottom: 4, paddingHorizontal: 8 }}>
               {title && <Text style={styles.sectionTitle}>{title}</Text>}
               <View style={styles.optionsList}>
                 {options.map((option, index) => {

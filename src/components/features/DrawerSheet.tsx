@@ -42,6 +42,7 @@ import { useAnimatedValue } from "../../hooks/useAnimatedValue";
 import { useKeyboardLift } from "../../hooks/useKeyboardLift";
 import { usePredictiveBack } from "../../hooks/usePredictiveBack";
 import { useColors, useThemedStyles } from "../../hooks/useTheme";
+import { useSliderDragging } from "../ui/lockTextSelection";
 import DrawerBackButton from "./DrawerBackButton";
 import {
     dragDrawer,
@@ -224,6 +225,7 @@ export const SheetScrollView = forwardRef<ScrollView, ScrollViewProps>(
     const { wrapStyle, contentContainerStyle, panHandlers, onScroll } =
       useSheetScroll(props.style, props.contentContainerStyle, props.onScroll);
     const { bled } = useContext(SheetInsetsContext);
+    const sliderDragging = useSliderDragging();
     return (
       <>
         <View style={wrapStyle} {...panHandlers}>
@@ -232,6 +234,7 @@ export const SheetScrollView = forwardRef<ScrollView, ScrollViewProps>(
             showsVerticalScrollIndicator={false}
             showsHorizontalScrollIndicator={false}
             {...props}
+            scrollEnabled={!sliderDragging && props.scrollEnabled !== false}
             ref={ref}
             style={scrollFill}
             contentContainerStyle={contentContainerStyle}
@@ -252,6 +255,7 @@ export const SheetKeyboardAwareScrollView = forwardRef<
   const { wrapStyle, contentContainerStyle, panHandlers, onScroll } =
     useSheetScroll(props.style, props.contentContainerStyle, props.onScroll);
   const { bled } = useContext(SheetInsetsContext);
+  const sliderDragging = useSliderDragging();
   return (
     <>
       <View style={wrapStyle} {...panHandlers}>
@@ -260,6 +264,7 @@ export const SheetKeyboardAwareScrollView = forwardRef<
           showsVerticalScrollIndicator={false}
           showsHorizontalScrollIndicator={false}
           {...props}
+          scrollEnabled={!sliderDragging && props.scrollEnabled !== false}
           ref={ref}
           style={scrollFill}
           contentContainerStyle={contentContainerStyle}

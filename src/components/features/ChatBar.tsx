@@ -58,6 +58,8 @@ import liveIcon from "../../../assets/icons/live.svg";
 
 //buttons are 28px in a 56px bar, slop fills its height
 const HIT_SLOP = { top: 14, bottom: 14, left: 6, right: 6 };
+//finger may drift while the bar scales, the press stays alive
+const PRESS_RETENTION = { top: 40, bottom: 40, left: 40, right: 40 };
 
 const IMAGE_MAX_WIDTH = 1280;
 const IMAGE_COMPRESS_QUALITY = 0.7;
@@ -697,6 +699,9 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
     Animated.timing(pressAnim, { toValue: 1, duration: 150, useNativeDriver: false }).start();
   };
 
+  //buttons only vibrate, the bar scale would shift them under the finger and cancel the tap
+  const handleButtonPressIn = () => vibrate(10);
+
   const handlePressOut = () => {
     Animated.timing(pressAnim, { toValue: 0, duration: 150, useNativeDriver: false }).start();
   };
@@ -1237,13 +1242,13 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 {leadingElement && <View style={{ marginRight: 8 }}>{leadingElement}</View>}
 
                 {supportsFiles && !isRecording && (
-                  <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.plusButton, "fadeLight")}>
+                  <Pressable onPress={Platform.OS === 'web' ? handlePickFiles : toggleAttachmentSheet} onPressIn={handleButtonPressIn} hitSlop={HIT_SLOP} pressRetentionOffset={PRESS_RETENTION} style={pressStyle(styles.plusButton, "fadeLight")}>
                     <AppIcon source={addIcon} style={styles.plusIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 )}
 
                 {(Platform.OS !== 'web' || Settings.getCached().whisperModel !== 'none' || canTranscribeRemotely) && hasPlatformFeature('android.hardware.microphone') && !isGenerating && (
-                  <Pressable onPress={handleMicPress} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.micButton, "fadeLight")}>
+                  <Pressable onPress={handleMicPress} onPressIn={handleButtonPressIn} hitSlop={HIT_SLOP} pressRetentionOffset={PRESS_RETENTION} style={pressStyle(styles.micButton, "fadeLight")}>
                     <Animated.View style={{ opacity: isRecording ? pulseAnim : 1 }}>
                       <AppIcon source={isRecording ? stopIcon : micIcon} style={styles.micIcon} tintColor={Colors.textOnPrimary} />
                     </Animated.View>
@@ -1342,15 +1347,15 @@ const ChatBar = forwardRef<ChatBarHandle, ChatInputBarProps>(function ChatBar({
                 )}
 
                 {isGenerating ? (
-                  <Pressable onPress={onStop} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.sendButton, "fadeLight")}>
+                  <Pressable onPress={onStop} onPressIn={handleButtonPressIn} hitSlop={HIT_SLOP} pressRetentionOffset={PRESS_RETENTION} style={pressStyle(styles.sendButton, "fadeLight")}>
                     <AppIcon source={stopIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 ) : onOpenLive && !isRecording && !text.trim() && attachments.length === 0 ? (
-                  <Pressable accessibilityLabel={t("chatbar.live")} onPress={onOpenLive} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.sendButton, "fadeLight")}>
+                  <Pressable accessibilityLabel={t("chatbar.live")} onPress={onOpenLive} onPressIn={handleButtonPressIn} hitSlop={HIT_SLOP} pressRetentionOffset={PRESS_RETENTION} style={pressStyle(styles.sendButton, "fadeLight")}>
                     <AppIcon source={liveIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 ) : (
-                  <Pressable onPress={handleSend} onPressIn={handlePressIn} onPressOut={handlePressOut} hitSlop={HIT_SLOP} style={pressStyle(styles.sendButton, "fadeLight")}>
+                  <Pressable onPress={handleSend} onPressIn={handleButtonPressIn} hitSlop={HIT_SLOP} pressRetentionOffset={PRESS_RETENTION} style={pressStyle(styles.sendButton, "fadeLight")}>
                     <AppIcon source={nextWhiteIcon} style={styles.sendIcon} tintColor={Colors.textOnPrimary} />
                   </Pressable>
                 )}

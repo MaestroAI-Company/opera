@@ -5,6 +5,9 @@ module.exports = ({ config }) => {
     //share extension needs an app group
     const shareIntent = config.plugins.find((plugin) => Array.isArray(plugin) && plugin[0] === "expo-share-intent");
     shareIntent[1].disableIOS = true;
+    //the production app group id is registered to another team, so the widgets need their own
+    const widgets = config.plugins.find((plugin) => Array.isArray(plugin) && plugin[0] === "expo-widgets");
+    widgets[1].groupIdentifier = "group.ai.maestro.opera.personal";
   }
   return config;
 };

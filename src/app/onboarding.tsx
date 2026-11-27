@@ -22,7 +22,7 @@ import {
   type StyleProp,
   type TextStyle,
 } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { KeyboardAvoidingView, useKeyboardState } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FontSizes, Fonts, Radius, Spacing, ThemeColors } from "../../constants/theme";
 import ButterflyCluster from "../components/features/ButterflyCluster";
@@ -311,6 +311,7 @@ export default function OnboardingPage() {
   const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const keyboardVisible = useKeyboardState((s) => s.isVisible);
   const { isLargeScreen, isDesktop } = useResponsive();
   const { height: windowHeight } = useWindowDimensions();
 
@@ -895,7 +896,11 @@ export default function OnboardingPage() {
           style={[
             styles.frame,
             isLargeScreen && styles.frameLarge,
-            { paddingTop: insets.top + Spacing.md, paddingBottom: insets.bottom + Spacing.xxl },
+            {
+              paddingTop: insets.top + Spacing.md,
+              //the keyboard already covers the safe area, so don't squeeze the content with it
+              paddingBottom: keyboardVisible ? Spacing.md : insets.bottom + Spacing.xxl,
+            },
           ]}
         >
           <View style={styles.header} />
